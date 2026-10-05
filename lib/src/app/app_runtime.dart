@@ -53,7 +53,7 @@ final class AppRuntimeIncompatibleSchema extends AppRuntimeBootstrapResult {
 final class AppRuntime {
   /// [dailyChoiceLocalDateSource] заменяет часы устройства как источник
   /// локального сегодня каталога дневных выборов во всём контейнере приложения;
-  /// без него используется [readDeviceLocalDate].
+  /// без него используется [readDeviceLocalDay].
   factory AppRuntime({
     required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
@@ -75,7 +75,7 @@ final class AppRuntime {
         diagnosticsSink: diagnosticsSink,
       ),
       resolvedRepositoryFactory,
-      dailyChoiceLocalDateSource ?? readDeviceLocalDate,
+      dailyChoiceLocalDateSource ?? readDeviceLocalDay,
     );
   }
 

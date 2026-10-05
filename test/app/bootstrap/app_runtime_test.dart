@@ -94,7 +94,7 @@ void main() {
       },
     );
 
-    test('по умолчанию предоставляет каталогу дату устройства', () async {
+    test('по умолчанию предоставляет каталогу часы устройства', () async {
       final runtime = AppRuntime(
         connectionFactory: openInMemoryLocalDatabase,
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -106,7 +106,7 @@ void main() {
 
       expect(
         ready.container.read(dailyChoiceLocalDateSourceProvider),
-        same(readDeviceLocalDate),
+        same(readDeviceLocalDay),
       );
     });
 
@@ -128,11 +128,11 @@ void main() {
         final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
 
         expect(localDate.readCount, 0);
-        expect(source(), CalendarDate.fromParts(2026, 10, 5));
+        expect(source().date, CalendarDate.fromParts(2026, 10, 5));
 
         localDate.today = CalendarDate.fromParts(2026, 10, 6);
         expect(
-          ready.container.read(dailyChoiceLocalDateSourceProvider)(),
+          ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
           CalendarDate.fromParts(2026, 10, 6),
         );
         expect(localDate.readCount, 2);

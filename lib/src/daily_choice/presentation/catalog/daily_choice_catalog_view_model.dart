@@ -31,7 +31,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   /// локальное сегодня со всеми состояниями выполнения. Перестроения модели
   /// сохраняют текущий выбор и часы не перечитывают.
   late var _selection = DailyChoiceCatalogSelection(
-    date: ref.read(dailyChoiceLocalDateSourceProvider)(),
+    date: ref.read(dailyChoiceLocalDateSourceProvider)().date,
   );
   var _generation = 0;
   var _invalidation = 0;

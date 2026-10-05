@@ -8,21 +8,28 @@ import 'package:flutter_riverpod/misc.dart';
 /// нужно наступление другого дня, без ожидания настоящих суток. Источник
 /// [read] подставляется в `AppRuntime` или через [override] в Riverpod.
 final class ControlledDailyChoiceLocalDate {
-  ControlledDailyChoiceLocalDate(this.today);
+  ControlledDailyChoiceLocalDate(
+    this.today, {
+    this.untilNextDate = const Duration(hours: 12),
+  });
 
   /// Дата, которую вернёт следующее чтение источника.
   CalendarDate today;
+
+  /// Время до следующей местной даты в следующем показании; по умолчанию
+  /// показания сделаны в местный полдень.
+  Duration untilNextDate;
 
   var _readCount = 0;
 
   /// Число чтений источника потребителями.
   int get readCount => _readCount;
 
-  /// Источник локального сегодня: при каждом вызове возвращает текущее
-  /// значение [today].
-  CalendarDate read() {
+  /// Источник локального сегодня: при каждом вызове возвращает текущие
+  /// значения [today] и [untilNextDate].
+  DailyChoiceLocalDay read() {
     _readCount += 1;
-    return today;
+    return DailyChoiceLocalDay(date: today, untilNextDate: untilNextDate);
   }
 
   /// Подстановка [read] вместо часов устройства в `ProviderScope` или

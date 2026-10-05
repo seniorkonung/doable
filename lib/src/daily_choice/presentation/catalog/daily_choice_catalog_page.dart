@@ -49,7 +49,7 @@ final class _DailyChoiceCatalogPageState
       focusedDate: ref.read(dailyChoiceCatalogViewModelProvider).selection.date,
       mode: DailyChoiceCalendarMode.week,
     );
-    _today = ref.read(dailyChoiceLocalDateSourceProvider)();
+    _today = ref.read(dailyChoiceLocalDateSourceProvider)().date;
   }
 
   @override

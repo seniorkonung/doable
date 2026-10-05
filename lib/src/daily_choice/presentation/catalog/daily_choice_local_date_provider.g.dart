@@ -8,23 +8,23 @@ part of 'daily_choice_local_date_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Источник локального сегодня каталога; по умолчанию — часы устройства.
+/// Источник местного сегодня каталога; по умолчанию — часы устройства.
 ///
 /// Зависимостью владеет композиция приложения: `AppRuntime` предоставляет
-/// контейнеру переданный при создании источник или [readDeviceLocalDate].
-/// Проверки подставляют управляемую дату через `AppRuntime` или переопределение
-/// провайдера до первого открытия каталога.
+/// контейнеру переданный при создании источник или [readDeviceLocalDay].
+/// Проверки подставляют управляемые часы через `AppRuntime` или
+/// переопределение провайдера до первого открытия каталога.
 
 @ProviderFor(dailyChoiceLocalDateSource)
 final dailyChoiceLocalDateSourceProvider =
     DailyChoiceLocalDateSourceProvider._();
 
-/// Источник локального сегодня каталога; по умолчанию — часы устройства.
+/// Источник местного сегодня каталога; по умолчанию — часы устройства.
 ///
 /// Зависимостью владеет композиция приложения: `AppRuntime` предоставляет
-/// контейнеру переданный при создании источник или [readDeviceLocalDate].
-/// Проверки подставляют управляемую дату через `AppRuntime` или переопределение
-/// провайдера до первого открытия каталога.
+/// контейнеру переданный при создании источник или [readDeviceLocalDay].
+/// Проверки подставляют управляемые часы через `AppRuntime` или
+/// переопределение провайдера до первого открытия каталога.
 
 final class DailyChoiceLocalDateSourceProvider
     extends
@@ -34,12 +34,12 @@ final class DailyChoiceLocalDateSourceProvider
           DailyChoiceLocalDateSource
         >
     with $Provider<DailyChoiceLocalDateSource> {
-  /// Источник локального сегодня каталога; по умолчанию — часы устройства.
+  /// Источник местного сегодня каталога; по умолчанию — часы устройства.
   ///
   /// Зависимостью владеет композиция приложения: `AppRuntime` предоставляет
-  /// контейнеру переданный при создании источник или [readDeviceLocalDate].
-  /// Проверки подставляют управляемую дату через `AppRuntime` или переопределение
-  /// провайдера до первого открытия каталога.
+  /// контейнеру переданный при создании источник или [readDeviceLocalDay].
+  /// Проверки подставляют управляемые часы через `AppRuntime` или
+  /// переопределение провайдера до первого открытия каталога.
   DailyChoiceLocalDateSourceProvider._()
     : super(
         from: null,
@@ -75,4 +75,4 @@ final class DailyChoiceLocalDateSourceProvider
 }
 
 String _$dailyChoiceLocalDateSourceHash() =>
-    r'68323202a346df7e4ebd7c42998de14d58cfaf5c';
+    r'6878a9b794c5a08467f9e77ebf7193820833aaea';
