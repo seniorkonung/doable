@@ -134,24 +134,57 @@ void main() {
   );
 
   testWidgets(
-    'не даёт менять текст выполняющейся отправки и повторяет отправку с показанным текстом',
+    'мягкие переносы сохраняют текст принятой команды, действие перехода и запрет правок во время отправки и повтора',
     (tester) async {
+      final title = List.filled(
+        30,
+        'Сохранить длинное название буквально',
+      ).join(' ');
+      const description = 'Описание\nс явным переносом';
+      final sessions = _EditorSessions();
       final repository = ControlledCatalogRepository();
-      await _openEditor(tester, repository);
+      await _openEditor(tester, repository, observers: [sessions]);
       TextField field(String key) =>
           tester.widget<TextField>(find.byKey(ValueKey(key)));
 
       await tester.enterText(
         find.byKey(const ValueKey('intention-editor-title')),
-        'Намерение',
+        title,
+      );
+      await tester.pumpAndSettle();
+      expect(field('intention-editor-title').keyboardType, TextInputType.text);
+      expect(
+        field('intention-editor-title').textInputAction,
+        TextInputAction.next,
+      );
+      expect(
+        field('intention-editor-description').keyboardType,
+        TextInputType.multiline,
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pumpAndSettle();
+      expect(
+        _editable(tester, _description).focusNode.hasFocus,
+        isTrue,
+        reason: 'следующее поле: ${FocusManager.instance.primaryFocus}',
       );
       await tester.enterText(
         find.byKey(const ValueKey('intention-editor-description')),
-        'Описание',
+        description,
       );
+      await tester.pumpAndSettle();
+      expect(sessions.state(tester).draft.title, title);
+      expect(sessions.state(tester).draft.description, description);
       await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
       await tester.pump();
 
+      expect(repository.commands, hasLength(1));
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', title)
+            .having((command) => command.description, 'описание', description),
+      );
       expect(field('intention-editor-title').readOnly, isTrue);
       expect(field('intention-editor-description').readOnly, isTrue);
 
@@ -163,7 +196,7 @@ void main() {
 
       expect(field('intention-editor-title').readOnly, isFalse);
       expect(field('intention-editor-description').readOnly, isFalse);
-      expect(field('intention-editor-title').controller?.text, 'Намерение');
+      expect(field('intention-editor-title').controller?.text, title);
       await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
       await tester.pump();
 
@@ -171,8 +204,8 @@ void main() {
       expect(
         repository.commands.last,
         isA<CreateIntention>()
-            .having((command) => command.title, 'название', 'Намерение')
-            .having((command) => command.description, 'описание', 'Описание'),
+            .having((command) => command.title, 'название', title)
+            .having((command) => command.description, 'описание', description),
       );
       repository.completeCommand(
         1,

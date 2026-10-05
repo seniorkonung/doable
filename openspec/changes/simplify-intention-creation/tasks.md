@@ -38,7 +38,7 @@
   - **Files likely touched:** `lib/src/intention/presentation/editor/intention_creation_sheet.dart`, `lib/src/intention/presentation/editor/intention_creation_sheet_mode.dart` (удаление), `lib/src/intention/presentation/editor/intention_editor_state.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart`; привязанная фикстура и новые проверки в `test/intention/presentation/editor/intention_creation_sheet_layout_test.dart`, согласование ожиданий семантики в `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`; производный `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart`.
   - **Estimated scope:** M — один контракт в пяти исходниках; изменения потребителей в тестах и генерация входят в ту же проверяемую поставку.
 
-- [ ] 1.4 Обеспечить рост названия по тексту в пределах адаптивной панели
+- [x] 1.4 Обеспечить рост названия по тексту в пределах адаптивной панели
   - **Acceptance criteria:**
     - Короткие название и описание начинаются с одной строки. Длинное название визуально переносится и увеличивает поле и панель до её предела; дальнейшее содержимое доступно прокруткой. Рост описания сохраняет тот же контракт.
     - Мягкие переносы не добавляют символов в черновик и принятую команду. Название сохраняет прежний тип клавиатуры и действие перехода к следующему полю по решению 2 дизайна; описание сохраняет многострочный ввод.

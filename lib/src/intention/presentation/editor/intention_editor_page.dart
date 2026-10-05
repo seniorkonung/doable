@@ -62,6 +62,7 @@ final class _IntentionEditorPageState
   final _formKey = IntentionCreationFormKey();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _descriptionFocus = FocusNode();
 
   /// Поля, которые панель доводит до видимости вместе с их ошибкой.
   final _titleField = GlobalKey(debugLabel: 'intention-editor-title');
@@ -89,6 +90,7 @@ final class _IntentionEditorPageState
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _descriptionFocus.dispose();
     super.dispose();
   }
 
@@ -167,7 +169,16 @@ final class _IntentionEditorPageState
                   controller: _titleController,
                   readOnly: isDraftFixed,
                   autofocus: true,
+                  minLines: 1,
+                  maxLines: null,
+                  // При росте поля тип клавиатуры остаётся прежним:
+                  // https://api.flutter.dev/flutter/material/TextField/keyboardType.html
+                  keyboardType: TextInputType.text,
                   textInputAction: TextInputAction.next,
+                  // Явный переход не зависит от положения длинного поля
+                  // относительно закреплённых действий панели.
+                  // https://api.flutter.dev/flutter/material/TextField/onSubmitted.html
+                  onSubmitted: (_) => _descriptionFocus.requestFocus(),
                   decoration: InputDecoration(
                     labelText: localizations.editorTitleLabel,
                     error: titleFailure == null
@@ -188,6 +199,7 @@ final class _IntentionEditorPageState
                 child: TextField(
                   key: const ValueKey('intention-editor-description'),
                   controller: _descriptionController,
+                  focusNode: _descriptionFocus,
                   readOnly: isDraftFixed,
                   minLines: 1,
                   maxLines: null,

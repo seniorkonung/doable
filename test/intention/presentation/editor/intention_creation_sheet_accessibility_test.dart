@@ -145,7 +145,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.semantics.byLabel(l10n.editorTitleLabel).evaluate().single,
-          isSemantics(value: _userTitle, isTextField: true),
+          isSemantics(value: _userTitle, isTextField: true, isMultiline: true),
         );
         expect(
           find.semantics.byLabel(l10n.editorDescriptionLabel).evaluate().single,
@@ -749,7 +749,7 @@ ValueKey<String> _tagRow(Tag tag) =>
 
 /// Пользовательские данные: интерфейс показывает их без перевода на любом
 /// языке.
-const _userTitle = 'Купить хлеб 🍞';
+const _userTitle = 'Купить хлеб 🍞, молоко и продукты для ужина после работы';
 const _userDescription = 'Зайти после работы\nWholegrain bread';
 
 final _home = _tag(1, 'Дом');
