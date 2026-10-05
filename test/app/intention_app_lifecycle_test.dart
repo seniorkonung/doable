@@ -432,7 +432,7 @@ void main() {
       expect(find.text('Creating…'), findsOneWidget);
 
       // Уход во время принятой отправки подтверждается и её не отменяет.
-      await tester.pageBack();
+      await tester.tap(find.byKey(const ValueKey('intention-editor-close')));
       await tester.pumpAndSettle();
       expect(find.text('Close the form?'), findsOneWidget);
       await tester.tap(

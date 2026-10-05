@@ -1544,6 +1544,12 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get editorCloseSavingLeaveAction;
 
+  /// Подсказка кнопки закрытия панели создания намерения и доступное название её модального фона
+  ///
+  /// In en, this message translates to:
+  /// **'Close the form'**
+  String get editorCloseFormAction;
+
   /// Вид операции создания намерения в сообщении оболочки
   ///
   /// In en, this message translates to:

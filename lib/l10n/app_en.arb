@@ -947,6 +947,10 @@
   "@editorCloseSavingLeaveAction": {
     "description": "Действие подтверждения закрытия во время сохранения, закрывающее форму без отмены сохранения"
   },
+  "editorCloseFormAction": "Close the form",
+  "@editorCloseFormAction": {
+    "description": "Подсказка кнопки закрытия панели создания намерения и доступное название её модального фона"
+  },
   "graphOperationCreate": "Create",
   "@graphOperationCreate": {
     "description": "Вид операции создания намерения в сообщении оболочки"

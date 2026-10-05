@@ -11,16 +11,18 @@ import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
+import 'intention_creation_sheet.dart';
 import 'intention_editor_state.dart';
 import 'intention_editor_view_model.dart';
 
-/// Хост сессии создания намерения.
+/// Хост сессии создания намерения в компактной модальной нижней панели над
+/// исходным каталогом.
 ///
-/// Любой уход с формы — кнопка «назад», системное «назад» и программный
-/// `maybePop` — сначала обращается к единому решению сессии о закрытии и не
-/// удаляет маршрут сам. Маршрут формы закрывается только по завершению
-/// сессии: сразу для неизменённого черновика, после подтверждённого сброса
-/// или успешного создания.
+/// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
+/// «назад» и программный `maybePop` — сначала обращается к единому решению
+/// сессии о закрытии и не удаляет маршрут сам. Маршрут формы закрывается
+/// только по завершению сессии: сразу для неизменённого черновика, после
+/// подтверждённого сброса или успешного создания.
 @RoutePage()
 final class IntentionEditorPage extends ConsumerStatefulWidget {
   const IntentionEditorPage({super.key});
@@ -89,11 +91,38 @@ final class _IntentionEditorPageState
           unawaited(_requestClose());
         }
       },
-      child: Scaffold(
-        appBar: AppBar(title: Text(localizations.editorTitle)),
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
+      child: IntentionCreationSheet(
+        closeLabel: localizations.editorCloseFormAction,
+        onCloseRequested: () => unawaited(_requestClose()),
+        header: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(24, 8, 8, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  container: true,
+                  header: true,
+                  namesRoute: true,
+                  child: Text(
+                    localizations.editorTitle,
+                    key: const ValueKey('intention-editor-heading'),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('intention-editor-close'),
+                tooltip: localizations.editorCloseFormAction,
+                onPressed: () => unawaited(_requestClose()),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+        ),
+        fields: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextField(
                 key: const ValueKey('intention-editor-title'),
@@ -112,17 +141,18 @@ final class _IntentionEditorPageState
                 ),
                 onChanged: notifier.changeTitle,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              // Описание начинается одной строкой и растёт с текстом; то, что
+              // не помещается в панель, доступно прокруткой полей.
               TextField(
                 key: const ValueKey('intention-editor-description'),
                 controller: _descriptionController,
                 readOnly: isDraftFixed,
-                minLines: 4,
+                minLines: 1,
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
                 decoration: InputDecoration(
                   labelText: localizations.editorDescriptionLabel,
-                  alignLabelWithHint: true,
                   error: descriptionFailure == null
                       ? null
                       : OperationFailurePresentation(
@@ -133,20 +163,25 @@ final class _IntentionEditorPageState
                 onChanged: notifier.changeDescription,
               ),
               if (generalFailure != null) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 OperationFailurePresentation(
                   claim: editor.failurePresentation,
                   message: generalFailure,
                   messageKey: const ValueKey('intention-editor-failure'),
                 ),
               ],
-              const SizedBox(height: 24),
-              FilledButton(
-                key: const ValueKey('intention-editor-submit'),
-                onPressed: editor.canSubmit ? notifier.submit : null,
-                child: Text(_submitLabel(localizations, editor)),
-              ),
             ],
+          ),
+        ),
+        footer: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FilledButton(
+              key: const ValueKey('intention-editor-submit'),
+              onPressed: editor.canSubmit ? notifier.submit : null,
+              child: Text(_submitLabel(localizations, editor)),
+            ),
           ),
         ),
       ),

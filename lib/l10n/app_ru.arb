@@ -247,6 +247,7 @@
   "editorCloseSavingMessage": "Сохранение уже выполняется и продолжится после закрытия формы. Если сохранить не удастся, введённые данные не восстановятся.",
   "editorCloseSavingStayAction": "Остаться",
   "editorCloseSavingLeaveAction": "Закрыть",
+  "editorCloseFormAction": "Закрыть форму",
   "graphOperationCreate": "Создание",
   "graphOperationUpdate": "Изменение",
   "graphOperationEnableReadiness": "Включение готовности",

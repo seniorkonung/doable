@@ -62,13 +62,17 @@ final class _IntentionCatalogPageState
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      // Создание показывает только «+»: название действия дают подсказка и
+      // экранный диктор. Панель создания открывается над этим каталогом, а
+      // её результат согласуется через подтверждённые изменения, а не через
+      // результат маршрута.
+      floatingActionButton: FloatingActionButton(
         key: const ValueKey('catalog-create-intention'),
+        tooltip: localizations.editorCreateAction,
         onPressed: () {
           context.router.push(const IntentionEditorRoute());
         },
-        icon: const Icon(Icons.add),
-        label: Text(localizations.editorCreateAction),
+        child: const Icon(Icons.add),
       ),
       body: IntentionSearchLayout(
         // Загруженная выдача получает всю высоту тела страницы: прокрученные

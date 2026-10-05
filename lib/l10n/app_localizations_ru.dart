@@ -874,6 +874,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCloseSavingLeaveAction => 'Закрыть';
 
   @override
+  String get editorCloseFormAction => 'Закрыть форму';
+
+  @override
   String get graphOperationCreate => 'Создание';
 
   @override

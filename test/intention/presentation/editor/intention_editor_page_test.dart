@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/navigation/app_shell_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -9,10 +13,12 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
@@ -20,6 +26,8 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -109,7 +117,7 @@ void main() {
         isNull,
       );
 
-      await tester.pageBack();
+      await _tapClose(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(_closeDiscard));
       await tester.pumpAndSettle();
@@ -500,7 +508,7 @@ void main() {
         find.text('The intention couldn’t be created. Try again.'),
         findsOneWidget,
       );
-      await tester.pageBack();
+      await _tapClose(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(_closeDiscard));
       await tester.pumpAndSettle();
@@ -522,7 +530,7 @@ void main() {
         'Намерение',
       );
       await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-      await tester.pageBack();
+      await _tapClose(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(_closeDiscard));
       await tester.pumpAndSettle();
@@ -559,7 +567,7 @@ void main() {
       'Позднее намерение',
     );
     await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-    await tester.pageBack();
+    await _tapClose(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(_closeDiscard));
     await tester.pumpAndSettle();
@@ -736,7 +744,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(failure), findsOneWidget);
 
-      await tester.pageBack();
+      await _tapClose(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(_closeDiscard));
       await tester.pumpAndSettle();
@@ -755,12 +763,12 @@ void main() {
 
   group('закрытие формы создания', () {
     testWidgets(
-      'неизменённая и возвращённая к исходным значениям форма закрывается «назад» без подтверждения',
+      'неизменённая и возвращённая к исходным значениям форма закрывается «назад» и кнопкой закрытия без подтверждения',
       (tester) async {
         final repository = ControlledCatalogRepository();
         final router = await _openEditor(tester, repository);
 
-        await tester.pageBack();
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
 
         expect(find.byKey(_closeConfirmation), findsNothing);
@@ -780,7 +788,7 @@ void main() {
         );
         await tester.pump();
 
-        await tester.pageBack();
+        await _tapClose(tester);
         await tester.pumpAndSettle();
 
         expect(find.byKey(_closeConfirmation), findsNothing);
@@ -830,7 +838,7 @@ void main() {
           );
           expect(draft.isChanged, isTrue);
 
-          await tester.pageBack();
+          await _tapClose(tester);
           await tester.pumpAndSettle();
 
           expect(find.byKey(_closeConfirmation), findsOneWidget);
@@ -855,7 +863,7 @@ void main() {
             description,
           );
 
-          await tester.pageBack();
+          await _tapClose(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(_closeDiscard));
           await tester.pumpAndSettle();
@@ -931,7 +939,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
         await tester.pump();
 
-        await tester.pageBack();
+        await _tapClose(tester);
         await tester.pumpAndSettle();
 
         expect(find.text('Close the form?'), findsOneWidget);
@@ -947,7 +955,7 @@ void main() {
         expect(router.current.name, IntentionEditorRoute.name);
         expect(find.text('Creating…'), findsOneWidget);
 
-        await tester.pageBack();
+        await _tapClose(tester);
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(_closeDiscard));
         await tester.pumpAndSettle();
@@ -979,7 +987,7 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
         await tester.pump();
-        await tester.pageBack();
+        await _tapClose(tester);
         await tester.pumpAndSettle();
         expect(find.byKey(_closeConfirmation), findsOneWidget);
 
@@ -1019,7 +1027,7 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
         await tester.pump();
-        await tester.pageBack();
+        await _tapClose(tester);
         await tester.pumpAndSettle();
         expect(find.text('Close the form?'), findsOneWidget);
 
@@ -1038,7 +1046,7 @@ void main() {
         expect(_fieldText(tester, 'intention-editor-title'), 'Намерение');
 
         // Новый запрос объясняет текущее состояние: отправки больше нет.
-        await tester.pageBack();
+        await _tapClose(tester);
         await tester.pumpAndSettle();
         expect(find.text('Discard the draft?'), findsOneWidget);
         await tester.tap(find.byKey(_closeContinue));
@@ -1059,7 +1067,7 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
         await tester.pump();
-        await tester.pageBack();
+        await _tapClose(tester);
         await tester.pumpAndSettle();
 
         // Человек уже нажимает «Закрыть», когда отправка завершается
@@ -1097,7 +1105,7 @@ void main() {
           'Намерение',
         );
 
-        await tester.tap(find.byType(BackButton));
+        await _tapClose(tester);
         await tester.pumpAndSettle();
 
         expect(find.text('Сбросить черновик?'), findsOneWidget);
@@ -1117,7 +1125,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
         await tester.pump();
-        await tester.tap(find.byType(BackButton));
+        await _tapClose(tester);
         await tester.pumpAndSettle();
 
         expect(find.text('Закрыть форму?'), findsOneWidget);
@@ -1142,7 +1150,333 @@ void main() {
       },
     );
   });
+
+  group('компактная модальная панель создания', () {
+    testWidgets(
+      'кнопка «+» открывает над сохранённым каталогом компактную панель с фокусом в пустом названии',
+      (tester) async {
+        _usePhone(tester, _phoneInsets);
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository);
+
+        // Маршрут создания прозрачен: каталог остаётся на экране под панелью.
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(
+          ModalRoute.of(tester.element(find.byType(IntentionEditorPage)))!
+              .opaque,
+          isFalse,
+        );
+        expect(find.byType(IntentionCatalogPage), findsOneWidget);
+
+        final sheet = tester.getRect(find.byKey(_sheet));
+        expect(sheet.bottom, _phone.height);
+        expect(sheet.left, 0);
+        expect(sheet.right, _phone.width);
+        // Над компактной панелью видны шапка и параметры каталога.
+        expect(tester.getRect(_catalogBar).top, 0);
+        expect(
+          sheet.top,
+          greaterThanOrEqualTo(tester.getRect(_catalogFilter).bottom),
+        );
+
+        // Фокус — в пустом названии; пустое описание начинается одной
+        // строкой, без резерва пустой многострочной области.
+        expect(_editable(tester, _title).focusNode.hasFocus, isTrue);
+        expect(_fieldText(tester, 'intention-editor-title'), isEmpty);
+        expect(_fieldText(tester, 'intention-editor-description'), isEmpty);
+        expect(
+          tester.getSize(find.byKey(_description)).height,
+          tester.getSize(find.byKey(_title)).height,
+        );
+
+        // Отправка — внутри панели над нижним безопасным отступом.
+        final submit = tester.getRect(find.byKey(_submit));
+        expect(sheet.contains(submit.topLeft), isTrue);
+        expect(
+          submit.bottom,
+          lessThanOrEqualTo(_phone.height - _phoneInsets.safeBottom),
+        );
+        expect(find.byKey(_submit).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'рост описания увеличивает панель только до предела под шапкой каталога, затем поля прокручиваются, а отправка остаётся закреплённой',
+      (tester) async {
+        _usePhone(tester, _phoneInsets);
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository);
+        final compact = tester.getRect(find.byKey(_sheet));
+
+        await tester.enterText(
+          find.byKey(_description),
+          'Первая строка\nВторая строка',
+        );
+        await tester.pumpAndSettle();
+        final twoLines = tester.getRect(find.byKey(_sheet));
+        expect(twoLines.bottom, compact.bottom);
+        expect(twoLines.height, greaterThan(compact.height));
+
+        await tester.enterText(find.byKey(_description), _lines(80));
+        await tester.pumpAndSettle();
+        final bounded = tester.getRect(find.byKey(_sheet));
+        expect(bounded.bottom, compact.bottom);
+        expect(bounded.top, lessThan(twoLines.top));
+        expect(
+          bounded.top,
+          greaterThanOrEqualTo(tester.getRect(_catalogBar).bottom),
+        );
+        // Описание выше панели: оно прокручивается внутри её полей.
+        expect(
+          tester.getSize(find.byKey(_description)).height,
+          greaterThan(bounded.height),
+        );
+        final submit = find.byKey(_submit);
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(tester.getRect(submit).top, greaterThan(bounded.top));
+        expect(
+          tester.getRect(submit).bottom,
+          lessThanOrEqualTo(bounded.bottom - _phoneInsets.safeBottom),
+        );
+
+        await tester.enterText(find.byKey(_description), _lines(160));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(find.byKey(_sheet)), bounded);
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'клавиатура поднимает компактную панель и ограничивает её высоту, оставляя шапку каталога над ней и отправку доступной',
+      (tester) async {
+        _usePhone(tester, _phoneInsets);
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository);
+        final withoutKeyboard = tester.getRect(find.byKey(_sheet));
+
+        _usePhone(tester, _keyboardInsets);
+        await tester.pumpAndSettle();
+        final withKeyboard = tester.getRect(find.byKey(_sheet));
+        expect(withKeyboard.bottom, _phone.height - _keyboardInsets.keyboard);
+        // Клавиатура закрыла нижний безопасный отступ, а высота по-прежнему
+        // задаётся содержимым.
+        expect(
+          withKeyboard.height,
+          withoutKeyboard.height - _phoneInsets.safeBottom,
+        );
+        final submit = find.byKey(_submit);
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(submit).bottom,
+          lessThanOrEqualTo(withKeyboard.bottom),
+        );
+
+        await tester.enterText(find.byKey(_description), _lines(40));
+        await tester.pumpAndSettle();
+        final bounded = tester.getRect(find.byKey(_sheet));
+        expect(bounded.bottom, withKeyboard.bottom);
+        expect(bounded.top, lessThan(withKeyboard.top));
+        expect(
+          bounded.top,
+          greaterThanOrEqualTo(tester.getRect(_catalogBar).bottom),
+        );
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(submit).bottom,
+          lessThanOrEqualTo(bounded.bottom),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'каталог и основная навигация под панелью исключены из нажатий, фокуса и семантики, а выбранный пункт сохраняется',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository);
+
+        final destinations = find.byType(NavigationDestination);
+        expect(_catalogFilter, findsOneWidget);
+        expect(_catalogFilter.hitTestable(), findsNothing);
+        expect(
+          find.byKey(const ValueKey('catalog-create-intention')).hitTestable(),
+          findsNothing,
+        );
+        expect(destinations, findsNWidgets(3));
+        expect(destinations.hitTestable(), findsNothing);
+        expect(_selectedDestination(tester), AppDestination.intentionGraph);
+        expect(
+          find.semantics.byPredicate(
+            (node) => node.role == SemanticsRole.tab,
+            describeMatch: (_) => 'пункты панели навигации',
+          ),
+          findsNothing,
+        );
+        expect(find.semantics.byLabel('Filter by title'), findsNothing);
+        expect(find.semantics.byLabel('Title'), findsOneWidget);
+
+        // Клавиатурный обход не переводит фокус в каталог или панель.
+        for (var step = 0; step < 10; step++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          expect(
+            FocusManager.instance.primaryFocus?.context
+                ?.findAncestorWidgetOfExactType<AppShellPage>(),
+            isNull,
+            reason: 'шаг обхода $step',
+          );
+        }
+        expect(_selectedDestination(tester), AppDestination.intentionGraph);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'нажатие вне неизменённой панели сразу закрывает её, а вне изменённой — запрашивает подтверждение без смены пункта',
+      (tester) async {
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+        );
+        final firstSession = sessions.latest;
+
+        await tester.tapAt(_outsideSheet);
+        await tester.pumpAndSettle();
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expectIntentionGraphRootPage(router);
+
+        await tester.tap(
+          find.byKey(const ValueKey('catalog-create-intention')),
+        );
+        await tester.pumpAndSettle();
+        // Новое открытие — новая сессия с начальным черновиком.
+        expect(sessions.latest, isNot(firstSession));
+        expect(sessions.state(tester).draft.isChanged, isFalse);
+        await tester.enterText(find.byKey(_title), 'Намерение');
+        await tester.pump();
+
+        await tester.tapAt(_outsideSheet);
+        await tester.pumpAndSettle();
+        expect(find.byKey(_closeConfirmation), findsOneWidget);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(_selectedDestination(tester), AppDestination.intentionGraph);
+
+        await tester.tap(find.byKey(_closeContinue));
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(_fieldText(tester, 'intention-editor-title'), 'Намерение');
+
+        await tester.tapAt(_outsideSheet);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_closeDiscard));
+        await tester.pumpAndSettle();
+        expectIntentionGraphRootPage(router);
+        expect(_selectedDestination(tester), AppDestination.intentionGraph);
+        expect(repository.commands, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'панель называет себя заголовком и даёт локализованное закрытие кнопкой и фоном без жеста',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        for (final (locale, heading, close) in [
+          (const Locale('en'), 'Create intention', 'Close the form'),
+          (const Locale('ru'), 'Создать намерение', 'Закрыть форму'),
+        ]) {
+          final repository = ControlledCatalogRepository();
+          final router = await _openEditor(tester, repository, locale: locale);
+
+          expect(
+            tester.getSemantics(find.byKey(_heading)),
+            isSemantics(label: heading, isHeader: true, namesRoute: true),
+          );
+          expect(
+            tester.getSemantics(find.byKey(_closeButton)),
+            isSemantics(tooltip: close, isButton: true, hasTapAction: true),
+          );
+          final barrier = find.semantics.byLabel(close);
+          expect(barrier, findsOneWidget);
+
+          // Экранный диктор закрывает неизменённую панель действием фона.
+          tester.semantics.dismiss(barrier);
+          await tester.pumpAndSettle();
+          expectIntentionGraphRootPage(router);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+        semantics.dispose();
+      },
+    );
+  });
 }
+
+const _sheet = ValueKey('intention-creation-sheet');
+const _heading = ValueKey('intention-editor-heading');
+const _closeButton = ValueKey('intention-editor-close');
+const _title = ValueKey('intention-editor-title');
+const _description = ValueKey('intention-editor-description');
+const _submit = ValueKey('intention-editor-submit');
+
+final _catalogBar = find.descendant(
+  of: find.byType(IntentionCatalogPage),
+  matching: find.byType(AppBar),
+);
+final _catalogFilter = find.byKey(const ValueKey('catalog-filter-field'));
+
+/// Точка над панелью, где под модальным фоном лежит шапка каталога.
+const _outsideSheet = Offset(400, 8);
+
+/// Экран телефона в портретной ориентации.
+const _phone = Size(400, 800);
+
+/// Системные отступы экрана и высота экранной клавиатуры.
+typedef _Insets = ({double safeTop, double safeBottom, double keyboard});
+
+const _Insets _phoneInsets = (safeTop: 47, safeBottom: 34, keyboard: 0);
+const _Insets _keyboardInsets = (safeTop: 47, safeBottom: 34, keyboard: 300);
+
+/// Ставит экран телефона с отступами [insets]: открытая клавиатура закрывает
+/// нижний безопасный отступ, как на устройстве.
+void _usePhone(WidgetTester tester, _Insets insets) {
+  tester.view.physicalSize = _phone;
+  tester.view.devicePixelRatio = 1;
+  tester.view.padding = FakeViewPadding(
+    top: insets.safeTop,
+    bottom: math.max(0, insets.safeBottom - insets.keyboard),
+  );
+  tester.view.viewPadding = FakeViewPadding(
+    top: insets.safeTop,
+    bottom: insets.safeBottom,
+  );
+  tester.view.viewInsets = FakeViewPadding(bottom: insets.keyboard);
+  addTearDown(tester.view.reset);
+}
+
+String _lines(int count) =>
+    [for (var line = 1; line <= count; line++) 'Строка $line'].join('\n');
+
+EditableText _editable(WidgetTester tester, Key field) =>
+    tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(field),
+        matching: find.byType(EditableText),
+      ),
+    );
+
+AppDestination _selectedDestination(WidgetTester tester) => tester
+    .widget<AppNavigationBar>(
+      find.byType(AppNavigationBar, skipOffstage: false),
+    )
+    .selected;
+
+Future<void> _tapClose(WidgetTester tester) =>
+    tester.tap(find.byKey(_closeButton));
 
 const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
@@ -1150,9 +1484,11 @@ const _closeDiscard = ValueKey('intention-editor-close-discard');
 
 /// Последняя построенная сессия формы создания. Набор тегов и отметки ещё
 /// не имеют элементов формы, поэтому проверки закрытия меняют их через
-/// сессию.
+/// сессию; новое открытие формы получает новую сессию.
 final class _EditorSessions extends ProviderObserver {
   IntentionEditorViewModelProvider? _latest;
+
+  IntentionEditorViewModelProvider? get latest => _latest;
 
   @override
   void didAddProvider(ProviderObserverContext context, Object? value) {

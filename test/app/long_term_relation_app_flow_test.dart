@@ -712,7 +712,16 @@ void main() {
       );
       await _dismissOperationMessage(tester);
 
-      expect(find.bySemanticsLabel('Create intention'), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('catalog-create-intention')),
+        ),
+        isSemantics(
+          tooltip: 'Create intention',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
       final catalogRow = tester.getSemantics(
         find.ancestor(
           of: find.text('Беречь здоровье'),
@@ -1545,7 +1554,10 @@ Future<void> _createIntention(
     find.byKey(const ValueKey('intention-editor-description')),
     description,
   );
-  await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+  // Панель въезжает снизу: отправку можно нажать, когда она на экране.
+  final submit = find.byKey(const ValueKey('intention-editor-submit'));
+  await _pumpUntilFound(tester, submit.hitTestable());
+  await tester.tap(submit);
   await _pumpUntilFound(tester, find.text(title));
 }
 
