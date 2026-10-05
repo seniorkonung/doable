@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -14,6 +16,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'in_memory_diagnostics_sink.dart';
 
@@ -205,3 +208,37 @@ Future<List<Object>> durabilityState(AppDatabase database) async => [
   await durabilityRows(database, 'daily_choices'),
   await durabilityRows(database, 'daily_choice_path_steps'),
 ];
+
+/// Полное содержимое SQLite-файла [databaseFile]: версия схемы, объекты
+/// схемы и строки всех таблиц, включая служебные.
+///
+/// Файл читается отдельным соединением, поэтому снимок можно получить и пока
+/// приложение держит хранилище открытым. Равенство двух снимков означает, что
+/// между ними не изменились ни сохранённые записи, ни схема и ничего нового
+/// в хранилище не записано.
+Map<String, Object?> durabilityFileState(File databaseFile) {
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    final schema = [
+      for (final row in database.select(
+        'SELECT type, name, tbl_name, sql FROM sqlite_master '
+        'ORDER BY type, name',
+      ))
+        Map<String, Object?>.of(row),
+    ];
+    return {
+      'версия схемы': database.select('PRAGMA user_version').single.values,
+      'схема': schema,
+      for (final object in schema)
+        if (object['type'] == 'table')
+          'таблица ${object['name']}': [
+            for (final row in database.select(
+              'SELECT * FROM "${object['name']}"',
+            ))
+              Map<String, Object?>.of(row),
+          ]..sort((a, b) => '$a'.compareTo('$b')),
+    };
+  } finally {
+    database.close();
+  }
+}
