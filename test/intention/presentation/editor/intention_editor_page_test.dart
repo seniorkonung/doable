@@ -904,6 +904,8 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(find.byKey(_closeConfirmation), findsOneWidget);
+        // «Назад» обращается к сессии панели, а не к оболочке под ней.
+        expect(_selectedDestination(tester), AppDestination.intentionGraph);
 
         // Нажатие на затемнение вне диалога закрывает только его.
         await tester.tapAt(const Offset(8, 8));
@@ -921,6 +923,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(_closeConfirmation), findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
+        expect(_selectedDestination(tester), AppDestination.intentionGraph);
         expect(_fieldText(tester, 'intention-editor-title'), '  Намерение  ');
         expect(sessions.state(tester).draft.title, '  Намерение  ');
         expect(repository.commands, isEmpty);
