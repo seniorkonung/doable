@@ -1634,6 +1634,18 @@ abstract class AppLocalizations {
   /// **'Mark as ready'**
   String get editorReadinessConfirmAction;
 
+  /// Подсказка и доступное название быстрого действия, открывающего общий выбор тегов для черновика нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Choose tags'**
+  String get editorChooseTags;
+
+  /// Подсказка и доступное название снятия выбранного тега из черновика нового намерения без записи назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Remove tag {tagName} from draft'**
+  String editorRemoveDraftTag(String tagName);
+
   /// Вид операции создания намерения в сообщении оболочки
   ///
   /// In en, this message translates to:

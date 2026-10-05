@@ -5,19 +5,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../tag/presentation/catalog/tag_selection_context.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 import 'intention_creation_sheet.dart';
+import 'intention_creation_tags.dart';
 import 'intention_editor_state.dart';
 import 'intention_editor_view_model.dart';
 
 /// Хост сессии создания намерения в модальной нижней панели над исходным
 /// каталогом. Панель открывается компактной; человек явно разворачивает и
 /// сворачивает ту же панель, а режим размера хранит сессия.
+///
+/// Теги черновика выбираются общим выбором тегов: хост открывает
+/// существующий маршрут выбора с контекстом набора своей сессии полноэкранно
+/// над панелью в том же корневом стеке. Маршрут панели остаётся под выбором
+/// и редактором тега и удерживает сессию; закрытие выбора возвращает ту же
+/// панель с её вводом, режимом и прокруткой.
 ///
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
@@ -44,6 +53,9 @@ final class _IntentionEditorPageState
 
   /// Объяснение критериев действия уже открыто.
   var _isConfirmingReadiness = false;
+
+  /// Общий выбор тегов этой сессии уже открыт.
+  var _isChoosingTags = false;
 
   IntentionEditorViewModelProvider get _provider =>
       intentionEditorViewModelProvider(_formKey);
@@ -161,11 +173,20 @@ final class _IntentionEditorPageState
                 ),
                 onChanged: notifier.changeDescription,
               ),
+              if (editor.selectedTags.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                IntentionCreationTags(
+                  tags: editor.selectedTags,
+                  enabled: !isDraftFixed,
+                  onRemove: notifier.removeTag,
+                ),
+              ],
               const SizedBox(height: 8),
               _DraftOptions(
                 favoriteMark: editor.draft.favoriteMark,
                 readiness: editor.draft.readiness,
                 enabled: !isDraftFixed,
+                onChooseTags: () => unawaited(_chooseTags()),
                 onMarkFavorite: notifier.markFavorite,
                 onUnmarkFavorite: notifier.unmarkFavorite,
                 onEnableReadiness: () => unawaited(_confirmReadiness()),
@@ -258,6 +279,34 @@ final class _IntentionEditorPageState
       return;
     }
     ref.read(_provider.notifier).confirmReadiness();
+  }
+
+  /// Открывает общий выбор тегов для набора черновика этой сессии.
+  ///
+  /// Выбор добавляет теги только через контракт набора сессии, который после
+  /// отправки или закрытия отвергает изменения; возврат из выбора сам
+  /// черновик не меняет. Повторное нажатие до закрытия выбора второй выбор не
+  /// открывает.
+  Future<void> _chooseTags() async {
+    if (_isChoosingTags) {
+      return;
+    }
+    switch (ref.read(_provider).draftAvailability) {
+      case IntentionDraftAvailability.editable:
+        break;
+      case IntentionDraftAvailability.submitting ||
+          IntentionDraftAvailability.closed:
+        return;
+    }
+    _isChoosingTags = true;
+    final tagSet = ref.read(_provider.notifier).draftTagSet;
+    try {
+      await context.router.push<void>(
+        TagCatalogRoute(selectionContext: TagDraftContext(tagSet)),
+      );
+    } finally {
+      _isChoosingTags = false;
+    }
   }
 
   /// Закрывает только маршрут этой формы, минуя повторное обращение к уже
@@ -455,17 +504,19 @@ final class _CloseConfirmationDialogState
   }
 }
 
-/// Быстрые отметки избранного и начальной готовности черновика.
+/// Быстрые действия черновика: общий выбор тегов и отметки избранного и
+/// начальной готовности.
 ///
-/// Отметки меняют только черновик сессии и не отправляют команд графа.
-/// Включённое состояние отличается формой значка и признаком включения для
-/// экранного диктора, а подсказка называет назначение и состояние, не выдавая
-/// черновик за сохранённое намерение.
+/// Действия меняют только черновик сессии и не отправляют команд графа.
+/// Включённое состояние отметок отличается формой значка и признаком
+/// включения для экранного диктора, а подсказка называет назначение и
+/// состояние, не выдавая черновик за сохранённое намерение.
 final class _DraftOptions extends StatelessWidget {
   const _DraftOptions({
     required this.favoriteMark,
     required this.readiness,
     required this.enabled,
+    required this.onChooseTags,
     required this.onMarkFavorite,
     required this.onUnmarkFavorite,
     required this.onEnableReadiness,
@@ -476,8 +527,9 @@ final class _DraftOptions extends StatelessWidget {
   final IntentionReadiness readiness;
 
   /// Черновик принимает правки: во время отправки и после завершения сессии
-  /// отметки недоступны.
+  /// действия недоступны.
   final bool enabled;
+  final VoidCallback onChooseTags;
   final VoidCallback onMarkFavorite;
   final VoidCallback onUnmarkFavorite;
 
@@ -495,6 +547,12 @@ final class _DraftOptions extends StatelessWidget {
         spacing: 8,
         runSpacing: 8,
         children: [
+          IconButton(
+            key: const ValueKey('intention-editor-choose-tags'),
+            tooltip: localizations.editorChooseTags,
+            onPressed: enabled ? onChooseTags : null,
+            icon: const Icon(Icons.label_outline),
+          ),
           switch (favoriteMark) {
             FavoriteMark.favorite => _DraftOptionButton(
               optionKey: const ValueKey('intention-editor-favorite'),

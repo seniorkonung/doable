@@ -919,6 +919,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorReadinessConfirmAction => 'Mark as ready';
 
   @override
+  String get editorChooseTags => 'Choose tags';
+
+  @override
+  String editorRemoveDraftTag(String tagName) {
+    return 'Remove tag $tagName from draft';
+  }
+
+  @override
   String get graphOperationCreate => 'Create';
 
   @override

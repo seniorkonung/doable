@@ -9,6 +9,7 @@ import 'package:doable/src/app/navigation/app_shell_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
@@ -22,9 +23,11 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -1958,6 +1961,217 @@ void main() {
       },
     );
   });
+
+  group('теги черновика в панели', () {
+    testWidgets(
+      'действие панели открывает общий выбор с набором своей сессии, а выбранные теги показаны компактно с локализованным доступным снятием',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        for (final (locale, choose, removeHome, removeWork) in [
+          (
+            const Locale('en'),
+            'Choose tags',
+            'Remove tag Дом from draft',
+            'Remove tag Работа from draft',
+          ),
+          (
+            const Locale('ru'),
+            'Выбрать теги',
+            'Убрать тег «Дом» из черновика',
+            'Убрать тег «Работа» из черновика',
+          ),
+        ]) {
+          final sessions = _EditorSessions();
+          final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
+          final repository = ControlledCatalogRepository()
+            ..tagCatalogItems = tags
+            ..tagObservations = _observedTags(tags);
+          final router = await _openEditor(
+            tester,
+            repository,
+            locale: locale,
+            observers: [sessions],
+          );
+          expect(find.byKey(_tagChip(1)), findsNothing);
+          expect(
+            tester.getSemantics(find.byKey(_chooseTags)),
+            isSemantics(
+              tooltip: choose,
+              isButton: true,
+              hasEnabledState: true,
+              isEnabled: true,
+              hasTapAction: true,
+            ),
+          );
+
+          final tagSet = sessions.notifier(tester).draftTagSet;
+
+          await tester.tap(find.byKey(_chooseTags));
+          await tester.pumpAndSettle();
+          expect(router.current.name, TagCatalogRoute.name);
+          expect(
+            router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
+            isA<TagDraftContext>().having(
+              (context) => context.tagSet,
+              'набор черновика',
+              same(tagSet),
+            ),
+          );
+          for (final number in [1, 2]) {
+            await tester.tap(find.byKey(_tagRow(number)));
+            await tester.pump();
+            await tester.tap(
+              find.byKey(const ValueKey('tag-catalog-add-to-draft')),
+            );
+            await tester.pump();
+          }
+          await tester.tap(find.byType(BackButton));
+          await tester.pumpAndSettle();
+
+          expect(router.current.name, IntentionEditorRoute.name);
+          expect(sessions.state(tester).draft.tagIds, [_tagId(1), _tagId(2)]);
+          expect(
+            tester.getTopLeft(find.byKey(_tagChip(1))).dx,
+            lessThan(tester.getTopLeft(find.byKey(_tagChip(2))).dx),
+          );
+          for (final (number, name, remove) in [
+            (1, 'Дом', removeHome),
+            (2, 'Работа', removeWork),
+          ]) {
+            expect(
+              find.descendant(
+                of: find.byKey(_tagChip(number)),
+                matching: find.text(name),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              tester.getSemantics(find.byKey(_tagChipRemove(number))),
+              isSemantics(
+                tooltip: remove,
+                isButton: true,
+                hasEnabledState: true,
+                isEnabled: true,
+                hasTapAction: true,
+              ),
+            );
+          }
+          await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+          await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+
+          await tester.tap(find.byKey(_tagChipRemove(1)));
+          await tester.pump();
+
+          expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
+          expect(find.byKey(_tagChip(1)), findsNothing);
+          expect(find.byKey(_tagChip(2)), findsOneWidget);
+          expect(router.current.name, IntentionEditorRoute.name);
+          expect(repository.commands, isEmpty);
+          expect(repository.tagCommands, isEmpty);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'во время отправки выбор тегов и снятие тега недоступны, а отказ возвращает их с прежним набором',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final sessions = _EditorSessions();
+        final tags = [_tag(1, 'Дом')];
+        final repository = ControlledCatalogRepository()
+          ..tagCatalogItems = tags
+          ..tagObservations = _observedTags(tags);
+        final router = await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+        );
+        sessions.notifier(tester).draftTagSet.add(_tag(1, 'Дом'));
+        await tester.enterText(find.byKey(_title), 'Намерение');
+        await tester.pump();
+        final draft = sessions.state(tester).draft;
+
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+
+        expect(repository.commands, hasLength(1));
+        expect(
+          repository.commands.single,
+          isA<CreateIntention>().having((command) => command.tagIds, 'теги', [
+            _tagId(1),
+          ]),
+        );
+        for (final action in [_chooseTags, _tagChipRemove(1)]) {
+          expect(
+            tester.widget<IconButton>(find.byKey(action)).onPressed,
+            isNull,
+          );
+          expect(
+            tester.getSemantics(find.byKey(action)),
+            isSemantics(hasEnabledState: true, isEnabled: false),
+          );
+          await tester.tap(find.byKey(action), warnIfMissed: false);
+        }
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(sessions.state(tester).draft, same(draft));
+        expect(find.byKey(_tagChip(1)), findsOneWidget);
+
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+
+        expect(sessions.state(tester).draft, same(draft));
+        for (final action in [_chooseTags, _tagChipRemove(1)]) {
+          expect(
+            tester.widget<IconButton>(find.byKey(action)).onPressed,
+            isNotNull,
+          );
+        }
+        await tester.tap(find.byKey(_chooseTags));
+        await tester.pumpAndSettle();
+        expect(router.current.name, TagCatalogRoute.name);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(find.byKey(_tagChip(1)), findsOneWidget);
+        expect(repository.commands, hasLength(1));
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'повторное нажатие выбора тегов до его открытия открывает один выбор',
+      (tester) async {
+        final repository = ControlledCatalogRepository()
+          ..tagCatalogItems = [_tag(1, 'Дом')];
+        final router = await _openEditor(tester, repository);
+
+        await tester.tap(find.byKey(_chooseTags));
+        await tester.tap(find.byKey(_chooseTags));
+        await tester.pumpAndSettle();
+
+        expect(router.stack.map((page) => page.routeData.name), [
+          AppShellRoute.name,
+          IntentionEditorRoute.name,
+          TagCatalogRoute.name,
+        ]);
+
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionEditorRoute.name);
+
+        // Закрытый выбор снова открывается тем же действием.
+        await tester.tap(find.byKey(_chooseTags));
+        await tester.pumpAndSettle();
+        expect(router.current.name, TagCatalogRoute.name);
+      },
+    );
+  });
 }
 
 const _sheet = ValueKey('intention-creation-sheet');
@@ -1974,6 +2188,17 @@ const _readinessConfirmation = ValueKey(
 );
 const _readinessConfirm = ValueKey('intention-editor-readiness-confirm');
 const _readinessCancel = ValueKey('intention-editor-readiness-cancel');
+const _chooseTags = ValueKey('intention-editor-choose-tags');
+
+ValueKey<String> _tagChip(int number) =>
+    ValueKey('intention-editor-tag-${_tagId(number).toCanonicalString()}');
+
+ValueKey<String> _tagChipRemove(int number) => ValueKey(
+  'intention-editor-tag-remove-${_tagId(number).toCanonicalString()}',
+);
+
+ValueKey<String> _tagRow(int number) =>
+    ValueKey('tag-catalog-row-${_tagId(number).toCanonicalString()}');
 
 /// Значок быстрой отметки: форма значка отличает включённое состояние.
 IconData? _iconOf(WidgetTester tester, Key option) => tester
@@ -2050,9 +2275,9 @@ const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
 const _closeDiscard = ValueKey('intention-editor-close-discard');
 
-/// Последняя построенная сессия формы создания. Набор тегов ещё не имеет
-/// элементов формы, поэтому проверки закрытия меняют его через сессию; новое
-/// открытие формы получает новую сессию.
+/// Последняя построенная сессия формы создания. Проверки, которым не нужен
+/// общий выбор тегов, меняют набор тегов через сессию; новое открытие формы
+/// получает новую сессию.
 final class _EditorSessions extends ProviderObserver {
   IntentionEditorViewModelProvider? _latest;
 
@@ -2099,6 +2324,20 @@ void _completeCatalogRefresh(ControlledCatalogRepository repository) {
 
 Tag _tag(int number, String name) =>
     Tag(id: _tagId(number), name: TagName.fromInput(name));
+
+/// Наблюдение подтверждает тег из [tags] или его отсутствие и не
+/// завершается, пока наблюдатель не освободит подписку.
+Stream<TagReadResult> Function(TagId) _observedTags(List<Tag> tags) =>
+    (id) => Stream.multi(
+      (controller) => controller.add(
+        TagReadSuccess(
+          GraphSnapshot(
+            value: tags.where((tag) => tag.id == id).firstOrNull,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      ),
+    );
 
 Future<void> _closeOperationMessage(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 5));

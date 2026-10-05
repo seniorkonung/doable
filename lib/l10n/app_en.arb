@@ -1007,6 +1007,19 @@
   "@editorReadinessConfirmAction": {
     "description": "Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике"
   },
+  "editorChooseTags": "Choose tags",
+  "@editorChooseTags": {
+    "description": "Подсказка и доступное название быстрого действия, открывающего общий выбор тегов для черновика нового намерения"
+  },
+  "editorRemoveDraftTag": "Remove tag {tagName} from draft",
+  "@editorRemoveDraftTag": {
+    "description": "Подсказка и доступное название снятия выбранного тега из черновика нового намерения без записи назначений",
+    "placeholders": {
+      "tagName": {
+        "type": "String"
+      }
+    }
+  },
   "graphOperationCreate": "Create",
   "@graphOperationCreate": {
     "description": "Вид операции создания намерения в сообщении оболочки"

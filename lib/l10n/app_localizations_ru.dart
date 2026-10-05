@@ -922,6 +922,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorReadinessConfirmAction => 'Отметить готовым';
 
   @override
+  String get editorChooseTags => 'Выбрать теги';
+
+  @override
+  String editorRemoveDraftTag(String tagName) {
+    return 'Убрать тег «$tagName» из черновика';
+  }
+
+  @override
   String get graphOperationCreate => 'Создание';
 
   @override
