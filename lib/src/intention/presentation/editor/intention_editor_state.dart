@@ -176,8 +176,12 @@ final class IntentionEditorState {
   final OperationState<Intention> operation;
   final IntentionEditorEvent? event;
 
-  /// Право открытой формы предъявить текущую ошибку; подтверждается страницей
-  /// только по кадру с видимым сообщением.
+  /// Право сессии предъявить текущую ошибку в своей форме.
+  ///
+  /// Публикуется, пока отказ действует и сессия не закрыта по запросу.
+  /// Renderer формы подтверждает его только по кадру с видимым сообщением.
+  /// Право, которое состояние перестало публиковать неподтверждённым, сессия
+  /// передаёт общей поверхности.
   final GraphInitiatorPresentationClaim? failurePresentation;
 
   /// Ход закрытия сессии. Ожидающее подтверждение связано с текущим
@@ -287,8 +291,10 @@ final class IntentionEditorState {
       ? this
       : _withDraft(draft.withFavoriteMark(value));
 
-  /// Меняет состояние отправки. Ожидающее подтверждение закрытия объясняло
-  /// прежнее состояние отправки и потому перестаёт действовать.
+  /// Меняет состояние отправки и публикует только переданное право ошибки
+  /// [failurePresentation]; прежнее неподтверждённое право сессия передаёт
+  /// общей поверхности. Ожидающее подтверждение закрытия объясняло прежнее
+  /// состояние отправки и потому перестаёт действовать.
   IntentionEditorState withOperation(
     OperationState<Intention> value, {
     IntentionEditorEvent? event,
@@ -326,9 +332,16 @@ final class IntentionEditorState {
       _withClosing(const IntentionCreationCloseNotRequested());
 
   /// Завершает сессию запросом закрытия. Черновик больше не меняется, а право
-  /// предъявления ошибки остаётся у её renderer до его удаления.
-  IntentionEditorState closedOnRequest() =>
-      _withClosing(const IntentionCreationClosedOnRequest());
+  /// предъявления ошибки больше не публикуется: сессия передаёт его общей
+  /// поверхности.
+  IntentionEditorState closedOnRequest() => IntentionEditorState._(
+    draft: draft,
+    selectedTags: selectedTags,
+    operation: operation,
+    event: event,
+    failurePresentation: null,
+    closing: const IntentionCreationClosedOnRequest(),
+  );
 
   IntentionEditorState _withClosing(IntentionCreationClosing value) =>
       IntentionEditorState._(
@@ -386,9 +399,10 @@ final class IntentionEditorState {
     );
   }
 
-  /// Снимает отказ, только если правка устраняет его типизированную причину.
-  /// Иначе отказ сохраняется вместе с правом предъявления, а повтор остаётся
-  /// доступным лишь для устранимой недоступности.
+  /// Снимает отказ, только если правка устраняет его типизированную причину;
+  /// право снятого отказа больше не публикуется, и сессия передаёт его общей
+  /// поверхности. Иначе отказ сохраняется вместе с правом предъявления, а
+  /// повтор остаётся доступным лишь для устранимой недоступности.
   OperationState<Intention> _operationAfterEditing(_DraftEdit edit) {
     final current = operation;
     if (current is! OperationFailed<Intention>) {

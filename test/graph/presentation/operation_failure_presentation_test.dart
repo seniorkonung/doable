@@ -26,6 +26,9 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/tag_failure_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1000,6 +1003,166 @@ void main() {
       },
     );
   });
+
+  group('право отказа сессии создания под непрозрачным выбором тегов', () {
+    testWidgets(
+      'отказ под выбором тегов остаётся у формы и предъявляется ею один раз после возвращения',
+      (tester) async {
+        final harness = _FailureHarness();
+        addTearDown(harness.dispose);
+        final provider = intentionEditorViewModelProvider(
+          IntentionCreationFormKey(),
+        );
+        final appSurface = _presentOnAppSurface(harness);
+        await _openCreationSession(tester, harness, provider);
+        harness.container.read(provider.notifier)
+          ..changeTitle('Намерение')
+          ..submit();
+        await _openTagChooser(tester);
+
+        harness.repository.completeCommand(
+          harness.repository.commands.length - 1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+
+        // Перекрытая форма не построила отказ и не предъявила его, а общая
+        // поверхность его не получила.
+        final claim = harness.container.read(provider).failurePresentation!;
+        expect(find.byType(TagCatalogView), findsOneWidget);
+        expect(
+          find.text(_creationFailureMessage, skipOffstage: false),
+          findsNothing,
+        );
+        expect(harness.claimAgain(claim), same(claim));
+        expect(appSurface, isEmpty);
+
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(TagCatalogView), findsNothing);
+        expect(find.text(_creationFailureMessage), findsOneWidget);
+        expect(harness.claimAgain(claim), isNull);
+        expect(appSurface, isEmpty);
+        expect(harness.repository.commands, hasLength(1));
+      },
+    );
+
+    for (final removal in _HostRemoval.values) {
+      testWidgets(
+        'удаление хоста под выбором тегов без возвращения (${removal.description}) передаёт отказ общей поверхности ровно один раз',
+        (tester) async {
+          final harness = _FailureHarness();
+          addTearDown(harness.dispose);
+          final formKey = IntentionCreationFormKey();
+          final provider = intentionEditorViewModelProvider(formKey);
+          final appSurface = _presentOnAppSurface(harness);
+          await _openCreationSession(tester, harness, provider);
+          harness.container.read(provider.notifier)
+            ..changeTitle('Намерение')
+            ..submit();
+          await _openTagChooser(tester);
+
+          harness.repository.completeCommand(
+            harness.repository.commands.length - 1,
+            const ResultFailure(IntentionUnavailableFailure()),
+          );
+          await tester.pumpAndSettle();
+          // Renderer перекрытого хоста право не получал.
+          final claim = harness.container.read(provider).failurePresentation!;
+          expect(
+            find.text(_creationFailureMessage, skipOffstage: false),
+            findsNothing,
+          );
+          expect(harness.claimAgain(claim), same(claim));
+          expect(appSurface, isEmpty);
+
+          removal.apply(
+            Navigator.of(tester.element(find.byType(TagCatalogView))),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byType(TagCatalogView), findsNothing);
+          expect(find.text('Закрыть'), findsNothing);
+          expect(find.text(_creationFailureMessage), findsNothing);
+          expect(appSurface.map((claim) => claim.completion), [
+            isA<IntentionCommandCompletion>()
+                .having(
+                  (completion) => completion.token,
+                  'token',
+                  same(claim.token),
+                )
+                .having(
+                  (completion) => completion.result,
+                  'исход',
+                  isA<ResultFailure<IntentionCommandSuccess>>().having(
+                    (result) => result.failure,
+                    'отказ',
+                    isA<IntentionUnavailableFailure>(),
+                  ),
+                ),
+          ]);
+          // Запись координатора не остаётся: право больше никому не выдаётся.
+          expect(harness.claimAgain(claim), isNull);
+          expect(harness.coordinator.isKeyRunning(formKey), isFalse);
+          expect(harness.repository.commands, hasLength(1));
+        },
+      );
+    }
+  });
+}
+
+/// Способ окончательно удалить хост сессии вместе с перекрывающим его
+/// выбором тегов, не возвращаясь к нему.
+enum _HostRemoval {
+  /// Хост может построиться во время анимации ухода выбора: право тогда
+  /// освобождают и renderer, и сессия, а предъявление остаётся единственным.
+  popUntil('popUntil к исходной странице'),
+
+  /// Хост удаляется под непрозрачным маршрутом без нового построения: право
+  /// передаёт только сессия.
+  stackReset('сброс стека без нового построения хоста');
+
+  const _HostRemoval(this.description);
+
+  final String description;
+
+  void apply(NavigatorState navigator) => switch (this) {
+    _HostRemoval.popUntil => navigator.popUntil((route) => route.isFirst),
+    _HostRemoval.stackReset => unawaited(
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('Новый корень')),
+        ),
+        (_) => false,
+      ),
+    ),
+  };
+}
+
+/// Общая поверхность приложения: получает права по очереди и сразу
+/// подтверждает каждое предъявление; возвращает предъявленные права.
+List<GraphAppPresentationClaim> _presentOnAppSurface(_FailureHarness harness) {
+  final presented = <GraphAppPresentationClaim>[];
+  void requestNext() => unawaited(
+    harness.registration.nextClaim().then((claim) {
+      if (claim == null) {
+        return;
+      }
+      presented.add(claim);
+      harness.coordinator.confirmPresentation(claim);
+      requestNext();
+    }),
+  );
+  requestNext();
+  return presented;
+}
+
+/// Открывает существующую страницу выбора тегов с контекстом черновика
+/// сессии непрозрачным маршрутом поверх её хоста.
+Future<void> _openTagChooser(WidgetTester tester) async {
+  await tester.tap(find.text('Теги'));
+  await tester.pumpAndSettle();
 }
 
 const _creationFailureMessage = 'Не удалось создать намерение';
@@ -1032,7 +1195,8 @@ Future<void> _openCreationSession(
   await tester.pumpAndSettle();
 }
 
-/// Управляемая сессия создания: рисует её отказ общим renderer и закрывает
+/// Управляемая сессия создания: рисует её отказ общим renderer, открывает
+/// над собой существующий выбор тегов с контекстом её черновика и закрывает
 /// свой маршрут только по решению сессии после её единственного
 /// подтверждения.
 final class _CreationSessionRoute extends ConsumerWidget {
@@ -1050,6 +1214,20 @@ final class _CreationSessionRoute extends ConsumerWidget {
             onPressed: () =>
                 _requestClose(context, ref.read(provider.notifier)),
             child: const Text('Закрыть'),
+          ),
+          TextButton(
+            onPressed: () => unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => TagCatalogPage(
+                    selectionContext: TagDraftContext(
+                      ref.read(provider.notifier).draftTagSet,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            child: const Text('Теги'),
           ),
           if (session.operation case OperationFailed<Intention>())
             OperationFailurePresentation(

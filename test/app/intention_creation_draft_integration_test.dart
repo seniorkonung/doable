@@ -512,13 +512,24 @@ void main() {
         }
 
         // Явное снятие отсутствующего тега разрешает новую проверку, но сама
-        // сессия её не запускает.
+        // сессия её не запускает. Снятый отказ сессия больше не публикует:
+        // право, которое не получил ни один renderer, один раз переходит
+        // общей поверхности.
         final kept = [garden, ?replacement];
         session.editor.removeTag(home);
         final corrected = session.state;
         expect(corrected.canSubmit, isTrue);
         expect(corrected.missingTagIds, isEmpty);
+        expect(corrected.failurePresentation, isNull);
         _expectPreparedDraft(corrected.draft, tagIds: kept);
+        await _acceptMessage(
+          tester,
+          l10n.graphOperationMessage(
+            l10n.graphOperationCreate,
+            l10n.graphOperationNewIntention,
+            l10n.editorInvalidInput,
+          ),
+        );
         await _settle(tester);
         expect(app.graph.observations(home), 0);
         expect(_creations(app), [same(rejected)]);
@@ -637,7 +648,11 @@ void main() {
       expect(find.byKey(_message), findsNothing);
       expect(_creations(app), [same(failed)]);
 
+      // Новая отправка больше не публикует прежний отказ: право, которое не
+      // получил ни один renderer, один раз переходит общей поверхности
+      // раньше результата повтора.
       session.editor.submit();
+      expect(session.state.failurePresentation, isNull);
       final retried = await _creation(tester, app, count: 2);
       expect(retried.token, isNot(same(failed.token)));
       final created = switch (retried.result) {
@@ -658,14 +673,18 @@ void main() {
         (await _revision(tester, app)).compareTo(retried.revision!),
         GraphRevisionOrder.same,
       );
-      await _acceptMessage(
-        tester,
+      await _acceptMessages(tester, [
+        l10n.graphOperationMessage(
+          l10n.graphOperationCreate,
+          l10n.graphOperationNewIntention,
+          l10n.editorCreateUnavailable,
+        ),
         l10n.graphOperationMessage(
           l10n.graphOperationCreate,
           _title,
           l10n.editorCreated,
         ),
-      );
+      ]);
       await _settle(tester);
       expect(find.byKey(_message), findsNothing);
       expect(_creations(app), hasLength(2));
@@ -1361,16 +1380,24 @@ void _expectPrivateDataHidden(_App app, Iterable<String> values) {
 
 /// Дожидается ровно одного сообщения [text] общей поверхности и закрывает
 /// его; предъявленный результат не показывается повторно.
-Future<void> _acceptMessage(WidgetTester tester, String text) async {
-  await _until(tester, find.byKey(_message));
-  await tester.pumpAndSettle();
-  expect(find.byType(SnackBar), findsOneWidget);
-  expect(find.text(text), findsOneWidget);
-  ScaffoldMessenger.of(tester.element(find.byKey(_message)))
-      .hideCurrentSnackBar();
-  await tester.pumpAndSettle();
-  await tester.pump(const Duration(seconds: 1));
-  await tester.pumpAndSettle();
+Future<void> _acceptMessage(WidgetTester tester, String text) =>
+    _acceptMessages(tester, [text]);
+
+/// Дожидается сообщений [texts] общей поверхности по одному в заданном
+/// порядке и закрывает каждое; предъявленные результаты не показываются
+/// повторно.
+Future<void> _acceptMessages(WidgetTester tester, List<String> texts) async {
+  for (final text in texts) {
+    await _until(tester, find.byKey(_message));
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text(text), findsOneWidget);
+    ScaffoldMessenger.of(tester.element(find.byKey(_message)))
+        .hideCurrentSnackBar();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+  }
   expect(find.byKey(_message), findsNothing);
 }
 

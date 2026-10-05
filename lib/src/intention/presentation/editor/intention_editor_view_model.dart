@@ -31,13 +31,20 @@ part 'intention_editor_view_model.g.dart';
 /// черновик закрывается сразу, изменённый — после одного подтверждения,
 /// связанного с ключом сессии и состоянием отправки. Переходы в выбор и
 /// редактор тегов сессию не завершают. Закрытие не отменяет принятую отправку:
-/// её результат переходит общей поверхности, а право уже полученной ошибки
-/// остаётся у её renderer до его окончательного удаления.
+/// её будущий результат переходит общей поверхности.
 ///
-/// Отказ сохраняет весь черновик без нормализации и передаёт право
-/// предъявления ошибки renderer страницы. Новая отправка становится доступна
-/// только после правки, устраняющей типизированную причину отказа, либо как
-/// явный повтор устранимой недоступности; сама сессия её не запускает.
+/// Отказ сохраняет весь черновик без нормализации. Право предъявления
+/// ошибки, выданное координатором, принадлежит сессии: пока отказ действует,
+/// она публикует право в состоянии, а renderer формы подтверждает его по
+/// кадру с видимым сообщением или освобождает при своём удалении. Временное
+/// перекрытие формы право не меняет. Когда состояние перестаёт публиковать
+/// право — правка снимает отказ, принята новая отправка, сессия закрыта по
+/// запросу или освобождена, — сессия передаёт его общей поверхности, даже
+/// если ни один renderer его не получал. Подтверждённое или уже освобождённое
+/// renderer право координатор повторно не выдаёт; сама сессия предъявление не
+/// подтверждает. Новая отправка становится доступна только после правки,
+/// устраняющей типизированную причину отказа, либо как явный повтор
+/// устранимой недоступности; сама сессия её не запускает.
 ///
 /// Проекцию выбранных тегов сессия поддерживает собственным наблюдением
 /// `watchTag` каждого выбранного идентификатора. Наблюдение меняет только
@@ -50,6 +57,9 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late TagReadContract _tagReads;
   late _SessionDraftTagSet _draftTagSet;
   IntentionOperationToken? _activeToken;
+
+  /// Право ошибки, которое публикует текущее состояние сессии.
+  GraphInitiatorPresentationClaim? _publishedFailureClaim;
   final _tagObservations = <TagId, _DraftTagObservation>{};
   var _tagObservationGeneration = 0;
 
@@ -64,6 +74,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       initial.draftTagSet,
     );
     listenSelf((previous, next) {
+      _publishFailureClaim(next.failurePresentation);
       if (previous == null) {
         return;
       }
@@ -86,6 +97,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       if (activeToken != null) {
         _coordinator.releaseInitiatorPresentation(activeToken);
       }
+      _publishFailureClaim(null);
     });
     return initial;
   }
@@ -292,10 +304,10 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
   /// Завершает сессию по запросу закрытия, не отменяя принятую отправку.
   ///
-  /// Результат выполняющейся отправки переходит общей поверхности. Право уже
-  /// полученной ошибки остаётся у её renderer: временное перекрытие его
-  /// сохраняет, а удаление renderer до предъявления передаёт общей
-  /// поверхности. Наблюдения тегов и контракт набора освобождаются при
+  /// Результат выполняющейся отправки переходит общей поверхности. Закрытое
+  /// состояние больше не публикует право уже полученной ошибки, поэтому
+  /// сессия передаёт его общей поверхности, если renderer ещё не подтвердил
+  /// предъявление. Наблюдения тегов и контракт набора освобождаются при
   /// переходе в закрытое состояние.
   void _endOnRequest() {
     final token = _activeToken;
@@ -309,6 +321,20 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   GraphInitiatorPresentationClaim? _claimFailure(
     IntentionOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
+
+  /// Учитывает право ошибки, которое публикует состояние сессии, и передаёт
+  /// общей поверхности прежнее право, переставшее публиковаться.
+  ///
+  /// Передача идёт по протоколу координатора: право, уже подтверждённое
+  /// renderer или освобождённое им, повторно не выдаётся, поэтому каждое
+  /// неподтверждённое право переходит общей поверхности ровно один раз.
+  void _publishFailureClaim(GraphInitiatorPresentationClaim? claim) {
+    final previous = _publishedFailureClaim;
+    _publishedFailureClaim = claim;
+    if (previous != null && !identical(previous, claim)) {
+      _coordinator.releaseInitiatorClaim(previous);
+    }
+  }
 
   bool get _observesTags =>
       ref.mounted &&

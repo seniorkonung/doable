@@ -1145,6 +1145,7 @@ void main() {
         for (final MapEntry(key: edit, value: apply) in edits.entries) {
           final reason = '$name × $edit';
           final session = await _failedFullDraftSession(failure);
+          final surface = _AppSurface(session.coordinator);
           final failed = session.state;
           final claim = failed.failurePresentation!;
 
@@ -1161,24 +1162,25 @@ void main() {
               );
               expect(edited.canSubmit, isTrue, reason: reason);
               expect(edited.failurePresentation, isNull, reason: reason);
+              // Снятый отказ сессия больше не публикует: его неподтверждённое
+              // право переходит общей поверхности.
+              expect(
+                session.coordinator.claimInitiatorFailure(claim.token),
+                isNull,
+                reason: reason,
+              );
+              expect(surface.tokens, [same(claim.token)], reason: reason);
             case _Recovery.retryable:
               expect(edited.operation, same(failed.operation), reason: reason);
               expect(edited.canRetry, isTrue, reason: reason);
               expect(edited.canSubmit, isTrue, reason: reason);
-              expect(edited.failurePresentation, same(claim), reason: reason);
+              _expectClaimKeptByForm(session, surface, claim, reason: reason);
             case _Recovery.blocked:
               expect(edited.operation, same(failed.operation), reason: reason);
               expect(edited.canRetry, isFalse, reason: reason);
               expect(edited.canSubmit, isFalse, reason: reason);
-              expect(edited.failurePresentation, same(claim), reason: reason);
+              _expectClaimKeptByForm(session, surface, claim, reason: reason);
           }
-          // Право предъявления остаётся у renderer: ViewModel его не
-          // подтверждает и не освобождает.
-          expect(
-            session.coordinator.claimInitiatorFailure(claim.token),
-            same(claim),
-            reason: reason,
-          );
           expect(session.repository.commands, hasLength(1), reason: reason);
           expect(session.repository.tagCommands, isEmpty, reason: reason);
         }
@@ -2554,18 +2556,21 @@ void main() {
       expect(repository.commands, hasLength(1));
     });
 
-    test('сброс после отказа оставляет непредъявленное право renderer и не подтверждает его во ViewModel', () async {
+    test('сброс после отказа без renderer передаёт непредъявленное право общей поверхности один раз и не подтверждает его во ViewModel', () async {
       final session = await _failedFullDraftSession(
         const IntentionUnavailableFailure(),
       );
-      final presenter = session.coordinator.registerAppPresentation();
-      addTearDown(presenter.release);
+      final surface = _AppSurface(session.coordinator);
       final claim = session.state.failurePresentation!;
       final confirmation = _confirmationOf(session.editor.requestClose());
       expect(
         confirmation.savingOnClose,
         IntentionCreationSavingOnClose.notStarted,
       );
+      await _settle(session.container);
+      // Подтверждение поверх формы оставляет право ей.
+      expect(session.state.failurePresentation, same(claim));
+      expect(surface.presented, isEmpty);
 
       expect(
         session.editor.resolveClose(
@@ -2574,26 +2579,34 @@ void main() {
         ),
         IntentionCreationCloseResolution.closed,
       );
-      GraphAppPresentationClaim? fallback;
-      unawaited(presenter.nextClaim().then((value) => fallback = value));
       await _settle(session.container);
 
       final closed = session.state;
       expect(closed.draftAvailability, IntentionDraftAvailability.closed);
-      expect(closed.failurePresentation, same(claim));
-      expect(
-        session.coordinator.claimInitiatorFailure(claim.token),
-        same(claim),
-      );
-      expect(fallback, isNull);
+      expect(closed.failurePresentation, isNull);
+      expect(surface.presented.map((claim) => claim.completion), [
+        isA<IntentionCommandCompletion>()
+            .having(
+              (completion) => completion.token,
+              'token',
+              same(claim.token),
+            )
+            .having(
+              (completion) => completion.result,
+              'исход',
+              isA<ResultFailure<IntentionCommandSuccess>>().having(
+                (result) => result.failure,
+                'отказ',
+                isA<IntentionUnavailableFailure>(),
+              ),
+            ),
+      ]);
+      expect(session.coordinator.claimInitiatorFailure(claim.token), isNull);
 
-      // Окончательное удаление renderer до предъявления передаёт право
-      // общей поверхности по протоколу renderer.
-      session.coordinator.releaseInitiatorClaim(claim);
+      // Освобождение закрытой сессии право повторно не передаёт.
+      session.release();
       await _settle(session.container);
-
-      expect(fallback?.token, same(claim.token));
-      session.coordinator.confirmPresentation(fallback!);
+      expect(surface.presented, hasLength(1));
       expect(session.repository.commands, hasLength(1));
     });
 
@@ -2710,6 +2723,252 @@ void main() {
       expect(repository.commands, isEmpty);
     });
   });
+
+  group('передача права ошибки общей поверхности', () {
+    test('освобождение сессии без renderer передаёт непредъявленное право общей поверхности ровно один раз', () async {
+      final session = await _failedFullDraftSession(
+        const IntentionUnavailableFailure(),
+      );
+      final surface = _AppSurface(session.coordinator);
+      final claim = session.state.failurePresentation!;
+      await _settle(session.container);
+      expect(surface.presented, isEmpty);
+
+      session.release();
+      await _settle(session.container);
+
+      expect(surface.tokens, [same(claim.token)]);
+      expect(session.coordinator.claimInitiatorFailure(claim.token), isNull);
+      expect(session.repository.commands, hasLength(1));
+    });
+
+    test('немедленное закрытие неизменённой сессии передаёт право её отказа общей поверхности', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final surface = _AppSurface(coordinator);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)..submit();
+      repository.completeCommand(
+        0,
+        const ResultFailure(
+          IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.title,
+              reason: IntentionTextValidationReason.empty,
+            ),
+          ),
+        ),
+      );
+      await _deliverEvents(container);
+      final claim = container.read(provider).failurePresentation!;
+      expect(container.read(provider).draft.isChanged, isFalse);
+
+      expect(
+        editor.requestClose(),
+        isA<IntentionCreationClosedImmediately>().having(
+          (decision) => decision.savingOnClose,
+          'отправка',
+          IntentionCreationSavingOnClose.notStarted,
+        ),
+      );
+      await _settle(container);
+
+      expect(container.read(provider).failurePresentation, isNull);
+      expect(surface.tokens, [same(claim.token)]);
+      expect(coordinator.claimInitiatorFailure(claim.token), isNull);
+    });
+
+    test(
+      'снятие отказа правкой передаёт право общей поверхности ровно один раз',
+      () async {
+        final corrections =
+            <
+              (
+                String,
+                IntentionFailure,
+                void Function(IntentionEditorViewModel),
+              )
+            >[
+              (
+                'название',
+                const IntentionTextInputValidationFailure(
+                  IntentionTextValidationFailure(
+                    field: IntentionTextField.title,
+                    reason: IntentionTextValidationReason.tooLong,
+                  ),
+                ),
+                (editor) => editor.changeTitle('Исправленное название'),
+              ),
+              (
+                'описание',
+                const IntentionTextInputValidationFailure(
+                  IntentionTextValidationFailure(
+                    field: IntentionTextField.description,
+                    reason: IntentionTextValidationReason.tooLong,
+                  ),
+                ),
+                (editor) => editor.changeDescription('Исправленное описание'),
+              ),
+              (
+                'общая проверка',
+                const IntentionGenericValidationFailure(),
+                (editor) => editor.changeTitle('Исправленное название'),
+              ),
+              (
+                'отсутствующий тег',
+                IntentionCreationTagsMissingFailure([_tagId(1)]),
+                (editor) => editor.removeTag(_tagId(1)),
+              ),
+            ];
+        for (final (name, failure, correct) in corrections) {
+          final session = await _failedFullDraftSession(failure);
+          final surface = _AppSurface(session.coordinator);
+          final claim = session.state.failurePresentation!;
+
+          correct(session.editor);
+          await _deliverEvents(session.container);
+
+          expect(
+            session.state.operation,
+            isA<OperationIdle<Intention>>(),
+            reason: name,
+          );
+          expect(session.state.failurePresentation, isNull, reason: name);
+          expect(surface.tokens, [same(claim.token)], reason: name);
+
+          // Дальнейшие правки, закрытие и освобождение право не повторяют.
+          session.editor.changeTitle('Ещё одна правка');
+          session.editor.requestClose();
+          session.release();
+          await _deliverEvents(session.container);
+          expect(surface.presented, hasLength(1), reason: name);
+          expect(
+            session.coordinator.claimInitiatorFailure(claim.token),
+            isNull,
+            reason: name,
+          );
+          expect(session.repository.commands, hasLength(1), reason: name);
+        }
+      },
+    );
+
+    test('новая отправка после устранимого отказа передаёт прежнее право общей поверхности до результата повтора', () async {
+      final session = await _failedFullDraftSession(
+        const IntentionUnavailableFailure(),
+      );
+      final surface = _AppSurface(session.coordinator);
+      final claim = session.state.failurePresentation!;
+
+      session.editor.submit();
+      await _settle(session.container);
+
+      expect(session.state.operation, isA<OperationRunning<Intention>>());
+      expect(session.state.failurePresentation, isNull);
+      expect(surface.tokens, [same(claim.token)]);
+      expect(session.coordinator.claimInitiatorFailure(claim.token), isNull);
+
+      session.repository.completeCommand(1, _savedResult());
+      await _settle(session.container);
+
+      expect(session.repository.commands, hasLength(2));
+      expect(surface.presented.map((claim) => claim.completion), [
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'отказ первой отправки',
+          isA<ResultFailure<IntentionCommandSuccess>>(),
+        ),
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'успех повтора',
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        ),
+      ]);
+    });
+
+    test('право, уже подтверждённое renderer, общая поверхность не получает ни при одном завершении публикации', () async {
+      final transitions =
+          <(String, IntentionFailure, void Function(_FailedSession))>[
+            (
+              'снятие отказа правкой',
+              const IntentionTextInputValidationFailure(
+                IntentionTextValidationFailure(
+                  field: IntentionTextField.title,
+                  reason: IntentionTextValidationReason.tooLong,
+                ),
+              ),
+              (session) => session.editor.changeTitle('Исправленное название'),
+            ),
+            (
+              'новая отправка',
+              const IntentionUnavailableFailure(),
+              (session) => session.editor.submit(),
+            ),
+            (
+              'подтверждённое закрытие',
+              const IntentionUnavailableFailure(),
+              (session) => session.editor.resolveClose(
+                _confirmationOf(session.editor.requestClose()),
+                IntentionCreationCloseChoice.discardDraft,
+              ),
+            ),
+            (
+              'освобождение сессии',
+              const IntentionUnavailableFailure(),
+              (session) => session.release(),
+            ),
+          ];
+      for (final (name, failure, transition) in transitions) {
+        final session = await _failedFullDraftSession(failure);
+        final surface = _AppSurface(session.coordinator);
+        final claim = session.state.failurePresentation!;
+        // Renderer подтверждает предъявление по кадру с видимым сообщением.
+        session.coordinator.confirmPresentation(claim);
+
+        transition(session);
+        await _deliverEvents(session.container);
+
+        expect(surface.presented, isEmpty, reason: name);
+        expect(
+          session.coordinator.claimInitiatorFailure(claim.token),
+          isNull,
+          reason: name,
+        );
+      }
+    });
+
+    test('право, освобождённое исчезнувшим renderer, общая поверхность получает один раз без повтора сессией', () async {
+      final session = await _failedFullDraftSession(
+        const IntentionUnavailableFailure(),
+      );
+      final surface = _AppSurface(session.coordinator);
+      final claim = session.state.failurePresentation!;
+      // Renderer исчезает до предъявления и освобождает право по своему
+      // протоколу, пока сессия ещё публикует отказ.
+      session.coordinator.releaseInitiatorClaim(claim);
+      await _settle(session.container);
+      expect(surface.tokens, [same(claim.token)]);
+
+      expect(
+        session.editor.resolveClose(
+          _confirmationOf(session.editor.requestClose()),
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.closed,
+      );
+      session.release();
+      await _settle(session.container);
+
+      expect(surface.tokens, [same(claim.token)]);
+      expect(session.repository.commands, hasLength(1));
+    });
+  });
 }
 
 IntentionCreationCloseConfirmation _confirmationOf(
@@ -2771,7 +3030,8 @@ List<(String, IntentionFailure)> _failureCases() => [
 
 /// Сессия, отправка полного черновика которой отклонена [failure].
 final class _FailedSession {
-  const _FailedSession({
+  const _FailedSession(
+    this._owner, {
     required this.container,
     required this.repository,
     required this.provider,
@@ -2780,6 +3040,7 @@ final class _FailedSession {
   final ProviderContainer container;
   final ControlledCatalogRepository repository;
   final IntentionEditorViewModelProvider provider;
+  final ProviderSubscription<IntentionEditorState> _owner;
 
   IntentionEditorState get state => container.read(provider);
 
@@ -2787,6 +3048,9 @@ final class _FailedSession {
 
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
+
+  /// Владелец уходит без нового построения, и сессия освобождается.
+  void release() => _owner.close();
 }
 
 Future<_FailedSession> _failedFullDraftSession(
@@ -2810,9 +3074,58 @@ Future<_FailedSession> _failedFullDraftSession(
   repository.completeCommand(0, ResultFailure(failure));
   await _deliverEvents(container);
   return _FailedSession(
+    subscription,
     container: container,
     repository: repository,
     provider: provider,
+  );
+}
+
+/// Неснятый отказ остаётся у формы: сессия публикует его право, а ViewModel
+/// его не подтверждает и не передаёт общей поверхности.
+void _expectClaimKeptByForm(
+  _FailedSession session,
+  _AppSurface surface,
+  GraphInitiatorPresentationClaim claim, {
+  required String reason,
+}) {
+  expect(session.state.failurePresentation, same(claim), reason: reason);
+  expect(
+    session.coordinator.claimInitiatorFailure(claim.token),
+    same(claim),
+    reason: reason,
+  );
+  expect(surface.presented, isEmpty, reason: reason);
+}
+
+/// Общая поверхность приложения: получает права предъявления по очереди
+/// и сразу подтверждает каждое предъявление.
+final class _AppSurface {
+  _AppSurface(this._coordinator)
+    : _registration = _coordinator.registerAppPresentation() {
+    addTearDown(_registration.release);
+    _requestNext();
+  }
+
+  final GraphCommandCoordinator _coordinator;
+  final GraphAppPresentationRegistration _registration;
+
+  /// Предъявленные результаты в порядке выдачи.
+  final presented = <GraphAppPresentationClaim>[];
+
+  List<GraphOperationToken> get tokens => [
+    for (final claim in presented) claim.token,
+  ];
+
+  void _requestNext() => unawaited(
+    _registration.nextClaim().then((claim) {
+      if (claim == null) {
+        return;
+      }
+      presented.add(claim);
+      _coordinator.confirmPresentation(claim);
+      _requestNext();
+    }),
   );
 }
 
