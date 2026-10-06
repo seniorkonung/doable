@@ -76,8 +76,8 @@ final class _IntentionEditorPageState
   /// черновик остаются прежними.
   IntentionCreationSheetReveal? _failureReveal;
 
-  /// Терминальный переход формы уже начат: закрытие или замена намерением.
-  var _hasEndedRoute = false;
+  /// Попытка открытия одноразова, но её отказ может оставить форму в стеке.
+  var _routeState = _EditorRouteState.active;
 
   /// Объяснение критериев действия уже открыто.
   var _isConfirmingReadiness = false;
@@ -317,7 +317,7 @@ final class _IntentionEditorPageState
 
   /// Передаёт запрос ухода сессии и выполняет её решение.
   Future<void> _requestClose() async {
-    if (!mounted || _hasEndedRoute) {
+    if (!_canCloseRoute) {
       return;
     }
     switch (ref.read(_provider.notifier).requestClose()) {
@@ -334,7 +334,7 @@ final class _IntentionEditorPageState
             confirmation: confirmation,
           ),
         );
-        if (!mounted || _hasEndedRoute) {
+        if (!_canCloseRoute) {
           return;
         }
         // Закрытие диалога без выбора продолжает ввод.
@@ -384,7 +384,9 @@ final class _IntentionEditorPageState
   /// Проверяет допуск заново: обработчик мог быть получен до открытия тегов
   /// или смены состояния сессии.
   void _submit() {
-    if (!mounted || _hasEndedRoute || _isChoosingTags) {
+    if (!mounted ||
+        _routeState != _EditorRouteState.active ||
+        _isChoosingTags) {
       return;
     }
     if (ref.read(_provider).canSubmit) {
@@ -399,7 +401,9 @@ final class _IntentionEditorPageState
   /// черновик не меняет. Повторное нажатие до закрытия выбора второй выбор не
   /// открывает.
   Future<void> _chooseTags() async {
-    if (!mounted || _hasEndedRoute || _isChoosingTags) {
+    if (!mounted ||
+        _routeState != _EditorRouteState.active ||
+        _isChoosingTags) {
       return;
     }
     switch (ref.read(_provider).draftAvailability) {
@@ -434,24 +438,44 @@ final class _IntentionEditorPageState
   /// Закрывает только маршрут этой формы, минуя повторное обращение к уже
   /// завершённой сессии.
   void _closeRoute() {
-    if (_hasEndedRoute || !mounted) {
+    if (!_canCloseRoute) {
       return;
     }
-    _hasEndedRoute = true;
+    _routeState = _EditorRouteState.removed;
     context.router.removeRoute(context.routeData);
+  }
+
+  /// Наличие исходного маршрута проверяется по matchId, как у removeRoute:
+  /// https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
+  /// После удаления либо освобождения формы её контекст не используется.
+  bool get _canCloseRoute {
+    if (!mounted) {
+      return false;
+    }
+    switch (_routeState) {
+      case _EditorRouteState.active || _EditorRouteState.openingFailed:
+        final route = context.routeData;
+        return context.router.stackData.any(
+          (entry) => entry.matchId == route.matchId,
+        );
+      case _EditorRouteState.openingCreatedIntention ||
+          _EditorRouteState.removed:
+        return false;
+    }
   }
 
   /// Потребляет успех только живого исходного маршрута и завершает переход
   /// до любого запоздалого запроса закрытия или ответа его диалога.
   void _openCreatedIntention(IntentionId intentionId) {
-    if (!mounted || _hasEndedRoute) {
+    if (!mounted || _routeState != _EditorRouteState.active) {
       return;
     }
     final router = context.router;
-    if (router.stackData.lastOrNull?.matchId != context.routeData.matchId) {
+    final route = context.routeData;
+    if (router.stackData.lastOrNull?.matchId != route.matchId) {
       return;
     }
-    _hasEndedRoute = true;
+    _routeState = _EditorRouteState.openingCreatedIntention;
     ref.read(_provider.notifier).consumeEvent();
 
     // replace удаляет форму вместе с её диалогами, сохраняя оболочку:
@@ -465,6 +489,15 @@ final class _IntentionEditorPageState
           IntentionDetailsRoute(intentionId: intentionId),
         ),
       ).catchError((Object error, StackTrace stack) {
+        // Отказ разрешает только новый запрос ухода оставшейся формы.
+        // Захваченные router и route позволяют обойтись без её контекста.
+        if (mounted &&
+            _routeState == _EditorRouteState.openingCreatedIntention) {
+          _routeState =
+              router.stackData.any((entry) => entry.matchId == route.matchId)
+              ? _EditorRouteState.openingFailed
+              : _EditorRouteState.removed;
+        }
         // Диагностика перехода не меняет результат и не повторяет создание:
         // https://api.flutter.dev/flutter/foundation/FlutterError/reportError.html
         FlutterError.reportError(
@@ -490,6 +523,14 @@ final class _IntentionEditorPageState
     OperationSucceeded<Intention>() ||
     OperationFailed<Intention>() => localizations.editorSaveAction,
   };
+}
+
+/// Разделяет допуск действий, одноразовый эффект и выход после его отказа.
+enum _EditorRouteState {
+  active,
+  openingCreatedIntention,
+  openingFailed,
+  removed,
 }
 
 /// Где панель показывает отказ сохранения: под своим полем в прокручиваемых

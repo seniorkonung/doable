@@ -551,60 +551,231 @@ void main() {
   );
 
   for (final synchronous in [true, false]) {
+    for (final (exit, awaitingConfirmation) in [
+      for (final exit in _CreationExit.values) (exit, false),
+      (_CreationExit.closeButton, true),
+      (_CreationExit.systemBack, true),
+    ]) {
+      testWidgets(
+        '${synchronous ? 'синхронный' : 'асинхронный'} отказ перехода сохраняет успех и допускает выход: ${exit.label}${awaitingConfirmation ? ' при прежнем подтверждении' : ''}',
+        (tester) async {
+          final repository = ControlledCatalogRepository();
+          final sessions = _EditorSessions();
+          final failureGate = synchronous ? null : Completer<void>();
+          final router = _FailingReplacementRouter(
+            synchronous: synchronous,
+            failureGate: failureGate?.future,
+          );
+          await _openEditor(
+            tester,
+            repository,
+            observers: [sessions],
+            navigationRouter: router,
+          );
+          final shell = router.stackData.first;
+          final form = router.stackData.last;
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(IntentionEditorPage)),
+          );
+          final provider = sessions.latest!;
+          await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
+          await tester.tap(find.byKey(_submit));
+          await tester.pump();
+          final lateClose = tester
+              .widget<IconButton>(find.byKey(_closeButton))
+              .onPressed!;
+          VoidCallback? lateDiscard;
+          VoidCallback? lateContinue;
+          if (awaitingConfirmation) {
+            await _tapClose(tester);
+            await tester.pumpAndSettle();
+            expect(find.byKey(_closeConfirmation), findsOneWidget);
+            lateDiscard = tester
+                .widget<FilledButton>(find.byKey(_closeDiscard))
+                .onPressed!;
+            lateContinue = tester
+                .widget<TextButton>(find.byKey(_closeContinue))
+                .onPressed!;
+          }
+
+          final errors = <FlutterErrorDetails>[];
+          final previousHandler = FlutterError.onError;
+          FlutterError.onError = errors.add;
+          try {
+            repository.completeCommand(
+              0,
+              _savedResult(title: 'Сохранённое намерение'),
+            );
+            await tester.pump();
+            await tester.pump();
+            if (failureGate != null) {
+              // Запрос, пришедший во время эффекта, не конкурирует с ним.
+              lateClose();
+              expect(router.stackData.last, same(form));
+              expect(errors, isEmpty);
+              failureGate.complete();
+            }
+            _completeCatalogRefresh(repository);
+            await tester.pumpAndSettle();
+          } finally {
+            FlutterError.onError = previousHandler;
+          }
+
+          expect(errors, hasLength(1));
+          expect(errors.single.exception, same(router.failure));
+          expect(
+            errors.single.context.toString(),
+            contains('при открытии созданного намерения'),
+          );
+          expect(
+            container.read(provider).operation,
+            isA<OperationSucceeded<Intention>>(),
+          );
+          expect(container.read(provider).event, isNull);
+          expect(
+            container.read(provider).draftAvailability,
+            IntentionDraftAvailability.closed,
+          );
+          expect(container.read(provider).canSubmit, isFalse);
+          expect(tester.widget<TextField>(find.byKey(_title)).readOnly, isTrue);
+          expect(
+            tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
+            isNull,
+          );
+          expect(router.stackData.last, same(form));
+          expect(router.replacementAttempts, 1);
+          expect(
+            find.textContaining('Intention created.').hitTestable(),
+            findsOneWidget,
+          );
+          expect(find.byKey(_pinnedFailure), findsNothing);
+          expect(find.byKey(_closeConfirmation), findsNothing);
+          await tester.pump(const Duration(seconds: 1));
+          await exit.request(tester);
+          await tester.pumpAndSettle();
+
+          expectIntentionGraphRootPage(router);
+          expect(router.stackData, [same(shell)]);
+          expect(find.byKey(_closeConfirmation), findsNothing);
+          expect(
+            find.byType(IntentionEditorPage, skipOffstage: false),
+            findsNothing,
+          );
+          lateClose();
+          await tester.pump();
+          expect(router.stackData, [same(shell)]);
+
+          await _closeOperationMessage(tester);
+          await tester.tap(
+            find.byKey(const ValueKey('catalog-create-intention')),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byKey(_title), 'Следующий черновик');
+          final nextForm = router.stackData.last;
+          lateClose();
+          lateClose();
+          lateDiscard?.call();
+          lateContinue?.call();
+          await tester.pump(const Duration(seconds: 1));
+          expect(router.stackData.last, same(nextForm));
+          expect(sessions.latest, isNot(provider));
+          expect(
+            _fieldText(tester, 'intention-editor-title'),
+            'Следующий черновик',
+          );
+          expect(find.textContaining('Intention created.'), findsNothing);
+          expect(router.replacementAttempts, 1);
+          expect(repository.commands, hasLength(1));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final openNewForm in [false, true]) {
     testWidgets(
-      '${synchronous ? 'синхронный' : 'асинхронный'} отказ перехода сохраняет успех записи без повторной команды',
+      'поздний отказ открытия после удаления формы сохраняет ${openNewForm ? 'новую сессию' : 'страницу намерения'}',
       (tester) async {
         final repository = ControlledCatalogRepository();
         final sessions = _EditorSessions();
-        final router = _FailingReplacementRouter(synchronous: synchronous);
+        final failureGate = Completer<void>();
+        final router = _FailingReplacementRouter(
+          synchronous: false,
+          replaceBeforeFailure: true,
+          failureGate: failureGate.future,
+        );
         await _openEditor(
           tester,
           repository,
           observers: [sessions],
           navigationRouter: router,
         );
-        final container = ProviderScope.containerOf(
-          tester.element(find.byType(IntentionEditorPage)),
-        );
-        final provider = sessions.latest!;
+        final shell = router.stackData.first;
+        final provider = sessions.latest;
         await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
         await tester.tap(find.byKey(_submit));
         await tester.pump();
-
+        final lateClose = tester
+            .widget<IconButton>(find.byKey(_closeButton))
+            .onPressed!;
+        repository.completeCommand(
+          0,
+          _savedResult(title: 'Сохранённое намерение'),
+        );
+        await tester.pump();
+        await tester.pump();
+        _completeCatalogRefresh(repository);
+        expect(router.current.name, IntentionDetailsRoute.name);
+        lateClose();
+        if (openNewForm) {
+          await tester.pumpAndSettle();
+          await returnToIntentionGraphAfterCreation(tester, router);
+          await tester.tap(
+            find.byKey(const ValueKey('catalog-create-intention')),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byKey(_title), 'Следующий черновик');
+          expect(sessions.latest, isNot(provider));
+        }
+        final current = router.stackData.last;
         final errors = <FlutterErrorDetails>[];
         final previousHandler = FlutterError.onError;
         FlutterError.onError = errors.add;
         try {
-          repository.completeCommand(
-            0,
-            _savedResult(title: 'Сохранённое намерение'),
-          );
+          failureGate.complete();
           await tester.pump();
-          await tester.pump();
-          _completeCatalogRefresh(repository);
+          lateClose();
           await tester.pumpAndSettle();
         } finally {
           FlutterError.onError = previousHandler;
         }
-
         expect(errors, hasLength(1));
         expect(errors.single.exception, same(router.failure));
-        expect(
-          errors.single.context.toString(),
-          contains('при открытии созданного намерения'),
-        );
-        expect(
-          container.read(provider).operation,
-          isA<OperationSucceeded<Intention>>(),
-        );
-        expect(container.read(provider).event, isNull);
-        expect(
-          find.textContaining('Intention created.').hitTestable(),
-          findsOneWidget,
-        );
-        expect(find.byKey(_pinnedFailure), findsNothing);
+        expect(router.stackData, [same(shell), same(current)]);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        if (openNewForm) {
+          expect(
+            _fieldText(tester, 'intention-editor-title'),
+            'Следующий черновик',
+          );
+          expect(
+            sessions.state(tester).draftAvailability,
+            IntentionDraftAvailability.editable,
+          );
+        } else {
+          expect(
+            router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+            testIntention(title: 'Сохранённое намерение').id,
+          );
+          expect(
+            find.byType(IntentionEditorPage, skipOffstage: false),
+            findsNothing,
+          );
+        }
         await tester.pump(const Duration(seconds: 1));
+        expect(router.stackData.last, same(current));
         expect(repository.commands, hasLength(1));
+        expect(router.replacementAttempts, 1);
         expect(tester.takeException(), isNull);
       },
     );
@@ -2979,10 +3150,17 @@ Future<RootStackRouter> _openEditor(
 
 /// Настоящий стек с маршрутами приложения и управляемым отказом его эффекта.
 final class _FailingReplacementRouter extends RootStackRouter {
-  _FailingReplacementRouter({required this.synchronous});
+  _FailingReplacementRouter({
+    required this.synchronous,
+    this.replaceBeforeFailure = false,
+    this.failureGate,
+  });
 
   final bool synchronous;
+  final bool replaceBeforeFailure;
+  final Future<void>? failureGate;
   final failure = StateError('Не удалось заменить маршрут.');
+  var replacementAttempts = 0;
 
   @override
   List<AutoRoute> get routes => AppRouter().routes;
@@ -2992,8 +3170,39 @@ final class _FailingReplacementRouter extends RootStackRouter {
     PageRouteInfo route, {
     OnNavigationFailure? onFailure,
   }) {
+    replacementAttempts++;
+    if (replaceBeforeFailure) {
+      unawaited(super.replace<T>(route, onFailure: onFailure));
+    }
     if (synchronous) throw failure;
-    return Future<T?>.error(failure, StackTrace.current);
+    return (failureGate ?? Future<void>.value()).then<T?>((_) => throw failure);
+  }
+}
+
+enum _CreationExit {
+  closeButton('кнопка закрытия'),
+  systemBack('системное «назад»'),
+  background('фон'),
+  handleSwipe('свайп вниз по ручке');
+
+  const _CreationExit(this.label);
+
+  final String label;
+
+  Future<void> request(WidgetTester tester) async {
+    switch (this) {
+      case _CreationExit.closeButton:
+        await _tapClose(tester);
+      case _CreationExit.systemBack:
+        await tester.binding.handlePopRoute();
+      case _CreationExit.background:
+        await tester.tapAt(_outsideSheet);
+      case _CreationExit.handleSwipe:
+        await tester.drag(
+          find.byKey(const ValueKey('intention-creation-sheet-handle')),
+          const Offset(0, 120),
+        );
+    }
   }
 }
 
