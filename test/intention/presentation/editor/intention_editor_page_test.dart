@@ -14,12 +14,16 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
@@ -692,11 +696,33 @@ void main() {
     }
   }
 
-  for (final openNewForm in [false, true]) {
+  for (final (openNewForm, awaitingConfirmation) in [
+    (false, false),
+    (false, true),
+    (true, false),
+    (true, true),
+  ]) {
     testWidgets(
-      'поздний отказ открытия после удаления формы сохраняет ${openNewForm ? 'новую сессию' : 'страницу намерения'}',
+      'поздний отказ открытия после удаления формы сохраняет ${openNewForm ? 'новую сессию' : 'страницу намерения'}${awaitingConfirmation ? ' при прежнем подтверждении' : ''}',
       (tester) async {
         final repository = ControlledCatalogRepository();
+        final saved = _savedResult(title: 'Сохранённое намерение');
+        final details = IntentionDetails(
+          intention: saved.value.intention,
+          relationCounts: testRelationCounts(),
+          favoriteMark: FavoriteMark.notFavorite,
+        );
+        repository.intentionObservations = (id) => Stream.multi((controller) {
+          expect(id, details.intention.id);
+          controller.add(
+            ResultSuccess(
+              GraphSnapshot(
+                value: details,
+                revision: const TestCatalogRevision(1),
+              ),
+            ),
+          );
+        });
         final sessions = _EditorSessions();
         final failureGate = Completer<void>();
         final router = _FailingReplacementRouter(
@@ -718,15 +744,44 @@ void main() {
         final lateClose = tester
             .widget<IconButton>(find.byKey(_closeButton))
             .onPressed!;
-        repository.completeCommand(
-          0,
-          _savedResult(title: 'Сохранённое намерение'),
-        );
+        VoidCallback? lateDiscard;
+        VoidCallback? lateContinue;
+        if (awaitingConfirmation) {
+          await _tapClose(tester);
+          await tester.pumpAndSettle();
+          expect(find.byKey(_closeConfirmation), findsOneWidget);
+          lateDiscard = tester
+              .widget<FilledButton>(find.byKey(_closeDiscard))
+              .onPressed!;
+          lateContinue = tester
+              .widget<TextButton>(find.byKey(_closeContinue))
+              .onPressed!;
+        }
+        repository.completeCommand(0, saved);
         await tester.pump();
         await tester.pump();
         _completeCatalogRefresh(repository);
         expect(router.current.name, IntentionDetailsRoute.name);
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(IntentionDetailsPage)),
+          listen: false,
+        );
+        final detailsProvider = intentionDetailsViewModelProvider(
+          details.intention.id,
+        );
+        final loadedDetails = container.read(detailsProvider);
+        expect(
+          loadedDetails,
+          isA<IntentionDetailsLoaded>().having(
+            (state) => state.details,
+            'подтверждённые подробные данные',
+            same(details),
+          ),
+        );
         lateClose();
+        lateDiscard?.call();
+        lateContinue?.call();
         if (openNewForm) {
           await tester.pumpAndSettle();
           await returnToIntentionGraphAfterCreation(tester, router);
@@ -735,9 +790,15 @@ void main() {
           );
           await tester.pumpAndSettle();
           await tester.enterText(find.byKey(_title), 'Следующий черновик');
+          await tester.enterText(
+            find.byKey(_description),
+            'Описание следующего черновика',
+          );
+          await tester.pumpAndSettle();
           expect(sessions.latest, isNot(provider));
         }
         final current = router.stackData.last;
+        final nextDraft = openNewForm ? sessions.state(tester).draft : null;
         final errors = <FlutterErrorDetails>[];
         final previousHandler = FlutterError.onError;
         FlutterError.onError = errors.add;
@@ -745,6 +806,8 @@ void main() {
           failureGate.complete();
           await tester.pump();
           lateClose();
+          lateDiscard?.call();
+          lateContinue?.call();
           await tester.pumpAndSettle();
         } finally {
           FlutterError.onError = previousHandler;
@@ -762,7 +825,21 @@ void main() {
             sessions.state(tester).draftAvailability,
             IntentionDraftAvailability.editable,
           );
+          expect(sessions.state(tester).draft, same(nextDraft));
+          expect(
+            _fieldText(tester, 'intention-editor-description'),
+            'Описание следующего черновика',
+          );
         } else {
+          expect(container.read(detailsProvider), same(loadedDetails));
+          expect(
+            tester
+                .widget<Text>(
+                  find.byKey(const ValueKey('intention-details-title')),
+                )
+                .data,
+            details.intention.title,
+          );
           expect(
             router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
             testIntention(title: 'Сохранённое намерение').id,

@@ -110,6 +110,10 @@ final class ControlledCatalogRepository
   /// Источник наблюдения тега; без него наблюдение сразу отказывает.
   Stream<TagReadResult> Function(TagId id)? tagObservations;
 
+  /// Источник подробных данных для проверок страницы над каталогом.
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> Function(IntentionId id)?
+  intentionObservations;
+
   @override
   Stream<TagReadResult> watchTag(TagId id) =>
       tagObservations?.call(id) ?? super.watchTag(id);
@@ -263,7 +267,9 @@ final class ControlledCatalogRepository
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
-  ) => throw UnsupportedError('Подробное чтение не используется в тесте.');
+  ) =>
+      intentionObservations?.call(id) ??
+      (throw UnsupportedError('Подробное чтение не используется в тесте.'));
 }
 
 final class TestCatalogCursor implements IntentionCatalogCursor {
