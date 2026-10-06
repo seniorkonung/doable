@@ -950,52 +950,62 @@ void main() {
       );
     }
 
-    testWidgets(
-      'успех при открытом подтверждении закрывает только свою панель и '
-      'подтверждение, предъявляется один раз и не закрывает новое открытие',
-      (tester) async {
-        final repository = _DelayedPersonalGraphRepository();
-        await _pumpCatalog(tester, repository, const []);
-        await _openPanel(tester);
-        await tester.enterText(find.byKey(_editorTitle), 'Своё намерение');
-        await tester.tap(find.byKey(_submit));
-        await _pumpUntil(tester, () => repository.commands.length == 1);
-        await tester.tap(find.byKey(_close));
-        await tester.pumpAndSettle();
-        expect(find.text('Close the form?'), findsOneWidget);
+    testWidgets('успех при открытом подтверждении заменяет панель намерением, '
+        'предъявляется один раз и не закрывает новое открытие', (tester) async {
+      final repository = _DelayedPersonalGraphRepository();
+      await _pumpCatalog(tester, repository, const []);
+      await _openPanel(tester);
+      final router = tester.element(find.byType(IntentionEditorPage)).router;
+      await tester.enterText(find.byKey(_editorTitle), 'Своё намерение');
+      await tester.tap(find.byKey(_submit));
+      await _pumpUntil(tester, () => repository.commands.length == 1);
+      await tester.tap(find.byKey(_close));
+      await tester.pumpAndSettle();
+      expect(find.text('Close the form?'), findsOneWidget);
 
-        final created = _intention(title: 'Своё намерение', description: null);
-        repository.completeCommand(0, _saved(created, revision: 1));
-        await tester.pumpAndSettle();
+      final created = _intention(title: 'Своё намерение', description: null);
+      repository.completeCommand(0, _saved(created, revision: 1));
+      await _pumpUntil(tester, () => repository.detailIds.contains(created.id));
+      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(
+        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        created.id,
+      );
+      repository.emitDetail(1, created);
+      await tester.pumpAndSettle();
 
-        const message = 'Create — “Своё намерение”: Intention created.';
-        expect(find.text('Close the form?'), findsNothing);
-        expect(find.byType(IntentionEditorPage), findsNothing);
-        expect(_visible(message), findsOneWidget);
-        expect(find.text(created.title), findsOneWidget);
-        expect(find.text('Total intentions: 1'), findsOneWidget);
+      const message = 'Create — “Своё намерение”: Intention created.';
+      expect(find.text('Close the form?'), findsNothing);
+      expect(find.byType(IntentionEditorPage), findsNothing);
+      expect(_visible(message), findsOneWidget);
+      expect(find.text(created.title), findsOneWidget);
+      expect(router.stackData.map((route) => route.name), [
+        AppShellRoute.name,
+        IntentionDetailsRoute.name,
+      ]);
+      await returnToIntentionGraphAfterCreation(tester, router);
+      expect(find.text('Total intentions: 1'), findsOneWidget);
 
-        await _openPanel(tester);
-        await tester.enterText(find.byKey(_editorTitle), 'Новое открытие');
-        await tester.pump(const Duration(seconds: 1));
-        await tester.pumpAndSettle();
-        expect(find.byType(IntentionEditorPage), findsOneWidget);
-        expect(find.text('Close the form?'), findsNothing);
-        expect(_visible(message), findsOneWidget);
-        expect(
-          find.descendant(
-            of: find.byType(IntentionEditorPage),
-            matching: _visible(message),
-          ),
-          findsOneWidget,
-        );
-        await _closeOperationMessage(tester);
-        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-        expect(_fieldText(tester), 'Новое открытие');
-        expect(repository.commands, hasLength(1));
-        expect(tester.takeException(), isNull);
-      },
-    );
+      await _openPanel(tester);
+      await tester.enterText(find.byKey(_editorTitle), 'Новое открытие');
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.byType(IntentionEditorPage), findsOneWidget);
+      expect(find.text('Close the form?'), findsNothing);
+      expect(_visible(message), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(IntentionEditorPage),
+          matching: _visible(message),
+        ),
+        findsOneWidget,
+      );
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+      expect(_fieldText(tester), 'Новое открытие');
+      expect(repository.commands, hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('отказ при открытом подтверждении остаётся у живой панели и не '
         'предъявляется общей поверхностью', (tester) async {

@@ -4,6 +4,7 @@ import 'package:doable/src/graph/application/selected_relations.dart';
 import 'dart:async';
 import 'dart:ui' show CheckedState, Tristate;
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 
@@ -1557,8 +1558,14 @@ Future<void> _createIntention(
   // Панель въезжает снизу: отправку можно нажать, когда она на экране.
   final submit = find.byKey(const ValueKey('intention-editor-submit'));
   await _pumpUntilFound(tester, submit.hitTestable());
+  final router = tester.element(submit).router;
   await tester.tap(submit);
-  await _pumpUntilFound(tester, find.text(title));
+  await _pumpUntilDetailsTitle(tester, title);
+  await returnToIntentionGraphAfterCreation(
+    tester,
+    router,
+    waitFor: _pumpUntilFound,
+  );
 }
 
 Future<void> _openIntention(

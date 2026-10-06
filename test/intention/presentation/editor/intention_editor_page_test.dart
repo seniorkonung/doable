@@ -23,6 +23,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
+import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -474,10 +475,11 @@ void main() {
   });
 
   testWidgets(
-    'создаёт намерение с минимальными данными и возвращается после success',
+    'успех заменяет форму страницей подтверждённого намерения один раз',
     (tester) async {
       final repository = ControlledCatalogRepository();
       final router = await _openEditor(tester, repository);
+      final shell = router.stackData.first;
       await tester.enterText(
         find.byKey(const ValueKey('intention-editor-title')),
         'Новое намерение',
@@ -518,8 +520,132 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expectIntentionGraphRootPage(router);
+      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(
+        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        testIntention(title: 'Новое намерение').id,
+      );
+      expect(router.stackData.map((route) => route.name), [
+        AppShellRoute.name,
+        IntentionDetailsRoute.name,
+      ]);
+      expect(router.stackData.first, same(shell));
+      expect(
+        find.byType(IntentionEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(find.byType(AppNavigationBar), findsNothing);
+      final details = router.stackData.last;
+      await tester.pump(const Duration(seconds: 1));
+      expect(router.stackData.last, same(details));
+      expect(repository.commands, hasLength(1));
       expect(find.textContaining('Intention created.'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expectIntentionGraphRootPage(router);
+      expect(
+        find.byType(IntentionEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+    },
+  );
+
+  for (final synchronous in [true, false]) {
+    testWidgets(
+      '${synchronous ? 'синхронный' : 'асинхронный'} отказ перехода сохраняет успех записи без повторной команды',
+      (tester) async {
+        final repository = ControlledCatalogRepository();
+        final sessions = _EditorSessions();
+        final router = _FailingReplacementRouter(synchronous: synchronous);
+        await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+          navigationRouter: router,
+        );
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(IntentionEditorPage)),
+        );
+        final provider = sessions.latest!;
+        await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+
+        final errors = <FlutterErrorDetails>[];
+        final previousHandler = FlutterError.onError;
+        FlutterError.onError = errors.add;
+        try {
+          repository.completeCommand(
+            0,
+            _savedResult(title: 'Сохранённое намерение'),
+          );
+          await tester.pump();
+          await tester.pump();
+          _completeCatalogRefresh(repository);
+          await tester.pumpAndSettle();
+        } finally {
+          FlutterError.onError = previousHandler;
+        }
+
+        expect(errors, hasLength(1));
+        expect(errors.single.exception, same(router.failure));
+        expect(
+          errors.single.context.toString(),
+          contains('при открытии созданного намерения'),
+        );
+        expect(
+          container.read(provider).operation,
+          isA<OperationSucceeded<Intention>>(),
+        );
+        expect(container.read(provider).event, isNull);
+        expect(
+          find.textContaining('Intention created.').hitTestable(),
+          findsOneWidget,
+        );
+        expect(find.byKey(_pinnedFailure), findsNothing);
+        await tester.pump(const Duration(seconds: 1));
+        expect(repository.commands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'успех после подтверждённого ухода во время анимации не открывает намерение',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      final router = await _openEditor(tester, repository);
+      await tester.enterText(find.byKey(_title), 'Позднее намерение');
+      await tester.tap(find.byKey(_submit));
+      await tester.pump();
+      await _tapClose(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_closeDiscard));
+      await tester.pump();
+      await tester.pump();
+
+      expectIntentionGraphRootPage(router);
+      expect(
+        find.byType(IntentionEditorPage, skipOffstage: false),
+        findsOneWidget,
+      );
+      repository.completeCommand(0, _savedResult(title: 'Позднее намерение'));
+      await tester.pump();
+      await tester.pump();
+      _completeCatalogRefresh(repository);
+      await tester.pumpAndSettle();
+
+      expectIntentionGraphRootPage(router);
+      expect(
+        find.byType(IntentionEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.text('Create — “Позднее намерение”: Intention created.'),
+        findsOneWidget,
+      );
+      expect(repository.commands, hasLength(1));
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -699,7 +825,7 @@ void main() {
   });
 
   testWidgets(
-    'success закрывает форму при занятой поверхности и предъявляется один раз после текущего сообщения',
+    'успех открывает намерение при занятой поверхности и предъявляется один раз после текущего сообщения',
     (tester) async {
       const busyMessage =
           'Delete — “Другое намерение”: The intention couldn’t be deleted. Try again.';
@@ -746,7 +872,7 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expectIntentionGraphRootPage(router);
+      expect(router.current.name, IntentionDetailsRoute.name);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.textContaining('Intention created.'), findsNothing);
 
@@ -1020,7 +1146,7 @@ void main() {
     );
 
     testWidgets(
-      'успех при открытом подтверждении закрывает свою форму и диалог, а его поздний ответ не закрывает новое открытие',
+      'успех заменяет форму с диалогом, а поздние ответы и закрытие сохраняют намерение и новую форму',
       (tester) async {
         final repository = ControlledCatalogRepository();
         final router = await _openEditor(tester, repository);
@@ -1034,28 +1160,58 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(_closeConfirmation), findsOneWidget);
 
+        final lateClose = tester
+            .widget<IconButton>(find.byKey(_closeButton))
+            .onPressed!;
+        final lateDiscard = tester
+            .widget<FilledButton>(find.byKey(_closeDiscard))
+            .onPressed!;
+        final lateContinue = tester
+            .widget<TextButton>(find.byKey(_closeContinue))
+            .onPressed!;
         repository.completeCommand(0, _savedResult(title: 'Новое намерение'));
         await tester.pump();
         await tester.pump();
+        expect(router.current.name, IntentionDetailsRoute.name);
+        final details = router.stackData.last;
+        // Прежние обработчики могут завершиться до освобождения виджета.
+        lateClose();
+        lateDiscard();
+        lateContinue();
         _completeCatalogRefresh(repository);
         await tester.pumpAndSettle();
 
         expect(find.byKey(_closeConfirmation), findsNothing);
-        expectIntentionGraphRootPage(router);
+        expect(router.stackData.last, same(details));
+        expect(router.stackData.map((route) => route.name), [
+          AppShellRoute.name,
+          IntentionDetailsRoute.name,
+        ]);
+        expect(
+          find.byType(IntentionEditorPage, skipOffstage: false),
+          findsNothing,
+        );
         expect(
           find.text('Create — “Новое намерение”: Intention created.'),
           findsOneWidget,
         );
 
+        await returnToIntentionGraphAfterCreation(tester, router);
         await tester.tap(
           find.byKey(const ValueKey('catalog-create-intention')),
         );
         await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(_title), 'Другая сессия');
+        lateClose();
+        lateDiscard();
+        lateContinue();
         await tester.pump(const Duration(seconds: 1));
 
         expect(router.current.name, IntentionEditorRoute.name);
         expect(find.byKey(_closeConfirmation), findsNothing);
-        expect(_fieldText(tester, 'intention-editor-title'), isEmpty);
+        expect(_fieldText(tester, 'intention-editor-title'), 'Другая сессия');
+        expect(repository.commands, hasLength(1));
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -2471,13 +2627,14 @@ Future<void> _closeOperationMessage(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<AppRouter> _openEditor(
+Future<RootStackRouter> _openEditor(
   WidgetTester tester,
   ControlledCatalogRepository repository, {
   Locale locale = const Locale('en'),
   List<ProviderObserver> observers = const [],
+  RootStackRouter? navigationRouter,
 }) async {
-  final router = AppRouter();
+  final router = navigationRouter ?? AppRouter();
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
@@ -2513,6 +2670,26 @@ Future<AppRouter> _openEditor(
   await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
   await tester.pumpAndSettle();
   return router;
+}
+
+/// Настоящий стек с маршрутами приложения и управляемым отказом его эффекта.
+final class _FailingReplacementRouter extends RootStackRouter {
+  _FailingReplacementRouter({required this.synchronous});
+
+  final bool synchronous;
+  final failure = StateError('Не удалось заменить маршрут.');
+
+  @override
+  List<AutoRoute> get routes => AppRouter().routes;
+
+  @override
+  Future<T?> replace<T extends Object?>(
+    PageRouteInfo route, {
+    OnNavigationFailure? onFailure,
+  }) {
+    if (synchronous) throw failure;
+    return Future<T?>.error(failure, StackTrace.current);
+  }
 }
 
 Result<IntentionCommandSuccess> _savedResult({required String title}) {

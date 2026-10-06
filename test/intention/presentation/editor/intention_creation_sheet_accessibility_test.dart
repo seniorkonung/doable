@@ -517,12 +517,14 @@ void main() {
               ),
         );
 
-        // Успех закрывает панель, и каталог с навигацией снова доступны.
+        // Успех открывает намерение; возврат делает каталог снова доступным.
         repository.completeCommand(3, _savedResult());
         await tester.pump();
         await tester.pump();
         _completeCatalogRefresh(repository);
         await tester.pumpAndSettle();
+        expect(router.current.name, IntentionDetailsRoute.name);
+        await returnToIntentionGraphAfterCreation(tester, router);
         expectIntentionGraphRootPage(router);
         expect(
           find.semantics.byPredicate(

@@ -11,6 +11,7 @@ import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../tag/presentation/catalog/tag_selection_context.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
+import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 import 'intention_creation_sheet.dart';
@@ -46,8 +47,9 @@ import 'intention_editor_view_model.dart';
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
 /// сессии о закрытии и не удаляет маршрут сам. Маршрут формы закрывается
-/// только по завершению сессии: сразу для неизменённого черновика, после
-/// подтверждённого сброса или успешного создания.
+/// только по завершению сессии: сразу для неизменённого черновика или после
+/// подтверждённого сброса. Успешное создание заменяет форму страницей
+/// созданного намерения в том же стеке, сохраняя каталог для возврата.
 @RoutePage()
 final class IntentionEditorPage extends ConsumerStatefulWidget {
   const IntentionEditorPage({super.key});
@@ -74,8 +76,8 @@ final class _IntentionEditorPageState
   /// черновик остаются прежними.
   IntentionCreationSheetReveal? _failureReveal;
 
-  /// Маршрут формы уже закрывается после завершения сессии.
-  var _isRouteClosing = false;
+  /// Терминальный переход формы уже начат: закрытие или замена намерением.
+  var _hasEndedRoute = false;
 
   /// Объяснение критериев действия уже открыто.
   var _isConfirmingReadiness = false;
@@ -103,10 +105,8 @@ final class _IntentionEditorPageState
     ref.listen(provider, (previous, next) {
       // Страница следит за сессией и перестраивается с новым запросом.
       _failureReveal = _failureRevealAfter(previous, next);
-      if (next.event case IntentionEditorCreated()) {
-        notifier.consumeEvent();
-        // Сообщение об успехе предъявляет общий presenter оболочки.
-        _closeRoute();
+      if (next.event case IntentionEditorCreated(:final intentionId)) {
+        _openCreatedIntention(intentionId);
       }
     });
 
@@ -315,6 +315,9 @@ final class _IntentionEditorPageState
 
   /// Передаёт запрос ухода сессии и выполняет её решение.
   Future<void> _requestClose() async {
+    if (!mounted || _hasEndedRoute) {
+      return;
+    }
     switch (ref.read(_provider.notifier).requestClose()) {
       case IntentionCreationClosedImmediately() ||
           IntentionCreationCloseSessionEnded():
@@ -329,7 +332,7 @@ final class _IntentionEditorPageState
             confirmation: confirmation,
           ),
         );
-        if (!mounted) {
+        if (!mounted || _hasEndedRoute) {
           return;
         }
         // Закрытие диалога без выбора продолжает ввод.
@@ -407,11 +410,49 @@ final class _IntentionEditorPageState
   /// Закрывает только маршрут этой формы, минуя повторное обращение к уже
   /// завершённой сессии.
   void _closeRoute() {
-    if (_isRouteClosing || !mounted) {
+    if (_hasEndedRoute || !mounted) {
       return;
     }
-    _isRouteClosing = true;
+    _hasEndedRoute = true;
     context.router.removeRoute(context.routeData);
+  }
+
+  /// Потребляет успех только живого исходного маршрута и завершает переход
+  /// до любого запоздалого запроса закрытия или ответа его диалога.
+  void _openCreatedIntention(IntentionId intentionId) {
+    if (!mounted || _hasEndedRoute) {
+      return;
+    }
+    final router = context.router;
+    if (router.stackData.lastOrNull?.matchId != context.routeData.matchId) {
+      return;
+    }
+    _hasEndedRoute = true;
+    ref.read(_provider.notifier).consumeEvent();
+
+    // replace удаляет форму вместе с её диалогами, сохраняя оболочку:
+    // https://pub.dev/packages/auto_route/versions/11.1.0#navigating-between-screens
+    // Future завершается при возврате со страницы; сессия его не ждёт.
+    // Future.sync отделяет даже синхронный отказ эффекта от успешной записи:
+    // https://api.dart.dev/dart-async/Future/Future.sync.html
+    unawaited(
+      Future<void>.sync(
+        () => router.replace<void>(
+          IntentionDetailsRoute(intentionId: intentionId),
+        ),
+      ).catchError((Object error, StackTrace stack) {
+        // Диагностика перехода не меняет результат и не повторяет создание:
+        // https://api.flutter.dev/flutter/foundation/FlutterError/reportError.html
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            library: 'intention editor',
+            context: ErrorDescription('при открытии созданного намерения'),
+          ),
+        );
+      }),
+    );
   }
 
   String _submitLabel(
