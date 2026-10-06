@@ -5,6 +5,7 @@ import '../../../tag/domain/tag_id.dart';
 import '../../../tag/domain/tag_name.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
+import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 import 'intention_creation_close.dart';
@@ -18,7 +19,9 @@ sealed class IntentionEditorEvent {
 }
 
 final class IntentionEditorCreated extends IntentionEditorEvent {
-  const IntentionEditorCreated();
+  const IntentionEditorCreated(this.intentionId);
+
+  final IntentionId intentionId;
 }
 
 /// Черновик создания намерения: данные будущего намерения, которое ещё не

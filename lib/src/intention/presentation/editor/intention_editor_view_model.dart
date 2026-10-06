@@ -271,12 +271,12 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       }
 
       _activeToken = null;
-      // Success предъявляет оболочка; форма получает его только для закрытия.
+      // Успех предъявляет оболочка; сессия получает отдельный одноразовый эффект.
       state = switch (completion.result) {
         ResultSuccess(value: IntentionSaved(:final intention)) =>
           state.withOperation(
             OperationSucceeded<Intention>(intention),
-            event: const IntentionEditorCreated(),
+            event: IntentionEditorCreated(intention.id),
           ),
         ResultSuccess(value: IntentionDeleted()) => state.withOperation(
           const OperationFailed<Intention>(IntentionUnexpectedFailure()),

@@ -939,9 +939,14 @@ void main() {
       expect(repository.commands, hasLength(1));
     });
 
-    test('успех публикует событие завершения только своей сессии и только один раз', () async {
+    test('успех передаёт подтверждённый идентификатор только своей сессии и только один раз без подтверждения сообщения', () async {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
       final provider = intentionEditorViewModelProvider(
         IntentionCreationFormKey(),
       );
@@ -962,16 +967,31 @@ void main() {
         ..changeTitle('Намерение')
         ..markFavorite()
         ..submit();
+      final otherEditor = container.read(otherProvider.notifier)
+        ..changeTitle('Намерение')
+        ..submit();
+      final confirmedIntention = testIntention(index: 7);
+      final otherIntention = testIntention(index: 8);
 
-      repository.completeCommand(0, _savedResult());
+      repository.completeCommand(
+        0,
+        _savedResult(intention: confirmedIntention),
+      );
       await _deliverEvents(container);
       editor
+        ..consumeEvent()
         ..consumeEvent()
         ..submit()
         ..changeTitle('После успеха');
       await _deliverEvents(container);
 
-      expect(events, [isA<IntentionEditorCreated>()]);
+      expect(events, [
+        isA<IntentionEditorCreated>().having(
+          (event) => event.intentionId,
+          'подтверждённый идентификатор',
+          same(confirmedIntention.id),
+        ),
+      ]);
       expect(container.read(provider).event, isNull);
       expect(
         container.read(provider).operation,
@@ -980,9 +1000,45 @@ void main() {
       expect(container.read(otherProvider).event, isNull);
       expect(
         container.read(otherProvider).operation,
-        isA<OperationIdle<Intention>>(),
+        isA<OperationRunning<Intention>>(),
       );
-      expect(repository.commands, hasLength(1));
+      final success = await presenter.nextClaim();
+      expect(
+        success!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат той же отправки',
+          isA<ResultSuccess<IntentionCommandSuccess>>().having(
+            (result) => result.value,
+            'сохранённое намерение',
+            isA<IntentionSaved>().having(
+              (saved) => saved.intention,
+              'намерение',
+              same(confirmedIntention),
+            ),
+          ),
+        ),
+      );
+      coordinator.confirmPresentation(success);
+
+      repository.completeCommand(1, _savedResult(intention: otherIntention));
+      await _deliverEvents(container);
+      expect(
+        container.read(otherProvider).event,
+        isA<IntentionEditorCreated>().having(
+          (event) => event.intentionId,
+          'идентификатор второй отправки',
+          same(otherIntention.id),
+        ),
+      );
+      otherEditor.consumeEvent();
+      await _deliverEvents(container);
+      expect(container.read(otherProvider).event, isNull);
+      expect(events, hasLength(1));
+      final otherSuccess = await presenter.nextClaim();
+      expect(otherSuccess!.token, isNot(same(success.token)));
+      coordinator.confirmPresentation(otherSuccess);
+      expect(repository.commands, hasLength(2));
     });
 
     test('освобождение инициатора не отменяет принятую отправку полного черновика и не снимает её ограничение до результата', () async {
@@ -1057,6 +1113,7 @@ void main() {
           final session = await _failedFullDraftSession(failure);
           final failed = session.state;
 
+          expect(failed.event, isNull, reason: name);
           expect(failed.draft.title, _rawTitle, reason: name);
           expect(failed.draft.description, _rawDescription, reason: name);
           expect(failed.draft.tagIds, [_tagId(1), _tagId(2)], reason: name);
@@ -2440,12 +2497,22 @@ void main() {
         ..changeTitle('Другое намерение');
       final confirmation = _confirmationOf(editor.requestClose());
       final otherConfirmation = _confirmationOf(otherEditor.requestClose());
+      final confirmedIntention = testIntention(index: 9);
 
-      repository.completeCommand(0, _savedResult());
+      repository.completeCommand(
+        0,
+        _savedResult(intention: confirmedIntention),
+      );
       await _settle(container);
 
       final succeeded = container.read(provider);
-      expect(events, [isA<IntentionEditorCreated>()]);
+      expect(events, [
+        isA<IntentionEditorCreated>().having(
+          (event) => event.intentionId,
+          'подтверждённый идентификатор при ожидающем уходе',
+          same(confirmedIntention.id),
+        ),
+      ]);
       expect(succeeded.operation, isA<OperationSucceeded<Intention>>());
       expect(succeeded.closing, isA<IntentionCreationCloseNotRequested>());
       expect(succeeded.draftAvailability, IntentionDraftAvailability.closed);
@@ -2457,6 +2524,10 @@ void main() {
       }
       expect(editor.requestClose(), isA<IntentionCreationCloseSessionEnded>());
       expect(container.read(provider), same(succeeded));
+      editor.consumeEvent();
+      await _settle(container);
+      expect(container.read(provider).event, isNull);
+      expect(events, hasLength(1));
 
       expect(
         otherEditor.resolveClose(
@@ -2610,7 +2681,7 @@ void main() {
       expect(session.repository.commands, hasLength(1));
     });
 
-    test('новое открытие после сброса пусто и не получает данные или событие прежней команды', () async {
+    test('подтверждённый уход до результата не публикует событие в оставшейся или новой сессии', () async {
       final watches = _TagWatches();
       final repository = ControlledCatalogRepository()
         ..tagObservations = watches.watch;
@@ -2624,6 +2695,7 @@ void main() {
         IntentionCreationFormKey(),
       );
       final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
       final editor = container.read(provider.notifier)
         ..changeTitle('Оставленный черновик')
         ..changeDescription('Описание')
@@ -2638,8 +2710,9 @@ void main() {
         ),
         IntentionCreationCloseResolution.closed,
       );
-      subscription.close();
       await _settle(container);
+      final closed = container.read(provider);
+      expect(closed.event, isNull);
 
       final reopenedProvider = intentionEditorViewModelProvider(
         IntentionCreationFormKey(),
@@ -2665,11 +2738,16 @@ void main() {
       expect(reopened.selectedTags, isEmpty);
       expect(reopened.closing, isA<IntentionCreationCloseNotRequested>());
       expect(reopened.draftAvailability, IntentionDraftAvailability.editable);
+      container.read(reopenedProvider.notifier).changeTitle('Другой черновик');
+      final editedReopened = container.read(reopenedProvider);
 
       repository.completeCommand(0, _savedResult());
       await _settle(container);
 
-      expect(container.read(reopenedProvider), same(reopened));
+      expect(container.read(provider), same(closed));
+      expect(container.read(provider).event, isNull);
+      expect(container.read(reopenedProvider), same(editedReopened));
+      expect(editedReopened.draft.title, 'Другой черновик');
       expect(reopenedEvents, isEmpty);
       expect(watches.count, 1);
       final success = await presenter.nextClaim();
@@ -3323,8 +3401,8 @@ Future<void> _deliverEvents(ProviderContainer container) async {
   await Future<void>.delayed(Duration.zero);
 }
 
-Result<IntentionCommandSuccess> _savedResult() {
-  final intention = testIntention(title: 'Намерение');
+Result<IntentionCommandSuccess> _savedResult({Intention? intention}) {
+  intention ??= testIntention(title: 'Намерение');
   return ResultSuccess(
     IntentionSaved(
       intention,
