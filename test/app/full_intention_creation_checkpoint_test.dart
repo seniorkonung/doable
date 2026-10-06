@@ -46,6 +46,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -232,6 +233,11 @@ void main() {
         await _pop(tester, app);
         expect(_visibleTitles(tester, TagNavigationPage), ['Гулять', _created]);
         await _pop(tester, app);
+        await returnToIntentionGraphAfterCreation(
+          tester,
+          app.router,
+          waitFor: _until,
+        );
         expect(
           find.descendant(
             of: find.byType(IntentionCatalogPage),

@@ -955,14 +955,6 @@
   "@editorCloseFormAction": {
     "description": "Подсказка кнопки закрытия панели создания намерения и доступное название её модального фона"
   },
-  "editorExpandFormAction": "Expand the form",
-  "@editorExpandFormAction": {
-    "description": "Подсказка и доступное название кнопки, разворачивающей компактную панель создания намерения на всю доступную высоту"
-  },
-  "editorCollapseFormAction": "Collapse the form",
-  "@editorCollapseFormAction": {
-    "description": "Подсказка и доступное название кнопки, возвращающей развёрнутую панель создания намерения к компактному виду"
-  },
   "editorFavoriteOption": "Create as favorite",
   "@editorFavoriteOption": {
     "description": "Доступное название быстрой отметки избранного в черновике нового намерения"

@@ -20,6 +20,7 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Способ сценария дождаться появления элемента.
@@ -125,6 +126,41 @@ void expectHomeRootPage(StackRouter router) {
 /// Проверяет, что все страницы поверх закрыты и открыт граф намерений.
 void expectIntentionGraphRootPage(StackRouter router) {
   _expectRootPage(router, IntentionCatalogRoute.name);
+}
+
+/// Возвращает в исходный каталог перед следующими действиями после создания.
+///
+/// Допускает уже открытый каталог либо одну страницу намерения над ним.
+/// Оставшаяся форма, диалог или другая цепочка страниц — ошибка сценария.
+/// Шаг не доказывает непосредственный результат успешного создания: его
+/// проверяют до возвращения отдельными ожиданиями.
+Future<void> returnToIntentionGraphAfterCreation(
+  WidgetTester tester,
+  StackRouter router, {
+  RootPageWait waitFor = pumpUntilFound,
+}) async {
+  expect(
+    find.byKey(const ValueKey('intention-creation-sheet'), skipOffstage: false),
+    findsNothing,
+  );
+  expect(find.byType(AlertDialog, skipOffstage: false), findsNothing);
+
+  if (router.current.name == IntentionDetailsRoute.name) {
+    expect(
+      [for (final page in router.stack) page.routeData.name],
+      [AppShellRoute.name, IntentionDetailsRoute.name],
+    );
+    expect(await router.maybePop(), isTrue);
+    await waitFor(tester, find.byType(AppNavigationBar));
+    await tester.pumpAndSettle();
+  }
+
+  expect(
+    [for (final page in router.stack) page.routeData.name],
+    [AppShellRoute.name],
+  );
+  expectIntentionGraphRootPage(router);
+  expect(find.byType(IntentionCatalogPage), findsOneWidget);
 }
 
 /// Проверяет, что все страницы поверх закрыты и открыты дневные выборы.

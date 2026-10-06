@@ -11,6 +11,7 @@ import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../tag/presentation/catalog/tag_selection_context.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
+import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 import 'intention_creation_sheet.dart';
@@ -19,14 +20,14 @@ import 'intention_editor_state.dart';
 import 'intention_editor_view_model.dart';
 
 /// Хост сессии создания намерения в модальной нижней панели над исходным
-/// каталогом. Панель открывается компактной; человек явно разворачивает и
-/// сворачивает ту же панель, а режим размера хранит сессия.
+/// каталогом. Высота панели следует за содержимым в пределах доступной
+/// области, оставляя видимую часть каталога над ней.
 ///
 /// Теги черновика выбираются общим выбором тегов: хост открывает
 /// существующий маршрут выбора с контекстом набора своей сессии полноэкранно
 /// над панелью в том же корневом стеке. Маршрут панели остаётся под выбором
 /// и редактором тега и удерживает сессию; закрытие выбора возвращает ту же
-/// панель с её вводом, режимом и прокруткой. Выбранные теги показываются с
+/// панель с её вводом и прокруткой. Выбранные теги показываются с
 /// актуальностью из проекции сессии. Отказ сохранения из-за удалённых тегов
 /// сохраняет набор: панель отмечает эти теги и предлагает явное исправление,
 /// которое снимает только их и само сохранение не отправляет.
@@ -46,8 +47,9 @@ import 'intention_editor_view_model.dart';
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
 /// сессии о закрытии и не удаляет маршрут сам. Маршрут формы закрывается
-/// только по завершению сессии: сразу для неизменённого черновика, после
-/// подтверждённого сброса или успешного создания.
+/// только по завершению сессии: сразу для неизменённого черновика или после
+/// подтверждённого сброса. Успешное создание заменяет форму страницей
+/// созданного намерения в том же стеке, сохраняя каталог для возврата.
 @RoutePage()
 final class IntentionEditorPage extends ConsumerStatefulWidget {
   const IntentionEditorPage({super.key});
@@ -62,6 +64,7 @@ final class _IntentionEditorPageState
   final _formKey = IntentionCreationFormKey();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _descriptionFocus = FocusNode();
 
   /// Поля, которые панель доводит до видимости вместе с их ошибкой.
   final _titleField = GlobalKey(debugLabel: 'intention-editor-title');
@@ -73,13 +76,13 @@ final class _IntentionEditorPageState
   /// черновик остаются прежними.
   IntentionCreationSheetReveal? _failureReveal;
 
-  /// Маршрут формы уже закрывается после завершения сессии.
-  var _isRouteClosing = false;
+  /// Попытка открытия одноразова, но её отказ может оставить форму в стеке.
+  var _routeState = _EditorRouteState.active;
 
   /// Объяснение критериев действия уже открыто.
   var _isConfirmingReadiness = false;
 
-  /// Общий выбор тегов этой сессии уже открыт.
+  /// Общий выбор тегов начат и удерживает запрет отправки до возврата.
   var _isChoosingTags = false;
 
   IntentionEditorViewModelProvider get _provider =>
@@ -89,6 +92,7 @@ final class _IntentionEditorPageState
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _descriptionFocus.dispose();
     super.dispose();
   }
 
@@ -101,10 +105,8 @@ final class _IntentionEditorPageState
     ref.listen(provider, (previous, next) {
       // Страница следит за сессией и перестраивается с новым запросом.
       _failureReveal = _failureRevealAfter(previous, next);
-      if (next.event case IntentionEditorCreated()) {
-        notifier.consumeEvent();
-        // Сообщение об успехе предъявляет общий presenter оболочки.
-        _closeRoute();
+      if (next.event case IntentionEditorCreated(:final intentionId)) {
+        _openCreatedIntention(intentionId);
       }
     });
 
@@ -139,14 +141,7 @@ final class _IntentionEditorPageState
         }
       },
       child: IntentionCreationSheet(
-        // Размер панели — режим этой сессии: смена режима не меняет черновик
-        // и не запрашивает закрытие.
-        mode: editor.sheetMode,
-        onExpand: notifier.expandSheet,
-        onCollapse: notifier.collapseSheet,
         closeLabel: localizations.editorCloseFormAction,
-        expandLabel: localizations.editorExpandFormAction,
-        collapseLabel: localizations.editorCollapseFormAction,
         onCloseRequested: () => unawaited(_requestClose()),
         reveal: _failureReveal,
         header: Padding(
@@ -174,7 +169,16 @@ final class _IntentionEditorPageState
                   controller: _titleController,
                   readOnly: isDraftFixed,
                   autofocus: true,
+                  minLines: 1,
+                  maxLines: null,
+                  // При росте поля тип клавиатуры остаётся прежним:
+                  // https://api.flutter.dev/flutter/material/TextField/keyboardType.html
+                  keyboardType: TextInputType.text,
                   textInputAction: TextInputAction.next,
+                  // Явный переход не зависит от положения длинного поля
+                  // относительно закреплённых действий панели.
+                  // https://api.flutter.dev/flutter/material/TextField/onSubmitted.html
+                  onSubmitted: (_) => _descriptionFocus.requestFocus(),
                   decoration: InputDecoration(
                     labelText: localizations.editorTitleLabel,
                     error: titleFailure == null
@@ -195,6 +199,7 @@ final class _IntentionEditorPageState
                 child: TextField(
                   key: const ValueKey('intention-editor-description'),
                   controller: _descriptionController,
+                  focusNode: _descriptionFocus,
                   readOnly: isDraftFixed,
                   minLines: 1,
                   maxLines: null,
@@ -274,7 +279,9 @@ final class _IntentionEditorPageState
                 ),
               FilledButton(
                 key: const ValueKey('intention-editor-submit'),
-                onPressed: editor.canSubmit ? notifier.submit : null,
+                onPressed: editor.canSubmit && !_isChoosingTags
+                    ? _submit
+                    : null,
                 child: Text(_submitLabel(localizations, editor)),
               ),
             ],
@@ -310,6 +317,9 @@ final class _IntentionEditorPageState
 
   /// Передаёт запрос ухода сессии и выполняет её решение.
   Future<void> _requestClose() async {
+    if (!_canCloseRoute) {
+      return;
+    }
     switch (ref.read(_provider.notifier).requestClose()) {
       case IntentionCreationClosedImmediately() ||
           IntentionCreationCloseSessionEnded():
@@ -324,7 +334,7 @@ final class _IntentionEditorPageState
             confirmation: confirmation,
           ),
         );
-        if (!mounted) {
+        if (!_canCloseRoute) {
           return;
         }
         // Закрытие диалога без выбора продолжает ввод.
@@ -371,6 +381,19 @@ final class _IntentionEditorPageState
     ref.read(_provider.notifier).confirmReadiness();
   }
 
+  /// Проверяет допуск заново: обработчик мог быть получен до открытия тегов
+  /// или смены состояния сессии.
+  void _submit() {
+    if (!mounted ||
+        _routeState != _EditorRouteState.active ||
+        _isChoosingTags) {
+      return;
+    }
+    if (ref.read(_provider).canSubmit) {
+      ref.read(_provider.notifier).submit();
+    }
+  }
+
   /// Открывает общий выбор тегов для набора черновика этой сессии.
   ///
   /// Выбор добавляет теги только через контракт набора сессии, который после
@@ -378,7 +401,9 @@ final class _IntentionEditorPageState
   /// черновик не меняет. Повторное нажатие до закрытия выбора второй выбор не
   /// открывает.
   Future<void> _chooseTags() async {
-    if (_isChoosingTags) {
+    if (!mounted ||
+        _routeState != _EditorRouteState.active ||
+        _isChoosingTags) {
       return;
     }
     switch (ref.read(_provider).draftAvailability) {
@@ -388,25 +413,103 @@ final class _IntentionEditorPageState
           IntentionDraftAvailability.closed:
         return;
     }
-    _isChoosingTags = true;
-    final tagSet = ref.read(_provider.notifier).draftTagSet;
+    setState(() => _isChoosingTags = true);
     try {
+      final tagSet = ref.read(_provider.notifier).draftTagSet;
       await context.router.push<void>(
         TagCatalogRoute(selectionContext: TagDraftContext(tagSet)),
       );
+    } catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'intention editor',
+          context: ErrorDescription('при открытии выбора тегов'),
+        ),
+      );
     } finally {
-      _isChoosingTags = false;
+      if (mounted) {
+        setState(() => _isChoosingTags = false);
+      }
     }
   }
 
   /// Закрывает только маршрут этой формы, минуя повторное обращение к уже
   /// завершённой сессии.
   void _closeRoute() {
-    if (_isRouteClosing || !mounted) {
+    if (!_canCloseRoute) {
       return;
     }
-    _isRouteClosing = true;
+    _routeState = _EditorRouteState.removed;
     context.router.removeRoute(context.routeData);
+  }
+
+  /// Наличие исходного маршрута проверяется по matchId, как у removeRoute:
+  /// https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
+  /// После удаления либо освобождения формы её контекст не используется.
+  bool get _canCloseRoute {
+    if (!mounted) {
+      return false;
+    }
+    switch (_routeState) {
+      case _EditorRouteState.active || _EditorRouteState.openingFailed:
+        final route = context.routeData;
+        return context.router.stackData.any(
+          (entry) => entry.matchId == route.matchId,
+        );
+      case _EditorRouteState.openingCreatedIntention ||
+          _EditorRouteState.removed:
+        return false;
+    }
+  }
+
+  /// Потребляет успех только живого исходного маршрута и завершает переход
+  /// до любого запоздалого запроса закрытия или ответа его диалога.
+  void _openCreatedIntention(IntentionId intentionId) {
+    if (!mounted || _routeState != _EditorRouteState.active) {
+      return;
+    }
+    final router = context.router;
+    final route = context.routeData;
+    if (router.stackData.lastOrNull?.matchId != route.matchId) {
+      return;
+    }
+    _routeState = _EditorRouteState.openingCreatedIntention;
+    ref.read(_provider.notifier).consumeEvent();
+
+    // replace удаляет форму вместе с её диалогами, сохраняя оболочку:
+    // https://pub.dev/packages/auto_route/versions/11.1.0#navigating-between-screens
+    // Future завершается при возврате со страницы; сессия его не ждёт.
+    // Future.sync отделяет даже синхронный отказ эффекта от успешной записи:
+    // https://api.dart.dev/dart-async/Future/Future.sync.html
+    unawaited(
+      Future<void>.sync(
+        () => router.replace<void>(
+          IntentionDetailsRoute(intentionId: intentionId),
+        ),
+      ).catchError((Object error, StackTrace stack) {
+        // Отказ разрешает только новый запрос ухода оставшейся формы.
+        // Захваченные router и route позволяют обойтись без её контекста.
+        if (mounted &&
+            _routeState == _EditorRouteState.openingCreatedIntention) {
+          _routeState =
+              router.stackData.any((entry) => entry.matchId == route.matchId)
+              ? _EditorRouteState.openingFailed
+              : _EditorRouteState.removed;
+        }
+        // Диагностика перехода не меняет результат и не повторяет создание:
+        // https://api.flutter.dev/flutter/foundation/FlutterError/reportError.html
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            library: 'intention editor',
+            context: ErrorDescription('при открытии созданного намерения'),
+          ),
+        );
+      }),
+    );
   }
 
   String _submitLabel(
@@ -420,6 +523,14 @@ final class _IntentionEditorPageState
     OperationSucceeded<Intention>() ||
     OperationFailed<Intention>() => localizations.editorSaveAction,
   };
+}
+
+/// Разделяет допуск действий, одноразовый эффект и выход после его отказа.
+enum _EditorRouteState {
+  active,
+  openingCreatedIntention,
+  openingFailed,
+  removed,
 }
 
 /// Где панель показывает отказ сохранения: под своим полем в прокручиваемых

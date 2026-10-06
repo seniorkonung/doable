@@ -249,8 +249,6 @@
   "editorCloseSavingStayAction": "Остаться",
   "editorCloseSavingLeaveAction": "Закрыть",
   "editorCloseFormAction": "Закрыть форму",
-  "editorExpandFormAction": "Развернуть форму",
-  "editorCollapseFormAction": "Свернуть форму",
   "editorFavoriteOption": "Создать избранным",
   "editorFavoriteOptionOn": "Создать избранным: включено",
   "editorFavoriteOptionOff": "Создать избранным: выключено",

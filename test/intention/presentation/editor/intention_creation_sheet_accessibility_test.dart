@@ -45,7 +45,69 @@ void main() {
     final code = locale.languageCode;
 
     testWidgets(
-      'экранный диктор проходит панель в порядке чтения при любом режиме, ориентации, клавиатуре и заполнении черновика — $code',
+      'диктор и нажатия доступны на экране 568×320 с клавиатурой и масштабом 200% в пустой и заполненной панели — $code',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        _usePhone(tester, size: const Size(568, 320), keyboard: 160, right: 48);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l10n = await AppLocalizations.delegate.load(locale);
+        final sessions = _EditorSessions();
+        await _openCatalog(tester, _repositoryWithTags(), sessions, locale);
+        await tester.tap(find.byKey(_catalogCreate));
+        await tester.pumpAndSettle();
+        final session = sessions.single;
+        expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
+        final fields = find.byKey(
+          const ValueKey('intention-creation-sheet-fields'),
+        );
+        expect(tester.getSize(fields).height, greaterThan(0));
+        expect(_traversal(tester), _panel(l10n));
+
+        await tester.enterText(find.byKey(_title), _userTitle);
+        await tester.enterText(find.byKey(_description), _userDescription);
+        sessions.notifier(tester)
+          ..draftTagSet.add(_home)
+          ..draftTagSet.add(_work)
+          ..markFavorite()
+          ..confirmReadiness();
+        await tester.pumpAndSettle();
+        expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
+        _expectNoSizeActions();
+        for (final control in [
+          _title,
+          _description,
+          _tagRemove(_home),
+          _tagRemove(_work),
+          _chooseTags,
+          _favorite,
+          _readiness,
+          _submit,
+          _closeButton,
+        ]) {
+          final target = find.byKey(control);
+          await Scrollable.ensureVisible(
+            tester.element(target),
+            alignment: 0.5,
+          );
+          await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget, reason: '$control');
+          final rect = tester.getRect(target);
+          expect(rect.center.dy, lessThan(160));
+          expect(rect.right, lessThanOrEqualTo(520));
+          expect(tester.view.viewInsets.bottom, 160);
+          expect(tester.getSize(fields).height, greaterThan(0));
+        }
+        _expectSameSession(sessions, session);
+        expect(sessions.state(tester).draft.title, _userTitle);
+        expect(sessions.state(tester).draft.description, _userDescription);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'экранный диктор проходит компактную панель в порядке чтения при любой ориентации, клавиатуре и заполнении черновика — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester);
@@ -69,22 +131,13 @@ void main() {
             (Size(_phone.height, _phone.width), 180.0),
           ]) {
             _usePhone(tester, size: size, keyboard: keyboard);
-            for (final mode in IntentionCreationSheetMode.values) {
-              if (sessions.state(tester).sheetMode != mode) {
-                await tester.tap(find.byKey(_resize));
-              }
-              await tester.pumpAndSettle();
-              expect(
-                _traversal(tester),
-                _panel(
-                  l10n,
-                  mode: mode,
-                  tags: [for (final tag in tags) tag.name.value],
-                ),
-                reason:
-                    '$size, клавиатура $keyboard, $mode, тегов: ${tags.length}',
-              );
-            }
+            await tester.pumpAndSettle();
+            expect(
+              _traversal(tester),
+              _panel(l10n, tags: [for (final tag in tags) tag.name.value]),
+              reason: '$size, клавиатура $keyboard, тегов: ${tags.length}',
+            );
+            _expectNoSizeActions();
           }
         }
         semantics.dispose();
@@ -153,9 +206,10 @@ void main() {
         await tester.enterText(find.byKey(_title), _userTitle);
         await tester.enterText(find.byKey(_description), _userDescription);
         await tester.pumpAndSettle();
+        _expectNoSizeActions();
         expect(
           find.semantics.byLabel(l10n.editorTitleLabel).evaluate().single,
-          isSemantics(value: _userTitle, isTextField: true),
+          isSemantics(value: _userTitle, isTextField: true, isMultiline: true),
         );
         expect(
           find.semantics.byLabel(l10n.editorDescriptionLabel).evaluate().single,
@@ -200,6 +254,7 @@ void main() {
         _expectSameSession(sessions, session);
         expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
+        _expectNoSizeActions();
 
         tester.semantics.tap(_nodeOf(tester, find.byKey(_favorite)));
         await tester.pumpAndSettle();
@@ -245,29 +300,6 @@ void main() {
           tooltip: l10n.editorReadinessOptionOn,
           isOn: true,
           icon: Icons.check_circle,
-        );
-
-        // Размер меняется кнопкой без жеста, и диктор слышит обратное
-        // действие.
-        tester.semantics.tap(_byTooltip(l10n.editorExpandFormAction));
-        await tester.pumpAndSettle();
-        expect(
-          sessions.state(tester).sheetMode,
-          IntentionCreationSheetMode.expanded,
-        );
-        expect(
-          _traversal(tester),
-          _panel(
-            l10n,
-            mode: IntentionCreationSheetMode.expanded,
-            tags: ['Дом', 'Работа'],
-          ),
-        );
-        tester.semantics.tap(_byTooltip(l10n.editorCollapseFormAction));
-        await tester.pumpAndSettle();
-        expect(
-          sessions.state(tester).sheetMode,
-          IntentionCreationSheetMode.compact,
         );
 
         tester.semantics.tap(_byTooltip(l10n.editorRemoveDraftTag('Работа')));
@@ -485,12 +517,14 @@ void main() {
               ),
         );
 
-        // Успех закрывает панель, и каталог с навигацией снова доступны.
+        // Успех открывает намерение; возврат делает каталог снова доступным.
         repository.completeCommand(3, _savedResult());
         await tester.pump();
         await tester.pump();
         _completeCatalogRefresh(repository);
         await tester.pumpAndSettle();
+        expect(router.current.name, IntentionDetailsRoute.name);
+        await returnToIntentionGraphAfterCreation(tester, router);
         expectIntentionGraphRootPage(router);
         expect(
           find.semantics.byPredicate(
@@ -525,14 +559,22 @@ void main() {
         await tester.enterText(find.byKey(_title), _userTitle);
         await tester.pumpAndSettle();
 
+        // Действие экранной клавиатуры ведёт из растущего названия в
+        // описание, сохраняя точный текст без дополнительных переносов.
+        await tester.testTextInput.receiveAction(TextInputAction.next);
+        await tester.pumpAndSettle();
+        expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
+        expect(sessions.state(tester).draft.title, _userTitle);
+        await tester.tap(find.byKey(_title));
+        await tester.pumpAndSettle();
+
         // Порядок обхода совпадает с порядком чтения и замыкается в панели.
-        expect(await _tabOrder(tester, steps: 9), [
+        expect(await _tabOrder(tester, steps: 8), [
           _description,
           _chooseTags,
           _favorite,
           _readiness,
           _submit,
-          _resize,
           _closeButton,
           _title,
           _description,
@@ -621,18 +663,6 @@ void main() {
         expect(sessions.state(tester).draft.tagIds, isEmpty);
         expect(_isFocusedIn(tester, find.byType(IntentionEditorPage)), isTrue);
 
-        // Размер меняется вводом без потери фокуса.
-        await _tabTo(tester, find.byKey(_resize));
-        for (final mode in [
-          IntentionCreationSheetMode.expanded,
-          IntentionCreationSheetMode.compact,
-        ]) {
-          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-          await tester.pumpAndSettle();
-          expect(sessions.state(tester).sheetMode, mode);
-          expect(_isFocusedIn(tester, find.byKey(_resize)), isTrue);
-        }
-
         // Подтверждение закрытия удерживает обход; Escape продолжает ввод.
         await _tabTo(tester, find.byKey(_closeButton));
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -705,9 +735,6 @@ void main() {
             ..confirmReadiness();
           await tester.pumpAndSettle();
           await _expectGuidelines(tester, 'заполненная компактная панель');
-          await tester.tap(find.byKey(_resize));
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'заполненная развёрнутая панель');
 
           sessions.notifier(tester).disableReadiness();
           await tester.pumpAndSettle();
@@ -761,9 +788,6 @@ void main() {
           );
           await tester.pumpAndSettle();
           await _expectGuidelines(tester, 'повтор после устранимого отказа');
-          await tester.tap(find.byKey(_resize));
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'повтор в компактной панели');
           expect(tester.takeException(), isNull);
           semantics.dispose();
         },
@@ -782,7 +806,6 @@ const _readiness = ValueKey('intention-editor-readiness');
 const _submit = ValueKey('intention-editor-submit');
 const _failure = ValueKey('intention-editor-failure');
 const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
-const _resize = ValueKey('intention-creation-sheet-resize');
 const _closeButton = ValueKey('intention-editor-close');
 const _readinessConfirmation = ValueKey(
   'intention-editor-readiness-confirmation',
@@ -802,7 +825,7 @@ ValueKey<String> _tagRow(Tag tag) =>
 
 /// Пользовательские данные: интерфейс показывает их без перевода на любом
 /// языке.
-const _userTitle = 'Купить хлеб 🍞';
+const _userTitle = 'Купить хлеб 🍞, молоко и продукты для ужина после работы';
 const _userDescription = 'Зайти после работы\nWholegrain bread';
 
 final _home = _tag(1, 'Дом');
@@ -815,28 +838,29 @@ const _phone = Size(360, 740);
 /// Ставит экран [size] со строкой состояния и жестовой навигацией;
 /// открытая клавиатура высотой [keyboard] закрывает нижний безопасный
 /// отступ.
-void _usePhone(WidgetTester tester, {Size size = _phone, double keyboard = 0}) {
+void _usePhone(
+  WidgetTester tester, {
+  Size size = _phone,
+  double keyboard = 0,
+  double right = 0,
+}) {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
-  tester.view.padding = FakeViewPadding(top: 24, bottom: keyboard > 0 ? 0 : 24);
-  tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+  tester.view.padding = FakeViewPadding(
+    top: 24,
+    right: right,
+    bottom: keyboard > 0 ? 0 : 24,
+  );
+  tester.view.viewPadding = FakeViewPadding(top: 24, right: right, bottom: 24);
   tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   addTearDown(tester.view.reset);
 }
 
-/// Что экранный диктор объявляет по порядку обхода панели [mode] с
-/// выбранными тегами [tags]: модальный фон, размер и закрытие, заголовок,
+/// Что экранный диктор объявляет по порядку обхода компактной панели с
+/// выбранными тегами [tags]: модальный фон, закрытие, заголовок,
 /// поля, теги со снятием, быстрые действия и сохранение.
-List<String> _panel(
-  AppLocalizations l10n, {
-  IntentionCreationSheetMode mode = IntentionCreationSheetMode.compact,
-  List<String> tags = const [],
-}) => [
+List<String> _panel(AppLocalizations l10n, {List<String> tags = const []}) => [
   l10n.editorCloseFormAction,
-  switch (mode) {
-    IntentionCreationSheetMode.compact => l10n.editorExpandFormAction,
-    IntentionCreationSheetMode.expanded => l10n.editorCollapseFormAction,
-  },
   l10n.editorCloseFormAction,
   l10n.editorTitle,
   l10n.editorTitleLabel,
@@ -873,6 +897,41 @@ List<String> _traversal(WidgetTester tester) => [
       SemanticsData(:final tooltip) => tooltip,
     },
 ];
+
+/// Старые действия отсутствуют в тексте, подсказках и всём семантическом
+/// дереве, включая названия и подсказки дополнительных действий диктора.
+/// https://api.flutter.dev/flutter/semantics/SemanticsData/customSemanticsActionIds.html
+void _expectNoSizeActions() {
+  for (final label in const [
+    'Развернуть форму',
+    'Свернуть форму',
+    'Expand the form',
+    'Collapse the form',
+  ]) {
+    expect(find.text(label), findsNothing);
+    expect(find.byTooltip(label), findsNothing);
+    expect(
+      find.semantics.byPredicate((node) {
+        final data = node.getSemanticsData();
+        final descriptions = [data.label, data.hint, data.tooltip];
+        for (final id in data.customSemanticsActionIds ?? const <int>[]) {
+          if (CustomSemanticsAction.getAction(id) case final action?) {
+            descriptions.addAll([action.label ?? '', action.hint ?? '']);
+          }
+        }
+        return descriptions.any((text) => text.contains(label));
+      }, describeMatch: (_) => 'действие изменения размера «$label»'),
+      findsNothing,
+    );
+  }
+  expect(
+    find.semantics.byAnyAction([
+      SemanticsAction.increase,
+      SemanticsAction.decrease,
+    ]),
+    findsNothing,
+  );
+}
 
 /// Узел экранного диктора, которым объявлен виджет [finder].
 FinderBase<SemanticsNode> _nodeOf(WidgetTester tester, Finder finder) {
@@ -962,7 +1021,6 @@ const _focusTargets = [
   _favorite,
   _readiness,
   _submit,
-  _resize,
   _closeButton,
   _readinessCancel,
   _readinessConfirm,

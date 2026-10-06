@@ -1,6 +1,8 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -157,6 +159,12 @@ void main() {
         ['Быт', _sport],
       );
       expect(app.storage.writes, _fullWrites);
+      await returnToIntentionGraphAfterCreation(
+        tester,
+        app.container.read(appRouterProvider),
+        waitFor: (tester, finder) =>
+            _wait(tester, () => finder.evaluate().isNotEmpty),
+      );
       await _acceptMessage(tester, _successMessage(app));
       expect(_intentionEvents(app), [
         _createEvent(
@@ -232,18 +240,24 @@ void main() {
   }
 
   testWidgets('отказ файлового хранилища после всех записей полного черновика '
-      'откатывает граф, FTS, порядок и ревизию; панель предъявляет один отказ '
-      'и явный повтор сохраняет одно намерение даже при отказе диагностики', (
-    tester,
-  ) async {
+      'откатывает граф, FTS, порядок и ревизию; компактная панель '
+      'предъявляет один отказ и явный повтор сохраняет одно намерение '
+      'на экране 568×320 с открытой клавиатурой и масштабом 200% '
+      'даже при отказе диагностики', (tester) async {
     final app = await _launch(tester);
     final sport = await _prepare(tester, app);
+    tester.view.physicalSize = const Size(568, 320);
+    tester.view.padding = const FakeViewPadding(top: 24, right: 48);
+    tester.view.viewPadding = const FakeViewPadding(top: 24, right: 48);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
     final before = _storedGraph(app.raw);
     final revision = await _revision(tester, app);
     final marks = storedFavoriteMarks(app.raw);
-    await _tap(tester, _key('intention-creation-sheet-resize'));
-    await tester.pumpAndSettle();
-    final expandedHeight = tester.getSize(_sheet).height;
+    final sheetElement = tester.element(_sheet);
+    _expectTightKeyboard(tester);
     app.storage.observeCreation(fail: true);
     app.diagnostics.throwOnIntentionCommand = true;
     await _tap(tester, _submit);
@@ -258,6 +272,7 @@ void main() {
         isA<IntentionUnavailableFailure>(),
       ),
     );
+    expect(failed.confirmedChange, isNull);
     _expectFaultPoint(app, [_home, sport]);
     expect(_storedGraph(app.raw), before);
     expect(storedFavoriteMarks(app.raw), marks);
@@ -266,8 +281,32 @@ void main() {
       GraphRevisionOrder.same,
     );
     _expectDraft(tester, [_home, sport]);
-    expect(tester.getSize(_sheet).height, expandedHeight);
+    expect(tester.element(_sheet), same(sheetElement));
+    _expectTightKeyboard(tester);
+    // Отказ читается от начала до конца прокруткой при той же клавиатуре.
+    final status = _key('intention-creation-sheet-status');
+    for (final alignment in [0.0, 1.0]) {
+      await Scrollable.ensureVisible(
+        tester.element(_failure),
+        alignment: alignment,
+      );
+      await tester.pumpAndSettle();
+      final viewport = tester.getRect(status);
+      final message = tester.getRect(_failure);
+      final edge = alignment == 0 ? message.top : message.bottom - 0.1;
+      expect(viewport.height, greaterThan(0));
+      expect(edge, greaterThanOrEqualTo(viewport.top));
+      expect(edge, lessThan(viewport.bottom));
+      _expectTightKeyboard(tester);
+    }
+    await Scrollable.ensureVisible(tester.element(_failure), alignment: 0.5);
+    await tester.pumpAndSettle();
     _expectInlineFailure(tester, app, failed, app.l10n.editorCreateUnavailable);
+    expect(
+      tester.getSemantics(_failure),
+      isSemantics(label: app.l10n.editorCreateUnavailable),
+    );
+    expect(_submit.hitTestable(), findsOneWidget);
     expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
     expect(_intentionEvents(app), [
       _createEvent(
@@ -279,6 +318,9 @@ void main() {
 
     // Одноразовый hook уже снял отказ. Сами поля и исправления не
     // отправляют новую команду: повтор выполняется только кнопкой панели.
+    expect(app.creations, [same(failed)]);
+    expect(app.storage.creationAttempts, 1);
+    _expectTightKeyboard(tester);
     await _tap(tester, _submit);
     final saved = await _creation(tester, app, count: 2);
     await _wait(tester, () => _sheet.evaluate().isEmpty);
@@ -298,6 +340,12 @@ void main() {
       GraphRevisionOrder.same,
     );
     expect(app.diagnostics.thrown, 2);
+    await returnToIntentionGraphAfterCreation(
+      tester,
+      app.container.read(appRouterProvider),
+      waitFor: (tester, finder) =>
+          _wait(tester, () => finder.evaluate().isNotEmpty),
+    );
     await _acceptMessage(tester, _successMessage(app));
     expect(_intentionEvents(app), [
       _createEvent(
@@ -312,6 +360,67 @@ void main() {
     app.diagnostics.expectPrivateDataHidden(app.raw);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('отказ при подтверждении ухода сохраняет полный черновик, '
+      'отклоняет прежний ответ и открывает намерение после явного повтора', (
+    tester,
+  ) async {
+    final app = await _launch(tester);
+    final sport = await _prepare(tester, app);
+    final router = app.container.read(appRouterProvider);
+    final formRoute = router.stackData.last;
+    final before = _storedGraph(app.raw);
+    final revision = await _revision(tester, app);
+    app.storage.observeCreation(fail: true);
+    app.storage.hold();
+    await _tap(tester, _submit);
+    await _wait(tester, () => app.storage.isHolding);
+    await _Leave.back.request(tester);
+    final lateDiscard = tester
+        .widget<FilledButton>(_key('intention-editor-close-discard'))
+        .onPressed!;
+    app.storage.release();
+    final failed = await _creation(tester, app);
+    await tester.pumpAndSettle();
+
+    _expectFaultPoint(app, [_home, sport]);
+    expect(_storedGraph(app.raw), before);
+    expect(
+      (await _revision(tester, app)).compareTo(revision),
+      GraphRevisionOrder.same,
+    );
+    expect(_confirmation, findsNothing);
+    _expectInlineFailure(tester, app, failed, app.l10n.editorCreateUnavailable);
+    _expectDraft(tester, [_home, sport]);
+    lateDiscard();
+    await tester.pumpAndSettle();
+    expect(router.current.name, IntentionEditorRoute.name);
+    expect(router.stackData.last, same(formRoute));
+    _expectDraft(tester, [_home, sport]);
+    expect(app.creations, [same(failed)]);
+    expect(app.storage.creationAttempts, 1);
+
+    await _tap(tester, _submit);
+    final saved = await _creation(tester, app, count: 2);
+    await _wait(tester, () => _sheet.evaluate().isEmpty);
+    final id = _expectSaved(app, saved, [_home, sport]);
+    _expectCreatedRoute(app, id);
+    final detailsRoute = router.stackData.last;
+    expect(saved.token, isNot(same(failed.token)));
+    expect(saved.revision!.compareTo(revision), GraphRevisionOrder.newer);
+    expect(app.storage.writes, [..._fullWrites, ..._fullWrites]);
+    expect(app.storage.creationAttempts, 2);
+    lateDiscard();
+    await _acceptMessage(tester, _successMessage(app));
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(router.stackData.last, same(detailsRoute));
+    expect(app.creations, [same(failed), same(saved)]);
+    expect(app.storage.creationAttempts, 2);
+    _expectSaved(app, saved, [_home, sport]);
+    expect(_message, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final leave in _Leave.values) {
     for (final outcome in _Outcome.values) {
       for (final surface in _AtResult.values) {
@@ -409,6 +518,9 @@ void main() {
                   expect(_sheet, findsNothing);
                   expect(_confirmation, findsNothing);
                 }
+                if (surface == _AtResult.confirmation) {
+                  _expectCreatedRoute(app, id);
+                }
                 await _acceptMessage(tester, _successMessage(app));
               case _Outcome.failure:
                 expect(
@@ -464,6 +576,19 @@ void main() {
             // Он не закрывает новую панель и не повторяет принятую команду.
             lateDiscard();
             await tester.pumpAndSettle();
+            if (surface != _AtResult.confirmation) {
+              final router = app.container.read(appRouterProvider);
+              expect(
+                router.current.name,
+                surface == _AtResult.newOpening
+                    ? IntentionEditorRoute.name
+                    : AppShellRoute.name,
+              );
+              expect(
+                router.stackData.map((route) => route.name),
+                isNot(contains(IntentionDetailsRoute.name)),
+              );
+            }
             if (surface == _AtResult.newOpening) {
               expect(_sheet, findsOneWidget);
               expect(
@@ -957,6 +1082,18 @@ void _expectInlineFailure(
   expect(app.coordinator.claimInitiatorFailure(completion.token), isNull);
 }
 
+void _expectCreatedRoute(_App app, IntentionId id) {
+  final router = app.container.read(appRouterProvider);
+  expect(router.current.name, IntentionDetailsRoute.name);
+  expect(router.current.argsAs<IntentionDetailsRouteArgs>().intentionId, id);
+  expect(router.stackData.map((route) => route.name), [
+    AppShellRoute.name,
+    IntentionDetailsRoute.name,
+  ]);
+  expect(_sheet, findsNothing);
+  expect(_confirmation, findsNothing);
+}
+
 String _successMessage(_App app) => app.l10n.graphOperationMessage(
   app.l10n.graphOperationCreate,
   _title,
@@ -998,6 +1135,22 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
+}
+
+/// Исходная тесная геометрия сохраняет поля и действия над клавиатурой.
+void _expectTightKeyboard(WidgetTester tester) {
+  expect(tester.view.physicalSize, const Size(568, 320));
+  expect(tester.view.viewInsets.bottom, 160);
+  expect(tester.view.padding.top, 24);
+  expect(tester.view.padding.right, 48);
+  expect(tester.platformDispatcher.textScaleFactor, 2);
+  expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(48));
+  expect(tester.getRect(_sheet).bottom, 160);
+  expect(
+    tester.getSize(_key('intention-creation-sheet-fields')).height,
+    greaterThan(0),
+  );
+  expect(_key('intention-editor-close').hitTestable(), findsOneWidget);
 }
 
 Future<void> _until(WidgetTester tester, Finder finder) =>

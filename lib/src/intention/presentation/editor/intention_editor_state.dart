@@ -5,14 +5,13 @@ import '../../../tag/domain/tag_id.dart';
 import '../../../tag/domain/tag_name.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
+import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 import 'intention_creation_close.dart';
-import 'intention_creation_sheet_mode.dart';
 import 'intention_draft_tag_set.dart';
 
 export 'intention_creation_close.dart';
-export 'intention_creation_sheet_mode.dart';
 export 'intention_draft_tag_set.dart';
 
 sealed class IntentionEditorEvent {
@@ -20,7 +19,9 @@ sealed class IntentionEditorEvent {
 }
 
 final class IntentionEditorCreated extends IntentionEditorEvent {
-  const IntentionEditorCreated();
+  const IntentionEditorCreated(this.intentionId);
+
+  final IntentionId intentionId;
 }
 
 /// Черновик создания намерения: данные будущего намерения, которое ещё не
@@ -154,7 +155,6 @@ final class IntentionDraftTagReadFailed extends IntentionDraftTagStatus {
 final class IntentionEditorState {
   const IntentionEditorState._({
     required this.draft,
-    required this.sheetMode,
     required this.selectedTags,
     required this.operation,
     required this.event,
@@ -164,7 +164,6 @@ final class IntentionEditorState {
 
   const IntentionEditorState.initial()
     : draft = const IntentionCreationDraft.initial(),
-      sheetMode = IntentionCreationSheetMode.compact,
       selectedTags = const {},
       operation = const OperationIdle<Intention>(),
       event = null,
@@ -172,10 +171,6 @@ final class IntentionEditorState {
       closing = const IntentionCreationCloseNotRequested();
 
   final IntentionCreationDraft draft;
-
-  /// Режим размера панели этой сессии. Не входит в черновик и не влияет на
-  /// его изменённость, отправку и ход закрытия.
-  final IntentionCreationSheetMode sheetMode;
 
   /// Выбранные теги для показа — неизменяемая проекция с теми же ключами и
   /// в том же порядке, что и набор черновика. Она не входит в черновик и не
@@ -283,7 +278,6 @@ final class IntentionEditorState {
       draft.tagIds.contains(id)
       ? IntentionEditorState._(
           draft: draft,
-          sheetMode: sheetMode,
           selectedTags: Map.unmodifiable({...selectedTags, id: tag}),
           operation: operation,
           event: event,
@@ -291,20 +285,6 @@ final class IntentionEditorState {
           closing: closing,
         )
       : this;
-
-  /// Меняет только режим размера панели.
-  IntentionEditorState withSheetMode(IntentionCreationSheetMode value) =>
-      sheetMode == value
-      ? this
-      : IntentionEditorState._(
-          draft: draft,
-          sheetMode: value,
-          selectedTags: selectedTags,
-          operation: operation,
-          event: event,
-          failurePresentation: failurePresentation,
-          closing: closing,
-        );
 
   IntentionEditorState withReadiness(IntentionReadiness value) =>
       draft.readiness == value ? this : _withDraft(draft.withReadiness(value));
@@ -324,7 +304,6 @@ final class IntentionEditorState {
     GraphInitiatorPresentationClaim? failurePresentation,
   }) => IntentionEditorState._(
     draft: draft,
-    sheetMode: sheetMode,
     selectedTags: selectedTags,
     operation: value,
     event: event,
@@ -339,7 +318,6 @@ final class IntentionEditorState {
 
   IntentionEditorState withoutEvent() => IntentionEditorState._(
     draft: draft,
-    sheetMode: sheetMode,
     selectedTags: selectedTags,
     operation: operation,
     event: null,
@@ -361,7 +339,6 @@ final class IntentionEditorState {
   /// поверхности.
   IntentionEditorState closedOnRequest() => IntentionEditorState._(
     draft: draft,
-    sheetMode: sheetMode,
     selectedTags: selectedTags,
     operation: operation,
     event: event,
@@ -372,7 +349,6 @@ final class IntentionEditorState {
   IntentionEditorState _withClosing(IntentionCreationClosing value) =>
       IntentionEditorState._(
         draft: draft,
-        sheetMode: sheetMode,
         selectedTags: selectedTags,
         operation: operation,
         event: event,
@@ -383,7 +359,6 @@ final class IntentionEditorState {
   IntentionEditorState _withDraft(IntentionCreationDraft draft) =>
       IntentionEditorState._(
         draft: draft,
-        sheetMode: sheetMode,
         selectedTags: selectedTags,
         operation: operation,
         event: event,
@@ -398,7 +373,6 @@ final class IntentionEditorState {
     final nextOperation = _operationAfterEditing(_DraftTextEdit(field));
     return IntentionEditorState._(
       draft: draft,
-      sheetMode: sheetMode,
       selectedTags: selectedTags,
       operation: nextOperation,
       event: null,
@@ -418,7 +392,6 @@ final class IntentionEditorState {
     );
     return IntentionEditorState._(
       draft: draft,
-      sheetMode: sheetMode,
       selectedTags: selectedTags,
       operation: nextOperation,
       event: event,
