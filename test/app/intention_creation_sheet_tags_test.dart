@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsRole;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
@@ -10,6 +11,10 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    show IntentionSaved;
+import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -330,6 +335,11 @@ void main() {
       final app = await _App.start(tester);
       final l10n = app.l10n;
       final home = _tagId(_homeTag);
+      final creations = <IntentionCommandCompletion>[];
+      final subscription = app.coordinator.completions.listen((completion) {
+        if (completion is IntentionCommandCompletion) creations.add(completion);
+      });
+      addTearDown(subscription.cancel);
 
       /// Панель показывает текст, обе включённые отметки и набор [tags].
       void expectPreparedFields(List<String> tags) {
@@ -437,10 +447,90 @@ void main() {
       // Только «Сохранить» записывает намерение со всеми пятью полями.
       await _tap(tester, _submit);
       await _waitForStorage(tester, () => _sheet.evaluate().isEmpty);
-      await returnToIntentionGraphAfterCreation(
+      expect(creations, hasLength(1));
+      final id = switch (creations.single.result) {
+        ResultSuccess(value: IntentionSaved(:final intention)) => intention.id,
+        final result => fail('Создание не подтверждено: $result'),
+      };
+      expect(app.router.current.name, IntentionDetailsRoute.name);
+      expect(
+        app.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        id,
+      );
+      expect(app.stackNames(), [
+        AppShellRoute.name,
+        IntentionDetailsRoute.name,
+      ]);
+      final page = find.byType(IntentionDetailsPage);
+      await _until(
         tester,
-        app.router,
-        waitFor: _until,
+        find.byKey(const ValueKey('intention-details-title')),
+      );
+      await _until(
+        tester,
+        find.byKey(ValueKey('tag-assignment-row-${shed.toCanonicalString()}')),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<IntentionDetailsPage>(page).intentionId, id);
+      expect(
+        find.descendant(of: page, matching: find.text(_rawTitle.trim())),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: page, matching: find.text(_description)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: page, matching: find.text(l10n.catalogReady)),
+        findsOneWidget,
+      );
+      expect(
+        _iconOf(
+          tester,
+          find.byKey(const ValueKey('intention-details-favorite-mark')),
+        ),
+        Icons.star,
+      );
+      for (final (tag, name) in [(home, 'Дом'), (shed, 'Сарай')]) {
+        expect(
+          find.descendant(
+            of: find.byKey(
+              ValueKey('tag-assignment-row-${tag.toCanonicalString()}'),
+            ),
+            matching: find.text(name),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(find.byType(AppNavigationBar), findsNothing);
+      expect(
+        find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
+        findsNothing,
+      );
+      expect(
+        find.semantics.byPredicate((node) => node.role == SemanticsRole.tab),
+        findsNothing,
+      );
+      expect(
+        find.byType(IntentionEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(_closeConfirmation, findsNothing);
+
+      // «Назад» возвращает каталог, минуя завершённую панель и её диалог.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(app.stackNames(), [AppShellRoute.name]);
+      expect(
+        find.byType(IntentionEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(_closeConfirmation, findsNothing);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
+      expect(creations, hasLength(1));
+      expect(
+        id.toCanonicalString(),
+        app.raw.select('SELECT id FROM intentions').single['id'],
       );
       expectIntentionGraphRootPage(app.router);
       expect(tagSet.current.availability, IntentionDraftAvailability.closed);

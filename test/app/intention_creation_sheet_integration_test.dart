@@ -39,10 +39,15 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
@@ -79,6 +84,9 @@ const _atWork = 4;
 /// «Рисовать в саду» — только тег «Сад»: без обязательного «Дом» в выдачу не
 /// входит.
 const _inGarden = 5;
+
+/// Уже существовавшее одноимённое намерение без тегов и отметок.
+const _namesake = 6;
 
 /// Этюды с тегом «Дом» совпадают со всеми условиями выдачи каталога; каждый
 /// четвёртый архивирован и виден, потому что каталог показывает оба охвата.
@@ -159,7 +167,8 @@ void main() {
 
     testWidgets(
       'намерение, подготовленное через «+» каталога, панель, общий выбор и '
-      'настоящий редактор тега, сохраняется одним подтверждённым результатом, '
+      'настоящий редактор тега, открывается по новому идентификатору при '
+      'совпадении названия и сохраняется одним подтверждённым результатом, '
       'учитывается ровно один раз в выдаче с прежними условиями и позицией, '
       'отражается скрытой Главной и навигацией по тегам и читается после '
       'повторного открытия хранилища вместе с минимальным созданием на $code',
@@ -175,6 +184,13 @@ void main() {
         final viewBefore = _catalogView(tester);
         final graphBefore = _storedGraph(app.raw);
         final intentionsBefore = _storedIntentionIds(app.raw);
+        _expectStoredIntention(
+          app.raw,
+          _intentionId(_namesake),
+          title: _title,
+          description: null,
+          readiness: IntentionReadiness.notReady,
+        );
         final events = app.diagnostics.events.length;
         expect(_home(app), isA<HomeList>());
         expect(app.completions, isEmpty);
@@ -210,7 +226,37 @@ void main() {
         await _tap(tester, _submit);
         final creation = await _creation(tester, app);
         await _waitFor(tester, () => _sheet.evaluate().isEmpty);
+        await _expectCreatedPage(
+          tester,
+          app,
+          creation,
+          title: _title,
+          description: _description,
+          tags: ['Дом', _sport],
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+        );
         final created = _createdId(creation);
+        expect(created, isNot(_intentionId(_namesake)));
+        expect(
+          app.raw
+              .select(
+                'SELECT id FROM intentions WHERE title = ? ORDER BY rowid',
+                [_title],
+              )
+              .map((row) => row['id']),
+          [
+            _intentionId(_namesake).toCanonicalString(),
+            created.toCanonicalString(),
+          ],
+        );
+        _expectStoredIntention(
+          app.raw,
+          _intentionId(_namesake),
+          title: _title,
+          description: null,
+          readiness: IntentionReadiness.notReady,
+        );
         final revision = creation.revision!;
         expect(app.completions, [same(tagCompletion), same(creation)]);
         expect(app.writes.take(), _fullCreationWrites(tags: 2));
@@ -245,11 +291,7 @@ void main() {
           () => _currentAt(app, revision),
           reason: () => '${_home(app)} ${_catalogState(app)}',
         );
-        await returnToIntentionGraphAfterCreation(
-          tester,
-          app.router,
-          waitFor: _until,
-        );
+        await _closeCreatedPage(tester, app);
         expectIntentionGraphRootPage(app.router);
         expect(_selected(tester), AppDestination.intentionGraph);
         final homeList = _home(app) as HomeList;
@@ -344,6 +386,16 @@ void main() {
         await _tap(tester, _submit);
         final minimalCreation = await _creation(tester, app, count: 2);
         await _waitFor(tester, () => _sheet.evaluate().isEmpty);
+        await _expectCreatedPage(
+          tester,
+          app,
+          minimalCreation,
+          title: _minimalTitle,
+          description: null,
+          tags: [],
+          readiness: IntentionReadiness.notReady,
+          favoriteMark: FavoriteMark.notFavorite,
+        );
         final minimal = _createdId(minimalCreation);
         expect(app.completions.last, same(minimalCreation));
         expect(app.writes.take(), _minimalCreationWrites);
@@ -384,11 +436,7 @@ void main() {
         expect(_home(app), same(homeAfterFull));
 
         // Ранее скрытая Главная показывает новое избранное в конце.
-        await returnToIntentionGraphAfterCreation(
-          tester,
-          app.router,
-          waitFor: _until,
-        );
+        await _closeCreatedPage(tester, app, systemBack: true);
         await _select(tester, AppDestination.home);
         expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
         expect(_message, findsNothing);
@@ -434,134 +482,148 @@ void main() {
       },
     );
 
-    testWidgets(
-      'намерение, подготовленное через «+» каталога, панель, общий выбор и '
-      'настоящий редактор тега с тегом, который исключают условия выдачи, не '
-      'вставляется в неподходящую выдачу, сохраняя её условия, количество и '
-      'позицию, а скрытая Главная и навигация по тегу отражают полный '
-      'результат на $code',
-      (tester) async {
-        final install = await _install(tester, locale);
-        final l10n = install.l10n;
-        final app = await _launch(tester, install, seed: _seedGraph);
-        final home = _tagId(_homeTag);
-        final work = _tagId(_workTag);
-        final marks = storedFavoriteMarks(app.raw);
-        await _searchCatalog(tester, app);
-        await _scrollCatalog(tester);
-        final catalogBefore = _catalog(app);
-        final viewBefore = _catalogView(tester);
-        final graphBefore = _storedGraph(app.raw);
-        final events = app.diagnostics.events.length;
+    for (final systemBack in [false, true]) {
+      testWidgets(
+        'намерение, подготовленное через «+» каталога, панель, общий выбор и '
+        'настоящий редактор тега с тегом, который исключают условия выдачи, не '
+        'вставляется в неподходящую выдачу, сохраняя её условия, количество и '
+        'позицию, а скрытая Главная и навигация по тегу отражают полный '
+        'результат до возврата ${systemBack ? 'системным «назад»' : 'кнопкой страницы'} на $code',
+        (tester) async {
+          final install = await _install(tester, locale);
+          final l10n = install.l10n;
+          final app = await _launch(tester, install, seed: _seedGraph);
+          final home = _tagId(_homeTag);
+          final work = _tagId(_workTag);
+          final marks = storedFavoriteMarks(app.raw);
+          await _searchCatalog(tester, app);
+          await _scrollCatalog(tester);
+          final catalogBefore = _catalog(app);
+          final viewBefore = _catalogView(tester);
+          final graphBefore = _storedGraph(app.raw);
+          final events = app.diagnostics.events.length;
 
-        app.writes.start();
-        final sport = await _prepareFullDraft(
-          tester,
-          app,
-          tags: [_homeTag, _workTag],
-        );
-        expect(_chipNames(tester), ['Дом', 'Работа', _sport]);
+          app.writes.start();
+          final sport = await _prepareFullDraft(
+            tester,
+            app,
+            tags: [_homeTag, _workTag],
+          );
+          expect(_chipNames(tester), ['Дом', 'Работа', _sport]);
 
-        // До отправки граф получил только самостоятельный тег.
-        final tagCompletion = app.completions.single as TagCommandCompletion;
-        expect(app.writes.take(), [
-          (write: 'insert tags', inTransaction: true),
-        ]);
-        expect(_storedCreationTables(app.raw), _creationTablesOf(graphBefore));
+          // До отправки граф получил только самостоятельный тег.
+          final tagCompletion = app.completions.single as TagCommandCompletion;
+          expect(app.writes.take(), [
+            (write: 'insert tags', inTransaction: true),
+          ]);
+          expect(
+            _storedCreationTables(app.raw),
+            _creationTablesOf(graphBefore),
+          );
 
-        // «Сохранить» подтверждает полное создание одним результатом, а
-        // Главная согласуется с ним, хотя выдача каталога его не принимает.
-        await _tap(tester, _submit);
-        final creation = await _creation(tester, app);
-        await _waitFor(tester, () => _sheet.evaluate().isEmpty);
-        final created = _createdId(creation);
-        final revision = creation.revision!;
-        expect(app.completions, [same(tagCompletion), same(creation)]);
-        expect(app.writes.take(), _fullCreationWrites(tags: 3));
-        _expectConfirmedPackage(
-          creation,
-          tags: ['Дом', 'Работа', _sport],
-          readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
-        );
-        _expectStoredIntention(
-          app.raw,
-          created,
-          title: _title,
-          description: _description,
-          readiness: IntentionReadiness.ready,
-        );
-        expect(
-          _storedAssignments(app.raw, created),
-          unorderedEquals([
-            home.toCanonicalString(),
-            work.toCanonicalString(),
-            sport.toCanonicalString(),
-          ]),
-        );
-        expect(storedFavoriteMarks(app.raw), [
-          ...marks,
-          (created.toCanonicalString(), 4),
-        ]);
+          // «Сохранить» подтверждает полное создание одним результатом, а
+          // Главная согласуется с ним, хотя выдача каталога его не принимает.
+          await _tap(tester, _submit);
+          final creation = await _creation(tester, app);
+          await _waitFor(tester, () => _sheet.evaluate().isEmpty);
+          await _expectCreatedPage(
+            tester,
+            app,
+            creation,
+            title: _title,
+            description: _description,
+            tags: ['Дом', 'Работа', _sport],
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+          );
+          final created = _createdId(creation);
+          final revision = creation.revision!;
+          expect(app.completions, [same(tagCompletion), same(creation)]);
+          expect(app.writes.take(), _fullCreationWrites(tags: 3));
+          _expectConfirmedPackage(
+            creation,
+            tags: ['Дом', 'Работа', _sport],
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+          );
+          _expectStoredIntention(
+            app.raw,
+            created,
+            title: _title,
+            description: _description,
+            readiness: IntentionReadiness.ready,
+          );
+          expect(
+            _storedAssignments(app.raw, created),
+            unorderedEquals([
+              home.toCanonicalString(),
+              work.toCanonicalString(),
+              sport.toCanonicalString(),
+            ]),
+          );
+          expect(storedFavoriteMarks(app.raw), [
+            ...marks,
+            (created.toCanonicalString(), 4),
+          ]);
 
-        await _waitFor(
-          tester,
-          () => _currentAt(app, revision),
-          reason: () => '${_home(app)} ${_catalogState(app)}',
-        );
-        await returnToIntentionGraphAfterCreation(
-          tester,
-          app.router,
-          waitFor: _until,
-        );
-        expectIntentionGraphRootPage(app.router);
-        expect(_selected(tester), AppDestination.intentionGraph);
-        expect(
-          [for (final row in (_home(app) as HomeList).items) row.id],
-          [_intentionId(_walk), _intentionId(_swim), created],
-        );
-        await _acceptMessage(
-          tester,
-          l10n.graphOperationMessage(
-            l10n.graphOperationCreate,
-            _title,
-            l10n.editorCreated,
-          ),
-        );
-        expect(_commandEvents(app, since: events), [
-          _tagCreateEvent(),
-          _createEvent(IntentionCreationCommandDiagnosticsStage.resultRead),
-        ]);
+          await _waitFor(
+            tester,
+            () => _currentAt(app, revision),
+            reason: () => '${_home(app)} ${_catalogState(app)}',
+          );
+          await _closeCreatedPage(tester, app, systemBack: systemBack);
+          expectIntentionGraphRootPage(app.router);
+          expect(_selected(tester), AppDestination.intentionGraph);
+          expect(
+            [for (final row in (_home(app) as HomeList).items) row.id],
+            [_intentionId(_walk), _intentionId(_swim), created],
+          );
+          await _acceptMessage(
+            tester,
+            l10n.graphOperationMessage(
+              l10n.graphOperationCreate,
+              _title,
+              l10n.editorCreated,
+            ),
+          );
+          expect(_commandEvents(app, since: events), [
+            _tagCreateEvent(),
+            _createEvent(IntentionCreationCommandDiagnosticsStage.resultRead),
+          ]);
 
-        // Исключённый тег из того же создания не пускает намерение в выдачу:
-        // её строки, количество, условия и позиция просмотра не изменились.
-        final catalog = _catalog(app);
-        _expectSameSearch(catalog, catalogBefore);
-        expect(catalog.totalCount, catalogBefore.totalCount);
-        expect(_ids(catalog), _ids(catalogBefore));
-        _expectSameView(_catalogView(tester), viewBefore);
-        expect(
-          find.descendant(
-            of: _catalogList,
-            matching: find.widgetWithText(IntentionSummaryView, _title),
-          ),
-          findsNothing,
-        );
+          // Исключённый тег из того же создания не пускает намерение в выдачу:
+          // её строки, количество, условия и позиция просмотра не изменились.
+          final catalog = _catalog(app);
+          _expectSameSearch(catalog, catalogBefore);
+          expect(catalog.totalCount, catalogBefore.totalCount);
+          expect(_ids(catalog), _ids(catalogBefore));
+          _expectSameView(_catalogView(tester), viewBefore);
+          expect(
+            find.descendant(
+              of: _catalogList,
+              matching: find.widgetWithText(IntentionSummaryView, _title),
+            ),
+            findsNothing,
+          );
 
-        await _openTagNavigation(tester, app, work);
-        _expectNavigationAt(tester, work, revision);
-        expect(_navigationIds(tester, work), [_intentionId(_atWork), created]);
-        await _closeTop(tester, TagNavigationPage);
-        await _closeTop(tester, TagCatalogPage);
-        expectIntentionGraphRootPage(app.router);
-        _expectSameView(_catalogView(tester), viewBefore);
+          await _openTagNavigation(tester, app, work);
+          _expectNavigationAt(tester, work, revision);
+          expect(_navigationIds(tester, work), [
+            _intentionId(_atWork),
+            created,
+          ]);
+          await _closeTop(tester, TagNavigationPage);
+          await _closeTop(tester, TagCatalogPage);
+          expectIntentionGraphRootPage(app.router);
+          _expectSameView(_catalogView(tester), viewBefore);
 
-        await _select(tester, AppDestination.home);
-        expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
-        expect(_message, findsNothing);
-        expect(tester.takeException(), isNull);
-      },
-    );
+          await _select(tester, AppDestination.home);
+          expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
+          expect(_message, findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 }
 
@@ -626,6 +688,7 @@ void _seedGraph(sqlite.Database database) {
     tags: [_homeTag, _workTag],
   );
   intention(_inGarden, 'Рисовать в саду', ready: false, tags: [_gardenTag]);
+  intention(_namesake, _title, ready: false);
   for (final number in _sketches) {
     intention(
       number,
@@ -1035,6 +1098,156 @@ IntentionId _createdId(IntentionCommandCompletion completion) =>
       ResultSuccess(value: IntentionSaved(:final intention)) => intention.id,
       final result => fail('Создание не подтверждено: $result'),
     };
+
+/// Непосредственный результат успеха: страница подтверждённого идентификатора
+/// с настоящими подробными данными и назначениями, без завершённой формы.
+Future<void> _expectCreatedPage(
+  WidgetTester tester,
+  _Launch app,
+  IntentionCommandCompletion completion, {
+  required String title,
+  required String? description,
+  required List<String> tags,
+  required IntentionReadiness readiness,
+  required FavoriteMark favoriteMark,
+}) async {
+  final id = _createdId(completion);
+  expect(app.router.current.name, IntentionDetailsRoute.name);
+  expect(
+    app.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+    id,
+  );
+  expect(_stack(app), [AppShellRoute.name, IntentionDetailsRoute.name]);
+  final page = find.byType(IntentionDetailsPage);
+  await _until(tester, page);
+  final container = ProviderScope.containerOf(
+    tester.element(page),
+    listen: false,
+  );
+  await _waitFor(
+    tester,
+    () =>
+        container.read(intentionDetailsViewModelProvider(id))
+            is IntentionDetailsLoaded &&
+        container.read(tagAssignmentsViewModelProvider(id))
+            is TagAssignmentsLoaded,
+  );
+  await tester.pumpAndSettle();
+  expect(tester.widget<IntentionDetailsPage>(page).intentionId, id);
+  final state = container.read(
+    intentionDetailsViewModelProvider(id),
+  ) as IntentionDetailsLoaded;
+  expect(state.intention.id, id);
+  expect(state.intention.title, title);
+  expect(state.intention.description, description);
+  expect(state.intention.readiness, readiness);
+  expect(state.intention.archiveState, IntentionArchiveState.active);
+  expect(state.details.favoriteMark, favoriteMark);
+  expect(
+    state.revision.compareTo(completion.revision!),
+    GraphRevisionOrder.same,
+  );
+  final assignments = container.read(
+    tagAssignmentsViewModelProvider(id),
+  ) as TagAssignmentsLoaded;
+  expect(assignments.intentionId, id);
+  expect([for (final tag in assignments.items) tag.name.value], tags);
+  expect(assignments.freshness, TagAssignmentsFreshness.current);
+  expect(
+    assignments.revision.compareTo(completion.revision!),
+    GraphRevisionOrder.same,
+  );
+  expect(
+    tester
+        .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
+        .data,
+    title,
+  );
+  expect(
+    find.descendant(
+      of: page,
+      matching: find.text(description ?? app.l10n.detailsNoDescription),
+    ),
+    findsOneWidget,
+  );
+  expect(
+    find.descendant(
+      of: page,
+      matching: find.text(
+        readiness == IntentionReadiness.ready
+            ? app.l10n.catalogReady
+            : app.l10n.catalogNotReady,
+      ),
+    ),
+    findsOneWidget,
+  );
+  expect(
+    _iconOf(
+      tester,
+      find.byKey(const ValueKey('intention-details-favorite-mark')),
+    ),
+    favoriteMark == FavoriteMark.favorite ? Icons.star : Icons.star_border,
+  );
+  for (final tag in assignments.items) {
+    expect(
+      find.descendant(
+        of: find.byKey(
+          ValueKey('tag-assignment-row-${tag.id.toCanonicalString()}'),
+        ),
+        matching: find.text(tag.name.value),
+      ),
+      findsOneWidget,
+    );
+  }
+  expect(
+    tester.getRect(page),
+    Offset.zero & (tester.view.physicalSize / tester.view.devicePixelRatio),
+  );
+  expect(find.byType(AppNavigationBar), findsNothing);
+  expect(
+    find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
+  expect(_selected(tester), AppDestination.intentionGraph);
+  expect(
+    find.byKey(const ValueKey('intention-creation-sheet'), skipOffstage: false),
+    findsNothing,
+  );
+  expect(find.byType(AlertDialog, skipOffstage: false), findsNothing);
+}
+
+/// Возвращение действием человека удаляет единственную страницу результата,
+/// не показывая завершённую форму или подтверждение ухода.
+Future<void> _closeCreatedPage(
+  WidgetTester tester,
+  _Launch app, {
+  bool systemBack = false,
+}) async {
+  expect(app.router.current.name, IntentionDetailsRoute.name);
+  if (systemBack) {
+    await tester.binding.handlePopRoute();
+  } else {
+    await _tap(
+      tester,
+      find.descendant(
+        of: find.byType(IntentionDetailsPage),
+        matching: find.byType(BackButton),
+      ),
+    );
+  }
+  await _until(tester, find.byType(AppNavigationBar));
+  await tester.pumpAndSettle();
+  expect(_stack(app), [AppShellRoute.name]);
+  expectIntentionGraphRootPage(app.router);
+  expect(find.byType(IntentionCatalogPage), findsOneWidget);
+  expect(find.byType(IntentionDetailsPage, skipOffstage: false), findsNothing);
+  expect(
+    find.byKey(const ValueKey('intention-creation-sheet'), skipOffstage: false),
+    findsNothing,
+  );
+  expect(find.byType(AlertDialog, skipOffstage: false), findsNothing);
+  expect(_selected(tester), AppDestination.intentionGraph);
+}
 
 /// Один подтверждённый пакет создания: полный снимок нового намерения с
 /// тегами [tags], готовностью и избранным и одно назначение на каждый тег,
