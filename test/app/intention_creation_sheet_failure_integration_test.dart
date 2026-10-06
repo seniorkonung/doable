@@ -1,6 +1,7 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -157,6 +158,12 @@ void main() {
         ['Быт', _sport],
       );
       expect(app.storage.writes, _fullWrites);
+      await returnToIntentionGraphAfterCreation(
+        tester,
+        app.container.read(appRouterProvider),
+        waitFor: (tester, finder) =>
+            _wait(tester, () => finder.evaluate().isNotEmpty),
+      );
       await _acceptMessage(tester, _successMessage(app));
       expect(_intentionEvents(app), [
         _createEvent(
@@ -332,6 +339,12 @@ void main() {
       GraphRevisionOrder.same,
     );
     expect(app.diagnostics.thrown, 2);
+    await returnToIntentionGraphAfterCreation(
+      tester,
+      app.container.read(appRouterProvider),
+      waitFor: (tester, finder) =>
+          _wait(tester, () => finder.evaluate().isNotEmpty),
+    );
     await _acceptMessage(tester, _successMessage(app));
     expect(_intentionEvents(app), [
       _createEvent(

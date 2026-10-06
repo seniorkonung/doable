@@ -245,6 +245,11 @@ void main() {
           () => _currentAt(app, revision),
           reason: () => '${_home(app)} ${_catalogState(app)}',
         );
+        await returnToIntentionGraphAfterCreation(
+          tester,
+          app.router,
+          waitFor: _until,
+        );
         expectIntentionGraphRootPage(app.router);
         expect(_selected(tester), AppDestination.intentionGraph);
         final homeList = _home(app) as HomeList;
@@ -379,6 +384,11 @@ void main() {
         expect(_home(app), same(homeAfterFull));
 
         // Ранее скрытая Главная показывает новое избранное в конце.
+        await returnToIntentionGraphAfterCreation(
+          tester,
+          app.router,
+          waitFor: _until,
+        );
         await _select(tester, AppDestination.home);
         expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
         expect(_message, findsNothing);
@@ -498,6 +508,11 @@ void main() {
           tester,
           () => _currentAt(app, revision),
           reason: () => '${_home(app)} ${_catalogState(app)}',
+        );
+        await returnToIntentionGraphAfterCreation(
+          tester,
+          app.router,
+          waitFor: _until,
         );
         expectIntentionGraphRootPage(app.router);
         expect(_selected(tester), AppDestination.intentionGraph);

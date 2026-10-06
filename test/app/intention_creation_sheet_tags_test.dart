@@ -437,6 +437,11 @@ void main() {
       // Только «Сохранить» записывает намерение со всеми пятью полями.
       await _tap(tester, _submit);
       await _waitForStorage(tester, () => _sheet.evaluate().isEmpty);
+      await returnToIntentionGraphAfterCreation(
+        tester,
+        app.router,
+        waitFor: _until,
+      );
       expectIntentionGraphRootPage(app.router);
       expect(tagSet.current.availability, IntentionDraftAvailability.closed);
       final created = app.raw
@@ -600,6 +605,11 @@ void main() {
       // Явное сохранение создаёт намерение только с оставшимся тегом.
       await _tap(tester, _submit);
       await _waitForStorage(tester, () => _sheet.evaluate().isEmpty);
+      await returnToIntentionGraphAfterCreation(
+        tester,
+        app.router,
+        waitFor: _until,
+      );
       expect(app.storedTable('intentions'), hasLength(1));
       expect(
         [
