@@ -2,6 +2,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -359,6 +360,67 @@ void main() {
     app.diagnostics.expectPrivateDataHidden(app.raw);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('отказ при подтверждении ухода сохраняет полный черновик, '
+      'отклоняет прежний ответ и открывает намерение после явного повтора', (
+    tester,
+  ) async {
+    final app = await _launch(tester);
+    final sport = await _prepare(tester, app);
+    final router = app.container.read(appRouterProvider);
+    final formRoute = router.stackData.last;
+    final before = _storedGraph(app.raw);
+    final revision = await _revision(tester, app);
+    app.storage.observeCreation(fail: true);
+    app.storage.hold();
+    await _tap(tester, _submit);
+    await _wait(tester, () => app.storage.isHolding);
+    await _Leave.back.request(tester);
+    final lateDiscard = tester
+        .widget<FilledButton>(_key('intention-editor-close-discard'))
+        .onPressed!;
+    app.storage.release();
+    final failed = await _creation(tester, app);
+    await tester.pumpAndSettle();
+
+    _expectFaultPoint(app, [_home, sport]);
+    expect(_storedGraph(app.raw), before);
+    expect(
+      (await _revision(tester, app)).compareTo(revision),
+      GraphRevisionOrder.same,
+    );
+    expect(_confirmation, findsNothing);
+    _expectInlineFailure(tester, app, failed, app.l10n.editorCreateUnavailable);
+    _expectDraft(tester, [_home, sport]);
+    lateDiscard();
+    await tester.pumpAndSettle();
+    expect(router.current.name, IntentionEditorRoute.name);
+    expect(router.stackData.last, same(formRoute));
+    _expectDraft(tester, [_home, sport]);
+    expect(app.creations, [same(failed)]);
+    expect(app.storage.creationAttempts, 1);
+
+    await _tap(tester, _submit);
+    final saved = await _creation(tester, app, count: 2);
+    await _wait(tester, () => _sheet.evaluate().isEmpty);
+    final id = _expectSaved(app, saved, [_home, sport]);
+    _expectCreatedRoute(app, id);
+    final detailsRoute = router.stackData.last;
+    expect(saved.token, isNot(same(failed.token)));
+    expect(saved.revision!.compareTo(revision), GraphRevisionOrder.newer);
+    expect(app.storage.writes, [..._fullWrites, ..._fullWrites]);
+    expect(app.storage.creationAttempts, 2);
+    lateDiscard();
+    await _acceptMessage(tester, _successMessage(app));
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(router.stackData.last, same(detailsRoute));
+    expect(app.creations, [same(failed), same(saved)]);
+    expect(app.storage.creationAttempts, 2);
+    _expectSaved(app, saved, [_home, sport]);
+    expect(_message, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final leave in _Leave.values) {
     for (final outcome in _Outcome.values) {
       for (final surface in _AtResult.values) {
@@ -456,6 +518,9 @@ void main() {
                   expect(_sheet, findsNothing);
                   expect(_confirmation, findsNothing);
                 }
+                if (surface == _AtResult.confirmation) {
+                  _expectCreatedRoute(app, id);
+                }
                 await _acceptMessage(tester, _successMessage(app));
               case _Outcome.failure:
                 expect(
@@ -511,6 +576,19 @@ void main() {
             // Он не закрывает новую панель и не повторяет принятую команду.
             lateDiscard();
             await tester.pumpAndSettle();
+            if (surface != _AtResult.confirmation) {
+              final router = app.container.read(appRouterProvider);
+              expect(
+                router.current.name,
+                surface == _AtResult.newOpening
+                    ? IntentionEditorRoute.name
+                    : AppShellRoute.name,
+              );
+              expect(
+                router.stackData.map((route) => route.name),
+                isNot(contains(IntentionDetailsRoute.name)),
+              );
+            }
             if (surface == _AtResult.newOpening) {
               expect(_sheet, findsOneWidget);
               expect(
@@ -1002,6 +1080,18 @@ void _expectInlineFailure(
   expect(_message, findsNothing);
   expect(find.byType(SnackBar), findsNothing);
   expect(app.coordinator.claimInitiatorFailure(completion.token), isNull);
+}
+
+void _expectCreatedRoute(_App app, IntentionId id) {
+  final router = app.container.read(appRouterProvider);
+  expect(router.current.name, IntentionDetailsRoute.name);
+  expect(router.current.argsAs<IntentionDetailsRouteArgs>().intentionId, id);
+  expect(router.stackData.map((route) => route.name), [
+    AppShellRoute.name,
+    IntentionDetailsRoute.name,
+  ]);
+  expect(_sheet, findsNothing);
+  expect(_confirmation, findsNothing);
 }
 
 String _successMessage(_App app) => app.l10n.graphOperationMessage(
