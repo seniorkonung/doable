@@ -45,6 +45,68 @@ void main() {
     final code = locale.languageCode;
 
     testWidgets(
+      'диктор и нажатия доступны на экране 568×320 с клавиатурой и масштабом 200% в пустой и заполненной панели — $code',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        _usePhone(tester, size: const Size(568, 320), keyboard: 160, right: 48);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l10n = await AppLocalizations.delegate.load(locale);
+        final sessions = _EditorSessions();
+        await _openCatalog(tester, _repositoryWithTags(), sessions, locale);
+        await tester.tap(find.byKey(_catalogCreate));
+        await tester.pumpAndSettle();
+        final session = sessions.single;
+        expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
+        final fields = find.byKey(
+          const ValueKey('intention-creation-sheet-fields'),
+        );
+        expect(tester.getSize(fields).height, greaterThan(0));
+        expect(_traversal(tester), _panel(l10n));
+
+        await tester.enterText(find.byKey(_title), _userTitle);
+        await tester.enterText(find.byKey(_description), _userDescription);
+        sessions.notifier(tester)
+          ..draftTagSet.add(_home)
+          ..draftTagSet.add(_work)
+          ..markFavorite()
+          ..confirmReadiness();
+        await tester.pumpAndSettle();
+        expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
+        _expectNoSizeActions();
+        for (final control in [
+          _title,
+          _description,
+          _tagRemove(_home),
+          _tagRemove(_work),
+          _chooseTags,
+          _favorite,
+          _readiness,
+          _submit,
+          _closeButton,
+        ]) {
+          final target = find.byKey(control);
+          await Scrollable.ensureVisible(
+            tester.element(target),
+            alignment: 0.5,
+          );
+          await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget, reason: '$control');
+          final rect = tester.getRect(target);
+          expect(rect.center.dy, lessThan(160));
+          expect(rect.right, lessThanOrEqualTo(520));
+          expect(tester.view.viewInsets.bottom, 160);
+          expect(tester.getSize(fields).height, greaterThan(0));
+        }
+        _expectSameSession(sessions, session);
+        expect(sessions.state(tester).draft.title, _userTitle);
+        expect(sessions.state(tester).draft.description, _userDescription);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
       'экранный диктор проходит компактную панель в порядке чтения при любой ориентации, клавиатуре и заполнении черновика — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
@@ -774,11 +836,20 @@ const _phone = Size(360, 740);
 /// Ставит экран [size] со строкой состояния и жестовой навигацией;
 /// открытая клавиатура высотой [keyboard] закрывает нижний безопасный
 /// отступ.
-void _usePhone(WidgetTester tester, {Size size = _phone, double keyboard = 0}) {
+void _usePhone(
+  WidgetTester tester, {
+  Size size = _phone,
+  double keyboard = 0,
+  double right = 0,
+}) {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
-  tester.view.padding = FakeViewPadding(top: 24, bottom: keyboard > 0 ? 0 : 24);
-  tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+  tester.view.padding = FakeViewPadding(
+    top: 24,
+    right: right,
+    bottom: keyboard > 0 ? 0 : 24,
+  );
+  tester.view.viewPadding = FakeViewPadding(top: 24, right: right, bottom: 24);
   tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   addTearDown(tester.view.reset);
 }

@@ -11,6 +11,8 @@ import 'package:flutter/rendering.dart';
 /// модальный фон над страницей под ней, высоту по содержимому в пределах
 /// доступной области с видимым участком страницы над панелью, закреплённые
 /// ручку и основное действие и вход и выход вместе со своим маршрутом.
+/// В тесной области закрытие и основные действия делят верхнюю полосу,
+/// оставляя место вводу без изменения дерева полей и их прокрутки.
 /// Доступная область учитывает клавиатуру и безопасные отступы.
 ///
 /// Свайп вниз по ручке, нажатие вне панели, кнопка закрытия и действие
@@ -18,7 +20,7 @@ import 'package:flutter/rendering.dart';
 /// маршрут не закрывает. Свайп вверх по ручке ничего не запускает;
 /// прокрутка полей панель не закрывает.
 ///
-/// Закреплённое сообщение [status] стоит между полями и нижней частью и
+/// Закреплённое сообщение [status] стоит после полей и
 /// остаётся видимым при любой прокрутке полей. По запросу [reveal] панель
 /// доводит часть полей до видимости и удерживает её видимой при пересчёте
 /// своей геометрии.
@@ -52,10 +54,10 @@ final class IntentionCreationSheet extends StatefulWidget {
   /// Поля формы. Прокручиваются, когда не помещаются в доступную высоту.
   final Widget fields;
 
-  /// Закреплённая нижняя часть с основным действием формы.
+  /// Закреплённые действия формы; при нехватке высоты стоят рядом с ручкой.
   final Widget footer;
 
-  /// Закреплённое над нижней частью сообщение, например общий отказ
+  /// Закреплённое после полей сообщение, например общий отказ
   /// сохранения. При нехватке высоты полям остаётся всё нужное им место, но
   /// не больше половины, а сообщение занимает остальное и прокручивается
   /// само, начиная с первой строки.
@@ -283,40 +285,56 @@ final class _IntentionCreationSheetState extends State<IntentionCreationSheet> {
                             child: _SheetLayout(
                               visibleContextExtent: _visibleContextExtent,
                               minVisibleContextExtent: _minVisibleContextExtent,
-                              topBar: _TopBar(
-                                closeLabel: widget.closeLabel,
-                                onClose: widget.onCloseRequested,
-                                onDragStart: _startDrag,
-                                onDragUpdate: _updateDrag,
-                                onDragEnd: _endDrag,
+                              topBar: Semantics(
+                                container: true,
+                                sortKey: const OrdinalSortKey(0),
+                                child: _TopBar(
+                                  closeLabel: widget.closeLabel,
+                                  onClose: widget.onCloseRequested,
+                                  onDragStart: _startDrag,
+                                  onDragUpdate: _updateDrag,
+                                  onDragEnd: _endDrag,
+                                ),
                               ),
-                              body: _FieldsScaffold(
-                                child: SingleChildScrollView(
-                                  key: const ValueKey(
-                                    'intention-creation-sheet-fields',
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [widget.header, widget.fields],
+                              body: Semantics(
+                                container: true,
+                                sortKey: const OrdinalSortKey(1),
+                                child: _FieldsScaffold(
+                                  child: SingleChildScrollView(
+                                    key: const ValueKey(
+                                      'intention-creation-sheet-fields',
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [widget.header, widget.fields],
+                                    ),
                                   ),
                                 ),
                               ),
                               status: switch (widget.status) {
-                                final status? => SingleChildScrollView(
-                                  key: const ValueKey(
-                                    'intention-creation-sheet-status',
+                                final status? => Semantics(
+                                  container: true,
+                                  sortKey: const OrdinalSortKey(2),
+                                  child: SingleChildScrollView(
+                                    key: const ValueKey(
+                                      'intention-creation-sheet-status',
+                                    ),
+                                    primary: false,
+                                    child: status,
                                   ),
-                                  primary: false,
-                                  child: status,
                                 ),
                                 null => null,
                               },
                               // Прокручивается, только если сама не помещается в
                               // тесную доступную область, и не переполняет панель.
-                              footer: SingleChildScrollView(
-                                primary: false,
-                                child: widget.footer,
+                              footer: Semantics(
+                                container: true,
+                                sortKey: const OrdinalSortKey(3),
+                                child: SingleChildScrollView(
+                                  primary: false,
+                                  child: widget.footer,
+                                ),
                               ),
                             ),
                           ),
@@ -400,9 +418,9 @@ final class _TopBar extends StatelessWidget {
 /// Собственный `Scaffold` панели вокруг её прокручиваемых полей.
 ///
 /// Через него панель участвует в общем `ScaffoldMessenger` приложения:
-/// сообщение общей поверхности появляется поверх полей у их нижнего края —
-/// над закреплённым сообщением и нижней частью с основным действием, которые
-/// оно не перекрывает. Собственного messenger у панели нет.
+/// сообщение общей поверхности появляется поверх полей у их нижнего края,
+/// не перекрывая закреплённое сообщение и основные действия.
+/// Собственного messenger у панели нет.
 ///
 /// `Scaffold` занимает всю данную ему высоту, поэтому при ограничении только
 /// сверху область, как и сами поля, следует за высотой полей.
@@ -533,9 +551,11 @@ enum _SheetSlot { topBar, body, status, footer }
 /// Раскладка панели: закреплённые верхняя полоса, сообщение и нижняя часть и
 /// прокручиваемые между ними поля.
 ///
-/// Нижняя часть с основным действием получает своё место первой после
-/// полосы, поля и сообщение делят оставшееся. Высота полей следует за
-/// содержимым в пределах доступной высоты за вычетом [visibleContextExtent].
+/// Поля резервируют место до закреплённых частей. Если верхняя полоса и
+/// нижняя часть не помещаются вместе с полями, они встают рядом сверху;
+/// длинные действия прокручиваются внутри своей области. Высота полей
+/// следует за содержимым в пределах доступной высоты за вычетом
+/// [visibleContextExtent].
 /// Ограничение высоты сверху сохраняет рост по содержимому:
 /// https://api.flutter.dev/flutter/rendering/BoxConstraints-class.html
 ///
@@ -626,6 +646,9 @@ final class _RenderSheetLayout extends RenderBox
   /// уменьшая ради неё видимый участок страницы: одна цель нажатия.
   static const _minBodyExtent = kMinInteractiveDimension;
 
+  /// Ручка шириной 32 и отдельная цель закрытия в общей полосе действий.
+  static const _actionsTopBarWidth = 128.0;
+
   RenderBox get _topBar => childForSlot(_SheetSlot.topBar)!;
 
   RenderBox get _body => childForSlot(_SheetSlot.body)!;
@@ -685,16 +708,25 @@ final class _RenderSheetLayout extends RenderBox
         ),
       ),
     );
-    if (topHeight + footerHeight > limit) {
-      // Тесная область: нижняя часть прокручивается в оставшемся месте.
-      topHeight = _layoutChild(_topBar, width, maxHeight: limit);
+    final actionsShareRow = topHeight + footerHeight + minBodyHeight > limit;
+    // Ширина сохраняет отдельные цели ручки и закрытия в верхней полосе.
+    final topWidth = actionsShareRow
+        ? math.min(_actionsTopBarWidth, width / 2)
+        : width;
+    final footerWidth = actionsShareRow ? width - topWidth : width;
+    if (actionsShareRow) {
+      final actionsLimit = math.max(0.0, limit - minBodyHeight);
+      topHeight = _layoutChild(_topBar, topWidth, maxHeight: actionsLimit);
       footerHeight = _layoutChild(
         _footer,
-        width,
-        maxHeight: math.max(0, limit - topHeight),
+        footerWidth,
+        maxHeight: actionsLimit,
       );
     }
-    final fixedHeight = topHeight + footerHeight;
+    final fixedHeight = actionsShareRow
+        ? math.max(topHeight, footerHeight)
+        : topHeight + footerHeight;
+    final bodyTop = actionsShareRow ? fixedHeight : topHeight;
     final status = _status;
     final statusExtent = status?.getMaxIntrinsicHeight(width) ?? 0;
     final space = math.max(0.0, limit - fixedHeight);
@@ -711,13 +743,18 @@ final class _RenderSheetLayout extends RenderBox
         minHeight: statusHeight,
         maxHeight: statusHeight,
       );
-      _position(status, topHeight + bodyHeight);
+      _position(status, bodyTop + bodyHeight);
     }
 
-    _position(_body, topHeight);
-    _position(_footer, topHeight + bodyHeight + statusHeight);
+    _position(_topBar, 0);
+    _position(_body, bodyTop);
+    _position(
+      _footer,
+      actionsShareRow ? 0 : topHeight + bodyHeight + statusHeight,
+      left: actionsShareRow ? topWidth : 0,
+    );
     size = constraints.constrain(
-      Size(width, topHeight + bodyHeight + statusHeight + footerHeight),
+      Size(width, fixedHeight + bodyHeight + statusHeight),
     );
   }
 
@@ -750,8 +787,8 @@ final class _RenderSheetLayout extends RenderBox
     return child.size.height;
   }
 
-  void _position(RenderBox child, double top) =>
-      (child.parentData! as BoxParentData).offset = Offset(0, top);
+  void _position(RenderBox child, double top, {double left = 0}) =>
+      (child.parentData! as BoxParentData).offset = Offset(left, top);
 
   @override
   void paint(PaintingContext context, Offset offset) {

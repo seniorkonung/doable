@@ -234,14 +234,22 @@ void main() {
   testWidgets('отказ файлового хранилища после всех записей полного черновика '
       'откатывает граф, FTS, порядок и ревизию; компактная панель '
       'предъявляет один отказ и явный повтор сохраняет одно намерение '
+      'на экране 568×320 с открытой клавиатурой и масштабом 200% '
       'даже при отказе диагностики', (tester) async {
     final app = await _launch(tester);
     final sport = await _prepare(tester, app);
+    tester.view.physicalSize = const Size(568, 320);
+    tester.view.padding = const FakeViewPadding(top: 24, right: 48);
+    tester.view.viewPadding = const FakeViewPadding(top: 24, right: 48);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
     final before = _storedGraph(app.raw);
     final revision = await _revision(tester, app);
     final marks = storedFavoriteMarks(app.raw);
     final sheetElement = tester.element(_sheet);
-    expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
+    _expectTightKeyboard(tester);
     app.storage.observeCreation(fail: true);
     app.diagnostics.throwOnIntentionCommand = true;
     await _tap(tester, _submit);
@@ -266,7 +274,25 @@ void main() {
     );
     _expectDraft(tester, [_home, sport]);
     expect(tester.element(_sheet), same(sheetElement));
-    expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
+    _expectTightKeyboard(tester);
+    // Отказ читается от начала до конца прокруткой при той же клавиатуре.
+    final status = _key('intention-creation-sheet-status');
+    for (final alignment in [0.0, 1.0]) {
+      await Scrollable.ensureVisible(
+        tester.element(_failure),
+        alignment: alignment,
+      );
+      await tester.pumpAndSettle();
+      final viewport = tester.getRect(status);
+      final message = tester.getRect(_failure);
+      final edge = alignment == 0 ? message.top : message.bottom - 0.1;
+      expect(viewport.height, greaterThan(0));
+      expect(edge, greaterThanOrEqualTo(viewport.top));
+      expect(edge, lessThan(viewport.bottom));
+      _expectTightKeyboard(tester);
+    }
+    await Scrollable.ensureVisible(tester.element(_failure), alignment: 0.5);
+    await tester.pumpAndSettle();
     _expectInlineFailure(tester, app, failed, app.l10n.editorCreateUnavailable);
     expect(
       tester.getSemantics(_failure),
@@ -286,6 +312,7 @@ void main() {
     // отправляют новую команду: повтор выполняется только кнопкой панели.
     expect(app.creations, [same(failed)]);
     expect(app.storage.creationAttempts, 1);
+    _expectTightKeyboard(tester);
     await _tap(tester, _submit);
     final saved = await _creation(tester, app, count: 2);
     await _wait(tester, () => _sheet.evaluate().isEmpty);
@@ -1005,6 +1032,22 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
+}
+
+/// Исходная тесная геометрия сохраняет поля и действия над клавиатурой.
+void _expectTightKeyboard(WidgetTester tester) {
+  expect(tester.view.physicalSize, const Size(568, 320));
+  expect(tester.view.viewInsets.bottom, 160);
+  expect(tester.view.padding.top, 24);
+  expect(tester.view.padding.right, 48);
+  expect(tester.platformDispatcher.textScaleFactor, 2);
+  expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(48));
+  expect(tester.getRect(_sheet).bottom, 160);
+  expect(
+    tester.getSize(_key('intention-creation-sheet-fields')).height,
+    greaterThan(0),
+  );
+  expect(_key('intention-editor-close').hitTestable(), findsOneWidget);
 }
 
 Future<void> _until(WidgetTester tester, Finder finder) =>
