@@ -82,7 +82,7 @@ final class _IntentionEditorPageState
   /// Объяснение критериев действия уже открыто.
   var _isConfirmingReadiness = false;
 
-  /// Общий выбор тегов этой сессии уже открыт.
+  /// Общий выбор тегов начат и удерживает запрет отправки до возврата.
   var _isChoosingTags = false;
 
   IntentionEditorViewModelProvider get _provider =>
@@ -279,7 +279,9 @@ final class _IntentionEditorPageState
                 ),
               FilledButton(
                 key: const ValueKey('intention-editor-submit'),
-                onPressed: editor.canSubmit ? notifier.submit : null,
+                onPressed: editor.canSubmit && !_isChoosingTags
+                    ? _submit
+                    : null,
                 child: Text(_submitLabel(localizations, editor)),
               ),
             ],
@@ -379,6 +381,17 @@ final class _IntentionEditorPageState
     ref.read(_provider.notifier).confirmReadiness();
   }
 
+  /// Проверяет допуск заново: обработчик мог быть получен до открытия тегов
+  /// или смены состояния сессии.
+  void _submit() {
+    if (!mounted || _hasEndedRoute || _isChoosingTags) {
+      return;
+    }
+    if (ref.read(_provider).canSubmit) {
+      ref.read(_provider.notifier).submit();
+    }
+  }
+
   /// Открывает общий выбор тегов для набора черновика этой сессии.
   ///
   /// Выбор добавляет теги только через контракт набора сессии, который после
@@ -386,7 +399,7 @@ final class _IntentionEditorPageState
   /// черновик не меняет. Повторное нажатие до закрытия выбора второй выбор не
   /// открывает.
   Future<void> _chooseTags() async {
-    if (_isChoosingTags) {
+    if (!mounted || _hasEndedRoute || _isChoosingTags) {
       return;
     }
     switch (ref.read(_provider).draftAvailability) {
@@ -396,14 +409,25 @@ final class _IntentionEditorPageState
           IntentionDraftAvailability.closed:
         return;
     }
-    _isChoosingTags = true;
-    final tagSet = ref.read(_provider.notifier).draftTagSet;
+    setState(() => _isChoosingTags = true);
     try {
+      final tagSet = ref.read(_provider.notifier).draftTagSet;
       await context.router.push<void>(
         TagCatalogRoute(selectionContext: TagDraftContext(tagSet)),
       );
+    } catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'intention editor',
+          context: ErrorDescription('при открытии выбора тегов'),
+        ),
+      );
     } finally {
-      _isChoosingTags = false;
+      if (mounted) {
+        setState(() => _isChoosingTags = false);
+      }
     }
   }
 
