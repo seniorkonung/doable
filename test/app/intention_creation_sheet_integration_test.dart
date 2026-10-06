@@ -42,6 +42,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
+import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -49,6 +50,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
@@ -222,8 +224,12 @@ void main() {
 
         // «Сохранить» записывает всё начальное состояние внутри транзакции
         // без посторонних записей и подтверждает его одним результатом на
-        // одной ревизии.
-        await _tap(tester, _submit);
+        // одной ревизии. Оба обработчика получены до нового кадра: выбор
+        // тегов после принятой отправки не открывает страницу.
+        final submit = tester.widget<FilledButton>(_submit).onPressed!;
+        final chooseTags = tester.widget<IconButton>(_chooseTags).onPressed!;
+        submit();
+        chooseTags();
         final creation = await _creation(tester, app);
         await _waitFor(tester, () => _sheet.evaluate().isEmpty);
         await _expectCreatedPage(
@@ -523,7 +529,11 @@ void main() {
 
           // «Сохранить» подтверждает полное создание одним результатом, а
           // Главная согласуется с ним, хотя выдача каталога его не принимает.
-          await _tap(tester, _submit);
+          // Быстрый выбор тегов после отправки не меняет стек и её данные.
+          final submit = tester.widget<FilledButton>(_submit).onPressed!;
+          final chooseTags = tester.widget<IconButton>(_chooseTags).onPressed!;
+          submit();
+          chooseTags();
           final creation = await _creation(tester, app);
           await _waitFor(tester, () => _sheet.evaluate().isEmpty);
           await _expectCreatedPage(
@@ -891,7 +901,8 @@ Future<void> _openSheet(WidgetTester tester, _Launch app) async {
 /// название, описание, избранное, явно подтверждённую готовность и набор из
 /// существующих тегов [tags] и тега «Спорт», созданного настоящим редактором
 /// из общего выбора. Принимает сообщение о созданном теге, возвращается в
-/// ту же панель и возвращает идентификатор созданного тега.
+/// ту же панель и возвращает идентификатор созданного тега. Быстрый вызов
+/// сохранения после открытия выбора не принимает и не откладывает отправку.
 Future<TagId> _prepareFullDraft(
   WidgetTester tester,
   _Launch app, {
@@ -926,11 +937,47 @@ Future<TagId> _prepareFullDraft(
   for (final tag in tags) {
     await _addToDraft(tester, _tagId(tag));
   }
+  final tagSet = switch (app.router.current
+      .argsAs<TagCatalogRouteArgs>()
+      .selectionContext) {
+    TagDraftContext(:final tagSet) => tagSet,
+    final other => throw StateError('Выбор открыт не для черновика: $other'),
+  };
+  await _tap(tester, find.byType(BackButton));
+  await tester.pumpAndSettle();
+  final sheetElement = tester.element(_sheet);
+  final formRoute = app.router.stackData.last;
+  final graphBefore = _storedCreationTables(app.raw);
+  final staleSubmit = tester.widget<FilledButton>(_submit).onPressed!;
+
+  // Два нажатия до следующего кадра идут через настоящую панель и роутер.
+  await tester.tap(_chooseTags);
+  await tester.tap(_submit);
+  await _until(tester, _row(_tagId(_homeTag)));
+  await tester.pumpAndSettle();
+  expect(_stack(app), [
+    AppShellRoute.name,
+    IntentionEditorRoute.name,
+    TagCatalogRoute.name,
+  ]);
+  expect(app.router.stackData[1], same(formRoute));
+  expect(
+    app.router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
+    isA<TagDraftContext>().having(
+      (context) => context.tagSet,
+      'набор',
+      same(tagSet),
+    ),
+  );
+  expect(tagSet.current.tagIds, [for (final tag in tags) _tagId(tag)]);
+  expect(app.completions, isEmpty);
+  expect(_storedCreationTables(app.raw), graphBefore);
 
   await _tap(tester, _createTagAction);
   await _until(tester, _tagEditorName);
   await tester.pumpAndSettle();
   expect(_stack(app).last, TagEditorRoute.name);
+  staleSubmit();
   await tester.enterText(_tagEditorName, _sport);
   await _tap(tester, _tagEditorSubmit);
   await _waitFor(tester, () => _tagEditorName.evaluate().isEmpty);
@@ -949,6 +996,17 @@ Future<TagId> _prepareFullDraft(
   await _waitFor(tester, () => find.byType(TagCatalogPage).evaluate().isEmpty);
   await tester.pumpAndSettle();
   expect(_stack(app), [AppShellRoute.name, IntentionEditorRoute.name]);
+  expect(tester.element(_sheet), same(sheetElement));
+  expect(app.router.stackData.last, same(formRoute));
+  expect(tagSet.current.availability, IntentionDraftAvailability.editable);
+  expect(tagSet.current.tagIds, [for (final tag in tags) _tagId(tag), sport]);
+  expect(_text(tester, 'intention-editor-title'), _rawTitle);
+  expect(_text(tester, 'intention-editor-description'), _description);
+  expect(_iconOf(tester, _favorite), Icons.star);
+  expect(_iconOf(tester, _readiness), Icons.check_circle);
+  expect(app.completions.whereType<IntentionCommandCompletion>(), isEmpty);
+  expect(_storedCreationTables(app.raw), graphBefore);
+  expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
   return sport;
 }
 

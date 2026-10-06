@@ -329,7 +329,8 @@ void main() {
     'все пять полей, подготовленные в панели и общем выборе, переживают '
     'объяснение готовности, переходы из компактной панели в выбор '
     'и настоящий редактор тега и продолжение после запроса закрытия, а '
-    'намерение, назначения и избранное записывает только «Сохранить»',
+    'гонка выбора и сохранения записывает актуальный черновик только '
+    'после возврата и нового «Сохранить»',
     (tester) async {
       final semantics = tester.ensureSemantics();
       final app = await _App.start(tester);
@@ -375,20 +376,49 @@ void main() {
       _expectCompactPanel(tester);
       final sheetElement = tester.element(_sheet);
 
-      // Выбор и настоящий редактор над компактной панелью: существующий тег
-      // и созданный самостоятельной операцией входят в набор только явным
-      // добавлением.
+      // Первый тег уже принадлежит исходному черновику до гонки действий.
       await app.openChooser(tester);
       final tagSet = app.chooserTagSet();
       await _tap(tester, _row(home));
       await _tap(tester, _addToDraft);
+      await _tap(tester, find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expectPreparedFields(['Дом']);
+      final formRoute = app.router.stackData.last;
+      final staleSubmit = tester.widget<FilledButton>(_submit).onPressed!;
+
+      // Между быстрыми нажатиями нет кадра с обновлёнными кнопками.
+      await tester.tap(_chooseTags);
+      await tester.tap(_submit);
+      await _until(tester, _row(home));
+      await tester.pumpAndSettle();
+      await _letStorageRun(tester);
+      expect(app.chooserTagSet(), same(tagSet));
+      expect(app.router.stackData[1], same(formRoute));
+      expect(tagSet.current.tagIds, [home]);
+      expect(creations, isEmpty);
+      expect(app.storedGraph(), graphBefore);
+      expect(app.stackNames(), [
+        AppShellRoute.name,
+        IntentionEditorRoute.name,
+        TagCatalogRoute.name,
+      ]);
+
+      // Выбор и настоящий редактор над компактной панелью: существующий тег
+      // и созданный самостоятельной операцией входят в набор только явным
+      // добавлением.
       await _tap(tester, _createTag);
       await _until(tester, _tagEditorName);
       await tester.pumpAndSettle();
+      staleSubmit();
+      await _letStorageRun(tester);
+      expect(creations, isEmpty);
+      expect(app.storedGraph(), graphBefore);
       await tester.enterText(_tagEditorName, 'Сарай');
       await _tap(tester, _tagEditorSubmit);
       await _waitForStorage(tester, () => _tagEditorName.evaluate().isEmpty);
       final shed = app.storedTagId('Сарай');
+      await app.closeMessage(tester);
       await _until(tester, _row(shed));
       await tester.pumpAndSettle();
       expect(tagSet.current.tagIds, [home]);
@@ -406,6 +436,9 @@ void main() {
       expectPreparedFields(['Дом', 'Сарай']);
       expect(app.storedGraph(), graphBefore);
       expect(app.storedTagNames(), ['Дом', 'Работа', 'Сад', 'Сарай']);
+      await _letStorageRun(tester);
+      expect(creations, isEmpty);
+      expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
 
       expect(_closeConfirmation, findsNothing);
 
@@ -445,7 +478,11 @@ void main() {
       expect(find.byTooltip(l10n.editorReadinessOptionOn), findsOneWidget);
 
       // Только «Сохранить» записывает намерение со всеми пятью полями.
-      await _tap(tester, _submit);
+      // В обратном порядке выбор тегов не открывается даже до нового кадра.
+      final submit = tester.widget<FilledButton>(_submit).onPressed!;
+      final chooseTags = tester.widget<IconButton>(_chooseTags).onPressed!;
+      submit();
+      chooseTags();
       await _waitForStorage(tester, () => _sheet.evaluate().isEmpty);
       expect(creations, hasLength(1));
       final id = switch (creations.single.result) {
@@ -517,28 +554,12 @@ void main() {
       );
       expect(_closeConfirmation, findsNothing);
 
-      // «Назад» возвращает каталог, минуя завершённую панель и её диалог.
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(app.stackNames(), [AppShellRoute.name]);
-      expect(
-        find.byType(IntentionEditorPage, skipOffstage: false),
-        findsNothing,
-      );
-      expect(_closeConfirmation, findsNothing);
-      expect(find.byType(AppNavigationBar), findsOneWidget);
-      expect(creations, hasLength(1));
-      expect(
-        id.toCanonicalString(),
-        app.raw.select('SELECT id FROM intentions').single['id'],
-      );
-      expectIntentionGraphRootPage(app.router);
-      expect(tagSet.current.availability, IntentionDraftAvailability.closed);
       final created = app.raw
           .select(
             'SELECT id, title, description, is_action_ready FROM intentions',
           )
           .single;
+      expect(created['id'], id.toCanonicalString());
       expect(created['title'], _rawTitle.trim());
       expect(created['description'], _description);
       expect(created['is_action_ready'], 1);
@@ -563,6 +584,47 @@ void main() {
           (created['id'], shed.toCanonicalString()),
         ],
       );
+
+      // Дополнительные кадры сохраняют одну запись, один маршрут и одно
+      // сообщение успеха до возвращения в каталог.
+      final detailsRoute = app.router.stackData.last;
+      final savedGraph = app.storedGraph();
+      await _until(tester, _message);
+      expect(
+        find.text(
+          l10n.graphOperationMessage(
+            l10n.graphOperationCreate,
+            _rawTitle.trim(),
+            l10n.editorCreated,
+          ),
+        ),
+        findsOneWidget,
+      );
+      await app.closeMessage(tester);
+      await tester.pump(const Duration(seconds: 1));
+      await _letStorageRun(tester);
+      expect(_message, findsNothing);
+      expect(creations, hasLength(1));
+      expect(app.storedGraph(), savedGraph);
+      expect(app.router.stackData.last, same(detailsRoute));
+
+      // «Назад» возвращает каталог, минуя завершённую панель и её диалог.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(app.stackNames(), [AppShellRoute.name]);
+      expect(
+        find.byType(IntentionEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(_closeConfirmation, findsNothing);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
+      expect(creations, hasLength(1));
+      expect(
+        id.toCanonicalString(),
+        app.raw.select('SELECT id FROM intentions').single['id'],
+      );
+      expectIntentionGraphRootPage(app.router);
+      expect(tagSet.current.availability, IntentionDraftAvailability.closed);
       semantics.dispose();
     },
   );
