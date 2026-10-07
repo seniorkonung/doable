@@ -23,7 +23,7 @@ enum AppDestination {
   /// Корневая страница пункта — дочерний маршрут оболочки.
   ///
   /// Порядок вкладок оболочки следует порядку значений, поэтому индекс
-  /// вкладки совпадает с индексом пункта и за пределы оболочки не выходит.
+  /// вкладки совпадает с индексом пункта и используется сборкой навигации.
   PageInfo get page => switch (this) {
     AppDestination.home => HomeRoute.page,
     AppDestination.dailyChoices => DailyChoiceCatalogRoute.page,
