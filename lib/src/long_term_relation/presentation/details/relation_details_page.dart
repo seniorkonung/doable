@@ -28,27 +28,58 @@ import 'relation_details_view_model.dart';
 /// собственную страницу с её начальной группой соседства и не раскрывает граф
 /// дальше автоматически.
 @RoutePage()
-final class RelationDetailsPage extends ConsumerWidget {
+final class RelationDetailsPage extends ConsumerStatefulWidget {
   const RelationDetailsPage({required this.relationId, super.key});
 
   final LongTermRelationId relationId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RelationDetailsPage> createState() =>
+      _RelationDetailsPageState();
+}
+
+final class _RelationDetailsPageState
+    extends ConsumerState<RelationDetailsPage> {
+  Future<void> _delete() async {
+    if (!mounted) return;
+    final relationId = widget.relationId;
+    final deleted = await ref
+        .read(relationDetailsViewModelProvider(relationId).notifier)
+        .delete();
+    // Закрытие принадлежит принявшему команду экземпляру, а не общему Deleted.
+    // После ожидания сброшенный маршрут теряет это право ещё до dispose.
+    // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
+    // pop синхронен: после проверки нет новой асинхронной границы.
+    // https://api.flutter.dev/flutter/widgets/NavigatorState/pop.html
+    if (deleted &&
+        mounted &&
+        widget.relationId == relationId &&
+        (ModalRoute.of(context)?.isCurrent ?? false)) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _retryLifecycleChange() {
+    final provider = relationDetailsViewModelProvider(widget.relationId);
+    final current = ref.read(provider);
+    if (current case RelationDetailsLoaded(
+      lifecycleChange: RelationDetailsLifecycleFailed(
+        kind: RelationDetailsLifecycleKind.delete,
+        canRetry: true,
+      ),
+    )) {
+      unawaited(_delete());
+    } else {
+      ref.read(provider.notifier).retryLifecycleChange();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final provider = relationDetailsViewModelProvider(relationId);
+    final provider = relationDetailsViewModelProvider(widget.relationId);
     final state = ref.watch(provider);
     final viewModel = ref.read(provider.notifier);
-    ref.listen(provider, (previous, next) {
-      // Успех предъявляет общий presenter, а удалённый контекст закрывается
-      // независимо от занятости общей поверхности сообщения.
-      // Сброшенный маршрут теряет право закрывать страницы до dispose:
-      // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
-      if (next is RelationDetailsDeleted &&
-          (ModalRoute.of(context)?.isCurrent ?? false)) {
-        unawaited(Navigator.of(context).maybePop());
-      }
-    });
     return OrdinaryPageScaffold(
       appBar: AppBar(title: Text(localizations.relationDetailsTitle)),
       body: SafeArea(
@@ -67,8 +98,8 @@ final class RelationDetailsPage extends ConsumerWidget {
                   onRetry: viewModel.retry,
                   onArchive: viewModel.archive,
                   onRestore: viewModel.restore,
-                  onDelete: viewModel.delete,
-                  onRetryLifecycleChange: viewModel.retryLifecycleChange,
+                  onDelete: _delete,
+                  onRetryLifecycleChange: _retryLifecycleChange,
                   onEdit: loaded.isOperationRunning
                       ? null
                       : () => unawaited(
