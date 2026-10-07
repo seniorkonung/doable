@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -14,10 +18,14 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
@@ -39,10 +47,12 @@ import '../support/tag_storage_fixture.dart';
 
 part 'tag_navigation_terminal_app_scenarios.dart';
 part 'tag_navigation_late_page_app_scenarios.dart';
+part 'tag_navigation_primary_navigation_app_scenarios.dart';
 
 void main() {
   _registerTerminalAppScenarios();
   _registerLatePageAppScenarios();
+  _registerPrimaryNavigationAppScenarios();
 
   for (final continuation in [false, true]) {
     testWidgets(
@@ -574,6 +584,7 @@ Future<T> _completed<T extends Object>(
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _waitFor(tester, () => finder.evaluate().isNotEmpty);
   await tester.ensureVisible(finder);
+  await tester.pump();
   await tester.tap(finder);
   await tester.pump();
 }
@@ -808,6 +819,35 @@ final class _ControlledRepository extends Fake
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => delegate.getCatalogPage(query);
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => delegate.watchIntention(id);
+
+  @override
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId id,
+  ) => delegate.getRelationCounts(id);
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupPageQuery query,
+  ) => delegate.getRelationGroupPage(query);
+
+  @override
+  Future<TagAssignmentsResult> getTagAssignments(IntentionId id) =>
+      delegate.getTagAssignments(id);
+
+  @override
+  Future<FavoriteIntentionsResult> getFavoriteIntentions() =>
+      delegate.getFavoriteIntentions();
+
+  @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => delegate.getDailyChoiceCatalogPage(query);
+
   @override
   Stream<TagReadResult> watchTag(TagId id) {
     watchedIds.add(id);

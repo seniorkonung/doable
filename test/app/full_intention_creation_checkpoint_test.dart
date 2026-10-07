@@ -831,10 +831,12 @@ List<String> _shownHome(WidgetTester tester) => [
 ];
 
 AppDestination _selected(WidgetTester tester) => tester
-    .widget<AppNavigationBar>(
+    .widgetList<AppNavigationBar>(
       find.byType(AppNavigationBar, skipOffstage: false),
     )
-    .selected;
+    .map((bar) => bar.selected)
+    .toSet()
+    .single;
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {

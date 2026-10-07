@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
@@ -30,17 +32,20 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
 
 part 'tag_navigation_semantics_scenarios.dart';
 part 'tag_navigation_terminal_page_scenarios.dart';
 part 'tag_navigation_late_page_widget_scenarios.dart';
+part 'tag_navigation_primary_navigation_scenarios.dart';
 
 void main() {
   _registerNavigationSemanticsScenarios();
   _registerTerminalNavigationScenarios();
   _registerLatePageWidgetScenarios();
+  _registerPrimaryNavigationScenarios();
   for (final (archived, number) in [(false, 1), (false, 4), (true, 2)]) {
     testWidgets('точный переход к намерению $number и возврат к охвату', (
       tester,
@@ -684,10 +689,8 @@ Future<void> _pumpPage(
         tagNavigationReaderProvider.overrideWithValue(reads),
         tagNavigationChangesProvider.overrideWithValue(const Stream.empty()),
       ],
-      child: MaterialApp(
+      child: OrdinaryPageTestApp(
         locale: Locale(locale),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
               .copyWith(textScaler: TextScaler.linear(textScale)),
@@ -698,6 +701,7 @@ Future<void> _pumpPage(
     ),
   );
   await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
 }
 
 Future<void> _scrollTo(WidgetTester tester, Finder finder) async {

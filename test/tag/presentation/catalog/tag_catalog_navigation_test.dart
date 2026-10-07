@@ -338,6 +338,7 @@ _pumpCatalog(
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
           deepLinkBuilder: (_) => DeepLink([
+            const AppShellRoute(),
             TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
           ]),
         ),

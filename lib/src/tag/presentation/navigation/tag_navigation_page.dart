@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../intention/domain/intention.dart';
 import '../../application/tagged_intentions_page.dart';
@@ -35,7 +36,7 @@ final class TagNavigationPage extends ConsumerWidget
     final provider = tagNavigationViewModelProvider(tagId);
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
-    return Scaffold(
+    return OrdinaryPageScaffold(
       appBar: AppBar(title: Text(l10n.tagNavigationTitle)),
       body: SafeArea(
         child: CustomScrollView(

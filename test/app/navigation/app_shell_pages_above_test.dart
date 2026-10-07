@@ -163,7 +163,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final page in [RelationDetailsPage, DailyChoiceDetailsPage]) {
+  for (final page in [
+    RelationDetailsPage,
+    DailyChoiceDetailsPage,
+    TagNavigationPage,
+  ]) {
     for (final destination in AppDestination.values) {
       testWidgets('$page над формой связи сбрасывает всю историю выбором '
           'пункта ${destination.index + 1}', (tester) async {
@@ -186,7 +190,13 @@ void main() {
           find.byKey(const ValueKey('relation-editor-open-source-details')),
           IntentionDetailsPage,
         );
-        if (page == DailyChoiceDetailsPage) {
+        if (page == TagNavigationPage) {
+          await _open(
+            tester,
+            find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(_tag)}')),
+            page,
+          );
+        } else if (page == DailyChoiceDetailsPage) {
           await _tap(
             tester,
             find.byKey(const ValueKey('relation-neighborhood-daily-source')),
@@ -780,7 +790,8 @@ void _expectAboveShell(WidgetTester tester, Type page, AppDestination under) {
   final ordinary =
       page == IntentionDetailsPage ||
       page == RelationDetailsPage ||
-      page == DailyChoiceDetailsPage;
+      page == DailyChoiceDetailsPage ||
+      page == TagNavigationPage;
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,
