@@ -204,3 +204,249 @@
   - **Dependencies:** 1.14, 1.15, 1.16 — исходные свидетельства и обе реализации с проверками повторного открытия того же ID.
   - **Files likely touched:** Нет — только проверка.
   - **Estimated scope:** XS.
+
+## Phase 2: Создание сохраняет исходную историю при любом входе
+
+- [ ] 2.1 Закрепить состояние одного создания дневного выбора за общей сессией потока
+  - **Acceptance criteria:**
+    - По решению 9 [дизайна](design.md) и [ADR-0022](../../../docs/adr/0022-complete-creation-flows-within-owned-route-boundaries.md) типизированная DailyChoiceCreationFlowSession связывает идентичность потока, экземпляр его корня и исходную историю; состояния редактирования, Submitting с принятой операцией, Saved с DailyChoiceId и покинутого потока не допускают несовместимых действий.
+    - Контракт задаёт принятие отправки, фиксацию результата до навигации, утрату права продолжения при выходе и удержание сессии оставшимися страницами и операцией завершения. Отмена и принятие отправки взаимно исключаются; Saved и покинутый поток не возобновляются поздним результатом, возвратом подтверждения или обновлением пути.
+    - Сессия принадлежит модулю дневного выбора, получает необходимые зависимости явно и не заменяет координатор команд или протокол предъявления. Пересчёт и замена пути существующего выбора не создают такую сессию; глобальный реестр и хранение сессии в графе не вводятся.
+  - **Verification:**
+    - Добавить контрактные проверки переходов, обеих очередностей отмены и отправки, позднего успеха и отказа, удержания после удаления страницы и независимости двух сессий; выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation`.
+  - **Dependencies:** 1.17 — проверенная навигация Phase 1; сессия задаёт общий контракт для страницы пути, подтверждения и завершения.
+  - **Files likely touched:** Новые файлы сессии и её состояний в `lib/src/daily_choice/presentation/`, контрактные проверки в `test/daily_choice/presentation/`; каталоги проверены, имена новых файлов уточняются при реализации.
+  - **Estimated scope:** M — один контракт состояния и его проверки, 2–3 файла.
+
+- [ ] 2.2 Запускать построение дневного пути в обоих направлениях типизированным маршрутом
+  - **Acceptance criteria:**
+    - ChoicePathRoute получает явное направление создания. Вход со страницы намерения сохраняет выбор сверху вниз; действующая кнопка каталога после поиска действия открывает типизированный корень снизу вверх вместо MaterialPageRoute.
+    - Корень создания получает одну сессию из 2.1 с собственной идентичностью маршрута и исходной историей. Вспомогательные forCreationRefresh и forReplacement сохраняют свои безымянные маршруты и возврат результата.
+    - Кнопка каталога и резерв места под неё сохраняются до Phase 3. Прямой запуск маршрута над глубокой страницей не удаляет её или чужой черновик ниже.
+  - **Verification:**
+    - Проверить оба направления с настоящим AppRouter и обычный возврат из корня; выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation/path test/daily_choice/presentation/daily_choice_creation_flow_test.dart test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`.
+  - **Dependencies:** 2.1 — согласованный и проверенный контракт сессии.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/path/choice_path_page_test.dart`, `lib/src/app/routing/app_router.gr.dart` после генерации.
+  - **Estimated scope:** M — одна точка маршрутизации для двух направлений, около 5 файлов.
+
+- [ ] 2.3 Открывать подтверждение дневного выбора типизированным маршрутом той же сессии
+  - **Acceptance criteria:**
+    - DailyChoiceCreationRoute зарегистрирован в корневом стеке и получает ту же сессию, что конкретный ChoicePathRoute. Подтверждение знает идентичность своего экземпляра; одно открытие не создаёт вторую сессию.
+    - Обычное «назад» до отправки возвращает тот же путь с возможностью продолжения. Пересчёт пути из подтверждения и замена существующего выбора сохраняют прежние безымянные маршруты с возвратом результата.
+    - Новый маршрут добавлен в матрицу видов страниц как задача без панели; генерация и вызывающие стороны согласованы в этом же шаге.
+  - **Verification:**
+    - Проверить реальный стек в обоих направлениях, передачу одной сессии и пошаговый возврат. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/routing test/app/navigation/app_shell_pages_above_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`.
+  - **Dependencies:** 2.1 — контракт сессии, 2.2 — типизированный корень обоих направлений.
+  - **Files likely touched:** `lib/src/app/routing/app_router.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; производный `lib/src/app/routing/app_router.gr.dart`.
+  - **Estimated scope:** M — регистрация одного маршрута с его потребителем и проверками, 5 рукописных файлов и генерация.
+
+- [ ] 2.4 Подтвердить границы типизированных маршрутов дневного выбора
+  - **Acceptance criteria:**
+    - Оба направления открывают конкретный корень и подтверждение в одной сессии; исходная история сохраняется при обычном возврате. Матрица навигации учитывает новый маршрут как страницу-задачу.
+    - Контрактные проверки сессии и реальная сборка маршрутов успешны; действующие входы, пересчёт и замена пути работают до подключения общего состояния операции.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/routing test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart test/graph/presentation/graph_operation_presenter_test.dart`; проверить отсутствие необработанных исключений. Выполнить `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 2.1, 2.2, 2.3.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.5 Сохранять принятую отправку и её результат после закрытия подтверждения дневного выбора
+  - **Acceptance criteria:**
+    - ViewModel подтверждения передаёт принятую операцию общей сессии до асинхронного ожидания. Результат обновляет её даже после освобождения ViewModel; Submitting блокирует новое подтверждение и отправку на оставшемся пути, а Saved фиксируется до события перехода.
+    - Страница пути проверяет сессию перед открытием подтверждения и после каждого возврата из него; подтверждение проверяет её непосредственно при отправке. До отправки обычный возврат сохраняет путь; после позднего успеха путь завершён без автоматического перехода, после отказа живой непокинутый поток допускает только новое явное действие.
+    - Координатор сохраняет единственное выполнение и владение командой, а ошибки и успех — действующий протокол [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md) и [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md). Закрытие подтверждения освобождает его право ошибки без потери или повторного предъявления результата.
+  - **Verification:**
+    - Добавить проверки с задержанным репозиторием: возврат до результата, попытка повторного подтверждения, поздний успех и отказ после dispose, новая независимая сессия. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation/editor test/daily_choice/presentation/path test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Dependencies:** 2.4 — проверенные контракт сессии и её передача реальным страницам.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; производная генерация ViewModel.
+  - **Estimated scope:** M — одна граница жизненного цикла принятой операции, до 5 рукописных файлов.
+
+- [ ] 2.6 Открывать созданный дневной выбор с безопасным выходом при частичном отказе перехода
+  - **Acceptance criteria:**
+    - Операция завершения получает сессию, matchId подтверждения и DailyChoiceId; удерживает Saved независимо от удаления виджетов и один раз удаляет только собственные страницы до конкретного корня, затем заменяет его подробным просмотром. Перед каждой мутацией и после асинхронной границы проверяются экземпляры маршрутов и исходная история; поиск только по имени недопустим.
+    - По требованию «Открытие созданной сущности» [спецификации навигации](specs/app-navigation/spec.md) отказы до удаления подтверждения, после его удаления и после удаления корня сохраняют одну запись, исходную историю и доступный выход. Адаптер согласует отображение с фактическим стеком без новых удалений или восстановления формы; Future от replace не считается свидетельством установки результата.
+    - Saved блокирует изменение пути, повторное подтверждение и запись. Поздний обработчик после установленного результата, выхода или нового создания не меняет историю. Отказ диагностируется отдельно через FlutterError.reportError без пользовательского содержимого, не подавляет успех записи и не повторяет переход.
+  - **Verification:**
+    - Для обоих направлений добавить управляемые отказы во всех трёх точках с настоящим AppRouter и координатором; проверять фактические маршруты, видимую страницу, один результат записи и возврат в исходную историю, включая чужой черновик под ней. Проверить запоздалый отказ после установки результата и возврат оставшегося подтверждения.
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart`; обновить ожидания возврата к пути после успеха на открытие созданного выбора.
+  - **Dependencies:** 2.5 — проверенная фиксация результата в общей сессии до навигации.
+  - **Files likely touched:** Новая операция завершения в `lib/src/daily_choice/presentation/`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, новые проверки частичных отказов в `test/daily_choice/presentation/`, `test/app/daily_choice_app_flow_test.dart`.
+  - **Estimated scope:** M — один навигационный эффект и матрица его отказов, около 5 файлов.
+
+- [ ] 2.7 Предоставить общее локализованное действие отмены и выхода из создания
+  - **Acceptance criteria:**
+    - Узкий компонент в shared/presentation получает типизированное состояние и явный обработчик: до принятия команды или после отказа показывает «Отменить создание» / «Cancel creation», при выполнении — «Выйти из создания» / «Leave creation» с объяснением продолжения сохранения. Терминальное состояние оставляет доступный выход без обещания отменить запись.
+    - Компонент не знает маршрутизатор или координатор; потребителями являются дневной выбор и форма связи. Действие доступно экранному диктору, при масштабе текста 2.6 и ограниченной высоте; существующая процедура защищённого закрытия намерения не заменяется.
+  - **Verification:**
+    - Добавить проверки русской и английской семантики, действия при Submitting и терминальном состоянии, длинных строк и увеличенного текста. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/shared` и генерацию локализации принятой командой репозитория.
+  - **Dependencies:** 2.1 — согласованные смыслы состояний потока; компонент задаёт общий контракт представления для последующих подключений.
+  - **Files likely touched:** Новый компонент в `lib/src/shared/presentation/`, его проверки в `test/shared/`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`; производные `lib/l10n/app_localizations*.dart`.
+  - **Estimated scope:** M — общий компонент представления и две локали, 4 рукописных файла.
+
+- [ ] 2.8 Подтвердить единственную запись дневного выбора при возврате и отказе открытия
+  - **Acceptance criteria:**
+    - Для обоих направлений проверены Submitting после возврата к пути, поздний успех и отказ, успешное открытие результата и три точки частичного отказа перехода. Сохраняются одна запись, Saved до удаления страниц, запрет повторного подтверждения и обычный выход.
+    - Возврат подтверждения и поздние обработчики не возобновляют завершённый поток; новые сессии независимы. Принятые команды, сообщения, пересчёт и замена пути сохраняют прежние границы; компонент явного выхода проверен для обеих локалей.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/graph/presentation/operation_failure_presentation_test.dart` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`. Сверить свидетельства с таблицей отказов решения 9 дизайна.
+  - **Dependencies:** 2.5, 2.6, 2.7.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.9 Завершать весь дневной выбор явной отменой или выходом без потери исходной истории
+  - **Acceptance criteria:**
+    - Путь, просмотр подсказки прежнего маршрута и подтверждение в обоих направлениях предоставляют действие 2.7. Отмена до принятия или после отказа удаляет весь собственный поток без создания; выход при Submitting сохраняет выполнение. Сначала сессия теряет право продолжения и перехода, затем удаляются только её маршруты до исходной истории.
+    - Частичный отказ удаления оставляет поток покинутым, запрещает продолжение и сохраняет повтор выхода только из оставшихся собственных страниц; отказ диагностируется без пользовательского содержимого. Отмена и отправка взаимно исключаются до обновления UI, а поздний результат не меняет новую сессию.
+    - Обычное «назад» закрывает только верхнюю страницу, скрытие клавиатуры не завершает поток; вспомогательные выборы и пересчёт возвращают результат вызывающей странице. Отказы команды сохраняют введённые данные и предусмотренное исправление в живой непокинутой сессии.
+  - **Verification:**
+    - Проверить отмену из пути, подсказки и подтверждения, выход при задержанной записи, обе очередности гонки с отправкой и повтор выхода после частичного отказа. Проверять одинаковый исходный стек и чужой черновик, ноль команд при отмене и одну при выходе после принятия.
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart`.
+  - **Dependencies:** 2.8 — проверенные сессия, завершение и компонент действия.
+  - **Files likely touched:** Операция потока из 2.6, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/daily_choice/presentation/path/choice_path_suggestions_view.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, новый файл сценариев выхода в `test/daily_choice/presentation/`.
+  - **Estimated scope:** M — один контракт выхода из многошагового создания, около 5 файлов.
+
+- [ ] 2.10 Изолировать состояние каждого поиска действия и основания дневного выбора
+  - **Acceptance criteria:**
+    - По требованию «Самостоятельное состояние открытых страниц поиска намерений» [спецификации намерений](specs/intention-management/spec.md) и решению 11 дизайна каждое смонтированное окно поиска создаёт один IntentionSearchSession. Токен входит по идентичности в назначение и одинаково передаётся каталогу, условиям тегов и выдаче; пересборка страницы не создаёт новую сессию.
+    - Два поиска одного назначения не делят фильтр, условия тегов, порции или прокрутку; закрытие одного не меняет другой. Повторное открытие начинает начальные параметры, а освобождение страницы освобождает её провайдеры; BrowseIntentionCatalog и правила поиска при замене пути сохраняются.
+    - Для последующего подключения выбора участника предусмотрен тот же контракт токена без обязательного одновременного переноса его страницы. Поиск основания допускает все активные намерения, поиск действия — только готовые; ID, ограниченные порции и протокол ревизий не меняются.
+  - **Verification:**
+    - Открыть одновременно два поиска каждого назначения, изменить название, обязательные и исключённые теги, догрузить и прокрутить, затем закрыть второй; проверить первый и чистое новое открытие, включая поздние ответы закрытой страницы.
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/intention/presentation/catalog test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`; привести затронутые тестовые обращения к провайдерам к реальной сессии страницы.
+  - **Dependencies:** 1.17 — сохранённая история допускает вложенный поиск; контракт поиска независим от механики завершения, файловый порядок соблюдается.
+  - **Files likely touched:** `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, обе страницы в `lib/src/daily_choice/presentation/action_picker/` и `source_picker/`, их проверки в `test/daily_choice/presentation/action_picker/` и `source_picker/`; точечная адаптация общих тестовых обращений к ключу провайдера.
+  - **Estimated scope:** M — один контракт изоляции у двух однотипных потребителей, около 5 основных файлов.
+
+- [ ] 2.11 Изолировать поиск участника связи и разрешить первый выбор без исключаемого намерения
+  - **Acceptance criteria:**
+    - Страница выбора участника использует токен 2.10 на всё время жизни; два поиска с одинаковым назначением сохраняют самостоятельные параметры, выдачу и прокрутку, а новая страница начинает исходные параметры.
+    - SelectRelationParticipant и параметр маршрута принимают необязательный excludedIntentionId. Форма исключает только участника другой роли; при его отсутствии поиск открывается без исключения, а текущее значение выбираемой роли остаётся допустимым.
+    - Активный и архивный контексты, выбор по идентификатору и отмена с сохранением черновика используют прежний контракт. Репозиторий уже поддерживает необязательное исключение; новая граница чтения и изменение правил самосвязи не требуются.
+  - **Verification:**
+    - Проверить оба порядка выбора ролей, повторный выбор текущего участника, одноимённые намерения, два вложенных поиска и отсутствие исключения. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/intention/presentation/catalog`.
+  - **Dependencies:** 2.10 — готовый контракт сессии поиска.
+  - **Files likely touched:** `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `lib/src/app/routing/app_router.gr.dart` после генерации.
+  - **Estimated scope:** M — один сценарий выбора участника, около 5 файлов.
+
+- [ ] 2.12 Подтвердить выход из дневного выбора и независимость поисковых страниц
+  - **Acceptance criteria:**
+    - Отмена и выход из пути, подсказки и подтверждения соблюдают контракт в обоих направлениях; частичный отказ удаления допускает только повтор безопасного выхода. Принятая команда продолжается один раз, чужая история и новые сессии не меняются.
+    - Одновременные поиски всех трёх назначений независимы; закрытие и поздние ответы одного не меняют соседние страницы. Поиск участника исключает ровно другую роль, вспомогательные выборы при редактировании и замене пути сохраняют свой смысл.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation test/intention/presentation/catalog test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/app/intention_tag_search_app_flow_test.dart` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 2.9, 2.10, 2.11.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.13 Создавать долговременную связь из формы без заранее выбранных участников
+  - **Acceptance criteria:**
+    - По [спецификации связей](specs/long-term-relation-management/spec.md) и решению 10 дизайна RelationBlankCreationContext представляет пустое создание отдельным закрытым вариантом. Начальные участники, тип, приоритет и описание пусты; исчерпывающая обработка охватывает заголовок, canSubmit, команду и результат.
+    - Обе роли доступны для поиска; отправка становится допустимой только после выбора двух участников, типа и приоритета. Команда проходит через прежний координатор, а занятая пара, недопустимый участник и остальные отказы сохраняют черновик и предусмотренные действия.
+    - Входы из исходящей и входящей групп сохраняют предвыбор правильной роли и возможность заменить обе роли. Редактирование существующей связи сохраняет свой контракт; новый вход пока проверяется непосредственным открытием типизированного маршрута.
+  - **Verification:**
+    - Проверить пустую форму, оба порядка участников, заполнение и отказ команды, предвыбор из обеих групп и редактирование. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker test/app/long_term_relation_app_flow_test.dart`.
+  - **Dependencies:** 2.12 — подтверждённый поиск участника без обязательного исключения.
+  - **Files likely touched:** `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `relation_editor_view_model.dart` и `relation_editor_page.dart` в том же каталоге, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart` и `relation_editor_page_test.dart`; производная генерация при изменении сигнатур.
+  - **Estimated scope:** M — один вариант существующей формы, 5 основных файлов.
+
+- [ ] 2.14 Открывать созданную связь поверх исходной истории при любом входе
+  - **Acceptance criteria:**
+    - RelationEditorCreated заменяет только актуальный экземпляр формы подробным просмотром по LongTermRelationId; RelationEditorUpdated сохраняет прежнее закрытие. Пустой вход и обе группы намерения следуют одному правилу [ADR-0022](../../../docs/adr/0022-complete-creation-flows-within-owned-route-boundaries.md).
+    - Пока отправка выполняется, переходы к подробным данным участников и занятой связи не открывают страницы над формой. Право перехода проверяется по matchId непосредственно перед изменением стека и после асинхронной границы; уход или сброс прекращает его до dispose.
+    - Отказ открытия оставляет запись успешной, запрещает повторную отправку и сохраняет выход из оставшейся формы; удалённая форма и поздний отказ не меняют новые маршруты. Фактическое отображение согласуется с остатком стека, диагностика отделена от результата записи, сообщение успеха предъявляется один раз без задержки перехода.
+  - **Verification:**
+    - Проверить три входа, одну запись и возврат в глубокую историю, сохранение черновика под ней, отказ до и после удаления формы, поздний результат после выхода, сброса и нового открытия; обновить прежние ожидания возврата на намерение.
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/long_term_relation/presentation/editor test/app/long_term_relation_app_flow_test.dart test/app/navigation/app_shell_operation_reset_test.dart`.
+  - **Dependencies:** 2.13 — рабочая пустая форма и прежние входы; принадлежность навигационного результата ограничена конкретным экземпляром по 1.17.
+  - **Files likely touched:** `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, при необходимости узкий адаптер завершения в том же каталоге, `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, новый файл отказов перехода в `test/long_term_relation/presentation/editor/`.
+  - **Estimated scope:** M — один навигационный результат создания, до 5 файлов.
+
+- [ ] 2.15 Предоставить отмену и выход из создания связи с защитой от поздних действий
+  - **Acceptance criteria:**
+    - Форма создания использует действие 2.7: отмена до принятия или после отказа возвращает исходную историю без связи, выход во время сохранения объясняет продолжение и не отменяет команду. Обычное закрытие поиска участника возвращает прежний черновик; редактирование существующей связи сохраняет свои действия.
+    - Отмена и отправка взаимно исключаются с первого обработчика. Выход прекращает право продолжения до удаления маршрута; при отказе удаления остаётся доступен повтор выхода без редактирования или новой отправки.
+    - Поздний результат, выбор участника или обработчик закрытия не меняет исходную историю и новую форму. Принятая запись и предъявление её результата завершаются один раз по действующим правилам.
+  - **Verification:**
+    - Проверить обе очередности отмены и отправки до следующего кадра, задержанные успех и отказ после выхода, частичный отказ удаления и новую форму с вводом; выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker test/app/long_term_relation_app_flow_test.dart`.
+  - **Dependencies:** 2.7 — общий компонент действия, 2.14 — безопасное завершение формы.
+  - **Files likely touched:** `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `relation_editor_state.dart` и при необходимости `relation_editor_view_model.dart` в том же каталоге, `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, новый файл сценариев выхода в том же тестовом каталоге.
+  - **Estimated scope:** M — один контракт выхода из формы, до 5 основных файлов.
+
+- [ ] 2.16 Подтвердить полное создание связи из пустой формы и групп намерения
+  - **Acceptance criteria:**
+    - Пустой вход и обе группы намерения позволяют выбрать участников, сохранить связь и открыть её подробный просмотр поверх исходной истории. Отказы команды сохраняют черновик, отказы перехода — успех записи и выход без повторной отправки.
+    - Отмена и выход при принятой записи, поздние результаты и новое открытие формы сохраняют границы сессии; сообщения предъявляются один раз. Редактирование существующей связи и вспомогательный поиск не приобретают правил завершения создания.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/long_term_relation/presentation test/app/long_term_relation_app_flow_test.dart test/app/navigation` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 2.13, 2.14, 2.15.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.17 Подтвердить самостоятельное создание намерения над корневой и глубокой страницей
+  - **Acceptance criteria:**
+    - По [спецификации намерений](specs/intention-management/spec.md), [ADR-0018](../../../docs/adr/0018-manage-modal-creation-sessions-in-root-stack.md) и [ADR-0019](../../../docs/adr/0019-separate-tag-selection-context-from-persistence.md) существующий IntentionEditorRoute запускается над любой обычной страницей без потери её состояния и нижележащего черновика. Сессия компактна, модальна, начинается пустой и сохраняется при выборе и редактировании тегов.
+    - Успех открывает правильный новый ID поверх исходной истории, не ждёт очереди сообщений; отмена сохраняет самостоятельно созданные теги. Все способы ухода сохраняют защиту изменённого черновика и подтверждение продолжения принятой записи; обычные страницы из выбора тегов недоступны.
+    - Отказ перехода до или после удаления панели сохраняет подтверждённый успех, отображение фактической истории и безопасный выход. Старое подтверждение ухода и поздние обработчики не влияют на новую сессию; если существующая реализация уже удовлетворяет контракту, достаточно расширить проверки.
+  - **Verification:**
+    - Открывать существующий типизированный вход напрямую через настоящий AppRouter над корнями и глубокой историей; проверить успех, ошибку, уход с записью, теговый сценарий, четыре способа закрытия после отказа перехода и позднее подтверждение.
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/intention_creation_sheet_integration_test.dart test/app/intention_creation_sheet_failure_integration_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/intention_creation_draft_integration_test.dart test/intention/presentation/editor`.
+  - **Dependencies:** 1.17 — навигация и модальная граница; общий контракт завершения определён дизайном и не требует замены существующей сессии намерения.
+  - **Files likely touched:** `test/app/intention_creation_sheet_integration_test.dart`, `test/app/intention_creation_sheet_failure_integration_test.dart`, `test/app/intention_creation_sheet_tags_test.dart`; при выявленном несоответствии — `lib/src/intention/presentation/editor/intention_editor_page.dart` и `intention_creation_close.dart`.
+  - **Estimated scope:** M — подтверждение существующего потока в новых исходных историях, до 5 файлов.
+
+- [ ] 2.18 Различать начальный поиск для создания дневного выбора и вспомогательный выбор для замены пути
+  - **Acceptance criteria:**
+    - Страницы поиска основания и действия получают явный типизированный контекст запуска: начальное создание предоставляет «Отменить создание», вспомогательный выбор сохраняет прежний возврат результата. У контекста есть узкий контракт отмены и принадлежности запуска; принадлежность не выводится из наличия других маршрутов.
+    - Отмена начального поиска прекращает запуск до закрытия, возвращает отсутствие ID и сохраняет исходную историю. Возврат из подробностей кандидата или условий тегов закрывает лишь вспомогательную страницу; пустой граф и отсутствие совпадений объясняются действующими сообщениями.
+    - Контекст запуска независим от токена поисковой сессии 2.10. Основание выбирается среди всех активных намерений, действие — среди готовых; совместный поиск по названию и тегам, локализация, доступность и ID сохраняются.
+  - **Verification:**
+    - Проверить создание и замену пути для обеих страниц, явную отмену, обычный возврат, пустой граф, одинаковые названия и вложенный поиск; выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`.
+  - **Dependencies:** 2.7 — локализованное действие, 2.10 — независимые поиски.
+  - **Files likely touched:** Обе страницы в `lib/src/daily_choice/presentation/action_picker/` и `source_picker/`, узкий контекст рядом с ними в `lib/src/daily_choice/presentation/`, их проверки в `test/daily_choice/presentation/action_picker/` и `source_picker/`; соответствующая генерация маршрутов и адаптация вызова из `daily_choice_path_replacement_flow.dart` при необходимости.
+  - **Estimated scope:** M — один контракт назначения поиска, около 5 основных файлов и механическая адаптация вызовов.
+
+- [ ] 2.19 Предоставить самостоятельный запуск дневного выбора через поиск основания или действия
+  - **Acceptance criteria:**
+    - Граница запуска в модуле дневного выбора принимает направление и исходную страницу, открывает поиск с контекстом 2.18 и после явного выбора ID запускает типизированный ChoicePathRoute нужного направления. Поиск закрывается до открытия корня; из входа со страницы намерения путь по-прежнему открывается сразу.
+    - До продолжения после await проверяются конкретный исходный маршрут и актуальность запуска, включая отмену и сброс до dispose. Поздний результат отменённого поиска не открывает путь, повторный вызов одного запуска не создаёт второй поток; независимые запуски над разными страницами не делят состояние.
+    - Действующая кнопка каталога использует готовый вход от действия. Вход от основания доступен на границе потока для будущей композиции приложения и проверяется с реальным маршрутизатором; кнопка, меню и режимы Phase 3 не добавляются.
+  - **Verification:**
+    - Для обоих направлений проверить запуск над корнем и глубокой страницей с чужой задачей под ней, явный выбор, отмену, поздний результат после сброса и новое открытие; проверить пустой граф и путь от неготового основания.
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart test/app/navigation/app_shell_operation_reset_test.dart`.
+  - **Dependencies:** 2.12 — готовые дневные потоки; 2.18 — согласованный и реализованный контракт начального поиска.
+  - **Files likely touched:** Новая граница запуска в `lib/src/daily_choice/presentation/`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, новый файл проверок запуска в `test/daily_choice/presentation/`, при необходимости `test/app/daily_choice_app_flow_test.dart`.
+  - **Estimated scope:** M — один сценарий запуска с параметром направления, до 5 файлов.
+
+- [ ] 2.20 Подтвердить готовность всех четырёх входов на границе потоков
+  - **Acceptance criteria:**
+    - Все потоки удаляют только собственные страницы, открывают созданный ID при живой завершающей сессии и сохраняют доступный выход после отказа перехода. Входы со страницы намерения и прежние кнопки каталогов работоспособны.
+    - Отмена, возврат на шаг и выход после принятия команды различаются; поздние результаты не меняют другие сессии. Черновики под исходной страницей, правила тегов, редактирования и замены пути сохраняются.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/intention_creation_sheet_integration_test.dart test/app/intention_creation_sheet_failure_integration_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/long_term_relation_app_flow_test.dart test/app/daily_choice_app_flow_test.dart test/daily_choice/presentation test/app/navigation` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 2.8, 2.12, 2.16, 2.17, 2.18, 2.19.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.21 Проверить совместную работу четырёх потоков с глубокой историей и доступными действиями
+  - **Acceptance criteria:**
+    - Интеграционная матрица запускает намерение, пустую связь и дневной выбор в обоих направлениях над корнем и глубокой страницей, в том числе над чужим черновиком. Успех, отмена и выход сохраняют нужные ID, исходную историю, выбранный пункт и параметры каталогов; один сценарий использует настоящее локальное хранилище через существующий harness.
+    - Русские и английские действия, объяснение продолжающегося сохранения, семантика и сообщения доступны при клавиатуре и тексте 2.6 на телефоне в вертикальной ориентации и планшете в обеих ориентациях. Полная матрица видов страниц по-прежнему покрывает новые типизированные маршруты как задачи без панели; результат открывается обычной страницей с панелью.
+    - Прежние проверки, ожидающие возврата к пути после создания дневного выбора или закрытия формы связи без открытия результата, перенесены на новое поведение; остальные сценарии редактирования, замены пути, сообщений и навигации сохраняются. Проверки используют публичные границы потоков без тестовых кнопок в продукте.
+  - **Verification:**
+    - Добавить сценарии в существующие тестовые каталоги с управляемыми результатами и настоящим AppRouter; проверить маршруты и данные, а также отсутствие исключений раскладки. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/navigation test/app test/daily_choice/presentation test/long_term_relation/presentation test/intention/presentation/editor`.
+    - При доступном устройстве проверить действия выхода и семантику в реальном приложении; новые входы до Phase 3 подтверждаются через интеграционные проверки публичной границы запуска, без добавления временного UI.
+  - **Dependencies:** 2.20 — все четыре готовых потока и оба начальных поиска.
+  - **Files likely touched:** Новые интеграционные сценарии в `test/app/`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, проверки доступности в `test/daily_choice/presentation/` и `test/long_term_relation/presentation/editor/`.
+  - **Estimated scope:** M — общая матрица готовых потоков и доступности, до 5 тестовых файлов.
+
+- [ ] 2.22 Подтвердить условие готовности Phase 2 перед подключением общей точки создания
+  - **Acceptance criteria:**
+    - Условие Ready to advance [Phase 2](plan.md) подтверждено для всех четырёх потоков: исходная история и сессии сохраняют принадлежность при успехе, отмене, обычном возврате, выходе после отправки и отказах. Для обоих направлений дневного выбора есть свидетельства трёх точек частичного отказа, запрета повторного создания и безопасного выхода.
+    - Проверки генерации, анализа, тестов и release-сборки успешны; новые контракты и русские комментарии описывают фактическое поведение. Диагностика не содержит пользовательских данных, запись и сообщения сохраняют прежние границы, схема графа, настройки установки и статусы ADR не изменены.
+    - Подтверждается только Phase 2. Её входы готовы для композиции Phase 3; кнопка быстрого создания, меню, сохранение режима и удаление прежних кнопок каталогов остаются за границей этого пакета. Все задачи Phase 1 и plan.md сохранены дословно.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise run codegen-check`, `MISE_AUTO_INSTALL=false mise run check`, `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter build apk --release` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`. Не устанавливать и не обновлять инструменты.
+    - После изменений Dart обнаружить работающее приложение через Dart MCP, при наличии выполнить горячую перезагрузку или перезапуск и проверить get_runtime_errors; иначе использовать CLI. Сопоставить свежие результаты и точную ревизию с критериями Phase 2 и матрицами 2.8, 2.12, 2.16, 2.20 и 2.21; не объявлять всё изменение завершённым.
+  - **Dependencies:** 2.4, 2.8, 2.12, 2.16, 2.20, 2.21; все реализации 2.1–2.21 подтверждены соответствующими контрольными точками.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
