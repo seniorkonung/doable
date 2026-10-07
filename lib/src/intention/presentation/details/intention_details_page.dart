@@ -75,7 +75,12 @@ final class _IntentionDetailsPageState
     ref.watch(relationNeighborhoodViewModelProvider(intentionId));
     ref.listen(provider, (previous, next) {
       // Сообщения об успехе предъявляет общий presenter оболочки.
-      if (next is IntentionDetailsDeleted) {
+      // Сброшенный маршрут теряет право закрывать страницы до dispose,
+      // даже пока обратная анимация удерживает этот виджет в дереве.
+      // isCurrent проверяет конкретный маршрут и его присутствие в истории:
+      // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
+      if (next is IntentionDetailsDeleted &&
+          (ModalRoute.of(context)?.isCurrent ?? false)) {
         unawaited(context.router.maybePop());
       }
     });

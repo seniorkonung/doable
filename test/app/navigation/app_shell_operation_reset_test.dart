@@ -21,6 +21,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -32,12 +33,179 @@ const _message = ValueKey('graph-operation-message');
 const _success = 'Архивирование — «Намерение»: Намерение архивировано.';
 const _failure =
     'Архивирование — «Намерение»: Не удалось изменить состояние намерения. Повторите попытку.';
+const _deleteSuccess = 'Удаление — «Намерение»: Намерение удалено.';
+const _description = ValueKey('relation-editor-description');
 
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
     );
+  });
+
+  for (final destination in [
+    AppDestination.intentionGraph,
+    AppDestination.home,
+  ]) {
+    final resetKind = destination == AppDestination.intentionGraph
+        ? 'текущему'
+        : 'другому';
+    testWidgets(
+      'позднее удаление намерения после сброса к $resetKind пункту '
+      'сохраняет новую форму связи и её ввод до освобождения прежней страницы',
+      (tester) async {
+        final app = await _ControlledApp.start(tester);
+        await app.openDetails(tester);
+        final previousPage = tester.state(find.byType(IntentionDetailsPage));
+        final previousRouteId = app.router.stackData.last.matchId;
+        await app.delete(tester);
+
+        await _select(tester, destination, settle: false);
+        unawaited(
+          app.router.push(
+            RelationEditorRoute(
+              editorContext: RelationCreationContext(
+                participant: RelationParticipantSummary(
+                  id: testDetailsIntentionId(2),
+                  title: 'Независимый участник',
+                  archiveState: IntentionArchiveState.active,
+                  activeRelationCount: 0,
+                ),
+                direction: RelationDirection.outgoing,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+        const text = 'Несохранённое описание новой связи';
+        await tester.enterText(find.byKey(_description), text);
+        expect(find.text(text), findsOneWidget);
+        final form = tester.state(find.byType(RelationEditorPage));
+        final formRouteId = app.router.stackData.last.matchId;
+        expect(previousPage.mounted, isTrue);
+        expect(
+          app.router.stackData.any((route) => route.matchId == previousRouteId),
+          isFalse,
+        );
+        expect(app.coordinator.isRunning(app.intention.id), isTrue);
+
+        app.complete(
+          testDetailsDeletedResult(
+            app.intention,
+            revision: const TestDetailsRevision(1),
+          ),
+        );
+        await _until(
+          tester,
+          () => !app.coordinator.isRunning(app.intention.id),
+        );
+        expect(previousPage.mounted, isTrue);
+        expect(app.router.stackData.last.matchId, formRouteId);
+        await tester.pumpAndSettle();
+
+        expect(tester.state(find.byType(RelationEditorPage)), same(form));
+        expect(find.text(text), findsOneWidget);
+        expect(app.router.stack.map((page) => page.name), [
+          AppShellRoute.name,
+          RelationEditorRoute.name,
+        ]);
+        expect(find.text(_deleteSuccess), findsOneWidget);
+        await _expireMessages(tester);
+        expect(app.repository.commands.single, isA<DeleteIntention>());
+        expect(app.repository.relationCommands, isEmpty);
+
+        unawaited(app.router.maybePop());
+        await tester.pumpAndSettle();
+        _expectRoot(tester, app.router, destination);
+        await _select(tester, AppDestination.intentionGraph);
+        expect(find.text(app.intention.title), findsNothing);
+        expect(app.repository.catalogQueries, hasLength(1));
+      },
+    );
+  }
+
+  testWidgets('позднее удаление намерения сохраняет каталог тегов, '
+      'открытый через «Теги» до освобождения сброшенной страницы', (
+    tester,
+  ) async {
+    final app = await _ControlledApp.start(tester);
+    await app.openDetails(tester);
+    final previousPage = tester.state(find.byType(IntentionDetailsPage));
+    final previousRouteId = app.router.stackData.last.matchId;
+    await app.delete(tester);
+
+    await _select(tester, AppDestination.intentionGraph, settle: false);
+    await tester.pump();
+    await tester.tap(find.byTooltip('Теги'));
+    await tester.pump();
+    await tester.pump();
+    final catalog = tester.element(find.byType(TagCatalogPage));
+    final catalogRouteId = app.router.stackData.last.matchId;
+    expect(app.router.stackData.last.name, TagCatalogRoute.name);
+    expect(previousPage.mounted, isTrue);
+    expect(
+      app.router.stackData.any((route) => route.matchId == previousRouteId),
+      isFalse,
+    );
+    expect(app.coordinator.isRunning(app.intention.id), isTrue);
+
+    app.complete(
+      testDetailsDeletedResult(
+        app.intention,
+        revision: const TestDetailsRevision(1),
+      ),
+    );
+    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+    expect(previousPage.mounted, isTrue);
+    expect(app.router.stackData.last.matchId, catalogRouteId);
+    await tester.pumpAndSettle();
+
+    expect(tester.element(find.byType(TagCatalogPage)), same(catalog));
+    expect(app.router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      TagCatalogRoute.name,
+    ]);
+    expect(find.text(_deleteSuccess), findsOneWidget);
+    await _expireMessages(tester);
+    expect(app.repository.commands.single, isA<DeleteIntention>());
+    unawaited(app.router.maybePop());
+    await tester.pumpAndSettle();
+    _expectRoot(tester, app.router, AppDestination.intentionGraph);
+    expect(find.text(app.intention.title), findsNothing);
+    expect(app.repository.catalogQueries, hasLength(1));
+  });
+
+  testWidgets('удаление с актуальной верхней страницы закрывает только её '
+      'и один раз предъявляет результат', (tester) async {
+    final app = await _ControlledApp.start(tester);
+    await tester.tap(find.byTooltip('Теги'));
+    await tester.pumpAndSettle();
+    final catalogRouteId = app.router.stackData.last.matchId;
+    await app.openDetails(tester);
+    await app.delete(tester);
+
+    app.complete(
+      testDetailsDeletedResult(
+        app.intention,
+        revision: const TestDetailsRevision(1),
+      ),
+    );
+    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+    await tester.pumpAndSettle();
+
+    expect(app.router.stackData.last.matchId, catalogRouteId);
+    expect(app.router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      TagCatalogRoute.name,
+    ]);
+    expect(
+      find.byType(IntentionDetailsPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(find.text(_deleteSuccess), findsOneWidget);
+    await _expireMessages(tester);
+    expect(app.repository.commands.single, isA<DeleteIntention>());
   });
 
   testWidgets('сброс сохраняет принятое архивирование и предъявляет поздний '
@@ -224,12 +392,16 @@ void main() {
   });
 }
 
-Future<void> _select(WidgetTester tester, AppDestination destination) async {
+Future<void> _select(
+  WidgetTester tester,
+  AppDestination destination, {
+  bool settle = true,
+}) async {
   final l10n = AppLocalizations.of(
     tester.element(find.byType(AppNavigationBar)),
   );
   await tester.tap(find.byTooltip(destination.title(l10n)));
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
 }
 
 void _expectRoot(
@@ -327,6 +499,20 @@ final class _ControlledApp {
     await tester.tap(find.byKey(_archive));
     await tester.pump();
     expect(repository.commands.last, isA<ArchiveIntention>());
+    expect(coordinator.isRunning(intention.id), isTrue);
+  }
+
+  Future<void> delete(WidgetTester tester) async {
+    final delete = find.byKey(const ValueKey('intention-details-delete'));
+    await tester.ensureVisible(delete);
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('intention-details-confirm-delete')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(repository.commands.single, isA<DeleteIntention>());
     expect(coordinator.isRunning(intention.id), isTrue);
   }
 
