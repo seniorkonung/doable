@@ -240,7 +240,7 @@
   - **Files likely touched:** `lib/src/app/routing/app_router.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; производный `lib/src/app/routing/app_router.gr.dart`.
   - **Estimated scope:** M — регистрация одного маршрута с его потребителем и проверками, 5 рукописных файлов и генерация.
 
-- [ ] 2.4 Подтвердить границы типизированных маршрутов дневного выбора
+- [x] 2.4 Подтвердить границы типизированных маршрутов дневного выбора
   - **Acceptance criteria:**
     - Оба направления открывают конкретный корень и подтверждение в одной сессии; исходная история сохраняется при обычном возврате. Матрица навигации учитывает новый маршрут как страницу-задачу.
     - Контрактные проверки сессии и реальная сборка маршрутов успешны; действующие входы, пересчёт и замена пути работают до подключения общего состояния операции.
