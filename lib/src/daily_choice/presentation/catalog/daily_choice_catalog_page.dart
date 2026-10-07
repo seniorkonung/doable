@@ -192,7 +192,7 @@ final class _DailyChoiceCatalogPageState
 
   Future<void> _chooseAction() async {
     final actionId = await context.router.push<IntentionId>(
-      const DailyChoiceActionPickerRoute(),
+      DailyChoiceActionPickerRoute(),
     );
     if (!mounted || actionId == null) return;
     await context.router.push<void>(

@@ -230,7 +230,7 @@ void main() {
       expect(router.topRoute.name, DailyChoiceCatalogRoute.name);
       expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
 
-      unawaited(router.push<IntentionId>(const DailyChoiceSourcePickerRoute()));
+      unawaited(router.push<IntentionId>(DailyChoiceSourcePickerRoute()));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(router.current.name, DailyChoiceSourcePickerRoute.name);

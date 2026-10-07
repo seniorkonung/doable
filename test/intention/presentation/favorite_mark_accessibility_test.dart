@@ -62,12 +62,12 @@ final _pages = [
     route: null,
     listKey: 'intention-catalog-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск действия',
     route: DailyChoiceActionPickerRoute(),
     listKey: 'daily-choice-action-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск исходного намерения',
     route: DailyChoiceSourcePickerRoute(),
     listKey: 'daily-choice-source-list',

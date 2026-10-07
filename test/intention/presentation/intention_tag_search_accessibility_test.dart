@@ -56,13 +56,13 @@ final _pages = [
     filterKey: 'catalog-filter-field',
     listKey: 'intention-catalog-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск действия',
     route: DailyChoiceActionPickerRoute(),
     filterKey: 'daily-choice-action-filter',
     listKey: 'daily-choice-action-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск исходного намерения',
     route: DailyChoiceSourcePickerRoute(),
     filterKey: 'daily-choice-source-filter',
