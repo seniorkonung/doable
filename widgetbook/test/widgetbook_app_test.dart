@@ -1,4 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable_widgetbook/favorite/home_row_use_cases.dart';
 import 'package:doable_widgetbook/navigation/app_navigation_bar_use_cases.dart';
@@ -24,8 +25,13 @@ void main() {
     expect(find.text('Намерения'), findsOneWidget);
   });
 
-  testWidgets('панель основной навигации показана с каждым выбранным пунктом '
-      'в обеих локалях', (tester) async {
+  testWidgets('панель каждого выбранного пункта показана под обычной страницей '
+      'с текстом 2.5 на телефоне в обеих локалях', (tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2.5;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     final useCases = appNavigationBarUseCases();
     expect(useCases.map((useCase) => useCase.name), [
       'Выбрана Главная',
@@ -51,9 +57,38 @@ void main() {
 
         final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
         expect(bar.selectedIndex, index);
+        final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+        expect(scaffold.bottomNavigationBar, isA<AppNavigationBar>());
+        final appBar = find.byType(AppBar);
+        expect(
+          find.descendant(of: appBar, matching: find.text(localeNames[index])),
+          findsOneWidget,
+        );
+        expect(MediaQuery.textScalerOf(tester.element(appBar)).scale(10), 25);
+        final barRect = tester.getRect(find.byType(AppNavigationBar));
+        expect(barRect.bottom, 780);
+        expect(barRect.height, AppNavigationBar.height);
+        expect(
+          tester.getBottomLeft(find.byType(SafeArea).first).dy,
+          lessThanOrEqualTo(barRect.top),
+        );
+        for (final icon in tester.widgetList<Icon>(
+          find.descendant(
+            of: find.byType(AppNavigationBar),
+            matching: find.byType(Icon),
+          ),
+        )) {
+          final rect = tester.getRect(find.byWidget(icon));
+          expect(barRect.contains(rect.topLeft), isTrue);
+          expect(
+            barRect.contains(rect.bottomRight - const Offset(0.1, 0.1)),
+            isTrue,
+          );
+        }
         for (final name in localeNames) {
           expect(find.byTooltip(name), findsOneWidget);
         }
+        expect(tester.takeException(), isNull);
       }
     }
   });

@@ -1,14 +1,23 @@
+import 'dart:async';
 import 'dart:ui' show Tristate;
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,9 +46,83 @@ final _names = {
 };
 
 void main() {
-  for (final MapEntry(key: locale, value: names) in _names.entries) {
+  for (final locale in [..._names.keys, const Locale('de', 'DE')]) {
+    final names = _names[locale] ?? _names[const Locale('en')]!;
     final code = locale.languageCode;
     final otherLocale = _names.keys.firstWhere((other) => other != locale);
+
+    testWidgets('обычные страницы сохраняют доступные названия, выбранный '
+        'пункт, подсказки и целые значки при тексте 2.5: $code', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      tester.view.physicalSize = _screen;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.textScaleFactorTestValue = _textScale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final router = await _start(tester, locale);
+
+      for (final selected in AppDestination.values) {
+        await tester.tap(_destination(selected));
+        await tester.pumpAndSettle();
+        for (final route in <PageRouteInfo>[
+          IntentionDetailsRoute(
+            intentionId: (IntentionId.decode(
+              tagFixtureId(1),
+            ) as IntentionIdDecodingSuccess).id,
+          ),
+          RelationDetailsRoute(
+            relationId: (LongTermRelationId.decode(
+              tagFixtureId(101),
+            ) as LongTermRelationIdDecodingSuccess).id,
+          ),
+          DailyChoiceDetailsRoute(
+            choiceId: (DailyChoiceId.decode(
+              tagFixtureId(201),
+            ) as DailyChoiceIdDecodingSuccess).id,
+          ),
+          TagNavigationRoute(
+            tagId: (TagId.decode(
+              tagFixtureId(firstTagNumber),
+            ) as TagIdDecodingSuccess).id,
+          ),
+          TagCatalogRoute(),
+        ]) {
+          unawaited(router.push<void>(route));
+          await tester.pumpAndSettle();
+
+          _expectAnnounced(
+            tester,
+            names,
+            selected: selected,
+            rootHeaderVisible: false,
+          );
+          _expectWholeIcons(tester, selected: selected);
+          for (final name in names.values) {
+            expect(find.byTooltip(name), findsOneWidget);
+          }
+          final appBar = find.byType(AppBar);
+          final title = tester.widget<AppBar>(appBar).title!;
+          final rect = tester.getRect(find.byWidget(title));
+          expect(rect.top, greaterThanOrEqualTo(tester.getRect(appBar).top));
+          expect(rect.bottom, lessThanOrEqualTo(tester.getRect(appBar).bottom));
+          expect(
+            tester.getSemantics(find.byWidget(title)).flagsCollection.isHeader,
+            isTrue,
+          );
+          expect(tester.takeException(), isNull);
+        }
+        // Доступное действие пункта закрывает всю историю до его корня.
+        tester.semantics.tap(
+          find.semantics.byLabel(_destinationLabel(tester, names, selected)),
+        );
+        await tester.pumpAndSettle();
+        _expectAnnounced(tester, names, selected: selected);
+        expect(router.stack, hasLength(1));
+      }
+      semantics.dispose();
+    });
 
     testWidgets('экранный диктор получает название, роль пункта навигации, '
         'положение среди трёх пунктов и признак выбранного пункта на каждой '
@@ -150,7 +233,7 @@ void main() {
 
 /// Запускает приложение на хранилище в памяти, ждёт Главную и засевает граф
 /// намерениями, связями, тегами и дневным выбором.
-Future<void> _start(WidgetTester tester, Locale locale) async {
+Future<AppRouter> _start(WidgetTester tester, Locale locale) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
   late sqlite.Database raw;
@@ -165,10 +248,11 @@ Future<void> _start(WidgetTester tester, Locale locale) async {
   });
   await tester.pumpWidget(MainApp(runtime: runtime));
   await tester.pumpAndSettle();
-  await runtime.bootstrap();
+  final ready = await runtime.bootstrap() as AppRuntimeReady;
   // Каталоги строятся при первом выборе пункта и читают уже засеянный граф.
   seedTagStorageFixture(raw);
   expect(find.byType(HomePage), findsOneWidget);
+  return ready.container.read(appRouterProvider);
 }
 
 final _bar = find.byType(AppNavigationBar);
@@ -223,6 +307,7 @@ void _expectAnnounced(
   WidgetTester tester,
   Map<AppDestination, String> names, {
   required AppDestination selected,
+  bool rootHeaderVisible = true,
 }) {
   for (final destination in AppDestination.values) {
     final node = tester.getSemantics(_destination(destination));
@@ -249,14 +334,11 @@ void _expectAnnounced(
         _destinationLabel(tester, names, destination),
     ],
   );
-  expect(
-    [
-      for (final node in traversal)
-        if (node.flagsCollection.isHeader && names.containsValue(node.label))
-          node.label,
-    ],
-    [names[selected]],
-  );
+  expect([
+    for (final node in traversal)
+      if (node.flagsCollection.isHeader && names.containsValue(node.label))
+        node.label,
+  ], rootHeaderVisible ? [names[selected]] : <String>[]);
 
   for (final label in tester.widgetList<Text>(
     find.descendant(of: _bar, matching: find.byType(Text)),
