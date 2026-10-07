@@ -11,7 +11,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -30,7 +29,6 @@ void main() {
   defineDailyChoicePickerTagSearchTests(
     DailyChoicePickerTagSearchCase(
       route: const DailyChoiceActionPickerRoute(),
-      purpose: const SelectDailyChoiceAction(),
       keyPrefix: 'daily-choice-action',
       readinessFilter: IntentionReadinessFilter.readyOnly,
       rowReadiness: const [IntentionReadiness.ready],

@@ -16,8 +16,6 @@ import '../../../intention/presentation/catalog/intention_search_results.dart';
 import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 
-const _purpose = SelectDailyChoiceSource();
-
 /// Выбор нового исходного намерения для замены пути дневного выбора.
 ///
 /// Список использует отдельную сессию ограниченного каталога. Только открытие
@@ -34,6 +32,7 @@ final class DailyChoiceSourcePickerPage extends ConsumerStatefulWidget {
 
 final class _DailyChoiceSourcePickerPageState
     extends ConsumerState<DailyChoiceSourcePickerPage> {
+  final _purpose = SelectDailyChoiceSource(session: IntentionSearchSession());
   final _filterController = TextEditingController();
 
   @override
@@ -83,8 +82,8 @@ final class _DailyChoiceSourcePickerPageState
                   onChanged: notifier.changeTitleFilter,
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: IntentionTagConditionsSection(purpose: _purpose),

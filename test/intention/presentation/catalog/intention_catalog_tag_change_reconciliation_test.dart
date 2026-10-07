@@ -21,6 +21,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
+final _actionSearchPurpose = SelectDailyChoiceAction(
+  session: IntentionSearchSession(),
+);
+final _sourceSearchPurpose = SelectDailyChoiceSource(
+  session: IntentionSearchSession(),
+);
+
 void main() {
   final health = Tag(id: _tagId(1), name: TagName.fromInput('Здоровье'));
   final rest = Tag(id: _tagId(2), name: TagName.fromInput('Отдых'));
@@ -265,8 +272,8 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
       addTearDown(container.dispose);
-      const action = SelectDailyChoiceAction();
-      const source = SelectDailyChoiceSource();
+      final action = _actionSearchPurpose;
+      final source = _sourceSearchPurpose;
       for (final purpose in [browse, action, source]) {
         final subscription = container.listen(
           intentionCatalogViewModelProvider(purpose),
@@ -634,12 +641,12 @@ void main() {
             [withBoth, withHealth],
           ),
           (
-            const SelectDailyChoiceAction(),
+            _actionSearchPurpose,
             IntentionTagFilter(requiredTagIds: [health.id, rest.id]),
             [withBoth],
           ),
           (
-            const SelectDailyChoiceSource(),
+            _sourceSearchPurpose,
             IntentionTagFilter(excludedTagIds: [rest.id]),
             [withHealth, untagged],
           ),
@@ -765,8 +772,8 @@ void main() {
     final excluded = testSummary(index: 9).id;
     final purposes = <IntentionCatalogPurpose>[
       browse,
-      const SelectDailyChoiceAction(),
-      const SelectDailyChoiceSource(),
+      _actionSearchPurpose,
+      _sourceSearchPurpose,
       SelectRelationParticipant(
         excludedIntentionId: excluded,
         selectionContext: RelationParticipantSelectionContext.activeRelation,
@@ -1286,12 +1293,12 @@ void main() {
             [withBoth, withHealth],
           ),
           (
-            const SelectDailyChoiceAction(),
+            _actionSearchPurpose,
             IntentionTagFilter(requiredTagIds: [health.id, rest.id]),
             [withBoth],
           ),
           (
-            const SelectDailyChoiceSource(),
+            _sourceSearchPurpose,
             IntentionTagFilter.empty,
             [withRest, withBoth, withHealth, untagged],
           ),
@@ -1365,17 +1372,13 @@ void main() {
       expect(current.query, same(before[purpose]!.query));
       expect(current.revision, const TestCatalogRevision(2));
     }
-    for (final purpose in [
-      browse,
-      const SelectDailyChoiceAction(),
-      searches[3].$1,
-    ]) {
+    for (final purpose in [browse, _actionSearchPurpose, searches[3].$1]) {
       final current = _confirmed(container, purpose);
       expect(current, isA<IntentionCatalogEmpty>());
       expect(current.totalCount, 0);
       expect(current.nextCursor, isNull);
     }
-    final source = _loaded(container, const SelectDailyChoiceSource());
+    final source = _loaded(container, _sourceSearchPurpose);
     expect(source.items.map((item) => item.id), [
       withRest.id,
       withBoth.id,

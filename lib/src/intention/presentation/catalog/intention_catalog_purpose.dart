@@ -1,6 +1,14 @@
 import '../../application/intention_catalog.dart';
 import '../../domain/intention_id.dart';
 
+/// Идентичность одного поиска на всё время жизни его страницы.
+///
+/// Создаётся при монтировании и передаётся всем секциям того же поиска.
+/// Новый экземпляр всегда обозначает отдельную сессию.
+final class IntentionSearchSession {
+  IntentionSearchSession();
+}
+
 /// Назначение, ради которого открыт ограниченный каталог намерений.
 ///
 /// Все назначения читают одни и те же порции одного источника, но остаются
@@ -26,13 +34,17 @@ final class BrowseIntentionCatalog extends IntentionCatalogPurpose {
 /// Охват и готовность закреплены назначением: вызывающая сторона не может
 /// превратить этот список в выбор архивного или неготового намерения.
 final class SelectDailyChoiceAction extends IntentionCatalogPurpose {
-  const SelectDailyChoiceAction();
+  const SelectDailyChoiceAction({required this.session});
+
+  final IntentionSearchSession session;
 
   @override
-  bool operator ==(Object other) => other is SelectDailyChoiceAction;
+  bool operator ==(Object other) =>
+      other is SelectDailyChoiceAction && identical(other.session, session);
 
   @override
-  int get hashCode => (SelectDailyChoiceAction).hashCode;
+  int get hashCode =>
+      Object.hash(SelectDailyChoiceAction, identityHashCode(session));
 }
 
 /// Выбор нового исходного намерения при замене пути дневного выбора.
@@ -40,13 +52,17 @@ final class SelectDailyChoiceAction extends IntentionCatalogPurpose {
 /// Любое активное намерение допустимо как основание, независимо от готовности.
 /// Прежние участники не исключаются: новый путь заменяет обоих участников.
 final class SelectDailyChoiceSource extends IntentionCatalogPurpose {
-  const SelectDailyChoiceSource();
+  const SelectDailyChoiceSource({required this.session});
+
+  final IntentionSearchSession session;
 
   @override
-  bool operator ==(Object other) => other is SelectDailyChoiceSource;
+  bool operator ==(Object other) =>
+      other is SelectDailyChoiceSource && identical(other.session, session);
 
   @override
-  int get hashCode => (SelectDailyChoiceSource).hashCode;
+  int get hashCode =>
+      Object.hash(SelectDailyChoiceSource, identityHashCode(session));
 }
 
 /// Выбор существующего намерения участником долговременной связи.
@@ -59,10 +75,14 @@ final class SelectRelationParticipant extends IntentionCatalogPurpose {
   const SelectRelationParticipant({
     required this.excludedIntentionId,
     required this.selectionContext,
+    this.session,
   });
 
   final IntentionId excludedIntentionId;
   final RelationParticipantSelectionContext selectionContext;
+
+  /// Контракт сессии для последующего подключения страницы выбора участника.
+  final IntentionSearchSession? session;
 
   IntentionScope get scope => selectionContext.catalogScope;
 
@@ -70,13 +90,15 @@ final class SelectRelationParticipant extends IntentionCatalogPurpose {
   bool operator ==(Object other) =>
       other is SelectRelationParticipant &&
       other.excludedIntentionId == excludedIntentionId &&
-      other.selectionContext == selectionContext;
+      other.selectionContext == selectionContext &&
+      identical(other.session, session);
 
   @override
   int get hashCode => Object.hash(
     SelectRelationParticipant,
     excludedIntentionId,
     selectionContext,
+    identityHashCode(session),
   );
 }
 

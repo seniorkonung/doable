@@ -9,6 +9,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
+final _actionSearchPurpose = SelectDailyChoiceAction(
+  session: IntentionSearchSession(),
+);
+final _sourceSearchPurpose = SelectDailyChoiceSource(
+  session: IntentionSearchSession(),
+);
+
 void main() {
   test(
     'поиск только по тегам начинает первую порцию и заменяет прежний префикс',
@@ -335,8 +342,8 @@ void main() {
       final excluded = testSummary(index: 9).id;
       final purposes = <IntentionCatalogPurpose>[
         const BrowseIntentionCatalog(),
-        const SelectDailyChoiceAction(),
-        const SelectDailyChoiceSource(),
+        _actionSearchPurpose,
+        _sourceSearchPurpose,
         SelectRelationParticipant(
           excludedIntentionId: excluded,
           selectionContext: RelationParticipantSelectionContext.activeRelation,
@@ -419,8 +426,8 @@ void main() {
 
   for (final purpose in <IntentionCatalogPurpose>[
     const BrowseIntentionCatalog(),
-    const SelectDailyChoiceAction(),
-    const SelectDailyChoiceSource(),
+    _actionSearchPurpose,
+    _sourceSearchPurpose,
     SelectRelationParticipant(
       excludedIntentionId: testSummary(index: 9).id,
       selectionContext: RelationParticipantSelectionContext.activeRelation,

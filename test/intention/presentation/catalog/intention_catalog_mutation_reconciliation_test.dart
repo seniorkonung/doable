@@ -17,6 +17,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
+final _actionSearchPurpose = SelectDailyChoiceAction(
+  session: IntentionSearchSession(),
+);
+
 void main() {
   test('применяет пакет каталожных изменений одной ревизии целиком', () async {
     final repository = ControlledCatalogRepository();
@@ -1018,13 +1022,13 @@ void main() {
           ),
           (
             'готовое при выборе действия',
-            const SelectDailyChoiceAction(),
+            _actionSearchPurpose,
             created(tags: [health]),
             true,
           ),
           (
             'неготовое при выборе действия',
-            const SelectDailyChoiceAction(),
+            _actionSearchPurpose,
             created(readiness: IntentionReadiness.notReady, tags: [health]),
             false,
           ),

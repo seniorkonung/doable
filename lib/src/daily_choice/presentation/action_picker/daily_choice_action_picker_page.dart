@@ -15,8 +15,6 @@ import '../../../intention/presentation/catalog/intention_search_results.dart';
 import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 
-const _purpose = SelectDailyChoiceAction();
-
 /// Выбор активного действия перед поиском основания дневного выбора.
 ///
 /// Список использует отдельную сессию ограниченного каталога. Только открытие
@@ -33,6 +31,7 @@ final class DailyChoiceActionPickerPage extends ConsumerStatefulWidget {
 
 final class _DailyChoiceActionPickerPageState
     extends ConsumerState<DailyChoiceActionPickerPage> {
+  final _purpose = SelectDailyChoiceAction(session: IntentionSearchSession());
   final _filterController = TextEditingController();
 
   @override
@@ -82,8 +81,8 @@ final class _DailyChoiceActionPickerPageState
                   onChanged: notifier.changeTitleFilter,
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: IntentionTagConditionsSection(purpose: _purpose),

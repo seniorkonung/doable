@@ -17,6 +17,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_test_support.dart';
 
+final _actionSearchPurpose = SelectDailyChoiceAction(
+  session: IntentionSearchSession(),
+);
+
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
 
@@ -363,7 +367,7 @@ void main() {
   test('условия разных назначений поиска независимы', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    const action = SelectDailyChoiceAction();
+    final action = _actionSearchPurpose;
     final conditions = intentionTagConditionsViewModelProvider(action);
     final subscription = h.container.listen(conditions, (_, _) {});
     addTearDown(subscription.close);

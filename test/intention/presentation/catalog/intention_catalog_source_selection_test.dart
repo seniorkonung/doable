@@ -10,8 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
-const _source = SelectDailyChoiceSource();
-const _action = SelectDailyChoiceAction();
+final _action = SelectDailyChoiceAction(session: IntentionSearchSession());
+final _source = SelectDailyChoiceSource(session: IntentionSearchSession());
+
 const _browse = BrowseIntentionCatalog();
 
 void main() {
