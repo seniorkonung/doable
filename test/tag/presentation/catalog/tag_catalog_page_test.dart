@@ -37,6 +37,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/ordinary_page_test_app.dart';
 
 String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -1224,14 +1225,13 @@ void main() {
         overrides: [
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
-        child: MaterialApp(
+        child: OrdinaryPageTestApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
           home: const TagCatalogPage(),
         ),
       ),
     );
+    await tester.pump();
     expect(find.text('Loading tags…'), findsOneWidget);
     repository.complete(const TagCatalogError(TagCatalogUnavailableFailure()));
     await tester.pumpAndSettle();
@@ -2204,10 +2204,8 @@ Future<void> _pumpCatalog(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
-      child: MaterialApp(
+      child: OrdinaryPageTestApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
               .copyWith(textScaler: TextScaler.linear(largeText ? 2.5 : 1)),
@@ -2217,6 +2215,7 @@ Future<void> _pumpCatalog(
       ),
     ),
   );
+  await tester.pump();
 }
 
 TagCatalogSuccess _page(List<Tag> tags, {int revision = 1}) =>

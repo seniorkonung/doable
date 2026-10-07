@@ -25,6 +25,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/ordinary_page_test_app.dart';
 
 String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -295,10 +296,9 @@ void main() {
 
           Widget host(Widget child) => UncontrolledProviderScope(
             container: container,
-            child: MaterialApp(
+            child: OrdinaryPageTestApp(
+              key: ObjectKey(child),
               locale: locale,
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
               home: GraphOperationPresenter(child: child),
             ),
           );

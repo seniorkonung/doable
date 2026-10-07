@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
@@ -25,7 +26,8 @@ import 'tag_selection_context.dart';
 
 /// Общий каталог тегов или выбор тега в типизированном контексте.
 /// Поиск принадлежит одному открытию; маршруты и контекст задаются
-/// потребителем.
+/// потребителем. Просмотр использует каркас обычной страницы с основной
+/// навигацией, выбор — каркас задачи с явным действием над кандидатом.
 final class TagCatalogView extends ConsumerStatefulWidget {
   const TagCatalogView({
     required this.onOpenEditor,
@@ -358,7 +360,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     final localizations = AppLocalizations.of(context);
     final state = ref.watch(_provider);
     final model = ref.read(_provider.notifier);
-    return Scaffold(
+    return _scaffold(
       appBar: AppBar(
         title: Text(switch (widget.selectionContext) {
           TagBrowseContext() => localizations.tagCatalogTitle,
@@ -538,6 +540,19 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
       ),
     );
   }
+
+  Widget _scaffold({
+    required PreferredSizeWidget appBar,
+    required Widget body,
+    required Widget? bottomNavigationBar,
+  }) => switch (widget.selectionContext) {
+    TagBrowseContext() => OrdinaryPageScaffold(appBar: appBar, body: body),
+    TagAssignmentContext() || TagDraftContext() => Scaffold(
+      appBar: appBar,
+      body: body,
+      bottomNavigationBar: bottomNavigationBar,
+    ),
+  };
 
   Widget _aboveKeyboard(Widget action) => Padding(
     padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),

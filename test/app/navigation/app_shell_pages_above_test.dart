@@ -33,6 +33,7 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
@@ -369,8 +370,8 @@ void main() {
     );
   }
 
-  testWidgets('каталог тегов из каталога намерений занимает весь экран без '
-      'панели, а его закрытие возвращает в каталог намерений', (tester) async {
+  testWidgets('каталог тегов из каталога намерений сохраняет панель, '
+      'а его закрытие возвращает в каталог намерений', (tester) async {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
     _expectRootPage(tester, router, AppDestination.intentionGraph);
@@ -383,6 +384,42 @@ void main() {
     _expectRootPage(tester, router, AppDestination.intentionGraph);
     expect(tester.takeException(), isNull);
   });
+
+  for (final page in [TagCatalogPage, TagNavigationPage]) {
+    for (final destination in [
+      AppDestination.intentionGraph,
+      AppDestination.home,
+    ]) {
+      testWidgets('$page из просмотра тегов возвращает к сохранённому корню '
+          '${destination.name} и удаляет историю', (tester) async {
+        final router = await _start(tester);
+        await _select(tester, AppDestination.intentionGraph);
+        await _open(tester, _openTags, TagCatalogPage);
+        if (page == TagNavigationPage) {
+          await _open(
+            tester,
+            find.byKey(ValueKey('tag-catalog-open-${tagFixtureId(_tag)}')),
+            TagNavigationPage,
+          );
+        }
+        _expectAboveShell(tester, page, AppDestination.intentionGraph);
+
+        await _select(tester, destination);
+
+        _expectRootPage(tester, router, destination);
+        expect(router.stack.map((route) => route.name), [AppShellRoute.name]);
+        expect(find.byType(TagCatalogPage, skipOffstage: false), findsNothing);
+        expect(
+          find.byType(TagNavigationPage, skipOffstage: false),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        _expectRootPage(tester, router, AppDestination.home);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('страница намерения над каталогом сохраняет панель, а формы '
       'и выборы открываются без неё', (tester) async {
@@ -791,7 +828,10 @@ void _expectAboveShell(WidgetTester tester, Type page, AppDestination under) {
       page == IntentionDetailsPage ||
       page == RelationDetailsPage ||
       page == DailyChoiceDetailsPage ||
-      page == TagNavigationPage;
+      page == TagNavigationPage ||
+      (page == TagCatalogPage &&
+          tester.widget<TagCatalogPage>(top).selectionContext
+              is TagBrowseContext);
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,

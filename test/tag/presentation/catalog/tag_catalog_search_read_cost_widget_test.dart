@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
 
@@ -52,10 +53,8 @@ void main() {
             overrides: [
               personalGraphRepositoryProvider.overrideWithValue(repository),
             ],
-            child: MaterialApp(
+            child: OrdinaryPageTestApp(
               locale: const Locale('ru'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
               home: TagCatalogPage(
                 selectionContext: switch (mode) {
                   TagCatalogBrowseMode() => const TagBrowseContext(),
@@ -66,6 +65,7 @@ void main() {
             ),
           ),
         );
+        await tester.pump();
         final home = _tag(firstTagNumber, 'Дом');
         final forHome = _tag(firstTagNumber + 2, 'Для дома');
         final work = _tag(lastTagNumber, 'Работа');

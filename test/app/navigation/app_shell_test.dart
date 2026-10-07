@@ -150,10 +150,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
     await tester.pumpAndSettle();
 
-    // Каталог тегов открыт поверх оболочки и закрывает панель.
+    // Просмотр каталога тегов сохраняет постоянную навигацию.
     expect(app.router.current.name, TagCatalogRoute.name);
     expect(find.byType(TagCatalogPage), findsOneWidget);
-    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
   });
 
   testWidgets('построенная вкладка остаётся в дереве, а невыбранная '

@@ -25,6 +25,7 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -377,7 +378,10 @@ void main() {
       final sheetElement = tester.element(_sheet);
 
       // Первый тег уже принадлежит исходному черновику до гонки действий.
+      await _expectProtectedNavigation(tester);
       await app.openChooser(tester);
+      await _expectProtectedNavigation(tester);
+      expect(find.byTooltip(l10n.tagNavigationTitle), findsNothing);
       final tagSet = app.chooserTagSet();
       await _tap(tester, _row(home));
       await _tap(tester, _addToDraft);
@@ -410,6 +414,7 @@ void main() {
       await _tap(tester, _createTag);
       await _until(tester, _tagEditorName);
       await tester.pumpAndSettle();
+      await _expectProtectedNavigation(tester);
       staleSubmit();
       await _letStorageRun(tester);
       expect(creations, isEmpty);
@@ -1006,4 +1011,26 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
+}
+
+/// Модальная сессия и её задачи не дают добраться до основной навигации
+/// нажатием, экранным диктором или последовательным обходом фокуса.
+Future<void> _expectProtectedNavigation(WidgetTester tester) async {
+  expect(
+    find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
+  expect(
+    find.semantics.byPredicate((node) => node.role == SemanticsRole.tab),
+    findsNothing,
+  );
+  for (var step = 0; step < 12; step++) {
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    expect(
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<AppNavigationBar>(),
+      isNull,
+    );
+  }
 }

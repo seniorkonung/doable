@@ -607,7 +607,7 @@ void main() {
       await _until(tester, find.byType(TagCatalogPage));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AppNavigationBar), findsNothing);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(_messageOf(2), findsOneWidget);
       expect(tester.takeException(), isNull);
 
