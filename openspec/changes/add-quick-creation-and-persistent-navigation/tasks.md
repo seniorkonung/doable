@@ -328,7 +328,7 @@
   - **Files likely touched:** `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `lib/src/app/routing/app_router.gr.dart` после генерации.
   - **Estimated scope:** M — один сценарий выбора участника, около 5 файлов.
 
-- [ ] 2.12 Подтвердить выход из дневного выбора и независимость поисковых страниц
+- [x] 2.12 Подтвердить выход из дневного выбора и независимость поисковых страниц
   - **Acceptance criteria:**
     - Отмена и выход из пути, подсказки и подтверждения соблюдают контракт в обоих направлениях; частичный отказ удаления допускает только повтор безопасного выхода. Принятая команда продолжается один раз, чужая история и новые сессии не меняются.
     - Одновременные поиски всех трёх назначений независимы; закрытие и поздние ответы одного не меняют соседние страницы. Поиск участника исключает ровно другую роль, вспомогательные выборы при редактировании и замене пути сохраняют свой смысл.
