@@ -406,6 +406,36 @@ void _registerPageMatrixTests() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('матрица: создание связи без участников — задача без панели', (
+    tester,
+  ) async {
+    final router = await _start(tester);
+    unawaited(
+      router.push(
+        RelationEditorRoute(
+          editorContext: const RelationBlankCreationContext(),
+        ),
+      ),
+    );
+    await _until(tester, find.byType(RelationEditorPage));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<RelationEditorPage>(find.byType(RelationEditorPage))
+          .editorContext,
+      isA<RelationBlankCreationContext>(),
+    );
+    _expectAboveShell(
+      tester,
+      RelationEditorPage,
+      AppDestination.home,
+      expectedPanel: false,
+    );
+    await _close(tester, RelationEditorPage);
+    _expectRootPage(tester, router, AppDestination.home);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 /// Новый вариант назначения требует явно указать проверяемую страницу.
