@@ -6,10 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../../intention/domain/intention_id.dart';
 import '../../application/choice_path_draft.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
+import '../daily_choice_creation_launcher.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_state.dart';
@@ -31,6 +31,8 @@ final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
 
 final class _DailyChoiceCatalogPageState
     extends ConsumerState<DailyChoiceCatalogPage> {
+  final _creationLauncher = DailyChoiceCreationLauncher();
+
   /// Просматриваемый период календаря.
   ///
   /// Выбранной датой владеет модель, а просмотром — страница: он один раз
@@ -190,18 +192,10 @@ final class _DailyChoiceCatalogPageState
     );
   }
 
-  Future<void> _chooseAction() async {
-    final actionId = await context.router.push<IntentionId>(
-      DailyChoiceActionPickerRoute(),
-    );
-    if (!mounted || actionId == null) return;
-    await context.router.push<void>(
-      ChoicePathRoute(
-        sourceIntentionId: actionId,
-        direction: ChoicePathDraftDirection.bottomUp,
-      ),
-    );
-  }
+  Future<void> _chooseAction() => _creationLauncher.launch(
+    sourceContext: context,
+    direction: ChoicePathDraftDirection.bottomUp,
+  );
 
   /// Нажатый день становится и датой просмотра в прежнем представлении, и
   /// выбранной датой модели — синхронно, до следующего кадра. Повторный выбор
