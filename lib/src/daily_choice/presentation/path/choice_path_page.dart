@@ -18,6 +18,7 @@ import '../../application/choice_path_draft.dart';
 import '../../application/choice_path_suggestions.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../domain/calendar_date.dart';
+import '../daily_choice_creation_exit_action.dart';
 import '../daily_choice_creation_flow_session.dart';
 import '../editor/daily_choice_creation_page.dart';
 import 'choice_path_state.dart';
@@ -223,6 +224,13 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (_creationSession case final session?) ...[
+              DailyChoiceCreationExitAction(
+                session: session,
+                ownerMatchId: session.rootMatchId,
+              ),
+              const SizedBox(height: 12),
+            ],
             Text(
               widget.direction == ChoicePathDraftDirection.bottomUp
                   ? l10n.choicePathBottomTraversal
@@ -242,6 +250,7 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
                   onSelected: _selectSuggestion,
                   onRetry: _suggestions.retry,
                   onRefresh: _suggestions.refresh,
+                  creationSession: _creationSession,
                 ),
               ),
             const SizedBox(height: 16),

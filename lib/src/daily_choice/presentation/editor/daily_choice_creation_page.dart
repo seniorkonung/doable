@@ -15,6 +15,7 @@ import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
 import '../daily_choice_creation_flow_session.dart';
+import '../daily_choice_creation_exit_action.dart';
 import '../daily_choice_creation_completion.dart';
 import '../daily_choice_command_failure_message.dart';
 import '../path/choice_path_page.dart';
@@ -90,10 +91,32 @@ final class DailyChoiceCreationPageState
     super.initState();
     _dateController.text = widget.initialDate.toCanonicalString();
     _visibleSteps = widget.steps;
+    widget.session.changes.addListener(_creationChanged);
+  }
+
+  void _creationChanged() {
+    // Удалённое подтверждение может ещё анимироваться, когда dispose корня
+    // завершает сессию внутри заблокированного дерева. Отложен только UI.
+    scheduleMicrotask(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void deactivate() {
+    widget.session.changes.removeListener(_creationChanged);
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    widget.session.changes.addListener(_creationChanged);
   }
 
   @override
   void dispose() {
+    widget.session.changes.removeListener(_creationChanged);
     _dateController.dispose();
     _descriptionController.dispose();
     _scrollController.dispose();
@@ -295,14 +318,10 @@ final class DailyChoiceCreationPageState
               }),
             ),
             const SizedBox(height: 8),
-            TextButton(
+            DailyChoiceCreationExitAction(
               key: const ValueKey('daily-choice-cancel'),
-              onPressed:
-                  state.operation is DailyChoiceCreationSubmitting ||
-                      state.operation is DailyChoiceCreationSucceeded
-                  ? null
-                  : () => unawaited(Navigator.of(context).maybePop()),
-              child: Text(l10n.dailyChoiceCreationCancel),
+              session: widget.session,
+              ownerMatchId: routeMatchId,
             ),
           ],
         ),

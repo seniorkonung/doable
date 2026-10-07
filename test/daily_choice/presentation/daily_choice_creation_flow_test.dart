@@ -411,7 +411,7 @@ void main() {
         expect(_savedIds(harness), hasLength(1));
 
         if (!bottomUp) {
-          await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+          await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
           expect(_savedIds(harness), hasLength(1));
           await _tap(tester, suggestion);
@@ -604,7 +604,7 @@ void main() {
         find.byKey(const ValueKey('daily-choice-date')),
         '2024-09-24',
       );
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(_savedIds(harness), isEmpty);
       await _tap(
@@ -1275,7 +1275,7 @@ void main() {
       );
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
       expect(_savedIds(harness), isEmpty);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await _waitFor(tester, find.text('Choose a path to an action'));
       expect(_savedIds(harness), isEmpty);

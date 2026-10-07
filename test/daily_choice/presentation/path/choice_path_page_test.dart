@@ -206,6 +206,10 @@ void main() {
       await tester.pump();
       repository.complete(2, [], ready: true);
       await tester.pumpAndSettle();
+      await _revealPathItem(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-action')),
+      );
       await tester.tap(find.byKey(const ValueKey('choice-path-select-action')));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -266,6 +270,12 @@ void main() {
     expect(find.byType(IntentionTagConditionsSection), findsNothing);
     final semantics = tester.ensureSemantics();
     expect(find.bySemanticsLabel(RegExp('Шаг 1:.*нужно.*P1')), findsOneWidget);
+    await _revealPathItem(
+      tester,
+      find.byKey(
+        ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
+      ),
+    );
     expect(
       find.byKey(const ValueKey('choice-path-select-action')),
       findsOneWidget,
@@ -390,6 +400,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('choice-path-load-more')),
       180,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('choice-path-load-more')));
@@ -466,7 +477,11 @@ void main() {
       final nextStep = find.byKey(
         ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
       );
-      await tester.scrollUntilVisible(nextStep, 180);
+      await tester.scrollUntilVisible(
+        nextStep,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.drag(find.byType(ListView), const Offset(0, -200));
       await tester.pumpAndSettle();
       await tester.tap(nextStep);
@@ -499,7 +514,11 @@ void main() {
       final alternateStep = find.byKey(
         ValueKey('choice-path-continue-${_relation(3).toCanonicalString()}'),
       );
-      await tester.scrollUntilVisible(alternateStep, 150);
+      await tester.scrollUntilVisible(
+        alternateStep,
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.drag(find.byType(ListView), const Offset(0, -200));
       await tester.pumpAndSettle();
       await tester.tap(alternateStep);
@@ -575,7 +594,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Selected action: Намерение 3'), findsOneWidget);
     final loadMore = find.byKey(const ValueKey('choice-path-load-more'));
-    await tester.scrollUntilVisible(loadMore, 150);
+    await tester.scrollUntilVisible(
+      loadMore,
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(loadMore);
     await tester.pump();
@@ -584,7 +607,11 @@ void main() {
     final loadedStep = find.byKey(
       ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
     );
-    await tester.scrollUntilVisible(loadedStep, 150);
+    await tester.scrollUntilVisible(
+      loadedStep,
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.drag(find.byType(ListView), const Offset(0, -200));
     await tester.pumpAndSettle();
     await tester.tap(loadedStep);
@@ -610,6 +637,16 @@ void main() {
       findsNothing,
     );
   });
+}
+
+Future<void> _revealPathItem(WidgetTester tester, Finder finder) async {
+  await tester.drag(find.byType(ListView).first, const Offset(0, 1000));
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+    finder,
+    150,
+    scrollable: find.byType(Scrollable).first,
+  );
 }
 
 Future<void> _pumpPage(

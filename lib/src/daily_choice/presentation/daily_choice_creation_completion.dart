@@ -2,10 +2,91 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../app/routing/app_router.gr.dart';
 import '../domain/daily_choice_id.dart';
 import 'daily_choice_creation_flow_session.dart';
+
+/// Прекращает создание до удаления его страниц. Повтор после отказа удаляет
+/// только оставшиеся экземпляры; чужая история и новая сессия недоступны.
+/// [previewRoute] — конкретный безымянный просмотр подсказки над корнем.
+void leaveDailyChoiceCreation({
+  required StackRouter router,
+  required DailyChoiceCreationFlowSession session,
+  required LocalKey ownerMatchId,
+  Route<void>? previewRoute,
+}) {
+  bool hasStack(List<LocalKey> suffix) => listEquals(
+    router.stackData.map((route) => route.matchId).toList(),
+    [...session.originalHistory, ...suffix],
+  );
+
+  final top = router.stackData.lastOrNull;
+  if (top == null || top.matchId != ownerMatchId) return;
+  final suffix = <LocalKey>[session.rootMatchId];
+  if (top.matchId != session.rootMatchId) {
+    if (top.args case DailyChoiceCreationRouteArgs(session: final owner)
+        when identical(owner, session)) {
+      suffix.add(top.matchId);
+    } else {
+      return;
+    }
+  }
+  if (!hasStack(suffix)) return;
+  final pageless = router.pagelessRoutesObserver;
+  if (previewRoute != null) {
+    if (top.matchId != session.rootMatchId ||
+        !identical(pageless.current, previewRoute) ||
+        !previewRoute.isCurrent) {
+      return;
+    }
+  } else if (pageless.hasPagelessTopRoute) {
+    return;
+  }
+
+  session.leave();
+  try {
+    if (previewRoute != null) {
+      // Уведомление сессии тоже может передать верхнюю позицию другой странице.
+      if (!hasStack(suffix) ||
+          !identical(pageless.current, previewRoute) ||
+          !previewRoute.isCurrent) {
+        return;
+      }
+      // Удаляем именно собственную подсказку, не произвольный верхний маршрут:
+      // https://api.flutter.dev/flutter/widgets/NavigatorState/removeRoute.html
+      previewRoute.navigator!.removeRoute(previewRoute);
+    }
+    while (suffix.isNotEmpty) {
+      if (session.state is! DailyChoiceCreationFlowLeft ||
+          !hasStack(suffix) ||
+          pageless.hasPagelessTopRoute) {
+        return;
+      }
+      // removeRoute проверяет matchId и синхронно меняет stackData:
+      // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
+      router.removeRoute(router.stackData.last);
+      suffix.removeLast();
+    }
+  } catch (_, stack) {
+    // Мутация могла успеть удалить маршрут без уведомления. Согласование
+    // отображения не удаляет историю и не возвращает право создания.
+    if (hasStack(suffix) || hasStack(suffix.take(suffix.length - 1).toList())) {
+      router.notifyAll(forceUrlRebuild: true);
+    }
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: FlutterError(
+          'Не удалось выйти из создания дневного выбора.',
+        ),
+        stack: stack,
+        library: 'daily choice creation',
+        context: ErrorDescription('при выходе из потока создания'),
+      ),
+    );
+  }
+}
 
 /// Открывает сохранённый выбор одной попыткой, удерживая сессию независимо
 /// от виджетов. Удаляет только конкретное подтверждение и заменяет его корень;
