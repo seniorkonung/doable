@@ -73,7 +73,7 @@
   - **Files likely touched:** `lib/src/tag/presentation/catalog/tag_catalog_view.dart`, `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `test/tag/presentation/catalog/tag_catalog_navigation_test.dart`, `test/app/intention_creation_sheet_tags_test.dart`, `test/app/navigation/app_shell_pages_above_test.dart`.
   - **Estimated scope:** M — выбор каркаса в общем компоненте и защита модального сценария, около 5 файлов.
 
-- [ ] 1.7 Подтвердить независимость принятых операций и предъявления результатов от сброса истории
+- [x] 1.7 Подтвердить независимость принятых операций и предъявления результатов от сброса истории
   - **Acceptance criteria:**
     - Сценарий с задержанным архивированием намерения и сбросом к корню подтверждает ровно одно выполнение принятой команды без отмены, повторной отправки или новой очереди. Поздний результат не открывает удалённую страницу и согласует сохранённые корневые представления по [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md).
     - Успех предъявляется общей поверхностью один раз. Непредъявленная ошибка удалённого renderer освобождается и переходит общей поверхности; уже предъявленная ошибка не повторяется. Сохраняются очерёдность, свидетельство кадра и бездействие запоздалых callbacks по [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md).
