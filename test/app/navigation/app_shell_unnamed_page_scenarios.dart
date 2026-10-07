@@ -97,31 +97,6 @@ void _registerUnnamedPageTests() {
     );
 
     testWidgets(
-      'безымянное подтверждение создания: ${_directionName(direction)}',
-      (tester) async {
-        final router = await _start(tester);
-        final destination = await _startCreationPath(tester, direction);
-        await _confirmPath(tester, direction, DailyChoiceCreationPage);
-        _expectAboveShell(
-          tester,
-          DailyChoiceCreationPage,
-          destination,
-          expectedPanel: false,
-        );
-        await _close(tester, DailyChoiceCreationPage);
-        _expectAboveShell(
-          tester,
-          ChoicePathPage,
-          destination,
-          expectedPanel: false,
-        );
-        await _closeAll(tester);
-        _expectRootPage(tester, router, destination);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets(
       'безымянное подтверждение замены пути: ${_directionName(direction)}',
       (tester) async {
         final router = await _start(tester);

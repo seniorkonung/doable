@@ -97,6 +97,94 @@ void _registerCreationRouteScenarios() {
         expect(state.creationSession, same(session));
         expect(session.canContinue, isTrue);
 
+        for (final relation
+            in direction == ChoicePathDraftDirection.topDown
+                ? [101, 102]
+                : [102, 101]) {
+          await _continue(tester, relation);
+        }
+        final selectEndpoint = find.byKey(
+          ValueKey(
+            direction == ChoicePathDraftDirection.topDown
+                ? 'choice-path-select-action'
+                : 'choice-path-select-source',
+          ),
+        );
+        await _tap(tester, selectEndpoint);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
+        await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+        await tester.pumpAndSettle();
+        expect(router.current.name, DailyChoiceCreationRoute.name);
+        final confirmationMatchId = router.current.matchId;
+        final confirmation = tester.widget<DailyChoiceCreationPage>(
+          find.byType(DailyChoiceCreationPage),
+        );
+        expect(confirmation.session, same(session));
+        expect(confirmation.direction, direction);
+        expect(
+          tester
+              .state<DailyChoiceCreationPageState>(
+                find.byType(DailyChoiceCreationPage),
+              )
+              .routeMatchId,
+          confirmationMatchId,
+        );
+        expect(confirmationMatchId, isNot(session.rootMatchId));
+        expect(
+          [for (final route in router.stackData) route.matchId],
+          [...history, session.rootMatchId, confirmationMatchId],
+        );
+        final confirmedPath = tester
+            .widget<DailyChoiceCreationPage>(
+              find.byType(DailyChoiceCreationPage),
+            )
+            .path;
+        expect(confirmedPath.steps.map((step) => step.relationId), [
+          _relation(101),
+          _relation(102),
+        ]);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          [for (final route in router.stackData) route.matchId],
+          [...history, session.rootMatchId],
+        );
+        expect(tester.state(find.byType(ChoicePathPage)), same(state));
+        expect(session.canContinue, isTrue);
+        await _tap(tester, selectEndpoint);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
+        await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+        await tester.pumpAndSettle();
+        expect(router.current.name, DailyChoiceCreationRoute.name);
+        expect(router.current.matchId, isNot(confirmationMatchId));
+        expect(
+          tester
+              .widget<DailyChoiceCreationPage>(
+                find.byType(DailyChoiceCreationPage),
+              )
+              .session,
+          same(session),
+        );
+        expect(
+          tester
+              .widget<DailyChoiceCreationPage>(
+                find.byType(DailyChoiceCreationPage),
+              )
+              .path
+              .steps
+              .map((step) => step.relationId),
+          confirmedPath.steps.map((step) => step.relationId),
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+
         await tester.binding.handlePopRoute();
         expect(session.canContinue, isFalse);
         await tester.pumpAndSettle();

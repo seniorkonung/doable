@@ -229,7 +229,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/path/choice_path_page_test.dart`, `lib/src/app/routing/app_router.gr.dart` после генерации.
   - **Estimated scope:** M — одна точка маршрутизации для двух направлений, около 5 файлов.
 
-- [ ] 2.3 Открывать подтверждение дневного выбора типизированным маршрутом той же сессии
+- [x] 2.3 Открывать подтверждение дневного выбора типизированным маршрутом той же сессии
   - **Acceptance criteria:**
     - DailyChoiceCreationRoute зарегистрирован в корневом стеке и получает ту же сессию, что конкретный ChoicePathRoute. Подтверждение знает идентичность своего экземпляра; одно открытие не создаёт вторую сессию.
     - Обычное «назад» до отправки возвращает тот же путь с возможностью продолжения. Пересчёт пути из подтверждения и замена существующего выбора сохраняют прежние безымянные маршруты с возвратом результата.

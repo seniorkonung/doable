@@ -9,6 +9,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -629,6 +630,10 @@ Future<void> _pump(
   double textScale = 1,
 }) async {
   final page = DailyChoiceCreationPage(
+    session: DailyChoiceCreationFlowSession(
+      rootMatchId: const ValueKey('choice-path-root'),
+      originalHistory: const [],
+    ),
     path: ConfirmedChoicePath([
       ConfirmedChoicePathStep(
         relationId: _relation(1),

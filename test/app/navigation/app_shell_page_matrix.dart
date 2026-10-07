@@ -17,6 +17,7 @@ enum _MatrixEntry {
   creation,
   condition,
   action,
+  actionCandidate,
   relation,
   tag,
   renameTag,
@@ -26,6 +27,10 @@ enum _MatrixEntry {
   replaceChoice,
   replaceTopDown,
   choosePath,
+  continuePath,
+  selectAction,
+  selectSource,
+  confirmPath,
   editChoice,
   createRelation,
   incomingRelations,
@@ -48,6 +53,10 @@ enum _MatrixEntry {
     _MatrixEntry.action => find.byKey(
       const ValueKey('daily-choice-create-from-action'),
     ),
+    _MatrixEntry.actionCandidate => _summary(
+      DailyChoiceActionPickerPage,
+      'Бегать',
+    ),
     _MatrixEntry.relation => _relationRow,
     _MatrixEntry.tag => find.byKey(
       ValueKey('tag-catalog-open-${tagFixtureId(_tag)}'),
@@ -68,6 +77,16 @@ enum _MatrixEntry {
     ),
     _MatrixEntry.choosePath => find.byKey(
       const ValueKey('intention-details-choose-path'),
+    ),
+    _MatrixEntry.continuePath => _continuePath,
+    _MatrixEntry.selectAction => find.byKey(
+      const ValueKey('choice-path-select-action'),
+    ),
+    _MatrixEntry.selectSource => find.byKey(
+      const ValueKey('choice-path-select-source'),
+    ),
+    _MatrixEntry.confirmPath => find.byKey(
+      const ValueKey('choice-path-open-confirmation'),
     ),
     _MatrixEntry.editChoice => find.byKey(
       const ValueKey('daily-choice-edit-open'),
@@ -192,6 +211,32 @@ void _registerPageMatrixTests() {
       page: ChoicePathPage,
       panel: false,
       entries: [read, _MatrixEntry.choosePath],
+    ),
+    (
+      name: 'подтверждение дневного выбора сверху вниз',
+      route: DailyChoiceCreationRoute.name,
+      page: DailyChoiceCreationPage,
+      panel: false,
+      entries: [
+        read,
+        _MatrixEntry.choosePath,
+        _MatrixEntry.continuePath,
+        _MatrixEntry.selectAction,
+        _MatrixEntry.confirmPath,
+      ],
+    ),
+    (
+      name: 'подтверждение дневного выбора снизу вверх',
+      route: DailyChoiceCreationRoute.name,
+      page: DailyChoiceCreationPage,
+      panel: false,
+      entries: [
+        _MatrixEntry.action,
+        _MatrixEntry.actionCandidate,
+        _MatrixEntry.continuePath,
+        _MatrixEntry.selectSource,
+        _MatrixEntry.confirmPath,
+      ],
     ),
     (
       name: 'изменение дневного выбора',

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,6 +15,7 @@ import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
+import '../daily_choice_creation_flow_session.dart';
 import '../daily_choice_command_failure_message.dart';
 import '../path/choice_path_page.dart';
 import '../path/choice_path_view_model.dart';
@@ -48,8 +50,10 @@ final class DailyChoiceCreationStep {
 }
 
 /// Подтверждение одного видимого пути. Экран не меняет граф до нажатия кнопки.
+@RoutePage()
 final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
   const DailyChoiceCreationPage({
+    required this.session,
     required this.path,
     required this.steps,
     required this.initialDate,
@@ -57,6 +61,7 @@ final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
     super.key,
   }) : assert(steps.length > 0);
 
+  final DailyChoiceCreationFlowSession session;
   final ConfirmedChoicePath path;
   final List<DailyChoiceCreationStep> steps;
   final CalendarDate initialDate;
@@ -64,11 +69,15 @@ final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<DailyChoiceCreationPage> createState() =>
-      _DailyChoiceCreationPageState();
+      DailyChoiceCreationPageState();
 }
 
-final class _DailyChoiceCreationPageState
+final class DailyChoiceCreationPageState
     extends ConsumerState<DailyChoiceCreationPage> {
+  /// Идентичность этого подтверждения в корневом стеке, отдельно от корня.
+  /// https://pub.dev/documentation/auto_route/11.1.0/auto_route/RouteData/matchId.html
+  LocalKey get routeMatchId => context.routeData.matchId;
+
   final _formKey = DailyChoiceCreationFormKey();
   final _dateController = TextEditingController();
   final _descriptionController = TextEditingController();

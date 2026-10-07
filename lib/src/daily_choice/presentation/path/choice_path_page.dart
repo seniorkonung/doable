@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
@@ -127,14 +128,15 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
       return;
     }
     final now = DateTime.now();
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => DailyChoiceCreationPage(
-          path: selection.path,
-          steps: selection.steps,
-          direction: widget.direction,
-          initialDate: CalendarDate.fromParts(now.year, now.month, now.day),
-        ),
+    // Типизированный маршрут передаёт сессию конкретного корня без копирования.
+    // https://pub.dev/packages/auto_route/versions/11.1.0#passing-arguments
+    await context.router.root.push<void>(
+      DailyChoiceCreationRoute(
+        session: _creationSession!,
+        path: selection.path,
+        steps: selection.steps,
+        direction: widget.direction,
+        initialDate: CalendarDate.fromParts(now.year, now.month, now.day),
       ),
     );
     if (!mounted) return;
