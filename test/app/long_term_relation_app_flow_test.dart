@@ -1672,6 +1672,13 @@ Future<void> _createNeedRelation(
   await _pumpUntilAbsent(tester, submit);
   await _pumpUntilFound(
     tester,
+    find.byKey(const ValueKey('relation-details-edit-relation')),
+  );
+  expect(find.text(description), findsOneWidget);
+  // Созданная связь заменяет форму; возврат ведёт к исходному намерению.
+  await tester.pageBack();
+  await _pumpUntilFound(
+    tester,
     find.byKey(const ValueKey('relation-neighborhood-summary')),
   );
 }

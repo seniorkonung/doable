@@ -687,7 +687,7 @@ void main() {
   );
 
   testWidgets(
-    'success закрывает форму и предъявляется один раз после занятого сообщения',
+    'успех открывает связь до предъявления сообщения и возвращает в исходную историю',
     (tester) async {
       const busyMessage =
           'Create — “new relation”: The relation couldn’t be created. Try '
@@ -707,12 +707,29 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
       await tester.pump();
-      repository.completeRelationCreated(1);
+      final created = repository.completeRelationCreated(1);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(router.current.name, RelationDetailsRoute.name);
+      repository.relationWatches.last.emitDetails(
+        testRelationDetails(
+          relationId: created.id,
+          sourceId: created.sourceIntentionId,
+          relatedId: created.relatedIntentionId,
+        ),
+        revision: const TestCatalogRevision(2),
+      );
       await tester.pumpAndSettle();
 
-      expectIntentionGraphRootPage(router);
+      expect(router.current.name, RelationDetailsRoute.name);
+      expect(repository.relationWatches.last.relationId, created.id);
+      expect(find.byType(RelationEditorPage), findsNothing);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.text(successMessage), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expectIntentionGraphRootPage(router);
 
       await _closeOperationMessage(tester);
 

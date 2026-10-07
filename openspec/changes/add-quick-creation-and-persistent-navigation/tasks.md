@@ -349,7 +349,7 @@
   - **Files likely touched:** `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `relation_editor_view_model.dart` и `relation_editor_page.dart` в том же каталоге, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart` и `relation_editor_page_test.dart`; производная генерация при изменении сигнатур.
   - **Estimated scope:** M — один вариант существующей формы, 5 основных файлов.
 
-- [ ] 2.14 Открывать созданную связь поверх исходной истории при любом входе
+- [x] 2.14 Открывать созданную связь поверх исходной истории при любом входе
   - **Acceptance criteria:**
     - RelationEditorCreated заменяет только актуальный экземпляр формы подробным просмотром по LongTermRelationId; RelationEditorUpdated сохраняет прежнее закрытие. Пустой вход и обе группы намерения следуют одному правилу [ADR-0022](../../../docs/adr/0022-complete-creation-flows-within-owned-route-boundaries.md).
     - Пока отправка выполняется, переходы к подробным данным участников и занятой связи не открывают страницы над формой. Право перехода проверяется по matchId непосредственно перед изменением стека и после асинхронной границы; уход или сброс прекращает его до dispose.
