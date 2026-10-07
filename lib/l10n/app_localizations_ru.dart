@@ -2541,4 +2541,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String choiceSuggestionStep(int index, int total) {
     return 'Переход $index из $total';
   }
+
+  @override
+  String get creationCancelAction => 'Отменить создание';
+
+  @override
+  String get creationLeaveAction => 'Выйти из создания';
+
+  @override
+  String get creationSavingContinues =>
+      'Сохранение продолжится после выхода из создания.';
 }

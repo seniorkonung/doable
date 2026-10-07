@@ -2536,4 +2536,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String choiceSuggestionStep(int index, int total) {
     return 'Step $index of $total';
   }
+
+  @override
+  String get creationCancelAction => 'Cancel creation';
+
+  @override
+  String get creationLeaveAction => 'Leave creation';
+
+  @override
+  String get creationSavingContinues =>
+      'Saving will continue after you leave creation.';
 }

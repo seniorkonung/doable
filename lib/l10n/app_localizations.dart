@@ -4329,6 +4329,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Step {index} of {total}'**
   String choiceSuggestionStep(int index, int total);
+
+  /// Отмена всего создания до принятия команды или после отказа
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel creation'**
+  String get creationCancelAction;
+
+  /// Выход из создания после принятия команды или завершения потока без обещания отменить запись
+  ///
+  /// In en, this message translates to:
+  /// **'Leave creation'**
+  String get creationLeaveAction;
+
+  /// Объяснение выхода из создания во время принятой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Saving will continue after you leave creation.'**
+  String get creationSavingContinues;
 }
 
 class _AppLocalizationsDelegate

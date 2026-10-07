@@ -2259,5 +2259,11 @@
   "choiceSuggestionDirection": "Route direction: from source to action",
   "@choiceSuggestionDirection": {"description": "Направление переходов в просмотре"},
   "choiceSuggestionStep": "Step {index} of {total}",
-  "@choiceSuggestionStep": {"description": "Порядок перехода маршрута", "placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}}
+  "@choiceSuggestionStep": {"description": "Порядок перехода маршрута", "placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
+  "creationCancelAction": "Cancel creation",
+  "@creationCancelAction": {"description": "Отмена всего создания до принятия команды или после отказа"},
+  "creationLeaveAction": "Leave creation",
+  "@creationLeaveAction": {"description": "Выход из создания после принятия команды или завершения потока без обещания отменить запись"},
+  "creationSavingContinues": "Saving will continue after you leave creation.",
+  "@creationSavingContinues": {"description": "Объяснение выхода из создания во время принятой записи"}
 }

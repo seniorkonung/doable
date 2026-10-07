@@ -762,5 +762,8 @@
   "choiceSuggestionActionNotReady": "Маршрут недоступен: конечное действие больше не готово к действию.",
   "choiceSuggestionPreviewTitle": "Полный маршрут",
   "choiceSuggestionDirection": "Направление маршрута: от основания к действию",
-  "choiceSuggestionStep": "Переход {index} из {total}"
+  "choiceSuggestionStep": "Переход {index} из {total}",
+  "creationCancelAction": "Отменить создание",
+  "creationLeaveAction": "Выйти из создания",
+  "creationSavingContinues": "Сохранение продолжится после выхода из создания."
 }
