@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,9 +20,9 @@ import 'intention_creation_tags.dart';
 import 'intention_editor_state.dart';
 import 'intention_editor_view_model.dart';
 
-/// Хост сессии создания намерения в модальной нижней панели над исходным
-/// каталогом. Высота панели следует за содержимым в пределах доступной
-/// области, оставляя видимую часть каталога над ней.
+/// Хост сессии создания намерения в модальной нижней панели над исходной
+/// обычной страницей. Высота панели следует за содержимым в пределах
+/// доступной области, оставляя видимую часть исходной страницы над ней.
 ///
 /// Теги черновика выбираются общим выбором тегов: хост открывает
 /// существующий маршрут выбора с контекстом набора своей сессии полноэкранно
@@ -49,7 +50,7 @@ import 'intention_editor_view_model.dart';
 /// сессии о закрытии и не удаляет маршрут сам. Маршрут формы закрывается
 /// только по завершению сессии: сразу для неизменённого черновика или после
 /// подтверждённого сброса. Успешное создание заменяет форму страницей
-/// созданного намерения в том же стеке, сохраняя каталог для возврата.
+/// созданного намерения в том же стеке, сохраняя исходную историю для возврата.
 @RoutePage()
 final class IntentionEditorPage extends ConsumerStatefulWidget {
   const IntentionEditorPage({super.key});
@@ -475,10 +476,14 @@ final class _IntentionEditorPageState
     if (router.stackData.lastOrNull?.matchId != route.matchId) {
       return;
     }
+    final history = router.stackData
+        .take(router.stackData.length - 1)
+        .map((entry) => entry.matchId)
+        .toList();
     _routeState = _EditorRouteState.openingCreatedIntention;
     ref.read(_provider.notifier).consumeEvent();
 
-    // replace удаляет форму вместе с её диалогами, сохраняя оболочку:
+    // replace удаляет форму вместе с её диалогами, сохраняя исходную историю:
     // https://pub.dev/packages/auto_route/versions/11.1.0#navigating-between-screens
     // Future завершается при возврате со страницы; сессия его не ждёт.
     // Future.sync отделяет даже синхронный отказ эффекта от успешной записи:
@@ -489,6 +494,15 @@ final class _IntentionEditorPageState
           IntentionDetailsRoute(intentionId: intentionId),
         ),
       ).catchError((Object error, StackTrace stack) {
+        if (listEquals(
+          router.stackData.map((entry) => entry.matchId).toList(),
+          history,
+        )) {
+          // replace мог удалить панель без уведомления. Показываем точную
+          // исходную историю; поздний отказ не трогает другие маршруты:
+          // https://pub.dev/documentation/auto_route/11.1.0/auto_route/RoutingController/notifyAll.html
+          router.notifyAll(forceUrlRebuild: true);
+        }
         // Отказ разрешает только новый запрос ухода оставшейся формы.
         // Захваченные router и route позволяют обойтись без её контекста.
         if (mounted &&
