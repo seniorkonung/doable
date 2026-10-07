@@ -16,6 +16,200 @@ import 'editor_test_support.dart';
 import '../daily_path_change_test_support.dart';
 
 void main() {
+  group('Создание связи без заранее выбранных участников', () {
+    test('новый черновик не содержит ни одного выбранного поля', () {
+      final harness = _EditorHarness(const RelationBlankCreationContext());
+
+      expect(harness.state.sourceParticipant, isNull);
+      expect(harness.state.relatedParticipant, isNull);
+      expect(harness.state.sourceRevision, isNull);
+      expect(harness.state.relatedRevision, isNull);
+      expect(harness.state.editingBasis, isNull);
+      expect(harness.state.type, isNull);
+      expect(harness.state.priority, isNull);
+      expect(harness.state.description, isEmpty);
+      expect(harness.state.hasChanges, isFalse);
+      expect(harness.state.operation, isA<RelationEditorIdle>());
+      expect(harness.state.event, isNull);
+      expect(
+        (harness.state.completeness as RelationDraftIncomplete).missing,
+        RelationDraftRequirement.values.toSet(),
+      );
+      harness.viewModel.submit();
+      expect(harness.repository.commandCount, isZero);
+    });
+
+    for (final (roleName, firstRole) in [
+      ('исходного участника', RelationParticipantRole.source),
+      ('связанного участника', RelationParticipantRole.related),
+    ]) {
+      test('создаёт связь при выборе сначала $roleName', () async {
+        final harness = _EditorHarness(const RelationBlankCreationContext());
+        final secondRole = firstRole == RelationParticipantRole.source
+            ? RelationParticipantRole.related
+            : RelationParticipantRole.source;
+        harness.viewModel.selectParticipant(firstRole, testEditorSelection(1));
+        expect(harness.state.hasChanges, isTrue);
+        expect(harness.state.canSubmit, isFalse);
+        harness.viewModel.submit();
+        harness.viewModel.selectParticipant(secondRole, testEditorSelection(2));
+        expect(harness.state.canSubmit, isFalse);
+        harness.viewModel.submit();
+        harness.viewModel.selectType(LongTermRelationType.can);
+        expect(harness.state.canSubmit, isFalse);
+        harness.viewModel.submit();
+        expect(harness.repository.commandCount, isZero);
+
+        harness.viewModel
+          ..selectPriority(RelationPriority.p4)
+          ..changeDescription('  Описание\nсвязи  ');
+        expect(harness.state.canSubmit, isTrue);
+        harness.viewModel
+          ..submit()
+          ..submit();
+        expect(harness.state.operation, isA<RelationEditorSubmitting>());
+        expect(harness.repository.commandCount, 1);
+        final command = harness.repository.createCommandAt(0);
+        expect(
+          command.sourceIntentionId,
+          testEditorIntentionId(
+            firstRole == RelationParticipantRole.source ? 1 : 2,
+          ),
+        );
+        expect(
+          command.relatedIntentionId,
+          testEditorIntentionId(
+            firstRole == RelationParticipantRole.source ? 2 : 1,
+          ),
+        );
+        expect(command.type, LongTermRelationType.can);
+        expect(command.priority, RelationPriority.p4);
+        expect(command.description?.value, '  Описание\nсвязи  ');
+
+        final relation = harness.repository.completeRelationCreated(0);
+        await harness.settle();
+        expect(harness.state.operation, isA<RelationEditorSucceeded>());
+        expect(
+          harness.state.event,
+          isA<RelationEditorCreated>().having(
+            (event) => event.relationId,
+            'идентификатор созданной связи',
+            relation.id,
+          ),
+        );
+        expect(harness.state.canSubmit, isFalse);
+        harness.viewModel.submit();
+        expect(harness.repository.commandCount, 1);
+      });
+    }
+
+    for (final (name, failure, expectedFailure, correction, canRetry) in [
+      (
+        'занятая пара',
+        LongTermRelationPairOccupiedFailure(testRelationId(9)),
+        isA<RelationEditorPairOccupied>(),
+        RelationParticipantRole.related,
+        false,
+      ),
+      (
+        'архивированный участник',
+        LongTermRelationParticipantArchivedFailure(
+          role: RelationParticipantRole.source,
+          intentionId: testEditorIntentionId(1),
+        ),
+        isA<RelationEditorParticipantRejected>(),
+        RelationParticipantRole.source,
+        false,
+      ),
+      (
+        'удалённый участник',
+        LongTermRelationParticipantNotFoundFailure(
+          role: RelationParticipantRole.related,
+          intentionId: testEditorIntentionId(2),
+        ),
+        isA<RelationEditorParticipantRejected>(),
+        RelationParticipantRole.related,
+        false,
+      ),
+      (
+        'недоступность хранилища',
+        const LongTermRelationUnavailableFailure(),
+        isA<RelationEditorUnavailable>(),
+        null,
+        true,
+      ),
+      (
+        'повреждение данных',
+        const LongTermRelationCorruptionFailure(),
+        isA<RelationEditorCorruption>(),
+        null,
+        false,
+      ),
+      (
+        'неизвестный отказ',
+        const LongTermRelationUnexpectedFailure(),
+        isA<RelationEditorUnexpected>(),
+        null,
+        false,
+      ),
+    ]) {
+      test('$name сохраняет пустой вход и правила исправления', () async {
+        final harness = _EditorHarness(const RelationBlankCreationContext());
+        harness.viewModel.selectParticipant(
+          RelationParticipantRole.source,
+          testEditorSelection(1),
+        );
+        harness.fillDraft(description: '  Сохранить\nбуквально  ');
+        harness.viewModel.submit();
+        harness.repository.failRelationCommand(0, failure);
+        await harness.settle();
+
+        expect(
+          harness.state.operation,
+          isA<RelationEditorFailed>().having(
+            (operation) => operation.failure,
+            'причина отказа',
+            expectedFailure,
+          ),
+        );
+        expect(harness.state.sourceIntentionId, testEditorIntentionId(1));
+        expect(harness.state.relatedIntentionId, testEditorIntentionId(2));
+        expect(harness.state.type, LongTermRelationType.need);
+        expect(harness.state.priority, RelationPriority.p2);
+        expect(harness.state.description, '  Сохранить\nбуквально  ');
+        expect(harness.state.event, isNull);
+        expect(harness.state.failurePresentation, isNotNull);
+        expect(harness.state.canRetry, canRetry);
+        expect(harness.state.canSubmit, canRetry);
+
+        if (correction != null) {
+          harness.viewModel.selectParticipant(
+            correction,
+            testEditorSelection(3),
+          );
+          expect(harness.state.canSubmit, isTrue);
+        }
+        if (harness.state.canSubmit) {
+          harness.viewModel.submit();
+          final relation = harness.repository.completeRelationCreated(1);
+          await harness.settle();
+          expect(harness.repository.commandCount, 2);
+          expect(
+            harness.state.event,
+            isA<RelationEditorCreated>().having(
+              (event) => event.relationId,
+              'созданная связь после исправления',
+              relation.id,
+            ),
+          );
+        } else {
+          harness.viewModel.submit();
+          expect(harness.repository.commandCount, 1);
+        }
+      });
+    }
+  });
+
   group('Черновик создания связи', () {
     test('исходящая группа предвыбирает текущее намерение исходным', () {
       final harness = _EditorHarness.outgoing();

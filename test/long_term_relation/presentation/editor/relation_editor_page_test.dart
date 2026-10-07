@@ -37,6 +37,10 @@ import 'relation_participant_selection_scenarios.dart';
 
 void main() {
   defineRelationParticipantSelectionTests(openForm: _openForm);
+  defineRelationBlankCreationTests(
+    openForm: (tester, repository, locale) =>
+        _openForm(tester, repository, null, locale: locale),
+  );
 
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
@@ -1662,7 +1666,7 @@ RelationParticipantSummary _participantSummary({
 Future<AppRouter> _openForm(
   WidgetTester tester,
   ControlledRelationFormRepository repository,
-  RelationDirection direction, {
+  RelationDirection? direction, {
   Locale? locale = const Locale('en'),
 }) async {
   // Высокая поверхность держит поля формы построенными без прокрутки.
@@ -1695,10 +1699,13 @@ Future<AppRouter> _openForm(
   unawaited(
     router.push(
       RelationEditorRoute(
-        editorContext: RelationCreationContext(
-          participant: _contextParticipant,
-          direction: direction,
-        ),
+        editorContext: switch (direction) {
+          null => const RelationBlankCreationContext(),
+          final direction => RelationCreationContext(
+            participant: _contextParticipant,
+            direction: direction,
+          ),
+        },
       ),
     ),
   );

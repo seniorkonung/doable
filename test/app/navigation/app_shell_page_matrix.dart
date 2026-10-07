@@ -338,6 +338,7 @@ void _registerPageMatrixTests() {
           TagEditorRenaming() => 'изменение тега',
         },
         RelationEditorPage(:final editorContext) => switch (editorContext) {
+          RelationBlankCreationContext() => 'создание связи без участников',
           RelationCreationContext(:final direction) => switch (direction) {
             RelationDirection.outgoing => 'создание исходящей связи',
             RelationDirection.incoming => 'создание входящей связи',

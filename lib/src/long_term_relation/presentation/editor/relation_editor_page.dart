@@ -55,7 +55,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     super.initState();
     _descriptionController = TextEditingController(
       text: switch (widget.editorContext) {
-        RelationCreationContext() => '',
+        RelationBlankCreationContext() || RelationCreationContext() => '',
         RelationEditingContext(:final details) =>
           details.description?.value ?? '',
       },
@@ -138,11 +138,11 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
         !isSubmitting && (!pathProtected || meaningDraftChanged);
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          editor.context is RelationEditingContext
-              ? localizations.relationEditorEditTitle
-              : localizations.relationEditorTitle,
-        ),
+        title: Text(switch (editor.context) {
+          RelationBlankCreationContext() ||
+          RelationCreationContext() => localizations.relationEditorTitle,
+          RelationEditingContext() => localizations.relationEditorEditTitle,
+        }),
       ),
       body: SafeArea(
         child: ListView(
@@ -424,12 +424,16 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
   ) => switch ((editor.context, editor.operation)) {
     (RelationEditingContext(), RelationEditorSubmitting()) =>
       localizations.relationEditorSaving,
-    (RelationCreationContext(), RelationEditorSubmitting()) =>
+    (
+      RelationBlankCreationContext() || RelationCreationContext(),
+      RelationEditorSubmitting(),
+    ) =>
       localizations.relationEditorCreating,
     (_, RelationEditorFailed()) when editor.canRetry =>
       localizations.commonRetry,
     (RelationEditingContext(), _) => localizations.relationEditorSaveAction,
-    (RelationCreationContext(), _) => localizations.relationEditorSubmitAction,
+    (RelationBlankCreationContext() || RelationCreationContext(), _) =>
+      localizations.relationEditorSubmitAction,
   };
 
   String? _relationPhrase(
@@ -474,7 +478,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     AppLocalizations localizations,
     RelationEditorState editor,
   ) {
-    final isEditing = editor.context is RelationEditingContext;
+    final isEditing = !editor.context.isCreating;
     return switch (editor.operation) {
       RelationEditorIdle() ||
       RelationEditorSubmitting() ||

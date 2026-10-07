@@ -197,6 +197,7 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     }
 
     final start = switch (_context) {
+      RelationBlankCreationContext() ||
       RelationCreationContext() => _coordinator.acceptRelationCreation(
         _formKey,
         CreateLongTermRelation(
@@ -246,13 +247,13 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
       // Success предъявляет оболочка; форма получает его только для закрытия.
       state = switch (completion.result) {
         GraphResultSuccess(value: LongTermRelationCreated(:final relation))
-            when _context is RelationCreationContext =>
+            when _context.isCreating =>
           state.withOperation(
             RelationEditorSucceeded(relation),
             event: RelationEditorCreated(relation.id),
           ),
         GraphResultSuccess(value: LongTermRelationUpdated(:final relation))
-            when _context is RelationEditingContext =>
+            when !_context.isCreating =>
           state.withOperation(
             RelationEditorSucceeded(relation),
             event: RelationEditorUpdated(relation.id),

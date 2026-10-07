@@ -11,6 +11,16 @@ import '../../domain/long_term_relation_id.dart';
 /// Типизированный источник черновика формы связи.
 sealed class RelationEditorContext {
   const RelationEditorContext();
+
+  bool get isCreating => switch (this) {
+    RelationBlankCreationContext() || RelationCreationContext() => true,
+    RelationEditingContext() => false,
+  };
+}
+
+/// Самостоятельное создание связи без заранее выбранных участников.
+final class RelationBlankCreationContext extends RelationEditorContext {
+  const RelationBlankCreationContext();
 }
 
 /// Контекст группы соседства, из которой открыт черновик создания связи.
@@ -298,6 +308,20 @@ final class RelationEditorState {
 
   factory RelationEditorState.initial(RelationEditorContext context) =>
       switch (context) {
+        RelationBlankCreationContext() => RelationEditorState(
+          context: context,
+          sourceParticipant: null,
+          relatedParticipant: null,
+          sourceRevision: null,
+          relatedRevision: null,
+          permissions: const LongTermRelationPermissions.unknown(),
+          permissionRevision: null,
+          type: null,
+          priority: null,
+          description: '',
+          operation: const RelationEditorIdle(),
+          event: null,
+        ),
         final RelationCreationContext creation => RelationEditorState(
           context: context,
           sourceParticipant: creation.initialSourceParticipant,
@@ -331,7 +355,7 @@ final class RelationEditorState {
   final RelationEditorContext context;
 
   LongTermRelationDetails? get editingBasis => switch (context) {
-    RelationCreationContext() => null,
+    RelationBlankCreationContext() || RelationCreationContext() => null,
     RelationEditingContext(:final details) => details,
   };
 
@@ -413,6 +437,12 @@ final class RelationEditorState {
   /// Недопустимый текст считается правкой, чтобы отправка могла показать
   /// точную ошибку валидации и сохранить введённое значение.
   bool get hasChanges => switch (context) {
+    RelationBlankCreationContext() =>
+      sourceParticipant != null ||
+          relatedParticipant != null ||
+          type != null ||
+          priority != null ||
+          description.isNotEmpty,
     final RelationCreationContext creation =>
       sourceParticipant != creation.initialSourceParticipant ||
           relatedParticipant != creation.initialRelatedParticipant ||
@@ -429,7 +459,10 @@ final class RelationEditorState {
 
   bool get canSubmit =>
       completeness is RelationDraftComplete &&
-      (context is RelationCreationContext || hasChanges) &&
+      (switch (context) {
+        RelationBlankCreationContext() || RelationCreationContext() => true,
+        RelationEditingContext() => hasChanges,
+      }) &&
       (editingBasis == null ||
           !_meaningChanged ||
           permissions.canChangeMeaning) &&
