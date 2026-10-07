@@ -9,27 +9,28 @@ import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
+import '../daily_choice_creation_flow_session.dart';
 import 'daily_choice_creation_state.dart';
 
 part 'daily_choice_creation_view_model.g.dart';
 
-/// Собирает одну явную команду создания и оставляет её coordinator после ухода
-/// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.
+/// Собирает явную команду создания и сохраняет её принятие и результат в общей
+/// сессии потока. Координатор выполняет запись независимо от жизни формы.
 @riverpod
 final class DailyChoiceCreationViewModel
     extends _$DailyChoiceCreationViewModel {
   late GraphCommandCoordinator _coordinator;
-  late DailyChoiceCreationFormKey _formKey;
+  late DailyChoiceCreationFlowSession _session;
   DailyChoiceOperationToken? _activeToken;
   DailyChoiceOperationToken? _failureToken;
 
   @override
   DailyChoiceCreationState build(
-    DailyChoiceCreationFormKey formKey,
+    DailyChoiceCreationFlowSession session,
     ConfirmedChoicePath path,
     CalendarDate date,
   ) {
-    _formKey = formKey;
+    _session = session;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     ref.onDispose(() {
       final active = _activeToken;
@@ -40,6 +41,7 @@ final class DailyChoiceCreationViewModel
   }
 
   void changeDate(CalendarDate value) {
+    if (!ref.mounted || !_session.canContinue) return;
     if (state.date == value) return;
     final next = state.withDate(value);
     _releaseDroppedClaim(next);
@@ -47,6 +49,7 @@ final class DailyChoiceCreationViewModel
   }
 
   void changeDescription(String value) {
+    if (!ref.mounted || !_session.canContinue) return;
     if (state.description == value) return;
     final next = state.withDescription(value);
     _releaseDroppedClaim(next);
@@ -54,6 +57,7 @@ final class DailyChoiceCreationViewModel
   }
 
   void changeCompletion(bool value) {
+    if (!ref.mounted || !_session.canContinue) return;
     if (state.isCompleted == value) return;
     final next = state.withCompletion(value);
     _releaseDroppedClaim(next);
@@ -64,6 +68,7 @@ final class DailyChoiceCreationViewModel
   /// подтверждённый человеком после актуализации обхода. Возвращает признак
   /// принятия пути, чтобы экран показывал только отправляемые шаги.
   bool confirmRefreshedPath(ConfirmedChoicePath path) {
+    if (!ref.mounted || !_session.canContinue) return false;
     final next = state.withRefreshedPath(path);
     if (identical(next, state)) return false;
     _releaseFailure();
@@ -72,7 +77,7 @@ final class DailyChoiceCreationViewModel
   }
 
   void submit() {
-    if (!state.canSubmit) return;
+    if (!ref.mounted || !_session.canContinue || !state.canSubmit) return;
 
     final DailyChoiceDescription? description;
     try {
@@ -89,16 +94,16 @@ final class DailyChoiceCreationViewModel
 
     _releaseFailure();
     final path = state.path;
-    final start = _coordinator.acceptDailyChoiceCreation(
-      _formKey,
-      CreateDailyChoice(
-        sourceIntentionId: path.steps.first.sourceIntentionId,
-        selectedIntentionId: path.steps.last.relatedIntentionId,
-        path: path,
-        date: state.date,
-        description: description,
-        isCompleted: state.isCompleted,
-      ),
+    final command = CreateDailyChoice(
+      sourceIntentionId: path.steps.first.sourceIntentionId,
+      selectedIntentionId: path.steps.last.relatedIntentionId,
+      path: path,
+      date: state.date,
+      description: description,
+      isCompleted: state.isCompleted,
+    );
+    final start = _session.acceptSubmission(
+      (formKey) => _coordinator.acceptDailyChoiceCreation(formKey, command),
     );
     switch (start) {
       case DailyChoiceCommandAccepted(:final token, :final future):
@@ -106,6 +111,7 @@ final class DailyChoiceCreationViewModel
         state = state.withOperation(const DailyChoiceCreationSubmitting());
         unawaited(_finish(future));
       case DailyChoiceCommandAlreadyRunning():
+      case null:
         return;
       case GraphCommandCoordinatorDraining():
         state = state.withOperation(
@@ -121,10 +127,18 @@ final class DailyChoiceCreationViewModel
   }
 
   Future<void> _finish(Future<DailyChoiceCommandCompletion> future) async {
+    final session = _session;
     try {
       final completion = await future;
+      // Результат принадлежит потоку; mounted ограничивает только доступ к Ref.
+      // https://pub.dev/documentation/riverpod/3.4.2/riverpod/Ref/mounted.html
+      session.recordCompletion(completion);
       if (!ref.mounted || !identical(_activeToken, completion.token)) return;
       _activeToken = null;
+      if (session.state is DailyChoiceCreationFlowLeft) {
+        _coordinator.releaseInitiatorPresentation(completion.token);
+        return;
+      }
       state = switch (completion.result) {
         GraphResultSuccess(value: DailyChoiceCreated(:final choice)) =>
           state.withOperation(

@@ -8,26 +8,26 @@ part of 'daily_choice_creation_view_model.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Собирает одну явную команду создания и оставляет её coordinator после ухода
-/// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.
+/// Собирает явную команду создания и сохраняет её принятие и результат в общей
+/// сессии потока. Координатор выполняет запись независимо от жизни формы.
 
 @ProviderFor(DailyChoiceCreationViewModel)
 final dailyChoiceCreationViewModelProvider =
     DailyChoiceCreationViewModelFamily._();
 
-/// Собирает одну явную команду создания и оставляет её coordinator после ухода
-/// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.
+/// Собирает явную команду создания и сохраняет её принятие и результат в общей
+/// сессии потока. Координатор выполняет запись независимо от жизни формы.
 final class DailyChoiceCreationViewModelProvider
     extends
         $NotifierProvider<
           DailyChoiceCreationViewModel,
           DailyChoiceCreationState
         > {
-  /// Собирает одну явную команду создания и оставляет её coordinator после ухода
-  /// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.
+  /// Собирает явную команду создания и сохраняет её принятие и результат в общей
+  /// сессии потока. Координатор выполняет запись независимо от жизни формы.
   DailyChoiceCreationViewModelProvider._({
     required DailyChoiceCreationViewModelFamily super.from,
-    required (DailyChoiceCreationFormKey, ConfirmedChoicePath, CalendarDate)
+    required (DailyChoiceCreationFlowSession, ConfirmedChoicePath, CalendarDate)
     super.argument,
   }) : super(
          retry: null,
@@ -72,10 +72,10 @@ final class DailyChoiceCreationViewModelProvider
 }
 
 String _$dailyChoiceCreationViewModelHash() =>
-    r'ca6a6dd5d69e61be37be504f4dd46a95967efc04';
+    r'd12f27631b40a2d43d4c8882eefd3a34ea4f4dda';
 
-/// Собирает одну явную команду создания и оставляет её coordinator после ухода
-/// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.
+/// Собирает явную команду создания и сохраняет её принятие и результат в общей
+/// сессии потока. Координатор выполняет запись независимо от жизни формы.
 
 final class DailyChoiceCreationViewModelFamily extends $Family
     with
@@ -84,7 +84,7 @@ final class DailyChoiceCreationViewModelFamily extends $Family
           DailyChoiceCreationState,
           DailyChoiceCreationState,
           DailyChoiceCreationState,
-          (DailyChoiceCreationFormKey, ConfirmedChoicePath, CalendarDate)
+          (DailyChoiceCreationFlowSession, ConfirmedChoicePath, CalendarDate)
         > {
   DailyChoiceCreationViewModelFamily._()
     : super(
@@ -95,15 +95,15 @@ final class DailyChoiceCreationViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Собирает одну явную команду создания и оставляет её coordinator после ухода
-  /// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.
+  /// Собирает явную команду создания и сохраняет её принятие и результат в общей
+  /// сессии потока. Координатор выполняет запись независимо от жизни формы.
 
   DailyChoiceCreationViewModelProvider call(
-    DailyChoiceCreationFormKey formKey,
+    DailyChoiceCreationFlowSession session,
     ConfirmedChoicePath path,
     CalendarDate date,
   ) => DailyChoiceCreationViewModelProvider._(
-    argument: (formKey, path, date),
+    argument: (session, path, date),
     from: this,
   );
 
@@ -111,20 +111,24 @@ final class DailyChoiceCreationViewModelFamily extends $Family
   String toString() => r'dailyChoiceCreationViewModelProvider';
 }
 
-/// Собирает одну явную команду создания и оставляет её coordinator после ухода
-/// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.
+/// Собирает явную команду создания и сохраняет её принятие и результат в общей
+/// сессии потока. Координатор выполняет запись независимо от жизни формы.
 
 abstract class _$DailyChoiceCreationViewModel
     extends $Notifier<DailyChoiceCreationState> {
   late final _$args =
       ref.$arg
-          as (DailyChoiceCreationFormKey, ConfirmedChoicePath, CalendarDate);
-  DailyChoiceCreationFormKey get formKey => _$args.$1;
+          as (
+            DailyChoiceCreationFlowSession,
+            ConfirmedChoicePath,
+            CalendarDate,
+          );
+  DailyChoiceCreationFlowSession get session => _$args.$1;
   ConfirmedChoicePath get path => _$args.$2;
   CalendarDate get date => _$args.$3;
 
   DailyChoiceCreationState build(
-    DailyChoiceCreationFormKey formKey,
+    DailyChoiceCreationFlowSession session,
     ConfirmedChoicePath path,
     CalendarDate date,
   );

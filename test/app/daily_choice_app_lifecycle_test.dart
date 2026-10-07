@@ -436,6 +436,13 @@ void main() {
       ScaffoldMessenger.of(tester.element(message.first)).hideCurrentSnackBar();
       await tester.pumpAndSettle();
       expect(message, findsNothing);
+      expect(
+        find.byKey(const ValueKey('choice-path-creation-status')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('daily-choice-submit')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       // Новый выбор относится к другому дню: человек выбирает этот день.
       await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));

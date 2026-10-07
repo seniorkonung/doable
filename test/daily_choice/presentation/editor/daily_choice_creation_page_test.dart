@@ -37,6 +37,58 @@ void main() {
     );
   });
 
+  for (final succeeds in [true, false]) {
+    for (final disposed in [true, false]) {
+      testWidgets(
+        'сессия хранит отправку и поздний ${succeeds ? 'успех' : 'отказ'} ${disposed ? 'после освобождения' : 'во время закрытия'} подтверждения',
+        (tester) async {
+          final repository = _Repository();
+          final navigatorKey = GlobalKey<NavigatorState>();
+          await _pump(tester, repository, navigatorKey: navigatorKey);
+          final page = tester.widget<DailyChoiceCreationPage>(
+            find.byType(DailyChoiceCreationPage),
+          );
+          final session = page.session;
+          final form = tester.state(find.byType(DailyChoiceCreationPage));
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('daily-choice-submit')),
+          );
+          await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+          expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
+          navigatorKey.currentState!.pop();
+          if (disposed) {
+            await tester.pumpAndSettle();
+          } else {
+            await tester.pump();
+          }
+          expect(form.mounted, !disposed);
+          expect(session.canContinue, isFalse);
+
+          if (succeeds) {
+            repository.succeed(0);
+          } else {
+            repository.fail(0, const DailyChoiceUnavailableFailure());
+          }
+          await tester.pumpAndSettle();
+          expect(
+            session.state,
+            succeeds
+                ? isA<DailyChoiceCreationFlowSaved>()
+                : isA<DailyChoiceCreationFlowEditing>(),
+          );
+          expect(repository.commands, hasLength(1));
+          expect(find.text('Домашний экран'), findsOneWidget);
+          final message = find.byKey(const ValueKey('graph-operation-message'));
+          expect(message, findsOneWidget);
+          await tester.pump(const Duration(seconds: 8));
+          await tester.pumpAndSettle();
+          expect(message, findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets(
     'успех предъявляется после результата команды, затем форма закрывается',
     (tester) async {

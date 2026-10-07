@@ -6,6 +6,13 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
+import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -28,6 +35,116 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
+  for (final direction in ChoicePathDraftDirection.values) {
+    for (final succeeds in [true, false]) {
+      testWidgets(
+        'возврат ${direction == ChoicePathDraftDirection.topDown ? 'сверху вниз' : 'снизу вверх'} при записи сохраняет поздний ${succeeds ? 'успех' : 'отказ'} и блокирует прежнее подтверждение',
+        (tester) async {
+          final repository = _PathRepository();
+          addTearDown(repository.dispose);
+          await _pumpPage(
+            tester,
+            repository,
+            direction: direction,
+            startingId: direction == ChoicePathDraftDirection.topDown ? 1 : 2,
+          );
+          repository.complete(0, [_edge(1, 2, 1)]);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(
+              ValueKey(
+                'choice-path-continue-${_relation(1).toCanonicalString()}',
+              ),
+            ),
+          );
+          await tester.pump();
+          repository.complete(1, [], ready: true);
+          await tester.pumpAndSettle();
+          final session = tester
+              .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+              .creationSession!;
+          final endpoint = ValueKey(
+            direction == ChoicePathDraftDirection.topDown
+                ? 'choice-path-select-action'
+                : 'choice-path-select-source',
+          );
+          await tester.tap(find.byKey(endpoint));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('choice-path-open-confirmation')),
+          );
+          final oldOpen = tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('choice-path-open-confirmation')),
+              )
+              .onPressed!;
+          oldOpen();
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('daily-choice-submit')),
+          );
+          await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+          await tester.pump();
+          expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
+          await tester.binding.handlePopRoute();
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+          await tester.pump();
+          expect(find.byType(DailyChoiceCreationPage), findsNothing);
+          expect(find.text('Сохраняем…'), findsOneWidget);
+          expect(find.byKey(endpoint), findsNothing);
+          expect(repository.queries, hasLength(2));
+          oldOpen();
+          await tester.pumpAndSettle();
+          expect(find.byType(DailyChoiceCreationPage), findsNothing);
+          expect(repository.commands, 1);
+
+          if (succeeds) {
+            repository.succeed();
+          } else {
+            repository.creationRequests.single.complete(
+              const GraphCommandFailed(DailyChoiceUnavailableFailure()),
+            );
+          }
+          await tester.pumpAndSettle();
+          expect(find.byType(DailyChoiceCreationPage), findsNothing);
+          expect(repository.commands, 1);
+          if (succeeds) {
+            expect(session.state, isA<DailyChoiceCreationFlowSaved>());
+            expect(find.text('Дневной выбор создан.'), findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('choice-path-open-confirmation')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('choice-path-back-0')),
+              findsNothing,
+            );
+            oldOpen();
+            await tester.pumpAndSettle();
+            expect(find.byType(DailyChoiceCreationPage), findsNothing);
+            expect(repository.commands, 1);
+          } else {
+            expect(session.canContinue, isTrue);
+            expect(
+              find.byKey(const ValueKey('choice-path-creation-status')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('choice-path-open-confirmation')),
+              findsOneWidget,
+            );
+            oldOpen();
+            await tester.pumpAndSettle();
+            expect(find.byType(DailyChoiceCreationPage), findsOneWidget);
+            expect(repository.commands, 1);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets(
     'после выбора действия открывает подтверждение, отмена не пишет граф',
     (tester) async {
@@ -547,7 +664,44 @@ final class _PathRepository
         sync: true,
       );
   var commands = 0;
+  final creationRequests = <Completer<DailyChoiceCommandResult>>[];
   CreateDailyChoice? lastCommand;
+
+  void succeed() {
+    final command = lastCommand!;
+    final id = (DailyChoiceId.decode(
+      '00000000-0000-4000-8002-000000000001',
+    ) as DailyChoiceIdDecodingSuccess).id;
+    final stepId = (ChoicePathStepId.decode(
+      '00000000-0000-4000-8003-000000000001',
+    ) as ChoicePathStepIdDecodingSuccess).id;
+    creationRequests.single.complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: const _Revision(1),
+          value: DailyChoiceCreated(
+            choice: DailyChoice(
+              id: id,
+              sourceIntentionId: command.sourceIntentionId,
+              selectedIntentionId: command.selectedIntentionId,
+              date: command.date,
+              description: command.description,
+              isCompleted: command.isCompleted,
+            ),
+            path: StoredChoicePath([
+              ChoicePathStep(
+                id: stepId,
+                dailyChoiceId: id,
+                relationId: command.path.steps.single.relationId,
+                previousStepId: null,
+              ),
+            ]),
+            changes: const [_CreationChange()],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -617,10 +771,12 @@ final class _PathRepository
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
-  >(GraphCommand<TSuccess, TFailure> command) {
+  >(GraphCommand<TSuccess, TFailure> command) async {
     commands++;
     lastCommand = command as CreateDailyChoice;
-    return Completer<GraphCommandResult<TSuccess, TFailure>>().future;
+    final request = Completer<DailyChoiceCommandResult>();
+    creationRequests.add(request);
+    return await request.future as GraphCommandResult<TSuccess, TFailure>;
   }
 
   @override
@@ -692,3 +848,9 @@ LongTermRelationSummary _edge(
   ),
   hasDescription: false,
 );
+
+final class _CreationChange implements GraphChange {
+  const _CreationChange();
+  @override
+  GraphRevision get revision => const _Revision(1);
+}

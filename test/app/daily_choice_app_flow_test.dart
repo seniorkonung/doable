@@ -88,7 +88,10 @@ Future<void> _createFromPath(WidgetTester tester) async {
   );
   await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
   await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-  await _until(tester, find.byKey(const ValueKey('choice-path-select-action')));
+  await _until(
+    tester,
+    find.byKey(const ValueKey('choice-path-creation-status')),
+  );
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
@@ -361,7 +364,7 @@ void main() {
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
       await _until(
         tester,
-        find.byKey(const ValueKey('choice-path-select-action')),
+        find.byKey(const ValueKey('choice-path-creation-status')),
       );
       final saved = await _read(repository, _savedIds(harness).single);
       expect(saved.choice.date, CalendarDate.fromParts(2028, 2, 3));
@@ -419,6 +422,20 @@ void main() {
       );
       await _createFromPath(tester);
       final firstId = _savedIds(harness).single;
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('intention-details-choose-path')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+      );
       await _createFromPath(tester);
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));
@@ -611,21 +628,24 @@ void main() {
 
       await tester.pumpWidget(MainApp(runtime: runtime));
       await openDailyChoices(tester, tap: _tap);
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
-      );
-      await _tap(tester, find.text('Намерение 3'));
-      await _tap(
-        tester,
-        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
-      );
-      await _tap(
-        tester,
-        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
-      );
-
       for (var index = 0; index < 2; index++) {
+        if (index > 0) {
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-create-from-action')),
+        );
+        await _tap(tester, find.text('Намерение 3'));
+        await _tap(
+          tester,
+          find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+        );
+        await _tap(
+          tester,
+          find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+        );
         await _tap(
           tester,
           find.byKey(const ValueKey('choice-path-select-source')),
@@ -648,7 +668,7 @@ void main() {
         await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
         await _until(
           tester,
-          find.byKey(const ValueKey('choice-path-select-source')),
+          find.byKey(const ValueKey('choice-path-creation-status')),
         );
       }
       final ids = _savedIds(harness);

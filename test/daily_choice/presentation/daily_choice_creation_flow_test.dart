@@ -105,13 +105,46 @@ Future<void> _save(WidgetTester tester, {bool doubleTap = false}) async {
   await _waitFor(tester, find.textContaining('Дневной выбор создан'));
   await _waitFor(
     tester,
-    find.byKey(const ValueKey('choice-path-select-action')),
+    find.byKey(const ValueKey('choice-path-creation-status')),
   );
   await tester.pumpAndSettle();
   await _waitFor(
     tester,
-    find.byKey(const ValueKey('choice-path-select-action')),
+    find.byKey(const ValueKey('choice-path-creation-status')),
   );
+}
+
+Future<void> _restartPath(WidgetTester tester, List<int> relations) async {
+  final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
+  final session = tester
+      .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+      .creationSession!;
+  final router =
+      (await (tester.widget<MainApp>(find.byType(MainApp)).runtime.bootstrap())
+              as AppRuntimeReady)
+          .container
+          .read(appRouterProvider);
+  await tester.binding.handlePopRoute();
+  await tester.pumpAndSettle();
+  unawaited(
+    router.push(
+      ChoicePathRoute(
+        sourceIntentionId: page.sourceIntentionId,
+        direction: page.direction,
+      ),
+    ),
+  );
+  await _waitFor(tester, find.byType(ChoicePathPage));
+  await tester.pumpAndSettle();
+  expect(
+    tester
+        .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+        .creationSession,
+    isNot(same(session)),
+  );
+  for (final relation in relations) {
+    await _continue(tester, relation);
+  }
 }
 
 Future<void> _seed(LocalDatabaseHarness harness) async {
@@ -611,10 +644,7 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
-      );
+      await _restartPath(tester, [102, 101]);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -632,7 +662,7 @@ void main() {
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
       await _waitFor(
         tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
+        find.byKey(const ValueKey('choice-path-creation-status')),
       );
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));
@@ -646,7 +676,7 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _tap(tester, find.byKey(const ValueKey('choice-path-back-1')));
+      await _restartPath(tester, [102]);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -684,7 +714,7 @@ void main() {
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
       await _waitFor(
         tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
+        find.byKey(const ValueKey('choice-path-creation-status')),
       );
       await tester.pumpAndSettle();
       final oneStepId = _savedIds(harness).last;
@@ -696,6 +726,7 @@ void main() {
       expect(oneStep.choice.isCompleted, isTrue);
       expect(oneStep.path.map((step) => step.relation.id), [_relation(102)]);
 
+      await _restartPath(tester, [102]);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -717,7 +748,7 @@ void main() {
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
       await _waitFor(
         tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
+        find.byKey(const ValueKey('choice-path-creation-status')),
       );
       final allIds = _savedIds(harness);
       expect(allIds, hasLength(4));
@@ -1021,8 +1052,7 @@ void main() {
         _relation(104),
       ]);
 
-      await _tap(tester, find.byKey(const ValueKey('choice-path-back-0')));
-      await _continue(tester, 101);
+      await _restartPath(tester, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final secondId = _savedIds(harness).last;
@@ -1030,6 +1060,7 @@ void main() {
       expect(second.choice.selectedIntentionId, _intention(2));
       expect(second.path.map((step) => step.relation.id), [_relation(101)]);
 
+      await _restartPath(tester, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final ids = _savedIds(harness);
