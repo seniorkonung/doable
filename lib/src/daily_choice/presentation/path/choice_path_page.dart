@@ -17,6 +17,7 @@ import '../../application/choice_path_draft.dart';
 import '../../application/choice_path_suggestions.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../domain/calendar_date.dart';
+import '../daily_choice_creation_flow_session.dart';
 import '../editor/daily_choice_creation_page.dart';
 import 'choice_path_state.dart';
 import 'choice_path_suggestions_view.dart';
@@ -25,16 +26,11 @@ import 'choice_path_view_model.dart';
 
 @RoutePage()
 final class ChoicePathPage extends ConsumerStatefulWidget {
-  const ChoicePathPage({required this.sourceIntentionId, super.key})
-    : direction = ChoicePathDraftDirection.topDown,
-      purpose = ChoicePathPurpose.create;
-
-  const ChoicePathPage.fromAction({
-    required IntentionId actionIntentionId,
+  const ChoicePathPage({
+    required this.sourceIntentionId,
+    required this.direction,
     super.key,
-  }) : sourceIntentionId = actionIntentionId,
-       direction = ChoicePathDraftDirection.bottomUp,
-       purpose = ChoicePathPurpose.create;
+  }) : purpose = ChoicePathPurpose.create;
 
   const ChoicePathPage.forCreationRefresh({
     required IntentionId startingIntentionId,
@@ -55,7 +51,7 @@ final class ChoicePathPage extends ConsumerStatefulWidget {
   final ChoicePathPurpose purpose;
 
   @override
-  ConsumerState<ChoicePathPage> createState() => _ChoicePathPageState();
+  ConsumerState<ChoicePathPage> createState() => ChoicePathPageState();
 }
 
 enum ChoicePathPurpose { create, refreshCreation, replace }
@@ -70,8 +66,12 @@ final class ChoicePathSelection {
   final List<DailyChoiceCreationStep> steps;
 }
 
-final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
+final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
   late final ChoicePathSuggestionsViewModel _suggestions;
+  DailyChoiceCreationFlowSession? _creationSession;
+
+  /// Сессия конкретного корня; вспомогательный выбор ею не владеет.
+  DailyChoiceCreationFlowSession? get creationSession => _creationSession;
   ConfirmedChoicePath? _selectedPath;
   GraphRevision? _selectedRevision;
   bool _openingConfirmation = false;
@@ -94,7 +94,27 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.purpose != ChoicePathPurpose.create ||
+        _creationSession != null) {
+      return;
+    }
+    // matchId различает экземпляры одного маршрута; история берётся только
+    // до своего корня, даже если над ним уже добавлена следующая страница.
+    // https://pub.dev/documentation/auto_route/11.1.0/auto_route/RouteData/matchId.html
+    final rootMatchId = context.routeData.matchId;
+    _creationSession = DailyChoiceCreationFlowSession(
+      rootMatchId: rootMatchId,
+      originalHistory: context.router.root.stackData
+          .takeWhile((route) => route.matchId != rootMatchId)
+          .map((route) => route.matchId),
+    );
+  }
+
+  @override
   void dispose() {
+    _creationSession?.leave();
     _suggestions.dispose();
     super.dispose();
   }
@@ -174,7 +194,7 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
             GraphRevisionOrder.same &&
         _samePath(confirmed, _selectedPath!);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
         title: Text(
           widget.purpose == ChoicePathPurpose.replace
@@ -327,6 +347,13 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
           ],
         ),
       ),
+    );
+    if (widget.purpose != ChoicePathPurpose.create) return scaffold;
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _creationSession?.leave();
+      },
+      child: scaffold,
     );
   }
 }

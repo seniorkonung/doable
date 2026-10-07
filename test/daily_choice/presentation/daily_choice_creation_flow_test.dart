@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -26,6 +31,8 @@ import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+
+part 'daily_choice_creation_route_scenarios.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -217,6 +224,8 @@ void main() {
     );
   });
 
+  _registerCreationRouteScenarios();
+
   for (final bottomUp in [false, true]) {
     testWidgets(
       'подсказка ${bottomUp ? 'снизу' : 'сверху'} создаёт отдельный выбор без наследования полей',
@@ -274,6 +283,18 @@ void main() {
           await _openPath(tester);
         }
 
+        await _waitFor(tester, find.byType(ChoicePathPage));
+        final router = ready.container.read(appRouterProvider);
+        expect(router.current.name, ChoicePathRoute.name);
+        final session = tester
+            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+            .creationSession!;
+        expect(session.rootMatchId, router.current.matchId);
+        expect(session.originalHistory, [
+          for (final route in router.stackData.take(router.stack.length - 1))
+            route.matchId,
+        ]);
+
         final suggestion = find.byKey(
           const ValueKey('choice-suggestion-select-0'),
         );
@@ -296,6 +317,7 @@ void main() {
         );
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
+        expect(session.canContinue, isTrue);
         await _tap(tester, suggestion);
         await _waitFor(tester, find.byType(DailyChoiceCreationPage));
         expect(

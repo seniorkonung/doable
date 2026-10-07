@@ -1,7 +1,10 @@
 part of 'app_shell_pages_above_test.dart';
 
 void _registerUnnamedPageTests() {
-  for (final purpose in ChoicePathPurpose.values) {
+  for (final purpose in [
+    ChoicePathPurpose.refreshCreation,
+    ChoicePathPurpose.replace,
+  ]) {
     for (final direction in ChoicePathDraftDirection.values) {
       testWidgets(
         'безымянное построение пути: ${_purposeName(purpose)}, ${_directionName(direction)}',
@@ -11,14 +14,9 @@ void _registerUnnamedPageTests() {
             direction == ChoicePathDraftDirection.topDown ? _read : _run,
           );
           final page = switch (purpose) {
-            ChoicePathPurpose.create => switch (direction) {
-              ChoicePathDraftDirection.topDown => ChoicePathPage(
-                sourceIntentionId: startingId,
-              ),
-              ChoicePathDraftDirection.bottomUp => ChoicePathPage.fromAction(
-                actionIntentionId: startingId,
-              ),
-            },
+            ChoicePathPurpose.create => throw StateError(
+              'Создание открывается типизированным маршрутом',
+            ),
             ChoicePathPurpose.refreshCreation =>
               ChoicePathPage.forCreationRefresh(
                 startingIntentionId: startingId,
@@ -40,6 +38,12 @@ void _registerUnnamedPageTests() {
           );
           expect(shown.purpose, purpose);
           expect(shown.direction, direction);
+          expect(
+            tester
+                .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+                .creationSession,
+            isNull,
+          );
           _expectAboveShell(
             tester,
             ChoicePathPage,

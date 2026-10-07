@@ -7,9 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../intention/domain/intention_id.dart';
+import '../../application/choice_path_draft.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
-import '../path/choice_path_page.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_state.dart';
@@ -195,9 +195,10 @@ final class _DailyChoiceCatalogPageState
       const DailyChoiceActionPickerRoute(),
     );
     if (!mounted || actionId == null) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => ChoicePathPage.fromAction(actionIntentionId: actionId),
+    await context.router.push<void>(
+      ChoicePathRoute(
+        sourceIntentionId: actionId,
+        direction: ChoicePathDraftDirection.bottomUp,
       ),
     );
   }

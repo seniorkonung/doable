@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
@@ -537,7 +538,10 @@ final class _LoadedDetails extends StatelessWidget {
                 onShowArchivedRelations: onShowArchivedRelations,
                 onChoosePath: () => unawaited(
                   context.router.push(
-                    ChoicePathRoute(sourceIntentionId: intention.id),
+                    ChoicePathRoute(
+                      sourceIntentionId: intention.id,
+                      direction: ChoicePathDraftDirection.topDown,
+                    ),
                   ),
                 ),
               ),

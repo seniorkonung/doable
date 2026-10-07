@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -501,26 +502,37 @@ Future<void> _pumpPage(
   double textScale = 1,
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   int startingId = 1,
-}) => tester.pumpWidget(
-  ProviderScope(
-    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
-    child: MaterialApp(
-      locale: locale,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context)
-            .copyWith(textScaler: TextScaler.linear(textScale)),
-        child: child!,
+}) async {
+  final router = AppRouter();
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+      child: MaterialApp.router(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        routerConfig: router.config(),
       ),
-      home: direction == ChoicePathDraftDirection.topDown
-          ? ChoicePathPage(sourceIntentionId: _intention(startingId))
-          : ChoicePathPage.fromAction(
-              actionIntentionId: _intention(startingId),
-            ),
     ),
-  ),
-);
+  );
+  unawaited(
+    router.push(
+      ChoicePathRoute(
+        sourceIntentionId: _intention(startingId),
+        direction: direction,
+      ),
+    ),
+  );
+  await tester.pump();
+}
 
 final class _PathRepository
     with
