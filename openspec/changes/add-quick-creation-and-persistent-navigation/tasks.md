@@ -40,7 +40,7 @@
   - **Files likely touched:** `lib/src/long_term_relation/presentation/details/relation_details_page.dart`, `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `test/long_term_relation/presentation/details/relation_details_widget_test.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`, `test/app/navigation/app_shell_pages_above_test.dart`.
   - **Estimated scope:** M — два однотипных подключения готового каркаса и их проверки, около 5 файлов.
 
-- [ ] 1.4 Подтвердить работу глубокой навигации между намерениями, связями и дневными выборами
+- [x] 1.4 Подтвердить работу глубокой навигации между намерениями, связями и дневными выборами
   - **Acceptance criteria:**
     - Проверки 1.1–1.3 подтверждают сброс до сохранённой оболочки, сохранение состояния всех трёх корневых страниц и последовательное закрытие верхних страниц. На корне каталога «назад» ведёт на Главную, на корне Главной — к выходу из приложения.
     - Реальный маршрутизатор не выдаёт исключений или конфликтов `Hero` при переходах между уже подключёнными страницами. Прежние входы создания остаются работоспособны.

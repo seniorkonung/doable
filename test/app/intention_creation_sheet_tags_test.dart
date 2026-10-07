@@ -503,10 +503,6 @@ void main() {
         tester,
         find.byKey(const ValueKey('intention-details-title')),
       );
-      await _until(
-        tester,
-        find.byKey(ValueKey('tag-assignment-row-${shed.toCanonicalString()}')),
-      );
       await tester.pumpAndSettle();
       expect(tester.widget<IntentionDetailsPage>(page).intentionId, id);
       expect(
@@ -529,24 +525,32 @@ void main() {
         Icons.star,
       );
       for (final (tag, name) in [(home, 'Дом'), (shed, 'Сарай')]) {
-        expect(
-          find.descendant(
-            of: find.byKey(
-              ValueKey('tag-assignment-row-${tag.toCanonicalString()}'),
-            ),
-            matching: find.text(name),
+        final row = find.byKey(
+          ValueKey('tag-assignment-row-${tag.toCanonicalString()}'),
+        );
+        await tester.scrollUntilVisible(
+          row,
+          200,
+          scrollable: find.descendant(
+            of: page,
+            matching: find.byType(Scrollable),
           ),
+        );
+        await _until(tester, row);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: row, matching: find.text(name)),
           findsOneWidget,
         );
       }
-      expect(find.byType(AppNavigationBar), findsNothing);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(
         find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
-        findsNothing,
+        findsExactly(3),
       );
       expect(
         find.semantics.byPredicate((node) => node.role == SemanticsRole.tab),
-        findsNothing,
+        findsExactly(3),
       );
       expect(
         find.byType(IntentionEditorPage, skipOffstage: false),

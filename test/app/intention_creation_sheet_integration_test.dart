@@ -1488,13 +1488,17 @@ Future<void> _expectCreatedPage(
     favoriteMark == FavoriteMark.favorite ? Icons.star : Icons.star_border,
   );
   for (final tag in assignments.items) {
+    final row = find.byKey(
+      ValueKey('tag-assignment-row-${tag.id.toCanonicalString()}'),
+    );
+    await tester.scrollUntilVisible(
+      row,
+      200,
+      scrollable: find.descendant(of: page, matching: find.byType(Scrollable)),
+    );
+    await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: find.byKey(
-          ValueKey('tag-assignment-row-${tag.id.toCanonicalString()}'),
-        ),
-        matching: find.text(tag.name.value),
-      ),
+      find.descendant(of: row, matching: find.text(tag.name.value)),
       findsOneWidget,
     );
   }
