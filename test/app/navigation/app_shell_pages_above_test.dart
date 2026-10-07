@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -6,6 +8,7 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
@@ -24,17 +27,22 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
+import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -46,6 +54,9 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+
+part 'app_shell_page_matrix.dart';
+part 'app_shell_unnamed_page_scenarios.dart';
 
 /// Активное готовое избранное намерение «Читать» с тегом «Дом»: исходный
 /// участник связи и исходное намерение дневного выбора.
@@ -65,6 +76,8 @@ const _tag = 301;
 final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
 
 void main() {
+  _registerPageMatrixTests();
+  _registerUnnamedPageTests();
   test('дочерние маршруты оболочки — только три корневые страницы без '
       'собственных стеков, остальные маршруты корневые', () {
     final router = AppRouter();
@@ -819,19 +832,27 @@ void _expectRootPage(
 
 /// Подключённые обычные страницы сохраняют панель над оболочкой.
 /// Все панели сохраняют пункт [under].
-void _expectAboveShell(WidgetTester tester, Type page, AppDestination under) {
+void _expectAboveShell(
+  WidgetTester tester,
+  Type page,
+  AppDestination under, {
+  bool? expectedPanel,
+}) {
   final top = find.byType(page);
   expect(top, findsOneWidget, reason: '$page');
   expect(tester.getRect(top), Offset.zero & _screen(tester), reason: '$page');
 
   final ordinary =
-      page == IntentionDetailsPage ||
-      page == RelationDetailsPage ||
-      page == DailyChoiceDetailsPage ||
-      page == TagNavigationPage ||
-      (page == TagCatalogPage &&
-          tester.widget<TagCatalogPage>(top).selectionContext
-              is TagBrowseContext);
+      expectedPanel ??
+      (page == IntentionDetailsPage ||
+          page == RelationDetailsPage ||
+          page == DailyChoiceDetailsPage ||
+          page == TagNavigationPage ||
+          (page == TagCatalogPage &&
+              switch (tester.widget<TagCatalogPage>(top).selectionContext) {
+                TagBrowseContext() => true,
+                TagAssignmentContext() || TagDraftContext() => false,
+              }));
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,
