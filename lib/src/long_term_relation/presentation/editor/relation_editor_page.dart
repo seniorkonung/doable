@@ -281,8 +281,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
 
   /// Открывает выбор участника и применяет только явно выбранное намерение.
   ///
-  /// Исключается намерение, уже занятое парой: второй участник, а до его
-  /// выбора — текущее значение самой роли. Отмена оставляет черновик прежним.
+  /// Исключается только участник другой роли; пока его нет, исключения нет.
+  /// Отмена оставляет черновик прежним.
   Future<void> _selectParticipant(RelationParticipantRole role) async {
     final provider = relationEditorViewModelProvider(
       _formKey,
@@ -291,14 +291,9 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     final notifier = ref.read(provider.notifier);
     final draft = ref.read(provider);
     final excluded = switch (role) {
-      RelationParticipantRole.source =>
-        draft.relatedIntentionId ?? draft.sourceIntentionId,
-      RelationParticipantRole.related =>
-        draft.sourceIntentionId ?? draft.relatedIntentionId,
+      RelationParticipantRole.source => draft.relatedIntentionId,
+      RelationParticipantRole.related => draft.sourceIntentionId,
     };
-    if (excluded == null) {
-      return;
-    }
     final selected = await context.router
         .push<GraphSnapshot<RelationParticipantSummary>>(
           RelationParticipantPickerRoute(

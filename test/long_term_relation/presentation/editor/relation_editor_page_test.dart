@@ -33,8 +33,11 @@ import '../../../intention/presentation/details/details_test_support.dart'
 import '../../../support/app_root_pages.dart';
 import '../details/relation_details_test_support.dart' show testRelationDetails;
 import 'relation_form_test_support.dart';
+import 'relation_participant_selection_scenarios.dart';
 
 void main() {
+  defineRelationParticipantSelectionTests(openForm: _openForm);
+
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,

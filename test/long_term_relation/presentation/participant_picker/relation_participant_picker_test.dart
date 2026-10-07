@@ -1579,11 +1579,13 @@ const _emptyByConditions = 'No intentions match the tag conditions.';
 const _excludedIndex = 9;
 
 final _activeRelation = SelectRelationParticipant(
+  session: IntentionSearchSession(),
   excludedIntentionId: _testIntentionId(_excludedIndex),
   selectionContext: RelationParticipantSelectionContext.activeRelation,
 );
 
 final _archivedRelation = SelectRelationParticipant(
+  session: IntentionSearchSession(),
   excludedIntentionId: _testIntentionId(_excludedIndex),
   selectionContext: RelationParticipantSelectionContext.archivedRelation,
 );
@@ -1649,7 +1651,15 @@ Future<void> _applyConditions(
   final expectedQueries = repository.queries.length + conditions.length;
   for (final (tag, requirement) in conditions) {
     container
-        .read(intentionTagConditionsViewModelProvider(purpose).notifier)
+        .read(
+          intentionTagConditionsViewModelProvider(
+            tester
+                .widget<IntentionTagConditionsSection>(
+                  find.byType(IntentionTagConditionsSection),
+                )
+                .purpose,
+          ).notifier,
+        )
         .applySelection(
           IntentionTagConditionSelection(
             tag: tag,

@@ -1055,6 +1055,7 @@ void main() {
       );
       final filteredProvider = intentionCatalogViewModelProvider(
         SelectRelationParticipant(
+          session: IntentionSearchSession(),
           excludedIntentionId: ids[3],
           selectionContext: RelationParticipantSelectionContext.activeRelation,
         ),

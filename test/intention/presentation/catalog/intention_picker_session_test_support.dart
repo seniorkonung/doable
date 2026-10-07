@@ -7,6 +7,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -20,14 +21,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
-import '../../intention/presentation/catalog/catalog_test_support.dart';
-import '../../support/app_root_pages.dart';
+import 'catalog_reconciliation_test_support.dart';
+import 'catalog_test_support.dart';
+import '../../../support/app_root_pages.dart';
 
 /// Проверяет жизнь поисков одного назначения в настоящем стеке маршрутов.
-void defineDailyChoicePickerSessionTests({
+void defineIntentionPickerSessionTests({
   required PageRouteInfo route,
-  required String keyPrefix,
+  required String filterKey,
+  required String listKey,
+  IntentionScope scope = IntentionScope.active,
+  IntentionId? excludedIntentionId,
   required IntentionReadinessFilter readinessFilter,
 }) {
   testWidgets('вложенные поиски сохраняют свои параметры, порции и прокрутку', (
@@ -43,7 +47,7 @@ void defineDailyChoicePickerSessionTests({
     repository.complete(1, _page('Первая', hasMore: true));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(ValueKey('$keyPrefix-filter')), 'Первая');
+    await tester.enterText(find.byKey(ValueKey(filterKey)), 'Первая');
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump();
     repository.complete(2, _page('Первая', hasMore: true));
@@ -87,7 +91,7 @@ void defineDailyChoicePickerSessionTests({
         container.read(intentionCatalogViewModelProvider(first)).requireValue
             as IntentionCatalogLoaded;
     expect(firstState.items, hasLength(120));
-    final firstPosition = _position(tester, keyPrefix);
+    final firstPosition = _position(tester, listKey);
     firstPosition.jumpTo(500);
     await tester.pumpAndSettle();
     final firstOffset = firstPosition.pixels;
@@ -101,14 +105,15 @@ void defineDailyChoicePickerSessionTests({
     final initialQuery = repository.queryAt(6);
     expect(initialQuery.titleFilter, isNull);
     expect(initialQuery.tagFilter, IntentionTagFilter.empty);
-    expect(initialQuery.scope, IntentionScope.active);
+    expect(initialQuery.scope, scope);
+    expect(initialQuery.excludedIntentionId, excludedIntentionId);
     expect(initialQuery.readinessFilter, readinessFilter);
     expect(initialQuery.pageSize, 60);
     repository.complete(6, _page('Вторая'));
     await tester.pumpAndSettle();
-    expect(_position(tester, keyPrefix).pixels, 0);
+    expect(_position(tester, listKey).pixels, 0);
 
-    await tester.enterText(find.byKey(ValueKey('$keyPrefix-filter')), 'Вторая');
+    await tester.enterText(find.byKey(ValueKey(filterKey)), 'Вторая');
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump();
     repository.complete(7, _page('Вторая'));
@@ -131,7 +136,7 @@ void defineDailyChoicePickerSessionTests({
     }
     repository.complete(9, _page('Вторая'));
     await tester.pumpAndSettle();
-    _position(tester, keyPrefix).jumpTo(200);
+    _position(tester, listKey).jumpTo(200);
     await tester.pumpAndSettle();
     expect(_purpose(tester), same(second));
     expect(
@@ -152,10 +157,10 @@ void defineDailyChoicePickerSessionTests({
       isFalse,
     );
     expect(_purpose(tester), same(first));
-    expect(_position(tester, keyPrefix).pixels, firstOffset);
+    expect(_position(tester, listKey).pixels, firstOffset);
     expect(
       tester
-          .widget<TextField>(find.byKey(ValueKey('$keyPrefix-filter')))
+          .widget<TextField>(find.byKey(ValueKey(filterKey)))
           .controller!
           .text,
       'Первая',
@@ -193,10 +198,7 @@ void defineDailyChoicePickerSessionTests({
       unawaited(router.push<void>(route));
       await _settleRoute(tester);
       final closed = _purpose(tester);
-      await tester.enterText(
-        find.byKey(ValueKey('$keyPrefix-filter')),
-        'Закрытый поиск',
-      );
+      await tester.enterText(find.byKey(ValueKey(filterKey)), 'Закрытый поиск');
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
       expect(repository.queries, hasLength(3));
@@ -242,10 +244,10 @@ IntentionCatalogPurpose _purpose(WidgetTester tester) => tester
     )
     .purpose;
 
-ScrollPosition _position(WidgetTester tester, String keyPrefix) => tester
+ScrollPosition _position(WidgetTester tester, String listKey) => tester
     .state<ScrollableState>(
       find.descendant(
-        of: find.byKey(PageStorageKey<String>('$keyPrefix-list')),
+        of: find.byKey(PageStorageKey<String>(listKey)),
         matching: find.byType(Scrollable),
       ),
     )

@@ -24,7 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
 import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../support/app_root_pages.dart';
-import 'daily_choice_picker_session_test_support.dart';
+import '../../intention/presentation/catalog/intention_picker_session_test_support.dart';
 
 /// Страница выбора намерения для дневного выбора и её ограничения поиска.
 ///
@@ -59,9 +59,10 @@ final class DailyChoicePickerTagSearchCase {
 void defineDailyChoicePickerTagSearchTests(
   DailyChoicePickerTagSearchCase page,
 ) {
-  defineDailyChoicePickerSessionTests(
+  defineIntentionPickerSessionTests(
     route: page.route,
-    keyPrefix: page.keyPrefix,
+    filterKey: '${page.keyPrefix}-filter',
+    listKey: '${page.keyPrefix}-list',
     readinessFilter: page.readinessFilter,
   );
   for (final (language, ownTags, otherTags, noTags) in [

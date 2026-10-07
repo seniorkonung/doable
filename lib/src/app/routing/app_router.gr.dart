@@ -600,15 +600,15 @@ class RelationEditorRouteArgs {
 class RelationParticipantPickerRoute
     extends _i21.PageRouteInfo<RelationParticipantPickerRouteArgs> {
   RelationParticipantPickerRoute({
-    required _i22.IntentionId excludedIntentionId,
     required _i33.RelationParticipantSelectionContext selectionContext,
+    _i22.IntentionId? excludedIntentionId,
     _i24.Key? key,
     List<_i21.PageRouteInfo>? children,
   }) : super(
          RelationParticipantPickerRoute.name,
          args: RelationParticipantPickerRouteArgs(
-           excludedIntentionId: excludedIntentionId,
            selectionContext: selectionContext,
+           excludedIntentionId: excludedIntentionId,
            key: key,
          ),
          initialChildren: children,
@@ -621,8 +621,8 @@ class RelationParticipantPickerRoute
     builder: (data) {
       final args = data.argsAs<RelationParticipantPickerRouteArgs>();
       return _i15.RelationParticipantPickerPage(
-        excludedIntentionId: args.excludedIntentionId,
         selectionContext: args.selectionContext,
+        excludedIntentionId: args.excludedIntentionId,
         key: args.key,
       );
     },
@@ -631,34 +631,34 @@ class RelationParticipantPickerRoute
 
 class RelationParticipantPickerRouteArgs {
   const RelationParticipantPickerRouteArgs({
-    required this.excludedIntentionId,
     required this.selectionContext,
+    this.excludedIntentionId,
     this.key,
   });
 
-  final _i22.IntentionId excludedIntentionId;
-
   final _i33.RelationParticipantSelectionContext selectionContext;
+
+  final _i22.IntentionId? excludedIntentionId;
 
   final _i24.Key? key;
 
   @override
   String toString() {
-    return 'RelationParticipantPickerRouteArgs{excludedIntentionId: $excludedIntentionId, selectionContext: $selectionContext, key: $key}';
+    return 'RelationParticipantPickerRouteArgs{selectionContext: $selectionContext, excludedIntentionId: $excludedIntentionId, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! RelationParticipantPickerRouteArgs) return false;
-    return excludedIntentionId == other.excludedIntentionId &&
-        selectionContext == other.selectionContext &&
+    return selectionContext == other.selectionContext &&
+        excludedIntentionId == other.excludedIntentionId &&
         key == other.key;
   }
 
   @override
   int get hashCode =>
-      excludedIntentionId.hashCode ^ selectionContext.hashCode ^ key.hashCode;
+      selectionContext.hashCode ^ excludedIntentionId.hashCode ^ key.hashCode;
 }
 
 /// generated route for

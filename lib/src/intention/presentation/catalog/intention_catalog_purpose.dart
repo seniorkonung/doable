@@ -67,22 +67,21 @@ final class SelectDailyChoiceSource extends IntentionCatalogPurpose {
 
 /// Выбор существующего намерения участником долговременной связи.
 ///
-/// Второе намерение пары исключается по идентификатору: прямая самосвязь
+/// Выбранное второе намерение пары исключается по идентификатору: прямая самосвязь
 /// запрещена, а одноимённые намерения остаются разными участниками. Контекст
 /// редактируемой связи задаёт допустимый архивный охват и не позволяет
 /// вызывающей стороне составить режим выбора только архивных намерений.
 final class SelectRelationParticipant extends IntentionCatalogPurpose {
   const SelectRelationParticipant({
-    required this.excludedIntentionId,
     required this.selectionContext,
-    this.session,
+    required this.session,
+    this.excludedIntentionId,
   });
 
-  final IntentionId excludedIntentionId;
+  final IntentionId? excludedIntentionId;
   final RelationParticipantSelectionContext selectionContext;
 
-  /// Контракт сессии для последующего подключения страницы выбора участника.
-  final IntentionSearchSession? session;
+  final IntentionSearchSession session;
 
   IntentionScope get scope => selectionContext.catalogScope;
 

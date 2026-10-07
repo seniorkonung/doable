@@ -34,6 +34,7 @@ void main() {
       fireImmediately: true,
     );
     final participant = SelectRelationParticipant(
+      session: IntentionSearchSession(),
       excludedIntentionId: testSummary(index: 9).id,
       selectionContext: RelationParticipantSelectionContext.activeRelation,
     );

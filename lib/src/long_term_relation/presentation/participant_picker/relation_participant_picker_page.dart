@@ -30,13 +30,13 @@ import '../../application/long_term_relation_projection.dart';
 @RoutePage()
 final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
   const RelationParticipantPickerPage({
-    required this.excludedIntentionId,
     required this.selectionContext,
+    this.excludedIntentionId,
     super.key,
   });
 
-  /// Намерение, уже занятое вторым участником пары.
-  final IntentionId excludedIntentionId;
+  /// Намерение другой роли; пока она пуста, исключения нет.
+  final IntentionId? excludedIntentionId;
 
   /// Архивное состояние редактируемой связи, выраженное допустимым охватом.
   final RelationParticipantSelectionContext selectionContext;
@@ -48,6 +48,11 @@ final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
 
 final class _RelationParticipantPickerPageState
     extends ConsumerState<RelationParticipantPickerPage> {
+  late final _purpose = SelectRelationParticipant(
+    session: IntentionSearchSession(),
+    excludedIntentionId: widget.excludedIntentionId,
+    selectionContext: widget.selectionContext,
+  );
   final _filterController = TextEditingController();
 
   @override
@@ -59,10 +64,7 @@ final class _RelationParticipantPickerPageState
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final purpose = SelectRelationParticipant(
-      excludedIntentionId: widget.excludedIntentionId,
-      selectionContext: widget.selectionContext,
-    );
+    final purpose = _purpose;
     final catalog = ref.watch(intentionCatalogViewModelProvider(purpose));
     final notifier = ref.read(
       intentionCatalogViewModelProvider(purpose).notifier,

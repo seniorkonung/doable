@@ -345,10 +345,12 @@ void main() {
         _actionSearchPurpose,
         _sourceSearchPurpose,
         SelectRelationParticipant(
+          session: IntentionSearchSession(),
           excludedIntentionId: excluded,
           selectionContext: RelationParticipantSelectionContext.activeRelation,
         ),
         SelectRelationParticipant(
+          session: IntentionSearchSession(),
           excludedIntentionId: excluded,
           selectionContext:
               RelationParticipantSelectionContext.archivedRelation,
@@ -429,10 +431,12 @@ void main() {
     _actionSearchPurpose,
     _sourceSearchPurpose,
     SelectRelationParticipant(
+      session: IntentionSearchSession(),
       excludedIntentionId: testSummary(index: 9).id,
       selectionContext: RelationParticipantSelectionContext.activeRelation,
     ),
     SelectRelationParticipant(
+      session: IntentionSearchSession(),
       excludedIntentionId: testSummary(index: 9).id,
       selectionContext: RelationParticipantSelectionContext.archivedRelation,
     ),

@@ -90,6 +90,7 @@ void main() {
         (
           'участник активной связи',
           SelectRelationParticipant(
+            session: IntentionSearchSession(),
             excludedIntentionId: _intentionId(2),
             selectionContext:
                 RelationParticipantSelectionContext.activeRelation,
@@ -99,6 +100,7 @@ void main() {
         (
           'участник архивной связи',
           SelectRelationParticipant(
+            session: IntentionSearchSession(),
             excludedIntentionId: _intentionId(2),
             selectionContext:
                 RelationParticipantSelectionContext.archivedRelation,
