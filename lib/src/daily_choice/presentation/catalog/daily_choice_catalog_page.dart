@@ -73,11 +73,46 @@ final class _DailyChoiceCatalogPageState
     final model = ref.read(dailyChoiceCatalogViewModelProvider.notifier);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.appDestinationDailyChoices)),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey('daily-choice-create-from-action'),
-        onPressed: () => unawaited(_chooseAction()),
-        icon: const Icon(Icons.add),
-        label: Text(l10n.dailyChoiceCreateFromAction),
+      floatingActionButton: LayoutBuilder(
+        builder: (context, constraints) {
+          final theme = Theme.of(context);
+          final style =
+              theme.floatingActionButtonTheme.extendedTextStyle ??
+              theme.textTheme.labelLarge;
+          // https://api.flutter.dev/flutter/painting/TextPainter-class.html
+          final label = TextPainter(
+            text: TextSpan(
+              text: l10n.dailyChoiceCreateFromAction,
+              style: style,
+            ),
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            locale: Localizations.localeOf(context),
+            maxLines: 1,
+          )..layout();
+          // Значок, промежуток и горизонтальные отступы заданы явно ниже.
+          final extended =
+              label.height <= 56 &&
+              label.width + 24 + 8 + 16 + 20 <=
+                  constraints.maxWidth - 2 * kFloatingActionButtonMargin;
+          label.dispose();
+          // Полное название компактной кнопки доступно в подсказке и семантике.
+          // https://api.flutter.dev/flutter/material/FloatingActionButton/tooltip.html
+          return FloatingActionButton.extended(
+            key: const ValueKey('daily-choice-create-from-action'),
+            onPressed: () => unawaited(_chooseAction()),
+            isExtended: extended,
+            tooltip: extended ? null : l10n.dailyChoiceCreateFromAction,
+            extendedTextStyle: style,
+            extendedIconLabelSpacing: 8,
+            extendedPadding: const EdgeInsetsDirectional.only(
+              start: 16,
+              end: 20,
+            ),
+            icon: const Icon(Icons.add, size: 24),
+            label: Text(l10n.dailyChoiceCreateFromAction),
+          );
+        },
       ),
       // Календарь, фильтры, количество, полосы обновления и выдача
       // прокручиваются вместе: прокрученная до конца выдача получает всю

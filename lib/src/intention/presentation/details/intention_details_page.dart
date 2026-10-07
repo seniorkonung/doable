@@ -977,15 +977,18 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
           ),
         ],
         const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        // При увеличенном тексте действия переходят на следующие строки.
+        // https://api.flutter.dev/flutter/widgets/Wrap-class.html
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 12,
+          runSpacing: 12,
           children: [
             TextButton(
               key: const ValueKey('intention-details-edit-cancel'),
               onPressed: controlsEnabled ? widget.onCancel : null,
               child: Text(localizations.detailsCancelEditAction),
             ),
-            const SizedBox(width: 12),
             FilledButton(
               key: const ValueKey('intention-details-edit-submit'),
               onPressed: controlsEnabled && edit.canSubmit

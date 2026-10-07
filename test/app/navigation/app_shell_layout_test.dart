@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
@@ -6,6 +7,9 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
@@ -20,6 +24,11 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/presentation/presentation_frame_evidence.dart';
@@ -33,6 +42,8 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+
+part 'ordinary_page_layout_scenarios.dart';
 
 /// Экран телефона: параметры поиска и выдача делят высоту, которую уменьшают
 /// панель, нижний безопасный отступ и клавиатура.
@@ -102,6 +113,7 @@ const _keyboardOpen = _Insets(
 const _insetVariants = [_plain, _safeArea, _keyboardOpen];
 
 void main() {
+  _registerOrdinaryLayoutTests();
   group('нижние вставки области вкладок', () {
     for (final destination in AppDestination.values) {
       testWidgets('«${_names[destination]}»: содержимое получает вставки без '
@@ -735,9 +747,21 @@ final class _RootPageEvidence extends StatelessWidget {
 /// завершается отказом занятости.
 final class _ReadFaults extends LocalDatabaseConnectionObserver {
   var isFailing = false;
+  Completer<void>? _gate;
+
+  void pause() {
+    _gate = Completer<void>();
+    addTearDown(resume);
+  }
+
+  void resume() {
+    _gate?.complete();
+    _gate = null;
+  }
 
   @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
+  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+    await _gate?.future;
     if (!isFailing) return;
     throw sqlite.SqliteException(
       extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
@@ -748,9 +772,10 @@ final class _ReadFaults extends LocalDatabaseConnectionObserver {
 
 /// Запущенное приложение.
 final class _App {
-  _App(this.coordinator);
+  _App(this.coordinator, this.router);
 
   final GraphCommandCoordinator coordinator;
+  final AppRouter router;
 }
 
 /// Сообщает окну системные вставки [insets].
@@ -774,12 +799,17 @@ Future<_App> _start(
   _Insets insets = _plain,
   Locale locale = const Locale('en'),
   LocalDatabaseConnectionObserver? observer,
+  Size screen = _screen,
+  double textScale = 1,
+  void Function(sqlite.Database)? seedAdditional,
 }) async {
   // Общая поверхность показывает сообщения только работающему приложению.
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-  tester.view.physicalSize = _screen;
+  tester.binding.platformDispatcher.textScaleFactorTestValue = textScale;
+  addTearDown(tester.binding.platformDispatcher.clearTextScaleFactorTestValue);
+  tester.view.physicalSize = screen;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   _apply(tester, insets);
@@ -806,10 +836,15 @@ Future<_App> _start(
   });
   await tester.runAsync(runtime.bootstrap);
   _seed(raw, intentions: intentions, dailyChoices: dailyChoices);
+  seedAdditional?.call(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomeIntentionRow));
   await tester.pumpAndSettle();
-  return _App(runtime.commandCoordinator);
+  final ready = await runtime.bootstrap() as AppRuntimeReady;
+  return _App(
+    runtime.commandCoordinator,
+    ready.container.read(appRouterProvider),
+  );
 }
 
 /// Намерения, одна отметка избранного, связь и дневные выборы по ней на
@@ -902,9 +937,15 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
   // Видимая часть корневой страницы, суженная видимой частью каждой
   // объемлющей прокрутки.
   var visibleTop = tester.getRect(find.byType(AppBar)).bottom;
-  var visibleBottom = insets.contentBottom;
+  var visibleBottom =
+      tester.view.physicalSize.height / tester.view.devicePixelRatio -
+      math.max(insets.keyboard, insets.barExtent);
   var inScroll = false;
   element.visitAncestorElements((ancestor) {
+    if (ancestor.widget is AppBar) {
+      visibleTop = insets.safeTop;
+      return false;
+    }
     if (ancestor.widget is Scrollable) {
       inScroll = true;
       final viewport = ancestor.renderObject! as RenderBox;
@@ -928,6 +969,9 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
     lessThanOrEqualTo(visibleBottom + precisionErrorTolerance),
     reason: '$finder: нижний край видимой части',
   );
+  final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+  expect(rect.left, greaterThanOrEqualTo(-precisionErrorTolerance));
+  expect(rect.right, lessThanOrEqualTo(width + precisionErrorTolerance));
   if (!inScroll) return;
   // Нажатие ровно на границе элементу не принадлежит, поэтому точки
   // отступают от краёв внутрь.
