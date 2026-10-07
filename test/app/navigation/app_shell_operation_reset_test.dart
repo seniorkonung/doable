@@ -10,22 +10,37 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../long_term_relation/presentation/details/relation_details_test_support.dart'
+    show ControlledRelationWatch, testRelationDetails;
+import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
+    show testRelationId;
 import '../../support/in_memory_diagnostics_sink.dart';
 
 const _archive = ValueKey('intention-details-archive');
@@ -34,6 +49,7 @@ const _success = 'Архивирование — «Намерение»: Нам�
 const _failure =
     'Архивирование — «Намерение»: Не удалось изменить состояние намерения. Повторите попытку.';
 const _deleteSuccess = 'Удаление — «Намерение»: Намерение удалено.';
+const _relationDeleteSuccess = 'Удаление — «связь»: Связь удалена.';
 const _description = ValueKey('relation-editor-description');
 
 void main() {
@@ -50,6 +66,110 @@ void main() {
     final resetKind = destination == AppDestination.intentionGraph
         ? 'текущему'
         : 'другому';
+    testWidgets('позднее удаление связи после сброса к $resetKind пункту '
+        'сохраняет новую форму и её ввод до освобождения прежней страницы', (
+      tester,
+    ) async {
+      final app = await _ControlledApp.start(tester, activeRelationCount: 1);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(IntentionCatalogPage)),
+      );
+      final catalogProvider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      expect(
+        container.read(catalogProvider).value,
+        isA<IntentionCatalogLoaded>().having(
+          (state) => state.items.single.activeRelationCount,
+          'число связей до удаления',
+          1,
+        ),
+      );
+      await app.openRelationDetails(tester);
+      final previousPage = tester.element(find.byType(RelationDetailsPage));
+      final previousRouteId = app.router.stackData.last.matchId;
+      await app.deleteRelation(tester);
+
+      await _select(tester, destination, settle: false);
+      unawaited(
+        app.router.push(
+          RelationEditorRoute(
+            editorContext: RelationCreationContext(
+              participant: RelationParticipantSummary(
+                id: testDetailsIntentionId(3),
+                title: 'Независимый участник',
+                archiveState: IntentionArchiveState.active,
+                activeRelationCount: 0,
+              ),
+              direction: RelationDirection.outgoing,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      const text = 'Несохранённое описание после сброса просмотра связи';
+      await tester.enterText(find.byKey(_description), text);
+      final form = tester.state(find.byType(RelationEditorPage));
+      final formRouteId = app.router.stackData.last.matchId;
+      expect(find.text(text), findsOneWidget);
+      expect(previousPage.mounted, isTrue);
+      expect(
+        app.router.stackData.any((route) => route.matchId == previousRouteId),
+        isFalse,
+      );
+      expect(
+        app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+        isTrue,
+      );
+
+      app.completeRelationDelete();
+      await _until(
+        tester,
+        () =>
+            !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+      );
+      expect(previousPage.mounted, isTrue);
+      expect(app.router.stackData.last.matchId, formRouteId);
+      await tester.pumpAndSettle();
+
+      expect(tester.state(find.byType(RelationEditorPage)), same(form));
+      expect(find.text(text), findsOneWidget);
+      expect(app.router.stack.map((page) => page.name), [
+        AppShellRoute.name,
+        RelationEditorRoute.name,
+      ]);
+      expect(find.text(_relationDeleteSuccess), findsOneWidget);
+      expect(
+        container.read(catalogProvider).value,
+        isA<IntentionCatalogLoaded>()
+            .having(
+              (state) => state.items.single.activeRelationCount,
+              'число связей после удаления',
+              0,
+            )
+            .having(
+              (state) => state.revision.compareTo(const TestDetailsRevision(1)),
+              'ревизия каталога',
+              GraphRevisionOrder.same,
+            ),
+      );
+      await _expireMessages(tester);
+      expect(
+        app.repository.relationCommands.single,
+        isA<DeleteLongTermRelation>(),
+      );
+      expect(app.repository.commands, isEmpty);
+
+      unawaited(app.router.maybePop());
+      await tester.pumpAndSettle();
+      _expectRoot(tester, app.router, destination);
+      expect(
+        find.byType(RelationDetailsPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(app.repository.catalogQueries, hasLength(1));
+    });
     testWidgets(
       'позднее удаление намерения после сброса к $resetKind пункту '
       'сохраняет новую форму связи и её ввод до освобождения прежней страницы',
@@ -124,6 +244,37 @@ void main() {
       },
     );
   }
+
+  testWidgets('удаление связи с актуальной верхней страницы закрывает только '
+      'её просмотр и один раз предъявляет результат', (tester) async {
+    final app = await _ControlledApp.start(tester, activeRelationCount: 1);
+    await tester.tap(find.byTooltip('Теги'));
+    await tester.pumpAndSettle();
+    final catalogRouteId = app.router.stackData.last.matchId;
+    await app.openRelationDetails(tester);
+    await app.deleteRelation(tester);
+
+    app.completeRelationDelete();
+    await _until(
+      tester,
+      () => !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+    );
+    await tester.pumpAndSettle();
+
+    expect(app.router.stackData.last.matchId, catalogRouteId);
+    expect(app.router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      TagCatalogRoute.name,
+    ]);
+    expect(find.byType(RelationDetailsPage, skipOffstage: false), findsNothing);
+    expect(find.text(_relationDeleteSuccess), findsOneWidget);
+    await _expireMessages(tester);
+    expect(
+      app.repository.relationCommands.single,
+      isA<DeleteLongTermRelation>(),
+    );
+    expect(app.repository.commands, isEmpty);
+  });
 
   testWidgets('позднее удаление намерения сохраняет каталог тегов, '
       'открытый через «Теги» до освобождения сброшенной страницы', (
@@ -441,10 +592,20 @@ final class _ControlledApp {
   final AppRouter router;
   final ControlledDetailsRepository repository;
   final intention = testDetailsIntention(description: null);
+  final relationDetails = testRelationDetails(
+    relationId: testRelationId(101),
+    sourceId: testDetailsIntentionId(1),
+    relatedId: testDetailsIntentionId(2),
+    sourceTitle: 'Намерение',
+  );
   var completedCommands = 0;
+  var completedRelationCommands = 0;
   GraphCommandCoordinator get coordinator => runtime.commandCoordinator;
 
-  static Future<_ControlledApp> start(WidgetTester tester) async {
+  static Future<_ControlledApp> start(
+    WidgetTester tester, {
+    int activeRelationCount = 0,
+  }) async {
     tester.view.physicalSize = const Size(1000, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -453,7 +614,12 @@ final class _ControlledApp {
     final repository = ControlledDetailsRepository()
       ..catalogResult = ResultSuccess(
         IntentionCatalogFirstPage(
-          items: [testDetailsSummary(testDetailsIntention(description: null))],
+          items: [
+            testDetailsSummary(
+              testDetailsIntention(description: null),
+              activeRelationCount: activeRelationCount,
+            ),
+          ],
           totalCount: 1,
           nextCursor: null,
           revision: const TestDetailsRevision(0),
@@ -474,6 +640,13 @@ final class _ControlledApp {
       while (app.completedCommands < repository.commands.length) {
         app.complete(const ResultFailure(IntentionUnavailableFailure()));
       }
+      while (app.completedRelationCommands <
+          repository.relationCommands.length) {
+        repository.completeRelationCommand(
+          app.completedRelationCommands++,
+          const GraphCommandFailed(LongTermRelationUnavailableFailure()),
+        );
+      }
       await tester.pumpWidget(const SizedBox.shrink());
       await runtime.shutdown();
       for (final request in repository.detailRequests) {
@@ -492,6 +665,70 @@ final class _ControlledApp {
     await tester.pump();
     repository.detailRequests.single.add(ResultSuccess(intention));
     await tester.pumpAndSettle();
+  }
+
+  Future<void> openRelationDetails(WidgetTester tester) async {
+    final watch = ControlledRelationWatch(relationDetails.relation.id);
+    addTearDown(watch.close);
+    repository.onWatchRelation = (id) {
+      expect(id, relationDetails.relation.id);
+      return watch.stream;
+    };
+    unawaited(
+      router.push(
+        RelationDetailsRoute(relationId: relationDetails.relation.id),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    watch.emitDetails(relationDetails, revision: const TestDetailsRevision(0));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> deleteRelation(WidgetTester tester) async {
+    final delete = find.byKey(
+      const ValueKey('relation-details-delete-relation'),
+    );
+    await tester.ensureVisible(delete);
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-confirm-delete')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());
+    expect(coordinator.isRelationRunning(relationDetails.relation.id), isTrue);
+  }
+
+  void completeRelationDelete() {
+    const revision = TestDetailsRevision(1);
+    repository.completeRelationCommand(
+      completedRelationCommands++,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationDeleted(
+            relation: relationDetails.relation,
+            changes: [
+              LongTermRelationDeletedChange(
+                revision: revision,
+                relation: relationDetails.relation,
+              ),
+              for (final id in [
+                relationDetails.source.id,
+                relationDetails.related.id,
+              ])
+                IntentionRelationCountsChanged(
+                  revision: revision,
+                  intentionId: id,
+                  counts: testRelationCounts(),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> archive(WidgetTester tester) async {

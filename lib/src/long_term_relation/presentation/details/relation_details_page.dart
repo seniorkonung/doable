@@ -42,7 +42,10 @@ final class RelationDetailsPage extends ConsumerWidget {
     ref.listen(provider, (previous, next) {
       // Успех предъявляет общий presenter, а удалённый контекст закрывается
       // независимо от занятости общей поверхности сообщения.
-      if (next is RelationDetailsDeleted) {
+      // Сброшенный маршрут теряет право закрывать страницы до dispose:
+      // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
+      if (next is RelationDetailsDeleted &&
+          (ModalRoute.of(context)?.isCurrent ?? false)) {
         unawaited(Navigator.of(context).maybePop());
       }
     });
