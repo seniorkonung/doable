@@ -269,6 +269,9 @@ sealed class RelationEditorEvent {
   const RelationEditorEvent();
 }
 
+/// Право одной формы продолжать создание независимо от удаления маршрута.
+enum RelationEditorSessionState { active, left }
+
 /// Связь создана: форма может быть закрыта.
 final class RelationEditorCreated extends RelationEditorEvent {
   const RelationEditorCreated(this.relationId);
@@ -304,6 +307,7 @@ final class RelationEditorState {
     required this.operation,
     required this.event,
     this.failurePresentation,
+    this.sessionState = RelationEditorSessionState.active,
   });
 
   factory RelationEditorState.initial(RelationEditorContext context) =>
@@ -353,6 +357,11 @@ final class RelationEditorState {
       };
 
   final RelationEditorContext context;
+  final RelationEditorSessionState sessionState;
+
+  bool get canEdit =>
+      sessionState == RelationEditorSessionState.active &&
+      (operation is RelationEditorIdle || operation is RelationEditorFailed);
 
   LongTermRelationDetails? get editingBasis => switch (context) {
     RelationBlankCreationContext() || RelationCreationContext() => null,
@@ -458,6 +467,7 @@ final class RelationEditorState {
   };
 
   bool get canSubmit =>
+      sessionState == RelationEditorSessionState.active &&
       completeness is RelationDraftComplete &&
       (switch (context) {
         RelationBlankCreationContext() || RelationCreationContext() => true,
@@ -576,6 +586,7 @@ final class RelationEditorState {
         : operation;
     return RelationEditorState(
       context: context,
+      sessionState: sessionState,
       sourceParticipant: sourceParticipant,
       relatedParticipant: relatedParticipant,
       sourceRevision: sourceRevision,
@@ -609,6 +620,7 @@ final class RelationEditorState {
     }
     return RelationEditorState(
       context: context,
+      sessionState: sessionState,
       sourceParticipant: role == RelationParticipantRole.source
           ? participant
           : sourceParticipant,
@@ -656,6 +668,7 @@ final class RelationEditorState {
     }
     return RelationEditorState(
       context: context,
+      sessionState: sessionState,
       sourceParticipant: role == RelationParticipantRole.source
           ? snapshot.value
           : sourceParticipant,
@@ -690,8 +703,10 @@ final class RelationEditorState {
     RelationEditorOperation value, {
     RelationEditorEvent? event,
     GraphInitiatorPresentationClaim? failurePresentation,
+    RelationEditorSessionState? sessionState,
   }) => RelationEditorState(
     context: context,
+    sessionState: sessionState ?? this.sessionState,
     sourceParticipant: sourceParticipant,
     relatedParticipant: relatedParticipant,
     sourceRevision: sourceRevision,
@@ -716,6 +731,7 @@ final class RelationEditorState {
 
   RelationEditorState withoutEvent() => RelationEditorState(
     context: context,
+    sessionState: sessionState,
     sourceParticipant: sourceParticipant,
     relatedParticipant: relatedParticipant,
     sourceRevision: sourceRevision,
@@ -742,6 +758,7 @@ final class RelationEditorState {
     String? description,
   }) => RelationEditorState(
     context: context,
+    sessionState: sessionState,
     sourceParticipant: sourceParticipant ?? this.sourceParticipant,
     relatedParticipant: relatedParticipant ?? this.relatedParticipant,
     sourceRevision: sourceRevision ?? this.sourceRevision,

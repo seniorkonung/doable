@@ -16,6 +16,7 @@ import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/details/intention_details_state.dart';
 import '../../../intention/presentation/details/intention_details_view_model.dart';
+import '../../../shared/presentation/creation_exit_action.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/long_term_relation_permissions.dart';
@@ -119,7 +120,10 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
       if (event == null) return;
       notifier.consumeEvent();
       // Сообщение предъявляет общий presenter независимо от перехода.
-      if (!_ownsTopRoute) return;
+      if (!_ownsTopRoute ||
+          next.sessionState == RelationEditorSessionState.left) {
+        return;
+      }
       switch (event) {
         case RelationEditorCreated(:final relationId):
           openCreatedRelation(
@@ -132,11 +136,17 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
       }
     });
 
-    final isSubmitting = editor.operation is RelationEditorSubmitting;
-    final controlsEnabled =
-        !isSubmitting && editor.operation is! RelationEditorSucceeded;
-    final descriptionFailure = _descriptionFailure(localizations, editor);
-    final generalFailure = _generalFailure(localizations, editor);
+    final controlsEnabled = editor.canEdit;
+    // Покинутый инициатор передал ошибку общей поверхности даже при отказе
+    // удаления формы; её оставшийся renderer не предъявляет результат снова.
+    final presentsFailure =
+        editor.sessionState == RelationEditorSessionState.active;
+    final descriptionFailure = presentsFailure
+        ? _descriptionFailure(localizations, editor)
+        : null;
+    final generalFailure = presentsFailure
+        ? _generalFailure(localizations, editor)
+        : null;
     final occupiedPair = _occupiedPair(editor);
     final basis = editor.editingBasis?.relation;
     final pathProtected =
@@ -284,6 +294,20 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
               onPressed: editor.canSubmit ? _submit : null,
               child: Text(_submitLabel(localizations, editor)),
             ),
+            if (editor.context.isCreating) ...[
+              const SizedBox(height: 16),
+              CreationExitAction(
+                state: switch ((editor.sessionState, editor.operation)) {
+                  (_, RelationEditorSubmitting()) =>
+                    CreationExitState.submitting,
+                  (RelationEditorSessionState.left, _) ||
+                  (_, RelationEditorSucceeded()) => CreationExitState.terminal,
+                  (_, RelationEditorIdle() || RelationEditorFailed()) =>
+                    CreationExitState.cancellable,
+                },
+                onExit: _leaveCreation,
+              ),
+            ],
           ],
         ),
       ),
@@ -299,10 +323,24 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
 
   bool get _canEdit {
     if (!_ownsTopRoute) return false;
-    final operation = ref
+    return ref
         .read(relationEditorViewModelProvider(_formKey, widget.editorContext))
-        .operation;
-    return operation is RelationEditorIdle || operation is RelationEditorFailed;
+        .canEdit;
+  }
+
+  void _leaveCreation() {
+    if (!_ownsTopRoute || !widget.editorContext.isCreating) return;
+    final router = context.router;
+    final matchId = context.routeData.matchId;
+    ref
+        .read(
+          relationEditorViewModelProvider(
+            _formKey,
+            widget.editorContext,
+          ).notifier,
+        )
+        .leaveCreation();
+    leaveRelationCreation(router: router, formMatchId: matchId);
   }
 
   void _submit() {

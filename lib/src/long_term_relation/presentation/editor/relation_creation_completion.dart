@@ -6,6 +6,46 @@ import 'package:flutter/foundation.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../domain/long_term_relation_id.dart';
 
+/// Закрывает только собственную форму после синхронной утраты прав создания.
+/// При частичном отказе согласует отображение с фактическим стеком.
+void leaveRelationCreation({
+  required StackRouter router,
+  required LocalKey formMatchId,
+}) {
+  if (router.stackData.lastOrNull?.matchId != formMatchId ||
+      router.pagelessRoutesObserver.hasPagelessTopRoute) {
+    return;
+  }
+  final form = router.stackData.last;
+  final history = router.stackData
+      .take(router.stackData.length - 1)
+      .map((route) => route.matchId)
+      .toList();
+  try {
+    // removeRoute удаляет конкретный matchId, не исходную страницу:
+    // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
+    router.removeRoute(form);
+  } catch (_, stack) {
+    final remaining = router.stackData.map((route) => route.matchId).toList();
+    if (listEquals(remaining, history) ||
+        listEquals(remaining, [...history, formMatchId])) {
+      // Удаление могло состояться без уведомления; новых мутаций здесь нет:
+      // https://pub.dev/documentation/auto_route/11.1.0/auto_route/RoutingController/notifyAll.html
+      router.notifyAll(forceUrlRebuild: true);
+    }
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: FlutterError('Не удалось выйти из создания связи.'),
+        stack: stack,
+        library: 'relation editor',
+        context: ErrorDescription(
+          'при выходе из создания долговременной связи',
+        ),
+      ),
+    );
+  }
+}
+
 /// Заменяет только актуальную форму, сохраняя подтверждённую запись при отказе.
 /// Обработка перехода не зависит от жизни виджета; поздний отказ не получает
 /// права менять новый маршрут или восстанавливать удалённую форму.
