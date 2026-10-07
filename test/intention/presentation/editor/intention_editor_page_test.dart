@@ -538,7 +538,7 @@ void main() {
         find.byType(IntentionEditorPage, skipOffstage: false),
         findsNothing,
       );
-      expect(find.byType(AppNavigationBar), findsNothing);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
       final details = router.stackData.last;
       await tester.pump(const Duration(seconds: 1));
       expect(router.stackData.last, same(details));

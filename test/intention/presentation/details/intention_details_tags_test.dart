@@ -86,6 +86,17 @@ void main() {
         await tester.pumpAndSettle();
 
         final choose = find.byKey(const ValueKey('tag-assignments-choose'));
+        await tester.scrollUntilVisible(
+          choose,
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byType(CustomScrollView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
         expect(choose, findsOneWidget);
         expect(find.text('Дом'), findsOneWidget);
         final open = find.byKey(

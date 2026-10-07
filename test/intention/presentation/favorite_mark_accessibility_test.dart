@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/ordinary_page_test_app.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 import 'details/details_test_support.dart';
@@ -332,10 +333,8 @@ Widget _detailsApp(
   Locale locale,
 ) => UncontrolledProviderScope(
   container: container,
-  child: MaterialApp(
+  child: OrdinaryPageTestApp(
     locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: _textScaler),
       child: GraphOperationPresenter(child: child ?? const SizedBox.shrink()),

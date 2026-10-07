@@ -5,6 +5,8 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
@@ -179,6 +181,56 @@ void main() {
     }
   });
 
+  group('сброс истории со страницы намерения', () {
+    for (final origin in AppDestination.values) {
+      for (final destination in AppDestination.values) {
+        testWidgets('из «${_names[origin]}» в «${_names[destination]}» '
+            'сохраняет состояние всех корневых страниц без повторного чтения', (
+          tester,
+        ) async {
+          final app = await _start(tester);
+          final before = <AppDestination, Map<String, Object?>>{};
+          for (final entry in _rootPageStates.entries) {
+            await entry.value.prepare(tester, app);
+            before[entry.key] = entry.value.view(tester, app);
+          }
+          await _select(tester, origin);
+          final router = app.container.read(appRouterProvider);
+          unawaited(
+            router.push(
+              IntentionDetailsRoute(intentionId: app.home.items.first.id),
+            ),
+          );
+          await _until(tester, find.byType(IntentionDetailsPage));
+          await tester.pumpAndSettle();
+          expect(_selected(tester), origin);
+          // Вторая страница создаёт глубокую историю над тем же пунктом.
+          unawaited(
+            router.push(
+              IntentionDetailsRoute(intentionId: app.home.items[1].id),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(_selected(tester), origin);
+
+          await _select(tester, destination);
+
+          expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
+          expect(
+            find.byType(IntentionDetailsPage, skipOffstage: false),
+            findsNothing,
+          );
+          expect(_selected(tester), destination);
+          for (final entry in _rootPageStates.entries) {
+            await _select(tester, entry.key);
+            expect(entry.value.view(tester, app), before[entry.key]);
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  });
+
   group('невыбранная корневая страница согласуется с подтверждёнными '
       'изменениями', () {
     testWidgets('переименование со страницы намерения, открытой с Главной, '
@@ -213,7 +265,6 @@ void main() {
         find.byKey(const ValueKey('intention-details-edit-submit')),
       );
       await _until(tester, find.text(newTitle));
-      await _closeTop(tester, IntentionDetailsPage);
       await _select(tester, AppDestination.intentionGraph);
 
       expect(_catalogRow(newTitle), findsOneWidget);

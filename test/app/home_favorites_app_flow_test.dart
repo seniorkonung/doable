@@ -750,7 +750,7 @@ Future<void> _expectDetails(WidgetTester tester, int intention) async {
         .toCanonicalString(),
     tagFixtureId(intention),
   );
-  expect(find.byType(AppNavigationBar), findsNothing);
+  expect(find.byType(AppNavigationBar), findsOneWidget);
   for (final page in _rootPages.values) {
     expect(find.byType(page), findsNothing);
   }

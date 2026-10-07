@@ -127,10 +127,8 @@ void main() {
     }
   });
 
-  testWidgets('с Главной страница намерения и подробный просмотр его связи '
-      'закрывают панель, а закрытие обеих возвращает на Главную', (
-    tester,
-  ) async {
+  testWidgets('с Главной страница намерения сохраняет панель, просмотр связи '
+      'закрывает её, а закрытие обеих возвращает на Главную', (tester) async {
     final router = await _start(tester);
     _expectRootPage(tester, router, AppDestination.home);
 
@@ -183,6 +181,118 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final destination in AppDestination.values) {
+    testWidgets(
+      'выбор пункта ${destination.index + 1} со страницы участника удаляет '
+      'незавершённую форму связи и правку намерения без сохранения',
+      (tester) async {
+        final router = await _start(tester);
+        await _open(
+          tester,
+          find.byType(HomeIntentionRow),
+          IntentionDetailsPage,
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+          RelationEditorPage,
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-editor-select-related')),
+          RelationParticipantPickerPage,
+        );
+        await _tap(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
+        await _gone(tester, RelationParticipantPickerPage);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('relation-editor-type-need')),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('relation-editor-priority-p2')),
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('relation-editor-description')),
+          'Несохранённый черновик связи',
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-editor-open-source-details')),
+          IntentionDetailsPage,
+        );
+        _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('intention-details-edit')),
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-details-edit-title')),
+          'Несохранённое название',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-details-edit-description')),
+          'Несохранённое описание',
+        );
+        tester.testTextInput.hide();
+        await tester.pumpAndSettle();
+        _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+
+        await _select(tester, destination);
+
+        _expectRootPage(tester, router, destination);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(
+          find.byType(RelationEditorPage, skipOffstage: false),
+          findsNothing,
+        );
+        expect(
+          find.byType(IntentionDetailsPage, skipOffstage: false),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        _expectRootPage(tester, router, AppDestination.home);
+        await _open(
+          tester,
+          find.byType(HomeIntentionRow),
+          IntentionDetailsPage,
+        );
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(const ValueKey('intention-details-title')),
+              )
+              .data,
+          'Читать',
+        );
+        expect(find.text('Несохранённое название'), findsNothing);
+        expect(find.text('Несохранённое описание'), findsNothing);
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+          RelationEditorPage,
+        );
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey('relation-editor-description')),
+              )
+              .controller!
+              .text,
+          isEmpty,
+        );
+        expect(
+          find.byKey(
+            const ValueKey('relation-editor-participant-title-related'),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('каталог тегов из каталога намерений занимает весь экран без '
       'панели, а его закрытие возвращает в каталог намерений', (tester) async {
     final router = await _start(tester);
@@ -198,8 +308,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('страницы, открытые из каталога намерений, занимают весь экран '
-      'без панели', (tester) async {
+  testWidgets('страница намерения над каталогом сохраняет панель, а формы '
+      'и выборы открываются без неё', (tester) async {
     const graph = AppDestination.intentionGraph;
     final router = await _start(tester);
     await _select(tester, graph);
@@ -584,32 +694,41 @@ void _expectRootPage(
   expect(_announcedDestinations, findsExactly(3));
 }
 
-/// Страница [page] открыта поверх оболочки: занимает весь экран, панель не
-/// видна, а сменить пункт нельзя ни нажатием, ни через экранный диктор.
-/// Выбранным под страницей остаётся пункт [under].
+/// Страница намерения сохраняет панель над оболочкой; остальные проверяемые
+/// здесь страницы пока закрывают её. Все панели сохраняют пункт [under].
 void _expectAboveShell(WidgetTester tester, Type page, AppDestination under) {
   final top = find.byType(page);
   expect(top, findsOneWidget, reason: '$page');
   expect(tester.getRect(top), Offset.zero & _screen(tester), reason: '$page');
 
-  expect(find.byType(AppNavigationBar), findsNothing, reason: '$page');
+  final ordinary = page == IntentionDetailsPage;
+  expect(
+    find.byType(AppNavigationBar),
+    ordinary ? findsOneWidget : findsNothing,
+    reason: '$page',
+  );
   for (final rootPage in _rootPages.values) {
     expect(find.byType(rootPage), findsNothing, reason: '$page');
   }
   // Оболочка остаётся в дереве под страницей, но её пункты не получают
   // нажатий и не объявляются экранным диктором.
-  expect(_destinations, findsExactly(3), reason: '$page');
-  expect(_destinations.hitTestable(), findsNothing, reason: '$page');
-  expect(_announcedDestinations, findsNothing, reason: '$page');
+  final bars = tester.widgetList<AppNavigationBar>(
+    find.byType(AppNavigationBar, skipOffstage: false),
+  );
+  expect(_destinations, findsExactly(3 * bars.length), reason: '$page');
   expect(
-    tester
-        .widget<AppNavigationBar>(
-          find.byType(AppNavigationBar, skipOffstage: false),
-        )
-        .selected,
-    under,
+    _destinations.hitTestable(),
+    ordinary ? findsExactly(3) : findsNothing,
     reason: '$page',
   );
+  expect(
+    _announcedDestinations,
+    ordinary ? findsExactly(3) : findsNothing,
+    reason: '$page',
+  );
+  for (final bar in bars) {
+    expect(bar.selected, under, reason: '$page');
+  }
 }
 
 /// Панель создания намерения открыта поверх каталога намерений: каталог и
@@ -752,12 +871,13 @@ Future<void> _close(WidgetTester tester, Type page) async {
 
 /// Закрывает системным действием «назад» все страницы поверх оболочки.
 Future<void> _closeAll(WidgetTester tester) async {
-  final bar = find.byType(AppNavigationBar);
-  for (var page = 0; page < 12 && bar.evaluate().isEmpty; page++) {
+  bool hasRootPage() =>
+      _rootPages.values.any((page) => find.byType(page).evaluate().isNotEmpty);
+  for (var page = 0; page < 12 && !hasRootPage(); page++) {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
   }
-  expect(bar, findsOneWidget);
+  expect(hasRootPage(), isTrue);
 }
 
 Future<void> _gone(WidgetTester tester, Type page) async {

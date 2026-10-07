@@ -23,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
 void main() {
@@ -48,6 +49,7 @@ void main() {
 
         final delete = find.byKey(const ValueKey('intention-details-delete'));
         await tester.ensureVisible(delete);
+        await tester.pump();
         await tester.tap(delete);
         await tester.pumpAndSettle();
 
@@ -127,6 +129,7 @@ void main() {
 
         final delete = find.byKey(const ValueKey('intention-details-delete'));
         await tester.ensureVisible(delete);
+        await tester.pump();
         await tester.tap(delete);
         await tester.pumpAndSettle();
         await tester.tap(
@@ -333,6 +336,7 @@ void main() {
 
     final delete = find.byKey(const ValueKey('intention-details-delete'));
     await tester.ensureVisible(delete);
+    await tester.pump();
     await tester.tap(delete);
     await tester.pumpAndSettle();
     await tester.tap(
@@ -404,6 +408,7 @@ void main() {
 
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);
+      await tester.pump();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -469,6 +474,7 @@ void main() {
 
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);
+      await tester.pump();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -591,6 +597,7 @@ void main() {
       await tester.pumpAndSettle();
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);
+      await tester.pump();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -669,12 +676,8 @@ ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
       retry: (retryCount, error) => null,
     );
 
-Widget _localizedApp(Widget home) => MaterialApp(
-  locale: const Locale('en'),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
-  supportedLocales: AppLocalizations.supportedLocales,
-  home: home,
-);
+Widget _localizedApp(Widget home) =>
+    OrdinaryPageTestApp(locale: const Locale('en'), home: home);
 
 final class _DeleteTestRevision implements GraphRevision {
   const _DeleteTestRevision();

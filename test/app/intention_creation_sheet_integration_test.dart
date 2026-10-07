@@ -1367,7 +1367,7 @@ Future<void> _select(WidgetTester tester, AppDestination destination) async {
 
 AppDestination _selected(WidgetTester tester) => tester
     .widget<AppNavigationBar>(
-      find.byType(AppNavigationBar, skipOffstage: false),
+      find.byType(AppNavigationBar, skipOffstage: false).first,
     )
     .selected;
 
@@ -1502,10 +1502,10 @@ Future<void> _expectCreatedPage(
     tester.getRect(page),
     Offset.zero & (tester.view.physicalSize / tester.view.devicePixelRatio),
   );
-  expect(find.byType(AppNavigationBar), findsNothing);
+  expect(find.byType(AppNavigationBar), findsOneWidget);
   expect(
     find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
-    findsNothing,
+    findsExactly(3),
   );
   expect(_selected(tester), AppDestination.intentionGraph);
   expect(

@@ -29,6 +29,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/ordinary_page_test_app.dart';
 import 'neighborhood_test_support.dart';
 
 void main() {
@@ -1854,10 +1855,8 @@ Future<void> _pumpDetailsPage(
         ),
       ],
       retry: (retryCount, error) => null,
-      child: MaterialApp(
+      child: OrdinaryPageTestApp(
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
         home: IntentionDetailsPage(intentionId: ownerId),
       ),
     ),

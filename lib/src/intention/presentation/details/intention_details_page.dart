@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
@@ -78,7 +79,7 @@ final class _IntentionDetailsPageState
         unawaited(context.router.maybePop());
       }
     });
-    return Scaffold(
+    return OrdinaryPageScaffold(
       appBar: AppBar(
         title: Text(localizations.detailsTitle),
         actions: [
