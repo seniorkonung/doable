@@ -210,8 +210,9 @@ final class _CreationObserver extends LocalDatabaseConnectionObserver {
             '^\\s*INSERT\\s+INTO\\s+"?$table"?\\s',
             caseSensitive: false,
           ).hasMatch(sql),
-        ))
+        )) {
       return;
+    }
     attempts++;
     await _gate?.future;
   }
