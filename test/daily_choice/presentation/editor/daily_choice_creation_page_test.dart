@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -90,7 +92,7 @@ void main() {
   }
 
   testWidgets(
-    'успех предъявляется после результата команды, затем форма закрывается',
+    'успех предъявляется после результата команды, затем открывается созданный выбор',
     (tester) async {
       final repository = _Repository();
       final navigatorKey = GlobalKey<NavigatorState>();
@@ -106,7 +108,7 @@ void main() {
       repository.succeed(0);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('daily-choice-date')), findsNothing);
-      expect(find.text('Домашний экран'), findsOneWidget);
+      expect(find.text('Подробный просмотр выбора'), findsOneWidget);
       expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
     },
   );
@@ -275,7 +277,7 @@ void main() {
         );
         repository.succeed(1);
         await tester.pumpAndSettle();
-        expect(find.text('Домашний экран'), findsOneWidget);
+        expect(find.text('Подробный просмотр выбора'), findsOneWidget);
         expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
       },
     );
@@ -681,31 +683,36 @@ Future<void> _pump(
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   double textScale = 1,
 }) async {
-  final page = DailyChoiceCreationPage(
-    session: DailyChoiceCreationFlowSession(
-      rootMatchId: const ValueKey('choice-path-root'),
-      originalHistory: const [],
-    ),
-    path: ConfirmedChoicePath([
-      ConfirmedChoicePathStep(
-        relationId: _relation(1),
-        sourceIntentionId: _intention(1),
-        relatedIntentionId: _intention(2),
-        type: LongTermRelationType.need,
+  final router = RootStackRouter.build(
+    navigatorKey: navigatorKey,
+    routes: [
+      NamedRouteDef(
+        name: 'HomeRoute',
+        initial: true,
+        builder: (_, _) => const Scaffold(body: Text('Домашний экран')),
       ),
-    ]),
-    steps: [DailyChoiceCreationStep.fromSummary(_step())],
-    initialDate: CalendarDate.fromParts(2026, 9, 24),
-    direction: direction,
+      NamedRouteDef(
+        name: ChoicePathRoute.name,
+        builder: (_, _) => const Scaffold(body: Text('Домашний экран')),
+      ),
+      AutoRoute(page: DailyChoiceCreationRoute.page),
+      NamedRouteDef(
+        name: DailyChoiceDetailsRoute.name,
+        builder: (_, _) =>
+            const Scaffold(body: Text('Подробный просмотр выбора')),
+      ),
+    ],
   );
+  addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        navigatorObservers: [?navigatorObserver],
+      child: MaterialApp.router(
+        routerConfig: router.config(
+          navigatorObservers: () => [?navigatorObserver],
+        ),
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -714,18 +721,40 @@ Future<void> _pump(
               .copyWith(textScaler: TextScaler.linear(textScale)),
           child: GraphOperationPresenter(child: child!),
         ),
-        home: navigatorKey == null
-            ? page
-            : const Scaffold(body: Text('Домашний экран')),
       ),
     ),
   );
-  if (navigatorKey != null) {
-    navigatorKey.currentState!.push(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
-    await tester.pumpAndSettle();
-  }
+  await tester.pumpAndSettle();
+  final history = router.stackData.map((route) => route.matchId).toList();
+  unawaited(
+    router.push(
+      ChoicePathRoute(sourceIntentionId: _intention(1), direction: direction),
+    ),
+  );
+  await tester.pumpAndSettle();
+  final session = DailyChoiceCreationFlowSession(
+    rootMatchId: router.stackData.last.matchId,
+    originalHistory: history,
+  );
+  unawaited(
+    router.push(
+      DailyChoiceCreationRoute(
+        session: session,
+        path: ConfirmedChoicePath([
+          ConfirmedChoicePathStep(
+            relationId: _relation(1),
+            sourceIntentionId: _intention(1),
+            relatedIntentionId: _intention(2),
+            type: LongTermRelationType.need,
+          ),
+        ]),
+        steps: [DailyChoiceCreationStep.fromSummary(_step())],
+        initialDate: CalendarDate.fromParts(2026, 9, 24),
+        direction: direction,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 final class _Repository

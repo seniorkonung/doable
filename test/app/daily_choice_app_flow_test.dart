@@ -5,6 +5,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -88,10 +89,7 @@ Future<void> _createFromPath(WidgetTester tester) async {
   );
   await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
   await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-  await _until(
-    tester,
-    find.byKey(const ValueKey('choice-path-creation-status')),
-  );
+  await _until(tester, find.byType(DailyChoiceDetailsPage));
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
@@ -362,10 +360,7 @@ void main() {
       );
       expect(_savedIds(harness), isEmpty);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('choice-path-creation-status')),
-      );
+      await _until(tester, find.byType(DailyChoiceDetailsPage));
       final saved = await _read(repository, _savedIds(harness).single);
       expect(saved.choice.date, CalendarDate.fromParts(2028, 2, 3));
       expect(saved.choice.description?.value, '  Подтверждённый текст  ');
@@ -666,10 +661,8 @@ void main() {
           find.byKey(const ValueKey('daily-choice-completed')),
         );
         await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-        await _until(
-          tester,
-          find.byKey(const ValueKey('choice-path-creation-status')),
-        );
+        await _until(tester, find.byType(DailyChoiceDetailsPage));
+        await tester.pumpAndSettle();
       }
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));

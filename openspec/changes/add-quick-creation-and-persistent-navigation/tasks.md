@@ -261,7 +261,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; производная генерация ViewModel.
   - **Estimated scope:** M — одна граница жизненного цикла принятой операции, до 5 рукописных файлов.
 
-- [ ] 2.6 Открывать созданный дневной выбор с безопасным выходом при частичном отказе перехода
+- [x] 2.6 Открывать созданный дневной выбор с безопасным выходом при частичном отказе перехода
   - **Acceptance criteria:**
     - Операция завершения получает сессию, matchId подтверждения и DailyChoiceId; удерживает Saved независимо от удаления виджетов и один раз удаляет только собственные страницы до конкретного корня, затем заменяет его подробным просмотром. Перед каждой мутацией и после асинхронной границы проверяются экземпляры маршрутов и исходная история; поиск только по имени недопустим.
     - По требованию «Открытие созданной сущности» [спецификации навигации](specs/app-navigation/spec.md) отказы до удаления подтверждения, после его удаления и после удаления корня сохраняют одну запись, исходную историю и доступный выход. Адаптер согласует отображение с фактическим стеком без новых удалений или восстановления формы; Future от replace не считается свидетельством установки результата.

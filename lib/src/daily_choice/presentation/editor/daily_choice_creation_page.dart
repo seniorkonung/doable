@@ -15,6 +15,7 @@ import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
 import '../daily_choice_creation_flow_session.dart';
+import '../daily_choice_creation_completion.dart';
 import '../daily_choice_command_failure_message.dart';
 import '../path/choice_path_page.dart';
 import '../path/choice_path_view_model.dart';
@@ -176,13 +177,17 @@ final class DailyChoiceCreationPageState
     final model = ref.read(provider.notifier);
     final canEdit = widget.session.canContinue;
     ref.listen(provider, (previous, next) {
-      if (next.event case DailyChoiceCreationCreated()) {
+      if (next.event case DailyChoiceCreationCreated(:final choiceId)) {
         model.consumeEvent();
         if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
-        // Успех после commit предъявляет общая оболочка, включая уход с экрана.
-        if (Navigator.of(context).canPop()) {
-          unawaited(Navigator.of(context).maybePop());
-        }
+        unawaited(
+          completeDailyChoiceCreation(
+            router: context.router.root,
+            session: widget.session,
+            confirmationMatchId: routeMatchId,
+            choiceId: choiceId,
+          ),
+        );
       } else if (next.operation is DailyChoiceCreationFailed &&
           previous?.operation != next.operation) {
         _revealFailure();

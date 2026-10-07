@@ -103,34 +103,31 @@ Future<void> _save(WidgetTester tester, {bool doubleTap = false}) async {
   if (doubleTap) await tester.tap(submit);
   await tester.pump();
   await _waitFor(tester, find.textContaining('Дневной выбор создан'));
-  await _waitFor(
-    tester,
-    find.byKey(const ValueKey('choice-path-creation-status')),
-  );
+  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
   await tester.pumpAndSettle();
-  await _waitFor(
-    tester,
-    find.byKey(const ValueKey('choice-path-creation-status')),
-  );
+  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
 }
 
-Future<void> _restartPath(WidgetTester tester, List<int> relations) async {
-  final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
-  final session = tester
-      .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-      .creationSession!;
+Future<void> _restartPath(
+  WidgetTester tester,
+  List<int> relations, {
+  ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
+}) async {
   final router =
       (await (tester.widget<MainApp>(find.byType(MainApp)).runtime.bootstrap())
               as AppRuntimeReady)
           .container
           .read(appRouterProvider);
+  expect(router.stackData.last.name, DailyChoiceDetailsRoute.name);
   await tester.binding.handlePopRoute();
   await tester.pumpAndSettle();
   unawaited(
     router.push(
       ChoicePathRoute(
-        sourceIntentionId: page.sourceIntentionId,
-        direction: page.direction,
+        sourceIntentionId: _intention(
+          direction == ChoicePathDraftDirection.topDown ? 1 : 3,
+        ),
+        direction: direction,
       ),
     ),
   );
@@ -139,8 +136,9 @@ Future<void> _restartPath(WidgetTester tester, List<int> relations) async {
   expect(
     tester
         .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-        .creationSession,
-    isNot(same(session)),
+        .creationSession!
+        .canContinue,
+    isTrue,
   );
   for (final relation in relations) {
     await _continue(tester, relation);
@@ -644,7 +642,10 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _restartPath(tester, [102, 101]);
+      await _restartPath(tester, [
+        102,
+        101,
+      ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -660,10 +661,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-creation-status')),
-      );
+      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));
       expect(ids.toSet(), hasLength(2));
@@ -676,7 +674,9 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _restartPath(tester, [102]);
+      await _restartPath(tester, [
+        102,
+      ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -712,10 +712,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-creation-status')),
-      );
+      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       await tester.pumpAndSettle();
       final oneStepId = _savedIds(harness).last;
       final oneStep = await _read(repository, oneStepId);
@@ -726,7 +723,9 @@ void main() {
       expect(oneStep.choice.isCompleted, isTrue);
       expect(oneStep.path.map((step) => step.relation.id), [_relation(102)]);
 
-      await _restartPath(tester, [102]);
+      await _restartPath(tester, [
+        102,
+      ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -746,10 +745,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-creation-status')),
-      );
+      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       final allIds = _savedIds(harness);
       expect(allIds, hasLength(4));
       expect(allIds.toSet(), hasLength(4));
@@ -768,6 +764,7 @@ void main() {
       expect(duplicate.path.map((step) => step.relation.id), [_relation(102)]);
       expect((await _read(repository, oneStepId)).path, hasLength(1));
 
+      await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-1')));
