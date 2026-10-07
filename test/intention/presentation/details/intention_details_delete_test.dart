@@ -209,8 +209,9 @@ void main() {
           },
         );
 
-        final details = container.read(provider.notifier)..delete();
-        details.delete();
+        final details = container.read(provider.notifier);
+        final deletion = details.delete();
+        expect(await details.delete(), isFalse);
         expect(repository.commands, hasLength(1));
         expect(repository.commands.single, isA<DeleteIntention>());
         expect(
@@ -236,6 +237,7 @@ void main() {
         final (failureFor, canRetry) = scenarios[index];
         repository.completeCommand(0, ResultFailure(failureFor(intention.id)));
         await pumpEventQueue();
+        expect(await deletion, isFalse);
 
         expect(
           container.read(provider),

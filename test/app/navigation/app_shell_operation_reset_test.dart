@@ -24,6 +24,8 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -66,6 +68,94 @@ void main() {
     final resetKind = destination == AppDestination.intentionGraph
         ? 'текущему'
         : 'другому';
+    testWidgets('позднее удаление намерения после сброса к $resetKind пункту '
+        'сохраняет повторно открытую страницу того же намерения', (
+      tester,
+    ) async {
+      final app = await _ControlledApp.start(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(IntentionCatalogPage)),
+      );
+      final catalogProvider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final catalogBefore = container.read(catalogProvider).value!;
+      await app.openDetails(tester);
+      final previousPage = tester.state(find.byType(IntentionDetailsPage));
+      final previousRouteId = app.router.stackData.last.matchId;
+      await app.delete(tester);
+
+      await _select(tester, destination, settle: false);
+      unawaited(
+        app.router.push(IntentionDetailsRoute(intentionId: app.intention.id)),
+      );
+      await tester.pump();
+      await tester.pump();
+      final newPage = tester
+          .stateList(find.byType(IntentionDetailsPage))
+          .singleWhere((page) => !identical(page, previousPage));
+      final newRouteId = app.router.stackData.last.matchId;
+      expect(newPage, isNot(same(previousPage)));
+      expect(newRouteId, isNot(previousRouteId));
+      expect(previousPage.mounted, isTrue);
+      expect(
+        app.router.stackData.any((route) => route.matchId == previousRouteId),
+        isFalse,
+      );
+      expect(app.coordinator.isRunning(app.intention.id), isTrue);
+
+      app.complete(
+        testDetailsDeletedResult(
+          app.intention,
+          revision: const TestDetailsRevision(1),
+        ),
+      );
+      await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+      expect(previousPage.mounted, isTrue);
+      expect(app.router.stackData.last.matchId, newRouteId);
+      expect(newPage.mounted, isTrue);
+      expect(
+        container.read(intentionDetailsViewModelProvider(app.intention.id)),
+        isA<IntentionDetailsDeleted>(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.state(find.byType(IntentionDetailsPage)), same(newPage));
+      expect(app.router.stackData.last.matchId, newRouteId);
+      expect(app.router.stack.map((page) => page.name), [
+        AppShellRoute.name,
+        IntentionDetailsRoute.name,
+      ]);
+      expect(previousPage.mounted, isFalse);
+      final l10n = AppLocalizations.of(newPage.context);
+      expect(find.text(l10n.detailsNotFound), findsOneWidget);
+      expect(find.text(app.intention.title), findsNothing);
+      expect(
+        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+        destination,
+      );
+      final catalogAfter = container.read(catalogProvider).value!;
+      expect(catalogAfter.selection, same(catalogBefore.selection));
+      expect(
+        catalogAfter,
+        isA<IntentionCatalogConfirmedState>()
+            .having((state) => state.totalCount, 'число намерений', 0)
+            .having(
+              (state) => state.revision.compareTo(const TestDetailsRevision(1)),
+              'ревизия каталога',
+              GraphRevisionOrder.same,
+            ),
+      );
+      expect(find.text(_deleteSuccess), findsOneWidget);
+      await _expireMessages(tester);
+      expect(app.router.stackData.last.matchId, newRouteId);
+      expect(app.repository.commands.single, isA<DeleteIntention>());
+      expect(app.repository.catalogQueries, hasLength(1));
+      unawaited(app.router.maybePop());
+      await tester.pumpAndSettle();
+      _expectRoot(tester, app.router, destination);
+    });
+
     testWidgets('позднее удаление связи после сброса к $resetKind пункту '
         'сохраняет новую форму и её ввод до освобождения прежней страницы', (
       tester,
@@ -357,6 +447,48 @@ void main() {
     expect(find.text(_deleteSuccess), findsOneWidget);
     await _expireMessages(tester);
     expect(app.repository.commands.single, isA<DeleteIntention>());
+  });
+
+  testWidgets('успешный повтор удаления после отказа закрывает только '
+      'принявшую повтор страницу', (tester) async {
+    final app = await _ControlledApp.start(tester);
+    await tester.tap(find.byTooltip('Теги'));
+    await tester.pumpAndSettle();
+    final catalogRouteId = app.router.stackData.last.matchId;
+    await app.openDetails(tester);
+    final detailsRouteId = app.router.stackData.last.matchId;
+    await app.delete(tester);
+    app.complete(const ResultFailure(IntentionUnavailableFailure()));
+    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+    await tester.pumpAndSettle();
+    expect(app.router.stackData.last.matchId, detailsRouteId);
+
+    final retry = find.byKey(
+      const ValueKey('intention-details-state-change-retry'),
+    );
+    await tester.ensureVisible(retry);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 100));
+    await tester.pumpAndSettle();
+    await tester.tap(retry);
+    await tester.pump();
+    expect(app.repository.commands, hasLength(2));
+    expect(app.repository.commands.last, isA<DeleteIntention>());
+    app.complete(
+      testDetailsDeletedResult(
+        app.intention,
+        revision: const TestDetailsRevision(1),
+      ),
+    );
+    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+    await tester.pumpAndSettle();
+
+    expect(app.router.stackData.last.matchId, catalogRouteId);
+    expect(
+      find.byType(IntentionDetailsPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(find.text(_deleteSuccess), findsOneWidget);
+    await _expireMessages(tester);
   });
 
   testWidgets('сброс сохраняет принятое архивирование и предъявляет поздний '

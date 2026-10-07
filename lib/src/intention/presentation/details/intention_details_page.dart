@@ -63,6 +63,25 @@ final class _IntentionDetailsPageState
     });
   }
 
+  Future<void> _delete() async {
+    if (!mounted) return;
+    final intentionId = widget.intentionId;
+    final deleted = await ref
+        .read(intentionDetailsViewModelProvider(intentionId).notifier)
+        .delete();
+    // Результат принадлежит принявшему удаление экземпляру страницы.
+    // После ожидания сброшенный маршрут уже не вправе менять историю,
+    // даже если обратная анимация ещё удерживает его виджет.
+    // ModalRoute.of подписывает страницу на изменения маршрута,
+    // поэтому обращаемся к нему только перед успешным закрытием.
+    if (deleted &&
+        mounted &&
+        widget.intentionId == intentionId &&
+        (ModalRoute.of(context)?.isCurrent ?? false)) {
+      context.router.pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final intentionId = widget.intentionId;
@@ -73,17 +92,6 @@ final class _IntentionDetailsPageState
     // соседства; сам sliver переиспользует это состояние после загрузки
     // подробных данных намерения.
     ref.watch(relationNeighborhoodViewModelProvider(intentionId));
-    ref.listen(provider, (previous, next) {
-      // Сообщения об успехе предъявляет общий presenter оболочки.
-      // Сброшенный маршрут теряет право закрывать страницы до dispose,
-      // даже пока обратная анимация удерживает этот виджет в дереве.
-      // isCurrent проверяет конкретный маршрут и его присутствие в истории:
-      // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
-      if (next is IntentionDetailsDeleted &&
-          (ModalRoute.of(context)?.isCurrent ?? false)) {
-        unawaited(context.router.maybePop());
-      }
-    });
     return OrdinaryPageScaffold(
       appBar: AppBar(
         title: Text(localizations.detailsTitle),
@@ -124,6 +132,7 @@ final class _IntentionDetailsPageState
                 selectionMode: _selectionMode,
                 neighborhoodKey: _neighborhoodKey,
                 onShowBlockingRelations: _showBlockingRelations,
+                onDelete: _delete,
               ),
             ),
           ],
@@ -328,6 +337,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.selectionMode,
     required this.neighborhoodKey,
     required this.onShowBlockingRelations,
+    required this.onDelete,
   });
 
   final IntentionId intentionId;
@@ -335,6 +345,7 @@ final class _DetailsContent extends ConsumerWidget {
   final bool selectionMode;
   final GlobalKey neighborhoodKey;
   final VoidCallback onShowBlockingRelations;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -375,12 +386,18 @@ final class _DetailsContent extends ConsumerWidget {
         onRestore: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .restore,
-        onDelete: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .delete,
-        onRetryStateChange: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .retryStateChange,
+        onDelete: onDelete,
+        onRetryStateChange: () {
+          final provider = intentionDetailsViewModelProvider(intentionId);
+          final current = ref.read(provider);
+          if (current is IntentionDetailsLoaded &&
+              current.stateChange?.kind ==
+                  IntentionDetailsStateChangeKind.delete) {
+            if (current.stateChange!.canRetry) onDelete();
+          } else {
+            ref.read(provider.notifier).retryStateChange();
+          }
+        },
         onShowBlockingRelations: onShowBlockingRelations,
         onShowArchivedRelations: ref
             .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
