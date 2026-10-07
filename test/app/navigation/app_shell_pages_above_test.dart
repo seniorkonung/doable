@@ -127,8 +127,8 @@ void main() {
     }
   });
 
-  testWidgets('с Главной страница намерения сохраняет панель, просмотр связи '
-      'закрывает её, а закрытие обеих возвращает на Главную', (tester) async {
+  testWidgets('страницы намерения и связи сохраняют панель, а закрытие обеих '
+      'возвращает на Главную', (tester) async {
     final router = await _start(tester);
     _expectRootPage(tester, router, AppDestination.home);
 
@@ -146,6 +146,15 @@ void main() {
       _relationId,
     );
 
+    await _open(
+      tester,
+      find.byKey(const ValueKey('relation-details-related-participant')),
+      IntentionDetailsPage,
+    );
+    _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+    await _close(tester, IntentionDetailsPage);
+    _expectAboveShell(tester, RelationDetailsPage, AppDestination.home);
+
     // «Назад» закрывает только верхнюю страницу и не меняет выбранный пункт.
     await _close(tester, RelationDetailsPage);
     _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
@@ -153,6 +162,63 @@ void main() {
     _expectRootPage(tester, router, AppDestination.home);
     expect(tester.takeException(), isNull);
   });
+
+  for (final page in [RelationDetailsPage, DailyChoiceDetailsPage]) {
+    for (final destination in AppDestination.values) {
+      testWidgets('$page над формой связи сбрасывает всю историю выбором '
+          'пункта ${destination.index + 1}', (tester) async {
+        const origin = AppDestination.intentionGraph;
+        final router = await _start(tester);
+        await _select(tester, origin);
+        await _open(
+          tester,
+          _summary(IntentionCatalogPage, 'Читать'),
+          IntentionDetailsPage,
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+          RelationEditorPage,
+        );
+        _expectAboveShell(tester, RelationEditorPage, origin);
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-editor-open-source-details')),
+          IntentionDetailsPage,
+        );
+        if (page == DailyChoiceDetailsPage) {
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('relation-neighborhood-daily-source')),
+          );
+          await _open(
+            tester,
+            find.byKey(
+              ValueKey(
+                'relation-neighborhood-daily-row-${tagFixtureId(_choice)}',
+              ),
+            ),
+            page,
+          );
+        } else {
+          await _open(tester, _relationRow, page);
+        }
+        _expectAboveShell(tester, page, origin);
+
+        await _select(tester, destination);
+
+        _expectRootPage(tester, router, destination);
+        expect(router.stack.map((route) => route.name), [AppShellRoute.name]);
+        expect(
+          find.byType(RelationEditorPage, skipOffstage: false),
+          findsNothing,
+        );
+        expect(find.byType(page, skipOffstage: false), findsNothing);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('поиск действия из каталога дневных выборов занимает весь '
       'экран без панели, а его закрытие возвращает в каталог дневных '
@@ -401,6 +467,7 @@ void main() {
 
     // Подробный просмотр связи и форма её изменения.
     await _open(tester, _relationRow, RelationDetailsPage);
+    _expectAboveShell(tester, RelationDetailsPage, graph);
     await _open(
       tester,
       find.byKey(const ValueKey('relation-details-edit-relation')),
@@ -408,6 +475,7 @@ void main() {
     );
     _expectAboveShell(tester, RelationEditorPage, graph);
     await _close(tester, RelationEditorPage);
+    _expectAboveShell(tester, RelationDetailsPage, graph);
     await _close(tester, RelationDetailsPage);
 
     // Выбор пути от намерения.
@@ -424,9 +492,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('страницы, открытые из каталога дневных выборов, занимают весь '
-      'экран без панели, а их закрытие сохраняет выбранный день и календарь '
-      'каталога', (tester) async {
+  testWidgets('просмотр дневного выбора сохраняет панель, задачи скрывают её, '
+      'а возврат сохраняет выбранный день и календарь каталога', (
+    tester,
+  ) async {
     const daily = AppDestination.dailyChoices;
     final router = await _start(tester);
     await _select(tester, daily);
@@ -463,6 +532,7 @@ void main() {
     );
     _expectAboveShell(tester, DailyChoiceEditPage, daily);
     await _close(tester, DailyChoiceEditPage);
+    _expectAboveShell(tester, DailyChoiceDetailsPage, daily);
 
     // Замена пути: поиск действия, поиск исходного намерения, выбор пути и
     // подтверждение замены.
@@ -601,6 +671,12 @@ void main() {
       _intentionId(_run),
     );
 
+    await _close(tester, IntentionDetailsPage);
+    _expectAboveShell(tester, RelationDetailsPage, home);
+    await _close(tester, RelationDetailsPage);
+    _expectAboveShell(tester, DailyChoiceDetailsPage, home);
+    await _close(tester, DailyChoiceDetailsPage);
+    _expectAboveShell(tester, IntentionDetailsPage, home);
     await _closeAll(tester);
     _expectRootPage(tester, router, home);
     expect(tester.takeException(), isNull);
@@ -694,14 +770,17 @@ void _expectRootPage(
   expect(_announcedDestinations, findsExactly(3));
 }
 
-/// Страница намерения сохраняет панель над оболочкой; остальные проверяемые
-/// здесь страницы пока закрывают её. Все панели сохраняют пункт [under].
+/// Подключённые обычные страницы сохраняют панель над оболочкой.
+/// Все панели сохраняют пункт [under].
 void _expectAboveShell(WidgetTester tester, Type page, AppDestination under) {
   final top = find.byType(page);
   expect(top, findsOneWidget, reason: '$page');
   expect(tester.getRect(top), Offset.zero & _screen(tester), reason: '$page');
 
-  final ordinary = page == IntentionDetailsPage;
+  final ordinary =
+      page == IntentionDetailsPage ||
+      page == RelationDetailsPage ||
+      page == DailyChoiceDetailsPage;
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,

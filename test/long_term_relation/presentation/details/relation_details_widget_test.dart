@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../neighborhood/neighborhood_test_support.dart';
+import '../../../support/ordinary_page_test_app.dart';
 import 'relation_details_test_support.dart';
 
 void main() {
@@ -991,10 +992,8 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
+        child: OrdinaryPageTestApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
               body: FilledButton(
@@ -1014,6 +1013,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('open-relation-details')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -1081,10 +1081,8 @@ Future<ProviderContainer> _pumpRelationDetails(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
+      child: OrdinaryPageTestApp(
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => MediaQuery(
             data: MediaQuery.of(context).copyWith(textScaler: textScaler),
