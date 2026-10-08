@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:doable/src/app/quick_creation/file_quick_creation_mode_store.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode_controller.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'controlled_mode_io.dart';
@@ -150,14 +152,31 @@ void main() {
 
             await io.run(() async {
               final adapter = store();
-              final savingFirst = adapter.save(firstMode);
-              final savingSecond = adapter.save(secondMode);
+              final container = _container(
+                adapter,
+                initialMode: await adapter.read(),
+              );
+              final controller = container.read(
+                quickCreationModeControllerProvider.notifier,
+              );
+              final observedModes = <QuickCreationMode>[];
+              container.listen(
+                quickCreationModeControllerProvider,
+                (_, next) => observedModes.add(next),
+              );
+              final savingFirst = controller.select(firstMode);
+              expect(
+                container.read(quickCreationModeControllerProvider),
+                firstMode,
+              );
+              await _waitUntilHeld(first, savingFirst);
+              final savingSecond = controller.select(secondMode);
+              expect(
+                container.read(quickCreationModeControllerProvider),
+                secondMode,
+              );
               var secondFinished = false;
               unawaited(savingSecond.then((_) => secondFinished = true));
-              await first.started.future;
-              await Future<void>(() {});
-              expect(io.startedAttempts, [first]);
-              await _waitUntilHeld(first, savingFirst);
               await Future<void>(() {});
 
               expect(io.startedAttempts, [first]);
@@ -170,6 +189,10 @@ void main() {
               first.release.complete();
               _expectOutcome(await savingFirst, failed: failFirst);
               await _waitUntilHeld(second, savingSecond);
+              expect(
+                container.read(quickCreationModeControllerProvider),
+                secondMode,
+              );
               final afterFirst = failFirst ? initial : firstMode;
               expect(await store().read(), afterFirst);
               expect(secondFinished, isFalse);
@@ -177,6 +200,11 @@ void main() {
 
               second.release.complete();
               _expectOutcome(await savingSecond, failed: failSecond);
+              expect(
+                container.read(quickCreationModeControllerProvider),
+                secondMode,
+              );
+              expect(observedModes, [firstMode, secondMode]);
               expect(
                 await store().read(),
                 failSecond ? afterFirst : secondMode,
@@ -207,8 +235,12 @@ void main() {
               if (failFirst && failSecond) {
                 io.plan.add(ModeWriteAttempt());
                 expect(
-                  await adapter.save(QuickCreationMode.intention),
+                  await controller.select(QuickCreationMode.intention),
                   isA<QuickCreationModeSaved>(),
+                );
+                expect(
+                  container.read(quickCreationModeControllerProvider),
+                  QuickCreationMode.intention,
                 );
                 expect(await store().read(), QuickCreationMode.intention);
                 expect(io.startedAttempts, hasLength(3));
@@ -236,7 +268,20 @@ void main() {
 
     await io.run(() async {
       final adapter = store();
-      final savings = modes.map(adapter.save).toList();
+      final container = _container(adapter);
+      final controller = container.read(
+        quickCreationModeControllerProvider.notifier,
+      );
+      final observedModes = <QuickCreationMode>[];
+      container.listen(
+        quickCreationModeControllerProvider,
+        (_, next) => observedModes.add(next),
+      );
+      final savings = modes.map((mode) {
+        final saving = controller.select(mode);
+        expect(container.read(quickCreationModeControllerProvider), mode);
+        return saving;
+      }).toList();
       for (var index = 0; index < attempts.length; index++) {
         final attempt = attempts[index];
         await _waitUntilHeld(attempt, savings[index]);
@@ -248,6 +293,8 @@ void main() {
         );
         attempt.release.complete();
         expect(await savings[index], isA<QuickCreationModeSaved>());
+        expect(container.read(quickCreationModeControllerProvider), modes.last);
+        expect(observedModes, modes);
       }
       expect(io.committedKeys, modes.map((mode) => mode.storageKey).toList());
       expect(
@@ -271,17 +318,29 @@ void main() {
       final io = ControlledModeIo(modeFile, [first, second]);
       await io.run(() async {
         final adapter = store();
-        final savingFirst = adapter.save(QuickCreationMode.relation);
-        final savingSecond = adapter.save(
+        final container = _container(adapter);
+        final controller = container.read(
+          quickCreationModeControllerProvider.notifier,
+        );
+        final savingFirst = controller.select(QuickCreationMode.relation);
+        final savingSecond = controller.select(
           QuickCreationMode.dailyChoiceFromAction,
         );
         await _waitUntilHeld(first, savingFirst);
+        expect(
+          container.read(quickCreationModeControllerProvider),
+          QuickCreationMode.dailyChoiceFromAction,
+        );
         expect(io.startedAttempts, [first]);
         expect(await store().read(), QuickCreationMode.intention);
 
         first.release.complete();
         _expectOutcome(await savingFirst, failed: true);
         expect(await savingSecond, isA<QuickCreationModeSaved>());
+        expect(
+          container.read(quickCreationModeControllerProvider),
+          QuickCreationMode.dailyChoiceFromAction,
+        );
         expect(await store().read(), QuickCreationMode.dailyChoiceFromAction);
         _expectFailures(diagnostics, QuickCreationModeDiagnosticsStage.write, [
           DiagnosticsFailureCode.unavailable,
@@ -297,18 +356,31 @@ void main() {
         final first = ModeWriteAttempt(holdAt: step, failAt: step);
         final second = ModeWriteAttempt();
         final io = ControlledModeIo(modeFile, [first, second]);
+        diagnostics.throwsOnRecord = true;
         await io.run(() async {
           final adapter = store();
-          final savingFirst = adapter.save(QuickCreationMode.relation);
-          final savingSecond = adapter.save(
+          final container = _container(adapter);
+          final controller = container.read(
+            quickCreationModeControllerProvider.notifier,
+          );
+          final savingFirst = controller.select(QuickCreationMode.relation);
+          final savingSecond = controller.select(
             QuickCreationMode.dailyChoiceFromAction,
           );
           await _waitUntilHeld(first, savingFirst);
+          expect(
+            container.read(quickCreationModeControllerProvider),
+            QuickCreationMode.dailyChoiceFromAction,
+          );
           expect(io.startedAttempts, [first]);
           expect(await store().read(), QuickCreationMode.intention);
           first.release.complete();
           _expectOutcome(await savingFirst, failed: true);
           expect(await savingSecond, isA<QuickCreationModeSaved>());
+          expect(
+            container.read(quickCreationModeControllerProvider),
+            QuickCreationMode.dailyChoiceFromAction,
+          );
           expect(await store().read(), QuickCreationMode.dailyChoiceFromAction);
           if (step == ModeWriteStep.prepare) {
             expect(first.temporaryPath, isNull);
@@ -325,6 +397,22 @@ void main() {
       },
     );
   }
+}
+
+ProviderContainer _container(
+  QuickCreationModeStore store, {
+  QuickCreationMode initialMode = QuickCreationMode.intention,
+}) {
+  final container = ProviderContainer(
+    overrides: [
+      quickCreationModeControllerProvider.overrideWith(
+        () =>
+            QuickCreationModeController(initialMode: initialMode, store: store),
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+  return container;
 }
 
 Future<void> _waitUntilHeld(
