@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_launcher.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
@@ -21,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 void main() {
   _defineLatePickerTests();
@@ -72,28 +75,32 @@ void main() {
       },
     );
   }
-  testWidgets('каталог запускает начальное создание от действия с отменой', (
-    tester,
-  ) async {
-    final router = await _openApp(tester);
-    final history = router.stackData.map((route) => route.matchId).toList();
-    final button = find.byKey(
-      const ValueKey('daily-choice-create-from-action'),
-    );
-    await tester.tap(button);
-    await tester.tap(button);
-    await tester.pumpAndSettle();
-    expect(router.stackData, hasLength(history.length + 1));
-    expect(router.current.name, DailyChoiceActionPickerRoute.name);
-    expect(
-      router.current.argsAs<DailyChoiceActionPickerRouteArgs>().pickerContext,
-      isA<InitialDailyChoicePickerContext>(),
-    );
-    await tester.tap(find.text('Отменить создание'));
-    await tester.pumpAndSettle();
-    expect(router.stackData.map((route) => route.matchId), history);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'общая панель запускает начальное создание от действия с отменой',
+    (tester) async {
+      final router = await _openApp(tester);
+      final history = router.stackData.map((route) => route.matchId).toList();
+      await openQuickCreation(
+        tester,
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        activate: (tester, button) async {
+          await tester.tap(button);
+          await tester.tap(button);
+        },
+      );
+      expect(router.stackData, hasLength(history.length + 1));
+      expect(router.current.name, DailyChoiceActionPickerRoute.name);
+      expect(
+        router.current.argsAs<DailyChoiceActionPickerRouteArgs>().pickerContext,
+        isA<InitialDailyChoicePickerContext>(),
+      );
+      await tester.tap(find.text('Отменить создание'));
+      await tester.pumpAndSettle();
+      expect(router.stackData.map((route) => route.matchId), history);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final direction in ChoicePathDraftDirection.values) {
     for (final closeIcon in [false, true]) {

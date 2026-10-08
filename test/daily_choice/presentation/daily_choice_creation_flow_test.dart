@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
@@ -32,6 +34,7 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 part 'daily_choice_creation_route_scenarios.dart';
 
@@ -122,25 +125,35 @@ Future<void> _restartPath(
   expect(router.stackData.last.name, DailyChoiceDetailsRoute.name);
   await tester.binding.handlePopRoute();
   await tester.pumpAndSettle();
-  unawaited(
-    router.push(
-      ChoicePathRoute(
-        sourceIntentionId: _intention(
-          direction == ChoicePathDraftDirection.topDown ? 1 : 3,
-        ),
-        direction: direction,
-      ),
-    ),
-  );
+  final history = [for (final route in router.stackData) route.matchId];
+  switch (direction) {
+    case ChoicePathDraftDirection.topDown:
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('intention-details-choose-path')),
+      );
+    case ChoicePathDraftDirection.bottomUp:
+      await openQuickCreation(
+        tester,
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: _waitFor,
+      );
+      await _tap(tester, find.text('Продолжение действия'));
+  }
   await _waitFor(tester, find.byType(ChoicePathPage));
   await tester.pumpAndSettle();
+  final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
+  expect(page.direction, direction);
   expect(
-    tester
-        .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-        .creationSession!
-        .canContinue,
-    isTrue,
+    page.sourceIntentionId,
+    _intention(direction == ChoicePathDraftDirection.topDown ? 1 : 3),
   );
+  final session = tester
+      .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+      .creationSession!;
+  expect(session.originalHistory, history);
+  expect(session.canContinue, isTrue);
   for (final relation in relations) {
     await _continue(tester, relation);
   }
@@ -306,9 +319,11 @@ void main() {
         if (bottomUp) {
           await openDailyChoices(tester, tap: _tap);
           await tester.pumpAndSettle();
-          await _tap(
+          await openQuickCreation(
             tester,
-            find.byKey(const ValueKey('daily-choice-create-from-action')),
+            QuickCreationMode.dailyChoiceFromAction,
+            openedPage: find.byType(DailyChoiceActionPickerPage),
+            wait: _waitFor,
           );
           await tester.pumpAndSettle();
           await _tap(tester, find.text('Продолжение действия'));
@@ -552,9 +567,11 @@ void main() {
 
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
-      await _tap(
+      await openQuickCreation(
         tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: _waitFor,
       );
       await tester.pumpAndSettle();
       await _tap(tester, find.text('Продолжение действия'));
@@ -815,9 +832,11 @@ void main() {
 
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
-      await _tap(
+      await openQuickCreation(
         tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: _waitFor,
       );
       await tester.pumpAndSettle();
       await _tap(tester, find.text('Продолжение действия'));

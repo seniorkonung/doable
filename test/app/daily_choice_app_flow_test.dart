@@ -1,10 +1,12 @@
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -28,6 +30,7 @@ import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 /// Дата дневных выборов, которые сценарии создают через форму. Она же —
 /// локальное сегодня каталога: каталог открывается на дне этих записей.
@@ -633,9 +636,11 @@ void main() {
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
         }
-        await _tap(
+        await openQuickCreation(
           tester,
-          find.byKey(const ValueKey('daily-choice-create-from-action')),
+          QuickCreationMode.dailyChoiceFromAction,
+          openedPage: find.byType(DailyChoiceActionPickerPage),
+          wait: _until,
         );
         await _tap(tester, find.text('Намерение 3'));
         await _tap(

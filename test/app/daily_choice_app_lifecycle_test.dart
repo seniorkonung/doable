@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
@@ -10,6 +11,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
@@ -53,6 +55,7 @@ import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 /// Локальное сегодня запуска, в котором человек настраивает календарь.
 final _firstToday = CalendarDate.fromParts(2026, 10, 4);
@@ -379,9 +382,12 @@ void main() {
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
       await openDailyChoices(tester, tap: _tap);
-      await _tap(
+      await openQuickCreation(
         tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
       );
       await _tap(tester, find.text('Намерение 3'));
       await _tap(
@@ -780,9 +786,12 @@ void main() {
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
       await openDailyChoices(tester, tap: _tap);
-      await _tap(
+      await openQuickCreation(
         tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
       );
       await _tap(tester, find.text('Намерение 3'));
       await _tap(
