@@ -7,6 +7,7 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -41,6 +42,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -672,10 +674,11 @@ void main() {
           expect(router.stackData, [same(shell)]);
 
           await _closeOperationMessage(tester);
-          await tester.tap(
-            find.byKey(const ValueKey('catalog-create-intention')),
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
           );
-          await tester.pumpAndSettle();
           await tester.enterText(find.byKey(_title), 'Следующий черновик');
           final nextForm = router.stackData.last;
           lateClose();
@@ -787,10 +790,11 @@ void main() {
         if (openNewForm) {
           await tester.pumpAndSettle();
           await returnToIntentionGraphAfterCreation(tester, router);
-          await tester.tap(
-            find.byKey(const ValueKey('catalog-create-intention')),
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
           );
-          await tester.pumpAndSettle();
           await tester.enterText(find.byKey(_title), 'Следующий черновик');
           await tester.enterText(
             find.byKey(_description),
@@ -1187,10 +1191,11 @@ void main() {
         expect(find.byKey(_closeConfirmation), findsNothing);
         expectIntentionGraphRootPage(router);
 
-        await tester.tap(
-          find.byKey(const ValueKey('catalog-create-intention')),
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
         );
-        await tester.pumpAndSettle();
         await tester.enterText(
           find.byKey(const ValueKey('intention-editor-title')),
           'Намерение',
@@ -1288,10 +1293,11 @@ void main() {
           expectIntentionGraphRootPage(router);
           expect(repository.commands, isEmpty);
 
-          await tester.tap(
-            find.byKey(const ValueKey('catalog-create-intention')),
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
           );
-          await tester.pumpAndSettle();
 
           expect(router.current.name, IntentionEditorRoute.name);
           expect(sessions.state(tester).draft.isChanged, isFalse);
@@ -1447,10 +1453,11 @@ void main() {
         );
 
         await returnToIntentionGraphAfterCreation(tester, router);
-        await tester.tap(
-          find.byKey(const ValueKey('catalog-create-intention')),
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
         );
-        await tester.pumpAndSettle();
         await tester.enterText(find.byKey(_title), 'Другая сессия');
         lateClose();
         lateDiscard();
@@ -1750,10 +1757,7 @@ void main() {
         final destinations = appNavigationDestinations();
         expect(_catalogFilter, findsOneWidget);
         expect(_catalogFilter.hitTestable(), findsNothing);
-        expect(
-          find.byKey(const ValueKey('catalog-create-intention')).hitTestable(),
-          findsNothing,
-        );
+        expect(quickCreationAction().hitTestable(), findsNothing);
         expect(destinations, findsNWidgets(3));
         expect(destinations.hitTestable(), findsNothing);
         expect(find.byType(QuickCreationButton), findsOneWidget);
@@ -1803,10 +1807,11 @@ void main() {
         expect(find.byKey(_closeConfirmation), findsNothing);
         expectIntentionGraphRootPage(router);
 
-        await tester.tap(
-          find.byKey(const ValueKey('catalog-create-intention')),
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
         );
-        await tester.pumpAndSettle();
         // Новое открытие — новая сессия с начальным черновиком.
         expect(sessions.latest, isNot(firstSession));
         expect(sessions.state(tester).draft.isChanged, isFalse);
@@ -2387,10 +2392,11 @@ void main() {
         await _tapClose(tester);
         await tester.pumpAndSettle();
         expectIntentionGraphRootPage(router);
-        await tester.tap(
-          find.byKey(const ValueKey('catalog-create-intention')),
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
         );
-        await tester.pumpAndSettle();
 
         expect(sessions.latest, isNot(firstSession));
         expect(find.byKey(_readinessConfirmation), findsNothing);
@@ -3226,8 +3232,11 @@ Future<RootStackRouter> _openEditor(
     ),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
-  await tester.pumpAndSettle();
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.intention,
+    openedPage: find.byType(IntentionEditorPage),
+  );
   return router;
 }
 

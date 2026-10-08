@@ -16,11 +16,13 @@ typedef QuickCreationWait = Future<void> Function(
 Finder quickCreationAction() => find.byType(QuickCreationButton);
 
 /// Выбирает режим через меню, проверяет отсутствие запуска от выбора
-/// и отдельно нажимает кнопку. Ожидание результата принадлежит сценарию.
+/// и отдельно активирует кнопку. Способ активации и ожидание результата
+/// могут принадлежать сценарию доступности или управляемой отправки.
 Future<void> openQuickCreation(
   WidgetTester tester,
   QuickCreationMode mode, {
   required Finder openedPage,
+  Future<void> Function(WidgetTester tester, Finder button)? activate,
   QuickCreationWait? wait,
 }) async {
   final button = quickCreationAction();
@@ -52,7 +54,11 @@ Future<void> openQuickCreation(
   expect(button.hitTestable(), findsOneWidget);
   expect(tester.widget<QuickCreationButton>(button).mode, mode);
 
-  await tester.tap(button);
+  if (activate == null) {
+    await tester.tap(button);
+  } else {
+    await activate(tester, button);
+  }
   await tester.pump();
   if (wait != null) await wait(tester, openedPage);
   await tester.pumpAndSettle();
