@@ -112,8 +112,10 @@ void _registerOrdinaryLayoutTests() {
           expect(tester.takeException(), isNull);
         });
 
-        testWidgets('создание из каталогов при тексте 2×, $conditions: '
-            'кнопки помещаются на экране и сохраняют действие', (tester) async {
+        testWidgets('быстрое создание из каталогов при тексте 2×, $conditions: '
+            'кнопка помещается в панели и запускает оба режима', (
+          tester,
+        ) async {
           final semantics = tester.ensureSemantics();
           try {
             final app = await _start(
@@ -124,30 +126,36 @@ void _registerOrdinaryLayoutTests() {
               textScale: 2,
             );
             await _select(tester, AppDestination.intentionGraph);
-            final intention = find.byKey(
-              const ValueKey('catalog-create-intention'),
+            _expectQuickCreationInPanel(tester, insets);
+            await openQuickCreation(
+              tester,
+              QuickCreationMode.intention,
+              openedPage: find.byType(IntentionEditorPage),
+              wait: _until,
             );
-            _expectFullyVisible(tester, intention, insets);
-            expect(intention.hitTestable(), findsOneWidget);
-            await tester.tap(intention);
-            await tester.pumpAndSettle();
             expect(find.byType(IntentionEditorPage), findsOneWidget);
             await app.router.maybePop();
             await tester.pumpAndSettle();
             await _select(tester, AppDestination.dailyChoices);
-            _expectFullyVisible(tester, _createDailyChoice, insets);
-            expect(_createDailyChoice.hitTestable(), findsOneWidget);
-            final name = lookupAppLocalizations(locale)
-                .dailyChoiceCreateFromAction;
+            _expectQuickCreationInPanel(tester, insets);
+            await openQuickCreation(
+              tester,
+              QuickCreationMode.dailyChoiceFromAction,
+              openedPage: find.byType(DailyChoiceActionPickerPage),
+              wait: _until,
+            );
+            expect(find.byType(DailyChoiceActionPickerPage), findsOneWidget);
+            await app.router.maybePop();
+            await tester.pumpAndSettle();
+            _expectQuickCreationInPanel(tester, insets);
+            final l10n = lookupAppLocalizations(locale);
+            final name =
+                '${l10n.quickCreationLabel}, '
+                '${l10n.quickCreationModeDailyChoiceFromAction}';
             expect(
-              find.semantics.byPredicate(
-                (node) => node.label == name || node.tooltip == name,
-              ),
+              find.semantics.byPredicate((node) => node.label == name),
               findsOneWidget,
             );
-            await tester.tap(_createDailyChoice);
-            await tester.pumpAndSettle();
-            expect(find.byType(DailyChoiceActionPickerPage), findsOneWidget);
             expect(tester.takeException(), isNull);
           } finally {
             semantics.dispose();
@@ -252,6 +260,23 @@ void _registerOrdinaryLayoutTests() {
       }
     }
   }
+}
+
+/// Кнопка занимает место в панели, а не в области содержимого над ней.
+void _expectQuickCreationInPanel(WidgetTester tester, _Insets insets) {
+  final button = quickCreationAction();
+  expect(button.hitTestable(), findsOneWidget);
+  final rect = tester.getRect(button);
+  final panel = tester.getRect(find.byType(AppNavigationBar));
+  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+  expect(rect.left, greaterThanOrEqualTo(panel.left));
+  expect(rect.right, lessThanOrEqualTo(panel.right));
+  expect(rect.top, greaterThanOrEqualTo(panel.top));
+  expect(rect.bottom, lessThanOrEqualTo(panel.bottom - insets.padding));
+  expect(rect.left, greaterThanOrEqualTo(0));
+  expect(rect.right, lessThanOrEqualTo(screen.width));
+  expect(rect.top, greaterThanOrEqualTo(insets.safeTop));
+  expect(rect.bottom, lessThanOrEqualTo(screen.height - insets.padding));
 }
 
 void _expectLayoutMessage(WidgetTester tester, _Insets insets) {

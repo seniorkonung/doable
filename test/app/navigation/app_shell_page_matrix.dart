@@ -44,14 +44,9 @@ enum _MatrixEntry {
       const ValueKey('daily-choice-row-1'),
     ),
     _MatrixEntry.tags => _openTags,
-    _MatrixEntry.creation => find.byKey(
-      const ValueKey('catalog-create-intention'),
-    ),
+    _MatrixEntry.creation || _MatrixEntry.action => quickCreationAction(),
     _MatrixEntry.condition => find.byKey(
       const ValueKey('intention-tag-conditions-add'),
-    ),
-    _MatrixEntry.action => find.byKey(
-      const ValueKey('daily-choice-create-from-action'),
     ),
     _MatrixEntry.actionCandidate => _summary(
       DailyChoiceActionPickerPage,
@@ -321,7 +316,24 @@ void _registerPageMatrixTests() {
           destination = root;
           await _select(tester, destination);
         }
-        await _tap(tester, entry.finder);
+        switch (entry) {
+          case _MatrixEntry.creation:
+            await openQuickCreation(
+              tester,
+              QuickCreationMode.intention,
+              openedPage: find.byType(IntentionEditorPage),
+              wait: _until,
+            );
+          case _MatrixEntry.action:
+            await openQuickCreation(
+              tester,
+              QuickCreationMode.dailyChoiceFromAction,
+              openedPage: find.byType(DailyChoiceActionPickerPage),
+              wait: _until,
+            );
+          default:
+            await _tap(tester, entry.finder);
+        }
         await tester.pumpAndSettle();
       }
       await _until(tester, find.byType(row.page));

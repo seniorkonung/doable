@@ -4,14 +4,17 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
 import 'package:doable/src/app/navigation/app_shell_tab_insets.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 void main() {
   test('каждый пункт определяет собственный дочерний маршрут оболочки', () {
@@ -108,11 +112,16 @@ void main() {
     expect(_selected(tester), AppDestination.dailyChoices);
     expect(app.router.current.name, AppShellRoute.name);
     expect(app.router.topRoute.name, DailyChoiceCatalogRoute.name);
-    // Создание дневного выбора остаётся действием каталога.
-    expect(
-      find.byKey(const ValueKey('daily-choice-create-from-action')),
-      findsOneWidget,
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.dailyChoiceFromAction,
+      openedPage: find.byType(DailyChoiceActionPickerPage),
     );
+    expect(app.router.current.name, DailyChoiceActionPickerRoute.name);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(app.router.topRoute.name, DailyChoiceCatalogRoute.name);
+    expect(_selected(tester), AppDestination.dailyChoices);
   });
 
   testWidgets('пункт графа открывает каталог намерений с охватом, поиском и '
@@ -127,10 +136,16 @@ void main() {
     expect(app.router.topRoute.name, IntentionCatalogRoute.name);
     expect(find.byKey(const ValueKey('catalog-scope-control')), findsOneWidget);
     expect(find.byKey(const ValueKey('catalog-filter-field')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('catalog-create-intention')),
-      findsOneWidget,
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
     );
+    expect(app.router.current.name, IntentionEditorRoute.name);
+    await tester.tap(find.byKey(const ValueKey('intention-editor-close')));
+    await tester.pumpAndSettle();
+    expect(app.router.topRoute.name, IntentionCatalogRoute.name);
+    expect(_selected(tester), AppDestination.intentionGraph);
   });
 
   testWidgets('шапка каталога намерений ведёт к каталогу тегов и не ведёт к '

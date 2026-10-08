@@ -7,6 +7,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -44,6 +45,7 @@ import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 part 'ordinary_page_layout_scenarios.dart';
 

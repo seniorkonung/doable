@@ -5,6 +5,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -56,6 +57,7 @@ import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
@@ -253,7 +255,12 @@ void main() {
     await _select(tester, AppDestination.dailyChoices);
     _expectRootPage(tester, router, AppDestination.dailyChoices);
 
-    await _open(tester, _createDailyChoice, DailyChoiceActionPickerPage);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.dailyChoiceFromAction,
+      openedPage: find.byType(DailyChoiceActionPickerPage),
+      wait: _until,
+    );
     _expectAboveShell(
       tester,
       DailyChoiceActionPickerPage,
@@ -443,10 +450,11 @@ void main() {
     await _select(tester, graph);
 
     // Создание намерения — исключение: модальная панель над каталогом.
-    await _open(
+    await openQuickCreation(
       tester,
-      find.byKey(const ValueKey('catalog-create-intention')),
-      IntentionEditorPage,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
+      wait: _until,
     );
     _expectCreationSheetAboveCatalog(tester, router);
     await _close(tester, IntentionEditorPage);
@@ -645,7 +653,12 @@ void main() {
 
     // Создание дневного выбора: выбор пути и форма создания открываются
     // прямо из корневой страницы и тоже закрывают панель.
-    await _open(tester, _createDailyChoice, DailyChoiceActionPickerPage);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.dailyChoiceFromAction,
+      openedPage: find.byType(DailyChoiceActionPickerPage),
+      wait: _until,
+    );
     await _open(
       tester,
       _summary(DailyChoiceActionPickerPage, 'Бегать'),
@@ -753,10 +766,6 @@ const _rootPages = {
 };
 
 final _openTags = find.byKey(const ValueKey('catalog-open-tags'));
-
-final _createDailyChoice = find.byKey(
-  const ValueKey('daily-choice-create-from-action'),
-);
 
 /// Строка связи «Читать» → «Бегать» в соседстве намерения.
 final _relationRow = find.byKey(

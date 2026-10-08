@@ -231,7 +231,12 @@ Future<AppDestination> _startCreationPath(
       return AppDestination.home;
     case ChoicePathDraftDirection.bottomUp:
       await _select(tester, AppDestination.dailyChoices);
-      await _open(tester, _createDailyChoice, DailyChoiceActionPickerPage);
+      await openQuickCreation(
+        tester,
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: _until,
+      );
       await _open(
         tester,
         _summary(DailyChoiceActionPickerPage, 'Бегать'),
