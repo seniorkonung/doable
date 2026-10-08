@@ -4,7 +4,9 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
+import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -33,7 +35,65 @@ void defineDailyChoicePickerContextTests({
   required String noMatchesMessage,
   required String detailsTooltip,
 }) {
-  _defineKeyboardCancellationTests(route: route, keyPrefix: keyPrefix);
+  _defineInitialPickerAccessibilityTests(route: route, keyPrefix: keyPrefix);
+  testWidgets('доступный одноимённый ввод не скрывает недостижимость '
+      'строки кандидата', (tester) async {
+    final blockedRect = ValueNotifier<Rect?>(null);
+    addTearDown(blockedRect.dispose);
+    final (repository, router) = await _openApp(
+      tester,
+      blockedRect: blockedRect,
+    );
+    final context = InitialDailyChoicePickerContext(launch: _Launch());
+    final selection = router.push<IntentionId>(route(context));
+    await _settleRoute(tester);
+    repository.complete(1, _page());
+    await tester.pumpAndSettle();
+    final filter = find.byKey(ValueKey('$keyPrefix-filter'));
+    await tester.enterText(filter, 'Гулять');
+    await tester.pump(const Duration(milliseconds: 300));
+    repository.complete(2, _page());
+    await tester.pumpAndSettle();
+    final id = testSummary(index: 2).id;
+    final row = find.byKey(ValueKey('$keyPrefix-${id.toCanonicalString()}'));
+    blockedRect.value = tester.getRect(row);
+    await tester.pumpAndSettle();
+
+    // Прежний оракул принимает EditableText за доступного кандидата.
+    final oldOracle = find.text('Гулять').first;
+    expect(tester.widget(oldOracle), isA<EditableText>());
+    expect(oldOracle.hitTestable(), findsOneWidget);
+    final candidate = _initialCandidate(context, keyPrefix, id);
+    expect(candidate, findsOneWidget);
+    expect(tester.widget(candidate), isA<IntentionSummaryView>());
+    expect(
+      find.descendant(of: candidate, matching: find.byType(EditableText)),
+      findsNothing,
+    );
+    expect(candidate.hitTestable(), findsNothing);
+    expect(
+      () => _expectPickerCandidateReachable(
+        tester,
+        candidate,
+        filter,
+        'Cancel creation',
+      ),
+      throwsA(isA<TestFailure>()),
+    );
+    final pickerId = router.current.matchId;
+    await tester.tap(candidate, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(router.current.matchId, pickerId);
+    expect(tester.widget<TextField>(filter).controller!.text, 'Гулять');
+    expect(repository.dailyChoiceCommands, isEmpty);
+    expect(tester.takeException(), isNull);
+    blockedRect.value = null;
+    await tester.pumpAndSettle();
+    expect(candidate.hitTestable(), findsOneWidget);
+    await tester.tap(candidate);
+    await tester.pumpAndSettle();
+    expect(await selection, id);
+  });
   for (final (language, cancelLabel) in [
     ('ru', 'Отменить создание'),
     ('en', 'Cancel creation'),
@@ -322,7 +382,71 @@ void defineDailyChoicePickerContextTests({
   });
 }
 
-void _defineKeyboardCancellationTests({
+Finder _initialCandidate(
+  InitialDailyChoicePickerContext context,
+  String keyPrefix,
+  IntentionId id,
+) => find.descendant(
+  of: _initialControl(
+    context,
+    ValueKey('$keyPrefix-${id.toCanonicalString()}'),
+  ),
+  matching: find.byType(IntentionSummaryView, skipOffstage: false),
+  skipOffstage: false,
+);
+
+Finder _initialControl(InitialDailyChoicePickerContext context, Key key) {
+  final page = find.byWidgetPredicate(
+    (widget) => switch (widget) {
+      DailyChoiceActionPickerPage(:final pickerContext) ||
+      DailyChoiceSourcePickerPage(
+        :final pickerContext,
+      ) => identical(pickerContext, context),
+      _ => false,
+    },
+  );
+  expect(page, findsOneWidget);
+  return find.descendant(
+    of: page,
+    matching: find.byKey(key, skipOffstage: false),
+    skipOffstage: false,
+  );
+}
+
+Future<void> _revealCandidate(
+  WidgetTester tester,
+  Finder candidate,
+  String keyPrefix,
+) async {
+  final list = find.byKey(PageStorageKey<String>('$keyPrefix-list'));
+  await tester.ensureVisible(list);
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+    candidate,
+    100,
+    scrollable: find.descendant(of: list, matching: find.byType(Scrollable)),
+  );
+  await Scrollable.ensureVisible(tester.element(candidate), alignment: 0.5);
+  await tester.pumpAndSettle();
+  // Вложенные списки меняют геометрию после раскладки ленивых строк.
+  // Доводим строку жестами в видимой области самой страницы.
+  for (var attempt = 0; attempt < 20; attempt++) {
+    final viewport = tester.getRect(find.byType(IntentionSearchLayout));
+    final center = tester.getCenter(candidate);
+    if (candidate.hitTestable().evaluate().isNotEmpty &&
+        center.dy >= viewport.top + 24 &&
+        center.dy <= viewport.bottom - 24) {
+      break;
+    }
+    await tester.dragFrom(
+      viewport.center,
+      Offset(0, center.dy < viewport.top + 24 ? 100 : -100),
+    );
+    await tester.pumpAndSettle();
+  }
+}
+
+void _defineInitialPickerAccessibilityTests({
   required PageRouteInfo Function(DailyChoicePickerContext) route,
   required String keyPrefix,
 }) {
@@ -335,7 +459,8 @@ void _defineKeyboardCancellationTests({
       ]) {
         for (final safe in [false, true]) {
           for (final keyboard in [0.0, 260.0]) {
-            testWidgets('$language: текстовая отмена начального поиска, '
+            testWidgets('$language: строка кандидата и текстовая отмена '
+                'начального поиска, '
                 '${size.width.toInt()}×${size.height.toInt()}, текст $scale, '
                 'клавиатура $keyboard, безопасные отступы $safe', (
               tester,
@@ -365,20 +490,28 @@ void _defineKeyboardCancellationTests({
                   for (final data in router.stackData) data.matchId,
                 ];
                 final launch = _Launch();
-                final selection = router.push<IntentionId>(
-                  route(InitialDailyChoicePickerContext(launch: launch)),
-                );
+                final context = InitialDailyChoicePickerContext(launch: launch);
+                final selection = router.push<IntentionId>(route(context));
                 await _settleRoute(tester);
                 repository.complete(3, _page());
                 await tester.pumpAndSettle();
-                await tester.enterText(filter, 'Гулять');
+                final initialFilter = _initialControl(
+                  context,
+                  ValueKey('$keyPrefix-filter'),
+                );
+                await tester.enterText(initialFilter, 'Гулять');
                 await tester.pump(const Duration(milliseconds: 300));
                 repository.complete(4, _page());
                 await tester.pumpAndSettle();
+                final expectedId = testSummary(index: 2).id;
+                final candidate = _initialCandidate(
+                  context,
+                  keyPrefix,
+                  expectedId,
+                );
+                await _revealCandidate(tester, candidate, keyPrefix);
                 final lateSelection = tester
-                    .widget<IntentionSummaryView>(
-                      find.byType(IntentionSummaryView).last,
-                    )
+                    .widget<IntentionSummaryView>(candidate)
                     .onTap!;
                 final label = language == 'ru'
                     ? 'Отменить создание'
@@ -397,19 +530,40 @@ void _defineKeyboardCancellationTests({
                         .hasAction(SemanticsAction.tap),
                     isTrue,
                   );
+                  await _revealCandidate(tester, candidate, keyPrefix);
+                  _expectPickerCandidateReachable(
+                    tester,
+                    candidate,
+                    initialFilter,
+                    label,
+                  );
+                  expect(tester.view.viewInsets.bottom, inset);
                   expect(launch.isActive, isTrue);
                   expect(tester.takeException(), isNull);
                 }
                 // Параметры и выдача достижимы прокруткой даже в тесной области.
                 for (final control in [
-                  filter,
-                  find.byKey(const ValueKey('intention-tag-conditions-add')),
-                  find.text('Гулять').first,
-                  filter,
+                  initialFilter,
+                  _initialControl(
+                    context,
+                    const ValueKey('intention-tag-conditions-add'),
+                  ),
+                  candidate,
+                  initialFilter,
                 ]) {
-                  await tester.ensureVisible(control);
-                  await tester.pumpAndSettle();
-                  expect(control.hitTestable(), findsOneWidget);
+                  if (control == candidate) {
+                    await _revealCandidate(tester, candidate, keyPrefix);
+                    _expectPickerCandidateReachable(
+                      tester,
+                      candidate,
+                      initialFilter,
+                      label,
+                    );
+                  } else {
+                    await tester.ensureVisible(control);
+                    await tester.pumpAndSettle();
+                    expect(control.hitTestable(), findsOneWidget);
+                  }
                 }
                 expect(
                   tester
@@ -443,6 +597,54 @@ void _defineKeyboardCancellationTests({
                 expect(repository.queries, hasLength(5));
                 expect(repository.dailyChoiceCommands, isEmpty);
                 expect(tester.takeException(), isNull);
+
+                // Отдельный запуск доказывает выбор ID обычным нажатием строки.
+                final nextContext = InitialDailyChoicePickerContext(
+                  launch: _Launch(),
+                );
+                final nextSelection = router.push<IntentionId>(
+                  route(nextContext),
+                );
+                await _settleRoute(tester);
+                repository.complete(5, _page());
+                await tester.pumpAndSettle();
+                final nextFilter = _initialControl(
+                  nextContext,
+                  ValueKey('$keyPrefix-filter'),
+                );
+                await tester.enterText(nextFilter, 'Гулять');
+                await tester.pump(const Duration(milliseconds: 300));
+                repository.complete(6, _page());
+                await tester.pumpAndSettle();
+                _setPickerInsets(tester, keyboard: keyboard, safe: safe);
+                await tester.pumpAndSettle();
+                _expectPickerCancelGeometry(tester, label, size);
+                final nextCandidate = _initialCandidate(
+                  nextContext,
+                  keyPrefix,
+                  expectedId,
+                );
+                await _revealCandidate(tester, nextCandidate, keyPrefix);
+                _expectPickerCandidateReachable(
+                  tester,
+                  nextCandidate,
+                  nextFilter,
+                  label,
+                );
+                expect(tester.view.viewInsets.bottom, keyboard);
+                await tester.tap(nextCandidate);
+                await tester.pumpAndSettle();
+                expect(await nextSelection, expectedId);
+                expect(nextContext.launch.isActive, isTrue);
+                expect([
+                  for (final data in router.stackData) data.matchId,
+                ], history);
+                expect(
+                  tester.widget<TextField>(filter).controller!.text,
+                  'Гул',
+                );
+                expect(repository.dailyChoiceCommands, isEmpty);
+                expect(tester.takeException(), isNull);
                 await router.maybePop();
                 await tester.pumpAndSettle();
                 expect(await underlying, isNull);
@@ -455,6 +657,57 @@ void _defineKeyboardCancellationTests({
       }
     }
   }
+}
+
+void _expectPickerCandidateReachable(
+  WidgetTester tester,
+  Finder candidate,
+  Finder filter,
+  String cancelLabel,
+) {
+  expect(candidate, findsOneWidget);
+  expect(
+    candidate.hitTestable(),
+    findsOneWidget,
+    reason:
+        'Строка ${tester.getRect(candidate)}, '
+        'область ${tester.getRect(find.byType(IntentionSearchLayout))}, '
+        'отмена ${tester.getRect(find.widgetWithText(TextButton, cancelLabel))}',
+  );
+  expect(
+    tester
+        .getSemantics(candidate)
+        .getSemanticsData()
+        .hasAction(SemanticsAction.tap),
+    isTrue,
+  );
+  final title = find.descendant(
+    of: candidate,
+    matching: find.text('Гулять', skipOffstage: false),
+    skipOffstage: false,
+  );
+  final input = find.descendant(
+    of: filter,
+    matching: find.byType(EditableText, skipOffstage: false),
+    skipOffstage: false,
+  );
+  expect(title, findsOneWidget);
+  expect(input, findsOneWidget);
+  expect(tester.element(title), isNot(same(tester.element(input))));
+  expect(tester.widget<EditableText>(input).controller.text, 'Гулять');
+  final viewport = tester.getRect(find.byType(IntentionSearchLayout));
+  final cancel = tester.getRect(find.widgetWithText(TextButton, cancelLabel));
+  // Обычный tester.tap нажимает центр строки. При крупном тексте сводка
+  // может быть выше области просмотра; её область нажатия остаётся внутри.
+  final rect = Rect.fromCenter(
+    center: tester.getCenter(candidate),
+    width: 48,
+    height: 48,
+  );
+  expect(rect.left, greaterThanOrEqualTo(viewport.left));
+  expect(rect.right, lessThanOrEqualTo(viewport.right));
+  expect(rect.top, greaterThanOrEqualTo(viewport.top));
+  expect(rect.bottom, lessThanOrEqualTo(cancel.top));
 }
 
 void _setPickerInsets(
@@ -529,6 +782,7 @@ Future<(ControlledCatalogRepository, AppRouter)> _openApp(
   WidgetTester tester, {
   String language = 'en',
   TextScaler textScaler = TextScaler.noScaling,
+  ValueNotifier<Rect?>? blockedRect,
 }) async {
   final repository = ControlledCatalogRepository();
   final container = reconciliationCatalogContainer(repository);
@@ -544,7 +798,22 @@ Future<(ControlledCatalogRepository, AppRouter)> _openApp(
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-          child: child!,
+          child: blockedRect == null
+              ? child!
+              : ValueListenableBuilder<Rect?>(
+                  valueListenable: blockedRect,
+                  builder: (context, rect, child) => Stack(
+                    children: [
+                      child!,
+                      if (rect != null)
+                        Positioned.fromRect(
+                          rect: rect,
+                          child: const AbsorbPointer(child: SizedBox.expand()),
+                        ),
+                    ],
+                  ),
+                  child: child,
+                ),
         ),
         routerConfig: router.config(),
       ),
