@@ -13,6 +13,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/main.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -24,6 +25,8 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
+    as catalog_page;
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
@@ -39,6 +42,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/quick_creation.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/favorite_read_contract_test_fallback.dart';
@@ -101,7 +105,7 @@ void main() {
       await tester.pageBack();
       await _pumpUntilFound(
         tester,
-        find.byKey(const ValueKey('catalog-create-intention')),
+        find.byType(catalog_page.IntentionCatalogPage),
       );
       await _openIntention(tester, 'Причина', settle: false);
       expect(find.text('Active relations: 1'), findsWidgets);
@@ -115,7 +119,7 @@ void main() {
       );
       await _pumpUntilFound(
         tester,
-        find.byKey(const ValueKey('catalog-create-intention')),
+        find.byType(catalog_page.IntentionCatalogPage),
       );
       await _openIntention(tester, 'Сосед');
       await app.repository.completePendingBlockingWithRealResult();
@@ -308,7 +312,7 @@ void main() {
         await _deleteCurrentIntention(tester);
         await _pumpUntilFound(
           tester,
-          find.byKey(const ValueKey('catalog-create-intention')),
+          find.byType(catalog_page.IntentionCatalogPage),
         );
         expect(find.text(_blockingOwnerTitle), findsNothing);
         semantics.dispose();
@@ -686,7 +690,7 @@ void main() {
       await openIntentionGraph(tester, waitFor: _pumpUntilFound);
       await _pumpUntilFound(
         tester,
-        find.byKey(const ValueKey('catalog-create-intention')),
+        find.byType(catalog_page.IntentionCatalogPage),
       );
 
       await _createIntention(
@@ -716,13 +720,15 @@ void main() {
       await _dismissOperationMessage(tester);
 
       expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('catalog-create-intention')),
-        ),
+        tester.getSemantics(quickCreationAction()),
         isSemantics(
-          tooltip: 'Create intention',
+          label: 'Quick create, New intention',
+          hint: 'Touch and hold to change mode',
           isButton: true,
           hasTapAction: true,
+          hasLongPressAction: true,
+          onLongPressHint: 'Change mode',
+          customActions: [CustomSemanticsAction(label: 'Change mode')],
         ),
       );
       final catalogRow = tester.getSemantics(
@@ -1520,10 +1526,7 @@ Future<_DelayedApp> _pumpDelayedRelationApp(
   addTearDown(runtime.shutdown);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await openIntentionGraph(tester, waitFor: _pumpUntilFound);
-  await _pumpUntilFound(
-    tester,
-    find.byKey(const ValueKey('catalog-create-intention')),
-  );
+  await _pumpUntilFound(tester, find.byType(catalog_page.IntentionCatalogPage));
   return (runtime: runtime, repository: repository);
 }
 
@@ -1546,10 +1549,11 @@ Future<void> _createIntention(
   required String title,
   required String description,
 }) async {
-  await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
-  await _pumpUntilFound(
+  await openQuickCreation(
     tester,
-    find.byKey(const ValueKey('intention-editor-title')),
+    QuickCreationMode.intention,
+    openedPage: find.byKey(const ValueKey('intention-creation-sheet')),
+    wait: _pumpUntilFound,
   );
   await tester.enterText(
     find.byKey(const ValueKey('intention-editor-title')),
@@ -1842,7 +1846,7 @@ Future<void> _deleteCurrentIntention(WidgetTester tester) async {
 }
 
 Future<void> _returnToCatalog(WidgetTester tester) async {
-  final catalog = find.byKey(const ValueKey('catalog-create-intention'));
+  final catalog = find.byType(catalog_page.IntentionCatalogPage);
   for (var attempt = 0; attempt < 4; attempt += 1) {
     if (catalog.evaluate().isNotEmpty) {
       return;

@@ -10,6 +10,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
@@ -30,6 +31,8 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
+    as catalog_page;
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -51,6 +54,7 @@ import '../support/tag_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 void main() {
   testWidgets(
@@ -422,8 +426,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
-      await tester.pumpAndSettle();
+      await _openPanel(tester);
       await tester.enterText(
         find.byKey(const ValueKey('intention-editor-title')),
         '  Быть здоровым  ',
@@ -653,10 +656,7 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('catalog-create-intention')),
-        findsOneWidget,
-      );
+      expect(find.byType(catalog_page.IntentionCatalogPage), findsOneWidget);
       repository.completeCommand(5, _deleted(restored, revision: 6));
       await tester.pumpAndSettle();
 
@@ -674,7 +674,6 @@ void main() {
     'продолжении, сброс ничего не создаёт, а уход во время записи не отменяет '
     'сохранение',
     (tester) async {
-      const create = ValueKey('catalog-create-intention');
       const title = ValueKey('intention-editor-title');
       String? titleText() =>
           tester.widget<TextField>(find.byKey(title)).controller?.text;
@@ -686,8 +685,7 @@ void main() {
       );
       final before = _storedGraph(app.raw);
 
-      await tester.tap(find.byKey(create));
-      await tester.pumpAndSettle();
+      await _openPanel(tester);
       await tester.enterText(find.byKey(title), '  Черновик  ');
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -703,11 +701,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(title), findsNothing);
-      expect(find.byKey(create), findsOneWidget);
+      expect(find.byType(catalog_page.IntentionCatalogPage), findsOneWidget);
       expect(_storedGraph(app.raw), before);
 
-      await tester.tap(find.byKey(create));
-      await tester.pumpAndSettle();
+      await _openPanel(tester);
       expect(titleText(), isEmpty);
 
       writeGate.hold();
@@ -722,7 +719,7 @@ void main() {
       await tester.tap(find.text('Закрыть'));
       await tester.pumpAndSettle();
       expect(find.byKey(title), findsNothing);
-      expect(find.byKey(create), findsOneWidget);
+      expect(find.byType(catalog_page.IntentionCatalogPage), findsOneWidget);
       expect(_storedIntentionCount(app.raw), 0);
 
       writeGate.release();
@@ -1134,7 +1131,8 @@ void main() {
 
       await _openPanel(tester);
       await tester.enterText(find.byKey(_editorTitle), 'Новое открытие');
-      await tester.pump(const Duration(seconds: 1));
+      // Меню и анимации нового входа уже продвинули время сообщения.
+      await tester.pump();
       await tester.pumpAndSettle();
       expect(find.byType(IntentionEditorPage), findsOneWidget);
       expect(find.text('Close the form?'), findsNothing);
@@ -1365,7 +1363,6 @@ void main() {
   });
 }
 
-const _createIntention = ValueKey('catalog-create-intention');
 const _editorTitle = ValueKey('intention-editor-title');
 const _submit = ValueKey('intention-editor-submit');
 const _close = ValueKey('intention-editor-close');
@@ -1390,9 +1387,13 @@ String? _fieldText(WidgetTester tester) =>
     tester.widget<TextField>(find.byKey(_editorTitle)).controller?.text;
 
 Future<void> _openPanel(WidgetTester tester) async {
-  await tester.tap(find.byKey(_createIntention));
-  await tester.pumpAndSettle();
-  expect(find.byType(IntentionEditorPage), findsOneWidget);
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.intention,
+    openedPage: find.byType(IntentionEditorPage),
+    wait: (tester, finder) =>
+        _pumpUntil(tester, () => finder.evaluate().isNotEmpty),
+  );
 }
 
 List<IntentionCommandCompletion> _collectCompletions(AppRuntime runtime) {

@@ -6,6 +6,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -72,6 +73,7 @@ import '../support/intention_creation_storage_observer.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 // Названия намерений и тегов — данные человека: они одинаковы в обеих
 // локалях.
@@ -131,7 +133,6 @@ const _creationTables = [
   'favorite_intentions',
 ];
 
-final _createIntention = find.byKey(const ValueKey('catalog-create-intention'));
 final _catalogList = find.byKey(
   const PageStorageKey<String>('intention-catalog-list'),
 );
@@ -154,8 +155,8 @@ final _tagEditorName = find.byKey(const ValueKey('tag-editor-name'));
 final _tagEditorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
-/// Сквозная проверка быстрого создания намерения: кнопка «+» настоящего
-/// каталога, компактная панель, общий выбор тегов и настоящий редактор тега
+/// Сквозная проверка быстрого создания намерения: меню и кнопка общей
+/// панели, компактная форма, общий выбор тегов и настоящий редактор тега
 /// на настоящих AppRouter, сессии черновика, координаторе команд, общей
 /// поверхности сообщений и Drift-адаптере через настроенное файловое
 /// соединение.
@@ -205,9 +206,7 @@ void main() {
               participantId: _intentionId(_walk),
               waitFor: _until,
             );
-            unawaited(router.push<void>(const IntentionEditorRoute()));
-            await _until(tester, _sheet);
-            await tester.pumpAndSettle();
+            await _openSheet(tester, app);
             await tester.enterText(
               find.byKey(const ValueKey('intention-editor-title')),
               _title,
@@ -265,9 +264,7 @@ void main() {
                     app.l10n.editorCreated,
                   ),
                 );
-                unawaited(router.push<void>(const IntentionEditorRoute()));
-                await _until(tester, _sheet);
-                await tester.pumpAndSettle();
+                await _openSheet(tester, app);
                 nextBeforeFailure = router.stackData.last;
                 await tester.enterText(
                   find.byKey(const ValueKey('intention-editor-title')),
@@ -341,9 +338,7 @@ void main() {
                 app.l10n.editorCreated,
               ),
             );
-            unawaited(router.push<void>(const IntentionEditorRoute()));
-            await _until(tester, _sheet);
-            await tester.pumpAndSettle();
+            await _openSheet(tester, app);
             final nextForm = router.stackData.last;
             await tester.enterText(
               find.byKey(const ValueKey('intention-editor-title')),
@@ -368,7 +363,7 @@ void main() {
   }
   for (final origin in IntentionCreationOrigin.values) {
     testWidgets(
-      'прямой вход над ${origin.description}: новый ID, теги и исходная история сохраняются без ожидания сообщения',
+      'общая кнопка над ${origin.description}: новый ID, теги и исходная история сохраняются без ожидания сообщения',
       (tester) async {
         final install = await _install(tester, const Locale('ru'));
         final app = await _launch(tester, install, seed: _seedGraph);
@@ -386,7 +381,6 @@ void main() {
           tester,
           app,
           tags: [_homeTag, _workTag],
-          directly: true,
         );
         final previous =
             app.container
@@ -458,9 +452,7 @@ void main() {
             app.l10n.editorCreated,
           ),
         );
-        unawaited(app.router.push<void>(const IntentionEditorRoute()));
-        await _until(tester, _sheet);
-        await tester.pumpAndSettle();
+        await _openSheet(tester, app);
         expect(_text(tester, 'intention-editor-title'), isEmpty);
         expect(_text(tester, 'intention-editor-description'), isEmpty);
         expect(_chipNames(tester), isEmpty);
@@ -490,7 +482,7 @@ void main() {
     final code = locale.languageCode;
 
     testWidgets(
-      'намерение, подготовленное через «+» каталога, панель, общий выбор и '
+      'намерение, подготовленное через общую кнопку, панель, общий выбор и '
       'настоящий редактор тега, открывается по новому идентификатору при '
       'совпадении названия и сохраняется одним подтверждённым результатом, '
       'учитывается ровно один раз в выдаче с прежними условиями и позицией, '
@@ -1028,7 +1020,7 @@ void main() {
 
     for (final systemBack in [false, true]) {
       testWidgets(
-        'намерение, подготовленное через «+» каталога, панель, общий выбор и '
+        'намерение, подготовленное через общую кнопку, панель, общий выбор и '
         'настоящий редактор тега с тегом, который исключают условия выдачи, не '
         'вставляется в неподходящую выдачу, сохраняя её условия, количество и '
         'позицию, а скрытая Главная и навигация по тегу отражают полный '
@@ -1457,15 +1449,22 @@ Future<void> _scrollCatalogToTop(WidgetTester tester) async {
   expect(_catalogListPosition(tester).pixels, 0);
 }
 
-/// Открывает панель создания кнопкой «+» каталога.
+/// Открывает панель создания через меню и кнопку общей панели.
 Future<void> _openSheet(WidgetTester tester, _Launch app) async {
-  await _tap(tester, _createIntention);
-  await _until(tester, _sheet);
-  await tester.pumpAndSettle();
-  expect(_stack(app), [AppShellRoute.name, IntentionEditorRoute.name]);
+  final history = List.of(app.router.stackData);
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.intention,
+    openedPage: _sheet,
+    wait: _until,
+  );
+  expect(_stack(app), [
+    ...history.map((route) => route.name),
+    IntentionEditorRoute.name,
+  ]);
 }
 
-/// Готовит в панели, открытой «+» каталога, все пять полей черновика: сырое
+/// Готовит в панели, открытой общей кнопкой, все пять полей черновика: сырое
 /// название, описание, избранное, явно подтверждённую готовность и набор из
 /// существующих тегов [tags] и тега «Спорт», созданного настоящим редактором
 /// из общего выбора. Принимает сообщение о созданном теге, возвращается в
@@ -1475,27 +1474,20 @@ Future<TagId> _prepareFullDraft(
   WidgetTester tester,
   _Launch app, {
   required List<int> tags,
-  bool directly = false,
 }) async {
   final l10n = app.l10n;
   final history = List.of(app.router.stackData);
-  if (directly) {
-    unawaited(app.router.push<void>(const IntentionEditorRoute()));
-    await _until(tester, _sheet);
-    await tester.pumpAndSettle();
-    expect(_text(tester, 'intention-editor-title'), isEmpty);
-    expect(_text(tester, 'intention-editor-description'), isEmpty);
-    expect(_chipNames(tester), isEmpty);
-    expect(_iconOf(tester, _favorite), Icons.star_border);
-    expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
-    expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
-    expect(
-      appNavigationDestinations(skipOffstage: false).hitTestable(),
-      findsNothing,
-    );
-  } else {
-    await _openSheet(tester, app);
-  }
+  await _openSheet(tester, app);
+  expect(_text(tester, 'intention-editor-title'), isEmpty);
+  expect(_text(tester, 'intention-editor-description'), isEmpty);
+  expect(_chipNames(tester), isEmpty);
+  expect(_iconOf(tester, _favorite), Icons.star_border);
+  expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+  expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
+  expect(
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
   await tester.enterText(
     find.byKey(const ValueKey('intention-editor-title')),
     _rawTitle,

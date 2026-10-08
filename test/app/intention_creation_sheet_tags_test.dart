@@ -6,6 +6,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -33,6 +34,7 @@ import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 const _homeTag = 301;
 const _workTag = 302;
@@ -88,8 +90,8 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// хранилища.
 ///
 /// Набор черновика виден по элементам панели и по контексту открытого
-/// выбора, граф — по строкам хранилища. Панель открывается кнопкой каталога,
-/// а выбор — её действием, поэтому проверки не подменяют сборку контекста.
+/// выбора, граф — по строкам хранилища. Панель открывается через меню и
+/// общую кнопку, а выбор — её действием, сохраняя настоящую сборку контекста.
 void main() {
   testWidgets(
     'выбор из компактной панели добавляет несколько тегов только в черновик, '
@@ -840,11 +842,14 @@ final class _App {
     );
   }
 
-  /// Открывает панель создания кнопкой каталога.
+  /// Открывает панель создания через меню и кнопку общей панели.
   Future<void> openPanel(WidgetTester tester) async {
-    await _tap(tester, find.byKey(const ValueKey('catalog-create-intention')));
-    await _until(tester, _sheet);
-    await tester.pumpAndSettle();
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: _sheet,
+      wait: _until,
+    );
     expect(router.current.name, IntentionEditorRoute.name);
   }
 
