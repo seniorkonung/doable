@@ -498,3 +498,303 @@
   - **Dependencies:** 2.25 — исправленный и проверенный контракт доступности кандидатов; 2.24 — исходные свидетельства готовности. Выполнять строго после 2.25; исходные отметки завершения не заменяют свежие проверки.
   - **Files likely touched:** `docs/verification/persistent-navigation-phase-two-readiness.md` — только свидетельства проверки готовности.
   - **Estimated scope:** XS.
+
+## Phase 3: Все режимы создания доступны из общей панели
+
+- [ ] 3.1 Предоставить единый типизированный режим быстрого создания с мгновенным переключением
+  - **Acceptance criteria:**
+    - По требованиям «Режимы быстрого создания» и «Сохранение режима между запусками» [спецификации](specs/quick-creation/spec.md), решениям 6–7 [дизайна](design.md) и [ADR-0021](../../../docs/adr/0021-separate-installation-preferences-from-personal-graph.md) закрытый QuickCreationMode содержит intention, relation, dailyChoiceFromIntention, dailyChoiceFromAction именно в этом порядке. Устойчивые ключи заданы явно, не зависят от индекса, имени enum и локали; неизвестное внешнее значение не становится доверенным режимом.
+    - QuickCreationModeController живёт весь процесс, получает начальный режим и узкую зависимость хранения явно. Выбор синхронно обновляет общее состояние и передаёт неизменяемый режим на сохранение; поздний успех или отказ не присваивает состояние обратно. Контракт хранилища определяет отдельный исход каждой записи, постановку до первой асинхронной границы, последовательность без объединения и продолжение после отказа; файловые операции принадлежат его реализации.
+    - Проверки потребителя с управляемым хранилищем доказывают мгновенность, последовательность переданных значений A → B → A и отсутствие отката при поздних исходах. Контроллер не получает маршрутизатор, PersonalGraphRepository или AppRuntime целиком; граф и GraphRevision не меняются.
+  - **Verification:**
+    - Добавить контрактные проверки режима и контроллера в новый подкаталог test/app/quick_creation/; выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation`. Подмена проверяет только потребителя; файловая реализация проверяется в 3.3.
+  - **Dependencies:** 2.26 — подтверждённые границы Phase 2; общий контракт необходим панели, меню, запуску и сборке AppRuntime.
+  - **Files likely touched:** Новые режим, контракт хранения и контроллер в `lib/src/app/quick_creation/`, новый файл их проверок в `test/app/quick_creation/`. Это предполагаемые дополнения к проверенным `lib/src/app/` и `test/app/`; имена уточняются при реализации, производная генерация учитывается отдельно.
+  - **Estimated scope:** M — один общий контракт и его потребитель, около 4 рукописных файлов.
+
+- [ ] 3.2 Диагностировать отказы настройки режима без пользовательского содержимого
+  - **Acceptance criteria:**
+    - По решению 13 дизайна существующее закрытое семейство DiagnosticsEvent дополнено QuickCreationModeDiagnosticsEvent с типизированным этапом read/write и DiagnosticsFailureCode. Кодирование исчерпывающе обрабатывает новое событие; содержимое файла, пользовательские строки, пути и исходные исключения не попадают в payload.
+    - Событие проходит через recordDiagnosticsSafely: даже бросающий получатель не меняет исход чтения или записи. События настройки не образуют результат команды графа или право показа сообщения пользователю.
+    - Проверки подтверждают безопасный состав сериализованного события обоих этапов и отсутствие утечки контрольной строки; существующая диагностика сохраняет формат.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/shared/diagnostics/diagnostics_sink_test.dart`; проверить кодирование обоих этапов и отказ диагностического получателя.
+  - **Dependencies:** 3.1 — согласованный контракт отказов настройки.
+  - **Files likely touched:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Estimated scope:** M — расширение существующей диагностической границы, 3 файла.
+
+- [ ] 3.3 Сохранять каждый выбранный режим последовательной атомарной заменой файла
+  - **Acceptance criteria:**
+    - Реализация контракта 3.1 хранит устойчивый ключ в `settings/quick_creation_mode` внутри переданного каталога локальных данных. Отсутствие файла даёт «Новое намерение» без диагностики; нечитаемое и неизвестное содержимое дают тот же режим с read/unavailable либо read/corruption. Чтение не удаляет данные графа и не вызывает отказ его запуска.
+    - Одна очередь владеет всей попыткой: подготовкой собственного временного файла в том же каталоге, записью и атомарным переименованием. Принятые значения не объединяются и не заменяются текущим состоянием контроллера; следующая попытка начинает файловые операции только после исхода предыдущей. Успех означает замену основного файла, отказ оставляет прежнее успешно сохранённое значение, диагностируется один раз и не останавливает очередь даже при отказе DiagnosticsSink.
+    - На настоящем временном каталоге проверены четыре сочетания исходов A → B, порядок A → B → A, задержки и отказы записи временного файла и переименования. Новое хранилище читает последний успешный выбор; после двух отказов следующий выбор сохраняется, незавершённая попытка не считается сохранённой. Очередь независима от исполнителя графа, автоматических повторов нет.
+  - **Verification:**
+    - Добавить проверки файлового адаптера и управляемых отказов в test/app/quick_creation/ с наблюдением начала каждой полной попытки и отсутствия пересечения временных файлов; выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation test/shared/diagnostics`.
+    - Сопоставить матрицу исходов с решением 7 и проверками решения 14 дизайна; выполнить `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.1 — контракт и устойчивые ключи; 3.2 — безопасная диагностика.
+  - **Files likely touched:** Новый файловый адаптер в `lib/src/app/quick_creation/`, 1–2 новых файла проверок и узкого управления файловыми отказами в `test/app/quick_creation/`.
+  - **Estimated scope:** M — один адаптер и его контрактные проверки, 3–4 файла.
+
+- [ ] 3.4 Подтвердить порядок сохранений и независимость текущего режима от исхода записи
+  - **Acceptance criteria:**
+    - Контроллер, настоящий файловый адаптер и диагностика совместно подтверждают мгновенный B при ожидающем A, отсутствие отката и последовательность A → B → A без пропусков. Отказ каждой стадии не блокирует следующую попытку.
+    - Свежий экземпляр хранилища восстанавливает B после двух успехов либо отказа A и успеха B, A после успеха A и отказа B, прежнее значение после двух отказов. Свидетельства не ограничены mock-хранилищем.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation test/shared/diagnostics` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`; проверить все сочетания исходов и отсутствие необработанных асинхронных ошибок.
+  - **Dependencies:** 3.1, 3.2, 3.3.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 3.5 Восстанавливать режим при запуске AppRuntime из отдельного локального хранилища установки
+  - **Acceptance criteria:**
+    - AppRuntime владеет единственным экземпляром хранилища и передаёт загруженный режим и его зависимость контейнеру контроллера. Чтение начинается параллельно с подготовкой графа; отсутствие, неизвестный ключ и отказ чтения не превращаются в ошибку bootstrap. Повтор bootstrap не создаёт конкурирующие очереди; новый runtime и новый контейнер читают сохранённое значение заново.
+    - Production-сборка получает каталог app_flutter через path_provider; пакет становится прямой зависимостью с уже закреплённой версией. Файл настройки остаётся в исключённом settings-каталоге по ADR-0021 и [ADR-0004](../../../docs/adr/0004-keep-personal-graph-device-local.md); схема базы, разрешения Android и правила резервного копирования не расширяются.
+    - Зависимости файлового адаптера в тестах подставляются явно. Жизненный цикл не допускает обращения позднего результата к освобождённому контейнеру и не выдаёт ожидающие записи за сохранённые; действующее завершение команд графа и состояния отказа его подготовки сохраняются.
+  - **Verification:**
+    - Добавить сценарии bootstrap с сохранёнными четырьмя режимами, отсутствующим/повреждённым файлом, отказом чтения и повторной подготовкой графа. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/bootstrap test/app/quick_creation`.
+    - Разрешить зависимости без обновления закреплённых версий и инструментов; проверить diff pubspec/lockfile и расположение файла относительно существующих Android backup/transfer-исключений.
+  - **Dependencies:** 3.4 — проверенная граница хранения и контроллера.
+  - **Files likely touched:** `lib/src/app/app_runtime.dart`, `pubspec.yaml`, `pubspec.lock`, новый файл проверки настройки runtime в `test/app/bootstrap/`; при необходимости отдельная production-фабрика адаптера в `lib/src/app/quick_creation/`.
+  - **Estimated scope:** M — одна сборка настройки при запуске, до 5 рукописных файлов.
+
+- [ ] 3.6 Предоставить локализованные названия и значки всех четырёх режимов
+  - **Acceptance criteria:**
+    - По требованию «Локализация и доступность быстрого создания» добавлены русские и английские названия кнопки, действия смены режима, четырёх режимов, заголовка меню и подсказки долгого нажатия. Формулировки режимов точно соответствуют спецификации; сохраняется английский fallback.
+    - Представление QuickCreationMode исчерпывающе сопоставляет режимам название и значки узла, звена цепи, стрелок вниз и вверх; порядок не зависит от данных или локали. Стрелки смены режима используют предусмотренный дизайном смысл. Хранилище не зависит от локализации или Flutter-значков.
+  - **Verification:**
+    - Сгенерировать локализацию через `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter gen-l10n`; выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation test/app/localization`. Проверить оба языка, fallback, полный порядок и различие направлений.
+  - **Dependencies:** 3.1 — закрытый набор режимов.
+  - **Files likely touched:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, новый адаптер представления режима и его тест в `lib/src/app/quick_creation/` и `test/app/quick_creation/`; производные `lib/l10n/app_localizations*.dart`.
+  - **Estimated scope:** M — локализованное представление одного набора режимов, 4 рукописных файла.
+
+- [ ] 3.7 Запускать каждый режим над конкретной исходной страницей через готовые потоки
+  - **Acceptance criteria:**
+    - QuickCreationLauncher исчерпывающе направляет четыре режима в IntentionEditorRoute, RelationEditorRoute с RelationBlankCreationContext и существующий DailyChoiceCreationLauncher для двух направлений. Исходный контекст принадлежит текущей обычной странице, включая выбранную корневую вкладку; запуск не сбрасывает историю, выбранный пункт или несохранённый ввод.
+    - Экземпляр панели владеет ExclusiveOperation до открытия первой страницы, а для дневного выбора — до возврата поиска и открытия пути. Двойное нажатие до следующего кадра запускает один поток; независимые страницы могут запускать свои потоки. Завершение Future возврата маршрута не подменяет свидетельство его открытия; отменённый или потерявший исходную страницу запуск не продолжает навигацию.
+    - Сборка приложения использует публичные границы Phase 2 и [ADR-0022](../../../docs/adr/0022-complete-creation-flows-within-owned-route-boundaries.md); модули сущностей не зависят от quick_creation. Отказ открытия освобождает блокировку без автоматического повтора и диагностируется безопасно; правила записи, завершения и сообщений потоков сохраняются.
+  - **Verification:**
+    - С настоящим AppRouter проверить все режимы над корнем и глубокой страницей, быстрые повторные вызовы, отказ открытия, отмену поиска и поздний результат после сброса. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation test/daily_choice/presentation/daily_choice_creation_launcher_test.dart test/shared/presentation/exclusive_operation_test.dart`.
+  - **Dependencies:** 2.26 — рабочие потоки; 3.1 — режим; 3.5 — рабочая сборка приложения.
+  - **Files likely touched:** Новый launcher и при необходимости узкая сборка принадлежности запуска в `lib/src/app/quick_creation/`, их проверки с реальными маршрутами в `test/app/quick_creation/`.
+  - **Estimated scope:** M — композиция четырёх готовых входов без переписывания потоков, 2–4 файла.
+
+- [ ] 3.8 Подтвердить восстановление настройки и готовность общей границы запуска
+  - **Acceptance criteria:**
+    - Новый AppRuntime с новым контейнером восстанавливает сохранённый режим, а отказ настройки оставляет приложение работоспособным с предусмотренным fallback и диагностикой. Загрузка графа и его отказы сохраняют прежние границы.
+    - Все четыре режима имеют проверенный запуск над точной исходной историей с независимыми блокировками и безопасной отменой. Русские и английские названия, порядок и значки согласованы со спецификацией.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/bootstrap test/app/quick_creation test/app/localization test/daily_choice/presentation/daily_choice_creation_launcher_test.dart` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.5, 3.6, 3.7.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 3.9 Предоставить модальное меню с выбором режима без запуска создания
+  - **Acceptance criteria:**
+    - Меню показывает ровно четыре режима в установленном порядке с названием, значком и отметкой текущего режима, различимой без цвета. Выбор передаёт режим контроллеру, закрывает меню и не вызывает launcher; выбор текущего режима и закрытие без выбора сохраняют его.
+    - Меню открывается над текущей страницей с барьером, исключающим нижележащие страницу и панель из взаимодействия, фокуса и доступной семантики. После закрытия сохраняются точная история, выбранный пункт и ввод.
+    - При задержанных записях меню можно снова открыть и выбрать B; оно сразу отражает B, а поздний исход A не меняет выбор. Все названия доступны при увеличенном тексте, при необходимости через прокрутку.
+  - **Verification:**
+    - Добавить widget-проверки выбора, повторного выбора, закрытия фоном и «назад», модальности, обеих локалей и задержанного хранения. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation`; использовать обычные нажатия и семантику, а не прямой вызов обработчиков.
+  - **Dependencies:** 3.8 — проверенный контроллер и локализованное представление.
+  - **Files likely touched:** Новый компонент меню в `lib/src/app/quick_creation/` и его проверки в `test/app/quick_creation/`.
+  - **Estimated scope:** S — один модальный компонент и его тест, 2 файла.
+
+- [ ] 3.10 Предоставить доступную кнопку быстрого создания с отдельным действием смены режима
+  - **Acceptance criteria:**
+    - Кнопка получает режим и явные действия запуска и открытия меню, изображает плюс с малым значком режима и стрелками вверх-вниз на собственной тональной подложке без видимой подписи. Она не имеет выбранного состояния или положения среди пунктов.
+    - Обычное нажатие вызывает только запуск; долгое нажатие открывает меню вместо tooltip и не запускает создание. Экранный диктор получает роль кнопки, «Быстрое создание» / «Quick create», текущий режим, подсказку долгого нажатия и самостоятельное действие «Сменить режим» / «Change mode».
+    - В обоих языках и при тексте 2.6 значки не обрезаны, зона нажатия доступна; отдельное действие семантики действительно открывает меню. Компонент не знает маршрутизатор, файловые пути или контейнер приложения.
+  - **Verification:**
+    - Проверить tap, longPress и доступное действие, каждое из четырёх представлений и отсутствие запуска при смене режима. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation`; проверять геометрию, hitTestable и отсутствие исключений раскладки.
+  - **Dependencies:** 3.6 — названия и значки; 3.9 — контракт открытия меню.
+  - **Files likely touched:** Новый компонент кнопки и его проверки в `lib/src/app/quick_creation/` и `test/app/quick_creation/`.
+  - **Estimated scope:** S — один компонент и его тест, 2 файла.
+
+- [ ] 3.11 Подтвердить контракт кнопки и меню перед подключением к навигации
+  - **Acceptance criteria:**
+    - Нажатие, долгое нажатие и действие экранного диктора имеют разные подтверждённые результаты. Меню блокирует фон, сохраняет историю и меняет общий режим без запуска; незавершённое сохранение не блокирует повторный выбор.
+    - Все четыре режима доступны независимо от графа, строки обоих языков и семантика согласованы; компонентные проверки не выдаются за интеграцию в каждую страницу приложения.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation test/app/bootstrap` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.9, 3.10.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 3.12 Отвязать проверки переходов и истории от внутреннего типа пункта NavigationDestination
+  - **Acceptance criteria:**
+    - Проверки оболочки, возврата, глубокой истории и сохранения состояния находят конкретный пункт по его публичному назначению и наблюдаемой семантике или значку, не через индекс NavigationDestination. Настоящие нажатия и точные проверки маршрутов сохраняются.
+    - Общий helper остаётся в test/support/app_root_pages.dart; перенос не ослабляет сброс к текущему пункту, состояние корней, матрицу страниц, модальные ограничения и поздние результаты. На действующей панели все перенесённые проверки проходят до замены компонента.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/support/app_root_pages_test.dart test/app/navigation/app_shell_test.dart test/app/navigation/app_shell_back_test.dart test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_state_test.dart`.
+  - **Dependencies:** 3.11 — согласованный контракт новой кнопки; это подготовка тестов перед заменой общей панели.
+  - **Files likely touched:** `test/support/app_root_pages.dart`, `test/app/navigation/app_shell_test.dart`, `test/app/navigation/app_shell_back_test.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/app/navigation/app_shell_state_test.dart`.
+  - **Estimated scope:** M — механическая адаптация входов четырёх связанных наборов без изменения поведения, до 5 файлов.
+
+- [ ] 3.13 Сохранить проверки геометрии и семантики панели при смене её внутренней реализации
+  - **Acceptance criteria:**
+    - Проверки доступности, раскладки и обычного каркаса используют назначение пункта и фактическую геометрию AppNavigationBar вместо NavigationDestination/NavigationBar. Сохраняются три пункта, локализованные позиции среди трёх, единственный выбор, подсказки, видимость содержимого и сообщений.
+    - Проверка Widgetbook оценивает публичный компонент и его наблюдаемое представление. Замена поиска не подменяет семантическую или геометрическую проверку чтением свойства виджета; старые кнопки каталогов пока сохраняются.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/navigation/app_navigation_accessibility_test.dart test/app/navigation/app_shell_layout_test.dart test/app/navigation/ordinary_page_scaffold_test.dart` и из widgetbook/ — `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub`.
+  - **Dependencies:** 3.12 — общий способ выбора пунктов.
+  - **Files likely touched:** `test/app/navigation/app_navigation_accessibility_test.dart`, `test/app/navigation/app_shell_layout_test.dart`, `test/app/navigation/ordinary_page_scaffold_test.dart`, `widgetbook/test/widgetbook_app_test.dart`.
+  - **Estimated scope:** M — перенос четырёх наборов проверок без ослабления контрактов.
+
+- [ ] 3.14 Подключить общую панель с тремя пунктами и действующей кнопкой всех четырёх режимов
+  - **Acceptance criteria:**
+    - По решению 5 дизайна AppNavigationBar получает четыре равных места: Главная, Дневные выборы, быстрое создание, Граф намерений. Пункты сохраняют названия, значки, Material 3-индикатор, подсказки и позиции среди трёх; кнопка не становится выбранной. Высота остаётся 64 плюс нижний безопасный отступ, цвета используют существующую тему.
+    - AppNavigation собирает один наблюдаемый контроллер режима, меню и launcher с собственным состоянием запуска каждого экземпляра панели. Исходный контекст выбранной корневой страницы передаётся корректно, хотя панель оболочки находится вне вкладок. На корнях и глубоких обычных страницах все четыре режима работают сразу; обычные страницы над задачами сохраняют возможность независимого запуска.
+    - AppShellTabInsets, единственный Hero на маршрут, сброс истории и модальность сохраняются по [ADR-0020](../../../docs/adr/0020-host-persistent-navigation-in-ordinary-page-scaffolds.md). Прямые потребители AppNavigationBar и Widgetbook получают явные новые параметры; продуктовая панель не содержит заглушек действий или неполного меню.
+  - **Verification:**
+    - Обновить компонентные проверки новой раскладки, семантики и трёх выбранных состояний. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/navigation test/app/quick_creation test/app/bootstrap` и из widgetbook/ — `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub`; проверить реальные нажатия запуска с корневой вкладки и обычной страницы.
+  - **Dependencies:** 3.8 — runtime и launcher; 3.11 — готовые компоненты; 3.12, 3.13 — перенос зависимых проверок.
+  - **Files likely touched:** `lib/src/app/navigation/app_navigation_bar.dart`, `lib/src/app/navigation/app_navigation.dart`, `test/app/navigation/app_navigation_bar_test.dart`, `widgetbook/lib/navigation/app_navigation_bar_use_cases.dart`, новый интеграционный тест подключения в `test/app/quick_creation/`.
+  - **Estimated scope:** M — сборка уже проверенных компонентов и обновление прямых потребителей, около 5 файлов.
+
+- [ ] 3.15 Подтвердить общую точку входа на корневых и глубоких обычных страницах
+  - **Acceptance criteria:**
+    - Кнопка доступна всюду, где доступна панель, а каждый режим открывает правильный поток без смены пункта. Меню обновляет общий режим всех экземпляров, блокирует фон и не создаёт сущность.
+    - Матрица видов страниц, состояния корней, возврат, сброс, геометрия сообщений и независимость принятых команд остаются успешными. Новые способы создания проверены до удаления прежних входов каталогов.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/navigation test/app/quick_creation test/app/bootstrap test/graph/presentation` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.12, 3.13, 3.14.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 3.16 Перевести общие навигационные сценарии создания на реальные действия новой панели
+  - **Acceptance criteria:**
+    - Узкий test helper выполняет выбор режима через меню и отдельное нажатие кнопки, поддерживает ожидание конкретного сценария и не подменяет вход прямым push или вызовом callback. Проверяет отсутствие запуска от выбора меню.
+    - Сценарии оболочки, матрица страниц и геометрия обычных страниц используют этот helper вместо catalog-create-intention и daily-choice-create-from-action. Проверки создания, отмены, модальности и исходной истории сохраняют наблюдаемые результаты.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/navigation test/app/quick_creation`; проверить helper в обоих режимах прежних каталогов и отсутствие обращения к старым кнопкам в перенесённых сценариях.
+  - **Dependencies:** 3.15 — работоспособная общая панель.
+  - **Files likely touched:** Новый helper в `test/support/`, `test/app/navigation/app_shell_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/app/navigation/ordinary_page_layout_scenarios.dart`.
+  - **Estimated scope:** M — один тестовый вход и четыре потребителя, до 5 файлов.
+
+- [ ] 3.17 Перевести проверки формы намерения на запуск кнопкой быстрого создания
+  - **Acceptance criteria:**
+    - Проверки редактора, тегов, компактной геометрии и доступности открывают создание через helper 3.16. Новый вход сохраняет пустой самостоятельный черновик, фокус, модальность, защищённое закрытие и принадлежность результата сессии.
+    - Изменение входа не удаляет проверки клавиатуры, размеров, русского и английского текста, атомарного сохранения тегов и состояний, отказов и позднего результата. Собственные тестовые кнопки продукта не добавляются.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/intention/presentation/editor`; подтвердить отсутствие старого ключа catalog-create-intention в перенесённых проверках и сохранение их прежних утверждений.
+  - **Dependencies:** 3.16 — проверенный пользовательский вход в тестах.
+  - **Files likely touched:** `test/intention/presentation/editor/intention_editor_page_test.dart`, `intention_creation_sheet_layout_test.dart`, `intention_creation_tags_test.dart`, `intention_creation_sheet_accessibility_test.dart` в том же каталоге.
+  - **Estimated scope:** M — перенос четырёх связанных наборов тестов формы.
+
+- [ ] 3.18 Перевести сквозные сценарии намерений, тегов и связей на общую кнопку создания
+  - **Acceptance criteria:**
+    - Прежние сценарии приложения создают намерение через меню и кнопку общей панели, сохраняя фактические координатор, маршрутизатор и локальное хранилище там, где они уже использовались.
+    - Поиск по тегам, долговечность намерения, модальная работа с тегами и входы связи из групп сохраняют прежние проверки. Новая точка входа не сбрасывает выбранный раздел, фильтры или прокрутку; утверждения о записи и принадлежности созданного ID сохраняются.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/intention_creation_sheet_tags_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/intention_app_lifecycle_test.dart test/app/long_term_relation_app_flow_test.dart test/app/intention_tag_search_app_flow_test.dart`.
+  - **Dependencies:** 3.16 — общий helper; 3.17 — подтверждённая форма через новый вход.
+  - **Files likely touched:** Пять перечисленных файлов проверок в `test/app/`.
+  - **Estimated scope:** M — механический перенос пользовательского входа в пяти сценарных файлах.
+
+- [ ] 3.19 Подтвердить сохранность поведения намерений после переноса пользовательского входа
+  - **Acceptance criteria:**
+    - Проверки формы и сквозных сценариев через общую кнопку сохраняют прежние гарантии черновика, тегов, однократной записи, закрытия и открытия созданного ID. Навигационная матрица проверяет новый пользовательский запуск.
+    - Выполненные задачи прежних фаз не переоткрываются; контрольная точка оценивает свежую интеграцию Phase 3. Старые кнопки ещё не используются перенесёнными сценариями.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/navigation test/app/intention_creation_sheet_integration_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/intention_app_lifecycle_test.dart test/intention/presentation/editor` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.16, 3.17, 3.18.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 3.20 Перевести сценарии дневного выбора на запуск режима от действия через общую панель
+  - **Acceptance criteria:**
+    - Проверки дневного выбора используют helper 3.16 с режимом «Дневной выбор от действия» вместо кнопки каталога. Выбор режима и отдельный запуск подтверждаются реальными действиями; направление, выбранный ID и исходная история остаются прежними.
+    - Проверки долговечности, завершения, отмены, позднего результата и независимости начального поиска сохраняются. Прямые вызовы публичного launcher остаются только там, где проверяется его собственный контракт, а не пользовательская точка входа.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/daily_choice_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart test/daily_choice/presentation/daily_choice_creation_launcher_test.dart`.
+  - **Dependencies:** 3.19 — проверенный перенос общих входов.
+  - **Files likely touched:** `test/app/daily_choice_app_flow_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_launcher_test.dart`.
+  - **Estimated scope:** M — перенос четырёх сценарных файлов дневного выбора.
+
+- [ ] 3.21 Убрать собственную кнопку создания намерения и зарезервированное под неё место
+  - **Acceptance criteria:**
+    - По требованию «Точки входа в каталоги» [спецификации навигации](specs/app-navigation/spec.md) и решению 12 дизайна IntentionCatalogPage больше не строит FloatingActionButton и не резервирует _createActionExtent в выдаче. Создание доступно общей кнопкой во всех состояниях каталога.
+    - Последняя строка, подгрузка и повтор после отказа полностью видимы и нажимаемы над панелью при безопасных отступах и клавиатуре. Сохраняются охват, поиск, теги, порции и прокрутка; вход «Теги» и действия создания на странице намерения остаются.
+    - Проверки каталога и раскладки заменяют ожидания старой кнопки и её отступа проверками новой доступной области, не удаляя утверждения о конце выдачи и сообщениях.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/intention/presentation/catalog/intention_catalog_page_test.dart test/app/navigation/app_shell_layout_test.dart test/app/navigation test/intention/presentation/editor` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.19 — все прежние потребители входа намерения перенесены; 3.20 — дневные сценарии готовы к общей раскладке.
+  - **Files likely touched:** `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/app/navigation/app_shell_layout_test.dart`.
+  - **Estimated scope:** M — удаление одного действия и проверка освобождённой области, 3 файла.
+
+- [ ] 3.22 Убрать собственную кнопку дневного выбора и её отступы во всех состояниях каталога
+  - **Acceptance criteria:**
+    - DailyChoiceCatalogPage больше не строит расширенную кнопку, не владеет её launcher и не добавляет _createActionExtent в список либо пустые и ошибочные состояния. Оба дневных режима доступны через общую панель.
+    - Сохраняются выбранная дата, фильтр выполнения, просмотр календаря, загруженные порции и прокрутка. Последняя запись, продолжение и повтор полностью доступны над панелью; создание на другую дату не меняет каталог.
+    - Проверки каталога и общей раскладки используют новый вход и фактическую границу панели. Общая локализация не теряет строки, ещё используемые другими экранами; удаление мёртвых импортов и комментариев ограничено этим действием.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/daily_choice/presentation/catalog test/app/navigation/app_shell_layout_test.dart test/app/daily_choice_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.20 — перенесённые сценарии дневного выбора; 3.21 — первая часть обновления общей проверки раскладки.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`, `test/app/navigation/app_shell_layout_test.dart`.
+  - **Estimated scope:** M — удаление одного действия во всех состояниях выдачи, 4 файла.
+
+- [ ] 3.23 Подтвердить замену действий каталогов без потери предусмотренных входов
+  - **Acceptance criteria:**
+    - В обоих каталогах отсутствуют прежние кнопки и места под них; их создание выполняется через общую панель. Входы дневного выбора и исходящей/входящей связи со страницы намерения, создание тега и редактирование существующих сущностей сохраняются.
+    - Все перенесённые сценарии проходят, а поиск старых ключей обнаруживает только осмысленные проверки отсутствия. Нет отключённых сценариев, ослабленных проверок либо продуктовых заглушек ради миграции тестов.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app test/intention/presentation test/daily_choice/presentation test/long_term_relation/presentation` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`; найти оставшиеся ссылки на catalog-create-intention и daily-choice-create-from-action и проверить назначение каждого совпадения.
+  - **Dependencies:** 3.20, 3.21, 3.22.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 3.24 Проверить четыре режима через общую кнопку с глубокой историей и чужими незавершёнными задачами
+  - **Acceptance criteria:**
+    - Интеграционная матрица запускает каждый режим реальным меню и нажатием кнопки на всех трёх корнях и глубокой обычной странице над чужим черновиком, включая незавершённую правку намерения. Проверены успех с правильным новым ID, возврат к точной исходной истории, явная отмена без команды, обычный возврат на шаг и выход после принятой записи.
+    - Быстрые повторные нажатия дают один поток; вложенный запуск с другой обычной страницы независим. Два поиска одного назначения сохраняют собственные фильтры, теги, выдачу и позицию. Все режимы остаются доступны в пустом графе: поиски объясняют отсутствие кандидатов, связь открывается пустой, лишних записей нет.
+    - Проверки Phase 2 частичных отказов, терминального состояния и поздних обработчиков остаются успешными после подключения панели. Сквозной сценарий использует настоящий локальный граф и AppRouter; задержанные результаты не меняют новую сессию, а общие сообщения сохраняют однократность и доступность.
+  - **Verification:**
+    - Расширить существующую матрицу создания входом через продуктовую панель; проверять matchId исходной истории, сохранённый ввод и число записей, а не только имена маршрутов. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/creation_flows_integration_test.dart test/app/quick_creation test/app/navigation test/daily_choice/presentation test/long_term_relation/presentation/editor test/intention/presentation/editor`.
+  - **Dependencies:** 3.23 — окончательная замена пользовательских входов; 2.26 — действующие контракты потоков.
+  - **Files likely touched:** `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`, `test/support/intention_creation_origin.dart`, новый файл сценариев повторного/вложенного запуска и пустого графа в `test/app/quick_creation/`.
+  - **Estimated scope:** M — интеграция проверенных потоков через реальную точку входа, до 4 тестовых файлов.
+
+- [ ] 3.25 Подтвердить восстановление последнего успешного режима после завершения процесса
+  - **Acceptance criteria:**
+    - Проверка с реальным файлом и свежим AppRuntime/контейнером охватывает первый запуск, каждый сохранённый режим, неизвестное содержимое и отказ чтения. После запуска открывается Главная, а нажатие кнопки запускает восстановленный режим; выбранный навигационный пункт не восстанавливается.
+    - При управляемых задержках и отказах A → B и A → B → A интерфейс всех панелей сразу показывает последний выбор, меню доступно, каждая запись имеет собственную попытку. Новый процесс получает последний успешный режим для четырёх сочетаний исходов, двух отказов с последующим успехом и завершения до обработки очереди.
+    - Свидетельство межпроцессной долговечности использует общий временный каталог и отдельный процесс, не только два объекта в общей памяти. Каждый отказ имеет событие read/write с безопасной категорией без пользовательского сообщения; отказ получателя не ломает продолжение. Реальная сборка runtime проверяется отдельно от низкоуровневого файлового worker.
+  - **Verification:**
+    - Добавить процессную проверку по существующему образцу test/support/*_process_worker.dart и интеграционные сценарии нового runtime. Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation test/app/bootstrap`; сравнить фактический файл, восстановленный режим и события каждой попытки. Не объявлять ожидающие операции сохранёнными.
+  - **Dependencies:** 3.4 — матрица файлового адаптера; 3.5 — runtime; 3.14 — настоящий интерфейс; 3.23 — окончательные входы.
+  - **Files likely touched:** Новые проверки перезапуска и задержанного меню в `test/app/quick_creation/`, проверка настройки runtime из 3.5 в `test/app/bootstrap/`, новый узкий процессный worker в `test/support/`.
+  - **Estimated scope:** M — одна граница долговечности от выбора до нового процесса, до 4 тестовых файлов.
+
+- [ ] 3.26 Подтвердить доступность общей панели и меню в поддерживаемых условиях отображения
+  - **Acceptance criteria:**
+    - Матрица включает русский, английский и fallback, текст 1.0 и 2.6, телефон 400×800, планшет 800×1280 и 1280×800 при DPR 1, безопасные отступы 0/0 и 24/32, клавиатуру 0/260. У кнопки видны плюс, значок режима и стрелки; каждый режим меню читаем и выбирается обычным нажатием после допустимой прокрутки.
+    - Семантика пунктов сохраняет позиции среди трёх и единственный выбор, а кнопка имеет название, режим, роль и действие смены режима без позиции/выбора. Проверено именно семантическое действие открытия меню; открытый барьер исключает нижележащие элементы из действий и фокуса, закрытие возвращает их.
+    - Последние строки, продолжение, поля и сообщения доступны над новой панелью. Переходы и жест «назад» сохраняют один видимый экземпляр без конфликтов Hero, включая смену режима между обычными страницами; скрытая панель не получает фокус или право подтвердить видимость сообщения. Визуальная сверка в приложении подтверждает читаемость малого значка режима около 12 логических пикселей и его отличие от стрелок смены режима.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/navigation/app_navigation_accessibility_test.dart test/app/navigation/app_navigation_transition_test.dart test/app/navigation/app_shell_layout_test.dart test/app/quick_creation`. Проверять полные прямоугольники конкретных элементов, hitTestable, обычные нажатия, семантику и tester.takeException(); вызов callback не доказывает достижимость.
+    - При доступном устройстве проверить экранный диктор, долгое нажатие, переходы и обычный/предиктивный жест «назад» в самом приложении через `MISE_AUTO_INSTALL=false mise run start`; зафиксировать устройство и результаты для итоговой готовности. После изменений Dart обнаружить приложение через Dart MCP, перезагрузить или перезапустить и проверить get_runtime_errors; иначе выполнить CLI-проверки и явно отметить отсутствие ручного свидетельства. Новые примеры Widgetbook не входят в пакет по решению пользователя.
+  - **Dependencies:** 3.24 — проверенная интеграция; 3.25 — режим при задержках и перезапуске.
+  - **Files likely touched:** `test/app/navigation/app_navigation_accessibility_test.dart`, `test/app/navigation/app_navigation_transition_test.dart`, новый общий сценарный файл геометрии кнопки и меню в `test/app/quick_creation/`; при выявленных локальных дефектах — компоненты кнопки и меню из 3.9–3.10.
+  - **Estimated scope:** M — проверка одного общего интерфейса, до 5 файлов.
+
+- [ ] 3.27 Подтвердить совместную работу режимов, истории и хранения перед итоговой проверкой
+  - **Acceptance criteria:**
+    - Новые интеграционные проверки подтверждают четыре режима, вложенный запуск, пустой граф, сохранность истории, независимость поисков и однократность принятых операций.
+    - Перезапуск, очередь сохранений и матрица доступности подтверждены свежими результатами. Отказы хранения не блокируют интерфейс, не показывают пользовательскую ошибку и не теряют диагностику; прежние правила сообщений и навигации сохраняются.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter test --no-pub test/app/quick_creation test/app/bootstrap test/app/creation_flows_integration_test.dart test/app/navigation test/graph/presentation` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`.
+  - **Dependencies:** 3.24, 3.25, 3.26.
+  - **Files likely touched:** Нет — только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 3.28 Подтвердить условие готовности Phase 3 свежими свидетельствами всего изменения
+  - **Acceptance criteria:**
+    - Условие Ready to advance [Phase 3](plan.md) подтверждено для общей кнопки, четырёх режимов, меню, навигации, потоков, глубокой истории и нового процесса. Матрица очереди включает задержки, все исходы, продолжение после отказов и безопасную диагностику; локализация, доступность и визуальная сверка подтверждены отдельно.
+    - Генерация, анализ, полные тесты приложения и Widgetbook, release-сборка и проверка итогового Android privacy manifest успешны. Файл настройки остаётся вне графа и внутри существующих исключений backup/transfer; схема графа, предметные правила и статусы ADR сохраняются. Контракты и русские комментарии описывают действующее поведение.
+    - В документе готовности указаны точная проверенная ревизия, команды, результаты и ограничения ручной проверки. Неуспешная обязательная проверка остаётся препятствием готовности; прежние свидетельства других фаз не заменяют свежую проверку. Архивация изменения и публикация не выполняются этой задачей.
+  - **Verification:**
+    - Выполнить `MISE_AUTO_INSTALL=false mise run codegen-check`, `MISE_AUTO_INSTALL=false mise run check`, `MISE_AUTO_INSTALL=false mise exec --no-deps -- flutter build apk --release` и `mise exec --no-deps -- openspec validate add-quick-creation-and-persistent-navigation --strict --json`. Запустить существующий `tool/check_android_privacy_manifest.dart` через `mise exec --no-deps -- dart run` с фактическими путями aapt2 и release APK по шагу Verify packaged Android privacy manifest из `.github/workflows/ci.yml`. Инструменты не устанавливать и не обновлять.
+    - При работающем приложении выполнить горячую перезагрузку или перезапуск через Dart MCP и проверить get_runtime_errors; учесть ручные свидетельства 3.26. Сверить все спецификации изменения и контрольные точки 3.4, 3.8, 3.11, 3.15, 3.19, 3.23 и 3.27 с фактическими результатами. Если документ следует отдельным коммитом, подтвердить неизменность проверенных исходников, тестов, зависимостей и конфигурации между ревизиями.
+  - **Dependencies:** 3.4, 3.8, 3.11, 3.15, 3.19, 3.23, 3.24, 3.25, 3.26, 3.27 — все реализации и проверки Phase 3.
+  - **Files likely touched:** Новый документ свидетельств Phase 3 в проверенном каталоге `docs/verification/`; только результаты проверки готовности.
+  - **Estimated scope:** XS.
