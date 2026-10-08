@@ -24,6 +24,38 @@
   "@appDestinationIntentionGraph": {
     "description": "Название пункта основной навигации и заголовок каталога намерений как корневой страницы"
   },
+  "quickCreationLabel": "Quick create",
+  "@quickCreationLabel": {
+    "description": "Доступное название кнопки быстрого создания"
+  },
+  "quickCreationChangeMode": "Change mode",
+  "@quickCreationChangeMode": {
+    "description": "Отдельное доступное действие открытия меню режимов быстрого создания"
+  },
+  "quickCreationMenuTitle": "Quick creation mode",
+  "@quickCreationMenuTitle": {
+    "description": "Заголовок меню выбора режима быстрого создания"
+  },
+  "quickCreationLongPressHint": "Touch and hold to change mode",
+  "@quickCreationLongPressHint": {
+    "description": "Подсказка долгого нажатия на кнопку быстрого создания для экранного диктора"
+  },
+  "quickCreationModeIntention": "New intention",
+  "@quickCreationModeIntention": {
+    "description": "Название режима создания намерения"
+  },
+  "quickCreationModeRelation": "New relation",
+  "@quickCreationModeRelation": {
+    "description": "Название режима создания долговременной связи"
+  },
+  "quickCreationModeDailyChoiceFromIntention": "Daily choice from an intention",
+  "@quickCreationModeDailyChoiceFromIntention": {
+    "description": "Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз"
+  },
+  "quickCreationModeDailyChoiceFromAction": "Daily choice from an action",
+  "@quickCreationModeDailyChoiceFromAction": {
+    "description": "Название режима дневного выбора с поиском действия и построением пути снизу вверх"
+  },
   "homeFavoritesHeading": "Favorite intentions",
   "@homeFavoritesHeading": {
     "description": "Название списка избранных намерений на Главной"

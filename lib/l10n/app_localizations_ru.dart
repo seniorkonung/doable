@@ -28,6 +28,33 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Граф намерений';
 
   @override
+  String get quickCreationLabel => 'Быстрое создание';
+
+  @override
+  String get quickCreationChangeMode => 'Сменить режим';
+
+  @override
+  String get quickCreationMenuTitle => 'Режим быстрого создания';
+
+  @override
+  String get quickCreationLongPressHint =>
+      'Нажмите и удерживайте, чтобы сменить режим';
+
+  @override
+  String get quickCreationModeIntention => 'Новое намерение';
+
+  @override
+  String get quickCreationModeRelation => 'Новая связь';
+
+  @override
+  String get quickCreationModeDailyChoiceFromIntention =>
+      'Дневной выбор от намерения';
+
+  @override
+  String get quickCreationModeDailyChoiceFromAction =>
+      'Дневной выбор от действия';
+
+  @override
   String get homeFavoritesHeading => 'Избранные намерения';
 
   @override

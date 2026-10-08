@@ -28,6 +28,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Intention graph';
 
   @override
+  String get quickCreationLabel => 'Quick create';
+
+  @override
+  String get quickCreationChangeMode => 'Change mode';
+
+  @override
+  String get quickCreationMenuTitle => 'Quick creation mode';
+
+  @override
+  String get quickCreationLongPressHint => 'Touch and hold to change mode';
+
+  @override
+  String get quickCreationModeIntention => 'New intention';
+
+  @override
+  String get quickCreationModeRelation => 'New relation';
+
+  @override
+  String get quickCreationModeDailyChoiceFromIntention =>
+      'Daily choice from an intention';
+
+  @override
+  String get quickCreationModeDailyChoiceFromAction =>
+      'Daily choice from an action';
+
+  @override
   String get homeFavoritesHeading => 'Favorite intentions';
 
   @override
