@@ -21,7 +21,7 @@ void _registerPrimaryNavigationScenarios() {
         expect(entry.hitTestable(), findsOneWidget);
         expect(
           tester.getSemantics(entry),
-          containsSemantics(
+          isSemantics(
             hasSelectedState: true,
             isSelected: destination == AppDestination.home,
             hasTapAction: true,

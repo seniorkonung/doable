@@ -126,7 +126,7 @@ void _expectPrimaryDestination(
     expect(entry.hitTestable(), findsOneWidget);
     expect(
       tester.getSemantics(entry),
-      containsSemantics(
+      isSemantics(
         hasSelectedState: true,
         isSelected: item == destination,
         hasTapAction: true,
