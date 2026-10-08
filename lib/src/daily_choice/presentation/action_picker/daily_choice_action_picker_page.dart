@@ -73,16 +73,27 @@ final class _DailyChoiceActionPickerPageState
         ),
       ),
       bottomNavigationBar: switch (widget.pickerContext) {
-        InitialDailyChoicePickerContext() => SafeArea(
-          child: CreationExitAction(
-            state: CreationExitState.cancellable,
-            onExit: () => unawaited(_close()),
+        // Scaffold не поднимает bottomNavigationBar над клавиатурой:
+        // https://api.flutter.dev/flutter/material/Scaffold/bottomNavigationBar.html
+        InitialDailyChoicePickerContext() => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SafeArea(
+            top: false,
+            child: CreationExitAction(
+              state: CreationExitState.cancellable,
+              onExit: () => unawaited(_close()),
+            ),
           ),
         ),
         AuxiliaryDailyChoicePickerContext() => null,
       },
       body: SafeArea(
         child: IntentionSearchLayout(
+          resultsExtent: IntentionSearchResults.showsList(catalog)
+              ? IntentionSearchResultsExtent.fullViewport
+              : IntentionSearchResultsExtent.remainingWhenSufficient,
           controls: Column(
             children: [
               Padding(

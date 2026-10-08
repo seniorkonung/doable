@@ -10,6 +10,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -32,13 +33,14 @@ void defineDailyChoicePickerContextTests({
   required String noMatchesMessage,
   required String detailsTooltip,
 }) {
+  _defineKeyboardCancellationTests(route: route, keyPrefix: keyPrefix);
   for (final (language, cancelLabel) in [
     ('ru', 'Отменить создание'),
     ('en', 'Cancel creation'),
   ]) {
-    testWidgets('$language: отмена начального поиска прекращает только его '
-        'запуск до закрытия и сохраняет вложенную историю', (tester) async {
-      tester.view.physicalSize = const Size(400, 900);
+    testWidgets('$language: верхний крестик при клавиатуре прекращает только '
+        'свой запуск и сохраняет вложенную историю', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final semantics = tester.ensureSemantics();
@@ -64,9 +66,17 @@ void defineDailyChoicePickerContextTests({
       final lateSelection = tester
           .widget<IntentionSummaryView>(find.byType(IntentionSummaryView).last)
           .onTap!;
-      final action = find.widgetWithText(TextButton, cancelLabel);
+      await tester.showKeyboard(find.byKey(ValueKey('$keyPrefix-filter')));
+      _setPickerInsets(tester, keyboard: 260, safe: true);
+      await tester.pumpAndSettle();
+      final action = find.byKey(ValueKey('$keyPrefix-cancel'));
       expect(action, findsOneWidget);
       expect(action.hitTestable(), findsOneWidget);
+      expect(tester.getRect(action).bottom, lessThanOrEqualTo(540));
+      expect(
+        tester.getSemantics(action).getSemanticsData().tooltip,
+        cancelLabel,
+      );
       expect(
         tester
             .getSemantics(action)
@@ -74,10 +84,8 @@ void defineDailyChoicePickerContextTests({
             .hasAction(SemanticsAction.tap),
         isTrue,
       );
-      final pickerId = router.current.matchId;
-      tester.widget<TextButton>(action).onPressed!();
+      await tester.tap(action);
       expect(launch.isActive, isFalse);
-      expect(router.stackData.any((data) => data.matchId == pickerId), isTrue);
       lateSelection();
       await tester.pumpAndSettle();
       expect(await selection, isNull);
@@ -312,6 +320,174 @@ void defineDailyChoicePickerContextTests({
     expect(find.text('Cancel creation'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+}
+
+void _defineKeyboardCancellationTests({
+  required PageRouteInfo Function(DailyChoicePickerContext) route,
+  required String keyPrefix,
+}) {
+  for (final language in ['ru', 'en']) {
+    for (final scale in [1.0, 2.6]) {
+      for (final size in [
+        const Size(400, 800),
+        const Size(800, 1280),
+        const Size(1280, 800),
+      ]) {
+        for (final safe in [false, true]) {
+          for (final keyboard in [0.0, 260.0]) {
+            testWidgets('$language: текстовая отмена начального поиска, '
+                '${size.width.toInt()}×${size.height.toInt()}, текст $scale, '
+                'клавиатура $keyboard, безопасные отступы $safe', (
+              tester,
+            ) async {
+              tester.view.physicalSize = size;
+              tester.view.devicePixelRatio = 1;
+              addTearDown(tester.view.reset);
+              final semantics = tester.ensureSemantics();
+              try {
+                final (repository, router) = await _openApp(
+                  tester,
+                  language: language,
+                  textScaler: TextScaler.linear(scale),
+                );
+                final underlying = router.push<IntentionId>(
+                  route(const AuxiliaryDailyChoicePickerContext()),
+                );
+                await _settleRoute(tester);
+                repository.complete(1, _page());
+                await tester.pumpAndSettle();
+                final filter = find.byKey(ValueKey('$keyPrefix-filter'));
+                await tester.enterText(filter, 'Гул');
+                await tester.pump(const Duration(milliseconds: 300));
+                repository.complete(2, _page());
+                await tester.pumpAndSettle();
+                final history = [
+                  for (final data in router.stackData) data.matchId,
+                ];
+                final launch = _Launch();
+                final selection = router.push<IntentionId>(
+                  route(InitialDailyChoicePickerContext(launch: launch)),
+                );
+                await _settleRoute(tester);
+                repository.complete(3, _page());
+                await tester.pumpAndSettle();
+                await tester.enterText(filter, 'Гулять');
+                await tester.pump(const Duration(milliseconds: 300));
+                repository.complete(4, _page());
+                await tester.pumpAndSettle();
+                final lateSelection = tester
+                    .widget<IntentionSummaryView>(
+                      find.byType(IntentionSummaryView).last,
+                    )
+                    .onTap!;
+                final label = language == 'ru'
+                    ? 'Отменить создание'
+                    : 'Cancel creation';
+                final action = find.widgetWithText(TextButton, label);
+                // Проверяем и появление, и скрытие клавиатуры на той же странице.
+                for (final inset in [keyboard, 260 - keyboard, keyboard]) {
+                  _setPickerInsets(tester, keyboard: inset, safe: safe);
+                  await tester.pumpAndSettle();
+                  _expectPickerCancelGeometry(tester, label, size);
+                  expect(action.hitTestable(), findsOneWidget);
+                  expect(
+                    tester
+                        .getSemantics(action)
+                        .getSemanticsData()
+                        .hasAction(SemanticsAction.tap),
+                    isTrue,
+                  );
+                  expect(launch.isActive, isTrue);
+                  expect(tester.takeException(), isNull);
+                }
+                // Параметры и выдача достижимы прокруткой даже в тесной области.
+                for (final control in [
+                  filter,
+                  find.byKey(const ValueKey('intention-tag-conditions-add')),
+                  find.text('Гулять').first,
+                  filter,
+                ]) {
+                  await tester.ensureVisible(control);
+                  await tester.pumpAndSettle();
+                  expect(control.hitTestable(), findsOneWidget);
+                }
+                expect(
+                  tester
+                      .widget<EditableText>(find.byType(EditableText))
+                      .focusNode
+                      .hasFocus,
+                  isTrue,
+                );
+                await tester.tap(action);
+                expect(launch.isActive, isFalse);
+                lateSelection();
+                await tester.pumpAndSettle();
+                expect(await selection, isNull);
+                expect([
+                  for (final data in router.stackData) data.matchId,
+                ], history);
+                expect(
+                  tester.widget<TextField>(filter).controller!.text,
+                  'Гул',
+                );
+                expect(
+                  tester
+                      .widget<ListView>(
+                        find.byKey(PageStorageKey<String>('$keyPrefix-list')),
+                      )
+                      .childrenDelegate
+                      .estimatedChildCount,
+                  2,
+                );
+                expect(find.text(label), findsNothing);
+                expect(repository.queries, hasLength(5));
+                expect(repository.dailyChoiceCommands, isEmpty);
+                expect(tester.takeException(), isNull);
+                await router.maybePop();
+                await tester.pumpAndSettle();
+                expect(await underlying, isNull);
+              } finally {
+                semantics.dispose();
+              }
+            });
+          }
+        }
+      }
+    }
+  }
+}
+
+void _setPickerInsets(
+  WidgetTester tester, {
+  required double keyboard,
+  required bool safe,
+}) {
+  final top = safe ? 24.0 : 0.0;
+  final bottom = safe ? 32.0 : 0.0;
+  tester.view.viewPadding = FakeViewPadding(top: top, bottom: bottom);
+  tester.view.padding = FakeViewPadding(
+    top: top,
+    bottom: keyboard == 0 ? bottom : 0,
+  );
+  tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+}
+
+void _expectPickerCancelGeometry(WidgetTester tester, String label, Size size) {
+  final action = tester.getRect(find.widgetWithText(TextButton, label));
+  final text = tester.getRect(find.text(label));
+  final bottom =
+      size.height - tester.view.viewInsets.bottom - tester.view.padding.bottom;
+  for (final rect in [action, text]) {
+    expect(rect.left, greaterThanOrEqualTo(0));
+    expect(rect.top, greaterThanOrEqualTo(tester.view.padding.top));
+    expect(rect.right, lessThanOrEqualTo(size.width));
+    expect(rect.bottom, lessThanOrEqualTo(bottom));
+  }
+  expect(action.bottom, closeTo(bottom, 0.01));
+  expect(
+    tester.getRect(find.byType(IntentionSearchLayout)).bottom,
+    closeTo(action.top, 0.01),
+  );
 }
 
 final class _Launch implements DailyChoicePickerLaunch {

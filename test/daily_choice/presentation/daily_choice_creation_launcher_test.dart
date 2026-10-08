@@ -95,6 +95,75 @@ void main() {
   });
 
   for (final direction in ChoicePathDraftDirection.values) {
+    for (final closeIcon in [false, true]) {
+      testWidgets(
+        '${_directionName(direction)}: ${closeIcon ? 'крестик' : 'текстовая отмена'} '
+        'при клавиатуре сохраняет глубокую историю и запрещает поздний путь',
+        (tester) async {
+          final router = await _openApp(tester);
+          final source = await _sourceContext(tester, router, deep: true);
+          final history = router.stackData.map((data) => data.matchId).toList();
+          final launcher = DailyChoiceCreationLauncher();
+          final running = launcher.launch(
+            sourceContext: source,
+            direction: direction,
+          );
+          await tester.pumpAndSettle();
+          final launch = _pickerContext(router).launch;
+          final lateSelection = tester
+              .widget<IntentionSummaryView>(
+                find.byType(IntentionSummaryView).first,
+              )
+              .onTap!;
+          final prefix = direction == ChoicePathDraftDirection.topDown
+              ? 'source'
+              : 'action';
+          final filter = find.byKey(ValueKey('daily-choice-$prefix-filter'));
+          await tester.enterText(filter, 'Намерение 3');
+          tester.view.physicalSize = const Size(400, 800);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+          tester.platformDispatcher.textScaleFactorTestValue = 2.6;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await tester.pumpAndSettle();
+          final action = closeIcon
+              ? find.byKey(ValueKey('daily-choice-$prefix-cancel'))
+              : find.widgetWithText(TextButton, 'Отменить создание');
+          expect(action.hitTestable(), findsOneWidget);
+          expect(tester.getRect(action).bottom, lessThanOrEqualTo(540));
+          await tester.tap(action);
+          expect(launch.isActive, isFalse);
+          lateSelection();
+          await tester.pumpAndSettle();
+          await running;
+          expect(router.stackData.map((data) => data.matchId), history);
+          expect(find.byType(ChoicePathPage), findsNothing);
+
+          final next = launcher.launch(
+            sourceContext: source,
+            direction: direction,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(filter).controller!.text, isEmpty);
+          expect(_pickerContext(router).launch, isNot(same(launch)));
+          await tester.tap(find.byKey(ValueKey('daily-choice-$prefix-cancel')));
+          await tester.pumpAndSettle();
+          await next;
+          expect(router.stackData.map((data) => data.matchId), history);
+          await router.maybePop();
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<TextField>(
+                  find.byKey(const ValueKey('relation-editor-description')),
+                )
+                .controller!
+                .text,
+            'Чужой черновик',
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
     for (final deep in [false, true]) {
       testWidgets(
         '${_directionName(direction)}: явный выбор над ${deep ? 'глубокой страницей' : 'корнем'} '
