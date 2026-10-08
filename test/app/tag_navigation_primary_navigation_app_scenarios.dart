@@ -120,15 +120,29 @@ void _expectPrimaryDestination(
 ) {
   final bar = find.byType(AppNavigationBar);
   expect(bar, findsOneWidget);
-  expect(tester.widget<AppNavigationBar>(bar).selected, destination);
-  expect(find.byType(NavigationDestination).hitTestable(), findsNWidgets(3));
+  expect(appNavigationDestinations().hitTestable(), findsNWidgets(3));
+  for (final item in AppDestination.values) {
+    final entry = appNavigationDestination(item);
+    expect(entry.hitTestable(), findsOneWidget);
+    expect(
+      tester.getSemantics(entry),
+      containsSemantics(
+        hasSelectedState: true,
+        isSelected: item == destination,
+        hasTapAction: true,
+      ),
+      reason: 'Пункт ${item.name}',
+    );
+  }
 }
 
 Future<void> _selectPrimaryDestination(
   WidgetTester tester,
   AppDestination destination,
 ) async {
-  await tester.tap(find.byType(NavigationDestination).at(destination.index));
+  final entry = appNavigationDestination(destination);
+  expect(entry.hitTestable(), findsOneWidget);
+  await tester.tap(entry);
   await tester.pump();
   await _waitFor(
     tester,

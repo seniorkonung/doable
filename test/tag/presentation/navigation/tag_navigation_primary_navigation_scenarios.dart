@@ -15,14 +15,20 @@ void _registerPrimaryNavigationScenarios() {
     final model = container.read(provider.notifier);
     void expectPanel() {
       expect(find.byType(AppNavigationBar), findsOneWidget);
-      expect(
-        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        AppDestination.home,
-      );
-      expect(
-        find.byType(NavigationDestination).hitTestable(),
-        findsNWidgets(3),
-      );
+      expect(appNavigationDestinations().hitTestable(), findsNWidgets(3));
+      for (final destination in AppDestination.values) {
+        final entry = appNavigationDestination(destination);
+        expect(entry.hitTestable(), findsOneWidget);
+        expect(
+          tester.getSemantics(entry),
+          containsSemantics(
+            hasSelectedState: true,
+            isSelected: destination == AppDestination.home,
+            hasTapAction: true,
+          ),
+          reason: 'Пункт ${destination.name}',
+        );
+      }
       expect(tester.takeException(), isNull);
     }
 
