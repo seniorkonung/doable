@@ -22,6 +22,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 Future<void> _until(WidgetTester tester, bool Function() done) async {
   for (var attempt = 0; attempt < 100 && !done(); attempt++) {
@@ -56,6 +57,7 @@ void main() {
     late _ControlledRepository repository;
     final diagnostics = InMemoryDiagnosticsSink();
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openInMemoryLocalDatabase(setup: (database) => raw = database),
       diagnosticsSink: diagnostics,
@@ -161,6 +163,7 @@ void main() {
     late _ControlledRepository repository;
     final diagnostics = InMemoryDiagnosticsSink();
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openInMemoryLocalDatabase(setup: (database) => raw = database),
       diagnosticsSink: diagnostics,
@@ -307,6 +310,7 @@ void main() {
       late _ControlledRepository repository;
       final diagnostics = InMemoryDiagnosticsSink();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openInMemoryLocalDatabase(setup: (database) => raw = database),
         diagnosticsSink: diagnostics,

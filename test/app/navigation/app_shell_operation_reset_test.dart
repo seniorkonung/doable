@@ -46,6 +46,7 @@ import '../../long_term_relation/presentation/details/relation_details_test_supp
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
     show testRelationId;
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 const _archive = ValueKey('intention-details-archive');
 const _message = ValueKey('graph-operation-message');
@@ -862,6 +863,7 @@ final class _ControlledApp {
         ),
       );
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => openInMemoryLocalDatabase(),
       diagnosticsSink: InMemoryDiagnosticsSink(),
       repositoryFactory: (_) => repository,

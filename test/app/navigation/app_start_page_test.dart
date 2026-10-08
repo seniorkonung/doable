@@ -20,6 +20,7 @@ import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Намерение «Гулять»: в зависимости от состава графа оно активное или
 /// архивированное, с отметкой избранного или без неё.
@@ -252,6 +253,7 @@ Future<void> _prepareStorage(
 Future<_App> _launch(WidgetTester tester, LocalDatabaseHarness harness) async {
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => openFileBackedLocalDatabase(
       harness.databaseFile,
       setup: (database) => raw = database,

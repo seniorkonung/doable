@@ -25,6 +25,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Узкий экран телефона: увеличенный текст занимает его целиком.
 const _screen = Size(360, 780);
@@ -238,6 +239,7 @@ Future<AppRouter> _start(WidgetTester tester, Locale locale) async {
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),

@@ -42,6 +42,7 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 part 'ordinary_page_layout_scenarios.dart';
 
@@ -815,6 +816,7 @@ Future<_App> _start(
   _apply(tester, insets);
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () {
       final connection = openInMemoryLocalDatabase(
         setup: (database) => raw = database,

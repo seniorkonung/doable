@@ -61,6 +61,7 @@ import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 // Названия намерений — данные человека: они одинаковы в обеих локалях.
 
@@ -579,6 +580,7 @@ final class _App {
     final faults = _FavoriteWriteFaults();
     final diagnostics = InMemoryDiagnosticsSink();
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => observeConfiguredLocalDatabaseConnection(
         openFileBackedLocalDatabase(
           harness.databaseFile,

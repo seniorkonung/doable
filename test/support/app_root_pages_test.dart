@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'app_root_pages.dart';
 import 'in_memory_diagnostics_sink.dart';
 import 'tag_storage_fixture.dart';
+import 'in_memory_quick_creation_mode_store.dart';
 
 final _intention =
     (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
@@ -126,6 +127,7 @@ void main() {
 Future<AppRouter> _start(WidgetTester tester) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: openInMemoryLocalDatabase,
     diagnosticsSink: InMemoryDiagnosticsSink(),
   );

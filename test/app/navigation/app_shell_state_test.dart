@@ -67,6 +67,7 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Активные избранные намерения «Избранное 01» … «Избранное 40» на местах
 /// 1…40: список Главной длиннее экрана.
@@ -948,6 +949,7 @@ Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
   final faults = _MarkWriteFaults();
   final diagnostics = InMemoryDiagnosticsSink();
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openInMemoryLocalDatabase(setup: (database) => raw = database),
       faults,

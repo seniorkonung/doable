@@ -33,6 +33,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 part 'tag_navigation_accessibility_scenarios.dart';
 part 'tag_catalog_search_accessibility_scenarios.dart';
@@ -219,6 +220,7 @@ void _registerAssignmentScenarios() {
 
         late sqlite.Database raw;
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () =>
               openInMemoryLocalDatabase(setup: (database) => raw = database),
           diagnosticsSink: InMemoryDiagnosticsSink(),

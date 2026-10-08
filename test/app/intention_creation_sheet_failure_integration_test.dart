@@ -31,6 +31,7 @@ import '../support/local_database_harness.dart';
 import '../support/intention_creation_storage_observer.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 const _rawTitle = '  Рисовать акварель  ';
 const _title = 'Рисовать акварель';
@@ -770,6 +771,7 @@ Future<_App> _launch(
   ]);
   final storage = IntentionCreationStorageObserver(snapshotGraph: _storedGraph);
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openFileBackedLocalDatabase(
         harness.databaseFile,

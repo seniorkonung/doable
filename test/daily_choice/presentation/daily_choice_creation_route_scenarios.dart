@@ -17,6 +17,7 @@ void _registerCreationRouteScenarios() {
         ))!;
         await tester.runAsync(() => _seed(harness));
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () =>
               openFileBackedLocalDatabase(harness.databaseFile),
           diagnosticsSink: InMemoryDiagnosticsSink(),

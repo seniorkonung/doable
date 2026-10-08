@@ -26,6 +26,7 @@ import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 /// Активное готовое намерение «Гулять», которое человек отмечает.
 const _walk = 1;
@@ -317,6 +318,7 @@ final class _App {
   }) async {
     late sqlite.Database raw;
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () {
         final connection = openFileBackedLocalDatabase(
           harness.databaseFile,

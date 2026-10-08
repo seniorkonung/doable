@@ -28,6 +28,7 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Намерения «Намерение 01» … «Намерение 40»: выдача каталога намерений
 /// длиннее экрана. Первое — избранное, исходное намерение дневных выборов.
@@ -423,6 +424,7 @@ Future<_App> _start(WidgetTester tester) async {
   );
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),

@@ -52,6 +52,7 @@ import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 /// Локальное сегодня запуска, в котором человек настраивает календарь.
 final _firstToday = CalendarDate.fromParts(2026, 10, 4);
@@ -211,6 +212,7 @@ void main() {
         // Каталог открывается на дне заменяемого дневного выбора.
         final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
             openFileBackedLocalDatabase(harness.databaseFile),
             gate,
@@ -361,6 +363,7 @@ void main() {
       final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
       final createdDate = CalendarDate.fromParts(2027, 1, 2);
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openFileBackedLocalDatabase(harness.databaseFile),
           gate,
@@ -485,6 +488,7 @@ void main() {
       // Каталог открывается на дне изменяемых дневных выборов.
       final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openFileBackedLocalDatabase(harness.databaseFile),
           gate,
@@ -759,6 +763,7 @@ void main() {
       // Каждый запуск открывает каталог на одном и том же дне.
       final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
       AppRuntime start() => AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openFileBackedLocalDatabase(harness.databaseFile),
           gate,
@@ -947,6 +952,7 @@ void main() {
       final localDate = ControlledDailyChoiceLocalDate(_firstToday);
       late _ObservedRepository graph;
       AppRuntime start() => AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),

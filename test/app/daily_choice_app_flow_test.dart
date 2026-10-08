@@ -27,6 +27,7 @@ import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 /// Дата дневных выборов, которые сценарии создают через форму. Она же —
 /// локальное сегодня каталога: каталог открывается на дне этих записей.
@@ -150,6 +151,7 @@ void main() {
     // Каталог открывается на дне дневного выбора фикстуры и его повтора.
     final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openFileBackedLocalDatabase(harness.databaseFile),
       diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -252,6 +254,7 @@ void main() {
       await seedDurabilityGraph(seeded);
       await harness.closePersistenceObjectGraph();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -387,6 +390,7 @@ void main() {
       // Каждый запуск открывает каталог на дне создаваемых записей.
       final localDate = ControlledDailyChoiceLocalDate(_formChoiceDate);
       AppRuntime start() => AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -609,6 +613,7 @@ void main() {
       // Каждый запуск открывает каталог на дне создаваемых записей.
       final localDate = ControlledDailyChoiceLocalDate(_formChoiceDate);
       AppRuntime start() => AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),

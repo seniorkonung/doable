@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
@@ -33,6 +34,7 @@ void main() {
       final openingStarted = Completer<void>();
       final allowOpening = Completer<void>();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openInMemoryLocalDatabase(),
           _ControlledOpenObserver(openingStarted, allowOpening),
@@ -70,6 +72,7 @@ void main() {
     final retryStarted = Completer<void>();
     final allowRetry = Completer<void>();
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () {
         attempts += 1;
         if (attempts == 1) {
@@ -123,6 +126,7 @@ void main() {
   testWidgets('corruption имеет terminal-состояние без retry', (tester) async {
     _useEnglishLocale(tester);
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => openInMemoryLocalDatabase(
         setup: (_) => throw SqliteException(
           extendedResultCode: SqlError.SQLITE_NOTADB,
@@ -149,6 +153,7 @@ void main() {
   ) async {
     _useEnglishLocale(tester);
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => openInMemoryLocalDatabase(
         setup: (database) => database.execute(
           'PRAGMA user_version = $_unsupportedSchemaVersion',
@@ -174,6 +179,7 @@ void main() {
   ) async {
     _useEnglishLocale(tester);
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => openInMemoryLocalDatabase(
         setup: (_) => throw StateError('неожиданный отказ'),
       ),
@@ -198,6 +204,7 @@ void main() {
       'неожиданным отказом без панели', (tester) async {
     _useEnglishLocale(tester);
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => openInMemoryLocalDatabase(),
       diagnosticsSink: InMemoryDiagnosticsSink(),
       repositoryFactory: (_) => throw StateError('неожиданный отказ'),

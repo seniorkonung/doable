@@ -50,6 +50,7 @@ import '../support/favorite_storage_fixture.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   testWidgets(
@@ -393,6 +394,7 @@ void main() {
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
       final repository = _DelayedPersonalGraphRepository();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: openInMemoryLocalDatabase,
         diagnosticsSink: InMemoryDiagnosticsSink(),
         repositoryFactory: (_) => repository,
@@ -1701,6 +1703,7 @@ final class _RealStorageApp {
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
     late sqlite.Database raw;
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () {
         final connection = openInMemoryLocalDatabase(
           setup: (database) => raw = database,
@@ -1822,6 +1825,7 @@ Future<AppRuntime> _pumpCatalog(
 ) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: openInMemoryLocalDatabase,
     diagnosticsSink: InMemoryDiagnosticsSink(),
     repositoryFactory: (_) => repository,

@@ -12,16 +12,20 @@ import 'quick_creation_mode_store.dart';
 final class FileQuickCreationModeStore implements QuickCreationModeStore {
   FileQuickCreationModeStore({
     required Directory localDataDirectory,
-    required this._diagnosticsSink,
-  }) : _settingsDirectory = Directory.fromUri(
-         localDataDirectory.uri.resolve('settings/'),
-       ),
-       _modeFile = File.fromUri(
-         localDataDirectory.uri.resolve('settings/quick_creation_mode'),
+    required DiagnosticsSink diagnosticsSink,
+  }) : this.withDirectoryProvider(
+         localDataDirectoryProvider: () async => localDataDirectory,
+         diagnosticsSink: diagnosticsSink,
        );
 
-  final Directory _settingsDirectory;
-  final File _modeFile;
+  /// Получает каталог внутри попытки чтения или записи: отказ платформы
+  /// обрабатывается так же, как недоступность самого файла настройки.
+  FileQuickCreationModeStore.withDirectoryProvider({
+    required this._localDataDirectoryProvider,
+    required this._diagnosticsSink,
+  });
+
+  final Future<Directory> Function() _localDataDirectoryProvider;
   final DiagnosticsSink _diagnosticsSink;
   Future<void> _pendingWrite = Future<void>.value();
 
@@ -29,7 +33,8 @@ final class FileQuickCreationModeStore implements QuickCreationModeStore {
   Future<QuickCreationMode> read() async {
     final stopwatch = Stopwatch()..start();
     try {
-      final key = utf8.decode(await _modeFile.readAsBytes());
+      final files = await _resolveFiles();
+      final key = utf8.decode(await files.mode.readAsBytes());
       final mode = QuickCreationMode.fromStorageKey(key);
       if (mode != null) return mode;
       _recordFailure(
@@ -61,15 +66,16 @@ final class FileQuickCreationModeStore implements QuickCreationModeStore {
     final stopwatch = Stopwatch()..start();
     File? ownedTemporaryFile;
     try {
-      await _settingsDirectory.create(recursive: true);
-      final temporaryFile = File('${_modeFile.path}.${const Uuid().v4()}.tmp');
+      final files = await _resolveFiles();
+      await files.settings.create(recursive: true);
+      final temporaryFile = File('${files.mode.path}.${const Uuid().v4()}.tmp');
       await temporaryFile.create(exclusive: true);
       ownedTemporaryFile = temporaryFile;
       // flush завершает запись до замены; основной файл заранее не удаляется.
       // https://api.dart.dev/dart-io/File/writeAsString.html
       // https://api.dart.dev/dart-io/File/rename.html
       await temporaryFile.writeAsString(mode.storageKey, flush: true);
-      await temporaryFile.rename(_modeFile.path);
+      await temporaryFile.rename(files.mode.path);
       ownedTemporaryFile = null;
       return const QuickCreationModeSaved();
     } on Object catch (error) {
@@ -92,6 +98,21 @@ final class FileQuickCreationModeStore implements QuickCreationModeStore {
         }
       }
     }
+  }
+
+  Future<({Directory settings, File mode})> _resolveFiles() async {
+    final Directory localData;
+    try {
+      localData = await _localDataDirectoryProvider();
+    } on Object {
+      throw const FileSystemException(
+        'Каталог настройки установки недоступен.',
+      );
+    }
+    return (
+      settings: Directory.fromUri(localData.uri.resolve('settings/')),
+      mode: File.fromUri(localData.uri.resolve('settings/quick_creation_mode')),
+    );
   }
 
   void _recordFailure(

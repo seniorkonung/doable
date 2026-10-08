@@ -44,6 +44,7 @@ import '../support/local_database_harness.dart';
 import '../support/favorite_read_contract_test_fallback.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   testWidgets(
@@ -352,6 +353,7 @@ void main() {
       final runtimes = <AppRuntime>[];
       late sqlite.Database raw;
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => openFileBackedLocalDatabase(
           database.databaseFile,
           setup: (database) => raw = database,
@@ -1498,6 +1500,7 @@ Future<_DelayedApp> _pumpDelayedRelationApp(
   final diagnostics = InMemoryDiagnosticsSink();
   late _DelayedRelationRepository repository;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: openInMemoryLocalDatabase,
     diagnosticsSink: diagnostics,
     repositoryFactory: (database) {
@@ -1533,6 +1536,7 @@ AppRuntime _fileRuntime(
   LocalDatabaseHarness database, {
   required InMemoryDiagnosticsSink diagnostics,
 }) => AppRuntime(
+  quickCreationModeStore: InMemoryQuickCreationModeStore(),
   connectionFactory: () => openFileBackedLocalDatabase(database.databaseFile),
   diagnosticsSink: diagnostics,
 );

@@ -31,6 +31,7 @@ import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 part 'daily_choice_creation_route_scenarios.dart';
 
@@ -283,6 +284,7 @@ void main() {
             ? catalogToday
             : CalendarDate.fromParts(2024, 9, 24);
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () =>
               openFileBackedLocalDatabase(harness.databaseFile),
           diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -531,6 +533,7 @@ void main() {
       // Каталог открывается на дне выборов, которые сценарий создаёт
       // последними.
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -793,6 +796,7 @@ void main() {
       await tester.runAsync(() => _seed(harness));
       // Каталог открывается на дне создаваемого выбора.
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -1010,6 +1014,7 @@ void main() {
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       await tester.runAsync(() => _seed(harness));
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -1089,6 +1094,7 @@ void main() {
         await _seedPreviousChoice(harness);
       });
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -1213,6 +1219,7 @@ void main() {
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       await tester.runAsync(() => _seed(harness));
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),

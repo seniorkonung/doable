@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   for (final bottomPadding in [0.0, 24.0]) {
@@ -159,6 +160,7 @@ Hero _panelHero(WidgetTester tester) => tester.widget(
 
 Future<AppRouter> _start(WidgetTester tester) async {
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => openInMemoryLocalDatabase(),
     diagnosticsSink: InMemoryDiagnosticsSink(),
   );

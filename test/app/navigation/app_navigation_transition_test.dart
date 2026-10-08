@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -173,6 +174,7 @@ Future<void> _expectStationaryFrames(WidgetTester tester, Rect rect) async {
 
 Future<AppRouter> _start(WidgetTester tester) async {
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => openInMemoryLocalDatabase(),
     diagnosticsSink: InMemoryDiagnosticsSink(),
   );

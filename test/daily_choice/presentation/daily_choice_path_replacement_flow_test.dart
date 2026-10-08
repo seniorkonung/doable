@@ -21,6 +21,7 @@ import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -212,6 +213,7 @@ void main() {
         ))!;
         await tester.runAsync(() => _seed(harness));
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () =>
               openFileBackedLocalDatabase(harness.databaseFile),
           diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -400,6 +402,7 @@ void main() {
           ))!;
           await tester.runAsync(() => _seed(harness));
           final runtime = AppRuntime(
+            quickCreationModeStore: InMemoryQuickCreationModeStore(),
             connectionFactory: () =>
                 openFileBackedLocalDatabase(harness.databaseFile),
             diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -581,6 +584,7 @@ void main() {
     final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
     await tester.runAsync(() => _seed(harness));
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openFileBackedLocalDatabase(harness.databaseFile),
       diagnosticsSink: InMemoryDiagnosticsSink(),

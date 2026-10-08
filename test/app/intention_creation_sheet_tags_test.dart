@@ -32,6 +32,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 const _homeTag = 301;
 const _workTag = 302;
@@ -806,6 +807,7 @@ final class _App {
 
     late sqlite.Database raw;
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openInMemoryLocalDatabase(setup: (database) => raw = database),
       diagnosticsSink: InMemoryDiagnosticsSink(),

@@ -64,6 +64,7 @@ import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 /// «Гулять» — активное готовое избранное на месте 1 с тегом «Работа».
 const _walk = 1;
@@ -1124,6 +1125,7 @@ Future<_App> _launch(WidgetTester tester) async {
   final faults = _StorageFaults();
   final diagnostics = _RecordedDiagnostics();
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openFileBackedLocalDatabase(
         harness.databaseFile,
