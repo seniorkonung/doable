@@ -23,6 +23,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
@@ -545,12 +546,7 @@ Future<void> _back(WidgetTester tester) async {
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  await tester.tap(appNavigationDestination(destination));
   await _until(tester, find.byType(_rootPages[destination]!));
   await tester.pumpAndSettle();
 }

@@ -17,6 +17,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -188,7 +189,7 @@ void main() {
     await _start(tester);
 
     // Один кадр без продвижения времени: страница уже показана целиком.
-    await tester.tap(find.byIcon(AppDestination.dailyChoices.icon));
+    await tester.tap(appNavigationDestination(AppDestination.dailyChoices));
     await tester.pump();
 
     expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
@@ -227,8 +228,8 @@ void main() {
         await _start(tester, locale: locale);
 
         for (final destination in AppDestination.values) {
-          // Нажатие по самому пункту: значок уже выбранной Главной залит.
-          await tester.tap(_destination(destination));
+          // Нажатие по самому пункту, в том числе уже выбранному.
+          await tester.tap(appNavigationDestination(destination));
           await tester.pumpAndSettle();
 
           final appBar = find.descendant(
@@ -252,7 +253,7 @@ void main() {
         for (final destination in AppDestination.values) {
           final name = names[destination]!;
           final gesture = await tester.startGesture(
-            tester.getCenter(_destination(destination)),
+            tester.getCenter(appNavigationDestination(destination)),
           );
           await tester.pump(kLongPressTimeout + kPressTimeout);
           await gesture.up();
@@ -285,7 +286,7 @@ void main() {
         for (final destination in AppDestination.values) {
           final name = names[destination]!;
           expect(
-            tester.getSemantics(_destination(destination)).label,
+            tester.getSemantics(appNavigationDestination(destination)).label,
             startsWith('$name\n'),
             reason: name,
           );
@@ -295,7 +296,7 @@ void main() {
             find
                 .ancestor(
                   of: find.descendant(
-                    of: _destination(destination),
+                    of: appNavigationDestination(destination),
                     matching: find.text(name),
                   ),
                   matching: find.byType(FadeTransition),
@@ -365,22 +366,11 @@ Future<_App> _start(
   return _App(ready.container.read(appRouterProvider));
 }
 
-/// Выбирает пункт панели нажатием его значка.
+/// Выбирает пункт панели по его назначению.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byIcon(destination.icon),
-    ),
-  );
+  await tester.tap(appNavigationDestination(destination));
   await tester.pumpAndSettle();
 }
-
-/// Пункт панели на своём месте слева направо.
-Finder _destination(AppDestination destination) => find.descendant(
-  of: find.byType(AppNavigationBar),
-  matching: find.byType(NavigationDestination).at(destination.index),
-);
 
 /// Пункт, который панель показывает выбранным.
 AppDestination _selected(WidgetTester tester) =>

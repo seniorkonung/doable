@@ -49,6 +49,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
@@ -779,7 +780,7 @@ IntentionId _intentionId(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 /// Пункты панели, включая панель под открытой страницей.
-final _destinations = find.byType(NavigationDestination, skipOffstage: false);
+final _destinations = appNavigationDestinations(skipOffstage: false);
 
 /// Пункты панели, которые получает экранный диктор.
 final _announcedDestinations = find.semantics.byPredicate(
@@ -999,12 +1000,7 @@ void _seed(sqlite.Database database) {
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  await tester.tap(appNavigationDestination(destination));
   await _until(tester, find.byType(_rootPages[destination]!));
   await tester.pumpAndSettle();
 }
