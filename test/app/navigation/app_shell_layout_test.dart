@@ -53,8 +53,8 @@ part 'ordinary_page_layout_scenarios.dart';
 /// панель, нижний безопасный отступ и клавиатура.
 const _screen = Size(400, 800);
 
-/// Локали интерфейса, в которых проверяется каталог дневных выборов: подписи
-/// кнопки создания дневного выбора и строк выдачи различаются длиной.
+/// Локали интерфейса, в которых проверяется каталог дневных выборов:
+/// подписи строк выдачи различаются длиной.
 const _locales = [Locale('ru'), Locale('en')];
 
 /// Размер порции каталога намерений и каталога дневных выборов.
@@ -325,7 +325,7 @@ void main() {
       for (final insets in _insetVariants) {
         testWidgets('каталог дневных выборов, ${locale.languageCode}, '
             '${insets.name}: продолжение выдачи и последняя строка видны над '
-            'панелью и не закрыты созданием дневного выбора', (tester) async {
+            'панелью без зарезервированного места', (tester) async {
           const count = _dailyChoicePageSize + 5;
           final l10n = lookupAppLocalizations(locale);
           await _start(
@@ -349,13 +349,7 @@ void main() {
 
           final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
           _expectFullyVisible(tester, loadMore, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(loadMore)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          _expectDailyChoiceEnd(tester, loadMore, insets);
           expect(loadMore.hitTestable(), findsOneWidget);
 
           await tester.tap(loadMore);
@@ -370,13 +364,7 @@ void main() {
 
           final lastRow = _dailyChoiceRow(count);
           _expectFullyVisible(tester, lastRow, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(lastRow)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          _expectDailyChoiceEnd(tester, lastRow, insets);
           expect(lastRow.hitTestable(), findsOneWidget);
 
           await tester.tap(lastRow);
@@ -399,7 +387,7 @@ void main() {
       for (final insets in [_safeArea, _keyboardOpen]) {
         testWidgets('каталог дневных выборов, ${locale.languageCode}, '
             '${insets.name}: отказ продолжения выдачи и повтор видны над '
-            'панелью и не закрыты созданием дневного выбора, а повтор '
+            'панелью без зарезервированного места, а повтор '
             'догружает выдачу', (tester) async {
           const count = _dailyChoicePageSize + 5;
           final l10n = lookupAppLocalizations(locale);
@@ -440,17 +428,7 @@ void main() {
           );
           _expectFullyVisible(tester, failure, insets);
           _expectFullyVisible(tester, retry, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(failure)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
-          expect(
-            tester.getRect(retry).overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          expect(find.byType(FloatingActionButton), findsNothing);
           expect(retry.hitTestable(), findsOneWidget);
 
           faults.isFailing = false;
@@ -466,13 +444,7 @@ void main() {
 
           final lastRow = _dailyChoiceRow(count);
           _expectFullyVisible(tester, lastRow, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(lastRow)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          _expectDailyChoiceEnd(tester, lastRow, insets);
           expect(lastRow.hitTestable(), findsOneWidget);
           expect(tester.takeException(), isNull);
         });
@@ -502,17 +474,7 @@ void main() {
         expect(bar.bottom, _screen.height);
         expect(appNavigationDestinations().hitTestable(), findsExactly(3));
 
-        final action = _mainActions[destination];
-        if (action != null) {
-          final button = find.byKey(action.key);
-          expect(tester.getRect(button).bottom, lessThanOrEqualTo(message.top));
-          expect(button.hitTestable(), findsOneWidget);
-          await tester.tap(button);
-          await _until(tester, find.byType(action.opens));
-          await tester.pumpAndSettle();
-          expect(find.byType(action.opens), findsOneWidget);
-        }
-        if (destination == AppDestination.intentionGraph) {
+        if (destination != AppDestination.home) {
           final create = quickCreationAction();
           expect(
             tester.getRect(create).top,
@@ -521,8 +483,12 @@ void main() {
           expect(create.hitTestable(), findsOneWidget);
           await openQuickCreation(
             tester,
-            QuickCreationMode.intention,
-            openedPage: find.byType(IntentionEditorPage),
+            destination == AppDestination.dailyChoices
+                ? QuickCreationMode.dailyChoiceFromAction
+                : QuickCreationMode.intention,
+            openedPage: destination == AppDestination.dailyChoices
+                ? find.byType(DailyChoiceActionPickerPage)
+                : find.byType(IntentionEditorPage),
           );
         }
         expect(tester.takeException(), isNull);
@@ -636,19 +602,7 @@ const _rootPages = {
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-/// Собственное действие каталога дневных выборов и открываемая им страница.
-const _mainActions = <AppDestination, ({Key key, Type opens})>{
-  AppDestination.dailyChoices: (
-    key: ValueKey('daily-choice-create-from-action'),
-    opens: DailyChoiceActionPickerPage,
-  ),
-};
-
 final _titleFilter = find.byKey(const ValueKey('catalog-filter-field'));
-
-final _createDailyChoice = find.byKey(
-  const ValueKey('daily-choice-create-from-action'),
-);
 
 /// Строка выдачи каталога дневных выборов с номером [number].
 Finder _dailyChoiceRow(int number) =>
@@ -997,36 +951,24 @@ void _expectCatalogEnd(WidgetTester tester, Finder last, _Insets insets) {
   expect(find.byKey(const ValueKey('catalog-create-intention')), findsNothing);
 }
 
-/// Выбор дня в начале каталога дневных выборов виден над клавиатурой,
-/// принимает нажатия и не закрыт созданием дневного выбора.
+/// Выбор дня в начале каталога дневных выборов виден над клавиатурой
+/// и принимает нажатия.
 void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
   expect(dailyChoiceCatalogDay(_today).hitTestable(), findsOneWidget);
   _expectFullyVisible(tester, dailyChoiceCatalogDateControl, insets);
-  _expectMainAction(tester, _createDailyChoice, insets);
-  expect(
-    tester
-        .getRect(dailyChoiceCatalogDateControl)
-        .overlaps(tester.getRect(_createDailyChoice)),
-    isFalse,
-  );
+  expect(find.byType(FloatingActionButton), findsNothing);
 }
 
-/// Основное действие корневой страницы стоит в своём углу над панелью либо
-/// клавиатурой: содержимое заканчивается на их верхней границе, без зазора,
-/// и действие принимает нажатия.
-void _expectMainAction(WidgetTester tester, Finder action, _Insets insets) {
-  _expectFullyVisible(tester, action, insets);
-  expect(
-    tester.getRect(action).bottom,
-    moreOrLessEquals(insets.contentBottom - kFloatingActionButtonMargin),
-  );
-  expect(action.hitTestable(), findsOneWidget);
+/// Выдача дневных выборов заканчивается у панели либо клавиатуры без зазора.
+void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
+  expect(tester.getRect(last).bottom, moreOrLessEquals(insets.contentBottom));
+  expect(find.byType(FloatingActionButton), findsNothing);
 }
 
 /// Прокручивает корневую страницу [page] жестами до конца её выдачи.
 ///
 /// Жест начинается у левого верхнего края видимой части прокрутки выдачи —
-/// в точке, не закрытой основным действием страницы. Прокрутка выдачи —
+/// в точке, доступной для нажатия. Прокрутка выдачи —
 /// самая вложенная прокрутка страницы: собственный список выдачи каталога
 /// намерений либо прокрутка, которую выдача каталога дневных выборов делит с
 /// фильтрами. Когда список дошёл до своего края, тот же жест продолжает

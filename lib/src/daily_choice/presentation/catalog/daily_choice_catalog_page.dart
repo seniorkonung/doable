@@ -1,24 +1,17 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../application/choice_path_draft.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
-import '../daily_choice_creation_launcher.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
 import 'daily_choice_local_date_provider.dart';
 import 'daily_choice_local_day_observer.dart';
-
-/// Высота кнопки создания дневного выбора вместе с отступами над нижним краем.
-const _createActionExtent = 56 + 2 * kFloatingActionButtonMargin;
 
 @RoutePage()
 final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
@@ -31,8 +24,6 @@ final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
 
 final class _DailyChoiceCatalogPageState
     extends ConsumerState<DailyChoiceCatalogPage> {
-  final _creationLauncher = DailyChoiceCreationLauncher();
-
   /// Просматриваемый период календаря.
   ///
   /// Выбранной датой владеет модель, а просмотром — страница: он один раз
@@ -75,51 +66,9 @@ final class _DailyChoiceCatalogPageState
     final model = ref.read(dailyChoiceCatalogViewModelProvider.notifier);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.appDestinationDailyChoices)),
-      floatingActionButton: LayoutBuilder(
-        builder: (context, constraints) {
-          final theme = Theme.of(context);
-          final style =
-              theme.floatingActionButtonTheme.extendedTextStyle ??
-              theme.textTheme.labelLarge;
-          // https://api.flutter.dev/flutter/painting/TextPainter-class.html
-          final label = TextPainter(
-            text: TextSpan(
-              text: l10n.dailyChoiceCreateFromAction,
-              style: style,
-            ),
-            textDirection: Directionality.of(context),
-            textScaler: MediaQuery.textScalerOf(context),
-            locale: Localizations.localeOf(context),
-            maxLines: 1,
-          )..layout();
-          // Значок, промежуток и горизонтальные отступы заданы явно ниже.
-          final extended =
-              label.height <= 56 &&
-              label.width + 24 + 8 + 16 + 20 <=
-                  constraints.maxWidth - 2 * kFloatingActionButtonMargin;
-          label.dispose();
-          // Полное название компактной кнопки доступно в подсказке и семантике.
-          // https://api.flutter.dev/flutter/material/FloatingActionButton/tooltip.html
-          return FloatingActionButton.extended(
-            key: const ValueKey('daily-choice-create-from-action'),
-            onPressed: () => unawaited(_chooseAction()),
-            isExtended: extended,
-            tooltip: extended ? null : l10n.dailyChoiceCreateFromAction,
-            extendedTextStyle: style,
-            extendedIconLabelSpacing: 8,
-            extendedPadding: const EdgeInsetsDirectional.only(
-              start: 16,
-              end: 20,
-            ),
-            icon: const Icon(Icons.add, size: 24),
-            label: Text(l10n.dailyChoiceCreateFromAction),
-          );
-        },
-      ),
       // Календарь, фильтры, количество, полосы обновления и выдача
       // прокручиваются вместе: прокрученная до конца выдача получает всю
-      // высоту тела страницы, а место под кнопкой создания остаётся последним
-      // элементом. Календарь стоит вне ветвления по состоянию выдачи и
+      // высоту тела страницы. Календарь стоит вне ветвления по состоянию выдачи и
       // доступен при загрузке, пустоте и любом отказе.
       body: SafeArea(
         child: CustomScrollView(
@@ -192,11 +141,6 @@ final class _DailyChoiceCatalogPageState
     );
   }
 
-  Future<void> _chooseAction() => _creationLauncher.launch(
-    sourceContext: context,
-    direction: ChoicePathDraftDirection.bottomUp,
-  );
-
   /// Нажатый день становится и датой просмотра в прежнем представлении, и
   /// выбранной датой модели — синхронно, до следующего кадра. Повторный выбор
   /// того же дня только возвращает к нему просмотр.
@@ -266,50 +210,44 @@ final class _DailyChoiceCatalogPageState
       if (state.items.isEmpty)
         _SliverStatus(_Status(message: l10n.dailyChoiceCatalogEmpty))
       else
-        SliverPadding(
-          // Место под кнопку создания дневного выбора: прокрученные до конца
-          // последняя строка и продолжение выдачи стоят над ней.
-          padding: const EdgeInsets.only(bottom: _createActionExtent),
-          sliver: SliverList.builder(
-            itemCount: state.items.length + (state.nextCursor == null ? 0 : 1),
-            itemBuilder: (context, index) {
-              if (index == state.items.length) {
-                return _pageFooter(state, model, l10n);
-              }
-              final item = state.items[index];
-              final phrase = l10n.dailyChoiceDetailsPhrase(
-                item.source.title,
-                item.selected.title,
-              );
-              final date = item.date.toCanonicalString();
-              final completion = item.isCompleted
-                  ? l10n.dailyChoiceDetailsCompleted
-                  : l10n.dailyChoiceDetailsNotCompleted;
-              void open() => context.router.push(
-                DailyChoiceDetailsRoute(choiceId: item.id),
-              );
-              return Semantics(
-                key: ValueKey('daily-choice-row-${index + 1}'),
-                button: true,
-                label: l10n.dailyChoiceCatalogRowLabel(
-                  index + 1,
-                  phrase,
-                  date,
-                  completion,
-                ),
-                onTap: open,
-                child: ExcludeSemantics(
-                  child: ListTile(
-                    title: Text(phrase),
-                    subtitle: Text(
-                      '${l10n.dailyChoiceDetailsDate(date)} · $completion',
-                    ),
-                    onTap: open,
+        SliverList.builder(
+          itemCount: state.items.length + (state.nextCursor == null ? 0 : 1),
+          itemBuilder: (context, index) {
+            if (index == state.items.length) {
+              return _pageFooter(state, model, l10n);
+            }
+            final item = state.items[index];
+            final phrase = l10n.dailyChoiceDetailsPhrase(
+              item.source.title,
+              item.selected.title,
+            );
+            final date = item.date.toCanonicalString();
+            final completion = item.isCompleted
+                ? l10n.dailyChoiceDetailsCompleted
+                : l10n.dailyChoiceDetailsNotCompleted;
+            void open() =>
+                context.router.push(DailyChoiceDetailsRoute(choiceId: item.id));
+            return Semantics(
+              key: ValueKey('daily-choice-row-${index + 1}'),
+              button: true,
+              label: l10n.dailyChoiceCatalogRowLabel(
+                index + 1,
+                phrase,
+                date,
+                completion,
+              ),
+              onTap: open,
+              child: ExcludeSemantics(
+                child: ListTile(
+                  title: Text(phrase),
+                  subtitle: Text(
+                    '${l10n.dailyChoiceDetailsDate(date)} · $completion',
                   ),
+                  onTap: open,
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
     ];
   }
@@ -392,21 +330,15 @@ final class _CompletionFilter extends StatelessWidget {
   }
 }
 
-/// Состояние без строк выдачи занимает остаток высоты под фильтрами и стоит
-/// над местом под кнопкой создания дневного выбора.
+/// Состояние без строк выдачи занимает остаток высоты под фильтрами.
 final class _SliverStatus extends StatelessWidget {
   const _SliverStatus(this.status);
 
   final _Status status;
 
   @override
-  Widget build(BuildContext context) => SliverFillRemaining(
-    hasScrollBody: false,
-    child: Padding(
-      padding: const EdgeInsets.only(bottom: _createActionExtent),
-      child: status,
-    ),
-  );
+  Widget build(BuildContext context) =>
+      SliverFillRemaining(hasScrollBody: false, child: status);
 }
 
 final class _Status extends StatelessWidget {

@@ -497,9 +497,14 @@ void main() {
       expect(states.whereType<DailyChoiceCatalogInitialLoad>(), isEmpty);
 
       // Продолжение новой ревизии дополняет выдачу без пропусков и повторов.
+      await _closeMessage(tester);
       final position = _dailyChoicePosition(tester);
       position.jumpTo(position.maxScrollExtent);
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('daily-choice-load-more')).hitTestable(),
+        findsOneWidget,
+      );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-load-more')));
       await _waitFor(
         tester,

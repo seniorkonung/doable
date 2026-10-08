@@ -45,7 +45,7 @@ void main() {
 
     group('экранный диктор на странице каталога ($language)', () {
       testWidgets('читает шапку календаря, дни недели, фильтры, количество, '
-          'строки и подгрузку по порядку, затем основное действие и панель, '
+          'строки и подгрузку по порядку, затем общую панель, '
           'без отдельных чисел дней', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
@@ -80,7 +80,6 @@ void main() {
           _rowLabel(l10n, 1),
           _rowLabel(l10n, 2),
           l10n.dailyChoiceCatalogLoadMore,
-          l10n.dailyChoiceCreateFromAction,
         ];
         final announced = _announced(tester);
         expect(announced.take(page.length), page);
@@ -196,7 +195,6 @@ void main() {
           ...filters,
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
-          l10n.dailyChoiceCreateFromAction,
         ]);
         _expectLiveRegion(tester, l10n.dailyChoiceCatalogUnavailable);
 
@@ -218,7 +216,6 @@ void main() {
           l10n.dailyChoiceCatalogTotalCount(2),
           _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogLoadMore,
-          l10n.dailyChoiceCreateFromAction,
         ]);
 
         tester.semantics.tap(
@@ -237,7 +234,6 @@ void main() {
           _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
-          l10n.dailyChoiceCreateFromAction,
         ]);
         _expectLiveRegion(tester, l10n.dailyChoiceCatalogUnavailable);
 
@@ -253,7 +249,6 @@ void main() {
           l10n.dailyChoiceCatalogTotalCount(2),
           _rowLabel(l10n, 1),
           _rowLabel(l10n, 2),
-          l10n.dailyChoiceCreateFromAction,
         ]);
 
         tester.semantics.tap(find.semantics.byLabel(filters.first));
@@ -273,7 +268,6 @@ void main() {
           l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(0),
           l10n.dailyChoiceCatalogEmpty,
-          l10n.dailyChoiceCreateFromAction,
         ]);
 
         tester.semantics.tap(
@@ -378,8 +372,8 @@ List<String> _announced(WidgetTester tester) => [
     ?_name(node),
 ];
 
-/// Названия узлов общей прокрутки страницы в порядке обхода: без заголовка,
-/// основного действия и панели, которые стоят вне прокрутки.
+/// Названия узлов общей прокрутки страницы в порядке обхода: без заголовка
+/// и общей панели, которые стоят вне прокрутки.
 List<String> _announcedInScroll(WidgetTester tester) {
   final scroll = find.semantics
       .scrollable(axis: Axis.vertical)
@@ -398,8 +392,8 @@ List<String> _announcedInScroll(WidgetTester tester) {
   ];
 }
 
-/// Названия после последнего дня календаря: фильтры, выдача, сообщения и
-/// основное действие страницы, без панели основной навигации.
+/// Названия после последнего дня календаря: фильтры, выдача и сообщения,
+/// без панели основной навигации.
 List<String> _afterCalendar(WidgetTester tester) {
   final nodes = tester.semantics.simulatedAccessibilityTraversal().toList();
   final lastDay = nodes.lastIndexWhere(
