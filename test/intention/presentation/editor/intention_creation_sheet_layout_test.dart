@@ -30,6 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../catalog/catalog_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -1822,6 +1823,7 @@ Future<AppRouter> _openEditor(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       observers: [sessions],

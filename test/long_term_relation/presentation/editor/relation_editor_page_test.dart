@@ -35,6 +35,8 @@ import '../details/relation_details_test_support.dart' show testRelationDetails;
 import 'relation_form_test_support.dart';
 import 'relation_participant_selection_scenarios.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 void main() {
   defineRelationParticipantSelectionTests(openForm: _openForm);
   defineRelationBlankCreationTests(
@@ -1695,6 +1697,7 @@ Future<AppRouter> _openForm(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,
@@ -1744,6 +1747,7 @@ Future<AppRouter> _openDetailsForEditing(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,

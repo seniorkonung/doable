@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 enum _FailurePoint {
   none,
@@ -283,7 +284,10 @@ Future<_App> _launch(
   await seedDurabilityGraph(database);
   final repository = durabilityRepository(database);
   final container = ProviderContainer(
-    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      inMemoryQuickCreationModeOverride,
+      personalGraphRepositoryProvider.overrideWithValue(repository),
+    ],
   );
   final router = _FailingRouter(point, delayFailure: delayFailure);
   final errors = <FlutterErrorDetails>[];

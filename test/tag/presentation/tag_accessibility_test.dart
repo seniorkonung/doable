@@ -120,6 +120,7 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              inMemoryQuickCreationModeOverride,
               personalGraphRepositoryProvider.overrideWithValue(repository),
             ],
             child: MaterialApp.router(

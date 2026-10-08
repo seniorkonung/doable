@@ -41,6 +41,7 @@ import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/tag_assignment_changed.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 part 'tag_catalog_draft_search_scenarios.dart';
 part 'tag_catalog_search_recovery_scenarios.dart';
@@ -1193,6 +1194,7 @@ Future<AppRouter> _pumpStoredCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(
@@ -1229,6 +1231,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: router == null

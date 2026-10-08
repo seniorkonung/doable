@@ -311,6 +311,9 @@ final class _TestApp {
           valueListenable: selected,
           builder: (_, destination, _) => AppNavigationBar(
             selected: destination,
+            quickCreationMode: QuickCreationMode.intention,
+            onQuickCreate: () {},
+            onChangeQuickCreationMode: () {},
             onSelected: (value) => selected.value = value,
           ),
         ),

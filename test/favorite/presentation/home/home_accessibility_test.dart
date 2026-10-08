@@ -420,7 +420,21 @@ void main() {
         _rowLabel(l10n, _rows[2]),
       ]);
       expect(
-        find.semantics.byAction(SemanticsAction.customAction),
+        find.semantics.byPredicate((node) {
+          final reorderActions = {
+            actions.reorderItemToStart,
+            actions.reorderItemUp,
+            actions.reorderItemDown,
+            actions.reorderItemToEnd,
+          };
+          return (node.getSemanticsData().customSemanticsActionIds ??
+                  const <int>[])
+              .any(
+                (id) => reorderActions.contains(
+                  CustomSemanticsAction.getAction(id)?.label,
+                ),
+              );
+        }),
         findsNothing,
       );
       expect(_announcements(l10n), findsNothing);

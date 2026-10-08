@@ -26,6 +26,8 @@ import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 import 'details/details_test_support.dart';
 
+import '../../support/in_memory_quick_creation_mode_store.dart';
+
 /// Масштаб текста проверки доступности четырёх поисков.
 const _textScaler = TextScaler.linear(2.5);
 
@@ -103,6 +105,7 @@ void main() {
       final repository = ControlledDetailsRepository();
       final container = ProviderContainer(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         retry: (retryCount, error) => null,

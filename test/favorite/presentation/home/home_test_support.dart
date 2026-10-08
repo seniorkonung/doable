@@ -25,6 +25,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 /// Поднимает view model Главной над управляемым чтением избранного.
 final class HomeHarness {
   /// [firstReadError] — исключение, которое граница бросает при запуске
@@ -33,6 +35,7 @@ final class HomeHarness {
     repository.nextReadError = firstReadError;
     container = ProviderContainer(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
       ],
     );

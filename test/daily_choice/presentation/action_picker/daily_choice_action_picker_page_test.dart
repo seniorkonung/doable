@@ -25,6 +25,7 @@ import '../../../long_term_relation/presentation/participant_picker/participant_
 import '../../../support/app_root_pages.dart';
 import '../daily_choice_picker_tag_search_test_support.dart';
 import '../daily_choice_picker_context_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   defineDailyChoicePickerContextTests(
@@ -566,6 +567,7 @@ Future<AppRouter> _pumpApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         catalogPagingPolicyProvider.overrideWithValue(
           CatalogPagingPolicy(

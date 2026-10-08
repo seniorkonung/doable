@@ -6,6 +6,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -41,6 +42,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../catalog/catalog_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -1745,7 +1747,7 @@ void main() {
         final repository = ControlledCatalogRepository();
         await _openEditor(tester, repository);
 
-        final destinations = find.byType(NavigationDestination);
+        final destinations = appNavigationDestinations();
         expect(_catalogFilter, findsOneWidget);
         expect(_catalogFilter.hitTestable(), findsNothing);
         expect(
@@ -1754,6 +1756,8 @@ void main() {
         );
         expect(destinations, findsNWidgets(3));
         expect(destinations.hitTestable(), findsNothing);
+        expect(find.byType(QuickCreationButton), findsOneWidget);
+        expect(find.byType(QuickCreationButton).hitTestable(), findsNothing);
         expect(_selectedDestination(tester), AppDestination.intentionGraph);
         expect(
           find.semantics.byPredicate(
@@ -1763,6 +1767,7 @@ void main() {
           findsNothing,
         );
         expect(find.semantics.byLabel('Filter by title'), findsNothing);
+        expect(find.semantics.byLabel(RegExp('New intention')), findsNothing);
         expect(find.semantics.byLabel('Title'), findsOneWidget);
 
         // Клавиатурный обход не переводит фокус в каталог или панель.
@@ -3192,6 +3197,7 @@ Future<RootStackRouter> _openEditor(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       observers: observers,

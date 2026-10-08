@@ -88,6 +88,7 @@ void main() {
           startsWith(l10n.appDestinationHome),
           startsWith(l10n.appDestinationDailyChoices),
           startsWith(l10n.appDestinationIntentionGraph),
+          '${l10n.quickCreationLabel}, ${l10n.quickCreationModeIntention}',
         ]);
         _expectEveryActionNamed(tester);
         semantics.dispose();

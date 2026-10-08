@@ -33,6 +33,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   for (final direction in ChoicePathDraftDirection.values) {
@@ -662,6 +663,7 @@ Future<void> _pumpPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(

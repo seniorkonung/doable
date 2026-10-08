@@ -385,6 +385,7 @@ Future<void> _showAccessibleSearch(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: ValueListenableBuilder<Locale>(

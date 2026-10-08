@@ -1,6 +1,7 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 
@@ -22,6 +23,9 @@ List<WidgetbookUseCase> appNavigationBarUseCases() => [
         ),
         bottomNavigationBar: AppNavigationBar(
           selected: destination,
+          quickCreationMode: QuickCreationMode.intention,
+          onQuickCreate: () {},
+          onChangeQuickCreationMode: () {},
           onSelected: (_) {},
         ),
       ),

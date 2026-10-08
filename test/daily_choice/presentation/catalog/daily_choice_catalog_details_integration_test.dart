@@ -29,6 +29,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/daily_choice_catalog_controls.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -67,6 +68,7 @@ void main() {
       // день явно и не зависит от первоначального охвата.
       final container = ProviderContainer(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ControlledDailyChoiceLocalDate(sourceDay).override,
         ],
@@ -234,6 +236,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ControlledDailyChoiceLocalDate(day).override,
         ],
@@ -476,6 +479,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWithValue(repository),
             ControlledDailyChoiceLocalDate(day).override,
           ],

@@ -116,6 +116,7 @@ Future<RootStackRouter> _openApp(
   await seedDurabilityGraph(database);
   final container = ProviderContainer(
     overrides: [
+      inMemoryQuickCreationModeOverride,
       personalGraphRepositoryProvider.overrideWithValue(
         durabilityRepository(database),
       ),

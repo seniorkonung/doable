@@ -290,20 +290,13 @@ void main() {
             startsWith('$name\n'),
             reason: name,
           );
-          // Подпись остаётся в дереве ради семантики, но не рисуется: её
-          // непрозрачность равна нулю.
-          final fade = tester.widget<FadeTransition>(
-            find
-                .ancestor(
-                  of: find.descendant(
-                    of: appNavigationDestination(destination),
-                    matching: find.text(name),
-                  ),
-                  matching: find.byType(FadeTransition),
-                )
-                .first,
+          expect(
+            find.descendant(
+              of: appNavigationDestination(destination),
+              matching: find.text(name),
+            ),
+            findsNothing,
           );
-          expect(fade.opacity.value, 0, reason: name);
         }
         semantics.dispose();
       });

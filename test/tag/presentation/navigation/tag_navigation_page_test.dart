@@ -32,6 +32,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
@@ -748,6 +749,7 @@ _pumpStoredPage(WidgetTester tester, {_Reads? reads}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         if (reads != null) ...[
           tagNavigationReaderProvider.overrideWithValue(reads),

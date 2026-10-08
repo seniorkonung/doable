@@ -236,6 +236,7 @@ Future<_App> _start(
   await tester.runAsync(() => seedDurabilityGraph(database!));
   final container = ProviderContainer(
     overrides: [
+      inMemoryQuickCreationModeOverride,
       personalGraphRepositoryProvider.overrideWithValue(
         durabilityRepository(database!),
       ),

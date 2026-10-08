@@ -39,6 +39,7 @@ import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -98,6 +99,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           child: MaterialApp.router(
@@ -171,6 +173,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
         ],
         child: MaterialApp.router(
@@ -263,6 +266,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           retry: (count, error) => null,
@@ -542,6 +546,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           child: MaterialApp.router(
@@ -589,6 +594,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
         ],
         child: MaterialApp.router(

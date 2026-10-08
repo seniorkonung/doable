@@ -1490,7 +1490,7 @@ Future<TagId> _prepareFullDraft(
     expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
     expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
     expect(
-      find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
+      appNavigationDestinations(skipOffstage: false).hitTestable(),
       findsNothing,
     );
   } else {
@@ -1864,7 +1864,7 @@ Future<void> _expectCreatedPage(
   );
   expect(find.byType(AppNavigationBar), findsOneWidget);
   expect(
-    find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
     findsExactly(3),
   );
   expect(

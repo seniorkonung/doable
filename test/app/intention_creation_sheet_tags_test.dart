@@ -551,7 +551,7 @@ void main() {
       }
       expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(
-        find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
+        appNavigationDestinations(skipOffstage: false).hitTestable(),
         findsExactly(3),
       );
       expect(
@@ -1019,7 +1019,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 /// нажатием, экранным диктором или последовательным обходом фокуса.
 Future<void> _expectProtectedNavigation(WidgetTester tester) async {
   expect(
-    find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
     findsNothing,
   );
   expect(

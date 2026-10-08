@@ -29,6 +29,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
@@ -646,6 +647,7 @@ Future<_Harness> _open(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(

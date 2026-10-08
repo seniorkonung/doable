@@ -3,6 +3,9 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'in_memory_quick_creation_mode_store.dart';
 
 /// Окружение отдельной обычной страницы с настоящей оболочкой и вкладками.
 ///
@@ -50,16 +53,19 @@ final class _OrdinaryPageTestAppState extends State<OrdinaryPageTestApp> {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp.router(
-    locale: widget.locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    builder: widget.builder,
-    routerConfig: _router.config(
-      deepLinkBuilder: (_) => DeepLink([
-        const AppShellRoute(),
-        const NamedRoute('TestOrdinaryRoute'),
-      ]),
+  Widget build(BuildContext context) => ProviderScope(
+    overrides: [inMemoryQuickCreationModeOverride],
+    child: MaterialApp.router(
+      locale: widget.locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      builder: widget.builder,
+      routerConfig: _router.config(
+        deepLinkBuilder: (_) => DeepLink([
+          const AppShellRoute(),
+          const NamedRoute('TestOrdinaryRoute'),
+        ]),
+      ),
     ),
   );
 }

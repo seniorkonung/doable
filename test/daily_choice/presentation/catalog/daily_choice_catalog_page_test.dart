@@ -27,6 +27,8 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 import 'daily_choice_calendar_test_support.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 void main() {
   for (final (locale, label) in [
     (const Locale('ru'), 'Создать выбор от действия'),
@@ -817,6 +819,7 @@ Future<AppRouter> _open(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         ControlledDailyChoiceLocalDate(today ?? _today).override,
       ],

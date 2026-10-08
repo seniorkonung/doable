@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   _defineLatePickerTests();
@@ -676,6 +677,7 @@ Future<RootStackRouter> _openApp(
   }
   final container = ProviderContainer(
     overrides: [
+      inMemoryQuickCreationModeOverride,
       personalGraphRepositoryProvider.overrideWithValue(
         durabilityRepository(database),
       ),

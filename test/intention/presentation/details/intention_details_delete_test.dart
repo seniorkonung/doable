@@ -26,6 +26,8 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
@@ -659,6 +661,7 @@ Future<void> _pumpDetailsPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         if (pagingPolicy case final policy?)
           relationNeighborhoodPagingPolicyProvider.overrideWithValue(policy),
@@ -673,6 +676,7 @@ Future<void> _pumpDetailsPage(
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
     ProviderContainer(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,

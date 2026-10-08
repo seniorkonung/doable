@@ -19,6 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_test_support.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 ProviderContainer reconciliationCatalogContainer(
   ControlledCatalogRepository repository, {
   Duration filterDebounce = const Duration(milliseconds: 250),
@@ -26,6 +28,7 @@ ProviderContainer reconciliationCatalogContainer(
   int prefetchRemaining = 30,
 }) => ProviderContainer(
   overrides: [
+    inMemoryQuickCreationModeOverride,
     personalGraphRepositoryProvider.overrideWithValue(repository),
     catalogPagingPolicyProvider.overrideWithValue(
       CatalogPagingPolicy(

@@ -1030,7 +1030,27 @@ void _expectSaving(
     findsOneWidget,
   );
   expect(find.byType(ReorderableDragStartListener), findsNothing);
-  expect(find.semantics.byAction(SemanticsAction.customAction), findsNothing);
+  final actions = WidgetsLocalizations.of(
+    tester.element(find.byType(HomePage, skipOffstage: false)),
+  );
+  final reorderActions = {
+    actions.reorderItemToStart,
+    actions.reorderItemUp,
+    actions.reorderItemDown,
+    actions.reorderItemToEnd,
+  };
+  expect(
+    find.semantics.byPredicate(
+      (node) =>
+          (node.getSemanticsData().customSemanticsActionIds ?? const <int>[])
+              .any(
+                (id) => reorderActions.contains(
+                  CustomSemanticsAction.getAction(id)?.label,
+                ),
+              ),
+    ),
+    findsNothing,
+  );
 }
 
 /// Узел семантики строки Главной намерения [number] малого графа.

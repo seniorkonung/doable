@@ -22,6 +22,8 @@ import '../../../support/app_root_pages.dart';
 import '../details/relation_details_test_support.dart';
 import 'relation_form_test_support.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 enum _Failure {
   none,
   beforeForm,
@@ -752,6 +754,7 @@ Future<_App> _launch(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,

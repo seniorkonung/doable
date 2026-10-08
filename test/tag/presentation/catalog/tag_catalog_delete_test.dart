@@ -26,6 +26,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -283,6 +284,7 @@ void main() {
           final repository = _PendingRepository();
           final container = ProviderContainer(
             overrides: [
+              inMemoryQuickCreationModeOverride,
               personalGraphRepositoryProvider.overrideWithValue(repository),
             ],
           );
@@ -372,6 +374,7 @@ Future<void> _openRealCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(

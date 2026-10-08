@@ -40,7 +40,7 @@ final class AppShellPage extends StatelessWidget {
                   child: _AppShellTabs(selected: selected, children: children),
                 ),
               ),
-              const AppNavigation(),
+              AppNavigation(sourceRoute: tabsRouter.current),
             ],
           ),
         );

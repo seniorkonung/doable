@@ -32,6 +32,7 @@ import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/local_database_harness.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 part 'creation_flows_test_support.dart';
 part 'creation_flows_accessibility_scenarios.dart';

@@ -28,6 +28,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../catalog/catalog_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Доступность полного сценария нижней панели создания намерения: экранный
 /// диктор, клавиатура и guidelines Android на русском и английском.
@@ -1163,6 +1164,7 @@ Future<AppRouter> _openCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       observers: [sessions],

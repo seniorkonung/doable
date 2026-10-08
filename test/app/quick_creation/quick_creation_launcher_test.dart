@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 part 'quick_creation_launcher_test_support.dart';
 

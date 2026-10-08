@@ -4,10 +4,14 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/app_root_pages.dart';
 
 const _russianNames = {
   AppDestination.home: 'Главная',
@@ -39,6 +43,50 @@ final _locales = {
 };
 
 void main() {
+  for (final mode in QuickCreationMode.values) {
+    final modeName = switch (mode) {
+      QuickCreationMode.intention => 'Новое намерение',
+      QuickCreationMode.relation => 'Новая связь',
+      QuickCreationMode.dailyChoiceFromIntention =>
+        'Дневной выбор от намерения',
+      QuickCreationMode.dailyChoiceFromAction => 'Дневной выбор от действия',
+    };
+    testWidgets(
+      'режим $modeName: создание и смена режима — отдельные действия',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        var launches = 0;
+        var menus = 0;
+        final selections = <AppDestination>[];
+        await tester.pumpWidget(
+          _testApp(
+            locale: const Locale('ru'),
+            quickCreationMode: mode,
+            onQuickCreate: () => launches++,
+            onChangeQuickCreationMode: () => menus++,
+            onSelected: selections.add,
+          ),
+        );
+        final button = find.byType(QuickCreationButton);
+        final node = tester.getSemantics(button);
+        expect(node.flagsCollection.isButton, isTrue);
+        expect(node.flagsCollection.isSelected, Tristate.none);
+        expect(node.role, isNot(SemanticsRole.tab));
+        expect(node.parent?.role, isNot(SemanticsRole.tabBar));
+        expect(appNavigationDestinations(), findsNWidgets(3));
+        await tester.tap(button);
+        await tester.longPress(button);
+        await tester.pumpAndSettle();
+        expect(launches, 1);
+        expect(menus, 1);
+        expect(selections, isEmpty);
+        expect(find.byIcon(Icons.home), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
   test('пункты идут в порядке Главная, Дневные выборы, Граф намерений', () {
     expect(AppDestination.values, [
       AppDestination.home,
@@ -64,14 +112,20 @@ void main() {
           'календаря и графа', (tester) async {
         await tester.pumpWidget(_testApp(locale: locale));
 
-        expect(find.byType(NavigationDestination), findsNWidgets(3));
+        expect(appNavigationDestinations(), findsNWidgets(3));
         final home = tester.getCenter(find.byIcon(Icons.home));
         final calendar = tester.getCenter(
           find.byIcon(Icons.calendar_month_outlined),
         );
         final graph = tester.getCenter(find.byIcon(Icons.hub_outlined));
         expect(home.dx, lessThan(calendar.dx));
-        expect(calendar.dx, lessThan(graph.dx));
+        final quick = tester.getCenter(find.byType(QuickCreationButton));
+        final slotWidth =
+            tester.getSize(find.byType(AppNavigationBar)).width / 4;
+        expect(calendar.dx - home.dx, moreOrLessEquals(slotWidth));
+        expect(quick.dx - calendar.dx, moreOrLessEquals(slotWidth));
+        expect(graph.dx - quick.dx, moreOrLessEquals(slotWidth));
+        expect(find.byType(QuickCreationButton).hitTestable(), findsOneWidget);
         expect(find.byIcon(Icons.account_tree), findsNothing);
         expect(find.byIcon(Icons.account_tree_outlined), findsNothing);
         expect(find.byIcon(Icons.schema), findsNothing);
@@ -81,23 +135,8 @@ void main() {
       testWidgets('не показывает текстовых подписей пунктов', (tester) async {
         await tester.pumpWidget(_testApp(locale: locale));
 
-        final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-        expect(
-          bar.labelBehavior,
-          NavigationDestinationLabelBehavior.alwaysHide,
-        );
-        // Подпись остаётся в дереве ради семантики, но не рисуется: её
-        // непрозрачность равна нулю.
         for (final name in names.values) {
-          final fade = tester.widget<FadeTransition>(
-            find
-                .ancestor(
-                  of: find.text(name),
-                  matching: find.byType(FadeTransition),
-                )
-                .first,
-          );
-          expect(fade.opacity.value, 0, reason: name);
+          expect(find.text(name), findsNothing);
         }
       });
 
@@ -119,7 +158,7 @@ void main() {
             );
             final indicator = tester.widget<NavigationIndicator>(
               find.descendant(
-                of: find.byType(NavigationDestination).at(destination.index),
+                of: appNavigationDestination(destination),
                 matching: find.byType(NavigationIndicator),
               ),
             );
@@ -138,9 +177,7 @@ void main() {
           expect(find.byTooltip(name), findsOneWidget);
 
           final gesture = await tester.startGesture(
-            tester.getCenter(
-              find.byType(NavigationDestination).at(destination.index),
-            ),
+            tester.getCenter(appNavigationDestination(destination)),
           );
           await tester.pump(kLongPressTimeout + kPressTimeout);
           await gesture.up();
@@ -178,7 +215,7 @@ void main() {
 
         for (final destination in AppDestination.values) {
           final node = tester.getSemantics(
-            find.byType(NavigationDestination).at(destination.index),
+            appNavigationDestination(destination),
           );
           final position = material.tabLabel(
             tabIndex: destination.index + 1,
@@ -219,7 +256,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        final barRect = tester.getRect(find.byType(NavigationBar));
+        final barRect = tester.getRect(find.byType(AppNavigationBar));
         for (final destination in AppDestination.values) {
           final icon = destination == AppDestination.home
               ? _filledIcons[destination]!
@@ -284,7 +321,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        tester.getSize(find.byType(NavigationBar)).height,
+        tester.getSize(find.byType(AppNavigationBar)).height,
         AppNavigationBar.height,
       );
     }
@@ -316,6 +353,9 @@ Widget _testApp({
   AppDestination selected = AppDestination.home,
   ValueChanged<AppDestination>? onSelected,
   TextScaler textScaler = TextScaler.noScaling,
+  QuickCreationMode quickCreationMode = QuickCreationMode.intention,
+  VoidCallback? onQuickCreate,
+  VoidCallback? onChangeQuickCreationMode,
 }) {
   return MaterialApp(
     locale: locale,
@@ -330,6 +370,9 @@ Widget _testApp({
       body: const SizedBox.expand(),
       bottomNavigationBar: AppNavigationBar(
         selected: selected,
+        quickCreationMode: quickCreationMode,
+        onQuickCreate: onQuickCreate ?? () {},
+        onChangeQuickCreationMode: onChangeQuickCreationMode ?? () {},
         onSelected: onSelected ?? (_) {},
       ),
     ),

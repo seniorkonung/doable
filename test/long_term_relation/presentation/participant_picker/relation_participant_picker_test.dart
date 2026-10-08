@@ -33,6 +33,8 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart'
 import '../../../support/app_root_pages.dart';
 import 'participant_picker_test_support.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 void main() {
   _defineTagSearchTests();
 
@@ -764,6 +766,7 @@ Future<AppRouter> _pumpAppWithCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         catalogPagingPolicyProvider.overrideWithValue(
           CatalogPagingPolicy(
