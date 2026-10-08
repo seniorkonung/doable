@@ -665,22 +665,14 @@ void main() {
         findsNothing,
       );
 
-      for (var attempt = 0; attempt < 4; attempt++) {
-        if (find
-            .byKey(const ValueKey('catalog-create-intention'))
-            .evaluate()
-            .isNotEmpty) {
-          break;
-        }
-        await tester.binding.handlePopRoute();
-        await tester.pump(const Duration(milliseconds: 350));
-      }
+      expectDailyChoicesRootPage(ready.container.read(appRouterProvider));
       await openIntentionGraph(
         tester,
         waitFor: (tester, finder) =>
             _until(tester, () => finder.evaluate().isNotEmpty),
         content: find.text('Намерение 1'),
       );
+      expectIntentionGraphRootPage(ready.container.read(appRouterProvider));
       await _tap(tester, find.text('Намерение 1').first);
       await _tap(
         tester,
