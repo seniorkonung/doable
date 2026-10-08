@@ -32,40 +32,45 @@ final class _QuickCreationModeMenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final localizations = AppLocalizations.of(context);
     final selected = ref.watch(quickCreationModeControllerProvider);
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Semantics(
-                header: true,
-                child: Text(
-                  localizations.quickCreationMenuTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
+    // SafeArea не учитывает клавиатуру: её область задаёт viewInsets.
+    // https://api.flutter.dev/flutter/widgets/MediaQueryData/viewInsets.html
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    localizations.quickCreationMenuTitle,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                 ),
               ),
-            ),
-            for (final mode in QuickCreationMode.values)
-              ListTile(
-                leading: Icon(mode.icon),
-                title: Text(mode.title(localizations)),
-                selected: mode == selected,
-                autofocus: mode == selected,
-                trailing: mode == selected ? const Icon(Icons.check) : null,
-                onTap: () {
-                  unawaited(
-                    ref
-                        .read(quickCreationModeControllerProvider.notifier)
-                        .select(mode),
-                  );
-                  Navigator.of(context).pop();
-                },
-              ),
-          ],
+              for (final mode in QuickCreationMode.values)
+                ListTile(
+                  leading: Icon(mode.icon),
+                  title: Text(mode.title(localizations)),
+                  selected: mode == selected,
+                  autofocus: mode == selected,
+                  trailing: mode == selected ? const Icon(Icons.check) : null,
+                  onTap: () {
+                    unawaited(
+                      ref
+                          .read(quickCreationModeControllerProvider.notifier)
+                          .select(mode),
+                    );
+                    Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );

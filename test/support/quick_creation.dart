@@ -37,7 +37,8 @@ Future<void> openQuickCreation(
   await tester.longPress(button);
   await tester.pumpAndSettle();
   final option = find.widgetWithText(ListTile, mode.title(localizations));
-  await tester.ensureVisible(option);
+  // При строке выше области прокрутки центр остаётся целью обычного нажатия.
+  await Scrollable.ensureVisible(tester.element(option), alignment: 0.5);
   await tester.pumpAndSettle();
   expect(option.hitTestable(), findsOneWidget);
   await tester.tap(option);
