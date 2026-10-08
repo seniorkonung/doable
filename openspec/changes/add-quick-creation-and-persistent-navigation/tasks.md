@@ -463,7 +463,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`.
   - **Estimated scope:** M — локальная коррекция компоновки двух страниц и общий регрессионный контракт, до 5 файлов.
 
-- [ ] 2.24 Подтвердить готовность Phase 2 после исправления доступности отмены начального поиска
+- [x] 2.24 Подтвердить готовность Phase 2 после исправления доступности отмены начального поиска
   - **Acceptance criteria:**
     - Матрица 2.23 подтверждает видимость, прямое нажатие и семантику текстовой отмены именно на обеих начальных поисковых страницах с клавиатурой и увеличенным текстом. Верхний крестик, самостоятельное состояние поисков, точная исходная история, запрет позднего продолжения отменённого запуска и вспомогательная замена пути сохраняют свои контракты.
     - Условие `Ready to advance` Phase 2 [плана](plan.md) подтверждено свежими проверками корректирующей реализации вместе с четырьмя потоками, навигацией, сообщениями, генерацией, анализом и release-сборкой. Документ готовности указывает точную проверенную ревизию и результаты; прежние свидетельства 2.22 не выдаются за проверку исправления.
