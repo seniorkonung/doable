@@ -37,6 +37,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
@@ -149,7 +150,7 @@ void main() {
           // отступа и нижней безопасной области.
           for (final item in AppDestination.values) {
             final icon = find.descendant(
-              of: find.byType(AppNavigationBar),
+              of: appNavigationDestination(item),
               matching: find.byIcon(
                 item == destination ? item.selectedIcon : item.icon,
               ),
@@ -522,10 +523,7 @@ void main() {
         expect(_messageOf(2).hitTestable(), findsOneWidget);
         // Панель при видимом сообщении остаётся на месте и принимает нажатия.
         expect(bar.bottom, _screen.height);
-        expect(
-          find.byType(NavigationDestination).hitTestable(),
-          findsExactly(3),
-        );
+        expect(appNavigationDestinations().hitTestable(), findsExactly(3));
 
         final action = _mainActions[destination];
         if (action != null) {
@@ -1120,12 +1118,9 @@ ScrollPosition _catalogPageScroll(WidgetTester tester) => tester
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  final entry = appNavigationDestination(destination);
+  expect(entry.hitTestable(), findsOneWidget);
+  await tester.tap(entry);
   await _until(tester, find.byType(_rootPages[destination]!));
   await tester.pumpAndSettle();
 }

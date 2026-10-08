@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
@@ -15,6 +16,7 @@ import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -64,6 +66,7 @@ void main() {
   for (final destination in AppDestination.values) {
     testWidgets('выбор ${destination.name} удаляет типизированную и '
         'безымянную историю без подтверждения', (tester) async {
+      final semantics = tester.ensureSemantics();
       final router = await _start(tester);
       await _select(tester, AppDestination.dailyChoices);
       final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
@@ -85,10 +88,7 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.pushNativeRoute<void>(_ordinaryRoute()));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        AppDestination.dailyChoices,
-      );
+      _expectSelected(tester, AppDestination.dailyChoices);
 
       await _select(tester, destination);
 
@@ -98,10 +98,7 @@ void main() {
       expect(router.innerRouterOf<TabsRouter>(AppShellRoute.name), same(tabs));
       expect(router.hasPagelessTopRoute, isFalse);
       expect(router.topRoute.name, destination.page.name);
-      expect(
-        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        destination,
-      );
+      _expectSelected(tester, destination);
       expect(
         find.byType(OrdinaryPageScaffold, skipOffstage: false),
         findsNothing,
@@ -119,6 +116,7 @@ void main() {
       expect(router.topRoute.name, HomeRoute.name);
       expect(find.byType(HomePage), findsOneWidget);
       expect(tester.takeException(), isNull);
+      semantics.dispose();
     });
   }
 
@@ -175,11 +173,23 @@ Future<AppRouter> _start(WidgetTester tester) async {
 }
 
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  final entry = appNavigationDestination(destination);
+  expect(entry.hitTestable(), findsOneWidget);
+  await tester.tap(entry);
   await tester.pumpAndSettle();
+}
+
+/// Выбор объявляется ровно у одного из трёх доступных пунктов.
+void _expectSelected(WidgetTester tester, AppDestination selected) {
+  expect(appNavigationDestinations(), findsExactly(3));
+  for (final destination in AppDestination.values) {
+    expect(
+      tester
+          .getSemantics(appNavigationDestination(destination))
+          .flagsCollection
+          .isSelected,
+      destination == selected ? Tristate.isTrue : Tristate.isFalse,
+      reason: destination.name,
+    );
+  }
 }

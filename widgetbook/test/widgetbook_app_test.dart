@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
@@ -27,6 +29,7 @@ void main() {
 
   testWidgets('панель каждого выбранного пункта показана под обычной страницей '
       'с текстом 2.5 на телефоне в обеих локалях', (tester) async {
+    final semantics = tester.ensureSemantics();
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -55,17 +58,34 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-        expect(bar.selectedIndex, index);
-        final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-        expect(scaffold.bottomNavigationBar, isA<AppNavigationBar>());
+        final bar = find.byType(AppNavigationBar);
+        expect(bar, findsOneWidget);
+        final destinations = tester.semantics
+            .simulatedAccessibilityTraversal()
+            .where((node) => node.role == SemanticsRole.tab)
+            .toList();
+        expect(destinations, hasLength(3));
+        for (final (destinationIndex, node) in destinations.indexed) {
+          final position = MaterialLocalizations.of(tester.element(bar))
+              .tabLabel(tabIndex: destinationIndex + 1, tabCount: 3);
+          expect(node.label, '${localeNames[destinationIndex]}\n$position');
+          expect(node.flagsCollection.isButton, isTrue);
+          expect(
+            node.getSemanticsData().hasAction(SemanticsAction.tap),
+            isTrue,
+          );
+          expect(
+            node.flagsCollection.isSelected,
+            destinationIndex == index ? Tristate.isTrue : Tristate.isFalse,
+          );
+        }
         final appBar = find.byType(AppBar);
         expect(
           find.descendant(of: appBar, matching: find.text(localeNames[index])),
           findsOneWidget,
         );
         expect(MediaQuery.textScalerOf(tester.element(appBar)).scale(10), 25);
-        final barRect = tester.getRect(find.byType(AppNavigationBar));
+        final barRect = tester.getRect(bar);
         expect(barRect.bottom, 780);
         expect(barRect.height, AppNavigationBar.height);
         expect(
@@ -91,6 +111,7 @@ void main() {
         expect(tester.takeException(), isNull);
       }
     }
+    semantics.dispose();
   });
 
   testWidgets('строка Главной показана в обеих локалях без звезды', (

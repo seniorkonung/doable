@@ -23,6 +23,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -65,7 +66,7 @@ void main() {
       final router = await _start(tester, locale);
 
       for (final selected in AppDestination.values) {
-        await tester.tap(_destination(selected));
+        await tester.tap(appNavigationDestination(selected));
         await tester.pumpAndSettle();
         for (final route in <PageRouteInfo>[
           IntentionDetailsRoute(
@@ -259,23 +260,24 @@ Future<AppRouter> _start(WidgetTester tester, Locale locale) async {
 
 final _bar = find.byType(AppNavigationBar);
 
-/// Пункт панели на своём месте слева направо.
-Finder _destination(AppDestination destination) => find.descendant(
-  of: _bar,
-  matching: find.byType(NavigationDestination).at(destination.index),
-);
-
 /// Значок пункта: залитый у выбранного, контурный у остальных.
 Finder _icon(AppDestination destination, {required bool isSelected}) =>
     find.descendant(
-      of: _bar,
+      of: appNavigationDestination(destination),
       matching: find.byIcon(
         isSelected ? destination.selectedIcon : destination.icon,
       ),
     );
 
 AppDestination _selected(WidgetTester tester) =>
-    tester.widget<AppNavigationBar>(_bar).selected;
+    AppDestination.values.singleWhere(
+      (destination) =>
+          tester
+              .getSemantics(appNavigationDestination(destination))
+              .flagsCollection
+              .isSelected ==
+          Tristate.isTrue,
+    );
 
 /// Корневая страница пункта.
 Type _rootPage(AppDestination destination) => switch (destination) {
@@ -304,7 +306,7 @@ String _destinationLabel(
 
 /// Экранный диктор проходит три пункта по порядку с названием, ролью,
 /// положением и признаком выбранного, а из корневых страниц слышит заголовок
-/// только открытой. Подписи пунктов в дереве остаются, но не рисуются.
+/// только открытой. Текстовые подписи в панели не рисуются.
 void _expectAnnounced(
   WidgetTester tester,
   Map<AppDestination, String> names, {
@@ -312,7 +314,7 @@ void _expectAnnounced(
   bool rootHeaderVisible = true,
 }) {
   for (final destination in AppDestination.values) {
-    final node = tester.getSemantics(_destination(destination));
+    final node = tester.getSemantics(appNavigationDestination(destination));
     expect(node.label, _destinationLabel(tester, names, destination));
     expect(node.role, SemanticsRole.tab);
     expect(node.parent?.role, SemanticsRole.tabBar);
@@ -342,18 +344,24 @@ void _expectAnnounced(
         node.label,
   ], rootHeaderVisible ? [names[selected]] : <String>[]);
 
-  for (final label in tester.widgetList<Text>(
+  expect(appNavigationDestinations(), findsExactly(3));
+  final panel = tester.renderObject(_bar);
+  for (final label in tester.renderObjectList<RenderParagraph>(
     find.descendant(of: _bar, matching: find.byType(Text)),
   )) {
-    final fade = tester.widget<FadeTransition>(
-      find
-          .ancestor(
-            of: find.byWidget(label),
-            matching: find.byType(FadeTransition),
-          )
-          .first,
-    );
-    expect(fade.opacity.value, 0, reason: label.data);
+    // Подписи могут отсутствовать либо быть скрыты любым способом отрисовки,
+    // без привязки к FadeTransition стандартной панели Material.
+    RenderObject child = label;
+    var painted = true;
+    while (child != panel) {
+      final parent = child.parent!;
+      if (!parent.paintsChild(child)) {
+        painted = false;
+        break;
+      }
+      child = parent;
+    }
+    expect(painted, isFalse, reason: label.text.toPlainText());
   }
 }
 
@@ -366,7 +374,9 @@ void _expectWholeIcons(
   final screen = Offset.zero & _screen;
   final bar = tester.getRect(_bar);
   for (final destination in AppDestination.values) {
-    final target = tester.getRect(_destination(destination));
+    final entry = appNavigationDestination(destination);
+    expect(entry.hitTestable(), findsOneWidget);
+    final target = tester.getRect(entry);
     final icon = tester.getRect(
       _icon(destination, isSelected: destination == selected),
     );
@@ -417,7 +427,10 @@ void _expectVisibleTitle(
 
 /// Значки панели слева направо вместе с их положением.
 List<(IconData?, Rect)> _barLayout(WidgetTester tester) {
-  final icons = find.descendant(of: _bar, matching: find.byType(Icon));
+  final icons = find.descendant(
+    of: appNavigationDestinations(),
+    matching: find.byType(Icon),
+  );
   return [
     for (final element in icons.evaluate())
       (
