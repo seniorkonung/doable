@@ -53,7 +53,7 @@ final class ControlledModeIo {
   final committedKeys = <String>[];
   Object? readError;
 
-  Future<void> run(Future<void> Function() body) {
+  Future<T> run<T>(Future<T> Function() body) {
     final realIo = Zone.current;
     return IOOverrides.runZoned(
       body,
