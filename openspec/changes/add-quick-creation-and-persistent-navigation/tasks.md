@@ -722,7 +722,7 @@
   - **Files likely touched:** `test/app/daily_choice_app_flow_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_launcher_test.dart`.
   - **Estimated scope:** M — перенос четырёх сценарных файлов дневного выбора.
 
-- [ ] 3.22 Убрать собственную кнопку создания намерения и зарезервированное под неё место
+- [x] 3.22 Убрать собственную кнопку создания намерения и зарезервированное под неё место
   - **Acceptance criteria:**
     - По требованию «Точки входа в каталоги» [спецификации навигации](specs/app-navigation/spec.md) и решению 12 дизайна IntentionCatalogPage больше не строит FloatingActionButton и не резервирует _createActionExtent в выдаче. Создание доступно общей кнопкой во всех состояниях каталога.
     - Последняя строка, подгрузка и повтор после отказа полностью видимы и нажимаемы над панелью при безопасных отступах и клавиатуре. Сохраняются охват, поиск, теги, порции и прокрутка; вход «Теги» и действия создания на странице намерения остаются.

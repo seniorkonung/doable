@@ -174,14 +174,14 @@ void main() {
   group('содержимое каталогов над панелью', () {
     for (final insets in _insetVariants) {
       testWidgets('каталог намерений, ${insets.name}: последняя строка выдачи, '
-          'загруженной до конца, полностью видна над панелью и не закрыта '
-          'созданием намерения', (tester) async {
+          'загруженной до конца, занимает доступную область до панели', (
+        tester,
+      ) async {
         const count = 40;
         await _start(tester, intentions: count, insets: insets);
         await _select(tester, AppDestination.intentionGraph);
         await _until(tester, find.text('Total intentions: $count'));
 
-        final create = find.byKey(const ValueKey('catalog-create-intention'));
         if (insets.keyboard > 0) {
           // Поле фильтра в фокусе остаётся над клавиатурой и сужает выдачу.
           await tester.enterText(_titleFilter, 'Намерение 00');
@@ -201,11 +201,6 @@ void main() {
           );
           expect(_titleFilter.hitTestable(), findsOneWidget);
           _expectFullyVisible(tester, _titleFilter, insets);
-          _expectMainAction(tester, create, insets);
-          expect(
-            tester.getRect(_titleFilter).overlaps(tester.getRect(create)),
-            isFalse,
-          );
         }
 
         await _scrollToEnd(tester, find.byType(IntentionCatalogPage));
@@ -214,26 +209,21 @@ void main() {
         // последним.
         final lastRow = _catalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(lastRow).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
 
       testWidgets('каталог намерений, ${insets.name}: один флинг от начала '
           'выдачи, загруженной до конца, доводит до конца список и страницу, '
-          'и последняя строка полностью видна над панелью и не закрыта '
-          'созданием намерения, а обратный флинг возвращает поле фильтра '
+          'и последняя строка занимает доступную область до панели, '
+          'а обратный флинг возвращает поле фильтра '
           'названия', (tester) async {
         // Двадцать строк одним флингом проходятся с запасом.
         const count = 20;
         await _start(tester, intentions: count, insets: insets);
         await _select(tester, AppDestination.intentionGraph);
         await _until(tester, find.text('Total intentions: $count'));
-        final create = find.byKey(const ValueKey('catalog-create-intention'));
         if (insets.keyboard > 0) {
           // Клавиатуру открывает поле фильтра в фокусе.
           await tester.enterText(_titleFilter, 'Намерение 00');
@@ -254,11 +244,7 @@ void main() {
         // последним.
         final lastRow = _catalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(lastRow).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
 
         await _flingCatalog(tester, const Offset(0, 300));
@@ -293,7 +279,6 @@ void main() {
         await _select(tester, AppDestination.intentionGraph);
         await _until(tester, find.text('Total intentions: $count'));
         final page = find.byType(IntentionCatalogPage);
-        final create = find.byKey(const ValueKey('catalog-create-intention'));
         if (insets.keyboard > 0) {
           // Клавиатуру открывает поле фильтра в фокусе, а выдача остаётся
           // больше одной порции.
@@ -316,15 +301,10 @@ void main() {
           matching: find.byType(FilledButton),
         );
         // Отступы состояния нажатий не принимают: полную видимость проверяют
-        // его сообщение и повтор, а отсутствие пересечения с кнопкой — всё
-        // состояние.
+        // его сообщение и повтор, а границу выдачи — всё состояние.
         _expectFullyVisible(tester, failure, insets);
         _expectFullyVisible(tester, retry, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(continuation).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, continuation, insets);
         expect(retry.hitTestable(), findsOneWidget);
 
         faults.isFailing = false;
@@ -335,11 +315,7 @@ void main() {
         expect(continuation, findsNothing);
         final lastRow = _catalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(lastRow).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
@@ -507,8 +483,7 @@ void main() {
   group('сообщения общей поверхности над панелью', () {
     for (final destination in AppDestination.values) {
       testWidgets('«${_names[destination]}»: сообщение о результате операции '
-          'видно над панелью, а основное действие страницы поднимается над '
-          'ним и остаётся доступным', (tester) async {
+          'видно над панелью, а создание остаётся доступным', (tester) async {
         final app = await _start(tester, insets: _safeArea);
         await _select(tester, destination);
 
@@ -536,6 +511,19 @@ void main() {
           await _until(tester, find.byType(action.opens));
           await tester.pumpAndSettle();
           expect(find.byType(action.opens), findsOneWidget);
+        }
+        if (destination == AppDestination.intentionGraph) {
+          final create = quickCreationAction();
+          expect(
+            tester.getRect(create).top,
+            greaterThanOrEqualTo(message.bottom),
+          );
+          expect(create.hitTestable(), findsOneWidget);
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
+          );
         }
         expect(tester.takeException(), isNull);
       });
@@ -648,16 +636,11 @@ const _rootPages = {
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-/// Основное действие корневой страницы и страница, которую оно открывает.
-/// У Главной основного действия нет.
+/// Собственное действие каталога дневных выборов и открываемая им страница.
 const _mainActions = <AppDestination, ({Key key, Type opens})>{
   AppDestination.dailyChoices: (
     key: ValueKey('daily-choice-create-from-action'),
     opens: DailyChoiceActionPickerPage,
-  ),
-  AppDestination.intentionGraph: (
-    key: ValueKey('catalog-create-intention'),
-    opens: IntentionEditorPage,
   ),
 };
 
@@ -988,9 +971,8 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
 }
 
 /// Ставит фокус в поле фильтра названия каталога намерений, не меняя поиск:
-/// поле видно над клавиатурой и не закрыто созданием намерения.
+/// поле видно над клавиатурой.
 Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
-  final create = find.byKey(const ValueKey('catalog-create-intention'));
   await tester.showKeyboard(_titleFilter);
   await tester.pumpAndSettle();
   expect(
@@ -1007,11 +989,12 @@ Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
   );
   expect(_titleFilter.hitTestable(), findsOneWidget);
   _expectFullyVisible(tester, _titleFilter, insets);
-  _expectMainAction(tester, create, insets);
-  expect(
-    tester.getRect(_titleFilter).overlaps(tester.getRect(create)),
-    isFalse,
-  );
+}
+
+/// Конец выдачи использует доступное место до панели либо клавиатуры.
+void _expectCatalogEnd(WidgetTester tester, Finder last, _Insets insets) {
+  expect(tester.getRect(last).bottom, moreOrLessEquals(insets.contentBottom));
+  expect(find.byKey(const ValueKey('catalog-create-intention')), findsNothing);
 }
 
 /// Выбор дня в начале каталога дневных выборов виден над клавиатурой,

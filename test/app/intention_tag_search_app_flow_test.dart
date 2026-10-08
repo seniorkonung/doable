@@ -628,14 +628,17 @@ void main() {
         expect(_conditions(tester, page), ['Самочувствие', deletedSport]);
 
         // Список прокручен ниже начала до того, как удаление обязательного
-        // тега снимет его с экрана.
-        tester.view.physicalSize = const Size(1200, 700);
+        // тега снимет его с экрана. Пять строк превышают высоту выдачи без
+        // прежнего резерва под кнопку создания.
+        tester.view.physicalSize = const Size(1200, 600);
         await tester.pumpAndSettle();
+        expect(_catalogListPosition(tester).maxScrollExtent, greaterThan(0));
         // Жест начинается в видимой части списка: его нижняя часть под
         // параметрами поиска лежит за нижним краем экрана.
         final list = tester.getRect(_catalogList);
+        final contentBottom = tester.getRect(find.byType(page)).bottom;
         await tester.dragFrom(
-          Offset(list.center.dx, (list.top + 700) / 2),
+          Offset(list.center.dx, (list.top + contentBottom) / 2),
           const Offset(0, -200),
         );
         await tester.pumpAndSettle();

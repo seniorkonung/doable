@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -21,6 +22,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_search_layou
 import 'package:doable/src/intention/presentation/catalog/intention_search_results.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -35,6 +37,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
 
@@ -441,8 +444,8 @@ void main() {
   ]) {
     testWidgets('загруженная выдача получает всю высоту тела страницы '
         '$variant: жест по списку прокручивает сначала список, а на его краю '
-        '— страницу с параметрами, и последняя строка видна целиком над '
-        'созданием намерения', (tester) async {
+        '— страницу с параметрами, и последняя строка использует всю '
+        'доступную область без резерва под создание', (tester) async {
       _usePhoneScreen(tester, keyboard: keyboard);
       final repository = ControlledCatalogRepository();
       await tester.pumpWidget(_testApp(repository));
@@ -486,11 +489,8 @@ void main() {
       // Выдача сохраняет порядок порции: последним стоит двадцатое намерение.
       final lastRow = find.widgetWithText(IntentionSummaryView, 'Намерение 20');
       final row = tester.getRect(lastRow);
-      final create = tester.getRect(
-        find.byKey(const ValueKey('catalog-create-intention')),
-      );
       expect(row.top, greaterThanOrEqualTo(tester.getRect(list).top));
-      expect(row.bottom, lessThanOrEqualTo(create.top));
+      expect(row.bottom, moreOrLessEquals(bodyBottom));
       expect(lastRow.hitTestable(), findsOneWidget);
 
       // Обратный жест тоже сначала прокручивает список, а страница остаётся
@@ -513,7 +513,7 @@ void main() {
     // из 20 строк.
     testWidgets('флинг $variant, начатый при списке и странице в начале, '
         'доводит до конца список и страницу, и получение следующей порции '
-        'видно целиком над созданием намерения, а обратный флинг возвращает '
+        'видно целиком до границы тела страницы, а обратный флинг возвращает '
         'список и страницу к параметрам поиска', (tester) async {
       _usePhoneScreen(tester, keyboard: keyboard);
       final bodyBottom = _phone.height - keyboard;
@@ -560,12 +560,8 @@ void main() {
       expect(
         tester
             .getRect(find.byType(IntentionCatalogContinuationStatusView))
-            .overlaps(
-              tester.getRect(
-                find.byKey(const ValueKey('catalog-create-intention')),
-              ),
-            ),
-        isFalse,
+            .bottom,
+        moreOrLessEquals(bodyBottom),
       );
       expect(repository.queries, hasLength(2));
 
@@ -1270,8 +1266,11 @@ void main() {
     expect(beforePosition, greaterThan(0));
     expect(beforeState.query.titleFilter?.map((value) => value), 'Намерение');
 
-    await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
-    await tester.pumpAndSettle();
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
+    );
     expect(router.current.name, IntentionEditorRoute.name);
     // Панель открыта над тем же каталогом: его выдача и прокрутка на месте,
     // а результат маршрута не запрашивает выдачу повторно.
@@ -1314,45 +1313,66 @@ void main() {
     );
   });
 
-  testWidgets('кнопка создания показывает только «+», а подсказка и экранный '
-      'диктор называют действие', (tester) async {
-    final semantics = tester.ensureSemantics();
-    for (final (locale, action) in [
-      (const Locale('en'), 'Create intention'),
-      (const Locale('ru'), 'Создать намерение'),
-    ]) {
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(_testApp(repository, locale: locale));
-      repository.queryAt(0);
-      final create = find.byKey(const ValueKey('catalog-create-intention'));
+  for (final locale in [const Locale('en'), const Locale('ru')]) {
+    for (final (state, result)
+        in <(String, Result<IntentionCatalogFirstPage>?)>[
+          ('загрузка', null),
+          ('пустая выдача', _firstPage(const [])),
+          ('загруженная выдача', _firstPage([testSummary(title: 'Намерение')])),
+          ('недоступность', const ResultFailure(IntentionUnavailableFailure())),
+          ('повреждение', const ResultFailure(IntentionCorruptionFailure())),
+          (
+            'неожиданный отказ',
+            const ResultFailure(IntentionUnexpectedFailure()),
+          ),
+        ]) {
+      testWidgets('каталог, ${locale.languageCode}, $state: создание доступно '
+          'только через общую панель, а вход в теги сохраняется', (
+        tester,
+      ) async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(repository);
+        final router = AppRouter();
+        addTearDown(container.dispose);
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          _routerTestAppWithContainer(container, router, locale: locale),
+        );
+        await tester.pump();
+        await openIntentionGraph(tester);
+        repository.queryAt(0);
+        if (result != null) repository.complete(0, result);
+        // Загрузка продолжает анимироваться, поэтому ждём только переход.
+        await tester.pump(const Duration(milliseconds: 500));
 
-      expect(
-        find.descendant(of: create, matching: find.byIcon(Icons.add)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: create, matching: find.byType(Text)),
-        findsNothing,
-      );
-      expect(
-        find.descendant(of: create, matching: find.byTooltip(action)),
-        findsOneWidget,
-      );
-      expect(
-        tester.getSemantics(create),
-        isSemantics(
-          tooltip: action,
-          isButton: true,
-          isEnabled: true,
-          hasTapAction: true,
-        ),
-      );
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-      await tester.pumpWidget(const SizedBox.shrink());
+        expect(
+          find.byKey(const ValueKey('catalog-create-intention')),
+          findsNothing,
+        );
+        expect(find.byType(FloatingActionButton), findsNothing);
+        expect(
+          find.byKey(const ValueKey('catalog-open-tags')).hitTestable(),
+          findsOneWidget,
+        );
+        final create = quickCreationAction();
+        expect(create.hitTestable(), findsOneWidget);
+        await tester.tap(create);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(find.byType(IntentionEditorPage), findsOneWidget);
+        expect(repository.commands, isEmpty);
+        expect(await router.maybePop(), isTrue);
+        if (result == null) repository.complete(0, _firstPage(const []));
+        await tester.pumpAndSettle();
+        expectIntentionGraphRootPage(router);
+        expect(create.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
     }
-    semantics.dispose();
-  });
+  }
 
   testWidgets('локализует параметры каталога на русский язык', (tester) async {
     final repository = ControlledCatalogRepository();
@@ -1505,8 +1525,8 @@ void main() {
     await tester.tap(reloadButton);
     await _pumpUntilQueries(tester, repository, 3);
     expect(repository.queryAt(2).cursor, isNull);
-    // Действие стоит выше кнопки создания намерения, поэтому первая строка
-    // сохранённой выдачи уходит за верхний край списка.
+    // Прокрутка к действию продолжения оставляет первую строку сохранённой
+    // выдачи за верхним краем списка.
     expect(find.text('Прежнее первое', skipOffstage: false), findsOneWidget);
     expect(find.text('Reloading catalog…'), findsOneWidget);
 
@@ -2757,11 +2777,12 @@ Widget _testAppWithContainer(
 
 Widget _routerTestAppWithContainer(
   ProviderContainer container,
-  AppRouter router,
-) => UncontrolledProviderScope(
+  AppRouter router, {
+  Locale locale = const Locale('en'),
+}) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp.router(
-    locale: const Locale('en'),
+    locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     routerConfig: router.config(),
