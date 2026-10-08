@@ -1,6 +1,6 @@
 part of 'creation_flows_integration_test.dart';
 
-/// Четыре публичных входа Phase 2, без временных кнопок в приложении.
+/// Четыре режима общей кнопки с настоящими потоками и локальным графом.
 enum _Flow {
   intention(
     'намерение',
@@ -49,35 +49,37 @@ enum _Flow {
     _App app,
     IntentionCreationOrigin origin,
   ) async {
-    switch (this) {
-      case intention:
-        unawaited(app.router.push(const IntentionEditorRoute()));
-      case relation:
-        unawaited(
-          app.router.push(
-            RelationEditorRoute(
-              editorContext: const RelationBlankCreationContext(),
-            ),
-          ),
-        );
-      case topDown || bottomUp:
-        final page = origin == IntentionCreationOrigin.deep
-            ? IntentionDetailsPage
-            : switch (origin.destination) {
-                AppDestination.home => HomePage,
-                AppDestination.dailyChoices => DailyChoiceCatalogPage,
-                AppDestination.intentionGraph => IntentionCatalogPage,
-              };
-        unawaited(
-          DailyChoiceCreationLauncher().launch(
-            sourceContext: tester.element(find.byType(page)),
-            direction: this == topDown
-                ? ChoicePathDraftDirection.topDown
-                : ChoicePathDraftDirection.bottomUp,
-          ),
-        );
-    }
-    await tester.pumpAndSettle();
+    await _until(
+      tester,
+      () => quickCreationAction().hitTestable().evaluate().isNotEmpty,
+    );
+    final history = [for (final route in app.router.stackData) route.matchId];
+    await openQuickCreation(
+      tester,
+      switch (this) {
+        intention => QuickCreationMode.intention,
+        relation => QuickCreationMode.relation,
+        topDown => QuickCreationMode.dailyChoiceFromIntention,
+        bottomUp => QuickCreationMode.dailyChoiceFromAction,
+      },
+      openedPage: _key(switch (this) {
+        intention => 'intention-editor-title',
+        relation => 'relation-editor-description',
+        topDown => 'daily-choice-source-filter',
+        bottomUp => 'daily-choice-action-filter',
+      }),
+      wait: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+      activate: (tester, button) async {
+        await tester.tap(button);
+        await tester.tap(button);
+      },
+    );
+    expect(app.router.stackData, hasLength(history.length + 1));
+    expect(
+      app.router.stackData.take(history.length).map((route) => route.matchId),
+      orderedEquals(history),
+    );
     expect(app.router.current.name, switch (this) {
       intention => IntentionEditorRoute.name,
       relation => RelationEditorRoute.name,
@@ -190,9 +192,11 @@ final class _CreationObserver extends LocalDatabaseConnectionObserver {
   String? _table;
   Completer<void>? _gate;
   var attempts = 0;
+  var _fail = false;
 
-  void observe(String table, {bool hold = false}) {
+  void observe(String table, {bool hold = false, bool fail = false}) {
     _table = table;
+    _fail = fail;
     if (hold) _gate = Completer<void>();
   }
 
@@ -215,6 +219,7 @@ final class _CreationObserver extends LocalDatabaseConnectionObserver {
     }
     attempts++;
     await _gate?.future;
+    if (_fail) throw StateError('Управляемый отказ записи.');
   }
 }
 
@@ -222,6 +227,7 @@ Future<_App> _start(
   WidgetTester tester, {
   Locale locale = const Locale('ru'),
   bool fileBacked = false,
+  Future<void> Function(AppDatabase) seed = seedDurabilityGraph,
 }) async {
   tester.view.physicalSize = const Size(1000, 1800);
   tester.view.devicePixelRatio = 1;
@@ -233,7 +239,7 @@ Future<_App> _start(
   final database = await tester.runAsync(
     () => harness!.openReadyDatabase(observer: observer),
   );
-  await tester.runAsync(() => seedDurabilityGraph(database!));
+  await tester.runAsync(() => seed(database!));
   final container = ProviderContainer(
     overrides: [
       inMemoryQuickCreationModeOverride,

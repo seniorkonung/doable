@@ -2,27 +2,23 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_creation_launcher.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
-    show IntentionCatalogOrder;
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+    show IntentionCatalogOrder, IntentionTagFilter;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,9 +29,11 @@ import '../support/daily_choice_local_date.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 part 'creation_flows_test_support.dart';
 part 'creation_flows_accessibility_scenarios.dart';
+part 'quick_creation/quick_creation_flow_scenarios.dart';
 
 void main() {
   setUp(
@@ -44,6 +42,8 @@ void main() {
     ),
   );
   _registerAccessibilityTests();
+  _registerQuickCreationFlowTests();
+  _registerNestedQuickCreationTests();
   for (final flow in _Flow.values) {
     for (final origin in IntentionCreationOrigin.values) {
       testWidgets('${flow.label}: успех над ${origin.description} сохраняет '
