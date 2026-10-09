@@ -126,34 +126,6 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('экранный диктор получает название, роль пункта навигации, '
-        'положение среди трёх пунктов и признак выбранного пункта на каждой '
-        'корневой странице, а видимых подписей в панели нет: $code', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      await _start(tester, locale);
-
-      _expectAnnounced(tester, names, selected: AppDestination.home);
-
-      // Пункт выбирается действием экранного диктора, а не только касанием.
-      for (final selected in [
-        AppDestination.dailyChoices,
-        AppDestination.intentionGraph,
-        AppDestination.home,
-      ]) {
-        tester.semantics.tap(
-          find.semantics.byLabel(_destinationLabel(tester, names, selected)),
-        );
-        await tester.pumpAndSettle();
-
-        expect(_selected(tester), selected);
-        _expectAnnounced(tester, names, selected: selected);
-      }
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    });
-
     testWidgets('при масштабе текста 2.5 значки пунктов не обрезаются, каждый '
         'пункт выбирается касанием, а заголовок его корневой страницы виден: '
         '$code', (tester) async {

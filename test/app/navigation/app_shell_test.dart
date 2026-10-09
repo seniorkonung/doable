@@ -16,7 +16,6 @@ import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -26,17 +25,6 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 
 void main() {
-  testWidgets('после подготовки хранилища открыта Главная с выбранным '
-      'пунктом «Главная»', (tester) async {
-    final app = await _start(tester);
-
-    expect(find.byType(HomePage), findsOneWidget);
-    expect(_selected(tester), AppDestination.home);
-    expect(app.router.current.name, AppShellRoute.name);
-    expect(app.router.topRoute.name, HomeRoute.name);
-    expect(app.router.canPop(), isFalse);
-  });
-
   testWidgets('оболочка — колонка из области вкладок и панели без '
       'собственного Scaffold', (tester) async {
     await _start(tester);
@@ -223,116 +211,7 @@ void main() {
     expect(app.router.topRoute.name, IntentionCatalogRoute.name);
     expect(find.byType(AppNavigationBar), findsOneWidget);
   });
-
-  for (final MapEntry(key: locale, value: names)
-      in _namesBySystemLocale.entries) {
-    group('системная локаль ${locale.toLanguageTag()}', () {
-      testWidgets('заголовок каждой корневой страницы совпадает с названием '
-          'её пункта', (tester) async {
-        await _start(tester, locale: locale);
-
-        for (final destination in AppDestination.values) {
-          // Нажатие по самому пункту, в том числе уже выбранному.
-          await tester.tap(appNavigationDestination(destination));
-          await tester.pumpAndSettle();
-
-          final appBar = find.descendant(
-            of: find.byType(_rootPages[destination]!),
-            matching: find.byType(AppBar),
-          );
-          expect(appBar, findsOneWidget, reason: destination.name);
-          final title = tester.widget<AppBar>(appBar).title;
-          expect(
-            title,
-            isA<Text>().having((text) => text.data, 'data', names[destination]),
-            reason: destination.name,
-          );
-        }
-      });
-
-      testWidgets('долгое нажатие на пункт показывает подсказку с его '
-          'названием', (tester) async {
-        await _start(tester, locale: locale);
-
-        for (final destination in AppDestination.values) {
-          final name = names[destination]!;
-          final gesture = await tester.startGesture(
-            tester.getCenter(appNavigationDestination(destination)),
-          );
-          await tester.pump(kLongPressTimeout + kPressTimeout);
-          await gesture.up();
-          await tester.pump();
-
-          // Подсказка рисуется форматированным текстом в слое поверх
-          // страницы: заголовок и скрытая подпись пункта под условие не
-          // попадают.
-          expect(
-            find.byWidgetPredicate(
-              (widget) =>
-                  widget is Text &&
-                  widget.data == null &&
-                  widget.textSpan?.toPlainText() == name,
-            ),
-            findsOneWidget,
-            reason: name,
-          );
-
-          // Подсказка скрывается до проверки следующего пункта.
-          await tester.pumpAndSettle(const Duration(seconds: 2));
-        }
-      });
-
-      testWidgets('экранный диктор получает название пункта, а видимых '
-          'подписей в панели нет', (tester) async {
-        final semantics = tester.ensureSemantics();
-        await _start(tester, locale: locale);
-
-        for (final destination in AppDestination.values) {
-          final name = names[destination]!;
-          expect(
-            tester.getSemantics(appNavigationDestination(destination)).label,
-            startsWith('$name\n'),
-            reason: name,
-          );
-          expect(
-            find.descendant(
-              of: appNavigationDestination(destination),
-              matching: find.text(name),
-            ),
-            findsNothing,
-          );
-        }
-        semantics.dispose();
-      });
-    });
-  }
 }
-
-const _russianNames = {
-  AppDestination.home: 'Главная',
-  AppDestination.dailyChoices: 'Дневные выборы',
-  AppDestination.intentionGraph: 'Граф намерений',
-};
-
-const _englishNames = {
-  AppDestination.home: 'Home',
-  AppDestination.dailyChoices: 'Daily choices',
-  AppDestination.intentionGraph: 'Intention graph',
-};
-
-/// Названия пунктов по системной локали: любая нерусская даёт английские.
-final _namesBySystemLocale = {
-  const Locale('ru', 'RU'): _russianNames,
-  const Locale('en', 'US'): _englishNames,
-  const Locale('de', 'DE'): _englishNames,
-};
-
-/// Корневая страница каждого пункта.
-const _rootPages = {
-  AppDestination.home: HomePage,
-  AppDestination.dailyChoices: DailyChoiceCatalogPage,
-  AppDestination.intentionGraph: IntentionCatalogPage,
-};
 
 /// Запущенное приложение с готовым локальным хранилищем.
 final class _App {

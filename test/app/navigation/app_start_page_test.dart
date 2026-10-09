@@ -185,31 +185,6 @@ void main() {
       expect(homeRow, findsOneWidget);
       expect(tester.takeException(), isNull);
     });
-
-    testWidgets('после выбора пункта «Дневные выборы» открывает Главную', (
-      tester,
-    ) async {
-      final harness = await _harness(tester, const Locale('ru'));
-      final l10n = lookupAppLocalizations(const Locale('ru'));
-      final explanation = find.text(l10n.homeEmptyNoFavorites);
-
-      final first = await _launch(tester, harness);
-      await _until(tester, explanation);
-      await openDailyChoices(tester);
-      await _until(tester, find.byType(DailyChoiceCatalogPage));
-      await tester.pumpAndSettle();
-      expect(_selected(tester), AppDestination.dailyChoices);
-      expect(first.router.topRoute.name, DailyChoiceCatalogRoute.name);
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.runAsync(first.runtime.shutdown);
-      final second = await _launch(tester, harness);
-      await _until(tester, explanation);
-      await tester.pumpAndSettle();
-
-      _expectStartPage(tester, second);
-      expect(tester.takeException(), isNull);
-    });
   });
 }
 

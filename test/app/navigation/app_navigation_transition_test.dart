@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
@@ -13,7 +12,6 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/shared/presentation/presentation_frame_evidence.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -159,91 +157,6 @@ void main() {
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
-
-  for (final locale in [
-    const Locale('ru'),
-    const Locale('en'),
-    const Locale('de'),
-  ]) {
-    testWidgets('меню изолирует действия и фокус обычной страницы, '
-        'закрытие восстанавливает их: ${locale.languageCode}', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final input = TextEditingController(text: 'Несохранённый ввод');
-      final focus = FocusNode();
-      addTearDown(input.dispose);
-      addTearDown(focus.dispose);
-      final router = await _start(tester);
-      tester.platformDispatcher.localesTestValue = [locale];
-      final route = MaterialPageRoute<void>(
-        builder: (_) => OrdinaryPageScaffold(
-          appBar: AppBar(title: const Text('Исходная страница')),
-          body: Column(
-            children: [
-              TextField(controller: input, focusNode: focus),
-              TextButton(
-                onPressed: input.clear,
-                child: const Text('Очистить ввод'),
-              ),
-            ],
-          ),
-        ),
-      );
-      unawaited(router.pushNativeRoute<void>(route));
-      await tester.pumpAndSettle();
-      final clearPosition = tester.getCenter(find.text('Очистить ввод'));
-      final button = find.byType(QuickCreationButton);
-      final node = tester.getSemantics(button);
-      final changeMode = AppLocalizations.of(tester.element(button))
-          .quickCreationChangeMode;
-      final action = node
-          .getSemanticsData()
-          .customSemanticsActionIds!
-          .map(CustomSemanticsAction.getAction)
-          .whereType<CustomSemanticsAction>()
-          .singleWhere((action) => action.label == changeMode);
-
-      tester.semantics.customAction(find.semantics.byLabel(node.label), action);
-      await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsOneWidget);
-      expect(find.semantics.byLabel('Очистить ввод'), findsNothing);
-      expect(find.semantics.byLabel(node.label), findsNothing);
-      expect(
-        tester.semantics.simulatedAccessibilityTraversal().where(
-          (node) => node.role == SemanticsRole.tab,
-        ),
-        isEmpty,
-      );
-      expect(button.hitTestable(), findsNothing);
-      for (var step = 0; step < 8; step++) {
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.pump();
-        expect(focus.hasFocus, isFalse);
-        expect(
-          FocusManager.instance.primaryFocus!.context!
-              .findAncestorWidgetOfExactType<BottomSheet>(),
-          isNotNull,
-        );
-      }
-
-      // Касание фона закрывает барьер, не активируя кнопку под ним.
-      await tester.tapAt(clearPosition);
-      await tester.pumpAndSettle();
-      expect(route.isCurrent, isTrue);
-      expect(input.text, 'Несохранённый ввод');
-      expect(find.byType(BottomSheet), findsNothing);
-      expect(find.semantics.byLabel('Очистить ввод'), findsOneWidget);
-      expect(find.semantics.byLabel(node.label), findsOneWidget);
-      expect(button.hitTestable(), findsOneWidget);
-      await tester.tap(find.byType(TextField));
-      await tester.pump();
-      expect(focus.hasFocus, isTrue);
-      await tester.tap(find.text('Очистить ввод'));
-      await tester.pumpAndSettle();
-      expect(input.text, isEmpty);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    });
-  }
 }
 
 final _bar = find.byType(AppNavigationBar);

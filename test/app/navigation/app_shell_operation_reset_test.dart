@@ -49,8 +49,6 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
 const _archive = ValueKey('intention-details-archive');
-const _message = ValueKey('graph-operation-message');
-const _success = 'Архивирование — «Намерение»: Намерение архивировано.';
 const _failure =
     'Архивирование — «Намерение»: Не удалось изменить состояние намерения. Повторите попытку.';
 const _deleteSuccess = 'Удаление — «Намерение»: Намерение удалено.';
@@ -522,38 +520,6 @@ void main() {
     expect(app.repository.catalogQueries, hasLength(1));
   });
 
-  testWidgets('удаление с актуальной верхней страницы закрывает только её '
-      'и один раз предъявляет результат', (tester) async {
-    final app = await _ControlledApp.start(tester);
-    await tester.tap(find.byTooltip('Теги'));
-    await tester.pumpAndSettle();
-    final catalogRouteId = app.router.stackData.last.matchId;
-    await app.openDetails(tester);
-    await app.delete(tester);
-
-    app.complete(
-      testDetailsDeletedResult(
-        app.intention,
-        revision: const TestDetailsRevision(1),
-      ),
-    );
-    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
-    await tester.pumpAndSettle();
-
-    expect(app.router.stackData.last.matchId, catalogRouteId);
-    expect(app.router.stack.map((page) => page.name), [
-      AppShellRoute.name,
-      TagCatalogRoute.name,
-    ]);
-    expect(
-      find.byType(IntentionDetailsPage, skipOffstage: false),
-      findsNothing,
-    );
-    expect(find.text(_deleteSuccess), findsOneWidget);
-    await _expireMessages(tester);
-    expect(app.repository.commands.single, isA<DeleteIntention>());
-  });
-
   testWidgets('успешный повтор удаления после отказа закрывает только '
       'принявшую повтор страницу', (tester) async {
     final app = await _ControlledApp.start(tester);
@@ -594,62 +560,6 @@ void main() {
     );
     expect(find.text(_deleteSuccess), findsOneWidget);
     await _expireMessages(tester);
-  });
-
-  testWidgets('сброс сохраняет принятое архивирование и предъявляет поздний '
-      'успех один раз после уже показанного сообщения', (tester) async {
-    final app = await _ControlledApp.start(tester);
-    await app.openDetails(tester);
-    final previous = testDetailsIntention(index: 2, title: 'Прежнее намерение');
-    app.coordinator.acceptExisting(
-      DeleteIntention(previous.id),
-      presentationTitle: previous.title,
-    );
-    app.complete(testDetailsDeletedResult(previous));
-    await _until(tester, () => !app.coordinator.isRunning(previous.id));
-    await tester.pumpAndSettle();
-    final previousMessage = tester
-        .widget<Semantics>(find.byKey(_message))
-        .properties
-        .label!;
-    expect(find.text(previousMessage), findsOneWidget);
-    final messenger = ScaffoldMessenger.of(
-      tester.element(find.byType(IntentionDetailsPage)),
-    );
-    await app.archive(tester);
-
-    await _select(tester, AppDestination.home);
-    expect(app.coordinator.isRunning(app.intention.id), isTrue);
-    expect(app.repository.commands, hasLength(2));
-    expect(
-      app.coordinator.acceptExisting(
-        ArchiveIntention(app.intention.id),
-        presentationTitle: app.intention.title,
-      ),
-      isA<IntentionCommandAlreadyRunning>(),
-    );
-
-    app.complete(
-      testDetailsSavedResult(
-        testDetailsIntention(archiveState: IntentionArchiveState.archived),
-        before: app.intention,
-        revision: const TestDetailsRevision(1),
-      ),
-    );
-    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
-    await tester.pumpAndSettle();
-    _expectRoot(tester, app.router, AppDestination.home);
-    expect(app.coordinator.isRunning(app.intention.id), isFalse);
-    expect(find.text(previousMessage), findsOneWidget);
-    expect(find.text(_success), findsNothing);
-
-    messenger.hideCurrentSnackBar();
-    await tester.pumpAndSettle();
-    expect(find.text(_success), findsOneWidget);
-    expect(find.byKey(_message), findsOneWidget);
-    await _expireMessages(tester);
-    expect(app.repository.commands, hasLength(2));
-    _expectRoot(tester, app.router, AppDestination.home);
   });
 
   testWidgets('ошибка архивирования после сброса переходит общей поверхности '

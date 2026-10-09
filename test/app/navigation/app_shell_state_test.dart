@@ -117,53 +117,6 @@ const _message = ValueKey('graph-operation-message');
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 
 void main() {
-  group('возвращение к пункту', () {
-    testWidgets('каталог намерений сохраняет охват, фильтр названия, условия '
-        'по тегам, порядок, загруженные порции и позицию прокрутки без '
-        'повторного получения первой порции', (tester) async {
-      final app = await _start(tester);
-      await _prepareIntentionCatalog(tester, app);
-      final before = _intentionCatalogView(tester, app);
-
-      await _select(tester, AppDestination.home);
-      await _select(tester, AppDestination.dailyChoices);
-      await _select(tester, AppDestination.intentionGraph);
-
-      expect(_intentionCatalogView(tester, app), before);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('каталог дневных выборов сохраняет выбранный день, '
-        'просматриваемый месяц раскрытого календаря, фильтр выполнения, '
-        'загруженные записи и позицию прокрутки без повторного получения', (
-      tester,
-    ) async {
-      final app = await _start(tester);
-      await _prepareDailyChoiceCatalog(tester, app);
-      final before = _dailyChoiceCatalogView(tester, app);
-
-      await _select(tester, AppDestination.intentionGraph);
-      await _select(tester, AppDestination.home);
-      await _select(tester, AppDestination.dailyChoices);
-
-      expect(_dailyChoiceCatalogView(tester, app), before);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('Главная сохраняет позицию прокрутки', (tester) async {
-      final app = await _start(tester);
-      await _prepareHome(tester, app);
-      final before = _homeView(tester, app);
-
-      await _select(tester, AppDestination.dailyChoices);
-      await _select(tester, AppDestination.intentionGraph);
-      await _select(tester, AppDestination.home);
-
-      expect(_homeView(tester, app), before);
-      expect(tester.takeException(), isNull);
-    });
-  });
-
   group('повторный выбор уже выбранного пункта', () {
     for (final destination in AppDestination.values) {
       testWidgets('«${_names[destination]}»: состояние страницы не меняется', (

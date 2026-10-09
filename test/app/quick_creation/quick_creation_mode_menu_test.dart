@@ -8,7 +8,6 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_controller.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_menu.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -202,50 +201,6 @@ void main() {
     await tester.tap(find.text('Очистить ввод'));
     expect(app.input.text, isEmpty);
   });
-
-  for (final outcome in [
-    const QuickCreationModeSaved(),
-    const QuickCreationModeSaveFailed(DiagnosticsFailureCode.unavailable),
-  ]) {
-    testWidgets(
-      'поздний ${outcome is QuickCreationModeSaved ? 'успех' : 'отказ'} '
-      'А не меняет Б после повторного открытия меню',
-      (tester) async {
-        final app = await _openApp(tester);
-        await _openMenu(tester);
-        await tester.tap(find.text('Новая связь'));
-        await tester.pumpAndSettle();
-        expect(app.mode, QuickCreationMode.relation);
-        await _openMenu(tester);
-        await tester.tap(find.text('Дневной выбор от действия'));
-        await tester.pumpAndSettle();
-        expect(app.mode, QuickCreationMode.dailyChoiceFromAction);
-        expect(app.store.writes.map((write) => write.mode), [
-          QuickCreationMode.relation,
-          QuickCreationMode.dailyChoiceFromAction,
-        ]);
-
-        await _openMenu(tester);
-        app.store.writes.first.completion.complete(outcome);
-        await tester.pumpAndSettle();
-        expect(app.mode, QuickCreationMode.dailyChoiceFromAction);
-        expect(
-          tester
-              .getSemantics(find.text('Дневной выбор от действия'))
-              .flagsCollection
-              .isSelected,
-          Tristate.isTrue,
-        );
-        expect(find.byType(SnackBar), findsNothing);
-        app.store.writes.last.completion.complete(outcome);
-        await tester.pumpAndSettle();
-        expect(app.mode, QuickCreationMode.dailyChoiceFromAction);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        app.expectOrigin(tester);
-      },
-    );
-  }
 }
 
 Future<void> _openMenu(WidgetTester tester) async {

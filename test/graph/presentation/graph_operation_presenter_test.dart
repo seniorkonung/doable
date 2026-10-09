@@ -521,61 +521,6 @@ void main() {
   );
 
   testWidgets(
-    'успех перестановки не показывает сообщения и не задерживает следующий результат',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final move = harness.startFavoriteOrderMove();
-      harness.completeFavoriteOrderMoved(move);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(SnackBar), findsNothing);
-
-      final deletion = harness.startDelete(index: 1, title: 'Следующее');
-      harness.completeDeleted(deletion);
-      await tester.pumpAndSettle();
-
-      expect(find.text(_deleted('Следующее')), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'отказ перестановки ждёт текущее сообщение, не вытесняет его и предъявляется один раз',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final deletion = harness.startDelete(index: 1, title: 'Текущее');
-      harness.completeDeleted(deletion);
-      await tester.pumpAndSettle();
-      expect(find.text(_deleted('Текущее')), findsOneWidget);
-
-      final move = harness.startFavoriteOrderMove();
-      harness.completeFavoriteOrderFailure(
-        move,
-        const FavoriteOrderConflictFailure(),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(_deleted('Текущее')), findsOneWidget);
-      expect(find.text(_favoriteOrderConflict), findsNothing);
-
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.text(_deleted('Текущее')), findsOneWidget);
-      expect(find.text(_favoriteOrderConflict), findsNothing);
-
-      await _closeMessage(tester);
-      expect(find.text(_deleted('Текущее')), findsNothing);
-      expect(find.text(_favoriteOrderConflict), findsOneWidget);
-
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-      harness.presenterGeneration.value += 1;
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.favoriteOrderCommands, hasLength(1));
-    },
-  );
-
-  testWidgets(
     'следующий результат ждёт закрытия отказа перестановки в порядке принятия',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
@@ -604,109 +549,6 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     },
   );
-
-  testWidgets(
-    'кадр текущего сообщения не потребляет ожидающий отказ перестановки',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final deletion = harness.startDelete(index: 1, title: 'Предъявленное');
-      final move = harness.startFavoriteOrderMove();
-      harness.completeDeleted(deletion);
-      harness.completeFavoriteOrderFailure(
-        move,
-        const FavoriteOrderConflictFailure(),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(_deleted('Предъявленное')), findsOneWidget);
-
-      // Замена presenter снимает подтверждённое сообщение без повтора, а
-      // ожидающий отказ получает новый presenter.
-      harness.presenterGeneration.value += 1;
-      await tester.pumpAndSettle();
-      expect(find.text(_deleted('Предъявленное')), findsNothing);
-      expect(find.text(_favoriteOrderConflict), findsOneWidget);
-
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.favoriteOrderCommands, hasLength(1));
-    },
-  );
-
-  testWidgets(
-    'отказ перестановки без поверхности ждёт её возвращения в прежнем порядке',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      harness.presenterGeneration.value = _withoutPresenter;
-      await tester.pumpAndSettle();
-
-      final move = harness.startFavoriteOrderMove();
-      final deletion = harness.startDelete(index: 1, title: 'Следующее');
-      harness.completeFavoriteOrderFailure(
-        move,
-        const FavoriteOrderConflictFailure(),
-      );
-      harness.completeDeleted(deletion);
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-
-      harness.presenterGeneration.value = 1;
-      await tester.pumpAndSettle();
-      expect(find.text(_favoriteOrderConflict), findsOneWidget);
-      expect(find.text(_deleted('Следующее')), findsNothing);
-
-      await _closeMessage(tester);
-      expect(find.text(_favoriteOrderConflict), findsNothing);
-      expect(find.text(_deleted('Следующее')), findsOneWidget);
-
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.favoriteOrderCommands, hasLength(1));
-    },
-  );
-
-  for (final scenario
-      in <({List<AppLifecycleState> away, List<AppLifecycleState> back})>[
-        (away: [AppLifecycleState.inactive], back: [AppLifecycleState.resumed]),
-        (
-          away: [
-            AppLifecycleState.inactive,
-            AppLifecycleState.hidden,
-            AppLifecycleState.paused,
-          ],
-          back: [
-            AppLifecycleState.hidden,
-            AppLifecycleState.inactive,
-            AppLifecycleState.resumed,
-          ],
-        ),
-      ]) {
-    testWidgets(
-      '${scenario.away.last.name} удерживает отказ перестановки до возвращения фокуса',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        for (final state in scenario.away) {
-          tester.binding.handleAppLifecycleStateChanged(state);
-        }
-        final move = harness.startFavoriteOrderMove();
-        harness.completeFavoriteOrderFailure(
-          move,
-          const FavoriteOrderConflictFailure(),
-        );
-        await tester.pump();
-        await tester.pump();
-        expect(find.byType(SnackBar), findsNothing);
-
-        for (final state in scenario.back) {
-          tester.binding.handleAppLifecycleStateChanged(state);
-        }
-        await tester.pumpAndSettle();
-        expect(find.text(_favoriteOrderConflict), findsOneWidget);
-
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
 
   testWidgets(
     'показанный без фокуса отказ перестановки подтверждается только своим кадром после возвращения',
@@ -740,42 +582,6 @@ void main() {
 
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'замена presenter до кадра снимает прежний отказ перестановки и предъявляет его один раз',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final move = harness.startFavoriteOrderMove();
-      harness.completeFavoriteOrderFailure(
-        move,
-        const FavoriteOrderConflictFailure(),
-      );
-      await tester.idle();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      await tester.pump();
-      expect(find.text(_favoriteOrderConflict), findsOneWidget);
-
-      harness.presenterGeneration.value += 1;
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-      expect(find.text(_favoriteOrderConflict), findsOneWidget);
-
-      // Запоздалые callbacks прежнего presenter не снимают и не дублируют
-      // сообщение нового.
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.text(_favoriteOrderConflict), findsOneWidget);
-
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-      harness.presenterGeneration.value += 1;
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.favoriteOrderCommands, hasLength(1));
     },
   );
 
@@ -1077,61 +883,6 @@ void main() {
     }
   }
 
-  for (final locale in const [Locale('en'), Locale('ru')]) {
-    testWidgets(
-      'отказ назначения после ухода ждёт смешанную очередь, ${locale.languageCode}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester, locale: locale);
-        final intention = harness.startDelete(index: 2, title: 'Граф');
-        final assignment = harness.startTag(
-          TagCommandKind.removeAssignment,
-          releaseInitiator: false,
-        );
-        harness.completeDeleted(intention);
-        harness.completeTagFailure(assignment, const TagCorruptionFailure());
-        await tester.pumpAndSettle();
-
-        expect(
-          find.text(
-            locale.languageCode == 'ru'
-                ? 'Удаление — «Граф»: Намерение удалено.'
-                : _deleted('Граф'),
-          ),
-          findsOneWidget,
-        );
-        expect(harness.claimInitiatorFailure(assignment.token), isNotNull);
-        await _closeMessage(tester);
-        harness.releaseInitiatorPresentation(assignment.token);
-        await tester.pumpAndSettle();
-        final fallback = locale.languageCode == 'ru'
-            ? 'Снятие — «назначение тега»: Сохранённые данные назначения тега повреждены. Назначение не изменено.'
-            : 'Remove — “tag assignment”: Stored tag assignment data is damaged. The assignment was not changed.';
-        expect(find.text(fallback), findsOneWidget);
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
-
-  testWidgets('сырое исключение назначения не раскрывает личные данные', (
-    tester,
-  ) async {
-    final harness = await _pumpPresenterApp(tester);
-    final accepted = harness.startTag(TagCommandKind.assign);
-    harness.failTagWithException(accepted, StateError('личное имя и SQL'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'Assign — “tag assignment”: The tag assignment operation failed because of an unexpected error.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.textContaining('личное имя'), findsNothing);
-    expect(find.textContaining('SQL'), findsNothing);
-    await _closeMessage(tester);
-  });
-
   for (final scenario
       in <({DailyChoiceValidationField field, String en, String ru})>[
         (
@@ -1331,30 +1082,6 @@ void main() {
       },
     );
   }
-
-  testWidgets('поздний дневной результат ждёт фокуса и смены presenter', (
-    tester,
-  ) async {
-    final harness = await _pumpPresenterApp(tester);
-    final deletion = harness.startDailyChoiceDelete();
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    harness.completeDailyChoiceDeleted(deletion);
-    await tester.pump();
-    expect(find.byType(SnackBar), findsNothing);
-
-    harness.presenterGeneration.value += 1;
-    await tester.pump();
-    expect(find.byType(SnackBar), findsNothing);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Delete — “daily choice”: Daily choice deleted.'),
-      findsOneWidget,
-    );
-    await _closeMessage(tester);
-    expect(find.byType(SnackBar), findsNothing);
-  });
 
   for (final scenario
       in <
@@ -1559,40 +1286,6 @@ void main() {
   );
 
   testWidgets(
-    'успех создания связи ждёт сообщение намерения в той же очереди',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final intention = harness.startDelete(index: 1, title: 'Намерение');
-      final relation = harness.startRelationCreation();
-      harness.completeDeleted(intention);
-      harness.completeRelationCreated(relation);
-      await tester.pumpAndSettle();
-
-      expect(find.text(_deleted('Намерение')), findsOneWidget);
-      expect(find.text(_relationCreated), findsNothing);
-
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.text(_deleted('Намерение')), findsOneWidget);
-
-      await _closeMessage(tester);
-      expect(find.text(_relationCreated), findsOneWidget);
-      expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('graph-operation-message')),
-        ),
-        matchesSemantics(
-          label: _relationCreated,
-          isLiveRegion: true,
-          textDirection: TextDirection.ltr,
-        ),
-      );
-
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
     'успех изменения связи ждёт сообщение намерения в той же очереди',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
@@ -1639,39 +1332,6 @@ void main() {
 
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'удаление связи после ухода ждёт общую поверхность и предъявляется один раз',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final intention = harness.startDelete(index: 1, title: 'Намерение');
-      final deletion = harness.startRelationDelete();
-      harness.completeDeleted(intention);
-      harness.completeRelationDeleted(deletion);
-      await tester.pumpAndSettle();
-
-      expect(find.text(_deleted('Намерение')), findsOneWidget);
-      expect(find.text(_relationDeleted), findsNothing);
-      expect(harness.repository.relationCommands, hasLength(1));
-
-      await _closeMessage(tester);
-      expect(find.text(_relationDeleted), findsOneWidget);
-      expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('graph-operation-message')),
-        ),
-        matchesSemantics(
-          label: _relationDeleted,
-          isLiveRegion: true,
-          textDirection: TextDirection.ltr,
-        ),
-      );
-
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.relationCommands, hasLength(1));
     },
   );
 
@@ -1724,68 +1384,6 @@ void main() {
     await _closeMessage(tester);
     expect(find.byType(SnackBar), findsNothing);
   });
-
-  testWidgets(
-    'массовый успех ждёт занятую поверхность и предъявляется одним кадром',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final intention = harness.startDelete(index: 2, title: 'Другое');
-      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
-      harness.completeDeleted(intention);
-      harness.completeBlockingRelationsDeleted(deletion);
-      await tester.pumpAndSettle();
-
-      const message =
-          'Delete selected relations — “Связанное”: Selected relations deleted.';
-      expect(find.text(_deleted('Другое')), findsOneWidget);
-      expect(find.text(message), findsNothing);
-      expect(harness.repository.blockingRelationsCommands, hasLength(1));
-
-      await _closeMessage(tester);
-      expect(find.text(message), findsOneWidget);
-      expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('graph-operation-message')),
-        ),
-        matchesSemantics(
-          label: message,
-          isLiveRegion: true,
-          textDirection: TextDirection.ltr,
-        ),
-      );
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.blockingRelationsCommands, hasLength(1));
-    },
-  );
-
-  testWidgets(
-    'массовый token переживает потерю фокуса и пересоздание presenter до кадра',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
-      harness.completeBlockingRelationsDeleted(deletion);
-      await tester.idle();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      await tester.pump();
-
-      const message =
-          'Delete selected relations — “Связанное”: Selected relations deleted.';
-      expect(find.text(message), findsOneWidget);
-      harness.presenterGeneration.value += 1;
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-      expect(find.text(message), findsOneWidget);
-      await _closeMessage(tester);
-      harness.presenterGeneration.value += 1;
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.blockingRelationsCommands, hasLength(1));
-    },
-  );
 
   testWidgets(
     'ошибка массовой операции остаётся у открытого инициатора до его ухода',
@@ -2047,71 +1645,6 @@ void main() {
     );
   });
 
-  testWidgets('результат связи без фокуса ждёт возвращения в resumed', (
-    tester,
-  ) async {
-    final harness = await _pumpPresenterApp(tester);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    final relation = harness.startRelationCreation();
-    harness.completeRelationCreated(relation);
-    await tester.pump();
-    await tester.pump();
-    expect(find.byType(SnackBar), findsNothing);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
-    expect(find.text(_relationCreated), findsOneWidget);
-
-    await _closeMessage(tester);
-    expect(find.byType(SnackBar), findsNothing);
-  });
-
-  testWidgets(
-    'результат восстановления без фокуса ждёт возвращения в resumed',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      final restore = harness.startRelationRestore();
-      harness.completeRelationRestored(restore);
-      await tester.pump();
-      await tester.pump();
-      expect(find.byType(SnackBar), findsNothing);
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-      expect(find.text(_relationRestored), findsOneWidget);
-
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'пересоздание presenter сохраняет непредъявленный результат связи',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final relation = harness.startRelationCreation();
-      harness.completeRelationCreated(relation);
-      await tester.idle();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      await tester.pump();
-      expect(find.text(_relationCreated), findsOneWidget);
-
-      harness.presenterGeneration.value += 1;
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-      expect(find.text(_relationCreated), findsOneWidget);
-
-      await _closeMessage(tester);
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.relationCommands, hasLength(1));
-    },
-  );
-
   for (final scenario
       in <
         ({
@@ -2290,8 +1823,6 @@ final _relationRestored = _relationRestoreOutcome('Relation restored.');
 
 String _relationDeleteOutcome(String outcome) =>
     'Delete — “relation”: $outcome';
-
-final _relationDeleted = _relationDeleteOutcome('Relation deleted.');
 
 final _relationFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[

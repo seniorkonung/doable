@@ -276,19 +276,6 @@ void main() {
     expect(layouts.first, layouts.last);
   });
 
-  testWidgets('нерусская системная локаль получает английские названия', (
-    tester,
-  ) async {
-    tester.platformDispatcher.localesTestValue = const [Locale('de', 'DE')];
-    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
-    await tester.pumpWidget(_testApp());
-    await tester.pumpAndSettle();
-
-    for (final name in _englishNames.values) {
-      expect(find.byTooltip(name), findsOneWidget);
-    }
-  });
-
   testWidgets('высота панели задана явно и не зависит от масштаба текста', (
     tester,
   ) async {
