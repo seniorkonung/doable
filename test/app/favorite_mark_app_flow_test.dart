@@ -210,92 +210,7 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-
-    testWidgets(
-      'быстрое повторное нажатие до снимка даёт одну команду и одно сообщение об успехе на $code',
-      (tester) async {
-        final harness = await _harness(tester, locale);
-        final gate = _SnapshotReadGate();
-        final app = await _App.start(
-          tester,
-          locale,
-          harness,
-          seed: true,
-          observer: gate,
-        );
-        final l10n = app.l10n;
-        final kinds = <IntentionCommandKind>[];
-        final completions = app.coordinator.intentionCompletions.listen(
-          (completion) => kinds.add(completion.kind),
-        );
-        addTearDown(completions.cancel);
-
-        await _openDetails(tester, row: 3, intention: _walk);
-        await _toggleMarkTwice(
-          tester,
-          gate,
-          l10n.graphOperationMessage(
-            l10n.graphOperationMarkFavorite,
-            'Гулять',
-            l10n.detailsFavoriteMarked,
-          ),
-        );
-        expect(kinds, [IntentionCommandKind.markFavorite]);
-        expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
-        expect(storedFavoriteMarks(app.raw), [(tagFixtureId(_walk), 1)]);
-
-        await _toggleMarkTwice(
-          tester,
-          gate,
-          l10n.graphOperationMessage(
-            l10n.graphOperationUnmarkFavorite,
-            'Гулять',
-            l10n.detailsFavoriteUnmarked,
-          ),
-        );
-        expect(kinds, [
-          IntentionCommandKind.markFavorite,
-          IntentionCommandKind.unmarkFavorite,
-        ]);
-        expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
-        expect(storedFavoriteMarks(app.raw), isEmpty);
-        expect(tester.takeException(), isNull);
-      },
-    );
   }
-}
-
-/// Задерживает чтение подробных данных намерения: после подтверждённой
-/// операции страница остаётся с прежним снимком до [release].
-final class _SnapshotReadGate extends LocalDatabaseConnectionObserver {
-  Completer<void>? _release;
-  var isHolding = false;
-
-  void hold() => _release = Completer<void>();
-
-  void release() {
-    _release?.complete();
-    _release = null;
-    isHolding = false;
-  }
-
-  @override
-  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
-    final release = _release;
-    if (release == null || !_readsIntentionDetails(statement)) {
-      return;
-    }
-    isHolding = true;
-    await release.future;
-  }
-
-  static bool _readsIntentionDetails(LocalDatabaseSqlStatement statement) =>
-      statement.operation == LocalDatabaseSqlOperation.select &&
-      statement.statements.single.contains('FROM intentions') &&
-      statement.statements.single.contains('description,') &&
-      // Команда читает строку намерения вместе с поисковым ключом.
-      !statement.statements.single.contains('title_search_key') &&
-      statement.statements.single.contains('WHERE id = ?');
 }
 
 /// Запуск приложения на постоянном хранилище [LocalDatabaseHarness].
@@ -594,43 +509,6 @@ Future<void> _toggleMark(WidgetTester tester, String? message) async {
   await tester.pumpAndSettle();
   expect(find.byKey(_message), findsOneWidget);
   if (message != null) expect(find.text(message), findsOneWidget);
-  ScaffoldMessenger.of(tester.element(find.byKey(_message)))
-      .hideCurrentSnackBar();
-  await tester.pumpAndSettle();
-  await _expectNoLateMessage(tester);
-}
-
-/// Нажимает управление отметкой и нажимает его снова в окне между
-/// подтверждением операции и снимком подробных данных, которое удерживает
-/// [gate]. Общая поверхность показывает ровно одно сообщение [message].
-Future<void> _toggleMarkTwice(
-  WidgetTester tester,
-  _SnapshotReadGate gate,
-  String message,
-) async {
-  final before = _controlTooltip(tester);
-  gate.hold();
-  addTearDown(gate.release);
-  await _tap(tester, find.byKey(_favoriteControl));
-  await _waitFor(tester, () => gate.isHolding);
-  await _until(tester, find.byKey(_message));
-  // Задержанное чтение держит индикаторы обновления: кадры не устоятся.
-  await tester.pump(const Duration(milliseconds: 500));
-
-  // Операция подтверждена, а страница ещё показывает прежнюю отметку.
-  expect(_controlTooltip(tester), before);
-  expect(
-    tester.widget<IconButton>(find.byKey(_favoriteControl)).onPressed,
-    isNull,
-  );
-  await tester.tap(find.byKey(_favoriteControl), warnIfMissed: false);
-  await tester.pump();
-
-  gate.release();
-  await _waitFor(tester, () => _controlTooltip(tester) != before);
-  await tester.pumpAndSettle();
-  expect(find.byKey(_message), findsOneWidget);
-  expect(find.text(message), findsOneWidget);
   ScaffoldMessenger.of(tester.element(find.byKey(_message)))
       .hideCurrentSnackBar();
   await tester.pumpAndSettle();

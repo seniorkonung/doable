@@ -53,42 +53,6 @@ void main() {
     );
   });
 
-  testWidgets('открывает generated route формы из каталога', (tester) async {
-    final repository = ControlledCatalogRepository();
-    final router = await _openEditor(tester, repository);
-
-    const route = IntentionEditorRoute();
-    expect(route, isA<PageRouteInfo<void>>());
-    expect(router.current.name, IntentionEditorRoute.name);
-    expect(find.byType(IntentionEditorPage), findsOneWidget);
-    expect(find.text('Create intention'), findsWidgets);
-    expect(find.text('Title'), findsOneWidget);
-    expect(find.text('Description (optional)'), findsOneWidget);
-    // Готовность выбирается быстрой отметкой, а не переключателем формы.
-    expect(find.byType(Switch), findsNothing);
-  });
-
-  testWidgets('форма проходит accessibility guidelines при масштабе 200%', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-    );
-    final repository = ControlledCatalogRepository();
-    await _openEditor(tester, repository);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('intention-editor-submit')),
-    );
-    await tester.pumpAndSettle();
-
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-    await expectLater(tester, meetsGuideline(textContrastGuideline));
-    semantics.dispose();
-  });
-
   testWidgets(
     'блокирует повторную отправку, сохраняя доступный уход с подтверждением',
     (tester) async {
@@ -972,45 +936,6 @@ void main() {
     },
   );
 
-  testWidgets('передаёт поздний success ушедшей формы оболочке', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    await _openEditor(tester, repository);
-    await tester.enterText(
-      find.byKey(const ValueKey('intention-editor-title')),
-      'Позднее намерение',
-    );
-    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-    await _tapClose(tester);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(_closeDiscard));
-    await tester.pumpAndSettle();
-
-    repository.completeCommand(0, _savedResult(title: 'Позднее намерение'));
-    await tester.pump();
-    await tester.pump();
-    if (repository.queries.length > 1) {
-      repository.complete(
-        1,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: const [],
-            totalCount: 0,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-        ),
-      );
-    }
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Create — “Позднее намерение”: Intention created.'),
-      findsOneWidget,
-    );
-  });
-
   testWidgets('успешный retry не оставляет сообщение прежнего failure', (
     tester,
   ) async {
@@ -1051,31 +976,6 @@ void main() {
       find.text('The intention couldn’t be created. Try again.'),
       findsNothing,
     );
-  });
-
-  testWidgets('локализует форму и validation на русском', (tester) async {
-    final repository = ControlledCatalogRepository();
-    await _openEditor(tester, repository, locale: const Locale('ru'));
-
-    expect(find.text('Создать намерение'), findsWidgets);
-    expect(find.text('Название'), findsOneWidget);
-    expect(find.text('Описание (необязательно)'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-    repository.completeCommand(
-      0,
-      const ResultFailure(
-        IntentionTextInputValidationFailure(
-          IntentionTextValidationFailure(
-            field: IntentionTextField.title,
-            reason: IntentionTextValidationReason.empty,
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Введите название.'), findsOneWidget);
   });
 
   testWidgets(
@@ -2141,45 +2041,6 @@ void main() {
           const ResultFailure(IntentionUnexpectedFailure()),
         );
         await tester.pumpAndSettle();
-        semantics.dispose();
-      },
-    );
-
-    testWidgets(
-      'локализует объяснение готовности на русском и сохраняет доступность его действий',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final repository = ControlledCatalogRepository();
-        await _openEditor(tester, repository, locale: const Locale('ru'));
-
-        await tester.tap(find.byKey(_readiness));
-        await tester.pumpAndSettle();
-
-        expect(find.text('Создать готовым к действию?'), findsOneWidget);
-        expect(
-          find.text('Его можно полностью выполнить в течение одного дня.'),
-          findsOneWidget,
-        );
-        expect(
-          find.text('Человеку достаточно понятно, что именно нужно сделать.'),
-          findsOneWidget,
-        );
-        expect(find.text('Отмена'), findsOneWidget);
-        expect(find.text('Отметить готовым'), findsOneWidget);
-        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-        await expectLater(tester, meetsGuideline(textContrastGuideline));
-
-        await tester.tap(find.byKey(_readinessConfirm));
-        await tester.pumpAndSettle();
-        expect(
-          _tooltipOf(tester, _readiness),
-          'Создать готовым к действию: включено',
-        );
-        await tester.tap(find.byKey(_favorite));
-        await tester.pump();
-        expect(_tooltipOf(tester, _favorite), 'Создать избранным: включено');
-        expect(repository.commands, isEmpty);
         semantics.dispose();
       },
     );

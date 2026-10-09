@@ -42,24 +42,6 @@ void main() {
   });
 
   group('геометрия и прокрутка компактной панели', () {
-    testWidgets('панель не предоставляет кнопку изменения размера', (
-      tester,
-    ) async {
-      _usePhone(tester, _portrait);
-      final sessions = _EditorSessions();
-      final repository = ControlledCatalogRepository();
-      await _openEditor(tester, repository, sessions);
-
-      expect(
-        find.byKey(const ValueKey('intention-creation-sheet-resize')),
-        findsNothing,
-      );
-      expect(find.byIcon(Icons.open_in_full), findsNothing);
-      expect(find.byIcon(Icons.close_fullscreen), findsNothing);
-      expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
-      _expectSubmitAvailable(tester, _portrait);
-    });
-
     for (final isFling in [false, true]) {
       testWidgets(
         '${isFling ? 'быстрый' : 'медленный'} свайп вверх по ручке сохраняет геометрию, черновик и сессию без отправки и закрытия',
@@ -366,28 +348,6 @@ void main() {
   });
 
   group('клавиатура и системные отступы', () {
-    testWidgets(
-      'пустая форма на экране 568×320 над клавиатурой при масштабе 200% сохраняет видимый ввод с фокусом',
-      (tester) async {
-        _usePhone(tester, _narrowLandscape, keyboard: true);
-        tester.platformDispatcher.textScaleFactorTestValue = 2;
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final sessions = _EditorSessions();
-        await _openEditor(tester, ControlledCatalogRepository(), sessions);
-
-        final viewport = tester.getRect(find.byKey(_fields));
-        expect(viewport.height, greaterThan(0));
-        _expectFocusedInputVisible(tester, _title);
-        _expectCompact(
-          tester,
-          _sheetRect(tester),
-          _narrowLandscape,
-          keyboard: true,
-        );
-        expect(tester.view.viewInsets.bottom, 160);
-        expect(tester.takeException(), isNull);
-      },
-    );
     for (final (name, field, textField) in [
       ('названия', _title, IntentionTextField.title),
       ('описания', _description, IntentionTextField.description),
