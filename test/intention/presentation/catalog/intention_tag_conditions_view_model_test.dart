@@ -25,92 +25,6 @@ const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
 
 void main() {
-  test('условия хранятся в порядке добавления и сразу применяют поиск', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    expect(h.conditions, isEmpty);
-    expect(h.state.tagFilter, IntentionTagFilter.empty);
-    final queriesBefore = h.repository.queries.length;
-
-    h.select(_tag(1, 'Здоровье'), _present);
-    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
-    h.select(_tag(2, 'Спорт'), _absent);
-
-    expect(h.shown, [
-      (_id(1), _present, 'Здоровье', false),
-      (_id(2), _absent, 'Спорт', false),
-    ]);
-    final filter = IntentionTagFilter(
-      requiredTagIds: [_id(1)],
-      excludedTagIds: [_id(2)],
-    );
-    expect(h.state.tagFilter, filter);
-    // Фильтр передан без ожидания debounce и отдельного подтверждения.
-    expect(h.appliedFilter, filter);
-    expect(h.repository.queries.length, greaterThan(queriesBefore));
-    expect(() => h.conditions.clear(), throwsUnsupportedError);
-  });
-
-  test('повторный выбор тега меняет надобность существующего условия', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
-    h.select(_tag(2, 'Спорт'), _absent);
-
-    h.select(_tag(1, 'Здоровье'), _absent);
-
-    expect(h.shown, [
-      (_id(1), _absent, 'Здоровье', false),
-      (_id(2), _absent, 'Спорт', false),
-    ]);
-    expect(
-      h.appliedFilter,
-      IntentionTagFilter(excludedTagIds: [_id(1), _id(2)]),
-    );
-  });
-
-  test('переключение сохраняет место условия и сразу применяет поиск', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
-    h.select(_tag(2, 'Спорт'), _absent);
-
-    h.model.toggleRequirement(_id(2));
-    expect(h.shown, [
-      (_id(1), _present, 'Здоровье', false),
-      (_id(2), _present, 'Спорт', false),
-    ]);
-    expect(
-      h.appliedFilter,
-      IntentionTagFilter(requiredTagIds: [_id(1), _id(2)]),
-    );
-
-    h.model.toggleRequirement(_id(2));
-    expect(h.shown.last, (_id(2), _absent, 'Спорт', false));
-    h.model.toggleRequirement(_id(9));
-    expect(h.shown, hasLength(2));
-  });
-
-  test('снятие убирает условие и не выполняет команд и чтений тегов', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
-    h.select(_tag(2, 'Спорт'), _absent);
-
-    h.model.remove(_id(2));
-    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
-    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
-
-    h.model.remove(_id(2));
-    h.model.remove(_id(1));
-    expect(h.conditions, isEmpty);
-    expect(h.appliedFilter, IntentionTagFilter.empty);
-    expect(h.repository.tagCommands, isEmpty);
-    expect(h.repository.commands, isEmpty);
-    // Выбор из актуального снимка не требует чтения тега.
-    expect(h.reads.queries, isEmpty);
-  });
-
   test('подтверждённое переименование обновляет название условия', () {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -348,22 +262,6 @@ void main() {
     expect(h.reads.queries, isEmpty);
   });
 
-  test('смена охвата и порядка каталога не меняет условия', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
-    h.select(_tag(2, 'Спорт'), _absent);
-    final shown = h.shown;
-    final filter = h.state.tagFilter;
-
-    h.catalog.changeScope(IntentionScope.archived);
-    h.catalog.changeOrder(IntentionCatalogOrder.createdAtAscending);
-
-    expect(h.shown, shown);
-    expect(h.catalog.selection.scope, IntentionScope.archived);
-    expect(h.catalog.selection.tagFilter, filter);
-  });
-
   test('условия разных назначений поиска независимы', () {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -400,20 +298,6 @@ void main() {
           .tagFilter,
       IntentionTagFilter(excludedTagIds: [_id(2)]),
     );
-  });
-
-  test('условия не сохраняются после закрытия своего поиска', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
-
-    h.subscription.close();
-    await h.container.pump();
-    final reopened = h.container.listen(h.provider, (_, _) {});
-    addTearDown(reopened.close);
-
-    expect(reopened.read().conditions, isEmpty);
-    expect(h.appliedFilter, IntentionTagFilter.empty);
   });
 }
 

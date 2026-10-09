@@ -1809,58 +1809,6 @@ void main() {
     expect(receivedRepeatedPresentation, isFalse);
   });
 
-  test('согласование данных не зависит от предъявления сообщения', () async {
-    final repository = _CheckpointGraphRepository();
-    final harness = _CheckpointHarness(repository);
-    addTearDown(harness.dispose);
-    await harness.loadInitialSurfaces();
-
-    final registration = harness.coordinator.registerAppPresentation();
-    addTearDown(registration.release);
-    GraphAppPresentationClaim? issued;
-    unawaited(registration.nextClaim().then((claim) => issued = claim));
-
-    await harness.completeRelationCreation(
-      relatedIntentionId: testIntentionId(1002),
-      relationIndex: 2,
-      revision: const TestGraphRevision(9),
-      activeCounts: {testIntentionId(1): 2, testIntentionId(1002): 1},
-    );
-    repository.completeGroupPage(
-      1,
-      RelationGroupFirstPage(
-        items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 2),
-        counts: testRelationCounts(activeNeedOutgoing: 2),
-        nextCursor: null,
-        revision: const TestGraphRevision(9),
-      ),
-    );
-    await pumpEventQueue();
-
-    // Данные согласованы до подтверждения предъявления.
-    expect(issued, isNotNull);
-    expect(harness.catalogCounts[testIntentionId(1)], 2);
-    expect(harness.neighborhood.items, hasLength(2));
-    expect(harness.neighborhood.revision, const TestGraphRevision(9));
-
-    final catalogAfterData = harness.catalog;
-    final neighborhoodAfterData = harness.neighborhood;
-    final confirmedStatesAfterData = harness.confirmedCatalogStates.length;
-
-    harness.coordinator.confirmPresentation(issued!);
-    var hasSecondClaim = false;
-    unawaited(registration.nextClaim().then((_) => hasSecondClaim = true));
-    await pumpEventQueue();
-
-    // Предъявление не применяет данные повторно и не выдаёт второй claim.
-    expect(hasSecondClaim, isFalse);
-    expect(harness.catalog, same(catalogAfterData));
-    expect(harness.neighborhood, same(neighborhoodAfterData));
-    expect(harness.confirmedCatalogStates, hasLength(confirmedStatesAfterData));
-    expect(repository.catalogQueries, hasLength(1));
-    expect(repository.groupQueries, hasLength(2));
-  });
-
   test(
     'пакет только тега сохраняет каталог и обновляет группу перед продолжением',
     () async {

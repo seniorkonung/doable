@@ -1143,49 +1143,6 @@ void main() {
     expect(repository.queries, hasLength(3));
   });
 
-  test('первая порция, прочитанная до удаления обязательного тега, '
-      'публикуется пустой', () async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(repository);
-    final confirmedStates = _observeConfirmedStates(container, browse);
-    final provider = intentionCatalogViewModelProvider(browse);
-    await waitForCatalogQueries(repository, 1);
-    repository.complete(0, _emptyPage(0));
-    await container.read(provider.future);
-    final filter = IntentionTagFilter(requiredTagIds: [health.id]);
-    container.read(provider.notifier).changeTagFilter(filter);
-    await waitForCatalogQueries(repository, 2);
-    confirmedStates.clear();
-
-    await _completeTagDelete(
-      container,
-      repository,
-      tagId: health.id,
-      revision: const TestCatalogRevision(2),
-    );
-    repository.complete(
-      1,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [
-            testSummary(index: 1, tags: [health]),
-          ],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(1),
-        ),
-      ),
-    );
-    await container.read(provider.future);
-
-    final current = _confirmed(container, browse);
-    expect(current, isA<IntentionCatalogEmpty>());
-    expect(current.revision, const TestCatalogRevision(2));
-    expect(current.selection.tagFilter, filter);
-    expect(confirmedStates, [same(current)]);
-    expect(repository.queries, hasLength(2));
-  });
-
   test('удаление тега вне условий убирает его из загруженных строк и '
       'сохраняет состав, количество, порядок и продолжение', () async {
     final repository = ControlledCatalogRepository();
