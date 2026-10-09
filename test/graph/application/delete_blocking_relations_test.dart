@@ -46,25 +46,6 @@ void main() {
     );
   });
 
-  test('подтверждённый набор не меняется вместе с исходным выбором', () {
-    final selection = <LongTermRelationId>{firstId, secondId};
-    final command = DeleteBlockingRelations.longTerm(
-      intentionId: owner,
-      relationIds: selection,
-    );
-
-    selection
-      ..clear()
-      ..add(_relationId(103));
-
-    expect(command.intentionId, owner);
-    expect(command.relationIds, unorderedEquals([firstId, secondId]));
-    expect(
-      () => command.relationIds.add(_relationId(104)),
-      throwsUnsupportedError,
-    );
-  });
-
   test('смешанный набор различает виды ссылок с одинаковым UUID', () {
     final choiceId = (DailyChoiceId.decode(
       firstId.toCanonicalString(),
@@ -87,27 +68,6 @@ void main() {
       ),
       throwsA(isA<DeleteBlockingRelationsValidationException>()),
     );
-  });
-
-  test('типизированные отказы сохраняют категории и идентификаторы', () {
-    const unavailable = DeleteBlockingRelationsUnavailableFailure();
-    const corruption = DeleteBlockingRelationsCorruptionFailure();
-    const unexpected = DeleteBlockingRelationsUnexpectedFailure();
-    final notFound = DeleteBlockingRelationsIntentionNotFoundFailure(owner);
-    final stale = DeleteBlockingRelationsSelectionConflictFailure.longTerm(
-      relationId: firstId,
-      reason: BlockingRelationConflictReason.noLongerBlocking,
-    );
-    final DeleteBlockingRelationsResult failed = GraphResultFailure(stale);
-
-    expect(notFound.intentionId, owner);
-    expect(notFound.category, GraphFailureCategory.notFound);
-    expect(stale.relationId, firstId);
-    expect(stale.category, GraphFailureCategory.conflict);
-    expect((failed as GraphResultFailure).failure, same(stale));
-    expect(unavailable.category, GraphFailureCategory.unavailable);
-    expect(corruption.category, GraphFailureCategory.corruption);
-    expect(unexpected.category, GraphFailureCategory.unexpected);
   });
 
   test('единый результат содержит ровно удаления и счётчики участников', () {

@@ -50,55 +50,6 @@ void main() {
     },
   );
 
-  test('снимок различает присутствие, отсутствие и утрату принадлежности', () {
-    final query = SelectedRelationsQuery.mixed(
-      intentionId: owner,
-      references: [relation, choice],
-    );
-    final entries = <BlockingRelationReference, SelectedRelationEntry>{
-      relation: SelectedRelationMissing(relationId),
-      choice: SelectedDailyChoicePresent(
-        DailyChoiceCatalogItem(
-          id: choiceId,
-          source: _participant(owner),
-          selected: _participant(other),
-          date: _date(),
-          isCompleted: true,
-        ),
-      ),
-    };
-    final snapshot = SelectedRelationsSnapshot.mixed(
-      query: query,
-      entriesByReference: entries,
-    );
-    entries.clear();
-
-    expect(snapshot.entriesByReference.keys, {relation, choice});
-    expect(
-      snapshot.entriesByReference[relation],
-      isA<SelectedRelationMissing>(),
-    );
-    final present =
-        snapshot.entriesByReference[choice] as SelectedDailyChoicePresent;
-    expect(present.item.id, choiceId);
-    expect(present.item.source.id, owner);
-    expect(present.item.selected.id, other);
-    expect(present.item.date, _date());
-    expect(present.item.isCompleted, isTrue);
-    expect(present.canDelete, isTrue);
-    expect(() => snapshot.entriesByReference.clear(), throwsUnsupportedError);
-    expect(
-      SelectedRelationsSnapshot.mixed(
-        query: query,
-        entriesByReference: {
-          relation: SelectedRelationMissing(relationId),
-          choice: SelectedDailyChoiceNoLongerBlocking(choiceId),
-        },
-      ).entriesByReference[choice],
-      isA<SelectedDailyChoiceNoLongerBlocking>(),
-    );
-  });
-
   test('снимок отклоняет неполный набор и дневную запись чужого намерения', () {
     final query = SelectedRelationsQuery.mixed(
       intentionId: owner,

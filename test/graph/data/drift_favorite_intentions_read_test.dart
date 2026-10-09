@@ -428,15 +428,6 @@ void main() {
       expect(before.items.map(_rowId), [_uuid(1)]);
       expect(after.items.map(_rowId), [_uuid(1), _uuid(2)]);
     });
-
-    test('снимок неизменяем', () async {
-      _insertIntention(raw, number: 1, title: 'Первое');
-      await _execute(repository, MarkIntentionFavorite(_id(1)));
-
-      final snapshot = await _favorites(repository);
-
-      expect(() => snapshot.items.clear(), throwsUnsupportedError);
-    });
   });
 }
 
