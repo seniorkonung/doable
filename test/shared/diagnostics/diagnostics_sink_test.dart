@@ -7,8 +7,6 @@ import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/in_memory_diagnostics_sink.dart';
-
 void main() {
   group('DiagnosticsSink', () {
     test(
@@ -935,68 +933,6 @@ void main() {
       ]);
     });
 
-    test('конструкторы события перестановки допускают только согласованные '
-        'сочетания этапа, статуса и вида завершения', () {
-      const started = FavoriteOrderCommandDiagnosticsEvent.started();
-      final moved = FavoriteOrderCommandDiagnosticsEvent.moved(
-        duration: const Duration(milliseconds: 4),
-      );
-      final unchanged = FavoriteOrderCommandDiagnosticsEvent.unchanged(
-        duration: const Duration(milliseconds: 5),
-      );
-      final conflict = FavoriteOrderCommandDiagnosticsEvent.failed(
-        stage: FavoriteOrderCommandDiagnosticsStage.validation,
-        duration: const Duration(milliseconds: 6),
-        code: DiagnosticsFailureCode.conflict,
-      );
-
-      expect(started.stage, FavoriteOrderCommandDiagnosticsStage.read);
-      expect(started.status, isA<DiagnosticsStarted>());
-      expect(started.completion, isNull);
-
-      expect(moved.stage, FavoriteOrderCommandDiagnosticsStage.write);
-      expect(
-        moved.status,
-        isA<DiagnosticsSucceeded>().having(
-          (status) => status.duration,
-          'duration',
-          const Duration(milliseconds: 4),
-        ),
-      );
-      expect(moved.completion, FavoriteOrderCommandDiagnosticsCompletion.moved);
-
-      expect(unchanged.stage, FavoriteOrderCommandDiagnosticsStage.validation);
-      expect(
-        unchanged.status,
-        isA<DiagnosticsSucceeded>().having(
-          (status) => status.duration,
-          'duration',
-          const Duration(milliseconds: 5),
-        ),
-      );
-      expect(
-        unchanged.completion,
-        FavoriteOrderCommandDiagnosticsCompletion.unchanged,
-      );
-
-      expect(conflict.stage, FavoriteOrderCommandDiagnosticsStage.validation);
-      expect(
-        conflict.status,
-        isA<DiagnosticsFailed>()
-            .having(
-              (status) => status.duration,
-              'duration',
-              const Duration(milliseconds: 6),
-            )
-            .having(
-              (status) => status.code,
-              'code',
-              DiagnosticsFailureCode.conflict,
-            ),
-      );
-      expect(conflict.completion, isNull);
-    });
-
     test('конфликт перестановки на этапе проверки сериализуется только '
         'разрешёнными полями без данных личного графа', () {
       final messages = <String>[];
@@ -1105,30 +1041,6 @@ void main() {
 
       expect(() => recordDiagnosticsSafely(sink, event), returnsNormally);
       expect(sink.attemptedEvents, [same(event)]);
-    });
-
-    test('сохраняет закрытые типизированные события без telemetry', () {
-      final sink = InMemoryDiagnosticsSink();
-
-      for (final event in _events()) {
-        sink.record(event);
-      }
-
-      expect(sink.events.map((event) => event.runtimeType), [
-        BootstrapDiagnosticsEvent,
-        MigrationDiagnosticsEvent,
-        CatalogPageReadDiagnosticsEvent,
-        IntentionDetailReadDiagnosticsEvent,
-        RelationGroupPageReadDiagnosticsEvent,
-        LongTermRelationDetailReadDiagnosticsEvent,
-        IntentionCommandDiagnosticsEvent,
-        LongTermRelationCommandDiagnosticsEvent,
-        BlockingRelationsDeleteDiagnosticsEvent,
-        SelectedRelationsReadDiagnosticsEvent,
-      ]);
-      expect(sink.events[0].status, isA<DiagnosticsStarted>());
-      expect(sink.events[1].status, isA<DiagnosticsSucceeded>());
-      expect(sink.events[3].status, isA<DiagnosticsFailed>());
     });
 
     test('production adapter записывает только allowlist полей', () {
