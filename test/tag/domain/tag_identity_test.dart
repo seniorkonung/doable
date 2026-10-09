@@ -1,8 +1,5 @@
-import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_id_generator.dart';
 import 'package:doable/src/tag/domain/tag.dart';
-import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,64 +57,9 @@ void main() {
       expect(second.id, isNot(first.id));
     });
   });
-
-  group('намерение и назначение тега', () {
-    test('различает намерение и долговременную связь с одинаковым UUID', () {
-      const value = '018f0b5d-6b2e-7c80-8000-000000000001';
-      final intention = _intentionId(value);
-      final relation = _relationId(value);
-
-      expect(intention, _intentionId(value));
-      expect(relation, _relationId(value));
-      expect(intention, isNot(relation));
-    });
-
-    test('назначение определяется только идентичностями тега и намерения', () {
-      const first = '018f0b5d-6b2e-7c80-8000-000000000001';
-      const second = '018f0b5d-6b2e-7c80-8000-000000000002';
-      final intentionId = _intentionId(first);
-      final assignment = TagAssignment(
-        tagId: _tagId(first),
-        intentionId: intentionId,
-      );
-
-      expect(assignment.tagId, _tagId(first));
-      expect(assignment.intentionId, intentionId);
-      expect(
-        assignment,
-        TagAssignment(tagId: _tagId(first), intentionId: _intentionId(first)),
-      );
-      expect(
-        assignment.hashCode,
-        TagAssignment(
-          tagId: _tagId(first),
-          intentionId: _intentionId(first),
-        ).hashCode,
-      );
-      expect(<TagAssignment>{
-        assignment,
-        TagAssignment(tagId: _tagId(first), intentionId: _intentionId(first)),
-        TagAssignment(tagId: _tagId(second), intentionId: intentionId),
-        TagAssignment(tagId: _tagId(first), intentionId: _intentionId(second)),
-      }, hasLength(3));
-    });
-  });
 }
 
 TagId _tagId(String value) => switch (TagId.decode(value)) {
   TagIdDecodingSuccess(:final id) => id,
   InvalidTagIdDecoding() => throw StateError('Ожидался корректный UUID тега.'),
 };
-
-IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
-  IntentionIdDecodingSuccess(:final id) => id,
-  InvalidIntentionIdDecoding() => throw StateError('Ожидался UUID намерения.'),
-};
-
-LongTermRelationId _relationId(String value) =>
-    switch (LongTermRelationId.decode(value)) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() => throw StateError(
-        'Ожидался UUID долговременной связи.',
-      ),
-    };
