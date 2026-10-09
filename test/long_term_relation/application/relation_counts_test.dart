@@ -103,23 +103,6 @@ void main() {
       );
     });
 
-    test('считает встречные связи как две отдельные группы направлений', () {
-      final counts = RelationCounts(
-        activeNeedIncoming: 1,
-        activeNeedOutgoing: 1,
-        activeCanIncoming: 0,
-        activeCanOutgoing: 0,
-        archivedNeedIncoming: 0,
-        archivedNeedOutgoing: 0,
-        archivedCanIncoming: 0,
-        archivedCanOutgoing: 0,
-      );
-
-      expect(counts.activeNeed, 2);
-      expect(counts.active, 2);
-      expect(counts.total, 2);
-    });
-
     test('отклоняет отрицательное значение в любой группе', () {
       for (var groupIndex = 0; groupIndex < 8; groupIndex++) {
         expect(

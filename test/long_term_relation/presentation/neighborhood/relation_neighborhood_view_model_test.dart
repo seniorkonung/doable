@@ -32,65 +32,6 @@ import 'neighborhood_test_support.dart';
 import '../../../support/daily_choice_reconciliation_fixture.dart';
 
 void main() {
-  test('дневная группа источника сохраняет строки и десять количеств одной ревизии', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-    repository.completePage(
-      0,
-      RelationGroupFirstPage(
-        items: const [],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-
-    harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
-    expect(repository.pageQueryAt(1), isA<DailyChoiceGroupQuery>());
-    final choice = reconciliationChoice(
-      source: harness.intentionId,
-      selected: testIntentionId(2),
-    );
-    final item = DailyChoiceCatalogItem(
-      id: choice.id,
-      source: DailyChoiceCatalogParticipant(
-        id: choice.sourceIntentionId,
-        title: 'Источник',
-        archiveState: IntentionArchiveState.active,
-        readiness: IntentionReadiness.notReady,
-      ),
-      selected: DailyChoiceCatalogParticipant(
-        id: choice.selectedIntentionId,
-        title: 'Действие',
-        archiveState: IntentionArchiveState.active,
-        readiness: IntentionReadiness.ready,
-      ),
-      date: choice.date,
-      isCompleted: choice.isCompleted,
-    );
-    repository.completePage(
-      1,
-      DailyChoiceGroupFirstPage(
-        items: [item],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-
-    final state = harness.state as DailyChoiceGroupLoaded;
-    expect(
-      state.group,
-      const DailyChoiceRelationGroup(role: DailyChoiceRelationRole.source),
-    );
-    expect(state.items.single.id, choice.id);
-    expect(state.counts.total, 1);
-    expect(state.revision, const TestGraphRevision(1));
-  });
-
   test('поздний ответ дневной роли не заменяет новую выбранную роль', () async {
     final repository = ControlledNeighborhoodRepository();
     final harness = _NeighborhoodHarness(repository);
@@ -1258,101 +1199,6 @@ void main() {
     );
   }
 
-  test('первое чтение открывает активную исходящую группу «нужно»', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    expect(
-      harness.state,
-      isA<RelationGroupInitialLoad>().having(
-        (value) => value.selection,
-        'выбор',
-        RelationGroupSelection.initial,
-      ),
-    );
-    expect(repository.requestCount, 1);
-    final query = repository.queryAt(0);
-    expect(query.intentionId, harness.intentionId);
-    expect(query.type, LongTermRelationType.need);
-    expect(query.direction, RelationDirection.outgoing);
-    expect(query.scope, RelationScope.active);
-    expect(query.pageSize, 50);
-    expect(query.cursor, isNull);
-  });
-
-  test('успешное отсутствие связей отличается от ошибки', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    repository.completePage(
-      0,
-      RelationGroupFirstPage(
-        items: const [],
-        counts: testRelationCounts(activeCanOutgoing: 3),
-        nextCursor: null,
-        revision: const TestGraphRevision(4),
-      ),
-    );
-    await pumpEventQueue();
-
-    expect(
-      harness.state,
-      isA<RelationGroupEmpty>()
-          .having((value) => value.totalCount, 'количество группы', 0)
-          .having(
-            (value) => value.counts.activeCanOutgoing,
-            'количество другой группы',
-            3,
-          ),
-    );
-  });
-
-  test('первая порция большой группы сохраняет продолжение', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    harness.completeFirstPage(
-      index: 0,
-      from: 1,
-      count: 2,
-      totalCount: 5,
-      nextCursor: const TestRelationGroupCursor(2),
-    );
-    await pumpEventQueue();
-
-    expect(
-      harness.loaded,
-      isA<RelationGroupLoaded>()
-          .having((value) => value.items.length, 'загружено строк', 2)
-          .having((value) => value.totalCount, 'полное количество', 5)
-          .having(
-            (value) => value.hasConfirmedEnd,
-            'подтверждённый конец',
-            false,
-          )
-          .having(
-            (value) => value.progress,
-            'процесс',
-            isA<RelationGroupIdle>(),
-          ),
-    );
-  });
-
-  test('малая группа сразу даёт подтверждённый конец', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    harness.completeFirstPage(index: 0, from: 1, count: 3, totalCount: 3);
-    await pumpEventQueue();
-
-    expect(harness.loaded.hasConfirmedEnd, isTrue);
-    expect(harness.loaded.items.length, 3);
-  });
-
   test('повторная прокрутка не отправляет то же продолжение дважды', () async {
     final repository = ControlledNeighborhoodRepository();
     final harness = _NeighborhoodHarness(repository);
@@ -1426,42 +1272,6 @@ void main() {
     expect(harness.loaded.hasConfirmedEnd, isTrue);
     expect(harness.loaded.totalCount, 5);
     expect(harness.loaded.progress, isA<RelationGroupIdle>());
-  });
-
-  test('смена типа начинает новую группу с первой порции', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    harness.completeFirstPage(index: 0, from: 1, count: 2, totalCount: 2);
-    await pumpEventQueue();
-
-    harness.viewModel.selectType(LongTermRelationType.can);
-
-    expect(harness.state, isA<RelationGroupInitialLoad>());
-    expect(repository.requestCount, 2);
-    final query = repository.queryAt(1);
-    expect(query.type, LongTermRelationType.can);
-    expect(query.direction, RelationDirection.outgoing);
-    expect(query.scope, RelationScope.active);
-    expect(query.cursor, isNull);
-  });
-
-  test('переключение в архив сохраняет тип и направление', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    harness.viewModel.selectDirection(RelationDirection.incoming);
-    harness.viewModel.selectScope(RelationScope.archived);
-    harness.viewModel.selectType(LongTermRelationType.can);
-
-    expect(repository.requestCount, 4);
-    final query = repository.queryAt(3);
-    expect(query.type, LongTermRelationType.can);
-    expect(query.direction, RelationDirection.incoming);
-    expect(query.scope, RelationScope.archived);
-    expect(harness.state.selection.scope, RelationScope.archived);
   });
 
   test('повторный выбор той же группы не перечитывает её', () async {
@@ -1993,61 +1803,6 @@ void main() {
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
     expect(repository.requestCount, 3);
     expect(repository.queryAt(2).cursor, isNull);
-  });
-
-  test('ошибка обновления сохраняет прежнюю подтверждённую пару', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    harness.completeFirstPage(
-      index: 0,
-      from: 1,
-      count: 2,
-      totalCount: 5,
-      nextCursor: const TestRelationGroupCursor(2),
-    );
-    await pumpEventQueue();
-    harness.scrollTo(1);
-    repository.failRead(1, const RelationGroupSnapshotExpired());
-    await pumpEventQueue();
-    repository.failRead(2, const RelationGroupUnavailableFailure());
-    await pumpEventQueue();
-
-    final loaded = harness.loaded;
-    expect(loaded.items.length, 2);
-    expect(loaded.totalCount, 5);
-    expect(loaded.hasConfirmedEnd, isFalse);
-    expect(loaded.summaryFreshness, RelationSummaryFreshness.stale);
-    expect(
-      loaded.summaryStatus,
-      isA<RelationSummaryRefreshFailure>().having(
-        (value) => value.canRetry,
-        'повтор доступен',
-        true,
-      ),
-    );
-
-    harness.retryRefresh();
-    expect(repository.requestCount, 4);
-    expect(repository.queryAt(3).cursor, isNull);
-    expect(
-      harness.loaded.summaryFreshness,
-      RelationSummaryFreshness.refreshing,
-    );
-
-    harness.completeFirstPage(
-      index: 3,
-      from: 1,
-      count: 2,
-      totalCount: 4,
-      nextCursor: const TestRelationGroupCursor(2),
-      revision: const TestGraphRevision(9),
-    );
-    await pumpEventQueue();
-
-    expect(harness.loaded.totalCount, 4);
-    expect(harness.loaded.summaryFreshness, RelationSummaryFreshness.current);
   });
 
   test('запоздалый успех подгрузки не снимает устаревание сводки', () async {

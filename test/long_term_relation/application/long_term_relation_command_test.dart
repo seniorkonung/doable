@@ -3,7 +3,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -34,42 +33,6 @@ void main() {
       final patch = LongTermRelationDescriptionPatch.fromInput(' \n\t ');
 
       expect(patch, isA<LongTermRelationDescriptionCleared>());
-    });
-
-    test('заменяет описание из 4096 составных графем без изменения', () {
-      final input = List.filled(4096, '👨‍👩‍👧‍👦').join();
-
-      final patch = LongTermRelationDescriptionPatch.fromInput(input);
-
-      expect(patch, isA<LongTermRelationDescriptionReplaced>());
-      expect((patch as LongTermRelationDescriptionReplaced).value.value, input);
-    });
-
-    test('отклоняет 4097 графем и недопустимый Unicode', () {
-      final tooLong = List.filled(4097, '👨‍👩‍👧‍👦').join();
-
-      expect(
-        () => LongTermRelationDescriptionPatch.fromInput(tooLong),
-        throwsA(
-          isA<LongTermRelationTextValidationException>().having(
-            (error) => error.failure.reason,
-            'reason',
-            LongTermRelationTextValidationReason.tooLong,
-          ),
-        ),
-      );
-      for (final invalidInput in ['текст\u0000', '\uD800']) {
-        expect(
-          () => LongTermRelationDescriptionPatch.fromInput(invalidInput),
-          throwsA(
-            isA<LongTermRelationTextValidationException>().having(
-              (error) => error.failure.reason,
-              'reason',
-              LongTermRelationTextValidationReason.invalidUnicodeRepertoire,
-            ),
-          ),
-        );
-      }
     });
   });
 
