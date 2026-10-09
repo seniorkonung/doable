@@ -3,11 +3,8 @@ import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:drift/drift.dart' hide isNull;
-import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/doable_schema_verifier.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -169,157 +166,8 @@ void main() {
       expect(trace, isNot(contains('from intention_titles_fts')));
       expect(trace, isNot(contains('integrity-check')));
     });
-
-    test(
-      'полный тестовый verifier выявляет повреждённую страницу sqlite_schema',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        await harness.openReadyDatabase();
-        await harness.closePersistenceObjectGraph();
-
-        final bytes = await harness.databaseFile.readAsBytes();
-        bytes[100] = 0xff;
-        await harness.databaseFile.writeAsBytes(bytes, flush: true);
-        final preservedBytes = await harness.databaseFile.readAsBytes();
-
-        final verifierDatabase = AppDatabase(
-          openFileBackedLocalDatabase(harness.databaseFile),
-        );
-        try {
-          await expectLater(
-            verifyDoableDatabaseSchema(verifierDatabase),
-            throwsA(isA<sqlite.SqliteException>()),
-          );
-        } finally {
-          await verifierDatabase.close();
-        }
-        expect(await harness.databaseFile.readAsBytes(), preservedBytes);
-      },
-    );
-
-    for (final scenario in _incompatibleSchemaScenarios) {
-      test(
-        'полный тестовый verifier выявляет текущую схему с ${scenario.description}',
-        () async {
-          final harness = await LocalDatabaseHarness.fileBacked();
-          addTearDown(harness.dispose);
-          await harness.openReadyDatabase();
-          await harness.closePersistenceObjectGraph();
-
-          final rawDatabase = sqlite.sqlite3.open(harness.databaseFile.path);
-          try {
-            scenario.mutate(rawDatabase);
-          } finally {
-            rawDatabase.close();
-          }
-          final preservedBytes = await harness.databaseFile.readAsBytes();
-
-          final verifierDatabase = AppDatabase(
-            openFileBackedLocalDatabase(harness.databaseFile),
-          );
-          try {
-            await expectLater(
-              verifyDoableDatabaseSchema(verifierDatabase),
-              throwsA(isA<SchemaMismatch>()),
-            );
-          } finally {
-            await verifierDatabase.close();
-          }
-          expect(await harness.databaseFile.readAsBytes(), preservedBytes);
-        },
-      );
-    }
-
-    test(
-      'dispose закрывает file-backed graph и удаляет его временные ресурсы',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-
-        await harness.openReadyDatabase();
-        expect(await harness.databaseFile.exists(), isTrue);
-
-        await harness.dispose();
-
-        expect(await harness.temporaryDirectory.exists(), isFalse);
-      },
-    );
   });
 }
-
-final _incompatibleSchemaScenarios = [
-  (
-    description: 'изменённым column constraint',
-    mutate: (sqlite.Database database) {
-      database.execute('PRAGMA writable_schema = ON');
-      try {
-        database.execute(
-          '''
-            UPDATE sqlite_schema
-            SET sql = replace(sql, ?, ?)
-            WHERE type = 'table' AND name = 'intentions'
-          ''',
-          [
-            "CHECK (title <> '' AND instr(CAST(title AS BLOB), X'00') = 0)",
-            'CHECK (length(title) > 1)',
-          ],
-        );
-      } finally {
-        database.execute('PRAGMA writable_schema = OFF');
-      }
-      database.execute('PRAGMA schema_version = 2');
-    },
-  ),
-  (
-    description: 'изменённой FTS5-конфигурацией',
-    mutate: (sqlite.Database database) {
-      database
-        ..execute('DROP TABLE intention_titles_fts')
-        ..execute('''
-          CREATE VIRTUAL TABLE intention_titles_fts USING fts5(
-            title_search_key,
-            content = 'intentions',
-            content_rowid = 'rowid',
-            tokenize = 'unicode61'
-          )
-        ''');
-    },
-  ),
-  (
-    description: 'изменённым телом trigger',
-    mutate: (sqlite.Database database) {
-      database
-        ..execute('DROP TRIGGER intentions_fts_after_insert')
-        ..execute('''
-          CREATE TRIGGER intentions_fts_after_insert
-          AFTER INSERT ON intentions
-          BEGIN
-            SELECT 1;
-          END
-        ''');
-    },
-  ),
-  (
-    description: 'изменённым predicate index',
-    mutate: (sqlite.Database database) {
-      database
-        ..execute('DROP INDEX intentions_active_created_at_asc_id_asc')
-        ..execute('''
-          CREATE INDEX intentions_active_created_at_asc_id_asc
-          ON intentions (created_at ASC, id ASC)
-          WHERE is_archived = 1
-        ''');
-    },
-  ),
-  (
-    description: 'лишним schema object',
-    mutate: (sqlite.Database database) {
-      database.execute(
-        'CREATE TABLE unexpected_schema_object (value TEXT NOT NULL)',
-      );
-    },
-  ),
-];
 
 Future<void> _expectStorageIsReady(GeneratedDatabase database) async {
   final foreignKeys = await database

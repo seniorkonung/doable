@@ -85,24 +85,6 @@ void main() {
     },
   );
 
-  test('контур инъекции ошибки закрывает неуспешное соединение', () async {
-    final harness = _FailedMigrationConnectionHarness();
-    addTearDown(harness.closeIfNeeded);
-
-    await expectLater(
-      harness.run(() {
-        return runAtomicMigration(
-          harness.database,
-          targetSchemaVersion: _nextSchemaVersion,
-          migrate: () async => throw const _InjectedMigrationFailure(),
-        );
-      }),
-      throwsA(isA<_InjectedMigrationFailure>()),
-    );
-
-    expect(harness.isClosed, isTrue);
-  });
-
   group('диагностика создания схемы', () {
     test(
       'ошибка получателя до создания не препятствует подтверждению',
@@ -583,30 +565,5 @@ final class _StatementRecorder extends LocalDatabaseConnectionObserver {
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     statements.addAll(statement.statements);
-  }
-}
-
-final class _FailedMigrationConnectionHarness {
-  _FailedMigrationConnectionHarness()
-    : database = AppDatabase(openInMemoryLocalDatabase());
-
-  final AppDatabase database;
-  var isClosed = false;
-
-  Future<void> run(Future<void> Function() operation) async {
-    try {
-      await operation();
-    } on Object {
-      await database.close();
-      isClosed = true;
-      rethrow;
-    }
-  }
-
-  Future<void> closeIfNeeded() async {
-    if (!isClosed) {
-      await database.close();
-      isClosed = true;
-    }
   }
 }

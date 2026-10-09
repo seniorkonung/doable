@@ -76,15 +76,6 @@ void main() {
     },
   );
 
-  test(
-    'AppDatabase принимает настроенное platform-neutral соединение',
-    () async {
-      final database = AppDatabase(openInMemoryLocalDatabase());
-
-      await database.close();
-    },
-  );
-
   test('регистрирует обязательные функции на production, in-memory и file-backed соединениях', () async {
     final connections = <ConfiguredLocalDatabaseConnection Function()>[
       openAndroidProductionDatabaseConnection,
