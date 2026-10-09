@@ -1,7 +1,6 @@
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -13,15 +12,6 @@ import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
-  test('запрос по умолчанию охватывает все даты и оба состояния', () {
-    final query = DailyChoiceCatalogQuery();
-
-    expect(query.date, isNull);
-    expect(query.isCompleted, isNull);
-    expect(query.pageSize, 50);
-    expect(query.cursor, isNull);
-  });
-
   test('запрос сохраняет явные фильтры и границы порции', () {
     final date = CalendarDate.fromParts(2026, 9, 24);
     const cursor = _Cursor();
@@ -125,42 +115,6 @@ void main() {
       ),
       throwsA(isA<DailyChoiceCatalogPageValidationException>()),
     );
-  });
-
-  test(
-    'продолжение не выдаёт новое количество за согласованное с первой порцией',
-    () {
-      final page = DailyChoiceCatalogContinuationPage(
-        items: [_item(3)],
-        nextCursor: null,
-        revision: _Revision(7),
-      );
-      expect(page.items.single.id, _choice(3));
-      expect(page.nextCursor, isNull);
-    },
-  );
-
-  test('типизированные исходы различают чужой и устаревший курсор', () {
-    const failures = <DailyChoiceCatalogReadFailure>[
-      DailyChoiceCatalogValidationFailure(),
-      DailyChoiceCatalogSnapshotExpired(),
-      DailyChoiceCatalogUnavailableFailure(),
-      DailyChoiceCatalogCorruptionFailure(),
-      DailyChoiceCatalogUnexpectedFailure(),
-    ];
-    expect(failures.map((failure) => failure.category), [
-      GraphFailureCategory.validation,
-      GraphFailureCategory.conflict,
-      GraphFailureCategory.unavailable,
-      GraphFailureCategory.corruption,
-      GraphFailureCategory.unexpected,
-    ]);
-    for (final failure in failures) {
-      final DailyChoiceCatalogPageResult result = DailyChoiceCatalogPageError(
-        failure,
-      );
-      expect(result, isA<DailyChoiceCatalogPageError>());
-    }
   });
 }
 

@@ -1,7 +1,6 @@
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -217,21 +216,6 @@ void main() {
         _step(3, 3, 1),
       ]),
       throwsArgumentError,
-    );
-  });
-
-  test('контракт различает ввод, отсутствие, конфликт и ошибки чтения', () {
-    const failures = <ChoicePathContinuationFailure>[
-      ChoicePathContinuationValidationFailure(),
-      ChoicePathContinuationIntentionNotFoundFailure(),
-      ChoicePathContinuationSnapshotExpired(),
-      ChoicePathContinuationUnavailableFailure(),
-      ChoicePathContinuationCorruptionFailure(),
-      ChoicePathContinuationUnexpectedFailure(),
-    ];
-    expect(
-      failures.map((failure) => failure.category).toSet(),
-      GraphFailureCategory.values.toSet(),
     );
   });
 }

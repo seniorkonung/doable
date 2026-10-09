@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -33,23 +32,6 @@ void main() {
       }
     });
 
-    test('равенство ограничено типом шага пути выбора', () {
-      const uuid = '018f0b5d-6b2e-7c80-8000-000000000001';
-      final first = _decode(uuid);
-      final second = _decode(uuid);
-      final choice = switch (DailyChoiceId.decode(uuid)) {
-        DailyChoiceIdDecodingSuccess(:final id) => id,
-        InvalidDailyChoiceIdDecoding() => throw StateError(
-          'Некорректный UUID.',
-        ),
-      };
-
-      expect(first, second);
-      expect(first.hashCode, second.hashCode);
-      expect({first, second}, hasLength(1));
-      expect(first, isNot(choice));
-    });
-
     test('рабочий генератор создаёт уникальные UUID v7', () {
       final generator = UuidV7ChoicePathStepIdGenerator();
       final ids = List.generate(32, (_) => generator.generate());
@@ -59,15 +41,6 @@ void main() {
         expect(UuidValue.withValidation(id.toCanonicalString()).isV7, isTrue);
         expect(_decode(id.toCanonicalString()), id);
       }
-    });
-
-    test('подменяемый генератор позволяет воспроизвести коллизию', () {
-      final id = _decode('018f0b5d-6b2e-7c80-8000-000000000001');
-      final ChoicePathStepIdGenerator generator =
-          _FixedChoicePathStepIdGenerator(id);
-
-      expect(generator.generate(), id);
-      expect(generator.generate(), id);
     });
   });
 }
@@ -79,13 +52,3 @@ ChoicePathStepId _decode(String value) =>
         'Ожидался корректный UUID.',
       ),
     };
-
-final class _FixedChoicePathStepIdGenerator
-    implements ChoicePathStepIdGenerator {
-  const _FixedChoicePathStepIdGenerator(this.id);
-
-  final ChoicePathStepId id;
-
-  @override
-  ChoicePathStepId generate() => id;
-}

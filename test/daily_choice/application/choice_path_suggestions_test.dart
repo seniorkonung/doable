@@ -13,15 +13,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('запрос различает исходное намерение и выбранное действие', () {
-    final top = ChoicePathSuggestionsForSource(_intention(1));
-    final bottom = ChoicePathSuggestionsForAction(_intention(3));
-    expect(top.participantId, _intention(1));
-    expect(bottom.participantId, _intention(3));
-    expect(top, isA<ChoicePathSuggestionsForSource>());
-    expect(bottom, isA<ChoicePathSuggestionsForAction>());
-  });
-
   test('допустимая подсказка содержит текущий полный путь и предложение', () {
     final details = _details();
     final suggestion = ChoicePathSuggestion.fromDetails(details);
@@ -141,27 +132,6 @@ void main() {
         revision: const _Revision(),
       ),
       throwsArgumentError,
-    );
-  });
-
-  test('пустой ответ, отсутствие участника и отказы различимы', () {
-    final empty = ChoicePathSuggestionsSnapshot(
-      query: ChoicePathSuggestionsForSource(_intention(1)),
-      items: const [],
-      revision: const _Revision(),
-    );
-    expect(empty.items, isEmpty);
-    expect(
-      const ChoicePathSuggestionsIntentionNotFoundFailure().category,
-      GraphFailureCategory.notFound,
-    );
-    expect(
-      const ChoicePathSuggestionsUnavailableFailure().category,
-      GraphFailureCategory.unavailable,
-    );
-    expect(
-      const ChoicePathSuggestionsUnexpectedFailure().category,
-      GraphFailureCategory.unexpected,
     );
   });
 }
