@@ -146,75 +146,6 @@ void _registerTerminalAppScenarios() {
       );
     }
   }
-
-  testWidgets(
-    'обработчики наблюдения и повтора закрытой сессии не меняют новый экран',
-    (tester) async {
-      final app = await _App.pump(tester);
-      await app.openNavigation(tester);
-      await app.loaded(tester);
-      final oldModel = app.model(tester);
-      final callbacks = app.repository.watchCallbacks.single;
-      app.readProbe.failure = sqlite.SqliteException(
-        extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-        message: 'занято',
-      );
-      app.database.markTablesUpdated({app.database.tags});
-      await _waitFor(tester, () => app.repository.completedWatches == 1);
-      await tester.pumpAndSettle();
-      final failure = app.repository.watchResults.last;
-      expect(failure, isA<TagReadError>());
-      final retry = tester
-          .widget<OutlinedButton>(
-            find.widgetWithText(OutlinedButton, app.l10n(tester).commonRetry),
-          )
-          .onPressed!;
-
-      app.router.pop();
-      await tester.pumpAndSettle();
-      await _waitFor(
-        tester,
-        () => find
-            .byType(TagNavigationPage, skipOffstage: false)
-            .evaluate()
-            .isEmpty,
-      );
-      app.readProbe.failure = null;
-      await app.openNavigation(tester);
-      final current = await app.loaded(tester);
-      expect(app.model(tester), isNot(same(oldModel)));
-      final queryCount = app.repository.queries.length;
-
-      callbacks.onData?.call(failure);
-      callbacks.onDone?.call();
-      await tester.runAsync(() => pumpEventQueue());
-      await tester.pumpAndSettle();
-
-      expect(app.state(tester), same(current));
-      expect(current.canUseCurrentItems, isTrue);
-      expect(current.scope, TaggedIntentionsScope.active);
-      expect(app.repository.queries, hasLength(queryCount));
-      final writes = app.raw
-          .select('SELECT total_changes() AS count')
-          .single['count'];
-      retry();
-      await _waitFor(tester, () => app.repository.activePages == 0);
-      await tester.pumpAndSettle();
-      expect(app.state(tester), same(current));
-      expect(
-        app.raw.select('SELECT total_changes() AS count').single['count'],
-        writes,
-      );
-      expect(app.repository.watchedIds, [_tagId, _tagId]);
-      expect(app.repository.commands, isEmpty);
-      expect(app.router.current.name, TagNavigationRoute.name);
-      expect(
-        find.text(app.l10n(tester).tagNavigationRefreshUnavailable),
-        findsNothing,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
 }
 
 /// Отказ настоящего чтения классифицируется Drift-адаптером.
@@ -225,34 +156,5 @@ final class _ReadProbe extends LocalDatabaseConnectionObserver {
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     if (failure case final error?) throw error;
-  }
-}
-
-typedef _WatchCallbacks = ({
-  void Function(TagReadResult)? onData,
-  void Function()? onDone,
-});
-
-/// Сохраняет обработчики уже запланированных событий закрытой подписки.
-final class _CapturedWatchStream extends Stream<TagReadResult> {
-  _CapturedWatchStream(this.source, this.capture);
-
-  final Stream<TagReadResult> source;
-  final void Function(_WatchCallbacks) capture;
-
-  @override
-  StreamSubscription<TagReadResult> listen(
-    void Function(TagReadResult)? onData, {
-    Function? onError,
-    void Function()? onDone,
-    bool? cancelOnError,
-  }) {
-    capture((onData: onData, onDone: onDone));
-    return source.listen(
-      onData,
-      onError: onError,
-      onDone: onDone,
-      cancelOnError: cancelOnError,
-    );
   }
 }

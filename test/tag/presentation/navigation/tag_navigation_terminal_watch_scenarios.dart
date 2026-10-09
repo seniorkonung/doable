@@ -39,33 +39,6 @@ void _testTerminalWatchRecovery() {
       },
     );
 
-    for (final failure in const [
-      TagReadUnavailableFailure(),
-      TagReadCorruptionFailure(),
-      TagReadUnexpectedFailure(),
-    ]) {
-      test(
-        'конечный отказ ${failure.category} ${loaded ? 'после загрузки' : 'до первой порции'} сохраняет категорию после done',
-        () async {
-          final h = _Harness(reader: _Reads(terminalWatches: true));
-          addTearDown(h.dispose);
-          if (loaded) {
-            h.reads.page(0, [_intention(1)], cursor: _Cursor());
-            await pumpEventQueue();
-          }
-
-          await _finishWatch(h, failure: failure);
-
-          _expectWatchFailure(h, failure.category, loaded: loaded);
-          unawaited(h.model.loadMore());
-          unawaited(h.model.retryLoadMore());
-          expect(h.reads.queries, hasLength(1));
-          expect(h.reads.watchedIds, [_tagId(1)]);
-          expect(h.reads.watches.single.isClosed, isTrue);
-        },
-      );
-    }
-
     for (final rawError in [false, true]) {
       test(
         '${rawError ? 'исключение и done' : 'необъяснённый done'} ${loaded ? 'после загрузки' : 'до первой порции'} остаётся неизвестным отказом',

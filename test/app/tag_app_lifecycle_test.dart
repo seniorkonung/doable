@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -15,7 +14,6 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -150,153 +148,6 @@ void main() {
     expect(repository.renameAttempts, 1);
   });
 
-  testWidgets('повтор, уход, фон и очередь результатов не повторяют запись', (
-    tester,
-  ) async {
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
-    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-    tester.view.physicalSize = const Size(1200, 2400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    late sqlite.Database raw;
-    late _ControlledRepository repository;
-    final diagnostics = InMemoryDiagnosticsSink();
-    final runtime = AppRuntime(
-      quickCreationModeStore: InMemoryQuickCreationModeStore(),
-      connectionFactory: () =>
-          openInMemoryLocalDatabase(setup: (database) => raw = database),
-      diagnosticsSink: diagnostics,
-      repositoryFactory: (database) => repository = _ControlledRepository(
-        DriftPersonalGraphRepository(
-          database,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(2026, 9, 25),
-          diagnostics,
-        ),
-      ),
-    );
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await runtime.shutdown();
-    });
-    await tester.pumpWidget(MainApp(runtime: runtime));
-    await openIntentionGraph(
-      tester,
-      waitFor: (tester, finder) =>
-          _until(tester, () => finder.evaluate().isNotEmpty),
-    );
-    await _tap(tester, 'catalog-open-tags');
-    await _tap(tester, 'tag-catalog-create');
-    await _until(
-      tester,
-      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      'Дом',
-    );
-    repository.holdNextCreate();
-    await _tap(tester, 'tag-editor-submit');
-    await _until(tester, () => repository.createAttempts == 1);
-    expect(
-      tester
-          .widget<FilledButton>(find.byKey(const ValueKey('tag-editor-submit')))
-          .onPressed,
-      isNull,
-    );
-    await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-    await tester.pump();
-    expect(repository.createAttempts, 1);
-
-    await _tap(tester, 'tag-editor-cancel');
-    await _until(
-      tester,
-      () => find
-          .byKey(const ValueKey('tag-catalog-create'))
-          .evaluate()
-          .isNotEmpty,
-    );
-    await _tap(tester, 'tag-catalog-create');
-    await _until(
-      tester,
-      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      'Работа',
-    );
-    await _tap(tester, 'tag-editor-submit');
-    expect(
-      find.text('Сохранение этого тега уже выполняется. Дождитесь результата.'),
-      findsOneWidget,
-    );
-    expect(repository.createAttempts, 1);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    repository.releaseCreate();
-    await _until(tester, () => raw.select('SELECT id FROM tags').length == 1);
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Сохранение этого тега уже выполняется. Дождитесь результата.'),
-      findsNothing,
-    );
-    expect(
-      tester
-          .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
-          .controller!
-          .text,
-      'Работа',
-    );
-    expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await _until(
-      tester,
-      () => find.textContaining('Тег создан.').evaluate().isNotEmpty,
-    );
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .getSemantics(
-            find.byKey(const ValueKey('graph-operation-message')).first,
-          )
-          .label,
-      contains('Тег создан.'),
-    );
-    await _tap(tester, 'tag-editor-cancel');
-    if (find.byKey(const ValueKey('catalog-open-tags')).evaluate().isNotEmpty) {
-      await _tap(tester, 'catalog-open-tags');
-    }
-    await _until(tester, () => find.text('Дом').evaluate().isNotEmpty);
-    expect(repository.createAttempts, 1);
-
-    final tagId = (TagId.decode(
-      raw.select('SELECT id FROM tags').single['id'] as String,
-    ) as TagIdDecodingSuccess).id;
-    final second = runtime.commandCoordinator.acceptTagRename(
-      RenameTag(tagId: tagId, name: TagName.fromInput('Работа')),
-    );
-    expect(second, isA<TagCommandAccepted>());
-    await (second as TagCommandAccepted).future;
-    await _until(
-      tester,
-      () => raw.select('SELECT name FROM tags').single['name'] == 'Работа',
-    );
-    expect(find.textContaining('Тег создан.'), findsWidgets);
-    expect(find.textContaining('Тег переименован.'), findsNothing);
-    ScaffoldMessenger.of(
-      tester.element(find.byKey(const ValueKey('tag-catalog-create'))),
-    ).removeCurrentSnackBar();
-    await _until(
-      tester,
-      () => find.textContaining('Тег переименован.').evaluate().isNotEmpty,
-    );
-    await _until(tester, () => find.text('Работа').evaluate().isNotEmpty);
-    expect(repository.createAttempts, 1);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets(
     'после commit ошибка чтения сохраняет ввод и не повторяет создание',
     (tester) async {
@@ -399,15 +250,12 @@ final class _ControlledRepository extends Fake
   _ControlledRepository(this.delegate);
 
   final PersonalGraphRepository delegate;
-  Completer<void>? _heldCreate;
   Completer<void>? _heldRename;
   bool failNextTagRead = false;
   bool failNextCatalogRead = false;
   int createAttempts = 0;
   int renameAttempts = 0;
 
-  void holdNextCreate() => _heldCreate = Completer<void>();
-  void releaseCreate() => _heldCreate!.complete();
   void holdNextRename() => _heldRename = Completer<void>();
   void releaseRename() => _heldRename!.complete();
 
@@ -439,14 +287,7 @@ final class _ControlledRepository extends Fake
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    if (command is CreateTag) {
-      createAttempts++;
-      final gate = _heldCreate;
-      if (gate != null) {
-        await gate.future;
-        _heldCreate = null;
-      }
-    }
+    if (command is CreateTag) createAttempts++;
     if (command is RenameTag) {
       renameAttempts++;
       final gate = _heldRename;

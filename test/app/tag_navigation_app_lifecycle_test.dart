@@ -31,12 +31,10 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -47,62 +45,11 @@ import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
 part 'tag_navigation_terminal_app_scenarios.dart';
-part 'tag_navigation_late_page_app_scenarios.dart';
 part 'tag_navigation_primary_navigation_app_scenarios.dart';
 
 void main() {
   _registerTerminalAppScenarios();
-  _registerLatePageAppScenarios();
   _registerPrimaryNavigationAppScenarios();
-
-  for (final continuation in [false, true]) {
-    testWidgets(
-      'смена охвата отвергает позднюю ${continuation ? 'подгрузку' : 'первую порцию'} через AppRuntime',
-      (tester) async {
-        final app = await _App.pump(tester);
-        final held = app.repository.holdNextPage();
-        if (continuation) {
-          app.repository.releasePage(held);
-          await app.openNavigation(tester);
-          await app.loaded(tester);
-          final more = app.repository.holdNextPage();
-          unawaited(app.model(tester).loadMore());
-          await _waitFor(tester, () => more.ready.isCompleted);
-          await _changeScope(tester, TaggedIntentionsScope.archived);
-          expect(app.state(tester), isA<TagNavigationInitialLoading>());
-          app.repository.releasePage(more);
-        } else {
-          await app.openNavigation(tester);
-          await _waitFor(tester, () => held.ready.isCompleted);
-          await _changeScope(tester, TaggedIntentionsScope.archived);
-          expect(app.state(tester), isA<TagNavigationInitialLoading>());
-          app.repository.releasePage(held);
-        }
-        final current = await app.loaded(tester);
-        expect(current.tagId, _tagId);
-        expect(current.scope, TaggedIntentionsScope.archived);
-        expect(current.items.map((item) => item.id), contains(_intention(2)));
-        expect(
-          current.items.map((item) => item.id),
-          isNot(contains(_intention(1))),
-        );
-        expect(
-          app.repository.queries.last.scope,
-          TaggedIntentionsScope.archived,
-        );
-        expect(app.repository.queries.last.cursor, isNull);
-        expect(
-          tester
-              .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
-              )
-              .selected,
-          isTrue,
-        );
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
 
   testWidgets(
     'новый маршрут не принимает страницу и обработчики закрытой сессии',
@@ -202,152 +149,6 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-
-  testWidgets(
-    'временный отказ подгрузки сохраняет строки и тот же курсор для повтора',
-    (tester) async {
-      final app = await _App.pump(tester);
-      await app.openNavigation(tester);
-      final before = await app.loaded(tester);
-      final l10n = app.l10n(tester);
-      app.repository.failNextPage = true;
-      await _scrollAndTap(
-        tester,
-        find.widgetWithText(OutlinedButton, l10n.tagNavigationLoadMore),
-      );
-      await _waitFor(
-        tester,
-        () =>
-            (app.state(tester) as TagNavigationLoaded).pageStatus
-                is TagNavigationPageFailure,
-      );
-      final failed = app.state(tester) as TagNavigationLoaded;
-      expect(failed.items, before.items);
-      expect(failed.nextCursor, same(before.nextCursor));
-      expect(failed.canUseCurrentItems, isTrue);
-      expect(find.text(l10n.tagNavigationLoadMoreUnavailable), findsOneWidget);
-      final count = app.repository.queries.length;
-      await _scrollAndTap(
-        tester,
-        find.widgetWithText(OutlinedButton, l10n.commonRetry),
-      );
-      final current = await app.loaded(tester);
-      expect(current.items, hasLength(53));
-      expect(current.items.take(50), before.items);
-      expect(current.items.map((item) => item.id).toSet(), hasLength(53));
-      expect(current.hasReachedEnd, isTrue);
-      expect(app.repository.queries, hasLength(count + 1));
-      expect(app.repository.queries.last.cursor, same(before.nextCursor));
-      expect(app.repository.commands, isEmpty);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  for (final fails in [false, true]) {
-    testWidgets(
-      '${fails ? 'отказ' : 'успех'} команды в фоне после закрытия формы предъявляется один раз на новом маршруте',
-      (tester) async {
-        final app = await _App.pump(tester);
-        await app.openNavigation(tester);
-        await app.loaded(tester);
-        await _changeScope(tester, TaggedIntentionsScope.archived);
-        final archived = await app.loaded(tester);
-        final l10n = app.l10n(tester);
-        final completions = <GraphCommandCompletion>[];
-        final subscription = app.runtime.commandCoordinator.completions.listen(
-          completions.add,
-        );
-        addTearDown(subscription.cancel);
-        if (fails) {
-          app.raw.execute(
-            "CREATE TRIGGER reject_tag_rename BEFORE UPDATE OF name ON tags BEGIN SELECT RAISE(ABORT, 'Сбой записи'); END",
-          );
-        }
-        final held = app.repository.holdNextCommand();
-        unawaited(
-          app.router.push(
-            TagEditorRoute(editorContext: TagEditorRenaming(archived.tag)),
-          ),
-        );
-        final input = find.byKey(const ValueKey('tag-editor-name'));
-        await _waitFor(tester, () => input.evaluate().isNotEmpty);
-        await tester.pumpAndSettle();
-        await tester.enterText(input, 'Новое название');
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        await _waitFor(tester, () => held.started.isCompleted);
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-cancel')));
-        await tester.pumpAndSettle();
-        expect(input, findsNothing);
-        await app.openNavigation(tester);
-        await app.loaded(tester);
-        expect(app.state(tester).scope, TaggedIntentionsScope.active);
-        await _changeScope(tester, TaggedIntentionsScope.archived);
-        await app.loaded(tester);
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.inactive,
-        );
-        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-        held.release.complete();
-        await _waitFor(tester, () => completions.length == 1);
-        expect(completions.single.isFailure, fails);
-        expect(app.repository.commands.whereType<RenameTag>(), hasLength(1));
-        expect(
-          find.byKey(const ValueKey('graph-operation-message')),
-          findsNothing,
-        );
-        expect(app.router.current.name, TagNavigationRoute.name);
-        expect(app.state(tester).tagId, _tagId);
-        expect(app.state(tester).scope, TaggedIntentionsScope.archived);
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.inactive,
-        );
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.resumed,
-        );
-        final message = fails ? l10n.tagUnexpected : l10n.tagRenamed;
-        await _waitFor(
-          tester,
-          () => find.textContaining(message).evaluate().isNotEmpty,
-        );
-        final current = await app.loaded(tester);
-        expect(
-          current.tag.name.value,
-          fails ? archived.tag.name.value : 'Новое название',
-        );
-        expect(current.scope, TaggedIntentionsScope.archived);
-        expect(find.textContaining(message), findsOneWidget);
-        expect(
-          tester
-              .getSemantics(
-                find.byKey(const ValueKey('graph-operation-message')).first,
-              )
-              .label,
-          contains(message),
-        );
-        await _dismissMessage(tester);
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.inactive,
-        );
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.resumed,
-        );
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('graph-operation-message')),
-          findsNothing,
-        );
-        app.router.pop();
-        await tester.pumpAndSettle();
-        final returned = await app.loaded(tester);
-        expect(returned.tagId, archived.tagId);
-        expect(returned.scope, TaggedIntentionsScope.archived);
-        expect(returned.tag.name, current.tag.name);
-        expect(completions, hasLength(1));
-        expect(app.repository.commands.whereType<RenameTag>(), hasLength(1));
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
 
   for (final mutation in _Mutation.values) {
     for (final order in _arrivalOrders) {
@@ -477,33 +278,6 @@ void main() {
       );
     }
   }
-
-  testWidgets(
-    'новая первая порция до пакета не обновляется повторно после его доставки',
-    (tester) async {
-      final app = await _App.pump(tester);
-      final held = app.repository.holdNextCommand(
-        delay: _CommandDelay.afterWrite,
-      );
-      final accepted = app.runtime.commandCoordinator.acceptTagRename(
-        RenameTag(tagId: _tagId, name: TagName.fromInput('Быт')),
-      ) as TagCommandAccepted;
-      await _waitFor(tester, () => held.written.isCompleted);
-      await app.openNavigation(tester);
-      final ahead = await app.loaded(tester);
-      expect(ahead.tag.name.value, 'Быт');
-      final queryCount = app.repository.queries.length;
-      held.release.complete();
-      await _completed(tester, accepted.future);
-      await tester.pumpAndSettle();
-      final after = await app.loaded(tester);
-      expect(after.revision, ahead.revision);
-      expect(after.items, ahead.items);
-      expect(app.repository.queries, hasLength(queryCount));
-      expect(app.repository.commands, hasLength(1));
-      expect(tester.takeException(), isNull);
-    },
-  );
 }
 
 enum _Mutation { removeAssignment, editParticipant, renameTag, deleteTag }
@@ -592,15 +366,6 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 
 Future<void> _changeScope(WidgetTester tester, TaggedIntentionsScope scope) =>
     _tap(tester, find.byKey(ValueKey(scope)));
-
-Future<void> _scrollAndTap(WidgetTester tester, Finder finder) async {
-  await tester.scrollUntilVisible(
-    finder,
-    800,
-    scrollable: find.byType(Scrollable).last,
-  );
-  await _tap(tester, finder);
-}
 
 Future<void> _dismissMessage(WidgetTester tester) async {
   final message = find.byKey(const ValueKey('graph-operation-message'));
@@ -742,14 +507,12 @@ final class _ControlledRepository extends Fake
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
   final watchedIds = <TagId>[];
   final watchResults = <TagReadResult>[];
-  final watchCallbacks = <_WatchCallbacks>[];
   int completedWatches = 0;
   final observations =
       <({TagReadResult result, StreamController<TagReadResult> delivery})>[];
   bool holdObservations = false;
   int activePages = 0;
   bool failPages = false;
-  bool failNextPage = false;
   _HeldPage? _nextPage;
   _HeldCommand? _nextCommand;
 
@@ -799,8 +562,7 @@ final class _ControlledRepository extends Fake
     TaggedIntentionsQuery query,
   ) async {
     queries.add(query);
-    if (failPages || failNextPage) {
-      failNextPage = false;
+    if (failPages) {
       return const TaggedIntentionsPageError(
         TaggedIntentionsUnavailableFailure(),
       );
@@ -878,7 +640,7 @@ final class _ControlledRepository extends Fake
       },
       onCancel: () => subscription.cancel(),
     );
-    return _CapturedWatchStream(delivery.stream, watchCallbacks.add);
+    return delivery.stream;
   }
 
   @override

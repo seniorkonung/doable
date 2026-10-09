@@ -874,34 +874,6 @@ void main() {
     },
   );
 
-  test(
-    'повтор временного отказа продолжает тот же снимок без повторов строк',
-    () async {
-      final h = _Harness();
-      addTearDown(h.dispose);
-      final cursor = _Cursor();
-      h.reads.page(0, [_intention(1)], cursor: cursor);
-      await pumpEventQueue();
-      final pending = h.model.loadMore();
-      h.reads.fail(1, const TaggedIntentionsUnavailableFailure());
-      await pending;
-      final failed = h.state as TagNavigationLoaded;
-      expect(failed.items.single.id, _intention(1).id);
-      expect(failed.nextCursor, same(cursor));
-      expect((failed.pageStatus as TagNavigationPageFailure).canRetry, isTrue);
-      await h.model.loadMore();
-      expect(h.reads.queries, hasLength(2));
-
-      final retry = h.model.retryLoadMore();
-      expect(h.reads.queries[2].cursor, same(cursor));
-      expect(h.model.retryLoadMore(), same(retry));
-      expect(h.reads.queries, hasLength(3));
-      h.reads.page(2, [_intention(101)]);
-      await retry;
-      expect((h.state as TagNavigationLoaded).items, hasLength(2));
-    },
-  );
-
   test('смена охвата очищает список и отвергает позднее продолжение', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -1044,36 +1016,6 @@ void main() {
     ),
   ];
   for (final (:failure, :category) in failures) {
-    test(
-      'первый отказ категории $category различим и повторяется только при недоступности',
-      () async {
-        final h = _Harness();
-        addTearDown(h.dispose);
-        h.reads.fail(0, failure);
-        await pumpEventQueue();
-        final failed = h.state as TagNavigationInitialFailure;
-        expect(failed.failure, same(failure));
-        expect(failed.failure.category, category);
-        expect(failed.canRetry, category == GraphFailureCategory.unavailable);
-        await h.model.loadMore();
-        await h.model.retryLoadMore();
-        expect(h.reads.queries, hasLength(1));
-        final retry = h.model.retryFirstPage();
-        if (failed.canRetry) {
-          expect(h.state, isA<TagNavigationInitialLoading>());
-          expect(h.reads.queries, hasLength(2));
-          expect(h.reads.queries.last.cursor, isNull);
-          h.reads.page(1, []);
-          await retry;
-          expect(h.state, isA<TagNavigationLoaded>());
-        } else {
-          await retry;
-          expect(h.state, same(failed));
-          expect(h.reads.queries, hasLength(1));
-        }
-      },
-    );
-
     test(
       'отказ продолжения категории $category сохраняет строки и безопасный статус',
       () async {

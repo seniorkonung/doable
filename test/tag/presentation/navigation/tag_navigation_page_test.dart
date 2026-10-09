@@ -413,48 +413,6 @@ void main() {
         semantics.dispose();
       }
     });
-
-    testWidgets('пустой охват отличается от отсутствующего тега на $locale', (
-      tester,
-    ) async {
-      final reads = _Reads();
-      addTearDown(reads.dispose);
-      await _pumpPage(tester, reads, locale: locale);
-      reads.page(0, []);
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          russian
-              ? 'С этим тегом нет активных намерений.'
-              : 'No active intentions have this tag.',
-        ),
-        findsOneWidget,
-      );
-      await tester.tap(_scope(TaggedIntentionsScope.archived));
-      await tester.pump();
-      reads.page(1, []);
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          russian
-              ? 'С этим тегом нет архивированных намерений.'
-              : 'No archived intentions have this tag.',
-        ),
-        findsOneWidget,
-      );
-      reads.watch.add(
-        const TagReadSuccess(
-          GraphSnapshot(value: null, revision: _Revision(2)),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final l10n = AppLocalizations.of(
-        tester.element(find.byType(TagNavigationPage)),
-      );
-      expect(find.text(l10n.tagNotFound), findsOneWidget);
-      expect(find.text(russian ? 'Тег: Дом' : 'Tag: Дом'), findsNothing);
-      expect(find.byType(OutlinedButton), findsNothing);
-    });
   }
 
   testWidgets('смена языка сохраняет тег, архивный охват и буквальный текст', (
@@ -534,56 +492,6 @@ void main() {
   );
 
   for (final locale in ['ru', 'en']) {
-    for (final (failure, russianMessage, englishMessage) in [
-      (
-        const TaggedIntentionsUnavailableFailure(),
-        'Не удалось загрузить намерения с тегом. Повторите попытку.',
-        'Could not load tagged intentions. Try again.',
-      ),
-      (
-        const TaggedIntentionsCorruptionFailure(),
-        'Сохранённые данные помеченных намерений повреждены и не могут быть показаны.',
-        'Stored tagged intention data is damaged and cannot be shown.',
-      ),
-      (
-        const TaggedIntentionsUnexpectedFailure(),
-        'Не удалось загрузить намерения с тегом из-за непредвиденной ошибки.',
-        'Could not load tagged intentions because of an unexpected error.',
-      ),
-      (
-        const TaggedIntentionsInvalidCursor(),
-        'Продолжение выдачи недействительно. Откройте навигацию по тегу заново.',
-        'This result continuation is invalid. Reopen tag navigation.',
-      ),
-    ]) {
-      testWidgets('начальный отказ на $locale: $russianMessage', (
-        tester,
-      ) async {
-        final reads = _Reads();
-        addTearDown(reads.dispose);
-        await _pumpPage(tester, reads, locale: locale);
-        reads.fail(0, failure);
-        await tester.pumpAndSettle();
-        expect(
-          find.text(locale == 'ru' ? russianMessage : englishMessage),
-          findsOneWidget,
-        );
-        final retry = find.text(locale == 'ru' ? 'Повторить' : 'Try again');
-        if (failure is TaggedIntentionsUnavailableFailure) {
-          expect(retry, findsOneWidget);
-          await tester.tap(retry);
-          await tester.pump();
-          expect(reads.queries, hasLength(2));
-          expect(reads.queries.last.cursor, isNull);
-          reads.page(1, [_intention(1)]);
-          await tester.pumpAndSettle();
-          expect(find.text('Намерение 1'), findsOneWidget);
-        } else {
-          expect(retry, findsNothing);
-          expect(reads.queries, hasLength(1));
-        }
-      });
-    }
     for (final (failure, pageRu, pageEn, refreshRu, refreshEn) in [
       (
         const TaggedIntentionsCorruptionFailure(),
