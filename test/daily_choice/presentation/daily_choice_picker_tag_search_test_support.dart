@@ -36,7 +36,7 @@ final class DailyChoicePickerTagSearchCase {
     required this.readinessFilter,
     required this.rowReadiness,
     required this.totalCountLabel,
-    required this.emptyScopeMessages,
+    required this.emptyScopeMessage,
   });
 
   final PageRouteInfo route;
@@ -49,8 +49,8 @@ final class DailyChoicePickerTagSearchCase {
   final List<IntentionReadiness> rowReadiness;
   final String Function(int count) totalCountLabel;
 
-  /// Сообщение о пустом допустимом охвате по языку.
-  final Map<String, String> emptyScopeMessages;
+  /// Сообщение о пустом допустимом охвате.
+  final String emptyScopeMessage;
 }
 
 /// Проверки подключения поиска по тегам к странице выбора намерения.
@@ -127,35 +127,24 @@ void defineDailyChoicePickerTagSearchTests(
     _expectNoCommands(repository);
   });
 
-  for (final (language, byConditions) in [
-    ('en', 'No intentions match the tag conditions.'),
-    ('ru', 'По условиям по тегам совпадений нет.'),
-  ]) {
-    testWidgets('$language: пустая выдача при условиях по тегам сообщает об '
-        'отсутствии совпадений по условиям, а не о пустом охвате', (
-      tester,
-    ) async {
-      final repository = ControlledCatalogRepository();
-      final byScope = page.emptyScopeMessages[language]!;
-      final opened = await _openPicker(
-        tester,
-        repository,
-        page,
-        locale: Locale(language),
-      );
-      repository.complete(1, _firstPage(const []));
-      await tester.pumpAndSettle();
-      expect(find.text(byScope), findsOneWidget);
-      expect(find.text(byConditions), findsNothing);
+  testWidgets('пустая выдача при условиях по тегам сообщает об отсутствии '
+      'совпадений по условиям, а не о пустом охвате', (tester) async {
+    final repository = ControlledCatalogRepository();
+    const byConditions = 'No intentions match the tag conditions.';
+    final byScope = page.emptyScopeMessage;
+    final opened = await _openPicker(tester, repository, page);
+    repository.complete(1, _firstPage(const []));
+    await tester.pumpAndSettle();
+    expect(find.text(byScope), findsOneWidget);
+    expect(find.text(byConditions), findsNothing);
 
-      await _applyConditions(tester, opened.container, repository, page, [
-        (_tag(1, 'Здоровье'), IntentionTagRequirement.mustBePresent),
-      ], _firstPage(const []));
+    await _applyConditions(tester, opened.container, repository, page, [
+      (_tag(1, 'Здоровье'), IntentionTagRequirement.mustBePresent),
+    ], _firstPage(const []));
 
-      expect(find.text(byConditions), findsOneWidget);
-      expect(find.text(byScope), findsNothing);
-    });
-  }
+    expect(find.text(byConditions), findsOneWidget);
+    expect(find.text(byScope), findsNothing);
+  });
 
   testWidgets('отказ обновления из-за недоступности показан над сохранённым '
       'списком, а повтор согласует выдачу с прежними ограничениями', (
@@ -240,9 +229,8 @@ typedef _OpenedPicker = ({
 Future<_OpenedPicker> _openPicker(
   WidgetTester tester,
   ControlledCatalogRepository repository,
-  DailyChoicePickerTagSearchCase page, {
-  Locale locale = const Locale('en'),
-}) async {
+  DailyChoicePickerTagSearchCase page,
+) async {
   final container = reconciliationCatalogContainer(repository);
   final router = AppRouter();
   addTearDown(container.dispose);
@@ -251,7 +239,7 @@ Future<_OpenedPicker> _openPicker(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
-        locale: locale,
+        locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(),

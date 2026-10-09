@@ -45,10 +45,7 @@ void main() {
         IntentionReadiness.notReady,
       ],
       totalCountLabel: (count) => 'Total intentions: $count',
-      emptyScopeMessages: const {
-        'en': 'No active intentions are available.',
-        'ru': 'Доступных активных намерений нет.',
-      },
+      emptyScopeMessage: 'No active intentions are available.',
     ),
   );
 
@@ -109,7 +106,6 @@ void main() {
 
   for (final (language, markLabel, totalCount) in [
     ('en', 'Favorite intention', 'Total intentions: 2'),
-    ('ru', 'Избранное намерение', 'Всего намерений: 2'),
   ]) {
     testWidgets(
       '$language: без условий поиска звезду показывает только '

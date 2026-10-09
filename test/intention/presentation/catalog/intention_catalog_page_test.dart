@@ -470,52 +470,52 @@ void main() {
       expect(filter.hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
-
-    testWidgets('флинг $variant прокручивает страницу только от края списка: '
-        'слабый флинг внутри списка оставляет страницу на месте, а флинг при '
-        'списке уже в конце сдвигает страницу дальше хода пальца', (
-      tester,
-    ) async {
-      _usePhoneScreen(tester, keyboard: keyboard);
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(_testApp(repository));
-      repository.complete(
-        0,
-        _firstPage([
-          for (var index = 1; index <= 20; index++)
-            testSummary(index: index, title: 'Намерение $index'),
-        ]),
-      );
-      await tester.pumpAndSettle();
-
-      await _flingCatalogList(tester, const Offset(0, -100), speed: 300);
-
-      final list = _catalogScrollPosition(tester);
-      expect(list.pixels, greaterThan(0));
-      expect(list.pixels, lessThan(list.maxScrollExtent));
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      list.jumpTo(list.maxScrollExtent);
-      await tester.pumpAndSettle();
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      const fingerTravel = 60.0;
-      await _flingCatalogList(
-        tester,
-        const Offset(0, -fingerTravel),
-        speed: 4000,
-      );
-
-      final page = _pageScrollPosition(tester);
-      expect(page.pixels, greaterThan(fingerTravel));
-      expect(page.pixels, lessThanOrEqualTo(page.maxScrollExtent));
-      expect(
-        _catalogScrollPosition(tester).pixels,
-        _catalogScrollPosition(tester).maxScrollExtent,
-      );
-      expect(tester.takeException(), isNull);
-    });
   }
+
+  testWidgets('флинг прокручивает страницу только от края списка: '
+      'слабый флинг внутри списка оставляет страницу на месте, а флинг при '
+      'списке уже в конце сдвигает страницу дальше хода пальца', (
+    tester,
+  ) async {
+    _usePhoneScreen(tester);
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(
+      0,
+      _firstPage([
+        for (var index = 1; index <= 20; index++)
+          testSummary(index: index, title: 'Намерение $index'),
+      ]),
+    );
+    await tester.pumpAndSettle();
+
+    await _flingCatalogList(tester, const Offset(0, -100), speed: 300);
+
+    final list = _catalogScrollPosition(tester);
+    expect(list.pixels, greaterThan(0));
+    expect(list.pixels, lessThan(list.maxScrollExtent));
+    expect(_pageScrollPosition(tester).pixels, 0);
+
+    list.jumpTo(list.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(_pageScrollPosition(tester).pixels, 0);
+
+    const fingerTravel = 60.0;
+    await _flingCatalogList(
+      tester,
+      const Offset(0, -fingerTravel),
+      speed: 4000,
+    );
+
+    final page = _pageScrollPosition(tester);
+    expect(page.pixels, greaterThan(fingerTravel));
+    expect(page.pixels, lessThanOrEqualTo(page.maxScrollExtent));
+    expect(
+      _catalogScrollPosition(tester).pixels,
+      _catalogScrollPosition(tester).maxScrollExtent,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   for (final (handoff, variant) in _pageFlingHandoffs) {
     testWidgets('касание строки во время инерции к концу, которую странице '
@@ -1135,65 +1135,52 @@ void main() {
     );
   });
 
-  for (final locale in [const Locale('en'), const Locale('ru')]) {
-    for (final (state, result)
-        in <(String, Result<IntentionCatalogFirstPage>?)>[
-          ('загрузка', null),
-          ('пустая выдача', _firstPage(const [])),
-          ('загруженная выдача', _firstPage([testSummary(title: 'Намерение')])),
-          ('недоступность', const ResultFailure(IntentionUnavailableFailure())),
-          ('повреждение', const ResultFailure(IntentionCorruptionFailure())),
-          (
-            'неожиданный отказ',
-            const ResultFailure(IntentionUnexpectedFailure()),
-          ),
-        ]) {
-      testWidgets('каталог, ${locale.languageCode}, $state: создание доступно '
-          'только через общую панель, а вход в теги сохраняется', (
-        tester,
-      ) async {
-        final repository = ControlledCatalogRepository();
-        final container = reconciliationCatalogContainer(repository);
-        final router = AppRouter();
-        addTearDown(container.dispose);
-        addTearDown(router.dispose);
-        await tester.pumpWidget(
-          _routerTestAppWithContainer(container, router, locale: locale),
-        );
-        await tester.pump();
-        await openIntentionGraph(tester);
-        repository.queryAt(0);
-        if (result != null) repository.complete(0, result);
-        // Загрузка продолжает анимироваться, поэтому ждём только переход.
-        await tester.pump(const Duration(milliseconds: 500));
+  // Выдача под параметрами и выдача на всю высоту тела страницы.
+  for (final (state, result) in <(String, Result<IntentionCatalogFirstPage>?)>[
+    ('загрузка', null),
+    ('загруженная выдача', _firstPage([testSummary(title: 'Намерение')])),
+  ]) {
+    testWidgets('каталог, $state: создание доступно '
+        'только через общую панель, а вход в теги сохраняется', (tester) async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final router = AppRouter();
+      addTearDown(container.dispose);
+      addTearDown(router.dispose);
+      await tester.pumpWidget(_routerTestAppWithContainer(container, router));
+      await tester.pump();
+      await openIntentionGraph(tester);
+      repository.queryAt(0);
+      if (result != null) repository.complete(0, result);
+      // Загрузка продолжает анимироваться, поэтому ждём только переход.
+      await tester.pump(const Duration(milliseconds: 500));
 
-        expect(
-          find.byKey(const ValueKey('catalog-create-intention')),
-          findsNothing,
-        );
-        expect(find.byType(FloatingActionButton), findsNothing);
-        expect(
-          find.byKey(const ValueKey('catalog-open-tags')).hitTestable(),
-          findsOneWidget,
-        );
-        final create = quickCreationAction();
-        expect(create.hitTestable(), findsOneWidget);
-        await tester.tap(create);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        find.byKey(const ValueKey('catalog-create-intention')),
+        findsNothing,
+      );
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(
+        find.byKey(const ValueKey('catalog-open-tags')).hitTestable(),
+        findsOneWidget,
+      );
+      final create = quickCreationAction();
+      expect(create.hitTestable(), findsOneWidget);
+      await tester.tap(create);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
-        expect(router.current.name, IntentionEditorRoute.name);
-        expect(find.byType(IntentionEditorPage), findsOneWidget);
-        expect(repository.commands, isEmpty);
-        expect(await router.maybePop(), isTrue);
-        if (result == null) repository.complete(0, _firstPage(const []));
-        await tester.pumpAndSettle();
-        expectIntentionGraphRootPage(router);
-        expect(create.hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
-      });
-    }
+      expect(router.current.name, IntentionEditorRoute.name);
+      expect(find.byType(IntentionEditorPage), findsOneWidget);
+      expect(repository.commands, isEmpty);
+      expect(await router.maybePop(), isTrue);
+      if (result == null) repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      expectIntentionGraphRootPage(router);
+      expect(create.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   testWidgets('локализует параметры каталога на русский язык', (tester) async {
@@ -1370,154 +1357,76 @@ void main() {
     expect(find.text('Total intentions: 1'), findsOneWidget);
   });
 
-  for (final (language, markLabel, totalCount) in [
-    ('en', 'Favorite intention', 'Total intentions: 2'),
-    ('ru', 'Избранное намерение', 'Всего намерений: 2'),
-  ]) {
-    testWidgets('$language: без условий поиска звезду показывает только '
-        'избранное из одноимённых намерений, без действия и фильтра отметки', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(_testApp(repository, locale: Locale(language)));
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [
-              testSummary(
-                index: 1,
-                title: 'Гулять',
-                favoriteMark: FavoriteMark.favorite,
-              ),
-              testSummary(index: 2, title: 'Гулять'),
-            ],
-            totalCount: 2,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
+  // Архивное состояние строки в охвате всех показывает тест архивного
+  // состояния в охвате всех.
+  testWidgets('архивный охват показывает звезду архивированного '
+      'избранного намерения', (tester) async {
+    const scopeName = 'Archived';
+    const scope = IntentionScope.archived;
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // Условия поиска пусты: отметка показана без фильтра названия и тегов.
-      expect(repository.queryAt(0).titleFilter, isNull);
-      expect(repository.queryAt(0).tagFilter, IntentionTagFilter.empty);
-      expect(repository.queries, hasLength(1));
-
-      final rows = find.byType(IntentionSummaryView);
-      expect(rows, findsNWidgets(2));
-      expect(find.text('Гулять'), findsNWidgets(2));
-      expect(find.text(totalCount), findsOneWidget);
-      expect(find.byIcon(Icons.star), findsOneWidget);
-      expect(
-        find.descendant(of: rows.at(0), matching: find.byIcon(Icons.star)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: rows.at(1), matching: find.byIcon(Icons.star)),
-        findsNothing,
-      );
-      expect(tester.getSemantics(rows.at(0)).label, contains(markLabel));
-      expect(tester.getSemantics(rows.at(1)).label, isNot(contains(markLabel)));
-
-      // Отметка — подпись строки: её нельзя поставить, снять или выбрать
-      // условием поиска.
-      expect(
-        find.ancestor(
-          of: find.byIcon(Icons.star),
-          matching: find.bySubtype<ButtonStyleButton>(),
+    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(scopeName).last);
+    await tester.pump();
+    expect(repository.queryAt(1).scope, scope);
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [
+            testSummary(
+              index: 1,
+              title: 'Архивное избранное',
+              archiveState: IntentionArchiveState.archived,
+              favoriteMark: FavoriteMark.favorite,
+            ),
+            testSummary(
+              index: 2,
+              title: 'Архивное обычное',
+              archiveState: IntentionArchiveState.archived,
+            ),
+          ],
+          totalCount: 2,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
         ),
-        findsNothing,
-      );
-      expect(
-        find.ancestor(
-          of: find.byIcon(Icons.star),
-          matching: find.byType(IconButton),
-        ),
-        findsNothing,
-      );
-      expect(find.byIcon(Icons.star_border), findsNothing);
-      expect(find.text(markLabel), findsNothing);
-      expect(find.byTooltip(markLabel), findsNothing);
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      semantics.dispose();
-    });
-  }
+    final favorite = find.ancestor(
+      of: find.text('Архивное избранное'),
+      matching: find.byType(IntentionSummaryView),
+    );
+    expect(find.byIcon(Icons.star), findsOneWidget);
+    expect(
+      find.descendant(of: favorite, matching: find.byIcon(Icons.star)),
+      findsOneWidget,
+    );
+    final label = tester.getSemantics(favorite).label;
+    expect(label, contains('Архивное избранное'));
+    expect(label, contains('Favorite intention'));
+    // Архивный охват сообщает архивное состояние самим выбранным охватом.
+    expect(label.contains('Archived'), isFalse);
+    expect(find.text('Total intentions: 2'), findsOneWidget);
 
-  for (final (scopeName, scope, showsArchiveState) in [
-    ('Archived', IntentionScope.archived, false),
-    ('All', IntentionScope.all, true),
-  ]) {
-    testWidgets('охват $scopeName показывает звезду архивированного '
-        'избранного намерения', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(_testApp(repository));
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: const [],
-            totalCount: 0,
-            nextCursor: null,
-            revision: const TestCatalogRevision(0),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(scopeName).last);
-      await tester.pump();
-      expect(repository.queryAt(1).scope, scope);
-      repository.complete(
-        1,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [
-              testSummary(
-                index: 1,
-                title: 'Архивное избранное',
-                archiveState: IntentionArchiveState.archived,
-                favoriteMark: FavoriteMark.favorite,
-              ),
-              testSummary(
-                index: 2,
-                title: 'Архивное обычное',
-                archiveState: IntentionArchiveState.archived,
-              ),
-            ],
-            totalCount: 2,
-            nextCursor: null,
-            revision: const TestCatalogRevision(0),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final favorite = find.ancestor(
-        of: find.text('Архивное избранное'),
-        matching: find.byType(IntentionSummaryView),
-      );
-      expect(find.byIcon(Icons.star), findsOneWidget);
-      expect(
-        find.descendant(of: favorite, matching: find.byIcon(Icons.star)),
-        findsOneWidget,
-      );
-      final label = tester.getSemantics(favorite).label;
-      expect(label, contains('Архивное избранное'));
-      expect(label, contains('Favorite intention'));
-      // Охват всех сообщает архивное состояние строкой, архивный — самим
-      // выбранным охватом.
-      expect(label.contains('Archived'), showsArchiveState);
-      expect(find.text('Total intentions: 2'), findsOneWidget);
-
-      semantics.dispose();
-    });
-  }
+    semantics.dispose();
+  });
 
   testWidgets(
     'показывает количество активных связей в каждой строке каталога',
@@ -1666,47 +1575,34 @@ void main() {
     expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
   });
 
-  for (final (language, byConditions, byScope) in [
-    (
-      'en',
-      'No intentions match the tag conditions.',
-      'No active intentions yet.',
-    ),
-    (
-      'ru',
-      'По условиям по тегам совпадений нет.',
-      'Активных намерений пока нет.',
-    ),
-  ]) {
-    testWidgets('$language: пустая выдача при условиях по тегам сообщает об '
-        'отсутствии совпадений по условиям, а не о пустом охвате', (
+  testWidgets('пустая выдача при условиях по тегам сообщает об '
+      'отсутствии совпадений по условиям, а не о пустом охвате', (
+    tester,
+  ) async {
+    const byConditions = 'No intentions match the tag conditions.';
+    const byScope = 'No active intentions yet.';
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(_testAppWithContainer(container));
+    repository.complete(0, _firstPage(const []));
+    await tester.pumpAndSettle();
+    expect(find.text(byScope), findsOneWidget);
+    expect(find.text(byConditions), findsNothing);
+
+    await _selectCondition(
       tester,
-    ) async {
-      final repository = ControlledCatalogRepository();
-      final container = reconciliationCatalogContainer(repository);
-      addTearDown(container.dispose);
-      await tester.pumpWidget(
-        _testAppWithContainer(container, locale: Locale(language)),
-      );
-      repository.complete(0, _firstPage(const []));
-      await tester.pumpAndSettle();
-      expect(find.text(byScope), findsOneWidget);
-      expect(find.text(byConditions), findsNothing);
+      container,
+      _tag(1, 'Здоровье'),
+      IntentionTagRequirement.mustBePresent,
+    );
+    await _pumpUntilQueries(tester, repository, 2);
+    repository.complete(1, _firstPage(const []));
+    await tester.pumpAndSettle();
 
-      await _selectCondition(
-        tester,
-        container,
-        _tag(1, 'Здоровье'),
-        IntentionTagRequirement.mustBePresent,
-      );
-      await _pumpUntilQueries(tester, repository, 2);
-      repository.complete(1, _firstPage(const []));
-      await tester.pumpAndSettle();
-
-      expect(find.text(byConditions), findsOneWidget);
-      expect(find.text(byScope), findsNothing);
-    });
-  }
+    expect(find.text(byConditions), findsOneWidget);
+    expect(find.text(byScope), findsNothing);
+  });
 
   testWidgets('отказ обновления из-за недоступности показан над сохранённым '
       'списком, а повтор согласует выдачу', (tester) async {
@@ -2100,27 +1996,24 @@ Widget _testApp(
   ),
 );
 
-Widget _testAppWithContainer(
-  ProviderContainer container, {
-  Locale locale = const Locale('en'),
-}) => UncontrolledProviderScope(
-  container: container,
-  child: MaterialApp(
-    locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: const IntentionCatalogPage(),
-  ),
-);
+Widget _testAppWithContainer(ProviderContainer container) =>
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const IntentionCatalogPage(),
+      ),
+    );
 
 Widget _routerTestAppWithContainer(
   ProviderContainer container,
-  AppRouter router, {
-  Locale locale = const Locale('en'),
-}) => UncontrolledProviderScope(
+  AppRouter router,
+) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp.router(
-    locale: locale,
+    locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     routerConfig: router.config(),

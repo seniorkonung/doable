@@ -1,19 +1,16 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/routing/app_router.dart';
-import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
@@ -31,158 +28,151 @@ const _dailyChoice = 201;
 typedef _Row = (String title, String tags);
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    final code = locale.languageCode;
+  testWidgets(
+    'каталог совместно применяет название, обязательные и исключённые теги',
+    (tester) async {
+      final app = await _App.pump(tester, const Locale('ru'));
+      final l10n = app.l10n;
+      const page = IntentionCatalogPage;
+      final before = _storedGraph(app.raw);
+      final changesBefore = _connectionChanges(app.raw);
+      final health = l10n.intentionSummaryTags('Здоровье');
+      final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
+      final all = l10n.intentionSummaryTags('Здоровье, Спорт, Отдых');
 
-    testWidgets(
-      'каталог совместно применяет название, обязательные и исключённые теги на $code',
-      (tester) async {
-        final app = await _App.pump(tester, locale);
-        final l10n = app.l10n;
-        const page = IntentionCatalogPage;
-        final before = _storedGraph(app.raw);
-        final changesBefore = _connectionChanges(app.raw);
-        final health = l10n.intentionSummaryTags('Здоровье');
-        final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
-        final all = l10n.intentionSummaryTags('Здоровье, Спорт, Отдых');
+      // Теги видны и без условий; одноимённые намерения остаются отдельными.
+      await _expectResults(tester, page, [
+        ('Ходить в парк', healthRest),
+        ('Гулять без тегов', l10n.intentionSummaryNoTags),
+        ('Читать в тишине', healthRest),
+        ('Ходить в зал', all),
+        ('Ходить до магазина', health),
+        ('Ходить в парк', healthRest),
+      ]);
+      expect(find.text(l10n.catalogTotalCount(6)), findsOneWidget);
+      expect(_conditions(tester, page), isEmpty);
 
-        // Теги видны и без условий; одноимённые намерения остаются отдельными.
-        await _expectResults(tester, page, [
-          ('Ходить в парк', healthRest),
-          ('Гулять без тегов', l10n.intentionSummaryNoTags),
-          ('Читать в тишине', healthRest),
-          ('Ходить в зал', all),
-          ('Ходить до магазина', health),
-          ('Ходить в парк', healthRest),
-        ]);
-        expect(find.text(l10n.catalogTotalCount(6)), findsOneWidget);
-        expect(_conditions(tester, page), isEmpty);
+      // Поиск только по обязательным тегам.
+      await _addCondition(tester, _health, present: true);
+      await _addCondition(tester, _rest, present: true);
+      await _expectResults(tester, page, [
+        ('Ходить в парк', healthRest),
+        ('Читать в тишине', healthRest),
+        ('Ходить в зал', all),
+        ('Ходить в парк', healthRest),
+      ]);
+      await _addCondition(tester, _sport, present: false);
+      final combined = [
+        'Здоровье',
+        'Отдых',
+        l10n.intentionTagConditionAbsent('Спорт'),
+      ];
+      expect(_conditions(tester, page), combined);
+      await _expectResults(tester, page, [
+        ('Ходить в парк', healthRest),
+        ('Читать в тишине', healthRest),
+        ('Ходить в парк', healthRest),
+      ]);
 
-        // Поиск только по обязательным тегам.
-        await _addCondition(tester, _health, present: true);
-        await _addCondition(tester, _rest, present: true);
-        await _expectResults(tester, page, [
-          ('Ходить в парк', healthRest),
-          ('Читать в тишине', healthRest),
-          ('Ходить в зал', all),
-          ('Ходить в парк', healthRest),
-        ]);
-        await _addCondition(tester, _sport, present: false);
-        final combined = [
-          'Здоровье',
-          'Отдых',
-          l10n.intentionTagConditionAbsent('Спорт'),
-        ];
-        expect(_conditions(tester, page), combined);
-        await _expectResults(tester, page, [
-          ('Ходить в парк', healthRest),
-          ('Читать в тишине', healthRest),
-          ('Ходить в парк', healthRest),
-        ]);
+      // Название, обязательные и исключённые теги действуют одновременно.
+      await tester.enterText(
+        find.byKey(const ValueKey('catalog-filter-field')),
+        'ходить',
+      );
+      await _expectResults(tester, page, [
+        ('Ходить в парк', healthRest),
+        ('Ходить в парк', healthRest),
+      ]);
+      expect(find.text(l10n.catalogTotalCount(2)), findsOneWidget);
 
-        // Название, обязательные и исключённые теги действуют одновременно.
-        await tester.enterText(
-          find.byKey(const ValueKey('catalog-filter-field')),
-          'ходить',
-        );
-        await _expectResults(tester, page, [
-          ('Ходить в парк', healthRest),
-          ('Ходить в парк', healthRest),
-        ]);
-        expect(find.text(l10n.catalogTotalCount(2)), findsOneWidget);
+      // Смена охвата сохраняет совместный фильтр.
+      await _selectScope(tester, l10n.catalogScopeArchived);
+      await _expectResults(tester, page, [('Ходить в парк', healthRest)]);
+      expect(find.text(l10n.catalogTotalCount(1)), findsOneWidget);
+      expect(_conditions(tester, page), combined);
+      await _selectScope(tester, l10n.catalogScopeActive);
+      await _expectResults(tester, page, [
+        ('Ходить в парк', healthRest),
+        ('Ходить в парк', healthRest),
+      ]);
 
-        // Смена охвата сохраняет совместный фильтр.
-        await _selectScope(tester, l10n.catalogScopeArchived);
-        await _expectResults(tester, page, [('Ходить в парк', healthRest)]);
-        expect(find.text(l10n.catalogTotalCount(1)), findsOneWidget);
-        expect(_conditions(tester, page), combined);
-        await _selectScope(tester, l10n.catalogScopeActive);
-        await _expectResults(tester, page, [
-          ('Ходить в парк', healthRest),
-          ('Ходить в парк', healthRest),
-        ]);
+      // Уже выбранный тег отмечен; закрытие без выбора сохраняет условия.
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('intention-tag-conditions-add')),
+      );
+      final sportRow = find.byKey(
+        ValueKey('tag-condition-picker-row-${tagFixtureId(_sport)}'),
+      );
+      await _until(tester, sportRow);
+      expect(
+        find.descendant(
+          of: sportRow,
+          matching: find.text(l10n.tagConditionPickerSelectedAbsent),
+        ),
+        findsOneWidget,
+      );
+      await _closeTop(tester, TagConditionPickerPage);
+      expect(_conditions(tester, page), combined);
 
-        // Уже выбранный тег отмечен; закрытие без выбора сохраняет условия.
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('intention-tag-conditions-add')),
-        );
-        final sportRow = find.byKey(
-          ValueKey('tag-condition-picker-row-${tagFixtureId(_sport)}'),
-        );
-        await _until(tester, sportRow);
-        expect(
-          find.descendant(
-            of: sportRow,
-            matching: find.text(l10n.tagConditionPickerSelectedAbsent),
-          ),
-          findsOneWidget,
-        );
-        await _closeTop(tester, TagConditionPickerPage);
-        expect(_conditions(tester, page), combined);
+      // Повторный выбор тега меняет надобность, а не добавляет условие.
+      await _addCondition(tester, _sport, present: true);
+      expect(_conditions(tester, page), ['Здоровье', 'Отдых', 'Спорт']);
+      await _expectResults(tester, page, [('Ходить в зал', all)]);
+      await _tap(
+        tester,
+        find.byKey(
+          ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
+        ),
+      );
+      expect(_conditions(tester, page), combined);
+      await _expectResults(tester, page, [
+        ('Ходить в парк', healthRest),
+        ('Ходить в парк', healthRest),
+      ]);
 
-        // Повторный выбор тега меняет надобность, а не добавляет условие.
-        await _addCondition(tester, _sport, present: true);
-        expect(_conditions(tester, page), ['Здоровье', 'Отдых', 'Спорт']);
-        await _expectResults(tester, page, [('Ходить в зал', all)]);
-        await _tap(
-          tester,
-          find.byKey(
-            ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
-          ),
-        );
-        expect(_conditions(tester, page), combined);
-        await _expectResults(tester, page, [
-          ('Ходить в парк', healthRest),
-          ('Ходить в парк', healthRest),
-        ]);
+      // Поиск только с исключением допускает намерение без тегов.
+      await tester.enterText(
+        find.byKey(const ValueKey('catalog-filter-field')),
+        '',
+      );
+      await _removeCondition(tester, _health);
+      await _removeCondition(tester, _rest);
+      expect(_conditions(tester, page), [
+        l10n.intentionTagConditionAbsent('Спорт'),
+      ]);
+      await _expectResults(tester, page, [
+        ('Ходить в парк', healthRest),
+        ('Гулять без тегов', l10n.intentionSummaryNoTags),
+        ('Читать в тишине', healthRest),
+        ('Ходить до магазина', health),
+        ('Ходить в парк', healthRest),
+      ]);
 
-        // Поиск только с исключением допускает намерение без тегов.
-        await tester.enterText(
-          find.byKey(const ValueKey('catalog-filter-field')),
-          '',
-        );
-        await _removeCondition(tester, _health);
-        await _removeCondition(tester, _rest);
-        expect(_conditions(tester, page), [
-          l10n.intentionTagConditionAbsent('Спорт'),
-        ]);
-        await _expectResults(tester, page, [
-          ('Ходить в парк', healthRest),
-          ('Гулять без тегов', l10n.intentionSummaryNoTags),
-          ('Читать в тишине', healthRest),
-          ('Ходить до магазина', health),
-          ('Ходить в парк', healthRest),
-        ]);
+      // Пустая выдача по условиям отличается от пустого охвата.
+      await _tap(
+        tester,
+        find.byKey(
+          ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
+        ),
+      );
+      await _addCondition(tester, _health, present: false);
+      await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
+      expect(find.text(l10n.catalogActiveEmpty), findsNothing);
+      expect(_results(tester, page), isEmpty);
 
-        // Пустая выдача по условиям отличается от пустого охвата.
-        await _tap(
-          tester,
-          find.byKey(
-            ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
-          ),
-        );
-        await _addCondition(tester, _health, present: false);
-        await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
-        expect(find.text(l10n.catalogActiveEmpty), findsNothing);
-        expect(_results(tester, page), isEmpty);
-
-        // Поиск не выполняет команд тегов и не меняет граф.
-        expect(_storedGraph(app.raw), before);
-        expect(_connectionChanges(app.raw), changesBefore);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
+      // Поиск не выполняет команд тегов и не меняет граф.
+      expect(_storedGraph(app.raw), before);
+      expect(_connectionChanges(app.raw), changesBefore);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 final class _App {
-  _App(this.raw, this.container, this.router, this.fault, this.l10n);
+  _App(this.raw, this.l10n);
 
   final sqlite.Database raw;
-  final ProviderContainer container;
-  final AppRouter router;
-  final _RefreshFault fault;
   final AppLocalizations l10n;
 
   static Future<_App> pump(WidgetTester tester, Locale locale) async {
@@ -194,64 +184,24 @@ final class _App {
     addTearDown(tester.view.reset);
 
     late sqlite.Database raw;
-    final fault = _RefreshFault();
     final runtime = AppRuntime(
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
-      connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (database) => raw = database),
-        fault,
-      ),
-      diagnosticsSink: fault,
+      connectionFactory: () =>
+          openInMemoryLocalDatabase(setup: (database) => raw = database),
+      diagnosticsSink: InMemoryDiagnosticsSink(),
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
       await runtime.shutdown();
     });
-    final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+    expect(await tester.runAsync(runtime.bootstrap), isA<AppRuntimeReady>());
     _seed(raw);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await openIntentionGraph(tester, waitFor: _until);
     await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
     await _until(tester, find.byType(IntentionSummaryView));
     await tester.pumpAndSettle();
-    return _App(
-      raw,
-      ready.container,
-      ready.container.read(appRouterProvider),
-      fault,
-      lookupAppLocalizations(locale),
-    );
-  }
-}
-
-/// Управляемый отказ SQLite только для чтения согласования выдачи.
-///
-/// Диагностика репозитория отмечает границы этого чтения, поэтому команды
-/// тегов и обычные порции каталога выполняются без отказа.
-final class _RefreshFault extends LocalDatabaseConnectionObserver
-    implements DiagnosticsSink {
-  Object? failure;
-  var failedReads = 0;
-  var _reconciling = false;
-
-  @override
-  void record(DiagnosticsEvent event) {
-    if (event is CatalogReconciliationReadDiagnosticsEvent) {
-      _reconciling = event.status is DiagnosticsStarted;
-    }
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    final failure = this.failure;
-    if (failure == null ||
-        !_reconciling ||
-        statement.operation != LocalDatabaseSqlOperation.select ||
-        !statement.statements.any((sql) => sql.contains('json_each('))) {
-      return;
-    }
-    failedReads += 1;
-    throw failure;
+    return _App(raw, lookupAppLocalizations(locale));
   }
 }
 

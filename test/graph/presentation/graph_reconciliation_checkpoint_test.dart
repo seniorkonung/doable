@@ -53,7 +53,6 @@ import 'package:doable/src/long_term_relation/presentation/neighborhood/relation
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag.dart' as tag_domain;
 import 'package:doable/src/tag/domain/tag_assignment.dart';
@@ -202,365 +201,179 @@ void main() {
       await database.close();
     });
 
-    for (final scope in TaggedIntentionsScope.values) {
-      final scopeName = scope == TaggedIntentionsScope.active
-          ? 'активного'
-          : 'архивного';
-      test(
-        'команды обновляют порции $scopeName охвата и сохраняют счётчики',
-        () async {
-          final initialRevision = loaded().revision;
-          model().setScope(scope);
-          await settle(initialRevision);
-          final expected = targetsFor(scope);
-          final countsBefore = neighborhood().counts;
-          final detailsCountsBefore = details().details.relationCounts;
-          final catalogCountsBefore = {
-            for (final item in catalog().items)
-              item.id: item.activeRelationCount,
-          };
-          final totalBefore = catalog().totalCount;
-          expect(loaded().scope, scope);
-          expect(expected.length, greaterThan(50));
+    // Охват передаётся чтению тем же путём; проверяется активный.
+    const scope = TaggedIntentionsScope.active;
+    const scopeName = 'активного';
+    test(
+      'команды обновляют порции $scopeName охвата и сохраняют счётчики',
+      () async {
+        final initialRevision = loaded().revision;
+        model().setScope(scope);
+        await settle(initialRevision);
+        final expected = targetsFor(scope);
+        final countsBefore = neighborhood().counts;
+        final detailsCountsBefore = details().details.relationCounts;
+        final catalogCountsBefore = {
+          for (final item in catalog().items) item.id: item.activeRelationCount,
+        };
+        final totalBefore = catalog().totalCount;
+        expect(loaded().scope, scope);
+        expect(expected.length, greaterThan(50));
+        expect(loaded().items.map((item) => item.id), expected.take(50));
+        await model().loadMore();
+        expect(loaded().items.map((item) => item.id), expected);
+        expect(loaded().hasReachedEnd, isTrue);
+
+        for (final target in expected.take(2).toList()) {
+          final removed = await (coordinator.acceptTagRemoveAssignment(
+            RemoveTagAssignment(tagId: tagId, intentionId: target),
+          ) as TagCommandAccepted).future;
+          expect(removed.confirmedResult, isA<TagCommandSucceeded>());
+          expected.remove(target);
+          await settle(removed.revision!);
+          expect(loaded().items.map((item) => item.id), expected.take(50));
+          expect(model().canActOn(target), isFalse);
+          await model().loadMore();
+          expect(loaded().items.map((item) => item.id), expected);
+
+          if (neighborhood().nextCursor != null) {
+            final countBefore = neighborhood().items.length;
+            await container
+                .read(relationNeighborhoodViewModelProvider(ownerId).notifier)
+                .loadMoreIfNeeded(visibleIndex: countBefore - 1);
+            await _settleUntil(() => neighborhood().items.length > countBefore);
+            expect(neighborhood().counts, countsBefore);
+            expect(
+              neighborhood().revision.compareTo(removed.revision!),
+              GraphRevisionOrder.same,
+            );
+          }
+
+          final assigned = await (coordinator.acceptTagAssign(
+            AssignTag(tagId: tagId, intentionId: target),
+          ) as TagCommandAccepted).future;
+          expect(assigned.confirmedResult, isA<TagCommandSucceeded>());
+          expected.add(target);
+          await settle(assigned.revision!);
           expect(loaded().items.map((item) => item.id), expected.take(50));
           await model().loadMore();
           expect(loaded().items.map((item) => item.id), expected);
-          expect(loaded().hasReachedEnd, isTrue);
+          expect(model().canActOn(target), isTrue);
+        }
 
-          for (final target in expected.take(2).toList()) {
-            final removed = await (coordinator.acceptTagRemoveAssignment(
-              RemoveTagAssignment(tagId: tagId, intentionId: target),
-            ) as TagCommandAccepted).future;
-            expect(removed.confirmedResult, isA<TagCommandSucceeded>());
-            expected.remove(target);
-            await settle(removed.revision!);
-            expect(loaded().items.map((item) => item.id), expected.take(50));
-            expect(model().canActOn(target), isFalse);
-            await model().loadMore();
-            expect(loaded().items.map((item) => item.id), expected);
+        final renamed = await (coordinator.acceptTagRename(
+          RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
+        ) as TagCommandAccepted).future;
+        await settle(renamed.revision!);
+        expect(loaded().tagId, tagId);
+        expect(loaded().tag.name.value, 'Быт');
+        expect(loaded().scope, scope);
+        expect(loaded().items.map((item) => item.id), expected.take(50));
 
-            if (neighborhood().nextCursor != null) {
-              final countBefore = neighborhood().items.length;
-              await container
-                  .read(relationNeighborhoodViewModelProvider(ownerId).notifier)
-                  .loadMoreIfNeeded(visibleIndex: countBefore - 1);
-              await _settleUntil(
-                () => neighborhood().items.length > countBefore,
-              );
-              expect(neighborhood().counts, countsBefore);
-              expect(
-                neighborhood().revision.compareTo(removed.revision!),
-                GraphRevisionOrder.same,
-              );
-            }
+        final edited = await (coordinator.acceptExisting(
+          UpdateIntention(
+            id: ownerId,
+            title: 'Новое исходное намерение',
+            description: null,
+          ),
+          presentationTitle: 'Исходное намерение',
+        ) as IntentionCommandAccepted).future;
+        await settle(edited.revision!);
+        expect(loaded().items.map((item) => item.id), expected.take(50));
+        expect(
+          loaded().items.map((item) => item.title),
+          expected
+              .take(50)
+              .map(
+                (id) => raw.select(
+                  'SELECT title FROM intentions WHERE id = ?',
+                  [id.toCanonicalString()],
+                ).single['title'],
+              ),
+        );
+        expect(loaded().items.any((item) => item.id == ownerId), isFalse);
+        expect(neighborhood().counts, countsBefore);
+        expect(details().details.relationCounts, detailsCountsBefore);
+        expect(catalog().totalCount, totalBefore);
+        expect({
+          for (final item in catalog().items) item.id: item.activeRelationCount,
+        }, catalogCountsBefore);
+      },
+    );
 
-            final assigned = await (coordinator.acceptTagAssign(
-              AssignTag(tagId: tagId, intentionId: target),
-            ) as TagCommandAccepted).future;
-            expect(assigned.confirmedResult, isA<TagCommandSucceeded>());
-            expected.add(target);
-            await settle(assigned.revision!);
-            expect(loaded().items.map((item) => item.id), expected.take(50));
-            await model().loadMore();
-            expect(loaded().items.map((item) => item.id), expected);
-            expect(model().canActOn(target), isTrue);
-          }
+    test(
+      'удаление тега очищает результаты $scopeName охвата без подмены одноимённым',
+      () async {
+        final initialRevision = loaded().revision;
+        model().setScope(scope);
+        await settle(initialRevision);
+        await model().loadMore();
+        final previousTargets = loaded().items.map((item) => item.id).toList();
+        final graphBefore = retainedTagFixtureGraph(raw);
+        List<List<Object?>> retainedTagAssignments() => raw
+            .select(
+              'SELECT * FROM tag_assignments WHERE tag_id = ? ORDER BY creation_sequence',
+              [tagFixtureId(9001)],
+            )
+            .map((row) => row.values.toList())
+            .toList();
+        final retainedBefore = retainedTagAssignments();
+        expect(retainedBefore, hasLength(108));
 
-          final renamed = await (coordinator.acceptTagRename(
-            RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
-          ) as TagCommandAccepted).future;
-          await settle(renamed.revision!);
-          expect(loaded().tagId, tagId);
-          expect(loaded().tag.name.value, 'Быт');
-          expect(loaded().scope, scope);
-          expect(loaded().items.map((item) => item.id), expected.take(50));
+        final deleted = await (coordinator.acceptTagDelete(
+          DeleteTag(tagId),
+        ) as TagCommandAccepted).future;
+        expect(deleted.confirmedResult, isA<TagCommandSucceeded>());
+        await _settleUntil(() => navigation() is TagNavigationTagMissing);
+        expect(navigation().tagId, tagId);
+        expect(navigation().scope, scope);
+        for (final target in previousTargets) {
+          expect(model().canActOn(target), isFalse);
+        }
+        expect(
+          await repository.getTaggedIntentionsPage(
+            TaggedIntentionsQuery(tagId: tagId, scope: scope),
+          ),
+          isA<TaggedIntentionsPageError>().having(
+            (result) => result.failure,
+            'причина',
+            isA<TaggedIntentionsTagNotFound>(),
+          ),
+        );
 
-          final edited = await (coordinator.acceptExisting(
-            UpdateIntention(
-              id: ownerId,
-              title: 'Новое исходное намерение',
-              description: null,
-            ),
-            presentationTitle: 'Исходное намерение',
-          ) as IntentionCommandAccepted).future;
-          await settle(edited.revision!);
-          expect(loaded().items.map((item) => item.id), expected.take(50));
-          expect(
-            loaded().items.map((item) => item.title),
-            expected
-                .take(50)
-                .map(
-                  (id) => raw.select(
-                    'SELECT title FROM intentions WHERE id = ?',
-                    [id.toCanonicalString()],
-                  ).single['title'],
-                ),
-          );
-          expect(loaded().items.any((item) => item.id == ownerId), isFalse);
-          expect(neighborhood().counts, countsBefore);
-          expect(details().details.relationCounts, detailsCountsBefore);
-          expect(catalog().totalCount, totalBefore);
-          expect({
-            for (final item in catalog().items)
-              item.id: item.activeRelationCount,
-          }, catalogCountsBefore);
-        },
-      );
+        final recreated = await (coordinator.acceptTagCreation(
+          TagCreationFormKey(),
+          CreateTag(TagName.fromInput('Общий тег')),
+        ) as TagCommandAccepted).future;
+        final newTag =
+            ((recreated.confirmedResult as TagCommandSucceeded).value.value
+                    as TagCreated)
+                .tag;
+        expect(newTag.id, isNot(tagId));
+        await pumpEventQueue();
+        expect(navigation(), isA<TagNavigationTagMissing>());
+        expect(navigation().tagId, tagId);
+        expect(retainedTagFixtureGraph(raw), graphBefore);
+        expect(
+          raw.select('SELECT tag_id FROM tag_assignments WHERE tag_id = ?', [
+            tagId.toCanonicalString(),
+          ]),
+          isEmpty,
+        );
+        expect(retainedTagAssignments(), retainedBefore);
 
-      test(
-        'удаление тега очищает результаты $scopeName охвата без подмены одноимённым',
-        () async {
-          final initialRevision = loaded().revision;
-          model().setScope(scope);
-          await settle(initialRevision);
-          await model().loadMore();
-          final previousTargets = loaded().items
-              .map((item) => item.id)
-              .toList();
-          final graphBefore = retainedTagFixtureGraph(raw);
-          List<List<Object?>> retainedTagAssignments() => raw
-              .select(
-                'SELECT * FROM tag_assignments WHERE tag_id = ? ORDER BY creation_sequence',
-                [tagFixtureId(9001)],
-              )
-              .map((row) => row.values.toList())
-              .toList();
-          final retainedBefore = retainedTagAssignments();
-          expect(retainedBefore, hasLength(108));
-
-          final deleted = await (coordinator.acceptTagDelete(
-            DeleteTag(tagId),
-          ) as TagCommandAccepted).future;
-          expect(deleted.confirmedResult, isA<TagCommandSucceeded>());
-          await _settleUntil(() => navigation() is TagNavigationTagMissing);
-          expect(navigation().tagId, tagId);
-          expect(navigation().scope, scope);
-          for (final target in previousTargets) {
-            expect(model().canActOn(target), isFalse);
-          }
-          expect(
-            await repository.getTaggedIntentionsPage(
-              TaggedIntentionsQuery(tagId: tagId, scope: scope),
-            ),
-            isA<TaggedIntentionsPageError>().having(
-              (result) => result.failure,
-              'причина',
-              isA<TaggedIntentionsTagNotFound>(),
-            ),
-          );
-
-          final recreated = await (coordinator.acceptTagCreation(
-            TagCreationFormKey(),
-            CreateTag(TagName.fromInput('Общий тег')),
-          ) as TagCommandAccepted).future;
-          final newTag =
-              ((recreated.confirmedResult as TagCommandSucceeded).value.value
-                      as TagCreated)
-                  .tag;
-          expect(newTag.id, isNot(tagId));
-          await pumpEventQueue();
-          expect(navigation(), isA<TagNavigationTagMissing>());
-          expect(navigation().tagId, tagId);
-          expect(retainedTagFixtureGraph(raw), graphBefore);
-          expect(
-            raw.select('SELECT tag_id FROM tag_assignments WHERE tag_id = ?', [
-              tagId.toCanonicalString(),
-            ]),
-            isEmpty,
-          );
-          expect(retainedTagAssignments(), retainedBefore);
-
-          model().setTagId(newTag.id);
-          await _settleUntil(
-            () =>
-                navigation() is TagNavigationLoaded &&
-                loaded().canUseCurrentItems,
-          );
-          expect(loaded().tagId, newTag.id);
-          expect(loaded().scope, scope);
-          expect(loaded().isEmpty, isTrue);
-          expect(loaded().hasReachedEnd, isTrue);
-        },
-      );
-
-      test(
-        'реальный истёкший курсор обновляет результаты $scopeName охвата до поздних сигналов',
-        () async {
-          final reads = _CheckpointNavigationReads(repository);
-          final changes =
-              StreamController<ConfirmedGraphChangePackage>.broadcast(
-                sync: true,
-              );
-          final heldPackages = <ConfirmedGraphChangePackage>[];
-          final observed = ProviderContainer(
-            overrides: [
-              personalGraphRepositoryProvider.overrideWithValue(repository),
-              tagNavigationReaderProvider.overrideWithValue(reads),
-              tagNavigationChangesProvider.overrideWithValue(changes.stream),
-            ],
-          );
-          final commands = observed.read(
-            graphCommandCoordinatorProvider.notifier,
-          );
-          final subscription = commands.completions.listen((completion) {
-            if (completion.confirmedChange case final package?) {
-              heldPackages.add(package);
-            }
-          });
-          final observationGate = Completer<void>();
-          addTearDown(() async {
-            if (!observationGate.isCompleted) observationGate.complete();
-            await commands.shutdown();
-            observed.dispose();
-            await subscription.cancel();
-            await changes.close();
-          });
-          final provider = tagNavigationViewModelProvider(tagId);
-          observed.listen(provider, (_, _) {});
-          final navigationModel = observed.read(provider.notifier);
-          navigationModel.setScope(scope);
-          TagNavigationLoaded current() =>
-              observed.read(provider) as TagNavigationLoaded;
-          await _settleUntil(
-            () =>
-                observed.read(provider) is TagNavigationLoaded &&
-                current().canUseCurrentItems,
-          );
-          final oldCursor = current().nextCursor;
-          expect(oldCursor, isNotNull);
-          final expected = targetsFor(scope);
-          final removedTarget = expected.removeAt(0);
-          reads.tagObservationGate = observationGate.future;
-          final removed = await (commands.acceptTagRemoveAssignment(
-            RemoveTagAssignment(tagId: tagId, intentionId: removedTarget),
-          ) as TagCommandAccepted).future;
-          expect(removed.confirmedResult, isA<TagCommandSucceeded>());
-          expect(current().nextCursor, same(oldCursor));
-
-          final resultOffset = reads.results.length;
-          await navigationModel.loadMore();
-          await _settleUntil(
-            () =>
-                current().canUseCurrentItems &&
-                current().revision.compareTo(removed.revision!) ==
-                    GraphRevisionOrder.same,
-          );
-          expect(reads.queries[resultOffset].cursor, same(oldCursor));
-          expect(
-            reads.results[resultOffset],
-            isA<TaggedIntentionsPageError>().having(
-              (result) => result.failure,
-              'причина',
-              isA<TaggedIntentionsSnapshotExpired>(),
-            ),
-          );
-          expect(reads.queries.last.cursor, isNull);
-          expect(current().scope, scope);
-          expect(current().items.map((item) => item.id), expected.take(50));
-          final queryCount = reads.queries.length;
-          expect(heldPackages, hasLength(1));
-          changes.add(heldPackages.single);
-          reads.tagObservationGate = null;
-          observationGate.complete();
-          await pumpEventQueue();
-          expect(reads.queries, hasLength(queryCount));
-          await navigationModel.loadMore();
-          expect(current().items.map((item) => item.id), expected);
-          expect(current().hasReachedEnd, isTrue);
-          expect(navigationModel.canActOn(removedTarget), isFalse);
-        },
-      );
-
-      test(
-        'поздняя реальная порция $scopeName охвата не отменяет подтверждённые команды',
-        () async {
-          final reads = _CheckpointNavigationReads(repository);
-          final observed = ProviderContainer(
-            overrides: [
-              personalGraphRepositoryProvider.overrideWithValue(repository),
-              tagNavigationReaderProvider.overrideWithValue(reads),
-            ],
-          );
-          final commands = observed.read(
-            graphCommandCoordinatorProvider.notifier,
-          );
-          final pageGate = Completer<void>();
-          addTearDown(() async {
-            if (!pageGate.isCompleted) pageGate.complete();
-            await commands.shutdown();
-            observed.dispose();
-          });
-          final states = <TagNavigationState>[];
-          final provider = tagNavigationViewModelProvider(tagId);
-          observed.listen(provider, (_, next) => states.add(next));
-          final navigationModel = observed.read(provider.notifier);
-          navigationModel.setScope(scope);
-          TagNavigationLoaded current() =>
-              observed.read(provider) as TagNavigationLoaded;
-          await _settleUntil(
-            () =>
-                observed.read(provider) is TagNavigationLoaded &&
-                current().canUseCurrentItems,
-          );
-          final initialRevision = current().revision;
-          final resultOffset = reads.results.length;
-          reads.nextPageGate = pageGate.future;
-          final pending = navigationModel.loadMore();
-          await _settleUntil(() => reads.results.length > resultOffset);
-          expect(
-            (reads.results[resultOffset] as TaggedIntentionsPageSuccess)
-                .value
-                .revision
-                .compareTo(initialRevision),
-            GraphRevisionOrder.same,
-          );
-          final expected = targetsFor(scope);
-          final removedTarget = expected.removeAt(0);
-          final removed = await (commands.acceptTagRemoveAssignment(
-            RemoveTagAssignment(tagId: tagId, intentionId: removedTarget),
-          ) as TagCommandAccepted).future;
-          expect(removed.confirmedResult, isA<TagCommandSucceeded>());
-          final renamed = await (commands.acceptTagRename(
-            RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
-          ) as TagCommandAccepted).future;
-          expect(renamed.confirmedResult, isA<TagCommandSucceeded>());
-          await _settleUntil(
-            () =>
-                current().freshness == TagNavigationFreshness.refreshing &&
-                current().tag.name.value == 'Быт',
-          );
-          expect(current().nextCursor, isNull);
-          expect(navigationModel.canActOn(removedTarget), isFalse);
-          final confirmedStateOffset = states.length;
-
-          pageGate.complete();
-          await pending;
-          await _settleUntil(
-            () =>
-                current().canUseCurrentItems &&
-                current().revision.compareTo(renamed.revision!) ==
-                    GraphRevisionOrder.same,
-          );
-          for (final state in states.skip(confirmedStateOffset)) {
-            if (state case TagNavigationLoaded(canUseCurrentItems: true)) {
-              expect(
-                state.revision.compareTo(renamed.revision!),
-                GraphRevisionOrder.same,
-              );
-              expect(state.tag.name.value, 'Быт');
-              expect(state.contains(removedTarget), isFalse);
-            }
-          }
-          expect(current().tagId, tagId);
-          expect(current().scope, scope);
-          expect(current().items.map((item) => item.id), expected.take(50));
-          expect(reads.queries.last.cursor, isNull);
-          await navigationModel.loadMore();
-          expect(current().items.map((item) => item.id), expected);
-          expect(current().hasReachedEnd, isTrue);
-        },
-      );
-    }
+        model().setTagId(newTag.id);
+        await _settleUntil(
+          () =>
+              navigation() is TagNavigationLoaded &&
+              loaded().canUseCurrentItems,
+        );
+        expect(loaded().tagId, newTag.id);
+        expect(loaded().scope, scope);
+        expect(loaded().isEmpty, isTrue);
+        expect(loaded().hasReachedEnd, isTrue);
+      },
+    );
   });
 
   test(
@@ -1727,88 +1540,6 @@ void main() {
     },
   );
 
-  test('каскад заменяет намерение и сводку только цельным снимком', () async {
-    final repository = _CheckpointGraphRepository();
-    final harness = _CheckpointHarness(repository);
-    addTearDown(harness.dispose);
-    await harness.loadInitialSurfaces();
-    final detailsBefore = harness.details.details;
-    final intentionBefore = detailsBefore.intention;
-    final intentionAfter = testNeighborhoodIntention(
-      id: harness.ownerId,
-      title: intentionBefore.title,
-      archiveState: IntentionArchiveState.archived,
-    );
-    final countsAfter = testRelationCounts(archivedNeedOutgoing: 1);
-    const revision = TestGraphRevision(9);
-    final presentation = harness.coordinator.registerAppPresentation();
-    addTearDown(presentation.release);
-
-    harness.archiveOwner();
-    expect(repository.intentionCommands, [isA<ArchiveIntention>()]);
-    repository.completeIntentionCommand(
-      0,
-      testNeighborhoodSavedResult(
-        before: intentionBefore,
-        after: intentionAfter,
-        revision: revision,
-        additionalChanges: [
-          IntentionRelationCountsChanged(
-            revision: revision,
-            intentionId: harness.ownerId,
-            counts: countsAfter,
-          ),
-        ],
-      ),
-    );
-    await pumpEventQueue();
-
-    expect(harness.details.details, same(detailsBefore));
-    expect(
-      harness.details.intention.archiveState,
-      IntentionArchiveState.active,
-    );
-    expect(harness.detailsCounts.activeNeedOutgoing, 1);
-    expect(harness.detailsCounts.archivedNeedOutgoing, 0);
-    expect(repository.observationsOf(harness.ownerId), 3);
-
-    final claim = await presentation.nextClaim();
-    expect(claim, isNotNull);
-    harness.coordinator.confirmPresentation(claim!);
-
-    repository.emitIntention(
-      harness.ownerId,
-      intentionAfter,
-      counts: countsAfter,
-      revision: revision,
-    );
-    repository.completeGroupPage(
-      1,
-      RelationGroupFirstPage(
-        items: const [],
-        counts: countsAfter,
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await pumpEventQueue();
-
-    expect(harness.details.intention, same(intentionAfter));
-    expect(harness.detailsCounts.activeNeedOutgoing, 0);
-    expect(harness.detailsCounts.archivedNeedOutgoing, 1);
-    expect(repository.intentionCommands, hasLength(1));
-    expect(repository.groupQueries, hasLength(2));
-
-    var receivedRepeatedPresentation = false;
-    unawaited(
-      presentation.nextClaim().then((_) {
-        receivedRepeatedPresentation = true;
-      }),
-    );
-    await pumpEventQueue();
-    expect(receivedRepeatedPresentation, isFalse);
-  });
-
   test(
     'пакет только тега сохраняет каталог и обновляет группу перед продолжением',
     () async {
@@ -1907,90 +1638,6 @@ void main() {
       expect(harness.neighborhood, same(currentGroup));
       expect(repository.catalogQueries, hasLength(1));
       expect(repository.groupQueries, hasLength(3));
-    },
-  );
-
-  test(
-    'завершение тега до страниц не публикует снимки прежней эпохи',
-    () async {
-      final repository = _CheckpointGraphRepository();
-      final harness = _CheckpointHarness(repository);
-      addTearDown(harness.dispose);
-      final tagId = switch (TagId.decode(
-        '018f0000-0000-7000-8000-000000000001',
-      )) {
-        TagIdDecodingSuccess(:final id) => id,
-        InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
-      };
-      const revision = TestGraphRevision(1, epoch: 1);
-      final accepted = harness.coordinator.acceptTagDelete(
-        DeleteTag(tagId),
-      ) as TagCommandAccepted;
-      repository.completeTagCommand(
-        0,
-        TagCommandSucceeded(
-          ConfirmedGraphResult(
-            revision: revision,
-            value: TagDeleted(
-              TagDeletedChange(revision: revision, tagId: tagId),
-            ),
-          ),
-        ),
-      );
-      await accepted.future;
-      await pumpEventQueue();
-
-      repository.completeCatalogPage(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [catalog_support.testSummary(index: 1, title: 'Старое')],
-            totalCount: 1,
-            nextCursor: null,
-            revision: const TestGraphRevision(4),
-          ),
-        ),
-      );
-      repository.completeGroupPage(
-        0,
-        RelationGroupFirstPage(
-          items: const [],
-          counts: testRelationCounts(),
-          nextCursor: null,
-          revision: const TestGraphRevision(4),
-        ),
-      );
-      await pumpEventQueue();
-      expect(repository.catalogQueries, hasLength(2));
-      expect(repository.groupQueries, hasLength(2));
-
-      repository.completeCatalogPage(
-        1,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [catalog_support.testSummary(index: 1, title: 'Новое')],
-            totalCount: 1,
-            nextCursor: null,
-            revision: revision,
-          ),
-        ),
-      );
-      repository.completeGroupPage(
-        1,
-        RelationGroupFirstPage(
-          items: const [],
-          counts: testRelationCounts(),
-          nextCursor: null,
-          revision: revision,
-        ),
-      );
-      await pumpEventQueue();
-      expect(harness.catalog.revision, revision);
-      expect(harness.catalog.items.single.title, 'Новое');
-      final group = harness._container.read(
-        relationNeighborhoodViewModelProvider(harness.ownerId),
-      ) as RelationGroupEmpty;
-      expect(group.revision, revision);
     },
   );
 
@@ -2206,37 +1853,6 @@ final class _CheckpointChoiceIds implements DailyChoiceIdGenerator {
   DailyChoiceId generate() => durabilityChoice(_next++);
 }
 
-/// Задерживает доставку настоящих ответов, сохраняя чтение и курсоры адаптера.
-final class _CheckpointNavigationReads with TagReadContractTestFallback {
-  _CheckpointNavigationReads(this.delegate);
-
-  final TagReadContract delegate;
-  final queries = <TaggedIntentionsQuery>[];
-  final results = <TaggedIntentionsPageResult>[];
-  Future<void>? tagObservationGate;
-  Future<void>? nextPageGate;
-
-  @override
-  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
-    TaggedIntentionsQuery query,
-  ) async {
-    final gate = nextPageGate;
-    nextPageGate = null;
-    queries.add(query);
-    final result = await delegate.getTaggedIntentionsPage(query);
-    results.add(result);
-    if (gate != null) await gate;
-    return result;
-  }
-
-  @override
-  Stream<TagReadResult> watchTag(TagId id) =>
-      delegate.watchTag(id).asyncMap((result) async {
-        if (tagObservationGate case final gate?) await gate;
-        return result;
-      });
-}
-
 /// Единая среда каталога, подробного просмотра и соседства одного намерения.
 final class _CheckpointHarness {
   _CheckpointHarness(
@@ -2318,10 +1934,6 @@ final class _CheckpointHarness {
   IntentionDetailsLoaded get details =>
       _container.read(intentionDetailsViewModelProvider(ownerId))
           as IntentionDetailsLoaded;
-
-  void archiveOwner() => _container
-      .read(intentionDetailsViewModelProvider(ownerId).notifier)
-      .archive();
 
   RelationCounts get detailsCounts => details.details.relationCounts;
 

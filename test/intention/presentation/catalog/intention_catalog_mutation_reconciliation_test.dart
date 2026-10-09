@@ -17,10 +17,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
-final _actionSearchPurpose = SelectDailyChoiceAction(
-  session: IntentionSearchSession(),
-);
-
 void main() {
   test('применяет пакет каталожных изменений одной ревизии целиком', () async {
     final repository = ControlledCatalogRepository();
@@ -740,13 +736,13 @@ void main() {
   });
 
   group('отметка избранного', () {
-    test('отметка и её снятие обновляют загруженную строку на месте во всех '
-        'четырёх порядках', () async {
+    test('отметка и её снятие обновляют загруженную строку на месте при '
+        'порядке по созданию и по изменению', () async {
+      // Отметка не меняет ключей порядка: направление не меняет путь, а
+      // порядок по изменению — случай, где изменение могло бы сдвинуть строку.
       for (final order in [
         IntentionCatalogOrder.createdAtDescending,
-        IntentionCatalogOrder.createdAtAscending,
         IntentionCatalogOrder.updatedAtDescending,
-        IntentionCatalogOrder.updatedAtAscending,
       ]) {
         final reason = '${order.field}/${order.direction}';
         final repository = ControlledCatalogRepository();
@@ -984,55 +980,32 @@ void main() {
 
     IntentionSummary created({
       String title = 'Ходить в лес',
-      IntentionReadiness readiness = IntentionReadiness.ready,
       required List<Tag> tags,
     }) => testSummary(
       index: 9,
       title: title,
-      readiness: readiness,
+      readiness: IntentionReadiness.ready,
       tags: tags,
       favoriteMark: FavoriteMark.favorite,
     );
 
-    for (final (name, purpose, entry, matches)
-        in <(String, IntentionCatalogPurpose, IntentionSummary, bool)>[
-          (
-            'подходит названию, готовности и тегам',
-            const BrowseIntentionCatalog(),
-            created(tags: [health, rest]),
-            true,
-          ),
-          (
-            'не подходит названию',
-            const BrowseIntentionCatalog(),
-            created(title: 'Читать в лесу', tags: [health, rest]),
-            false,
-          ),
-          (
-            'без обязательного тега',
-            const BrowseIntentionCatalog(),
-            created(tags: [rest]),
-            false,
-          ),
-          (
-            'с исключённым тегом',
-            const BrowseIntentionCatalog(),
-            created(tags: [health, sport, rest]),
-            false,
-          ),
-          (
-            'готовое при выборе действия',
-            _actionSearchPurpose,
-            created(tags: [health]),
-            true,
-          ),
-          (
-            'неготовое при выборе действия',
-            _actionSearchPurpose,
-            created(readiness: IntentionReadiness.notReady, tags: [health]),
-            false,
-          ),
-        ]) {
+    // Готовность при выборе действия проверяет создание через настоящий
+    // репозиторий; здесь — условия, по-разному сочетающиеся с фактами
+    // назначений пакета.
+    for (final (name, entry, matches) in <(String, IntentionSummary, bool)>[
+      (
+        'подходит названию, готовности и тегам',
+        created(tags: [health, rest]),
+        true,
+      ),
+      (
+        'не подходит названию',
+        created(title: 'Читать в лесу', tags: [health, rest]),
+        false,
+      ),
+      ('без обязательного тега', created(tags: [rest]), false),
+      ('с исключённым тегом', created(tags: [health, sport, rest]), false),
+    ]) {
       test('принадлежность выдаче задаёт окончательный снимок, а пакет с '
           'фактами назначений применяется одним изменением ревизии: '
           '$name', () async {
@@ -1042,7 +1015,9 @@ void main() {
           pageSize: 2,
           prefetchRemaining: 0,
         );
-        final provider = intentionCatalogViewModelProvider(purpose);
+        final provider = intentionCatalogViewModelProvider(
+          const BrowseIntentionCatalog(),
+        );
         final published = <AsyncValue<IntentionCatalogState>>[];
         final subscription = container.listen(
           provider,

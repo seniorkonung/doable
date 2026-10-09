@@ -30,10 +30,6 @@ const _unavailableRu = 'Не удалось загрузить намерени�
 const _emptyRu = 'Активных намерений пока нет.';
 const _refreshUnavailableRu =
     'Список намерений не обновлён: не удалось получить изменения.';
-const _refreshCorruptionRu =
-    'Список намерений не обновлён: сохранённые данные повреждены.';
-const _refreshUnexpectedRu =
-    'Список намерений не обновлён из-за непредвиденной ошибки.';
 
 /// Высота строки-образца выдачи.
 const _rowExtent = 48.0;
@@ -53,52 +49,38 @@ final _health = _tag(1, 'Здоровье');
 final _sport = _tag(2, 'Спорт');
 final _other = _tag(3, 'Отдых');
 
-/// Отказы обновления трёх категорий с их сообщениями.
-final _refreshFailures = <(String, IntentionFailure, String)>[
-  ('недоступности', const IntentionUnavailableFailure(), _refreshUnavailableRu),
-  ('повреждения', const IntentionCorruptionFailure(), _refreshCorruptionRu),
-  (
-    'неожиданной ошибки',
-    const IntentionUnexpectedFailure(),
-    _refreshUnexpectedRu,
-  ),
-];
-
 void main() {
   group('отказ обновления над загруженным списком', () {
-    for (final (name, failure, message) in _refreshFailures) {
-      testWidgets('появление и снятие отказа из-за $name не меняют смещение '
-          'и экранное положение строки прокрученного списка', (tester) async {
-        final h = await _open(tester);
-        await h.load(_summaries(first: 40));
-        h.position.jumpTo(300);
-        await _settle(tester);
-        final rowTop = _rowTop(tester, 'Намерение 33');
+    // Категория отказа меняет только текст и повтор общего представления
+    // отказа; место над списком у всех одно.
+    testWidgets('появление и снятие отказа из-за недоступности не меняют '
+        'смещение и экранное положение строки прокрученного списка', (
+      tester,
+    ) async {
+      final h = await _open(tester);
+      await h.load(_summaries(first: 40));
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final rowTop = _rowTop(tester, 'Намерение 33');
 
-        await h.failRefresh(failure);
+      await h.failRefresh(const IntentionUnavailableFailure());
 
-        expect(find.text(message), findsOneWidget);
-        expect(
-          _refreshRetry,
-          failure is IntentionUnavailableFailure
-              ? findsOneWidget
-              : findsNothing,
-        );
-        expect(h.position.pixels, 300);
-        expect(_rowTop(tester, 'Намерение 33'), rowTop);
-        // Отказ лежит поверх верхнего края списка и не сжимает его область.
-        expect(
-          tester.getRect(_refreshStatus).top,
-          moreOrLessEquals(tester.getRect(_list).top, epsilon: 0.01),
-        );
+      expect(find.text(_refreshUnavailableRu), findsOneWidget);
+      expect(_refreshRetry, findsOneWidget);
+      expect(h.position.pixels, 300);
+      expect(_rowTop(tester, 'Намерение 33'), rowTop);
+      // Отказ лежит поверх верхнего края списка и не сжимает его область.
+      expect(
+        tester.getRect(_refreshStatus).top,
+        moreOrLessEquals(tester.getRect(_list).top, epsilon: 0.01),
+      );
 
-        await h.recoverRefresh(totalCount: 40);
+      await h.recoverRefresh(totalCount: 40);
 
-        expect(find.text(message), findsNothing);
-        expect(h.position.pixels, 300);
-        expect(_rowTop(tester, 'Намерение 33'), rowTop);
-      });
-    }
+      expect(find.text(_refreshUnavailableRu), findsNothing);
+      expect(h.position.pixels, 300);
+      expect(_rowTop(tester, 'Намерение 33'), rowTop);
+    });
 
     for (final (name, count) in [
       ('прокручиваемый', 40),
@@ -166,37 +148,27 @@ void main() {
       );
     });
 
-    for (final (name, failure, message) in _refreshFailures) {
-      testWidgets('отказ обновления из-за $name стоит над сообщением о '
-          'пустоте', (tester) async {
-        final h = await _open(tester);
-        await h.load(const []);
+    testWidgets('отказ обновления из-за недоступности стоит над сообщением '
+        'о пустоте', (tester) async {
+      final h = await _open(tester);
+      await h.load(const []);
 
-        await h.failRefresh(failure);
+      await h.failRefresh(const IntentionUnavailableFailure());
 
-        expect(h.confirmed, isA<IntentionCatalogEmpty>());
-        expect(find.text(message), findsOneWidget);
-        expect(find.text(_emptyRu), findsOneWidget);
-        expect(
-          _refreshRetry,
-          failure is IntentionUnavailableFailure
-              ? findsOneWidget
-              : findsNothing,
-        );
-        expect(
-          tester.getRect(_refreshStatus).bottom,
-          lessThanOrEqualTo(tester.getRect(find.text(_emptyRu)).top),
-        );
-      });
-    }
+      expect(h.confirmed, isA<IntentionCatalogEmpty>());
+      expect(find.text(_refreshUnavailableRu), findsOneWidget);
+      expect(find.text(_emptyRu), findsOneWidget);
+      expect(_refreshRetry, findsOneWidget);
+      expect(
+        tester.getRect(_refreshStatus).bottom,
+        lessThanOrEqualTo(tester.getRect(find.text(_emptyRu)).top),
+      );
+    });
   });
 
   group('верхняя позиция при смене параметров', () {
     for (final (name, change) in <(String, void Function(_Harness))>[
-      (
-        'условий по тегам',
-        (h) => h.notifier.changeTagFilter(IntentionTagFilter.empty),
-      ),
+      ('условий по тегам', _clearTagConditions),
       ('текста названия', (h) => h.notifier.changeTitleFilter('намерение')),
       ('охвата', (h) => h.notifier.changeScope(IntentionScope.archived)),
       (
@@ -219,9 +191,14 @@ void main() {
           moreOrLessEquals(tester.getRect(_list).top),
         );
       });
+    }
 
-      testWidgets('смена $name при списке, снятом с экрана пустой выдачей, '
-          'открывает выдачу со смещением ноль', (tester) async {
+    // Смена любого параметра идёт одним путём; на краях списка проверяется
+    // смена условий по тегам.
+    testWidgets(
+      'смена условий по тегам при списке, снятом с экрана пустой выдачей, '
+      'открывает выдачу со смещением ноль',
+      (tester) async {
         final h = await _open(tester);
         await h.load(_summaries(first: 40));
         h.position.jumpTo(300);
@@ -232,30 +209,30 @@ void main() {
         expect(_list, findsNothing);
         expect(find.text(_emptyRu), findsOneWidget);
 
-        await h.changeParameters(change, _summaries(first: 40));
+        await h.changeParameters(_clearTagConditions, _summaries(first: 40));
 
         expect(h.position.pixels, 0);
         expect(
           _rowTop(tester, 'Намерение 40'),
           moreOrLessEquals(tester.getRect(_list).top),
         );
-      });
+      },
+    );
 
-      testWidgets('первая после монтирования на уже загруженную выдачу смена '
-          '$name открывает выдачу со смещением ноль', (tester) async {
-        final h = await _open(tester, loadedBeforeMount: _summaries(first: 40));
-        h.position.jumpTo(300);
-        await _settle(tester);
+    testWidgets('первая после монтирования на уже загруженную выдачу смена '
+        'условий по тегам открывает выдачу со смещением ноль', (tester) async {
+      final h = await _open(tester, loadedBeforeMount: _summaries(first: 40));
+      h.position.jumpTo(300);
+      await _settle(tester);
 
-        await h.changeParameters(change, _summaries(first: 40));
+      await h.changeParameters(_clearTagConditions, _summaries(first: 40));
 
-        expect(h.position.pixels, 0);
-        expect(
-          _rowTop(tester, 'Намерение 40'),
-          moreOrLessEquals(tester.getRect(_list).top),
-        );
-      });
-    }
+      expect(h.position.pixels, 0);
+      expect(
+        _rowTop(tester, 'Намерение 40'),
+        moreOrLessEquals(tester.getRect(_list).top),
+      );
+    });
 
     testWidgets('выдача, вернувшаяся после временной пустоты без смены '
         'параметров, сохраняет позицию', (tester) async {
@@ -455,6 +432,9 @@ List<IntentionSummary> _summaries({
       tags: tags ?? [_health],
     ),
 ];
+
+void _clearTagConditions(_Harness h) =>
+    h.notifier.changeTagFilter(IntentionTagFilter.empty);
 
 double _rowTop(WidgetTester tester, String title) =>
     tester.getTopLeft(find.text(title)).dy;

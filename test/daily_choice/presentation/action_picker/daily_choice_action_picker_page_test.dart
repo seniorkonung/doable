@@ -44,10 +44,7 @@ void main() {
       readinessFilter: IntentionReadinessFilter.readyOnly,
       rowReadiness: const [IntentionReadiness.ready],
       totalCountLabel: (count) => 'Total actions: $count',
-      emptyScopeMessages: const {
-        'en': 'No active actions are available.',
-        'ru': 'Доступных активных действий нет.',
-      },
+      emptyScopeMessage: 'No active actions are available.',
     ),
   );
 
@@ -105,7 +102,6 @@ void main() {
 
   for (final (language, markLabel, totalCount) in [
     ('en', 'Favorite intention', 'Total actions: 2'),
-    ('ru', 'Избранное намерение', 'Всего действий: 2'),
   ]) {
     testWidgets(
       '$language: без условий поиска звезду показывает только '

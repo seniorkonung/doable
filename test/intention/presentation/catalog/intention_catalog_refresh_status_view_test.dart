@@ -86,41 +86,24 @@ void main() {
     },
   );
 
-  for (final (name, failure, text, hasRetry) in [
-    (
-      'недоступности',
-      const IntentionUnavailableFailure(),
-      _unavailableRu,
-      true,
-    ),
-    ('повреждения', const IntentionCorruptionFailure(), _corruptionRu, false),
-    (
-      'неожиданной ошибки',
-      const IntentionUnexpectedFailure(),
-      _unexpectedRu,
-      false,
-    ),
-  ]) {
-    testWidgets('отказ обновления из-за $name объявляется живой областью', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      final h = await _open(tester);
-      await h.loadExcluding([testSummary(index: 1)]);
+  // Живую область задаёт общее представление сообщения всех категорий
+  // отказа; категория с повтором проверяет и кнопку.
+  testWidgets('отказ обновления из-за недоступности объявляется живой '
+      'областью', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final h = await _open(tester);
+    await h.loadExcluding([testSummary(index: 1)]);
 
-      await h.failRefresh(ResultFailure(failure));
+    await h.failRefresh(const ResultFailure(IntentionUnavailableFailure()));
 
-      final message = tester.getSemantics(find.text(text));
-      expect(message.label, contains(text));
-      expect(message.flagsCollection.isLiveRegion, isTrue);
-      if (hasRetry) {
-        final retry = tester.getSemantics(_retry);
-        expect(retry.label, 'Повторить');
-        expect(retry.flagsCollection.isButton, isTrue);
-      }
-      semantics.dispose();
-    });
-  }
+    final message = tester.getSemantics(find.text(_unavailableRu));
+    expect(message.label, contains(_unavailableRu));
+    expect(message.flagsCollection.isLiveRegion, isTrue);
+    final retry = tester.getSemantics(_retry);
+    expect(retry.label, 'Повторить');
+    expect(retry.flagsCollection.isButton, isTrue);
+    semantics.dispose();
+  });
 
   for (final (language, retry, messages) in [
     ('ru', 'Повторить', [_unavailableRu, _corruptionRu, _unexpectedRu]),

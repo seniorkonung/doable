@@ -124,10 +124,6 @@ final class ControlledCatalogRepository
     _requests[index].complete(result);
   }
 
-  void failPage(int index, Object error) {
-    _requests[index].completeError(error);
-  }
-
   IntentionCatalogReconciliationQuery reconciliationQueryAt(int index) =>
       reconciliationQueries[index];
 
@@ -136,10 +132,6 @@ final class ControlledCatalogRepository
     Result<IntentionCatalogReconciliationOutcome> result,
   ) {
     _reconciliationRequests[index].complete(result);
-  }
-
-  void failReconciliation(int index, Object error) {
-    _reconciliationRequests[index].completeError(error);
   }
 
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {

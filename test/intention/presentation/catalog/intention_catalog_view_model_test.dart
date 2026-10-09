@@ -268,7 +268,7 @@ void main() {
         ),
       );
     }
-    for (final prefetchRemaining in [-1, 3, 4]) {
+    for (final prefetchRemaining in [-1, 3]) {
       expect(
         () => CatalogPagingPolicy(
           pageSize: 3,

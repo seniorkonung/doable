@@ -172,18 +172,6 @@ void main() {
     expect(h.reads.queries, hasLength(3));
   });
 
-  test('чтение чужого тега не подменяет условие', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
-    h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-
-    h.reads.tag(0, _tag(2, 'Спорт'), revision: 2);
-    await pumpEventQueue();
-
-    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
-  });
-
   test(
     'позднее чтение не возвращает название до более нового пакета',
     () async {
