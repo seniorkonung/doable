@@ -1605,6 +1605,15 @@ deployments:
   content_hash: sha256:1f8352e4fad91fc1f1bee955d70521636e1da6453a96022fb3a8939cc6646e55
 - kind: project-relative
   target: claude
+  value: .claude/rules/responsible-testing.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:656b5421dd95c096807dca35d5fd7a9e74c0bd2305427b4f90d84b77faefaf7f
+- kind: project-relative
+  target: claude
   value: .claude/rules/spec-first.md
   runtime: null
   scope: project
@@ -2603,10 +2612,12 @@ mcp_target_servers:
 local_deployed_files:
 - .claude/rules/dart-mcp.md
 - .claude/rules/language-preferences.md
+- .claude/rules/responsible-testing.md
 - .claude/rules/spec-first.md
 - .claude/rules/type-safe-design.md
 local_deployed_file_hashes:
   .claude/rules/dart-mcp.md: sha256:2fe787079b658fa1fba9f8bfbdd219858c3fd18e5997f01d43e8ddec488ca8e9
   .claude/rules/language-preferences.md: sha256:e500f4facb5fc936b79aa3b7eb140bbd2f456d5d497da76a269ae7d5322ca1e8
+  .claude/rules/responsible-testing.md: sha256:656b5421dd95c096807dca35d5fd7a9e74c0bd2305427b4f90d84b77faefaf7f
   .claude/rules/spec-first.md: sha256:bd2ca3e1948f97d2a9875b0f0dd72b8d56cb737a738207bbfcf6bd01b1807083
   .claude/rules/type-safe-design.md: sha256:91e3d48f0eb3d7f65f523e59c7734221f93208c91557d07ddc40dc2a9c8dd867
