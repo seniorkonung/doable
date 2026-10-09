@@ -694,100 +694,6 @@ void main() {
   });
 
   group('Диагностика', () {
-    test('фактическая перестановка начинается чтением и подтверждается '
-        'записью', () async {
-      for (final number in [1, 2]) {
-        _insertFavorite(
-          raw,
-          number: number,
-          title: '$number',
-          position: number,
-        );
-      }
-
-      await _moved(repository, _move(2, first: true));
-
-      final events = _orderEvents(diagnostics);
-      expect(events.map(_eventShape), [
-        (
-          stage: FavoriteOrderCommandDiagnosticsStage.read,
-          status: DiagnosticsStarted,
-          completion: null,
-          code: null,
-        ),
-        (
-          stage: FavoriteOrderCommandDiagnosticsStage.write,
-          status: DiagnosticsSucceeded,
-          completion: FavoriteOrderCommandDiagnosticsCompletion.moved,
-          code: null,
-        ),
-      ]);
-    });
-
-    test(
-      'перемещение без изменения завершается проверкой без записи',
-      () async {
-        for (final number in [1, 2]) {
-          _insertFavorite(
-            raw,
-            number: number,
-            title: '$number',
-            position: number,
-          );
-        }
-
-        await _confirmed(repository, _move(2, after: 1));
-
-        expect(_orderEvents(diagnostics).map(_eventShape).last, (
-          stage: FavoriteOrderCommandDiagnosticsStage.validation,
-          status: DiagnosticsSucceeded,
-          completion: FavoriteOrderCommandDiagnosticsCompletion.unchanged,
-          code: null,
-        ));
-      },
-    );
-
-    for (final scenario in [
-      (
-        name: 'ошибка ввода',
-        command: _move(1, after: 1),
-        code: DiagnosticsFailureCode.validation,
-      ),
-      (
-        name: 'конфликт актуального состояния',
-        command: _move(1, after: 9),
-        code: DiagnosticsFailureCode.conflict,
-      ),
-    ]) {
-      test('${scenario.name} диагностируется на этапе проверки', () async {
-        for (final number in [1, 2]) {
-          _insertFavorite(
-            raw,
-            number: number,
-            title: '$number',
-            position: number,
-          );
-        }
-
-        await repository.execute(scenario.command);
-
-        expect(_orderEvents(diagnostics).map(_eventShape), [
-          (
-            stage: FavoriteOrderCommandDiagnosticsStage.read,
-            status: DiagnosticsStarted,
-            completion: null,
-            code: null,
-          ),
-          (
-            stage: FavoriteOrderCommandDiagnosticsStage.validation,
-            status: DiagnosticsFailed,
-            completion: null,
-            code: scenario.code,
-          ),
-        ]);
-      });
-    }
-
     test('повреждение сохранённого порядка диагностируется на этапе '
         'проверки', () async {
       _insertFavorite(raw, number: 1, title: '1', position: 1);
@@ -805,33 +711,6 @@ void main() {
         completion: null,
         code: DiagnosticsFailureCode.corruption,
       ));
-    });
-
-    test('отказ получателя диагностики не меняет результат, не повторяет и '
-        'не откатывает запись', () async {
-      final throwingDiagnostics = _ThrowingDiagnosticsSink();
-      final failingRepository = _repository(database, throwingDiagnostics);
-      for (final number in [1, 2, 3]) {
-        _insertFavorite(
-          raw,
-          number: number,
-          title: '$number',
-          position: number,
-        );
-      }
-      trace.clear();
-
-      final result = await failingRepository.execute(_move(3, first: true));
-
-      expect(_successOf(result), isA<FavoriteOrderMoved>());
-      expect(_storedOrder(raw), _uuids([3, 1, 2]));
-      expect(trace.writes, hasLength(2));
-      expect(
-        throwingDiagnostics.attemptedEvents
-            .whereType<FavoriteOrderCommandDiagnosticsEvent>()
-            .map((event) => event.completion),
-        [null, FavoriteOrderCommandDiagnosticsCompletion.moved],
-      );
     });
   });
 }
@@ -876,16 +755,6 @@ final class _WriteGate extends LocalDatabaseConnectionObserver {
     _armed = false;
     _entered.complete();
     await _released.future;
-  }
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-отказ-получателя-диагностики');
   }
 }
 

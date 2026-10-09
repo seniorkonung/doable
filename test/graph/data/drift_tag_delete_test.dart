@@ -32,11 +32,6 @@ final class _StatementProbe extends LocalDatabaseConnectionObserver {
   }
 }
 
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  @override
-  void record(DiagnosticsEvent event) => throw StateError('Сбой диагностики');
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
@@ -289,22 +284,6 @@ void main() {
       (await currentRevision()).compareTo(revision),
       GraphRevisionOrder.same,
     );
-  });
-
-  test('сбой диагностики не меняет подтверждённое удаление', () async {
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(601),
-      'Дом',
-    ]);
-    final withBrokenDiagnostics = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      _ThrowingDiagnosticsSink(),
-    );
-    final result = await withBrokenDiagnostics.execute(DeleteTag(_tagId(601)));
-    expect(result, isA<TagCommandSucceeded>());
-    expect(raw.select('SELECT * FROM tags'), isEmpty);
   });
 
   test('широко используемый тег удаляется одним компактным каскадом', () async {

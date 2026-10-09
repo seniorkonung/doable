@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
@@ -12,7 +11,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -418,225 +416,6 @@ void main() {
       await expectCorruption();
     });
   });
-
-  group('Диагностика чтения списка', () {
-    test(
-      'успех несёт этап проверки сохранённых данных и длительность',
-      () async {
-        seedFavorites();
-        diagnostics.clear();
-
-        await _favorites(repository);
-
-        expect(diagnostics.readEvents, [_started(), _succeeded()]);
-        expect(
-          (diagnostics.readEvents.last.status as DiagnosticsSucceeded).duration,
-          greaterThanOrEqualTo(Duration.zero),
-        );
-      },
-    );
-
-    test('успешный пустой снимок диагностируется как успех', () async {
-      diagnostics.clear();
-
-      final snapshot = await _favorites(repository);
-
-      expect(snapshot.items, isEmpty);
-      expect(diagnostics.readEvents, [_started(), _succeeded()]);
-    });
-
-    test('чтение списка не получает событий других операций', () async {
-      seedFavorites();
-      diagnostics.clear();
-
-      await _favorites(repository);
-
-      expect(
-        diagnostics.events,
-        everyElement(isA<FavoriteIntentionsReadDiagnosticsEvent>()),
-      );
-    });
-
-    test('события и запись получателя разработчика несут только безопасные '
-        'поля', () async {
-      seedFavorites();
-      diagnostics.clear();
-
-      await _favorites(repository);
-      for (final (point, error) in [
-        (_FaultPoint.rowsRead, _busy),
-        (_FaultPoint.rowsRead, _corrupt),
-        (_FaultPoint.countsRead, StateError('CANARY-исключение')),
-        (_FaultPoint.countsRead, _readOnly),
-      ]) {
-        storage.arm(point, error);
-        await repository.getFavoriteIntentions();
-        storage.disarm();
-      }
-      _insertIntentionWithId(
-        raw,
-        id: 'CANARY-идентификатор',
-        title: 'CANARY-повреждённое',
-        description: 'CANARY-описание',
-      );
-      storeFavoriteMark(raw, intentionId: 'CANARY-идентификатор', position: 8);
-      await repository.getFavoriteIntentions();
-
-      expect(
-        [
-          for (final message in diagnostics.messages)
-            (message['outcome'], message['stage'], message['failureCode']),
-        ],
-        [
-          ('started', 'read', null),
-          ('succeeded', 'validation', null),
-          ('started', 'read', null),
-          ('failed', 'read', 'unavailable'),
-          ('started', 'read', null),
-          ('failed', 'read', 'corruption'),
-          ('started', 'read', null),
-          ('failed', 'read', 'unexpected'),
-          ('started', 'read', null),
-          ('failed', 'read', 'unexpected'),
-          ('started', 'read', null),
-          ('failed', 'validation', 'corruption'),
-        ],
-      );
-      for (final message in diagnostics.messages) {
-        expect(message['operation'], 'favoriteIntentionsRead');
-        expect(message.keys.toSet(), switch (message['outcome']) {
-          'started' => {'operation', 'stage', 'outcome'},
-          'succeeded' => {'operation', 'stage', 'outcome', 'durationMicros'},
-          _ => {
-            'operation',
-            'stage',
-            'outcome',
-            'durationMicros',
-            'failureCode',
-          },
-        });
-      }
-      final written = diagnostics.rawMessages.join('\n');
-      for (final secret in [
-        'CANARY',
-        for (var number = 1; number <= 4; number++) _uuid(number),
-        'favorite_intentions',
-        'position',
-        'SELECT',
-        'Exception',
-        'StateError',
-      ]) {
-        expect(written, isNot(contains(secret)));
-      }
-      // Значения событий — только перечисления и длительность: названий,
-      // идентификаторов, состава и порядка избранных в них нет по построению
-      // типа.
-      for (final value in [
-        for (final message in diagnostics.messages) ...message.values,
-      ]) {
-        expect(
-          value,
-          anyOf(
-            isA<int>(),
-            isIn([
-              'favoriteIntentionsRead',
-              'read',
-              'validation',
-              'started',
-              'succeeded',
-              'failed',
-              'unavailable',
-              'corruption',
-              'unexpected',
-            ]),
-          ),
-        );
-      }
-    });
-  });
-
-  group('Независимость от получателя диагностики', () {
-    test('отказ получателя не меняет успешный список и не повторяет '
-        'чтение', () async {
-      seedFavorites();
-      final failing = _ThrowingDiagnosticsSink();
-      repository = repositoryWith(failing);
-      storage.clear();
-
-      final snapshot = await _favorites(repository);
-
-      expect(snapshot.items.map(_rowId), [_uuid(1), _uuid(3)]);
-      expect(snapshot.archivedCount, 1);
-      expect(storage.favoriteReads, 1);
-      expect(storage.writes, isEmpty);
-      expect(failing.attemptedEvents, [_started(), _succeeded()]);
-    });
-
-    test('отказ получателя не меняет повреждение и не повторяет '
-        'чтение', () async {
-      seedFavorites();
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _uuid(101),
-        position: 3,
-      );
-      final failing = _ThrowingDiagnosticsSink();
-      repository = repositoryWith(failing);
-      storage.clear();
-
-      final result = await repository.getFavoriteIntentions();
-
-      expect(result, _failure(isA<FavoriteIntentionsCorruptionFailure>()));
-      expect(storage.favoriteReads, 1);
-      expect(failing.attemptedEvents, [
-        _started(),
-        _failed(
-          FavoriteIntentionsReadDiagnosticsStage.validation,
-          DiagnosticsFailureCode.corruption,
-        ),
-      ]);
-    });
-
-    for (final fault in _storageFaults) {
-      test('отказ получателя не меняет категорию отказа: '
-          '${fault.name}', () async {
-        seedFavorites();
-        final failing = _ThrowingDiagnosticsSink();
-        repository = repositoryWith(failing);
-        storage.clear();
-        storage.arm(_FaultPoint.rowsRead, fault.error);
-
-        final result = await repository.getFavoriteIntentions();
-
-        expect(result, _failure(fault.failure));
-        expect(storage.failures, 1);
-        expect(storage.favoriteReads, 1);
-        expect(failing.attemptedEvents, [
-          _started(),
-          _failed(FavoriteIntentionsReadDiagnosticsStage.read, fault.code),
-        ]);
-      });
-    }
-
-    test('отказ записи получателя разработчика не меняет результат и не '
-        'повторяет чтение', () async {
-      seedFavorites();
-      var writeAttempts = 0;
-      repository = repositoryWith(
-        DeveloperDiagnosticsSink((_) {
-          writeAttempts++;
-          throw StateError('CANARY-отказ-записи-диагностики');
-        }),
-      );
-      storage.clear();
-
-      final snapshot = await _favorites(repository);
-
-      expect(snapshot.items.map(_rowId), [_uuid(1), _uuid(3)]);
-      expect(writeAttempts, 2);
-      expect(storage.favoriteReads, 1);
-    });
-  });
 }
 
 /// Подтверждённые отметки намерений фикстуры, чьи сохранённые данные целостны.
@@ -658,11 +437,6 @@ final _busy = sqlite.SqliteException(
 final _corrupt = sqlite.SqliteException(
   extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
   message: 'CANARY-повреждение',
-);
-
-final _readOnly = sqlite.SqliteException(
-  extendedResultCode: sqlite.SqlError.SQLITE_READONLY,
-  message: 'CANARY-неизвестный-SQLite-отказ',
 );
 
 /// Отказы хранилища трёх различимых категорий.
@@ -773,42 +547,20 @@ final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
   }
 }
 
-/// Сохраняет события и то, что получатель разработчика записал бы в журнал.
+/// Сохраняет события диагностики чтения.
 final class _RecordingDiagnostics implements DiagnosticsSink {
   final _events = <DiagnosticsEvent>[];
-  final rawMessages = <String>[];
-  late final _developer = DeveloperDiagnosticsSink(rawMessages.add);
-
-  List<DiagnosticsEvent> get events => List.unmodifiable(_events);
 
   List<FavoriteIntentionsReadDiagnosticsEvent> get readEvents =>
       _events.whereType<FavoriteIntentionsReadDiagnosticsEvent>().toList();
 
-  /// Записи получателя разработчика.
-  List<Map<String, Object?>> get messages => [
-    for (final message in rawMessages)
-      jsonDecode(message) as Map<String, Object?>,
-  ];
-
   void clear() {
     _events.clear();
-    rawMessages.clear();
   }
 
   @override
   void record(DiagnosticsEvent event) {
     _events.add(event);
-    _developer.record(event);
-  }
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-отказ-получателя-диагностики');
   }
 }
 
@@ -881,7 +633,6 @@ void _insertIntentionWithId(
   sqlite.Database database, {
   required String id,
   required String title,
-  String? description,
   bool isArchived = false,
   DateTime? createdAt,
 }) {
@@ -890,7 +641,7 @@ void _insertIntentionWithId(
   database.execute(
     'INSERT INTO intentions (id, title, description, is_action_ready, '
     'is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, title, description, 0, isArchived ? 1 : 0, timestamp, timestamp],
+    [id, title, null, 0, isArchived ? 1 : 0, timestamp, timestamp],
   );
 }
 

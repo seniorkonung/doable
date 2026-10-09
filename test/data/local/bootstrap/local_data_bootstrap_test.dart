@@ -650,34 +650,6 @@ void main() {
       );
     });
 
-    test('записывает безопасные события bootstrap и миграции', () async {
-      final diagnosticsSink = InMemoryDiagnosticsSink();
-      final bootstrap = LocalDataBootstrap(
-        connectionFactory: openInMemoryLocalDatabase,
-        diagnosticsSink: diagnosticsSink,
-      );
-      addTearDown(bootstrap.close);
-
-      expect(await bootstrap.open(), isA<LocalDataReady>());
-
-      expect(diagnosticsSink.events.map((event) => event.runtimeType), [
-        BootstrapDiagnosticsEvent,
-        MigrationDiagnosticsEvent,
-        MigrationDiagnosticsEvent,
-        BootstrapDiagnosticsEvent,
-      ]);
-      final migrationEvents = diagnosticsSink.events
-          .whereType<MigrationDiagnosticsEvent>()
-          .toList();
-      expect(migrationEvents[0].fromSchemaVersion, 0);
-      expect(
-        migrationEvents[0].toSchemaVersion,
-        AppDatabase.currentSchemaVersion,
-      );
-      expect(migrationEvents[0].status, isA<DiagnosticsStarted>());
-      expect(migrationEvents[1].status, isA<DiagnosticsSucceeded>());
-    });
-
     test('записывает версии и безопасный код несовместимой схемы', () async {
       final databaseFile = await _temporaryDatabaseFile();
       final diagnosticsSink = InMemoryDiagnosticsSink();

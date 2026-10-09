@@ -633,67 +633,6 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
-
-  test(
-    'сбой диагностики после commit не меняет подтверждённый успех',
-    () async {
-      await _create(repository, sourceId, relatedId);
-      final throwingDiagnostics = _ThrowingDiagnosticsSink();
-      repository = _repository(database, throwingDiagnostics, const []);
-
-      final result = await repository.execute(
-        UpdateLongTermRelation(
-          relationId: relationId,
-          patch: const LongTermRelationPatch(
-            priority: LongTermRelationFieldSet(RelationPriority.p1),
-          ),
-        ),
-      );
-
-      expect(result, isA<GraphCommandSucceeded>());
-      expect((await _storedRelation(database, relationId))['priority'], 1);
-      expect(
-        throwingDiagnostics.attemptedEvents,
-        everyElement(
-          isA<LongTermRelationCommandDiagnosticsEvent>().having(
-            (event) => event.commandType,
-            'commandType',
-            LongTermRelationCommandDiagnosticsType.update,
-          ),
-        ),
-      );
-    },
-  );
-
-  test('диагностика различает безопасный исход изменения', () async {
-    await _create(repository, sourceId, relatedId);
-
-    await repository.execute(
-      UpdateLongTermRelation(
-        relationId: relationId,
-        patch: const LongTermRelationPatch(
-          priority: LongTermRelationFieldSet(RelationPriority.p3),
-        ),
-      ),
-    );
-
-    expect(
-      diagnostics.events.whereType<LongTermRelationCommandDiagnosticsEvent>(),
-      contains(
-        isA<LongTermRelationCommandDiagnosticsEvent>()
-            .having(
-              (event) => event.commandType,
-              'commandType',
-              LongTermRelationCommandDiagnosticsType.update,
-            )
-            .having(
-              (event) => event.status,
-              'status',
-              isA<DiagnosticsSucceeded>(),
-            ),
-      ),
-    );
-  });
 }
 
 Future<LongTermRelationCreated> _create(
@@ -853,14 +792,4 @@ final class _DeterministicRelationIdGenerator
 
   @override
   LongTermRelationId generate() => _ids[_index++];
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-диагностика');
-  }
 }

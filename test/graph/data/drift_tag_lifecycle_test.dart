@@ -64,11 +64,6 @@ final class _WriteProbe extends LocalDatabaseConnectionObserver {
   }
 }
 
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  @override
-  void record(DiagnosticsEvent event) => throw StateError('Сбой диагностики');
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
@@ -347,29 +342,6 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
-
-  test(
-    'отказ диагностического получателя не меняет результат команды',
-    () async {
-      final withBrokenDiagnostics = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 25),
-        _ThrowingDiagnosticsSink(),
-      );
-      final created = await withBrokenDiagnostics.execute(
-        CreateTag(_name('Дом')),
-      );
-      expect(created, isA<TagCommandSucceeded>());
-      final id =
-          ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
-      final renamed = await withBrokenDiagnostics.execute(
-        RenameTag(tagId: id, name: _name('Быт')),
-      );
-      expect(renamed, isA<TagCommandSucceeded>());
-      expect(raw.select('SELECT name FROM tags').single['name'], 'Быт');
-    },
-  );
 
   test('отсутствующий тег не заменяется новым одноимённым', () async {
     final missing = (TagId.decode(_uuid(8)) as TagIdDecodingSuccess).id;

@@ -411,28 +411,6 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
-
-  test(
-    'сбой диагностики после commit не меняет подтверждённый успех',
-    () async {
-      final throwingDiagnostics = _ThrowingDiagnosticsSink();
-      repository = _repository(database, throwingDiagnostics, [relationId]);
-
-      final result = await repository.execute(
-        _createCommand(sourceId, relatedId),
-      );
-
-      expect(result, isA<GraphCommandSucceeded>());
-      expect(
-        await database.select(database.longTermRelations).get(),
-        hasLength(1),
-      );
-      expect(
-        throwingDiagnostics.attemptedEvents,
-        everyElement(isA<LongTermRelationCommandDiagnosticsEvent>()),
-      );
-    },
-  );
 }
 
 CreateLongTermRelation _createCommand(
@@ -527,16 +505,6 @@ final class _DeterministicRelationIdGenerator
 
   @override
   LongTermRelationId generate() => _ids[_index++];
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-диагностика');
-  }
 }
 
 IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {

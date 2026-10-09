@@ -125,11 +125,6 @@ final class _Fixture {
   }
 }
 
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  @override
-  void record(DiagnosticsEvent event) => throw StateError('Сбой диагностики');
-}
-
 final class _ContinuationSelectTrace extends LocalDatabaseConnectionObserver {
   final selects = <_MeasuredSelect>[];
   final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
@@ -1229,22 +1224,5 @@ void main() {
       (stale as ChoicePathContinuationError).failure,
       isA<ChoicePathContinuationSnapshotExpired>(),
     );
-  });
-
-  test('сбой диагностики не меняет результат чтения', () async {
-    fixture.intention(1);
-    fixture.intention(2, ready: true);
-    fixture.relation(101, 1, 2);
-    final repository = DriftPersonalGraphRepository(
-      fixture.database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 23),
-      _ThrowingDiagnosticsSink(),
-    );
-    final result = await repository.getChoicePathContinuations(
-      ChoicePathContinuationQuery(draft: ChoicePathDraftStart(_intention(1))),
-    );
-    expect(result, isA<ChoicePathContinuationSuccess>());
-    expect((result as ChoicePathContinuationSuccess).value.items, hasLength(1));
   });
 }

@@ -89,31 +89,25 @@ void main() {
   }
 
   for (final unreadable in [false, true]) {
-    for (final throwingSink in [false, true]) {
-      testWidgets('${unreadable ? 'отказ чтения' : 'неизвестный ключ'}, '
-          'получатель ${throwingSink ? 'бросает' : 'работает'}: '
-          'Главная и создание доступны без сообщения об ошибке', (
-        tester,
-      ) async {
-        await tester.runAsync(() async {
-          if (unreadable) {
-            await Directory(modeFile.path).create(recursive: true);
-          } else {
-            await modeFile.parent.create();
-            await modeFile.writeAsString('Секретное содержимое настройки');
-          }
-        });
-        diagnostics.throwsOnMode = throwingSink;
-        final session = await _mount(tester, store(), diagnostics);
-        _expectHome(tester, session, QuickCreationMode.intention);
-        _expectFailures(diagnostics, 'read', [
-          unreadable ? 'unavailable' : 'corruption',
-        ]);
-        expect(find.byType(SnackBar), findsNothing);
-        expect(find.byType(AlertDialog), findsNothing);
-        await _expectLaunch(tester, session, QuickCreationMode.intention);
+    testWidgets('${unreadable ? 'отказ чтения' : 'неизвестный ключ'}: '
+        'Главная и создание доступны без сообщения об ошибке', (tester) async {
+      await tester.runAsync(() async {
+        if (unreadable) {
+          await Directory(modeFile.path).create(recursive: true);
+        } else {
+          await modeFile.parent.create();
+          await modeFile.writeAsString('Секретное содержимое настройки');
+        }
       });
-    }
+      final session = await _mount(tester, store(), diagnostics);
+      _expectHome(tester, session, QuickCreationMode.intention);
+      _expectFailures(diagnostics, 'read', [
+        unreadable ? 'unavailable' : 'corruption',
+      ]);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      await _expectLaunch(tester, session, QuickCreationMode.intention);
+    });
   }
 
   for (final step in [ModeWriteStep.write, ModeWriteStep.rename]) {

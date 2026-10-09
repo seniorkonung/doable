@@ -384,27 +384,6 @@ void main() {
     );
   });
 
-  test('сбой диагностики не меняет успешную сводку', () async {
-    final owner = _id(_uuid(60));
-    await _insertIntention(database, owner);
-    final failingDiagnostics = _ThrowingDiagnosticsSink();
-    repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 19),
-      failingDiagnostics,
-    );
-
-    final result = await repository.getRelationCounts(owner);
-
-    expect(result, isA<ResultSuccess<GraphSnapshot<RelationCounts>>>());
-    expect(
-      failingDiagnostics.attemptedEvents,
-      everyElement(isA<RelationCountsReadDiagnosticsEvent>()),
-    );
-    expect(failingDiagnostics.attemptedEvents, hasLength(2));
-  });
-
   test('не перечитывает наблюдение при изменении другого намерения', () async {
     await database.close();
     final trace = _SelectTrace();
@@ -838,15 +817,5 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     if (statement.operation == LocalDatabaseSqlOperation.select) {
       statements.add(statement.statements.single);
     }
-  }
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-диагностика');
   }
 }

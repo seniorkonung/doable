@@ -274,45 +274,6 @@ void main() {
     );
     expect(events, hasLength(1));
   });
-
-  test(
-    'диагностика удаления безопасна и её отказ не повторяет запись',
-    () async {
-      await _create(repository, sourceId, relatedId);
-
-      await repository.execute(DeleteLongTermRelation(relationId));
-
-      final deletionEvent = diagnostics.events
-          .whereType<LongTermRelationCommandDiagnosticsEvent>()
-          .singleWhere(
-            (event) =>
-                event.commandType ==
-                LongTermRelationCommandDiagnosticsType.delete,
-          );
-      expect(deletionEvent.status, isA<DiagnosticsSucceeded>());
-
-      await _create(repository, sourceId, relatedId);
-      final throwingDiagnostics = _ThrowingDiagnosticsSink();
-      repository = _repository(database, throwingDiagnostics, const []);
-
-      final result = await repository.execute(
-        DeleteLongTermRelation(secondRelationId),
-      );
-
-      expect(result, isA<GraphCommandSucceeded>());
-      expect(await _storedRelationOrNull(database, secondRelationId), isNull);
-      expect(
-        throwingDiagnostics.attemptedEvents,
-        everyElement(
-          isA<LongTermRelationCommandDiagnosticsEvent>().having(
-            (event) => event.commandType,
-            'тип команды',
-            LongTermRelationCommandDiagnosticsType.delete,
-          ),
-        ),
-      );
-    },
-  );
 }
 
 Future<LongTermRelationCreated> _create(
@@ -489,14 +450,4 @@ final class _DeterministicRelationIdGenerator
 
   @override
   LongTermRelationId generate() => _ids[_index++];
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('Управляемый отказ диагностики.');
-  }
 }

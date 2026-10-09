@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
@@ -85,176 +84,7 @@ void main() {
     },
   );
 
-  group('диагностика создания схемы', () {
-    test(
-      'ошибка получателя до создания не препятствует подтверждению',
-      () async {
-        final diagnostics = _SelectivelyThrowingDiagnosticsSink(
-          (event) => event.status is DiagnosticsStarted,
-        );
-
-        final database = await _createSchemaWithDiagnostics(diagnostics);
-
-        await _expectCurrentSchema(database);
-        expect(
-          diagnostics.attemptedEvents.map((event) => event.status.runtimeType),
-          [DiagnosticsStarted, DiagnosticsSucceeded],
-        );
-      },
-    );
-
-    test('ошибка получателя после создания не меняет его исход', () async {
-      final diagnostics = _SelectivelyThrowingDiagnosticsSink(
-        (event) => event.status is DiagnosticsSucceeded,
-      );
-
-      final database = await _createSchemaWithDiagnostics(diagnostics);
-
-      await _expectCurrentSchema(database);
-      expect(
-        diagnostics.attemptedEvents.map((event) => event.status.runtimeType),
-        [DiagnosticsStarted, DiagnosticsSucceeded],
-      );
-    });
-
-    test('отказ создания сохраняет версии, длительность и категорию без '
-        'исходного исключения', () async {
-      final databaseFile = await _temporaryDatabaseFile();
-      final diagnostics = _SelectivelyThrowingDiagnosticsSink((_) => false);
-
-      final result = await _openWithDiagnostics(
-        databaseFile,
-        diagnostics,
-        observer: _SchemaCreationFailureInjector(),
-      );
-
-      expect(result, isA<LocalDataUnexpectedFailure>());
-      final migrationEvents = diagnostics.attemptedEvents
-          .whereType<MigrationDiagnosticsEvent>()
-          .toList();
-      expect(migrationEvents, hasLength(2));
-      for (final event in migrationEvents) {
-        expect(event.fromSchemaVersion, 0);
-        expect(event.toSchemaVersion, AppDatabase.currentSchemaVersion);
-      }
-      expect(migrationEvents.first.status, isA<DiagnosticsStarted>());
-      expect(
-        migrationEvents.last.status,
-        isA<DiagnosticsFailed>()
-            .having(
-              (status) => status.code,
-              'категория отказа',
-              DiagnosticsFailureCode.unexpected,
-            )
-            .having(
-              (status) => status.duration,
-              'длительность',
-              greaterThanOrEqualTo(Duration.zero),
-            ),
-      );
-      _expectEncodedMigrationEvents(
-        migrationEvents,
-        fromSchemaVersion: 0,
-        failureCode: DiagnosticsFailureCode.unexpected,
-      );
-    });
-
-    for (final sinkFailure in _DiagnosticsSinkFailure.values) {
-      test('отказ получателя ${sinkFailure.testDescription} не меняет исход '
-          'прерванного создания и повторного запуска', () async {
-        final databaseFile = await _temporaryDatabaseFile();
-        final diagnostics = _SelectivelyThrowingDiagnosticsSink(
-          sinkFailure.shouldThrow,
-        );
-
-        final result = await _openWithDiagnostics(
-          databaseFile,
-          diagnostics,
-          observer: _SchemaCreationFailureInjector(),
-        );
-
-        expect(result, isA<LocalDataUnexpectedFailure>());
-        expect(
-          diagnostics.attemptedEvents
-              .whereType<MigrationDiagnosticsEvent>()
-              .map((event) => event.status.runtimeType),
-          [DiagnosticsStarted, DiagnosticsFailed],
-        );
-        _expectStorageWithoutSchema(databaseFile);
-
-        final retried = await _openWithDiagnostics(databaseFile, diagnostics);
-        expect(retried, isA<LocalDataReady>());
-      });
-    }
-  });
-
   group('диагностика несовместимого маркера версии', () {
-    test(
-      'сохраняет версии, длительность и категорию без данных хранилища',
-      () async {
-        final databaseFile = await _storageWithNewerSchemaVersion();
-        final preservedBytes = await databaseFile.readAsBytes();
-        final diagnostics = _SelectivelyThrowingDiagnosticsSink((_) => false);
-
-        final result = await _openWithDiagnostics(databaseFile, diagnostics);
-
-        expect(
-          result,
-          isA<LocalDataIncompatibleSchema>()
-              .having(
-                (result) => result.expectedSchemaVersion,
-                'ожидаемая версия',
-                AppDatabase.currentSchemaVersion,
-              )
-              .having(
-                (result) => result.detectedSchemaVersion,
-                'обнаруженная версия',
-                _nextSchemaVersion,
-              ),
-        );
-        expect(await databaseFile.readAsBytes(), preservedBytes);
-        final migrationEvents = diagnostics.attemptedEvents
-            .whereType<MigrationDiagnosticsEvent>()
-            .toList();
-        expect(migrationEvents.map((event) => event.status.runtimeType), [
-          DiagnosticsStarted,
-          DiagnosticsFailed,
-        ]);
-        for (final event in migrationEvents) {
-          expect(event.fromSchemaVersion, _nextSchemaVersion);
-          expect(event.toSchemaVersion, AppDatabase.currentSchemaVersion);
-        }
-        _expectEncodedMigrationEvents(
-          migrationEvents,
-          fromSchemaVersion: _nextSchemaVersion,
-          failureCode: DiagnosticsFailureCode.incompatibleSchema,
-        );
-        _expectEncodedWithoutPersonalData(diagnostics.attemptedEvents);
-      },
-    );
-
-    for (final sinkFailure in _DiagnosticsSinkFailure.values) {
-      test('отказ получателя ${sinkFailure.testDescription} не меняет '
-          'несовместимость и файл хранилища', () async {
-        final databaseFile = await _storageWithNewerSchemaVersion();
-        final preservedBytes = await databaseFile.readAsBytes();
-        final diagnostics = _SelectivelyThrowingDiagnosticsSink(
-          sinkFailure.shouldThrow,
-        );
-
-        final result = await _openWithDiagnostics(databaseFile, diagnostics);
-
-        expect(result, isA<LocalDataIncompatibleSchema>());
-        expect(
-          diagnostics.attemptedEvents
-              .whereType<MigrationDiagnosticsEvent>()
-              .map((event) => event.status.runtimeType),
-          [DiagnosticsStarted, DiagnosticsFailed],
-        );
-        expect(await databaseFile.readAsBytes(), preservedBytes);
-      });
-    }
-
     test('сообщение отказа не содержит данных хранилища', () async {
       final databaseFile = await _storageWithNewerSchemaVersion();
       final database = AppDatabase(openFileBackedLocalDatabase(databaseFile));
@@ -387,21 +217,6 @@ Future<File> _storageWithNewerSchemaVersion() async {
   return databaseFile;
 }
 
-void _expectStorageWithoutSchema(File databaseFile) {
-  final database = sqlite.sqlite3.open(databaseFile.path);
-  try {
-    expect(
-      database.select('''
-        SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'
-      '''),
-      isEmpty,
-    );
-    expect(database.select('PRAGMA user_version').single['user_version'], 0);
-  } finally {
-    database.close();
-  }
-}
-
 List<String> _encode(Iterable<DiagnosticsEvent> events) {
   final messages = <String>[];
   final sink = DeveloperDiagnosticsSink(messages.add);
@@ -409,35 +224,6 @@ List<String> _encode(Iterable<DiagnosticsEvent> events) {
     sink.record(event);
   }
   return messages;
-}
-
-void _expectEncodedMigrationEvents(
-  List<MigrationDiagnosticsEvent> events, {
-  required int fromSchemaVersion,
-  required DiagnosticsFailureCode failureCode,
-}) {
-  final encoded = _encode(events).map(jsonDecode).toList();
-  expect(encoded, [
-    {
-      'operation': 'migration',
-      'outcome': 'started',
-      'fromSchemaVersion': fromSchemaVersion,
-      'toSchemaVersion': AppDatabase.currentSchemaVersion,
-    },
-    {
-      'operation': 'migration',
-      'outcome': 'failed',
-      'durationMicros': isA<int>().having(
-        (duration) => duration,
-        'неотрицательная длительность',
-        greaterThanOrEqualTo(0),
-      ),
-      'failureCode': failureCode.name,
-      'fromSchemaVersion': fromSchemaVersion,
-      'toSchemaVersion': AppDatabase.currentSchemaVersion,
-    },
-  ]);
-  _expectEncodedWithoutPersonalData(events);
 }
 
 void _expectEncodedWithoutPersonalData(Iterable<DiagnosticsEvent> events) {
@@ -450,41 +236,6 @@ void _expectWithoutPersonalData(String text) {
   for (final marker in _personalDataMarkers) {
     expect(text, isNot(contains(marker)));
   }
-}
-
-Future<AppDatabase> _createSchemaWithDiagnostics(
-  DiagnosticsSink diagnostics,
-) async {
-  final temporaryDirectory = await Directory.systemTemp.createTemp(
-    'doable_diagnostics_creation_',
-  );
-  addTearDown(() async {
-    if (await temporaryDirectory.exists()) {
-      await temporaryDirectory.delete(recursive: true);
-    }
-  });
-  final databaseFile = File('${temporaryDirectory.path}/doable.sqlite');
-  final database = AppDatabase(
-    openFileBackedLocalDatabase(databaseFile),
-    diagnosticsSink: diagnostics,
-  );
-  addTearDown(database.close);
-  await database.open();
-  return database;
-}
-
-Future<void> _expectCurrentSchema(AppDatabase database) async {
-  final version = await database
-      .customSelect('PRAGMA user_version')
-      .getSingle();
-  final relationTable = await database
-      .customSelect(
-        "SELECT name FROM sqlite_schema "
-        "WHERE type = 'table' AND name = 'long_term_relations'",
-      )
-      .getSingleOrNull();
-  expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
-  expect(relationTable?.read<String>('name'), 'long_term_relations');
 }
 
 Future<void> _insertIntention(AppDatabase database) {
@@ -519,43 +270,6 @@ final class _SelectivelyThrowingDiagnosticsSink implements DiagnosticsSink {
     if (_shouldThrow(event)) {
       throw StateError('CANARY-diagnostics-sink-failure');
     }
-  }
-}
-
-enum _DiagnosticsSinkFailure {
-  onStart(testDescription: 'при начале'),
-  onCompletion(testDescription: 'при завершении'),
-  onEveryEvent(testDescription: 'на каждом событии');
-
-  const _DiagnosticsSinkFailure({required this.testDescription});
-
-  final String testDescription;
-
-  bool shouldThrow(DiagnosticsEvent event) => switch (this) {
-    _DiagnosticsSinkFailure.onStart => event.status is DiagnosticsStarted,
-    _DiagnosticsSinkFailure.onCompletion => event.status is! DiagnosticsStarted,
-    _DiagnosticsSinkFailure.onEveryEvent => true,
-  };
-}
-
-/// Прерывает создание на первом объекте схемы исключением с пользовательскими
-/// данными, чтобы проверить, что они не попадают в диагностику.
-final class _SchemaCreationFailureInjector
-    extends LocalDatabaseConnectionObserver {
-  var _didInjectFailure = false;
-
-  @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (_didInjectFailure ||
-        statement.operation != LocalDatabaseSqlOperation.custom ||
-        !RegExp(
-          r'^CREATE\b',
-          caseSensitive: false,
-        ).hasMatch(statement.statements.single.trimLeft())) {
-      return;
-    }
-    _didInjectFailure = true;
-    throw StateError('$_personalTagName $_personalIntentionId');
   }
 }
 

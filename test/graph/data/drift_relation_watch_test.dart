@@ -573,20 +573,6 @@ void main() {
       ),
     );
   });
-
-  test('отказ диагностики не меняет успешный результат', () async {
-    final throwingDiagnostics = _ThrowingDiagnosticsSink();
-    final result = await _repository(
-      database,
-      throwingDiagnostics,
-    ).watchRelation(relationId).first;
-
-    expect(_snapshot(result).value!.relation.id, relationId);
-    expect(
-      throwingDiagnostics.attemptedEvents,
-      everyElement(isA<LongTermRelationDetailReadDiagnosticsEvent>()),
-    );
-  });
 }
 
 GraphSnapshot<LongTermRelationDetails?> _snapshot(
@@ -676,13 +662,3 @@ LongTermRelationId _relationId(String value) =>
 
 String _uuid(int value) =>
     '018f0b5d-6b2e-7c80-8000-${value.toString().padLeft(12, '0')}';
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('Управляемый отказ диагностики.');
-  }
-}

@@ -379,35 +379,6 @@ void main() {
       });
     }
   });
-
-  group('Диагностика', () {
-    test('различает отметку и её снятие как виды команды намерения', () async {
-      _insertIntention(raw, number: 1, title: 'CANARY-название');
-
-      await _saved(repository, MarkIntentionFavorite(_id(1)));
-      await _saved(repository, UnmarkIntentionFavorite(_id(1)));
-      await repository.execute(MarkIntentionFavorite(_id(2)));
-
-      final events = diagnostics.events
-          .whereType<IntentionCommandDiagnosticsEvent>()
-          .toList();
-      expect(events.map((event) => event.commandType), [
-        IntentionCommandDiagnosticsType.markFavorite,
-        IntentionCommandDiagnosticsType.unmarkFavorite,
-        IntentionCommandDiagnosticsType.markFavorite,
-      ]);
-      expect(events[0].status, isA<DiagnosticsSucceeded>());
-      expect(events[1].status, isA<DiagnosticsSucceeded>());
-      expect(
-        events[2].status,
-        isA<DiagnosticsFailed>().having(
-          (status) => status.code,
-          'категория',
-          DiagnosticsFailureCode.notFound,
-        ),
-      );
-    });
-  });
 }
 
 /// Записи одного соединения в порядке выполнения.

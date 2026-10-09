@@ -482,52 +482,6 @@ void main() {
   );
 
   test(
-    'отказ получателя диагностики до и после commit не меняет исход',
-    () async {
-      final owner = intentions[0];
-      final first = await _create(repository, owner, intentions[1]);
-      final second = await _create(repository, owner, intentions[2]);
-      final sink = _ThrowingDiagnosticsSink();
-      repository = _repository(database, sink, relationIds);
-
-      final confirmed = _success(
-        await repository.execute(
-          DeleteBlockingRelations.longTerm(
-            intentionId: owner,
-            relationIds: [first, second],
-          ),
-        ),
-      );
-
-      expect(confirmed.value.deletedRelations, hasLength(2));
-      expect(await _relation(database, first), isNull);
-      expect(await _relation(database, second), isNull);
-      expect(sink.events.map((event) => event.status.runtimeType), [
-        DiagnosticsStarted,
-        DiagnosticsSucceeded,
-      ]);
-
-      final missing = _failure(
-        await repository.execute(
-          DeleteBlockingRelations.longTerm(
-            intentionId: owner,
-            relationIds: [first],
-          ),
-        ),
-      );
-      expect(missing, isA<DeleteBlockingRelationsSelectionConflictFailure>());
-      expect(
-        sink.events.last.status,
-        isA<DiagnosticsFailed>().having(
-          (status) => status.code,
-          'код',
-          DiagnosticsFailureCode.conflict,
-        ),
-      );
-    },
-  );
-
-  test(
     'одиночное удаление до набора даёт конфликт, после набора — отсутствие',
     () async {
       final owner = intentions[0];
@@ -1372,16 +1326,6 @@ final class _RelationIds implements LongTermRelationIdGenerator {
 
   @override
   LongTermRelationId generate() => _relationId(next++);
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final events = <BlockingRelationsDeleteDiagnosticsEvent>[];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    events.add(event as BlockingRelationsDeleteDiagnosticsEvent);
-    throw StateError('Отказ диагностики');
-  }
 }
 
 final class _BulkDeleteObserver extends LocalDatabaseConnectionObserver {

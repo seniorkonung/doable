@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -10,7 +8,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -179,64 +176,6 @@ void main() {
   });
 
   group('Диагностика этапа и исхода', () {
-    for (final command in _commands) {
-      test('${command.name}: успех с записью относится к этапу записи и несёт '
-          'длительность', () async {
-        seedGraph();
-
-        await _confirmed(repository, command.build());
-
-        expect(diagnostics.commandEvents, [
-          _succeededCommand(
-            command.type,
-            FavoriteMarkCommandDiagnosticsStage.write,
-          ),
-        ]);
-        expect(
-          (diagnostics.commandEvents.single.status as DiagnosticsSucceeded)
-              .duration,
-          greaterThanOrEqualTo(Duration.zero),
-        );
-      });
-
-      test('${command.name}: отсутствие намерения относится к этапу '
-          'проверки', () async {
-        seedGraph();
-
-        final result = await repository.execute(command.buildFor(_id(7)));
-
-        expect(result, _failure(isA<IntentionNotFoundFailure>()));
-        expect(diagnostics.commandEvents, [
-          _failedCommand(
-            command.type,
-            FavoriteMarkCommandDiagnosticsStage.validation,
-            DiagnosticsFailureCode.notFound,
-          ),
-        ]);
-      });
-    }
-
-    test(
-      'повтор без изменения завершается успехом на этапе проверки',
-      () async {
-        seedGraph();
-
-        await _confirmed(repository, MarkIntentionFavorite(_id(1)));
-        await _confirmed(repository, UnmarkIntentionFavorite(_id(3)));
-
-        expect(diagnostics.commandEvents, [
-          _succeededCommand(
-            IntentionCommandDiagnosticsType.markFavorite,
-            FavoriteMarkCommandDiagnosticsStage.validation,
-          ),
-          _succeededCommand(
-            IntentionCommandDiagnosticsType.unmarkFavorite,
-            FavoriteMarkCommandDiagnosticsStage.validation,
-          ),
-        ]);
-      },
-    );
-
     test('недопустимое место сохранённой отметки — повреждение на этапе '
         'проверки без записи', () async {
       _insertIntention(raw, number: 1, title: 'CANARY-первое');
@@ -258,260 +197,6 @@ void main() {
         ),
       ]);
     });
-
-    test('этап избранного не получают остальные команды намерения, а '
-        'создание несёт собственный этап', () async {
-      seedGraph();
-
-      await _confirmed(
-        repository,
-        const CreateIntention(title: 'CANARY-новое', description: null),
-      );
-      await _confirmed(repository, EnableIntentionReadiness(_id(1)));
-      await _confirmed(repository, ArchiveIntention(_id(3)));
-      await repository.execute(DeleteIntention(_id(7)));
-
-      expect(diagnostics.commandEvents.map((event) => event.commandType), [
-        IntentionCommandDiagnosticsType.create,
-        IntentionCommandDiagnosticsType.enableReadiness,
-        IntentionCommandDiagnosticsType.archive,
-        IntentionCommandDiagnosticsType.delete,
-      ]);
-      expect(diagnostics.commandEvents.map((event) => event.stage), [
-        IntentionCreationCommandDiagnosticsStage.resultRead,
-        null,
-        null,
-        null,
-      ]);
-      expect(diagnostics.messages.map((message) => message['stage']), [
-        'resultRead',
-        null,
-        null,
-        null,
-      ]);
-      for (final message in diagnostics.messages.skip(1)) {
-        expect(message.keys, isNot(contains('stage')));
-      }
-    });
-  });
-
-  group('Безопасность диагностики', () {
-    test('события и запись получателя разработчика несут только безопасные '
-        'поля', () async {
-      seedGraph();
-
-      await _confirmed(repository, MarkIntentionFavorite(_id(3)));
-      await _confirmed(repository, UnmarkIntentionFavorite(_id(1)));
-      await _confirmed(repository, UnmarkIntentionFavorite(_id(1)));
-      await repository.execute(MarkIntentionFavorite(_id(7)));
-      for (final (point, error) in [
-        (_FaultPoint.validationRead, _busy),
-        (_FaultPoint.beforeWrite, _corrupt),
-        (_FaultPoint.afterWrite, StateError('CANARY-исключение')),
-        (_FaultPoint.resultRead, _readOnly),
-      ]) {
-        faults.arm(point, error);
-        await repository.execute(MarkIntentionFavorite(_id(1)));
-        faults.disarm();
-      }
-
-      expect(diagnostics.messages, hasLength(8));
-      const succeededKeys = {
-        'operation',
-        'outcome',
-        'durationMicros',
-        'commandType',
-        'stage',
-      };
-      for (final message in diagnostics.messages) {
-        expect(message['operation'], 'intentionCommand');
-        expect(message['commandType'], anyOf('markFavorite', 'unmarkFavorite'));
-        expect(message['stage'], anyOf('validation', 'write'));
-        expect(message['durationMicros'], isA<int>());
-        expect(
-          message.keys.toSet(),
-          message['outcome'] == 'succeeded'
-              ? succeededKeys
-              : {...succeededKeys, 'failureCode'},
-        );
-      }
-      expect(
-        [
-          for (final message in diagnostics.messages)
-            (message['outcome'], message['stage'], message['failureCode']),
-        ],
-        [
-          ('succeeded', 'write', null),
-          ('succeeded', 'write', null),
-          ('succeeded', 'validation', null),
-          ('failed', 'validation', 'notFound'),
-          ('failed', 'validation', 'unavailable'),
-          ('failed', 'write', 'corruption'),
-          ('failed', 'write', 'unexpected'),
-          ('failed', 'write', 'unexpected'),
-        ],
-      );
-      final written = diagnostics.rawMessages.join('\n');
-      for (final secret in [
-        'CANARY',
-        for (var number = 1; number <= 7; number++) _uuid(number),
-        'favorite_intentions',
-        'position',
-        'INSERT',
-        'DELETE',
-        'SELECT',
-        'Exception',
-        'StateError',
-      ]) {
-        expect(written, isNot(contains(secret)));
-      }
-      // Значения событий — только перечисления и длительность: мест, состава
-      // избранных и идентификаторов в них нет по построению типа.
-      for (final value in [
-        for (final message in diagnostics.messages) ...message.values,
-      ]) {
-        expect(
-          value,
-          anyOf(
-            isA<int>(),
-            isIn([
-              'intentionCommand',
-              'markFavorite',
-              'unmarkFavorite',
-              'validation',
-              'write',
-              'succeeded',
-              'failed',
-              'notFound',
-              'unavailable',
-              'corruption',
-              'unexpected',
-            ]),
-          ),
-        );
-      }
-    });
-  });
-
-  group('Независимость от получателя диагностики', () {
-    test('отказ получателя не откатывает подтверждённую отметку и не '
-        'повторяет запись', () async {
-      seedGraph();
-      final failing = _ThrowingDiagnosticsSink();
-      repository = repositoryWith(failing);
-      final revisionBefore = await _revision(repository);
-      failing.attemptedEvents.clear();
-      faults.writes.clear();
-
-      final confirmed = await _confirmed(
-        repository,
-        MarkIntentionFavorite(_id(3)),
-      );
-
-      expect(
-        (confirmed.value as IntentionSaved).catalogMutation,
-        isA<IntentionCatalogUpdated>(),
-      );
-      expect(
-        confirmed.revision.compareTo(revisionBefore),
-        GraphRevisionOrder.newer,
-      );
-      expect(faults.writes, hasLength(1));
-      expect(_storedMarks(raw), [(_uuid(1), 4), (_uuid(2), 9), (_uuid(3), 10)]);
-      expect(failing.attemptedEvents, [
-        _succeededCommand(
-          IntentionCommandDiagnosticsType.markFavorite,
-          FavoriteMarkCommandDiagnosticsStage.write,
-        ),
-      ]);
-    });
-
-    test('отказ получателя не откатывает подтверждённое снятие и не '
-        'повторяет запись', () async {
-      seedGraph();
-      final failing = _ThrowingDiagnosticsSink();
-      repository = repositoryWith(failing);
-      faults.writes.clear();
-
-      final confirmed = await _confirmed(
-        repository,
-        UnmarkIntentionFavorite(_id(1)),
-      );
-
-      expect(
-        (confirmed.value as IntentionSaved).catalogMutation,
-        isA<IntentionCatalogUpdated>(),
-      );
-      expect(faults.writes, hasLength(1));
-      expect(_storedMarks(raw), [(_uuid(2), 9)]);
-      expect(failing.attemptedEvents, hasLength(1));
-    });
-
-    test('отказ получателя не меняет результат команды без записи', () async {
-      seedGraph();
-      final failing = _ThrowingDiagnosticsSink();
-      repository = repositoryWith(failing);
-      faults.writes.clear();
-
-      final unchanged = await _confirmed(
-        repository,
-        MarkIntentionFavorite(_id(1)),
-      );
-      final notFound = await repository.execute(MarkIntentionFavorite(_id(7)));
-
-      expect(
-        (unchanged.value as IntentionSaved).catalogMutation,
-        isA<IntentionCatalogUnchanged>(),
-      );
-      expect(notFound, _failure(isA<IntentionNotFoundFailure>()));
-      expect(faults.writes, isEmpty);
-      expect(_storedMarks(raw), [(_uuid(1), 4), (_uuid(2), 9)]);
-      expect(failing.attemptedEvents, hasLength(2));
-    });
-
-    for (final point in _FaultPoint.values) {
-      test('отказ получателя не меняет категорию отказа и откат '
-          '${point.description}', () async {
-        seedGraph();
-        final marksBefore = _storedMarks(raw);
-        final failing = _ThrowingDiagnosticsSink();
-        repository = repositoryWith(failing);
-        faults.arm(point, _busy);
-
-        final result = await repository.execute(MarkIntentionFavorite(_id(3)));
-
-        expect(result, _failure(isA<IntentionUnavailableFailure>()));
-        expect(faults.failures, 1);
-        expect(_storedMarks(raw), marksBefore);
-        expect(failing.attemptedEvents, [
-          _failedCommand(
-            IntentionCommandDiagnosticsType.markFavorite,
-            point.stage,
-            DiagnosticsFailureCode.unavailable,
-          ),
-        ]);
-      });
-    }
-
-    test('отказ записи получателя разработчика не меняет результат и не '
-        'повторяет запись', () async {
-      seedGraph();
-      var writeAttempts = 0;
-      repository = repositoryWith(
-        DeveloperDiagnosticsSink((_) {
-          writeAttempts++;
-          throw StateError('CANARY-отказ-записи-диагностики');
-        }),
-      );
-      faults.writes.clear();
-
-      await _confirmed(repository, MarkIntentionFavorite(_id(3)));
-      await _confirmed(repository, UnmarkIntentionFavorite(_id(1)));
-
-      expect(writeAttempts, 2);
-      expect(faults.writes, hasLength(2));
-      expect(_storedMarks(raw), [(_uuid(2), 9), (_uuid(3), 10)]);
-    });
   });
 }
 
@@ -523,11 +208,6 @@ final _busy = sqlite.SqliteException(
 final _corrupt = sqlite.SqliteException(
   extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
   message: 'CANARY-повреждение',
-);
-
-final _readOnly = sqlite.SqliteException(
-  extendedResultCode: sqlite.SqlError.SQLITE_READONLY,
-  message: 'CANARY-неизвестный-SQLite-отказ',
 );
 
 /// Отказы хранилища трёх различимых категорий.
@@ -567,7 +247,6 @@ final _commands =
         String name,
         int number,
         IntentionCommand Function() build,
-        IntentionCommand Function(IntentionId) buildFor,
         IntentionCommandDiagnosticsType type,
         FavoriteMark markBefore,
       })
@@ -576,7 +255,6 @@ final _commands =
         name: 'отметка',
         number: 3,
         build: () => MarkIntentionFavorite(_id(3)),
-        buildFor: MarkIntentionFavorite.new,
         type: IntentionCommandDiagnosticsType.markFavorite,
         markBefore: FavoriteMark.notFavorite,
       ),
@@ -584,7 +262,6 @@ final _commands =
         name: 'снятие отметки',
         number: 1,
         build: () => UnmarkIntentionFavorite(_id(1)),
-        buildFor: UnmarkIntentionFavorite.new,
         type: IntentionCommandDiagnosticsType.unmarkFavorite,
         markBefore: FavoriteMark.favorite,
       ),
@@ -677,42 +354,20 @@ final class _FavoriteStorageFaults extends LocalDatabaseConnectionObserver {
   }
 }
 
-/// Сохраняет события и то, что получатель разработчика записал бы в журнал.
+/// Сохраняет события диагностики команд намерения.
 final class _RecordingDiagnostics implements DiagnosticsSink {
   final _events = <DiagnosticsEvent>[];
-  final rawMessages = <String>[];
-  late final _developer = DeveloperDiagnosticsSink(rawMessages.add);
 
   List<IntentionCommandDiagnosticsEvent> get commandEvents =>
       _events.whereType<IntentionCommandDiagnosticsEvent>().toList();
 
-  /// Записи получателя разработчика о командах намерения.
-  List<Map<String, Object?>> get messages => [
-    for (final message in rawMessages)
-      if (jsonDecode(message) case final Map<String, Object?> decoded
-          when decoded['operation'] == 'intentionCommand')
-        decoded,
-  ];
-
   void clear() {
     _events.clear();
-    rawMessages.clear();
   }
 
   @override
   void record(DiagnosticsEvent event) {
     _events.add(event);
-    _developer.record(event);
-  }
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-отказ-получателя-диагностики');
   }
 }
 

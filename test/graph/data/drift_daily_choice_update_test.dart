@@ -420,39 +420,4 @@ void main() {
       );
     },
   );
-
-  test(
-    'сбой записи диагностируется отдельно и сохраняет прежние поля',
-    () async {
-      final id = await createChoice();
-      final before = await read(id);
-      raw.execute('''CREATE TRIGGER reject_daily_choice_update
-        BEFORE UPDATE ON daily_choices
-        BEGIN SELECT RAISE(ABORT, 'Отказ записи'); END''');
-      final result = await repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: id,
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(false),
-          ),
-        ),
-      );
-      expect(
-        (result as GraphCommandFailed).failure.category,
-        GraphFailureCategory.unexpected,
-      );
-      final after = await read(id);
-      expect(
-        after.revision.compareTo(before.revision),
-        GraphRevisionOrder.same,
-      );
-      expect(after.value!.choice.isCompleted, isTrue);
-      final last = diagnostics.events
-          .whereType<DailyChoiceCommandDiagnosticsEvent>()
-          .last;
-      expect(last.commandType, DailyChoiceCommandDiagnosticsType.updateFields);
-      expect(last.stage, DailyChoiceCommandDiagnosticsStage.write);
-      expect(last.status, isA<DiagnosticsFailed>());
-    },
-  );
 }

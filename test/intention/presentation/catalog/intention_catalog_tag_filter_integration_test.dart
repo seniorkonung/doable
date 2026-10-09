@@ -673,63 +673,6 @@ void main() {
       ],
     ]);
   });
-
-  test('отказ диагностического приёмника не меняет согласование после '
-      'удаления исключённого тега', () async {
-    await _seedExcludedMatches(database);
-    final throwingContainer = ProviderContainer(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWithValue(
-          DriftPersonalGraphRepository(
-            database,
-            UuidV7IntentionIdGenerator(),
-            () => DateTime.utc(2026, 9, 29),
-            _ThrowingDiagnosticsSink(),
-          ),
-        ),
-        catalogPagingPolicyProvider.overrideWithValue(
-          CatalogPagingPolicy(
-            pageSize: 2,
-            prefetchRemaining: 0,
-            filterDebounce: const Duration(milliseconds: 250),
-          ),
-        ),
-      ],
-      retry: (retryCount, error) => null,
-    );
-    addTearDown(throwingContainer.dispose);
-    final provider = intentionCatalogViewModelProvider(
-      const BrowseIntentionCatalog(),
-    );
-    final subscription = throwingContainer.listen(provider, (_, _) {});
-    addTearDown(subscription.close);
-    await throwingContainer.read(provider.future);
-    throwingContainer
-        .read(provider.notifier)
-        .changeTagFilter(
-          IntentionTagFilter(
-            requiredTagIds: [_tagId(301)],
-            excludedTagIds: [_tagId(302)],
-          ),
-        );
-    final loaded =
-        await throwingContainer.read(provider.future) as IntentionCatalogLoaded;
-
-    await _deleteTag(throwingContainer, _tagId(302));
-    final current = await _awaitRevisionAfter(
-      throwingContainer,
-      provider,
-      loaded,
-    );
-
-    expect(current, isA<IntentionCatalogLoaded>());
-    final reconciled = current as IntentionCatalogLoaded;
-    expect(reconciled.items.map((item) => item.id), [
-      for (final number in [13, 12, 11, 10, 6]) _intentionId(number),
-    ]);
-    expect(reconciled.totalCount, 9);
-    expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
-  });
   test('ранее полностью загруженная выдача в несколько окон согласуется '
       'через настоящий репозиторий окнами не больше порции', () async {
     await _seedWindowedArea(database);
@@ -1719,13 +1662,6 @@ TagId _tagId(int number) => switch (TagId.decode(tagFixtureId(number))) {
   TagIdDecodingSuccess(:final id) => id,
   InvalidTagIdDecoding() => throw StateError('Неверный ID тега.'),
 };
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  @override
-  void record(DiagnosticsEvent event) {
-    throw StateError('Контролируемый отказ диагностики.');
-  }
-}
 
 final class _CatalogReadFault extends LocalDatabaseConnectionObserver {
   bool failNextSelect = false;

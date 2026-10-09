@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'dart:convert';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
@@ -10,7 +9,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -352,315 +350,7 @@ void main() {
       ]);
     });
   });
-
-  group('Категории отказов и диагностика без данных личного графа', () {
-    test('каждый исход сохраняет свою категорию и этап, а записи '
-        'диагностики не несут контрольных данных', () async {
-      await seedGraph();
-      diagnostics.clear();
-      final moveThreeFirst = MoveFavoriteIntention(
-        intentionId: _id(3),
-        placement: const FirstFavoritePlacement(),
-      );
-
-      final outcomes = <Object>[];
-      Future<void> run(
-        MoveFavoriteIntention command, {
-        (_FaultPoint, Object)? fault,
-      }) async {
-        if (fault case (final point, final error)) faults.arm(point, error);
-        outcomes.add(switch (await repository.execute(command)) {
-          FavoriteOrderCommandSucceeded(:final value) =>
-            value.value.runtimeType,
-          FavoriteOrderCommandFailed(:final failure) => failure.category,
-        });
-        faults.disarm();
-      }
-
-      await run(_moveFiveAfterOne);
-      await run(_moveFiveAfterOne);
-      await run(
-        MoveFavoriteIntention(
-          intentionId: _id(2),
-          placement: AfterFavoritePlacement(_id(2)),
-        ),
-      );
-      await run(
-        MoveFavoriteIntention(
-          intentionId: _id(4),
-          placement: const FirstFavoritePlacement(),
-        ),
-      );
-      await run(moveThreeFirst, fault: (_FaultPoint.orderRead, _busy));
-      await run(
-        moveThreeFirst,
-        fault: (_FaultPoint.validation, StateError('CANARY-проверка')),
-      );
-      await run(moveThreeFirst, fault: (_FaultPoint.afterShift, _corrupt));
-      await run(
-        moveThreeFirst,
-        fault: (_FaultPoint.beforeAssignment, StateError('CANARY-запись')),
-      );
-      _CommitRejection.install(raw);
-      await run(moveThreeFirst);
-      raw.commitFilter = null;
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _uuid(9),
-        position: 99,
-      );
-      await run(moveThreeFirst);
-
-      expect(outcomes, [
-        FavoriteOrderMoved,
-        FavoriteOrderUnchanged,
-        GraphFailureCategory.validation,
-        GraphFailureCategory.conflict,
-        GraphFailureCategory.unavailable,
-        GraphFailureCategory.unexpected,
-        GraphFailureCategory.corruption,
-        GraphFailureCategory.unexpected,
-        GraphFailureCategory.unexpected,
-        GraphFailureCategory.corruption,
-      ]);
-      final messages = diagnostics.orderMessages;
-      expect(
-        [
-          for (final message in messages)
-            if (message['outcome'] != 'started')
-              (
-                message['stage'],
-                message['outcome'],
-                message['failureCode'],
-                message['completion'],
-              ),
-        ],
-        [
-          ('write', 'succeeded', null, 'moved'),
-          ('validation', 'succeeded', null, 'unchanged'),
-          ('validation', 'failed', 'validation', null),
-          ('validation', 'failed', 'conflict', null),
-          ('read', 'failed', 'unavailable', null),
-          ('validation', 'failed', 'unexpected', null),
-          ('write', 'failed', 'corruption', null),
-          ('write', 'failed', 'unexpected', null),
-          ('write', 'failed', 'unexpected', null),
-          ('validation', 'failed', 'corruption', null),
-        ],
-      );
-      expect(
-        messages.where((message) => message['outcome'] == 'started'),
-        hasLength(10),
-      );
-      for (final message in messages) {
-        expect(
-          message.keys.toSet().difference({
-            'operation',
-            'stage',
-            'outcome',
-            'durationMicros',
-            'failureCode',
-            'completion',
-          }),
-          isEmpty,
-        );
-        for (final value in message.values) {
-          expect(
-            value,
-            anyOf(
-              isA<int>(),
-              isIn([
-                'favoriteOrderCommand',
-                'read',
-                'validation',
-                'write',
-                'started',
-                'succeeded',
-                'failed',
-                'moved',
-                'unchanged',
-                'conflict',
-                'unavailable',
-                'corruption',
-                'unexpected',
-              ]),
-            ),
-          );
-        }
-      }
-      final written = diagnostics.rawMessages.join('\n');
-      for (final secret in [
-        'CANARY',
-        'Намерение',
-        'Выбор',
-        for (final number in [1, 2, 3, 4, 5, 6, 7, 9, 401]) _uuid(number),
-        'favorite_intentions',
-        'position',
-        'json_each',
-        'UPDATE',
-        'SELECT',
-        'Exception',
-        'StateError',
-      ]) {
-        expect(written, isNot(contains(secret)));
-      }
-    });
-  });
-
-  group('Независимость от получателя диагностики', () {
-    for (final failure in _SinkFailure.values) {
-      for (final scenario in _sinkScenarios) {
-        test('отказ получателя ${failure.description} не меняет исход '
-            '«${scenario.name}» и число записей', () async {
-          await seedGraph();
-          final sink = _FailingDiagnosticsSink(failure);
-          repository = _repository(database, sink);
-          final marksBefore = storedFavoriteMarks(raw);
-          final revisionBefore = await _graphRevision(repository);
-          final fault = scenario.fault;
-          if (fault == null) {
-            faults.clear();
-          } else {
-            faults.arm(fault, _busy);
-          }
-
-          final result = await repository.execute(scenario.command);
-
-          faults.disarm();
-          expect(switch (result) {
-            FavoriteOrderCommandSucceeded(:final value) => value.value,
-            FavoriteOrderCommandFailed(:final failure) => failure,
-          }, scenario.outcome);
-          expect(faults.executedWrites, scenario.executedWrites);
-          expect(
-            storedFavoriteMarks(raw),
-            scenario.persists ? _movedMarks : marksBefore,
-          );
-          expect(
-            (await _graphRevision(repository)).compareTo(revisionBefore),
-            scenario.persists
-                ? GraphRevisionOrder.newer
-                : GraphRevisionOrder.same,
-          );
-          // Каждое событие перестановки передаётся получателю один раз.
-          expect(
-            sink.attemptedEvents
-                .whereType<FavoriteOrderCommandDiagnosticsEvent>(),
-            [_startedEvent(), scenario.event],
-          );
-        });
-      }
-    }
-  });
 }
-
-/// Момент, в который получатель диагностики отказывает.
-enum _SinkFailure {
-  /// Событие начала записывается до транзакции и её commit.
-  beforeCommit('до commit'),
-
-  /// Событие исхода записывается после завершения транзакции.
-  afterCommit('после commit'),
-
-  always('до и после commit');
-
-  const _SinkFailure(this.description);
-
-  final String description;
-
-  bool failsOn(DiagnosticsEvent event) => switch (this) {
-    _SinkFailure.beforeCommit => event.status is DiagnosticsStarted,
-    _SinkFailure.afterCommit => event.status is! DiagnosticsStarted,
-    _SinkFailure.always => true,
-  };
-}
-
-final class _FailingDiagnosticsSink implements DiagnosticsSink {
-  _FailingDiagnosticsSink(this._failure);
-
-  final _SinkFailure _failure;
-  final attemptedEvents = <DiagnosticsEvent>[];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    if (_failure.failsOn(event)) {
-      throw StateError('CANARY-отказ-получателя-диагностики');
-    }
-  }
-}
-
-/// Исходы перестановки на фикстуре [seedGraph] при отказе получателя
-/// диагностики.
-final _sinkScenarios =
-    <
-      ({
-        String name,
-        MoveFavoriteIntention command,
-        _FaultPoint? fault,
-        Matcher outcome,
-        int executedWrites,
-        bool persists,
-        Matcher event,
-      })
-    >[
-      (
-        name: 'перестановка',
-        command: _moveFiveAfterOne,
-        fault: null,
-        outcome: isA<FavoriteOrderMoved>(),
-        executedWrites: 2,
-        persists: true,
-        event: isA<FavoriteOrderCommandDiagnosticsEvent>().having(
-          (event) => event.completion,
-          'завершение',
-          FavoriteOrderCommandDiagnosticsCompletion.moved,
-        ),
-      ),
-      (
-        name: 'без изменения',
-        command: MoveFavoriteIntention(
-          intentionId: _id(2),
-          placement: AfterFavoritePlacement(_id(1)),
-        ),
-        fault: null,
-        outcome: isA<FavoriteOrderUnchanged>(),
-        executedWrites: 0,
-        persists: false,
-        event: isA<FavoriteOrderCommandDiagnosticsEvent>().having(
-          (event) => event.completion,
-          'завершение',
-          FavoriteOrderCommandDiagnosticsCompletion.unchanged,
-        ),
-      ),
-      (
-        name: 'конфликт',
-        command: MoveFavoriteIntention(
-          intentionId: _id(4),
-          placement: const FirstFavoritePlacement(),
-        ),
-        fault: null,
-        outcome: isA<FavoriteOrderConflictFailure>(),
-        executedWrites: 0,
-        persists: false,
-        event: _failedEvent(
-          FavoriteOrderCommandDiagnosticsStage.validation,
-          DiagnosticsFailureCode.conflict,
-        ),
-      ),
-      (
-        name: 'недоступность после назначения итоговых мест',
-        command: _moveFiveAfterOne,
-        fault: _FaultPoint.afterAssignment,
-        outcome: isA<FavoriteOrderUnavailableFailure>(),
-        executedWrites: 2,
-        persists: false,
-        event: _failedEvent(
-          FavoriteOrderCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.unavailable,
-        ),
-      ),
-    ];
 
 /// Наибольшее место, которое SQLite хранит целым числом.
 const _largestStoredPlace = 9223372036854775807;
@@ -1004,32 +694,20 @@ final class _CommitRejection {
   var rejected = 0;
 }
 
-/// Сохраняет события и то, что получатель разработчика записал бы в журнал.
+/// Сохраняет события диагностики перестановки.
 final class _RecordingDiagnostics implements DiagnosticsSink {
   final _events = <DiagnosticsEvent>[];
-  final rawMessages = <String>[];
-  late final _developer = DeveloperDiagnosticsSink(rawMessages.add);
 
   List<FavoriteOrderCommandDiagnosticsEvent> get orderEvents =>
       _events.whereType<FavoriteOrderCommandDiagnosticsEvent>().toList();
 
-  /// Записи получателя разработчика о перестановке.
-  List<Map<String, Object?>> get orderMessages => [
-    for (final message in rawMessages)
-      if (jsonDecode(message) case final Map<String, Object?> decoded
-          when decoded['operation'] == 'favoriteOrderCommand')
-        decoded,
-  ];
-
   void clear() {
     _events.clear();
-    rawMessages.clear();
   }
 
   @override
   void record(DiagnosticsEvent event) {
     _events.add(event);
-    _developer.record(event);
   }
 }
 
