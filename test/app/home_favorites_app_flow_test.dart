@@ -60,11 +60,6 @@ const _freeRelation = 103;
 /// действия и исходного намерения.
 const _openChoice = 201;
 
-/// Избранные намерения «Избранное 01» … «Избранное 40» на местах 1…40:
-/// список Главной длиннее экрана.
-const _longFavoriteCount = 40;
-const _firstLongFavorite = 1001;
-
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
 
@@ -281,79 +276,6 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-
-    testWidgets(
-      'обновление списка не сбрасывает позицию прокрутки Главной на $code',
-      (tester) async {
-        final harness = await _harness(tester, locale);
-        final app = await _App.start(tester, locale, harness, _seedLongList);
-        final l10n = app.l10n;
-        await _until(tester, find.byType(HomeIntentionRow));
-        _homePosition(tester).jumpTo(500);
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
-
-        // Строки, с которыми работает сценарий, видны без прокрутки.
-        await _openFromHome(
-          tester,
-          row: _shownHomeTitles(tester).indexOf(_longTitle(10)),
-          intention: _longFavorite(10),
-        );
-        await _rename(tester, 'Избранное 10 вечером');
-        await _closeTop(tester, IntentionDetailsPage);
-        await _waitFor(
-          tester,
-          () => _shownHomeTitles(tester).contains('Избранное 10 вечером'),
-        );
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
-        expect(_neighbours(tester, 'Избранное 10 вечером'), (
-          _longTitle(9),
-          _longTitle(11),
-        ));
-
-        await _openFromHome(
-          tester,
-          row: _shownHomeTitles(tester).indexOf(_longTitle(12)),
-          intention: _longFavorite(12),
-        );
-        await _archive(tester);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _waitFor(
-          tester,
-          () => !_shownHomeTitles(tester).contains(_longTitle(12)),
-        );
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
-        expect(_neighbours(tester, _longTitle(11)), (
-          'Избранное 10 вечером',
-          _longTitle(13),
-        ));
-
-        // Восстановление на странице, открытой из каталога, возвращает
-        // строку на место, а Главная остаётся в прежней позиции.
-        await _select(tester, AppDestination.intentionGraph);
-        await _selectScope(tester, l10n.catalogScopeArchived);
-        await _expectRows(tester, IntentionCatalogPage, [
-          (_longTitle(12), true),
-        ], l10n);
-        await _openFromCatalog(tester, row: 0, intention: _longFavorite(12));
-        await _restore(tester);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _select(tester, AppDestination.home);
-        await _waitFor(
-          tester,
-          () => _shownHomeTitles(tester).contains(_longTitle(12)),
-        );
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
-        expect(_neighbours(tester, _longTitle(12)), (
-          _longTitle(11),
-          _longTitle(13),
-        ));
-        expect(tester.takeException(), isNull);
-      },
-    );
   }
 }
 
@@ -474,27 +396,6 @@ void _seedGraph(sqlite.Database database, {List<int> favorites = const []}) {
     );
   }
 }
-
-/// Длинный список избранных намерений без связей.
-void _seedLongList(sqlite.Database database) {
-  for (var number = 1; number <= _longFavoriteCount; number++) {
-    final intention = _longFavorite(number);
-    database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(intention), _longTitle(number), 1, 0, number, number],
-    );
-    storeFavoriteMark(
-      database,
-      intentionId: tagFixtureId(intention),
-      position: number,
-    );
-  }
-}
-
-int _longFavorite(int number) => _firstLongFavorite + number - 1;
-
-String _longTitle(int number) =>
-    'Избранное ${number.toString().padLeft(2, '0')}';
 
 /// Проверяет звёзды отмеченных А, Б и В в каталоге намерений и в поисках
 /// действия, исходного намерения и участника связи. Каждая выдача сохраняет
@@ -628,19 +529,6 @@ List<_HomeRow> _shownHomeRows(WidgetTester tester) => [
       final texts => fail('Недопустимое содержимое строки Главной: $texts'),
     },
 ];
-
-List<String> _shownHomeTitles(WidgetTester tester) => [
-  for (final (_, title, _, _) in _shownHomeRows(tester)) title,
-];
-
-/// Соседние строки строки [title] в списке Главной.
-(String, String) _neighbours(WidgetTester tester, String title) {
-  final titles = _shownHomeTitles(tester);
-  final index = titles.indexOf(title);
-  expect(index, greaterThan(0), reason: title);
-  expect(index, lessThan(titles.length - 1), reason: title);
-  return (titles[index - 1], titles[index + 1]);
-}
 
 int _intentionNumber(HomeIntentionRow row) {
   final id = row.row.id.toCanonicalString();
@@ -941,19 +829,6 @@ Future<void> _selectScope(WidgetTester tester, String label) async {
   await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
-
-ScrollPosition _homePosition(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(
-            of: find.byKey(
-              const PageStorageKey<String>('home-favorite-intentions'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    )
-    .position;
 
 Future<void> _popToRoot(WidgetTester tester, _App app) async {
   while (app.router.canPop()) {

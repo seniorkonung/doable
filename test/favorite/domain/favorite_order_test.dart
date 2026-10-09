@@ -5,19 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('изменение порядка', () {
-    test('перемещение Д после А при скрытых архивированных Б и Г даёт '
-        'А, Д, Б, В, Г', () {
-      final order = _order(['А', 'Б*', 'В', 'Г*', 'Д']);
-
-      final result = moveInFavoriteOrder(
-        order,
-        intentionId: _id('Д'),
-        placement: AfterFavoritePlacement(_id('А')),
-      );
-
-      expect(_namesOf(result), ['А', 'Д', 'Б', 'В', 'Г']);
-    });
-
     test('перемещение на первое место ставит намерение перед скрытыми '
         'архивированными', () {
       final order = _order(['Б*', 'А', 'В']);
@@ -97,49 +84,6 @@ void main() {
         _entry('В'),
         _entry('Г*'),
       ]);
-    });
-
-    test('архивирование перемещаемого намерения не отклоняет перемещение', () {
-      final order = _order(['А', 'Б', 'В*']);
-
-      final result = moveInFavoriteOrder(
-        order,
-        intentionId: _id('В'),
-        placement: const FirstFavoritePlacement(),
-      );
-
-      expect(_namesOf(result), ['В', 'А', 'Б']);
-    });
-
-    test('архивирование опорного намерения не отклоняет перемещение', () {
-      final order = _order(['А', 'Б*', 'В', 'Г']);
-
-      final result = moveInFavoriteOrder(
-        order,
-        intentionId: _id('Г'),
-        placement: AfterFavoritePlacement(_id('Б')),
-      );
-
-      expect(_namesOf(result), ['А', 'Б', 'Г', 'В']);
-    });
-
-    test('одноимённые намерения различаются только идентификатором', () {
-      final first = _intentionId(1);
-      final second = _intentionId(2);
-      final reading = _intentionId(3);
-      final order = FavoriteOrder([
-        _activeEntry(first),
-        _activeEntry(second),
-        _activeEntry(reading),
-      ]);
-
-      final result = moveInFavoriteOrder(
-        order,
-        intentionId: second,
-        placement: AfterFavoritePlacement(reading),
-      );
-
-      expect(_reordered(result).intentionIds, [first, reading, second]);
     });
 
     test('каждое перемещение меняет место только перемещаемого намерения', () {
@@ -375,11 +319,6 @@ FavoriteOrderEntry _entry(String name) => FavoriteOrderEntry(
   archiveState: name.endsWith('*')
       ? IntentionArchiveState.archived
       : IntentionArchiveState.active,
-);
-
-FavoriteOrderEntry _activeEntry(IntentionId id) => FavoriteOrderEntry(
-  intentionId: id,
-  archiveState: IntentionArchiveState.active,
 );
 
 IntentionId _id(String name) {

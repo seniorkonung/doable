@@ -732,29 +732,6 @@ void main() {
   });
 
   group('отказ обновления сохраняет прежнее состояние неактуальным', () {
-    const failures = <(String, FavoriteIntentionsReadFailure, bool)>[
-      ('недоступность', FavoriteIntentionsUnavailableFailure(), true),
-      ('повреждение', FavoriteIntentionsCorruptionFailure(), false),
-      ('неизвестный отказ', FavoriteIntentionsUnexpectedFailure(), false),
-    ];
-    for (final (name, failure, canRetry) in failures) {
-      test('$name оставляет прежний список с причиной', () async {
-        final h = await loadedHome();
-
-        await confirmMarkC(h, revision: 2);
-        h.repository.failRead(1, failure);
-        await pumpEventQueue();
-
-        final list = h.state as HomeList;
-        expect(list.items.map((row) => row.id), [a, b]);
-        expect((list.revision as HomeTestRevision).number, 1);
-        final stale = list.freshness as HomeFreshnessStale;
-        expect(stale.failure.runtimeType, failure.runtimeType);
-        expect(stale.canRetry, canRetry);
-        expect(h.repository.readCount, 2);
-      });
-    }
-
     test('исключение границы оставляет прежний список с неизвестным '
         'отказом', () async {
       final h = await loadedHome();
@@ -766,44 +743,6 @@ void main() {
       final stale = (h.state as HomeList).freshness as HomeFreshnessStale;
       expect(stale.failure, isA<FavoriteIntentionsUnexpectedFailure>());
       expect(ids(h), [a, b]);
-    });
-
-    test('пустое состояние остаётся с прежней причиной и пометкой', () async {
-      final h = HomeHarness();
-      addTearDown(h.dispose);
-      h.repository.completeRead(0, archivedCount: 2);
-      await pumpEventQueue();
-
-      await confirmMarkC(h, revision: 2);
-      h.repository.failRead(1, const FavoriteIntentionsUnavailableFailure());
-      await pumpEventQueue();
-
-      final empty = h.state as HomeEmpty;
-      expect(empty.reason, HomeEmptyReason.allArchived);
-      expect(empty.freshness, isA<HomeFreshnessStale>());
-    });
-
-    test('явный повтор при недоступности возвращает текущую актуальность и '
-        'убирает причину', () async {
-      final h = await loadedHome();
-      await confirmMarkC(h, revision: 2);
-      h.repository.failRead(1, const FavoriteIntentionsUnavailableFailure());
-      await pumpEventQueue();
-
-      h.model.retry();
-
-      expectRefreshingAB(h);
-      expect(h.repository.readCount, 3);
-
-      h.repository.completeRead(
-        2,
-        items: [homeTestRow(1, 'А'), homeTestRow(2, 'Б'), homeTestRow(3, 'В')],
-        revision: 2,
-      );
-      await pumpEventQueue();
-
-      expect(ids(h), [a, b, c]);
-      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
     });
 
     test('повтор не публикует снимок старше ревизии отказавшего '

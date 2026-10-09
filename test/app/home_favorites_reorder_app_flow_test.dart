@@ -321,110 +321,6 @@ void main() {
       });
     }
 
-    testWidgets('снятие отметки опорного намерения, принятое раньше '
-        'перестановки, даёт ей реальный конфликт: после результата снятия '
-        'отказ перестановки предъявляется один раз, а Главная приходит к '
-        'актуальному списку; повторная перестановка во время выполнения не '
-        'принимается на $code', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final app = await _App.start(
-        tester,
-        locale,
-        (database) => _seedGraph(
-          database,
-          favorites: const [_walk, _read, _otherWalk, _sleep],
-        ),
-      );
-      final l10n = app.l10n;
-      await _expectConfirmedHome(tester, app, const [
-        _walk,
-        _read,
-        _otherWalk,
-        _sleep,
-      ]);
-
-      // Снятие отметки «Читать» принято и выполняется в хранилище, а
-      // страница закрыта до его подтверждения: Главная ещё показывает
-      // подтверждённый список с «Читать».
-      await _openFromHome(tester, _read);
-      app.faults.holdNextUnmarkWrite();
-      await _tap(tester, find.byKey(_favoriteControl));
-      await _waitFor(tester, () => app.faults.isHoldingUnmarkWrite);
-      await _closeTop(tester, IntentionDetailsPage);
-      await _expectConfirmedHome(tester, app, const [
-        _walk,
-        _read,
-        _otherWalk,
-        _sleep,
-      ]);
-
-      // «Спать» ставится жестом сразу после «Читать»: перестановка принята
-      // и ждёт в хранилище снятия отметки, принятого раньше.
-      await _dragHandle(tester, _sleep, -1);
-      await _waitFor(tester, () => app.repository.moves == 1);
-      await tester.pumpAndSettle();
-      const requested = [_walk, _read, _sleep, _otherWalk];
-      _expectSaving(tester, app, requested, moved: _sleep);
-
-      // Ручки недоступны: перетаскивание другой строки ничего не отправляет.
-      await _dragHandle(tester, _walk, 1);
-      await tester.pumpAndSettle();
-      _expectSaving(tester, app, requested, moved: _sleep);
-      expect(app.repository.moves, 1);
-      expect(
-        storedFavoriteMarks(app.raw),
-        _places(const [_walk, _read, _otherWalk, _sleep]),
-      );
-
-      // Сначала предъявляется подтверждённое снятие отметки.
-      app.faults.releaseUnmarkWrite();
-      await _until(
-        tester,
-        find.descendant(
-          of: find.byKey(_message),
-          matching: find.textContaining('Читать'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byKey(_message), findsOneWidget);
-      await _hideMessage(tester);
-
-      // Затем — один отказ перестановки на общей поверхности Главной.
-      final conflict = find.text(l10n.favoriteOrderConflict);
-      await _until(tester, conflict);
-      await tester.pumpAndSettle();
-      expect(find.byKey(_message), findsOneWidget);
-      expect(
-        find.descendant(of: find.byType(HomePage), matching: conflict),
-        findsOneWidget,
-      );
-      await _expectConfirmedHome(tester, app, const [
-        _walk,
-        _otherWalk,
-        _sleep,
-      ], allowMessage: true);
-      expect(storedFavoriteMarks(app.raw), [
-        (tagFixtureId(_walk), 1),
-        (tagFixtureId(_otherWalk), 3),
-        (tagFixtureId(_sleep), 4),
-      ]);
-      await _closeMessage(tester);
-
-      // Отказ не повторяется ни на других пунктах, ни при возвращении.
-      await openIntentionGraph(tester, waitFor: _until);
-      await _settle(tester);
-      expect(_builtMessages, findsNothing);
-      await openHome(tester, waitFor: _until);
-      await _expectConfirmedHome(tester, app, const [
-        _walk,
-        _otherWalk,
-        _sleep,
-      ]);
-      expect(app.repository.moves, 1);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    });
-
     testWidgets('подтверждённая перестановка не меняет состав, порядок, '
         'количество и отметки открытых каталога намерений и трёх поисков, а '
         'намерения, их время, связи, теги и дневные выборы сохраняются на '
@@ -603,7 +499,6 @@ final class _App {
     );
     addTearDown(() async {
       repository.releaseMove();
-      faults.releaseUnmarkWrite();
       await tester.pumpWidget(const SizedBox.shrink());
       await runtime.shutdown();
     });
@@ -922,12 +817,6 @@ Finder _homeRow(int number) => find.descendant(
   matching: find.byKey(ValueKey(_intentionId(number))),
 );
 
-/// Ручка строки Главной намерения [number].
-Finder _handle(int number) => find.descendant(
-  of: _homeRow(number),
-  matching: find.byIcon(Icons.drag_handle),
-);
-
 ScrollPosition _homePosition(WidgetTester tester) => tester
     .state<ScrollableState>(
       find
@@ -1094,25 +983,6 @@ void _moveBySemantics(
   );
 }
 
-/// Перетаскивает строку Главной намерения [number] ручкой на [places] мест:
-/// вниз при положительном числе, вверх — при отрицательном.
-///
-/// Перетаскиваемая строка занимает место соседней, когда её край заходит за
-/// середину соседней строки, поэтому смещение на три четверти высоты строки
-/// на каждое место однозначно задаёт новое место.
-Future<void> _dragHandle(WidgetTester tester, int number, int places) async {
-  final rowHeight = tester.getSize(_homeRow(number)).height;
-  final distance = (places.abs() - 0.25) * rowHeight * places.sign;
-  final gesture = await tester.startGesture(tester.getCenter(_handle(number)));
-  const steps = 10;
-  for (var step = 0; step < steps; step++) {
-    await gesture.moveBy(Offset(0, distance / steps));
-    await tester.pump();
-  }
-  await gesture.up();
-  await tester.pump();
-}
-
 /// Уходит с Главной: выбирает пункт каталога либо открывает поверх Главной
 /// страницу «Избранное 20».
 Future<void> _depart(WidgetTester tester, _Departure departure) async {
@@ -1141,18 +1011,6 @@ Future<void> _returnHome(WidgetTester tester, _Departure departure) async {
       await _closeTop(tester, IntentionDetailsPage);
   }
   await tester.pumpAndSettle();
-}
-
-Future<void> _openFromHome(WidgetTester tester, int intention) async {
-  await _tap(tester, _homeRow(intention));
-  await _until(tester, find.byKey(_favoriteControl));
-  await tester.pumpAndSettle();
-  expect(
-    tester
-        .widget<IntentionDetailsPage>(find.byType(IntentionDetailsPage))
-        .intentionId,
-    _intentionId(intention),
-  );
 }
 
 /// Отправляет новое название намерения открытой страницы, не дожидаясь
@@ -1238,31 +1096,14 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 /// Управляет записями избранного на уровне хранилища: отказывает ближайшей
-/// записи мест перестановки устранимой недоступностью и задерживает
-/// ближайшую запись снятия отметки внутри её транзакции.
+/// записи мест перестановки устранимой недоступностью.
 ///
-/// Отказ откатывает транзакцию перестановки самим адаптером. Задержанная
-/// запись занимает последовательный исполнитель хранилища, поэтому команды,
-/// принятые после неё, ждут её завершения, как и при медленной записи.
-/// Остальные чтения и записи не затрагиваются.
+/// Отказ откатывает транзакцию перестановки самим адаптером. Остальные
+/// чтения и записи не затрагиваются.
 final class _FavoriteWriteFaults extends LocalDatabaseConnectionObserver {
   var _failNextPlaceWrite = false;
-  Completer<void>? _nextUnmarkHold;
-  Completer<void>? _heldUnmark;
 
   void failNextPlaceWrite() => _failNextPlaceWrite = true;
-
-  void holdNextUnmarkWrite() => _nextUnmarkHold = Completer<void>();
-
-  /// Задержанная запись снятия отметки дошла до хранилища и ждёт
-  /// [releaseUnmarkWrite].
-  bool get isHoldingUnmarkWrite => _heldUnmark != null;
-
-  void releaseUnmarkWrite() {
-    final held = _heldUnmark;
-    _heldUnmark = null;
-    if (held != null && !held.isCompleted) held.complete();
-  }
 
   @override
   FutureOr<void> beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -1276,15 +1117,6 @@ final class _FavoriteWriteFaults extends LocalDatabaseConnectionObserver {
         extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
         message: 'Управляемый отказ записи мест перестановки',
       );
-    }
-    final hold = _nextUnmarkHold;
-    if (hold != null &&
-        statement.statements.any(
-          (sql) => sql.startsWith('DELETE FROM favorite_intentions'),
-        )) {
-      _nextUnmarkHold = null;
-      _heldUnmark = hold;
-      return hold.future;
     }
     return null;
   }

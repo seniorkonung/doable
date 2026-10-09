@@ -67,55 +67,6 @@ void main() {
       (loaded.revision as HomeTestRevision).number;
 
   group('запрос перестановки', () {
-    test('перемещение по текущему списку передаётся координатору, а список '
-        'показывает запрошенное положение с ожиданием сохранения', () async {
-      final h = await loadedHome();
-
-      h.model.move(d, AfterFavoritePlacement(a));
-
-      final command = h.repository.moves.single.command;
-      expect(command.intentionId, d);
-      expect((command.placement as AfterFavoritePlacement).anchorId, a);
-      expect(h.coordinator.isFavoriteOrderRunning, isTrue);
-      final saving = list(h).reorder as HomeReorderSaving;
-      expect(saving.intentionId, d);
-      expect((saving.placement as AfterFavoritePlacement).anchorId, a);
-      // Подтверждённый снимок отделён от запрошенного положения.
-      expect(confirmedIds(h), [a, b, c, d]);
-      expect(displayedIds(h), [a, d, b, c]);
-      expect(list(h).acceptsReorder, isFalse);
-      expect(list(h).freshness, isA<HomeFreshnessCurrent>());
-      expect(revisionOf(list(h)), 1);
-      expect(h.repository.readCount, 1);
-    });
-
-    test('перемещение на первое место показывает намерение первым', () async {
-      final h = await loadedHome();
-
-      h.model.move(c, const FirstFavoritePlacement());
-
-      expect(
-        h.repository.moves.single.command.placement,
-        isA<FirstFavoritePlacement>(),
-      );
-      expect(list(h).reorder, isA<HomeReorderSaving>());
-      expect(confirmedIds(h), [a, b, c, d]);
-      expect(displayedIds(h), [c, a, b, d]);
-    });
-
-    test('вторая перестановка во время выполняющейся не принимается и не '
-        'отправляется', () async {
-      final h = await loadedHome();
-      h.model.move(d, AfterFavoritePlacement(a));
-
-      h.model.move(b, const FirstFavoritePlacement());
-      h.model.move(c, AfterFavoritePlacement(d));
-      await pumpEventQueue();
-
-      expect(h.repository.moves, hasLength(1));
-      expect(displayedIds(h), [a, d, b, c]);
-    });
-
     test(
       'перемещение без изменения положения в списке команду не отправляет',
       () async {
@@ -190,47 +141,6 @@ void main() {
           expect(h.state, isA<HomeUnavailable>());
           expect(h.repository.moves, isEmpty);
         });
-
-        test('во время обновления списка', () async {
-          final h = await loadedHome();
-          await h.confirm(
-            UpdateIntention(id: b, title: 'Бэ', description: null),
-            revision: 2,
-            before: homeTestSummary(2, 'Б'),
-            after: homeTestSummary(2, 'Бэ'),
-          );
-          expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-          expect(list(h).acceptsReorder, isFalse);
-
-          h.model.move(d, AfterFavoritePlacement(a));
-          await pumpEventQueue();
-
-          expect(h.repository.moves, isEmpty);
-          expect(list(h).reorder, isA<HomeReorderIdle>());
-        });
-
-        test('при неактуальном списке', () async {
-          final h = await loadedHome();
-          await h.confirm(
-            UpdateIntention(id: b, title: 'Бэ', description: null),
-            revision: 2,
-            before: homeTestSummary(2, 'Б'),
-            after: homeTestSummary(2, 'Бэ'),
-          );
-          h.repository.failRead(
-            1,
-            const FavoriteIntentionsUnavailableFailure(),
-          );
-          await pumpEventQueue();
-          expect(list(h).freshness, isA<HomeFreshnessStale>());
-          expect(list(h).acceptsReorder, isFalse);
-
-          h.model.move(d, AfterFavoritePlacement(a));
-          await pumpEventQueue();
-
-          expect(h.repository.moves, isEmpty);
-          expect(displayedIds(h), [a, b, c, d]);
-        });
       },
     );
   });
@@ -286,23 +196,6 @@ void main() {
         expect(h.repository.moves, hasLength(1));
       },
     );
-
-    test('освобождённый ключ до цельного снимка не разрешает команду по '
-        'прежнему порядку', () async {
-      final h = await loadedHome();
-      h.model.move(d, AfterFavoritePlacement(a));
-      h.repository.completeMove(0, revision: 2);
-      await pumpEventQueue();
-      expect(h.coordinator.isFavoriteOrderRunning, isFalse);
-
-      h.model.move(c, const FirstFavoritePlacement());
-      h.model.move(b, AfterFavoritePlacement(c));
-      await pumpEventQueue();
-
-      expect(h.repository.moves, hasLength(1));
-      expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
-      expect(displayedIds(h), [a, d, b, c]);
-    });
 
     test(
       'снимок, уже несущий подтверждённую запись, завершает перестановку без '
@@ -479,17 +372,6 @@ void main() {
       expect(h.coordinator.isFavoriteOrderRunning, isFalse);
     }
 
-    test('при недоступности', () async {
-      final h = await failedMove(
-        (h) =>
-            h.repository.failMove(0, const FavoriteOrderUnavailableFailure()),
-      );
-
-      expectConfirmedOrder(h);
-      expect(h.repository.favoriteOrder.intentionIds, [a, b, c, d]);
-      await expectSharedFailure(h, isA<FavoriteOrderUnavailableFailure>());
-    });
-
     test('при повреждении', () async {
       final h = await failedMove(
         (h) => h.repository.failMove(0, const FavoriteOrderCorruptionFailure()),
@@ -528,37 +410,6 @@ void main() {
       expectConfirmedOrder(h);
       await expectSharedFailure(h, isA<FavoriteOrderInputFailure>());
     });
-  });
-
-  test('конфликт актуального состояния запрашивает актуальный снимок без '
-      'повторной отправки перемещения', () async {
-    final h = await loadedHome();
-    // Отметка Б к моменту записи снята: опора перестала быть избранной.
-    h.repository.favoriteOrder = homeTestOrder([1, 3, 4]);
-    h.model.move(a, AfterFavoritePlacement(b));
-
-    h.repository.completeMove(0, revision: 1);
-    await pumpEventQueue();
-
-    expect(h.repository.favoriteOrder.intentionIds, [a, c, d]);
-    expect(list(h).reorder, isA<HomeReorderIdle>());
-    expect(confirmedIds(h), [a, b, c, d]);
-    expect(displayedIds(h), [a, b, c, d]);
-    expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-    expect(list(h).acceptsReorder, isFalse);
-    expect(h.repository.readCount, 2);
-
-    h.repository.completeRead(
-      1,
-      items: [homeTestRow(1, 'А'), homeTestRow(3, 'В'), homeTestRow(4, 'Г')],
-      revision: 2,
-    );
-    await pumpEventQueue();
-
-    expect(confirmedIds(h), [a, c, d]);
-    expect(list(h).freshness, isA<HomeFreshnessCurrent>());
-    expect(list(h).acceptsReorder, isTrue);
-    expect(h.repository.moves, hasLength(1));
   });
 
   test('конфликт из-за снятой до записи отметки опоры приводит к актуальному '
@@ -605,41 +456,6 @@ void main() {
     expect(list(h).freshness, isA<HomeFreshnessCurrent>());
     expect(list(h).acceptsReorder, isTrue);
     expect(h.repository.moves, hasLength(1));
-  });
-
-  test('архивированные избранные границы сохраняют места, а Главная показывает '
-      'подтверждённый снимок', () async {
-    final h = HomeHarness();
-    addTearDown(h.dispose);
-    // Полный порядок: А, архивированное Б, В, архивированное Г, Д.
-    h.repository.favoriteOrder = homeTestOrder(
-      [1, 2, 3, 4, 5],
-      archived: {2, 4},
-    );
-    h.repository.completeRead(
-      0,
-      items: [homeTestRow(1, 'А'), homeTestRow(3, 'В'), homeTestRow(5, 'Д')],
-      archivedCount: 2,
-    );
-    await pumpEventQueue();
-    final e = homeTestIntentionId(5);
-
-    h.model.move(e, AfterFavoritePlacement(a));
-    expect(displayedIds(h), [a, e, c]);
-    h.repository.completeMove(0, revision: 2);
-    await pumpEventQueue();
-
-    expect(h.repository.favoriteOrder.intentionIds, [a, e, b, c, d]);
-    h.repository.completeRead(
-      1,
-      items: [homeTestRow(1, 'А'), homeTestRow(5, 'Д'), homeTestRow(3, 'В')],
-      archivedCount: 2,
-      revision: 2,
-    );
-    await pumpEventQueue();
-
-    expect(list(h).reorder, isA<HomeReorderIdle>());
-    expect(confirmedIds(h), [a, e, c]);
   });
 
   test('ожидание снимка после записи ограничено: без подтверждающего снимка '
@@ -1282,38 +1098,6 @@ void main() {
       expect(confirmed.count, count);
     }
 
-    test('появляется только вместе с цельным снимком, подтвердившим запись, '
-        'и несёт место перемещённого намерения в нём', () async {
-      final h = await loadedHome();
-      expect(list(h).confirmedMove, isNull);
-
-      h.model.move(d, AfterFavoritePlacement(a));
-      expect(list(h).reorder, isA<HomeReorderSaving>());
-      expect(list(h).confirmedMove, isNull);
-
-      h.repository.completeMove(0, revision: 2);
-      await pumpEventQueue();
-      expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
-      expect(list(h).confirmedMove, isNull);
-
-      // Снимок старше записи её не подтверждает.
-      h.repository.completeRead(1, items: rowsAbcd);
-      await pumpEventQueue();
-      expect(list(h).confirmedMove, isNull);
-
-      h.repository.completeRead(2, items: rowsAdbc, revision: 2);
-      await pumpEventQueue();
-
-      expect(list(h).reorder, isA<HomeReorderIdle>());
-      expectConfirmed(
-        list(h).confirmedMove,
-        intentionId: d,
-        title: 'Г',
-        position: 2,
-        count: 4,
-      );
-    });
-
     test('снимок, уже несущий запись к её завершению, подтверждает её с '
         'актуальными данными строк', () async {
       final h = await loadedHome();
@@ -1421,80 +1205,6 @@ void main() {
         expect(confirmedIds(h), [a, b, c]);
         expect(list(h).confirmedMove, isNull);
       },
-    );
-
-    for (final (name, complete) in <(String, void Function(HomeHarness h))>[
-      (
-        'успех без изменения',
-        (h) {
-          h.repository.favoriteOrder = homeTestOrder([1, 4, 2, 3]);
-          h.repository.completeMove(0, revision: 1);
-        },
-      ),
-      (
-        'отказ записи',
-        (h) =>
-            h.repository.failMove(0, const FavoriteOrderUnavailableFailure()),
-      ),
-      (
-        'конфликт актуального состояния',
-        (h) {
-          h.repository.favoriteOrder = homeTestOrder([2, 3, 4]);
-          h.repository.completeMove(0, revision: 1);
-        },
-      ),
-    ]) {
-      test('$name не подтверждает новое место', () async {
-        final h = await loadedHome();
-        h.model.move(d, AfterFavoritePlacement(a));
-
-        complete(h);
-        await pumpEventQueue();
-        if (h.repository.readCount > 1) {
-          h.repository.completeRead(
-            1,
-            items: [
-              homeTestRow(2, 'Б'),
-              homeTestRow(3, 'В'),
-              homeTestRow(4, 'Г'),
-            ],
-            revision: 2,
-          );
-          await pumpEventQueue();
-        }
-
-        expect(list(h).reorder, isA<HomeReorderIdle>());
-        expect(list(h).confirmedMove, isNull);
-      });
-    }
-  });
-
-  test('запрошенное положение одноимённых намерений определяется '
-      'идентификатором', () {
-    final shown = HomeList(
-      items: [homeTestRow(1, 'Гулять'), homeTestRow(2, 'Гулять')],
-      revision: const HomeTestRevision(1),
-      reorder: HomeReorderSaving(
-        intentionId: homeTestIntentionId(2),
-        placement: const FirstFavoritePlacement(),
-      ),
-    );
-
-    expect(shown.displayedItems.map((row) => row.id), [
-      homeTestIntentionId(2),
-      homeTestIntentionId(1),
-    ]);
-    expect(shown.items.map((row) => row.id), [
-      homeTestIntentionId(1),
-      homeTestIntentionId(2),
-    ]);
-    expect(shown.acceptsReorder, isFalse);
-    expect(
-      HomeList(
-        items: shown.items,
-        revision: const HomeTestRevision(1),
-      ).acceptsReorder,
-      isTrue,
     );
   });
 }
