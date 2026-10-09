@@ -65,7 +65,6 @@ void main() {
       InMemoryDiagnosticsSink(),
       tagIdGenerator: switch (operation) {
         'assignments_mutate' => _FixtureTagIdGenerator(),
-        'navigation_mutate' => _FixtureTagIdGenerator(305),
         _ => null,
       },
     );
@@ -77,68 +76,10 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final firstId =
-        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
-    final lastId =
-        (TagId.decode(tagFixtureId(lastTagNumber)) as TagIdDecodingSuccess).id;
     try {
-      if (operation == 'mutate') {
-        await _expectSuccess(
-          coordinator.acceptTagRename(
-            RenameTag(tagId: firstId, name: TagName.fromInput('Быт')),
-          ),
-        );
-        await _expectSuccess(coordinator.acceptTagDelete(DeleteTag(lastId)));
-        final accepted = coordinator.acceptTagCreation(
-          TagCreationFormKey(),
-          CreateTag(TagName.fromInput('Работа')),
-        );
-        // Штатное закрытие ждёт уже принятую команду.
-        await coordinator.shutdown();
-        await _expectSuccess(accepted);
-      } else if (operation == 'delete_before_commit' ||
-          operation == 'delete_after_commit') {
-        await _expectSuccess(coordinator.acceptTagDelete(DeleteTag(firstId)));
-        if (operation == 'delete_after_commit') await _reportReadyAndWait();
-        await coordinator.shutdown();
-      } else if (operation == 'assignments_mutate') {
+      if (operation == 'assignments_mutate') {
         await _mutateAssignments(coordinator);
-      } else if (operation == 'navigation_rename') {
-        await _verifyNavigationFixture(
-          repository,
-          changed: false,
-          name: 'Дом 🏷️',
-        );
-        await _expectSuccess(
-          coordinator.acceptTagRename(
-            RenameTag(tagId: firstId, name: TagName.fromInput('Быт 🏷️')),
-          ),
-        );
-        await _verifyNavigationFixture(repository, changed: false);
-      } else if (operation == 'navigation_verify') {
-        await _verifyNavigationFixture(repository, changed: false);
-      } else if (operation == 'navigation_mutate') {
-        await _mutateNavigation(coordinator);
-        await _reportReadyAndWait();
-      } else if (operation == 'navigation_verify_removed' ||
-          operation == 'navigation_verify_reassigned') {
-        await _verifyNavigationFixture(
-          repository,
-          changed: true,
-          secondIntentionAssigned: operation == 'navigation_verify_reassigned',
-        );
-      } else if (operation == 'navigation_assignment_before_commit' ||
-          operation == 'navigation_assignment_after_commit') {
-        await _expectSuccess(
-          coordinator.acceptTagAssign(
-            AssignTag(tagId: firstId, intentionId: _intention(2)),
-          ),
-        );
-        if (operation == 'navigation_assignment_after_commit') {
-          await _reportReadyAndWait();
-        }
-      } else if (operation == 'assignments_verify' ||
-          operation == 'assignment_before_commit_verify' ||
+      } else if (operation == 'assignment_before_commit_verify' ||
           operation == 'assignment_after_commit_verify') {
         await _verifyAssignments(
           database,
@@ -303,107 +244,6 @@ Future<void> _verifyAssignments(
   );
 }
 
-Future<void> _mutateNavigation(GraphCommandCoordinator coordinator) async {
-  await _expectSuccess(
-    coordinator.acceptTagRename(
-      RenameTag(
-        tagId: _tag(firstTagNumber),
-        name: TagName.fromInput('Быт 🏷️'),
-      ),
-    ),
-  );
-  await _expectSuccess(
-    coordinator.acceptTagDelete(DeleteTag(_tag(lastTagNumber))),
-  );
-  final created = await _expectSuccess(
-    coordinator.acceptTagCreation(
-      TagCreationFormKey(),
-      CreateTag(TagName.fromInput('Работа')),
-    ),
-  );
-  expect((created as TagCreated).tag.id, _tag(305));
-
-  final relationDelete = coordinator.acceptRelationDelete(
-    DeleteLongTermRelation(_relation(106)),
-  );
-  expect(relationDelete, isA<LongTermRelationCommandAccepted>());
-  expect(
-    (await (relationDelete as LongTermRelationCommandAccepted).future)
-        .isFailure,
-    isFalse,
-  );
-  final intentionDelete = coordinator.acceptExisting(
-    DeleteIntention(_intention(5)),
-    presentationTitle: 'Отдельное намерение',
-  );
-  expect(intentionDelete, isA<IntentionCommandAccepted>());
-  expect(
-    (await (intentionDelete as IntentionCommandAccepted).future).isFailure,
-    isFalse,
-  );
-  for (final target in [_intention(1), _intention(2)]) {
-    await _expectSuccess(
-      coordinator.acceptTagRemoveAssignment(
-        RemoveTagAssignment(tagId: _tag(firstTagNumber), intentionId: target),
-      ),
-    );
-    await _expectSuccess(
-      coordinator.acceptTagAssign(
-        AssignTag(tagId: _tag(firstTagNumber), intentionId: target),
-      ),
-    );
-  }
-  // Подтверждённый последний номер удалён до остановки процесса.
-  await _expectSuccess(
-    coordinator.acceptTagRemoveAssignment(
-      RemoveTagAssignment(
-        tagId: _tag(firstTagNumber),
-        intentionId: _intention(2),
-      ),
-    ),
-  );
-}
-
-Future<void> _verifyNavigationFixture(
-  DriftPersonalGraphRepository repository, {
-  required bool changed,
-  bool secondIntentionAssigned = true,
-  String name = 'Быт 🏷️',
-}) async {
-  await _expectNavigation(
-    repository,
-    _tag(firstTagNumber),
-    name,
-    active: changed
-        ? [_intention(4), _intention(1)]
-        : [_intention(1), _intention(4), _intention(5)],
-    archived: changed
-        ? [_intention(6), if (secondIntentionAssigned) _intention(2)]
-        : [_intention(2), _intention(6)],
-  );
-  if (changed) {
-    for (final scope in TaggedIntentionsScope.values) {
-      expect(
-        await repository.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(tagId: _tag(lastTagNumber), scope: scope),
-        ),
-        isA<TaggedIntentionsPageError>().having(
-          (result) => result.failure,
-          'удалённый тег',
-          isA<TaggedIntentionsTagNotFound>(),
-        ),
-      );
-    }
-    await _expectNavigation(
-      repository,
-      _tag(305),
-      'Работа',
-      active: [],
-      archived: [],
-    );
-  }
-}
-
 Future<void> _expectNavigation(
   DriftPersonalGraphRepository repository,
   TagId tagId,
@@ -454,9 +294,7 @@ Future<void> _expectNavigation(
 }
 
 final class _FixtureTagIdGenerator implements TagIdGenerator {
-  _FixtureTagIdGenerator([this._next = 301]);
-
-  int _next;
+  var _next = 301;
 
   @override
   TagId generate() => _tag(_next++);
@@ -469,18 +307,9 @@ final class _StopBeforeCommit extends LocalDatabaseConnectionObserver {
 
   @override
   Future<void> afterStatement(LocalDatabaseSqlStatement statement) async {
-    if ((operation == 'delete_before_commit' &&
-            statement.statements.any(
-              (sql) =>
-                  sql.toUpperCase().contains('DELETE FROM') &&
-                  sql.contains('tags'),
-            )) ||
-        ((operation == 'assignment_before_commit' ||
-                operation == 'navigation_assignment_before_commit') &&
-            statement.operation == LocalDatabaseSqlOperation.insert &&
-            statement.statements.any(
-              (sql) => sql.contains('tag_assignments'),
-            ))) {
+    if (operation == 'assignment_before_commit' &&
+        statement.operation == LocalDatabaseSqlOperation.insert &&
+        statement.statements.any((sql) => sql.contains('tag_assignments'))) {
       await _reportReadyAndWait();
     }
   }

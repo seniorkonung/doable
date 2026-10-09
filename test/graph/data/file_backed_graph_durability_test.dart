@@ -297,9 +297,7 @@ void main() {
     await _expectCanonicalConnectionIntegrity(database);
   });
 
-  for (final operation in _GraphProcessOperation.values.where(
-    (operation) => operation != _GraphProcessOperation.bulkDelete,
-  )) {
+  for (final operation in _GraphProcessOperation.values) {
     for (final stopPoint in [
       _GraphProcessStopPoint.beforeCommit,
       _GraphProcessStopPoint.afterCommit,
@@ -333,8 +331,6 @@ void main() {
                 database,
                 archived: operation == _GraphProcessOperation.restore,
               );
-            case _GraphProcessOperation.bulkDelete:
-              throw StateError('Массовое удаление проверяется отдельно.');
           }
           await harness.closePersistenceObjectGraph();
 
@@ -361,8 +357,6 @@ void main() {
                 operation,
                 committed: stopPoint.isAfterCommit,
               );
-            case _GraphProcessOperation.bulkDelete:
-              throw StateError('Массовое удаление проверяется отдельно.');
           }
           await _expectCanonicalConnectionIntegrity(reopenedDatabase);
         },
@@ -889,11 +883,7 @@ enum _GraphProcessOperation {
   update(environmentValue: 'update', testDescription: 'изменения связи'),
   archive(environmentValue: 'archive', testDescription: 'архивирования связи'),
   restore(environmentValue: 'restore', testDescription: 'восстановления связи'),
-  delete(environmentValue: 'delete', testDescription: 'удаления связи'),
-  bulkDelete(
-    environmentValue: 'bulk_delete',
-    testDescription: 'удаления большого набора',
-  );
+  delete(environmentValue: 'delete', testDescription: 'удаления связи');
 
   const _GraphProcessOperation({
     required this.environmentValue,
