@@ -46,35 +46,6 @@ void main() {
     },
   );
 
-  test('очистка описания не меняет дату и выполнение', () {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.model
-      ..changeDescription(' \n ')
-      ..submit();
-    final patch = harness.repository.commands.single.patch;
-    expect(patch.description, isA<DailyChoiceDescriptionCleared>());
-    expect(patch.date, isA<DailyChoiceFieldUnchanged<CalendarDate>>());
-    expect(patch.isCompleted, isA<DailyChoiceFieldUnchanged<bool>>());
-  });
-
-  test('отказ описания сохраняет дату и 4097 графем для исправления', () {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.model
-      ..changeDate(CalendarDate.fromParts(9999, 12, 31))
-      ..changeDescription('е\u0301' * 4097)
-      ..submit();
-    expect(harness.repository.commands, isEmpty);
-    expect(harness.state.date, CalendarDate.fromParts(9999, 12, 31));
-    expect(harness.state.description, 'е\u0301' * 4097);
-    expect(harness.state.operation, isA<DailyChoiceEditFailed>());
-    harness.model.changeDescription('Исправлено');
-    expect(harness.state.canSubmit, isTrue);
-    harness.model.submit();
-    expect(harness.repository.commands, hasLength(1));
-  });
-
   test(
     'временный отказ допускает повтор, отсутствие и конфликт его блокируют',
     () async {

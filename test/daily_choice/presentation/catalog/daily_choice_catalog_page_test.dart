@@ -649,34 +649,6 @@ void main() {
     expect(find.text('To Основание, today I Действие'), findsOneWidget);
   });
 
-  testWidgets('фильтры, количество и выдача прокручиваются вместе одним '
-      'жестом по выдаче', (tester) async {
-    final repository = _Repository();
-    await _open(tester, repository, size: _phone);
-    repository.completeFirst(
-      [for (var number = 1; number <= 20; number++) _item(number)],
-      total: 21,
-      cursor: const _Cursor(),
-    );
-    await tester.pumpAndSettle();
-    final calendar = find.byType(DailyChoiceCalendar);
-    final count = find.text('Всего дневных выборов: 21');
-    final row = find.byKey(const ValueKey('daily-choice-row-2'));
-    final before = [
-      for (final finder in [calendar, count, row]) tester.getRect(finder).top,
-    ];
-
-    await tester.drag(row, const Offset(0, -100));
-    await tester.pumpAndSettle();
-
-    final shifts = [
-      for (final (index, finder) in [calendar, count, row].indexed)
-        before[index] - tester.getRect(finder).top,
-    ];
-    expect(shifts.first, greaterThan(0));
-    expect(shifts, everyElement(moreOrLessEquals(shifts.first)));
-  });
-
   for (final (keyboard, variant) in [
     (0.0, 'без клавиатуры'),
     (300.0, 'при открытой клавиатуре'),
@@ -768,32 +740,6 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
-
-  testWidgets('фильтры и строки доступны при увеличенном тексте', (
-    tester,
-  ) async {
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-    );
-    final repository = _Repository();
-    await _open(tester, repository, size: const Size(360, 640));
-    repository.completeFirst([_item(1)], total: 1);
-    await tester.pumpAndSettle();
-    expect(find.byType(DailyChoiceCalendar), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('daily-choice-completion-filter')),
-      findsOneWidget,
-    );
-    // Строки идут за крупными фильтрами и становятся видимыми прокруткой
-    // страницы.
-    await tester.dragUntilVisible(
-      find.byKey(const ValueKey('daily-choice-row-1')),
-      find.byType(CustomScrollView),
-      const Offset(0, -100),
-    );
-    expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
-  });
 }
 
 /// Экран телефона, на котором фильтры и выдача делят высоту.

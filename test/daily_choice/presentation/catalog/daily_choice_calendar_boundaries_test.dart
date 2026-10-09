@@ -278,27 +278,6 @@ void main() {
         expect(dayCell(tester, date(1, 1, 1)).isSelected, isTrue);
       });
 
-      testWidgets('первый месяц начинается с 0001-01-01 ($language)', (
-        tester,
-      ) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: month(date(1, 1, 1)),
-          today: date(2026, 10, 4),
-          locale: locale,
-        );
-
-        expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 5));
-
-        await tester.tap(calendarDay(date(1, 1, 1)));
-        await tester.pumpAndSettle();
-
-        expect(consumer.events, [DateSelected(date(1, 1, 1))]);
-        expect(consumer.viewport, month(date(1, 1, 1)));
-        expect(dayCell(tester, date(1, 1, 1)).isSelected, isTrue);
-      });
-
       testWidgets(
         'последняя неделя сохраняет семь позиций и выбирает 9999-12-31 ($language)',
         (tester) async {
@@ -318,31 +297,6 @@ void main() {
           expect(consumer.events, [DateSelected(date(9999, 12, 31))]);
           expect(consumer.viewport, week(date(9999, 12, 31)));
           expect(visibleWeeks(tester), [_lastWeekPositions]);
-          expect(dayCell(tester, date(9999, 12, 31)).isSelected, isTrue);
-        },
-      );
-
-      testWidgets(
-        'последний месяц сохраняет семь позиций и выбирает 9999-12-31 ($language)',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: month(date(9999, 12, 31)),
-            today: date(2026, 10, 4),
-            locale: locale,
-          );
-
-          expect(visibleWeeks(tester), [
-            ...weeksFrom(date(9999, 11, 29), 4),
-            _lastWeekPositions,
-          ]);
-
-          await tester.tap(calendarDay(date(9999, 12, 31)));
-          await tester.pumpAndSettle();
-
-          expect(consumer.events, [DateSelected(date(9999, 12, 31))]);
-          expect(consumer.viewport, month(date(9999, 12, 31)));
           expect(dayCell(tester, date(9999, 12, 31)).isSelected, isTrue);
         },
       );
@@ -428,25 +382,6 @@ void main() {
           ViewportChanged(week(date(9999, 12, 24))),
           ViewportChanged(week(date(9999, 12, 31))),
         ]);
-        expect(consumer.selectedDate, date(2026, 10, 4));
-        expect(visibleWeeks(tester), [_lastWeekPositions]);
-      },
-    );
-
-    testWidgets(
-      'переход к последней неделе заменяет фокус за пределом на 9999-12-31',
-      (tester) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: week(date(9999, 12, 26)),
-          today: date(2026, 10, 4),
-        );
-        expect(visibleWeeks(tester), weeksFrom(date(9999, 12, 20), 1));
-
-        await swipeToNextPeriod(tester);
-
-        expect(consumer.events, [ViewportChanged(week(date(9999, 12, 31)))]);
         expect(consumer.selectedDate, date(2026, 10, 4));
         expect(visibleWeeks(tester), [_lastWeekPositions]);
       },

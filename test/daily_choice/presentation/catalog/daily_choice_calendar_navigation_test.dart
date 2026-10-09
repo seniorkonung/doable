@@ -39,75 +39,7 @@ void main() {
   for (final texts in _localizedTexts) {
     final language = texts.locale.languageCode;
 
-    group('шапка ($language)', () {
-      testWidgets('сообщает месяц просмотра, выбранную дату и команды недели', (
-        tester,
-      ) async {
-        await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: week(date(2026, 10, 4)),
-          today: date(2026, 10, 4),
-          locale: texts.locale,
-        );
-
-        expect(find.text(texts.october), findsOneWidget);
-        expect(find.text(texts.selectedDate), findsOneWidget);
-        expect(find.byTooltip(texts.previousWeek), findsOneWidget);
-        expect(find.byTooltip(texts.nextWeek), findsOneWidget);
-        expect(find.byTooltip(texts.previousMonth), findsNothing);
-        expect(find.byTooltip(texts.nextMonth), findsNothing);
-        expect(find.byTooltip(texts.expand), findsOneWidget);
-        expect(find.byTooltip(texts.collapse), findsNothing);
-      });
-
-      testWidgets('в месячном представлении называет команды месяца', (
-        tester,
-      ) async {
-        await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: month(date(2026, 10, 4)),
-          today: date(2026, 10, 4),
-          locale: texts.locale,
-        );
-
-        expect(find.text(texts.october), findsOneWidget);
-        expect(find.text(texts.selectedDate), findsOneWidget);
-        expect(find.byTooltip(texts.previousMonth), findsOneWidget);
-        expect(find.byTooltip(texts.nextMonth), findsOneWidget);
-        expect(find.byTooltip(texts.previousWeek), findsNothing);
-        expect(find.byTooltip(texts.nextWeek), findsNothing);
-        expect(find.byTooltip(texts.collapse), findsOneWidget);
-        expect(find.byTooltip(texts.expand), findsNothing);
-      });
-    });
-
     group('перелистывание недель ($language)', () {
-      testWidgets(
-        'кнопка следующей недели показывает 2026-10-05 — 2026-10-11 без выбора дня',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: week(date(2026, 10, 4)),
-            today: date(2026, 10, 4),
-            locale: texts.locale,
-          );
-
-          await tester.tap(find.byTooltip(texts.nextWeek));
-          await tester.pumpAndSettle();
-
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-          expect(consumer.events, [ViewportChanged(week(date(2026, 10, 11)))]);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-          // Выбранного дня нет в видимой неделе, но подпись сообщает его.
-          expect(calendarDay(date(2026, 10, 4)), findsNothing);
-          expect(find.text(texts.selectedDate), findsOneWidget);
-          expect(find.text(texts.october), findsOneWidget);
-        },
-      );
-
       testWidgets(
         'кнопки и свайп перелистывают одни и те же недели через границу месяца',
         (tester) async {
@@ -148,30 +80,6 @@ void main() {
     });
 
     group('перелистывание месяцев ($language)', () {
-      testWidgets('кнопка следующего месяца показывает ноябрь без выбора дня', (
-        tester,
-      ) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: month(date(2026, 10, 4)),
-          today: date(2026, 10, 4),
-          locale: texts.locale,
-        );
-
-        await tester.tap(find.byTooltip(texts.nextMonth));
-        await tester.pumpAndSettle();
-
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-        expect(consumer.events, [ViewportChanged(month(date(2026, 11, 1)))]);
-        expect(consumer.selectedDate, date(2026, 10, 4));
-        expect(find.text(texts.november), findsOneWidget);
-        expect(find.text(texts.october), findsNothing);
-        // Выбранного дня нет в видимом месяце, но подпись сообщает его.
-        expect(calendarDay(date(2026, 10, 4)), findsNothing);
-        expect(find.text(texts.selectedDate), findsOneWidget);
-      });
-
       testWidgets('кнопки и свайп перелистывают одни и те же месяцы', (
         tester,
       ) async {

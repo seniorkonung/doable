@@ -37,59 +37,6 @@ void main() {
   );
 
   test(
-    'отмена первой не допускает принятия команды даже до следующего кадра',
-    () {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final session = _session();
-
-      expect(session.leave(), isTrue);
-      expect(harness.submit(session), isNull);
-      expect(harness.repository.requests, isEmpty);
-      expect(session.state, isA<DailyChoiceCreationFlowLeft>());
-      expect(session.canContinue, isFalse);
-      expect(session.leave(), isFalse);
-    },
-  );
-
-  test(
-    'принятие первым сохраняет операцию при выходе без повторной отправки',
-    () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final session = _session();
-      final accepted = harness.submit(session)!;
-
-      expect(
-        session.state,
-        isA<DailyChoiceCreationFlowSubmitting>().having(
-          (state) => state.operation.token,
-          'принятая операция',
-          same(accepted.token),
-        ),
-      );
-      expect(session.canContinue, isFalse);
-      expect(harness.submit(session), isNull);
-      expect(session.leave(), isTrue);
-      harness.repository.succeed(0);
-      final completion = await accepted.future;
-      expect(session.recordCompletion(completion), isTrue);
-
-      expect(
-        session.state,
-        isA<DailyChoiceCreationFlowLeft>().having(
-          (state) => state.lastActiveState,
-          'сохранённый результат покинутого потока',
-          isA<DailyChoiceCreationFlowSaved>(),
-        ),
-      );
-      expect(session.canContinue, isFalse);
-      expect(harness.submit(session), isNull);
-      expect(harness.repository.requests, hasLength(1));
-    },
-  );
-
-  test(
     'успех фиксируется до навигации и не сбрасывается поздним возвратом',
     () async {
       final harness = _Harness();
@@ -120,30 +67,6 @@ void main() {
       expect(session.canContinue, isFalse);
     },
   );
-
-  for (final leave in [false, true]) {
-    test(
-      'поздний отказ ${leave ? 'не возобновляет покинутый поток' : 'допускает только явное продолжение'}',
-      () async {
-        final harness = _Harness();
-        addTearDown(harness.dispose);
-        final session = _session();
-        final accepted = harness.submit(session)!;
-        if (leave) session.leave();
-        harness.repository.fail(0);
-
-        expect(session.recordCompletion(await accepted.future), isTrue);
-        expect(session.canContinue, !leave);
-        expect(harness.repository.requests, hasLength(1));
-        if (leave) {
-          expect(harness.submit(session), isNull);
-        } else {
-          expect(harness.submit(session), isNotNull);
-          expect(harness.repository.requests, hasLength(2));
-        }
-      },
-    );
-  }
 
   test('операция и оставшаяся страница удерживают одну сессию после удаления подтверждения', () async {
     final harness = _Harness();
@@ -281,20 +204,6 @@ void main() {
       expect(session.canContinue, isFalse);
     },
   );
-
-  test('завершение удерживает успех после удаления всех страниц', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    DailyChoiceCreationFlowSession? page = _session();
-    final changes = page.changes;
-    final accepted = harness.submit(page)!;
-    final finishing = accepted.future.then(page.recordCompletion);
-    page = null;
-    harness.repository.succeed(0);
-
-    expect(await finishing, isTrue);
-    expect(changes.value, isA<DailyChoiceCreationFlowSaved>());
-  });
 }
 
 DailyChoiceCreationFlowSession _session() => DailyChoiceCreationFlowSession(

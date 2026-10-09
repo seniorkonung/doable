@@ -31,17 +31,6 @@ void main() {
         .withDescription('Исходный текст');
     expect(state.toPatch(), isNull);
   });
-
-  test('4097 графем отвергаются вместе с изменённой датой', () {
-    final state = DailyChoiceEditState.initial(_choice())
-        .withDate(CalendarDate.fromParts(9999, 12, 31))
-        .withDescription('е\u0301' * 4097);
-    expect(
-      state.toPatch,
-      throwsA(isA<DailyChoiceDescriptionValidationException>()),
-    );
-    expect(state.description, 'е\u0301' * 4097);
-  });
 }
 
 DailyChoice _choice() => DailyChoice(

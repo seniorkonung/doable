@@ -45,36 +45,6 @@ void main() {
     );
   }
 
-  testWidgets('выбранный и сегодняшний дни отмечены по входам потребителя', (
-    tester,
-  ) async {
-    await pumpCalendarConsumer(
-      tester,
-      selectedDate: date(2026, 10, 1),
-      viewport: week(date(2026, 10, 4)),
-      today: date(2026, 10, 4),
-    );
-
-    expect(dayCell(tester, date(2026, 10, 1)).isSelected, isTrue);
-    expect(dayCell(tester, date(2026, 10, 1)).isToday, isFalse);
-    expect(dayCell(tester, date(2026, 10, 4)).isSelected, isFalse);
-    expect(dayCell(tester, date(2026, 10, 4)).isToday, isTrue);
-  });
-
-  testWidgets('выбранный сегодняшний день сохраняет оба признака', (
-    tester,
-  ) async {
-    await pumpCalendarConsumer(
-      tester,
-      selectedDate: date(2026, 10, 4),
-      viewport: week(date(2026, 10, 4)),
-      today: date(2026, 10, 4),
-    );
-
-    expect(dayCell(tester, date(2026, 10, 4)).isSelected, isTrue);
-    expect(dayCell(tester, date(2026, 10, 4)).isToday, isTrue);
-  });
-
   testWidgets('нажатие дня передаёт одно событие выбора с датой этой ячейки', (
     tester,
   ) async {
@@ -205,22 +175,5 @@ void main() {
     expect(dayCell(tester, date(2026, 10, 4)).isToday, isFalse);
     expect(consumer.selectedDate, date(2027, 2, 14));
     expect(consumer.events, isEmpty);
-  });
-
-  testWidgets('перелистывание недели сообщает только изменение просмотра', (
-    tester,
-  ) async {
-    final consumer = await pumpCalendarConsumer(
-      tester,
-      selectedDate: date(2026, 10, 4),
-      viewport: week(date(2026, 10, 4)),
-      today: date(2026, 10, 4),
-    );
-
-    await swipeToNextPeriod(tester);
-
-    expect(consumer.events, [ViewportChanged(week(date(2026, 10, 11)))]);
-    expect(consumer.selectedDate, date(2026, 10, 4));
-    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
   });
 }

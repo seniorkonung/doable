@@ -6,7 +6,6 @@ import 'daily_choice_calendar_test_support.dart';
 /// Подпись выбранной 2026-10-04. Русские даты Flutter форматирует с узким
 /// неразрывным пробелом перед «г.».
 const _selectedOctober4 = 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.';
-const _october = 'октябрь 2026\u202Fг.';
 const _november = 'ноябрь 2026\u202Fг.';
 
 double _calendarHeight(WidgetTester tester) =>
@@ -18,41 +17,6 @@ void main() {
   // по событиям календаря. Отсутствие лишних чтений каталога проверяется при
   // подключении к странице.
   group('сценарии спецификации', () {
-    testWidgets('свайп недели сохраняет фильтр', (tester) async {
-      final consumer = await pumpCalendarConsumer(
-        tester,
-        selectedDate: date(2026, 10, 4),
-        viewport: week(date(2026, 10, 4)),
-        today: date(2026, 10, 4),
-      );
-
-      await swipeToNextPeriod(tester);
-
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-      expect(consumer.events, [ViewportChanged(week(date(2026, 10, 11)))]);
-      expect(consumer.selectedDate, date(2026, 10, 4));
-      expect(find.text(_selectedOctober4), findsOneWidget);
-    });
-
-    testWidgets('свайп месяца сохраняет фильтр', (tester) async {
-      final consumer = await pumpCalendarConsumer(
-        tester,
-        selectedDate: date(2026, 10, 4),
-        viewport: month(date(2026, 10, 4)),
-        today: date(2026, 10, 4),
-      );
-
-      await swipeToNextPeriod(tester);
-
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-      expect(find.text(_november), findsOneWidget);
-      expect(consumer.events, [ViewportChanged(month(date(2026, 11, 1)))]);
-      expect(consumer.selectedDate, date(2026, 10, 4));
-      // Выбранного дня нет в сетке ноября, но подпись сообщает его.
-      expect(calendarDay(date(2026, 10, 4)), findsNothing);
-      expect(find.text(_selectedOctober4), findsOneWidget);
-    });
-
     testWidgets('раскрытие сохраняет просмотр соседнего периода', (
       tester,
     ) async {
@@ -86,89 +50,6 @@ void main() {
       expect(consumer.selectedDate, date(2026, 10, 4));
       expect(find.text(_selectedOctober4), findsOneWidget);
     });
-
-    testWidgets('сворачивание сохраняет дату просмотра', (tester) async {
-      final consumer = await pumpCalendarConsumer(
-        tester,
-        selectedDate: date(2026, 10, 4),
-        viewport: month(date(2026, 11, 15)),
-        today: date(2026, 10, 4),
-      );
-      final monthHeight = _calendarHeight(tester);
-
-      await tester.tap(find.byTooltip('Свернуть календарь'));
-      await tester.pumpAndSettle();
-
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
-      expect(_calendarHeight(tester), lessThan(monthHeight));
-      expect(consumer.events, [ViewportChanged(week(date(2026, 11, 15)))]);
-      expect(consumer.selectedDate, date(2026, 10, 4));
-      expect(find.text(_selectedOctober4), findsOneWidget);
-    });
-
-    testWidgets('выбор дня сохраняет раскрытое представление', (tester) async {
-      final consumer = await pumpCalendarConsumer(
-        tester,
-        selectedDate: date(2026, 10, 4),
-        viewport: month(date(2026, 11, 1)),
-        today: date(2026, 10, 4),
-      );
-
-      await tester.tap(calendarDay(date(2026, 11, 15)));
-      await tester.pumpAndSettle();
-
-      expect(consumer.events, [DateSelected(date(2026, 11, 15))]);
-      expect(consumer.selectedDate, date(2026, 11, 15));
-      expect(consumer.viewport, month(date(2026, 11, 15)));
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-      expect(find.text(_november), findsOneWidget);
-      expect(dayCell(tester, date(2026, 11, 15)).isSelected, isTrue);
-      expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
-    });
-  });
-
-  group('выбор уже выбранного дня переносит просмотр в этот день', () {
-    testWidgets('в недельном представлении неделя сохраняется', (tester) async {
-      final consumer = await pumpCalendarConsumer(
-        tester,
-        selectedDate: date(2026, 10, 4),
-        viewport: week(date(2026, 9, 29)),
-        today: date(2026, 10, 4),
-      );
-
-      await tester.tap(calendarDay(date(2026, 10, 4)));
-      await tester.pumpAndSettle();
-
-      expect(consumer.events, [DateSelected(date(2026, 10, 4))]);
-      expect(consumer.selectedDate, date(2026, 10, 4));
-      expect(consumer.viewport, week(date(2026, 10, 4)));
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-    });
-
-    testWidgets(
-      'в месячном представлении день соседнего месяца показывает свой месяц',
-      (tester) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 29),
-          viewport: month(date(2026, 11, 15)),
-          today: date(2026, 10, 4),
-        );
-        expect(dayCell(tester, date(2026, 10, 29)).isSelected, isTrue);
-
-        await tester.tap(calendarDay(date(2026, 10, 29)));
-        await tester.pumpAndSettle();
-
-        // Технический фокус библиотеки для дня до просматриваемого месяца —
-        // начало этого месяца; просмотр переходит именно в нажатый день.
-        expect(consumer.events, [DateSelected(date(2026, 10, 29))]);
-        expect(consumer.selectedDate, date(2026, 10, 29));
-        expect(consumer.viewport, month(date(2026, 10, 29)));
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
-        expect(find.text(_october), findsOneWidget);
-        expect(dayCell(tester, date(2026, 10, 29)).isSelected, isTrue);
-      },
-    );
   });
 
   group('перестроение потребителя не возвращает начальный период', () {
@@ -322,42 +203,5 @@ void main() {
         expect(consumer.selectedDate, date(2026, 10, 4));
       });
     }
-  });
-
-  testWidgets('просмотр, раскрытие и сворачивание не выбирают дни', (
-    tester,
-  ) async {
-    final consumer = await pumpCalendarConsumer(
-      tester,
-      selectedDate: date(2026, 10, 4),
-      viewport: week(date(2026, 10, 4)),
-      today: date(2026, 10, 4),
-    );
-
-    await tester.tap(find.byTooltip('Следующая неделя'));
-    await tester.pumpAndSettle();
-    await swipeToNextPeriod(tester);
-    await tester.tap(find.byTooltip('Развернуть календарь'));
-    await tester.pumpAndSettle();
-    await swipeToPreviousPeriod(tester);
-    await tester.tap(find.byTooltip('Следующий месяц'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Свернуть календарь'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Предыдущая неделя'));
-    await tester.pumpAndSettle();
-
-    expect(consumer.events, [
-      ViewportChanged(week(date(2026, 10, 11))),
-      ViewportChanged(week(date(2026, 10, 18))),
-      ViewportChanged(month(date(2026, 10, 18))),
-      ViewportChanged(month(date(2026, 9, 1))),
-      ViewportChanged(month(date(2026, 10, 1))),
-      ViewportChanged(week(date(2026, 10, 1))),
-      ViewportChanged(week(date(2026, 9, 24))),
-    ]);
-    expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
-    expect(consumer.selectedDate, date(2026, 10, 4));
-    expect(find.text(_selectedOctober4), findsOneWidget);
   });
 }

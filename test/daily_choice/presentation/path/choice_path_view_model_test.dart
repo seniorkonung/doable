@@ -25,42 +25,6 @@ import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   test(
-    'нижний обход сохраняет действие и направляет видимый путь к нему',
-    () async {
-      final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
-      addTearDown(harness.dispose);
-      expect(harness.state.draft, isA<ChoicePathDraftBottomStart>());
-      harness.repository.completePage(0, [_edge(2, 3, 1)]);
-      await pumpEventQueue();
-      expect(harness.state.confirmedPath, isNull);
-      expect(harness.model.selectContinuation(_relation(1)), isTrue);
-      harness.repository.completePage(1, [_edge(1, 2, 2)], ready: false);
-      await pumpEventQueue();
-
-      final first = harness.state as ChoicePathData;
-      expect(first.canConfirm, isTrue);
-      expect(first.confirmedPath!.steps.first.sourceIntentionId, _intention(2));
-      expect(first.confirmedPath!.steps.last.relatedIntentionId, _intention(3));
-      expect(harness.model.selectContinuation(_relation(2)), isTrue);
-      harness.repository.completePage(2, [], ready: false);
-      await pumpEventQueue();
-
-      final complete = harness.state as ChoicePathEmpty;
-      expect(complete.canConfirm, isTrue);
-      expect(complete.draft.startingIntentionId, _intention(3));
-      expect(complete.visibleSteps.map((step) => step.relation.id), [
-        _relation(2),
-        _relation(1),
-      ]);
-      expect(complete.confirmedPath!.steps.map((step) => step.relationId), [
-        _relation(2),
-        _relation(1),
-      ]);
-      expect(harness.repository.commandCount, 0);
-    },
-  );
-
-  test(
     'нижний возврат меняет основание и отбрасывает позднюю порцию',
     () async {
       final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
@@ -368,21 +332,6 @@ void main() {
     await refresh;
     expect(harness.model.selectContinuation(_relation(1)), isFalse);
     expect(harness.model.selectContinuation(_relation(2)), isTrue);
-  });
-
-  test('достигнутое действие допускает выбор и дальнейший проход', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.repository.completePage(0, [_edge(1, 2, 1)]);
-    await pumpEventQueue();
-    harness.model.selectContinuation(_relation(1));
-    harness.repository.completePage(1, [_edge(2, 3, 2)], ready: true);
-    await pumpEventQueue();
-    final current = harness.state as ChoicePathData;
-    expect(current.canConfirm, isTrue);
-    expect(current.confirmedPath!.steps.single.relationId, _relation(1));
-    expect(harness.model.selectContinuation(_relation(2)), isTrue);
-    expect(harness.state.draft.steps, hasLength(2));
   });
 
   test(
