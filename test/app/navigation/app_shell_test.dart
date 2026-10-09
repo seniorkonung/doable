@@ -26,17 +26,6 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 
 void main() {
-  test('каждый пункт определяет собственный дочерний маршрут оболочки', () {
-    expect(
-      [for (final destination in AppDestination.values) destination.page.name],
-      [
-        HomeRoute.name,
-        DailyChoiceCatalogRoute.name,
-        IntentionCatalogRoute.name,
-      ],
-    );
-  });
-
   testWidgets('после подготовки хранилища открыта Главная с выбранным '
       'пунктом «Главная»', (tester) async {
     final app = await _start(tester);

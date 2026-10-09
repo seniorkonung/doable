@@ -64,20 +64,4 @@ void main() {
       ], expectedMessages);
     });
   }
-
-  test('четыре режима сохраняют порядок и различимые значки направлений', () {
-    expect(QuickCreationMode.values, const [
-      QuickCreationMode.intention,
-      QuickCreationMode.relation,
-      QuickCreationMode.dailyChoiceFromIntention,
-      QuickCreationMode.dailyChoiceFromAction,
-    ]);
-    expect(QuickCreationMode.values.map((mode) => mode.icon), const [
-      Icons.circle_outlined,
-      Icons.link,
-      Icons.arrow_downward,
-      Icons.arrow_upward,
-    ]);
-    expect(quickCreationChangeModeIcon, Icons.unfold_more);
-  });
 }

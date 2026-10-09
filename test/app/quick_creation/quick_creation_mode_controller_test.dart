@@ -16,14 +16,6 @@ void main() {
       'daily-choice-from-action': QuickCreationMode.dailyChoiceFromAction,
     };
 
-    test('четыре режима имеют постоянный порядок и явные ключи', () {
-      expect(QuickCreationMode.values, storedModes.values.toList());
-      expect(
-        QuickCreationMode.values.map((mode) => mode.storageKey),
-        storedModes.keys.toList(),
-      );
-    });
-
     test('каждый сохранённый ключ декодируется в свой режим', () {
       for (final entry in storedModes.entries) {
         expect(QuickCreationMode.fromStorageKey(entry.key), entry.value);

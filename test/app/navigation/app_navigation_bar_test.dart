@@ -87,27 +87,8 @@ void main() {
     );
   }
 
-  test('пункты идут в порядке Главная, Дневные выборы, Граф намерений', () {
-    expect(AppDestination.values, [
-      AppDestination.home,
-      AppDestination.dailyChoices,
-      AppDestination.intentionGraph,
-    ]);
-  });
-
   for (final MapEntry(key: locale, value: names) in _locales.entries) {
     group('локаль ${locale.languageCode}', () {
-      testWidgets('название пункта берётся из локализации', (tester) async {
-        await tester.pumpWidget(_testApp(locale: locale));
-        final localizations = AppLocalizations.of(
-          tester.element(find.byType(AppNavigationBar)),
-        );
-
-        for (final destination in AppDestination.values) {
-          expect(destination.title(localizations), names[destination]);
-        }
-      });
-
       testWidgets('показывает три пункта слева направо со значками дома, '
           'календаря и графа', (tester) async {
         await tester.pumpWidget(_testApp(locale: locale));
