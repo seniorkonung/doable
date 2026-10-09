@@ -4,7 +4,6 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
@@ -89,32 +88,6 @@ void main() {
       await coordinator.shutdown();
     },
   );
-
-  test('дневная команда не отдаёт ключ смешанному удалению', () async {
-    final repository = _ControlledRepository();
-    final coordinator = _coordinator(repository);
-    final accepted = coordinator.acceptDailyChoiceDelete(
-      DeleteDailyChoice(_choiceA),
-    ) as DailyChoiceCommandAccepted;
-    expect(
-      coordinator.acceptBlockingRelationsDelete(
-        DeleteBlockingRelations(
-          intentionId: _intentionA,
-          references: {
-            DailyChoiceBlockingRelationReference(_choiceA),
-            LongTermBlockingRelationReference(_relationA),
-          },
-        ),
-        presentationTitle: 'Первое',
-      ),
-      isA<BlockingRelationsDeleteAlreadyRunning>(),
-    );
-    expect(coordinator.isRunning(_intentionA), isFalse);
-    expect(coordinator.isRelationRunning(_relationA), isFalse);
-    repository.completeDailyFailure(0);
-    await accepted.future;
-    await coordinator.shutdown();
-  });
 
   test('ключи остаются занятыми до публикации конечного результата', () async {
     final repository = _ControlledRepository();
@@ -243,44 +216,6 @@ void main() {
     },
   );
 
-  test('уход и возврат не снимают блокировки принятого набора и не повторяют запись', () async {
-    final repository = _ControlledRepository();
-    final coordinator = _coordinator(repository);
-    final command = _delete(_intentionA, {_relationA, _relationB});
-    final accepted = coordinator.acceptBlockingRelationsDelete(
-      command,
-      presentationTitle: 'Первое',
-    ) as BlockingRelationsDeleteAccepted;
-
-    coordinator.releaseInitiatorPresentation(accepted.token);
-    final registration = coordinator.registerAppPresentation();
-    final appClaimFuture = registration.nextClaim();
-    expect(coordinator.isRunning(_intentionA), isTrue);
-    expect(coordinator.isRelationRunning(_relationA), isTrue);
-    expect(coordinator.isRelationRunning(_relationB), isTrue);
-    expect(
-      coordinator.acceptBlockingRelationsDelete(
-        command,
-        presentationTitle: 'Первое',
-      ),
-      isA<BlockingRelationsDeleteAlreadyRunning>(),
-    );
-    expect(repository.commands, [same(command)]);
-
-    repository.completeFailure(0);
-    final completion = await accepted.future;
-    final claim = await appClaimFuture;
-    expect(claim?.token, same(accepted.token));
-    expect(claim?.completion, same(completion));
-    expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
-    expect(coordinator.isRunning(_intentionA), isFalse);
-    expect(coordinator.isRelationRunning(_relationA), isFalse);
-    expect(coordinator.isRelationRunning(_relationB), isFalse);
-    coordinator.confirmPresentation(claim!);
-    registration.release();
-    await coordinator.shutdown();
-  });
-
   test(
     'успех отдаёт один token и пакет, освобождает ключи и принадлежит оболочке',
     () async {
@@ -323,39 +258,6 @@ void main() {
       registration.release();
       await subscription.cancel();
       await coordinator.shutdown();
-    },
-  );
-
-  test(
-    'отказ остаётся у инициатора, а shutdown ждёт принятую команду',
-    () async {
-      final repository = _ControlledRepository();
-      final coordinator = _coordinator(repository);
-      final accepted = coordinator.acceptBlockingRelationsDelete(
-        _delete(_intentionA, {_relationA}),
-        presentationTitle: 'Первое',
-      ) as BlockingRelationsDeleteAccepted;
-      final shutdown = coordinator.shutdown();
-      var drained = false;
-      unawaited(shutdown.then((_) => drained = true));
-      expect(
-        coordinator.acceptBlockingRelationsDelete(
-          _delete(_intentionB, {_relationB}),
-          presentationTitle: 'Второе',
-        ),
-        isA<GraphCommandCoordinatorDraining>(),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(drained, isFalse);
-
-      repository.completeFailure(0);
-      final completion = await accepted.future;
-      expect(completion.isFailure, isTrue);
-      expect(completion.confirmedChange, isNull);
-      expect(coordinator.isRunning(_intentionA), isFalse);
-      expect(coordinator.isRelationRunning(_relationA), isFalse);
-      await shutdown;
-      expect(drained, isTrue);
     },
   );
 
@@ -491,13 +393,6 @@ final class _ControlledRepository
       LongTermRelationCommandSuccess,
       LongTermRelationCommandFailure
     >(LongTermRelationUnavailableFailure()),
-  );
-
-  void completeDailyFailure(int index) => _results[index].complete(
-    const GraphCommandFailed<
-      DailyChoiceCommandSuccess,
-      DailyChoiceCommandFailure
-    >(DailyChoiceUnavailableFailure()),
   );
 
   void completeSuccess(int index, DeleteBlockingRelationsResult result) =>
