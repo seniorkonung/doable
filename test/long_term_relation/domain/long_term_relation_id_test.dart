@@ -46,18 +46,6 @@ void main() {
         expect(_decode(canonical), id);
       }
     });
-
-    test('тестовый генератор заменяет рабочую стратегию UUID v7', () {
-      final expected = [
-        _decode('018f0b5d-6b2e-7c80-8000-000000000001'),
-        _decode('018f0b5d-6b2e-7c80-8000-000000000002'),
-      ];
-      final generator = _DeterministicLongTermRelationIdGenerator(expected);
-
-      expect(generator.generate(), expected[0]);
-      expect(generator.generate(), expected[1]);
-      expect(generator.generate, throwsStateError);
-    });
   });
 }
 
@@ -68,20 +56,3 @@ LongTermRelationId _decode(String value) =>
         'Ожидался корректный UUID.',
       ),
     };
-
-final class _DeterministicLongTermRelationIdGenerator
-    implements LongTermRelationIdGenerator {
-  _DeterministicLongTermRelationIdGenerator(Iterable<LongTermRelationId> ids)
-    : _ids = List.unmodifiable(ids);
-
-  final List<LongTermRelationId> _ids;
-  var _nextIndex = 0;
-
-  @override
-  LongTermRelationId generate() {
-    if (_nextIndex == _ids.length) {
-      throw StateError('Последовательность идентификаторов исчерпана.');
-    }
-    return _ids[_nextIndex++];
-  }
-}

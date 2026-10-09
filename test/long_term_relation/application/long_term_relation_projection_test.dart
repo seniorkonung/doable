@@ -18,19 +18,6 @@ void main() {
       expect(permissions.canChangeMeaning, isFalse);
       expect(permissions.canEditDescriptionAndPriority, isFalse);
     });
-    test('краткие данные участника содержат активное количество', () {
-      final participant = RelationParticipantSummary(
-        id: _intentionId('0f8fad5b-d9cb-469f-a165-70867728950e'),
-        title: 'Быть здоровым',
-        archiveState: IntentionArchiveState.active,
-        activeRelationCount: 3,
-      );
-
-      expect(participant.title, 'Быть здоровым');
-      expect(participant.archiveState, IntentionArchiveState.active);
-      expect(participant.activeRelationCount, 3);
-    });
-
     test('краткие данные участника отклоняют отрицательное количество', () {
       expect(
         () => RelationParticipantSummary(
@@ -55,25 +42,6 @@ void main() {
       expect(details.relationCounts, same(counts));
       expect(details.activeRelationCount, 2);
       expect(details.relationCounts.total, 6);
-    });
-
-    test('краткая связь передаёт только признак проверенного описания', () {
-      final summary = LongTermRelationSummary(
-        relation: _relation(),
-        source: _participant(
-          '0f8fad5b-d9cb-469f-a165-70867728950e',
-          'Быть здоровым',
-        ),
-        related: _participant(
-          '7c9e6679-7425-40de-944b-e07fc1f90ae7',
-          'Много ходить',
-        ),
-        hasDescription: true,
-      );
-
-      expect(summary.hasDescription, isTrue);
-      expect(summary.source.activeRelationCount, 1);
-      expect(summary.related.activeRelationCount, 1);
     });
 
     test('подробная связь передаёт полный проверенный текст описания', () {

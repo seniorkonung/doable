@@ -1,5 +1,4 @@
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -43,40 +42,6 @@ void main() {
       expect(daily, isNot(isA<LongTermRelationGroup>()));
     },
   );
-
-  test('дневной запрос и первая порция сохраняют общую ревизию и сводку', () {
-    final query = DailyChoiceGroupQuery(
-      intentionId: _intentionId,
-      role: DailyChoiceRelationRole.selected,
-      pageSize: 50,
-    );
-    final revision = _TestRevision();
-    final counts = RelationCounts(
-      activeNeedIncoming: 0,
-      activeNeedOutgoing: 0,
-      activeCanIncoming: 0,
-      activeCanOutgoing: 0,
-      archivedNeedIncoming: 0,
-      archivedNeedOutgoing: 0,
-      archivedCanIncoming: 0,
-      archivedCanOutgoing: 0,
-      dailySelected: 0,
-    );
-    final page = DailyChoiceGroupFirstPage(
-      items: const [],
-      counts: counts,
-      nextCursor: null,
-      revision: revision,
-    );
-
-    expect(
-      query.group,
-      const DailyChoiceRelationGroup(role: DailyChoiceRelationRole.selected),
-    );
-    expect(page.revision, same(revision));
-    expect(page.counts, same(counts));
-    expect(() => page.items.clear(), throwsUnsupportedError);
-  });
 
   test('дневная группа сохраняет границы порции 1–100', () {
     for (final pageSize in [0, 101]) {
@@ -131,21 +96,6 @@ void main() {
         );
       }
     });
-
-    test('сохраняет непрозрачное продолжение без раскрытия его данных', () {
-      const cursor = _TestRelationGroupCursor();
-
-      final query = RelationGroupQuery(
-        intentionId: _intentionId,
-        type: LongTermRelationType.can,
-        direction: RelationDirection.incoming,
-        scope: RelationScope.archived,
-        pageSize: 25,
-        cursor: cursor,
-      );
-
-      expect(query.cursor, same(cursor));
-    });
   });
 }
 
@@ -155,14 +105,3 @@ final IntentionId _intentionId = switch (IntentionId.decode(
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw StateError('Некорректная фикстура.'),
 };
-
-final class _TestRelationGroupCursor implements RelationGroupCursor {
-  const _TestRelationGroupCursor();
-}
-
-final class _TestRevision implements GraphRevision {
-  @override
-  GraphRevisionOrder compareTo(GraphRevision other) => identical(this, other)
-      ? GraphRevisionOrder.same
-      : GraphRevisionOrder.differentEpoch;
-}

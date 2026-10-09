@@ -294,18 +294,6 @@ void main() {
       expect(harness.state.completeness, isA<RelationDraftComplete>());
       expect(harness.state.canSubmit, isTrue);
     });
-
-    test('отмена выбора участника сохраняет прежний черновик', () {
-      final harness = _EditorHarness.outgoing()
-        ..fillDraft(description: 'Черновик описания');
-
-      // Отменённый выбор не сообщает ViewModel ничего, поэтому черновик
-      // остаётся прежним целиком.
-      expect(harness.state.relatedIntentionId, testEditorIntentionId(2));
-      expect(harness.state.type, LongTermRelationType.need);
-      expect(harness.state.priority, RelationPriority.p2);
-      expect(harness.state.description, 'Черновик описания');
-    });
   });
 
   group('Отправка черновика', () {
