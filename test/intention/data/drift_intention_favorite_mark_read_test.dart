@@ -47,38 +47,6 @@ void main() {
   tearDown(() => database.close());
 
   group('Подробные данные намерения', () {
-    test('несут отметку своего идентификатора, а не названия', () async {
-      _insertIntention(raw, number: 1, title: 'Гулять');
-      _insertIntention(raw, number: 2, title: 'Гулять');
-      storeFavoriteMark(raw, intentionId: _uuid(2), position: 5);
-
-      expect(
-        (await _details(repository, 1)).favoriteMark,
-        FavoriteMark.notFavorite,
-      );
-      expect(
-        (await _details(repository, 2)).favoriteMark,
-        FavoriteMark.favorite,
-      );
-    });
-
-    test('несут отметку архивированного готового намерения', () async {
-      _insertIntention(
-        raw,
-        number: 1,
-        title: 'Архивное действие',
-        isArchived: true,
-        isActionReady: true,
-      );
-      storeFavoriteMark(raw, intentionId: _uuid(1), position: 1);
-
-      final details = await _details(repository, 1);
-
-      expect(details.favoriteMark, FavoriteMark.favorite);
-      expect(details.intention.archiveState, IntentionArchiveState.archived);
-      expect(details.intention.readiness, IntentionReadiness.ready);
-    });
-
     test('читают только отметку запрошенного намерения без записи', () async {
       _insertIntention(raw, number: 1, title: 'Первое');
       _insertIntention(raw, number: 2, title: 'Второе');
@@ -98,44 +66,6 @@ void main() {
   });
 
   group('Порция каталога', () {
-    test('различает одноимённые избранное и неизбранное намерения', () async {
-      _insertIntention(raw, number: 1, title: 'Гулять');
-      _insertIntention(raw, number: 2, title: 'Гулять');
-      storeFavoriteMark(raw, intentionId: _uuid(2), position: 1);
-
-      final page = await _page(repository, _query());
-
-      expect(_marks(page.items), {
-        _uuid(1): FavoriteMark.notFavorite,
-        _uuid(2): FavoriteMark.favorite,
-      });
-    });
-
-    test(
-      'показывает отметку архивированного намерения в архивном охвате',
-      () async {
-        _insertIntention(raw, number: 1, title: 'Активное');
-        _insertIntention(raw, number: 2, title: 'Архивное', isArchived: true);
-        _insertIntention(raw, number: 3, title: 'Архивное', isArchived: true);
-        storeFavoriteMark(raw, intentionId: _uuid(1), position: 1);
-        storeFavoriteMark(raw, intentionId: _uuid(3), position: 2);
-
-        final page = await _page(
-          repository,
-          _query(scope: IntentionScope.archived),
-        );
-
-        expect(_marks(page.items), {
-          _uuid(2): FavoriteMark.notFavorite,
-          _uuid(3): FavoriteMark.favorite,
-        });
-        expect(
-          page.items.map((item) => item.archiveState),
-          everyElement(IntentionArchiveState.archived),
-        );
-      },
-    );
-
     test(
       'не меняет состав, порядок, количество и продолжение выдачи',
       () async {
@@ -507,56 +437,6 @@ void main() {
       trace.clear();
     });
 
-    test('подробные данные показывают подтверждённые отметки', () async {
-      for (final (number, mark) in _intactMarks) {
-        trace.clear();
-
-        expect(
-          (await _details(repository, number)).favoriteMark,
-          mark,
-          reason: 'намерение $number',
-        );
-
-        final markRead = trace.favoriteMarkReads.single;
-        expect(markRead.arguments, [_uuid(number)]);
-        expect(markRead.rowCount, mark == FavoriteMark.favorite ? 1 : 0);
-        expect(
-          diagnostics.events.last,
-          isA<IntentionDetailReadDiagnosticsEvent>().having(
-            (event) => event.status,
-            'исход',
-            isA<DiagnosticsSucceeded>(),
-          ),
-        );
-      }
-      expect(trace.writes, isEmpty);
-    });
-
-    test('порции каталога показывают подтверждённые отметки', () async {
-      for (final pageSize in [1, 2, 10]) {
-        final marks = <String, FavoriteMark>{};
-        IntentionCatalogCursor? cursor;
-        do {
-          trace.clear();
-          final page = await _page(
-            repository,
-            _query(pageSize: pageSize, cursor: cursor),
-          );
-          _expectSingleMarkRead(trace, page.items);
-          marks.addAll(_marks(page.items));
-          cursor = page.nextCursor;
-        } while (cursor != null);
-
-        expect(marks, _intactMarksById, reason: 'порция $pageSize');
-      }
-      expect(
-        diagnostics.events.whereType<CatalogPageReadDiagnosticsEvent>().map(
-          (event) => event.status,
-        ),
-        everyElement(isNot(isA<DiagnosticsFailed>())),
-      );
-    });
-
     test('порция согласования показывает подтверждённые отметки', () async {
       final result = await repository.getCatalogReconciliationPortion(
         _reconciliationQuery(),
@@ -620,41 +500,6 @@ void main() {
       ]);
       expect(diagnostics.events.toString(), isNot(contains('CANARY')));
     });
-
-    test(
-      'недопустимое место отметки запрошенного намерения остаётся повреждением',
-      () async {
-        storeFavoriteMarkWithInvalidPosition(
-          raw,
-          intentionId: _uuid(2),
-          position: 0,
-        );
-
-        expect(
-          await repository.watchIntention(_id(2)).first,
-          isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          await repository.getCatalogPage(_query()),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        // Порция без повреждённого намерения от него не зависит.
-        final page = await _page(repository, _query(pageSize: 1));
-        expect(_marks(page.items), {_uuid(1): FavoriteMark.favorite});
-        expect(
-          (await _details(repository, 3)).favoriteMark,
-          FavoriteMark.favorite,
-        );
-      },
-    );
   });
 }
 

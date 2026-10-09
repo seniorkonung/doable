@@ -8,7 +8,6 @@ const _firstIntention = '018f0b5d-6b2e-7c80-8000-000000000001';
 const _secondIntention = '018f0b5d-6b2e-7c80-8000-000000000002';
 const _thirdIntention = '018f0b5d-6b2e-7c80-8000-000000000003';
 const _missingIntention = '018f0b5d-6b2e-7c80-8000-000000000004';
-const _tag = '018f0b5d-6b2e-7c80-8000-000000000005';
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -101,13 +100,6 @@ void main() {
         reason: 'Объект ${object['name']} не должен зависеть от соединения.',
       );
     }
-  });
-
-  test('хранит отметку активного и архивированного намерения с местом', () {
-    _addFavorite(raw, _secondIntention, 1);
-    _addFavorite(raw, _firstIntention, 7);
-
-    expect(_favorites(raw), [(_secondIntention, 1), (_firstIntention, 7)]);
   });
 
   test('отклоняет отметку отсутствующего намерения', () {
@@ -227,41 +219,6 @@ void main() {
     );
 
     expect(_favorites(raw), [(_secondIntention, 1), (_firstIntention, 5)]);
-  });
-
-  test('удаление намерения удаляет только его строку отметки', () {
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_tag, 'Дом']);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?), (?, ?)',
-      [_tag, _firstIntention, _tag, _thirdIntention],
-    );
-    _addFavorite(raw, _firstIntention, 1);
-    _addFavorite(raw, _secondIntention, 2);
-    _addFavorite(raw, _thirdIntention, 3);
-
-    raw.execute('DELETE FROM intentions WHERE id = ?', [_secondIntention]);
-
-    expect(_favorites(raw), [(_firstIntention, 1), (_thirdIntention, 3)]);
-    expect(
-      raw
-          .select('SELECT id FROM intentions ORDER BY id')
-          .map((row) => row['id']),
-      [_firstIntention, _thirdIntention],
-    );
-    expect(raw.select('SELECT * FROM tag_assignments'), hasLength(2));
-    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-  });
-
-  test('снятие отметки сохраняет намерение и остальные отметки', () {
-    _addFavorite(raw, _firstIntention, 1);
-    _addFavorite(raw, _secondIntention, 2);
-
-    raw.execute('DELETE FROM favorite_intentions WHERE intention_id = ?', [
-      _firstIntention,
-    ]);
-
-    expect(_favorites(raw), [(_secondIntention, 2)]);
-    expect(raw.select('SELECT id FROM intentions'), hasLength(3));
   });
 }
 

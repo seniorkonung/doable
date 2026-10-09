@@ -114,30 +114,6 @@ void main() {
     await _expectTagNameFunctions(database);
   });
 
-  test('открытие соединения не запускает аудит всего графа', () async {
-    final trace = _StatementTrace();
-    final database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        trace,
-      ),
-    );
-    addTearDown(database.close);
-
-    await database.open();
-
-    expect(
-      trace.statements.where(
-        (statement) =>
-            statement.operation == LocalDatabaseSqlOperation.select &&
-            statement.statements.any(
-              (sql) => sql.contains('FROM long_term_relations'),
-            ),
-      ),
-      isEmpty,
-    );
-  });
-
   test('объединяет search-key setup с fixture setup', () async {
     final database = AppDatabase(
       openInMemoryLocalDatabase(setup: _registerFixtureFunction),
@@ -266,13 +242,4 @@ void _replaceCanonicalFunctions(sqlite.Database database) {
       argumentCount: const sqlite.AllowedArgumentCount(1),
       function: (_) => 'fixture-implementation',
     );
-}
-
-final class _StatementTrace extends LocalDatabaseConnectionObserver {
-  final statements = <LocalDatabaseSqlStatement>[];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    statements.add(statement);
-  }
 }

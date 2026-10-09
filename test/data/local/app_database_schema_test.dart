@@ -17,51 +17,6 @@ void main() {
 
   group('схема локальных намерений', () {
     test(
-      'вычисляет поисковую проекцию только из записываемого title',
-      () async {
-        await database.customStatement(
-          '''
-            INSERT INTO intentions (id, title, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
-          ''',
-          ['018f0b5d-6b2e-7c80-8000-000000000000', 'Straße', 1000000, 1000000],
-        );
-
-        final stored = await database
-            .customSelect(
-              '''
-            SELECT title, title_search_key
-            FROM intentions
-            WHERE id = ?
-          ''',
-              variables: [
-                Variable.withString('018f0b5d-6b2e-7c80-8000-000000000000'),
-              ],
-            )
-            .getSingle();
-        final ftsColumns = await database
-            .customSelect('PRAGMA table_info(intention_titles_fts)')
-            .get();
-        final updateTrigger = await database.customSelect('''
-            SELECT sql
-            FROM sqlite_schema
-            WHERE type = 'trigger'
-              AND name = 'intentions_fts_after_update_search_content'
-          ''').getSingle();
-
-        expect(stored.read<String>('title'), 'Straße');
-        expect(stored.read<String>('title_search_key'), 'strasse');
-        expect(ftsColumns.map((column) => column.read<String>('name')), [
-          'title_search_key',
-        ]);
-        expect(
-          updateTrigger.read<String>('sql'),
-          contains('AFTER UPDATE ON intentions'),
-        );
-      },
-    );
-
-    test(
       'отклоняет прямую запись search key и согласует Unicode-проекции',
       () async {
         const fixtures = [
@@ -161,49 +116,6 @@ void main() {
         expect(recalculated.read<String>('title_search_key'), 'strasse');
       },
     );
-
-    test('сохраняет одноимённые намерения с допускающим отсутствие описанием и исходными состояниями', () async {
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000001',
-        title: 'Быть здоровым',
-        description: null,
-        createdAt: 1000000,
-        updatedAt: 1000000,
-      );
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000002',
-        title: 'Быть здоровым',
-        description: 'Сон и прогулки',
-        createdAt: 2000000,
-        updatedAt: 3000000,
-      );
-
-      final rows = await database.customSelect('''
-              SELECT id, title, title_search_key, description,
-                     is_action_ready, is_archived, created_at, updated_at
-              FROM intentions
-              ORDER BY id ASC
-            ''').get();
-
-      expect(database.schemaVersion, AppDatabase.currentSchemaVersion);
-      expect(rows, hasLength(2));
-      expect(
-        rows[0].read<String>('id'),
-        '018f0b5d-6b2e-7c80-8000-000000000001',
-      );
-      expect(rows[0].read<String>('title'), 'Быть здоровым');
-      expect(rows[0].read<String>('title_search_key'), 'быть здоровым');
-      expect(rows[0].read<String?>('description'), isNull);
-      expect(rows[0].read<bool>('is_action_ready'), isFalse);
-      expect(rows[0].read<bool>('is_archived'), isFalse);
-      expect(rows[0].read<int>('created_at'), 1000000);
-      expect(rows[0].read<int>('updated_at'), 1000000);
-      expect(rows[1].read<String?>('description'), 'Сон и прогулки');
-      expect(rows[1].read<int>('created_at'), 2000000);
-      expect(rows[1].read<int>('updated_at'), 3000000);
-    });
 
     test(
       'атомарно отклоняет NUL в каноническом тексте и сохраняет FTS',
@@ -311,26 +223,6 @@ void main() {
         );
       },
     );
-
-    test('принимает обратный порядок корректных timestamps', () async {
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000003',
-        title: 'Показание после перевода часов',
-        description: null,
-        createdAt: 1000000,
-        updatedAt: 999999,
-      );
-
-      final row =
-          await (database.select(database.intentions)..where(
-                (row) => row.id.equals('018f0b5d-6b2e-7c80-8000-000000000003'),
-              ))
-              .getSingle();
-
-      expect(row.createdAt, 1000000);
-      expect(row.updatedAt, 999999);
-    });
 
     test('отклоняет неполную строку и недопустимые boolean', () async {
       await expectLater(

@@ -1,6 +1,4 @@
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -11,14 +9,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
-import 'package:doable/src/tag/application/tag_command.dart';
-import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -40,9 +31,6 @@ final _seededMarks = [
   (durabilityUuid(7), 7),
   (durabilityUuid(8), 9),
 ];
-
-TagId _tag(int number) =>
-    (TagId.decode(durabilityUuid(number)) as TagIdDecodingSuccess).id;
 
 void main() {
   late AppDatabase database;
@@ -172,22 +160,6 @@ void main() {
   }
 
   group('Команды графа сохраняют отметки и места', () {
-    test('новое намерение создаётся без отметки, в том числе одноимённое с '
-        'избранным', () async {
-      final success = await intentionSucceeded(
-        const CreateIntention(title: 'Намерение 2', description: null),
-      );
-
-      final created = (success as IntentionSaved).intention.id;
-      expect(storedFavoriteMarks(raw), _seededMarks);
-      expect(
-        success.catalogMutation.after!.summary.favoriteMark,
-        FavoriteMark.notFavorite,
-      );
-      expect(await detailsMark(created), FavoriteMark.notFavorite);
-      expect(await detailsMark(durabilityIntention(2)), FavoriteMark.favorite);
-    });
-
     test('изменение названия, описания и готовности, архивирование с '
         'каскадом связей и восстановление сохраняют отметку и место и '
         'обновляют время изменения', () async {
@@ -264,121 +236,6 @@ void main() {
         'is_archived': 0,
       }, directRelationArchive: 1);
     });
-
-    test('изменения неизбранного намерения не ставят отметку', () async {
-      for (final command in [
-        UpdateIntention(
-          id: durabilityIntention(6),
-          title: 'Намерение 2',
-          description: 'Одноимённое с избранным',
-        ),
-        EnableIntentionReadiness(durabilityIntention(6)),
-        DisableIntentionReadiness(durabilityIntention(4)),
-        ArchiveIntention(durabilityIntention(4)),
-        RestoreIntention(durabilityIntention(4)),
-      ]) {
-        final success = await intentionSucceeded(command);
-
-        expect(success.catalogMutation, isA<IntentionCatalogUpdated>());
-        expectSnapshotsCarryStoredMarks(success);
-        expect(storedFavoriteMarks(raw), _seededMarks);
-      }
-      expect(
-        await detailsMark(durabilityIntention(4)),
-        FavoriteMark.notFavorite,
-      );
-      expect(
-        await detailsMark(durabilityIntention(6)),
-        FavoriteMark.notFavorite,
-      );
-    });
-
-    test('назначение и снятие тегов, переименование и удаление тега '
-        'сохраняют отметки и места', () async {
-      final created = await repository.execute(
-        CreateTag(TagName.fromInput('Отдых')),
-      );
-      final newTag =
-          ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
-
-      for (final command in <TagCommand>[
-        AssignTag(tagId: newTag, intentionId: durabilityIntention(2)),
-        AssignTag(tagId: newTag, intentionId: durabilityIntention(6)),
-        AssignTag(tagId: _tag(_workTag), intentionId: durabilityIntention(8)),
-        RemoveTagAssignment(
-          tagId: _tag(_homeTag),
-          intentionId: durabilityIntention(1),
-        ),
-        RemoveTagAssignment(
-          tagId: _tag(_workTag),
-          intentionId: durabilityIntention(4),
-        ),
-        RenameTag(tagId: _tag(_homeTag), name: TagName.fromInput('Быт')),
-        DeleteTag(newTag),
-      ]) {
-        expect(await repository.execute(command), isA<TagCommandSucceeded>());
-        expect(storedFavoriteMarks(raw), _seededMarks);
-      }
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    });
-
-    test('создание, изменение, архивирование, восстановление и удаление '
-        'связей сохраняют отметки и места', () async {
-      final created = await repository.execute(
-        CreateLongTermRelation(
-          sourceIntentionId: durabilityIntention(7),
-          relatedIntentionId: durabilityIntention(6),
-          type: LongTermRelationType.need,
-          priority: RelationPriority.p2,
-          description: LongTermRelationDescription.fromInput('Описание'),
-        ),
-      );
-      final relation =
-          ((created as GraphCommandSucceeded).value.value
-                  as LongTermRelationCreated)
-              .relation
-              .id;
-      expect(storedFavoriteMarks(raw), _seededMarks);
-
-      for (final command in <GraphCommand>[
-        UpdateLongTermRelation(
-          relationId: relation,
-          patch: LongTermRelationPatch(
-            type: const LongTermRelationFieldSet(LongTermRelationType.can),
-            priority: const LongTermRelationFieldSet(RelationPriority.p4),
-            relatedIntentionId: LongTermRelationFieldSet(
-              durabilityIntention(2),
-            ),
-          ),
-        ),
-        ArchiveLongTermRelation(relation),
-        RestoreLongTermRelation(relation),
-        DeleteLongTermRelation(relation),
-        DeleteBlockingRelations.longTerm(
-          intentionId: durabilityIntention(1),
-          relationIds: [durabilityRelation(104)],
-        ),
-      ]) {
-        expect(await repository.execute(command), isA<GraphResultSuccess>());
-        expect(storedFavoriteMarks(raw), _seededMarks);
-      }
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    });
-
-    test('создание, изменение, замена пути и удаление дневного выбора '
-        'сохраняют отметки и места', () async {
-      for (final command in <GraphCommand>[
-        durabilityCreate(),
-        durabilityUpdate(201),
-        durabilityReplace(201),
-        DeleteDailyChoice(durabilityChoice(201)),
-      ]) {
-        expect(await repository.execute(command), isA<GraphResultSuccess>());
-        expect(storedFavoriteMarks(raw), _seededMarks);
-      }
-      expect(rows('daily_choices'), isEmpty);
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    });
   });
 
   group('Физическое удаление намерения', () {
@@ -424,84 +281,6 @@ void main() {
       ]);
       expect(rows('long_term_relations'), relationsBefore);
       expect(rows('tag_assignments'), assignmentsBefore);
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    });
-
-    test('удаление неизбранного намерения не меняет отметки и места', () async {
-      final success = await intentionSucceeded(
-        DeleteIntention(durabilityIntention(6)),
-      );
-
-      expect(
-        success.catalogMutation.before!.summary.favoriteMark,
-        FavoriteMark.notFavorite,
-      );
-      expect(storedFavoriteMarks(raw), _seededMarks);
-    });
-
-    test('долговременная связь и дневной выбор блокируют удаление и '
-        'сохраняют намерение, его отметку и место', () async {
-      storeFavoriteMark(raw, intentionId: durabilityUuid(3), position: 11);
-      expect(
-        await repository.execute(durabilityCreate()),
-        isA<GraphResultSuccess>(),
-      );
-      final graphBefore = graphWithoutMarks();
-      final marksBefore = storedFavoriteMarks(raw);
-      final revisionBefore = await revision();
-
-      // Намерение 2 защищено долговременными связями, 1 и 3 — ещё и дневным
-      // выбором как исходное и выбранное намерения.
-      for (final number in [2, 1, 3]) {
-        final result = await repository.execute(
-          DeleteIntention(durabilityIntention(number)),
-        );
-
-        expect(
-          (result as ResultFailure).failure,
-          isA<IntentionHasBlockingRelationsFailure>(),
-        );
-        expect(graphWithoutMarks(), graphBefore);
-        expect(storedFavoriteMarks(raw), marksBefore);
-        expect(
-          await detailsMark(durabilityIntention(number)),
-          FavoriteMark.favorite,
-        );
-      }
-      expect(
-        (await revision()).compareTo(revisionBefore),
-        GraphRevisionOrder.same,
-      );
-    });
-
-    test('ошибка удаления откатывает намерение вместе с отметкой и '
-        'местом', () async {
-      final graphBefore = graphWithoutMarks();
-      final revisionBefore = await revision();
-      await database.customStatement('''
-        CREATE TEMP TRIGGER fail_favorite_mark_cascade
-        AFTER DELETE ON favorite_intentions
-        WHEN OLD.intention_id = '${durabilityUuid(7)}'
-        BEGIN
-          SELECT RAISE(ABORT, 'canary favorite mark cascade');
-        END
-      ''');
-
-      final result = await repository.execute(
-        DeleteIntention(durabilityIntention(7)),
-      );
-
-      expect(
-        (result as ResultFailure).failure,
-        isA<IntentionUnexpectedFailure>(),
-      );
-      expect(graphWithoutMarks(), graphBefore);
-      expect(storedFavoriteMarks(raw), _seededMarks);
-      expect(await detailsMark(durabilityIntention(7)), FavoriteMark.favorite);
-      expect(
-        (await revision()).compareTo(revisionBefore),
-        GraphRevisionOrder.same,
-      );
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
     });
   });

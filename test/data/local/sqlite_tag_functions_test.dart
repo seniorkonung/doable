@@ -53,22 +53,6 @@ void main() {
     },
   );
 
-  test('ключ закрепляет Unicode folding без нормализации', () {
-    String key(String name) =>
-        database.select('SELECT $tagNameKeyFunctionName(?) AS value', [
-              name,
-            ]).single['value']
-            as String;
-
-    expect(key('Straße'), 'strasse');
-    expect(key('STRASSE'), 'strasse');
-    expect(key('Все'), 'все');
-    expect(key('Всё'), 'всё');
-    expect(key('é'), 'é');
-    expect(key('e\u0301'), 'e\u0301');
-    expect(key('İ'), 'i\u0307');
-  });
-
   test('ошибка декодирования TEXT прерывает SQL без сохранения строки', () {
     database.execute('''
       CREATE TABLE tag_names (

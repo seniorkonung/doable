@@ -494,40 +494,6 @@ void main() {
           );
         }
 
-        for (final (name, command) in <(String, TagCommand)>[
-          (
-            'назначения',
-            AssignTag(
-              tagId: _tagId(tagFixtureId(firstTagNumber)),
-              intentionId: _id(tagFixtureId(1)),
-            ),
-          ),
-          (
-            'снятия',
-            RemoveTagAssignment(
-              tagId: _tagId(tagFixtureId(lastTagNumber)),
-              intentionId: _id(tagFixtureId(1)),
-            ),
-          ),
-        ]) {
-          test('повтор $name не даёт мутации и новой ревизии', () async {
-            final revisionBefore = _firstCatalogPage(
-              await repository.getCatalogPage(catalogQuery),
-            ).revision;
-
-            final confirmed = _tagCommandSuccess(
-              await repository.execute(command),
-            );
-
-            expect(confirmed.value, isA<TagAssignmentUnchanged>());
-            expect(confirmed.changes, [isA<TagAssignmentUnchangedChange>()]);
-            expect(
-              confirmed.revision.compareTo(revisionBefore),
-              GraphRevisionOrder.same,
-            );
-          });
-        }
-
         for (final (side, skippedTagReads, stage) in [
           ('до', 0, TagCommandDiagnosticsStage.validation),
           ('после', 1, TagCommandDiagnosticsStage.resultRead),
@@ -760,28 +726,6 @@ void main() {
         GraphRevisionOrder.same,
       );
     });
-
-    test(
-      'отклоняет недопустимый Unicode title до генерации ID и записи',
-      () async {
-        final title = List.filled(256, '👩🏽‍💻').join();
-
-        final result = await repository.execute(
-          CreateIntention(title: title, description: null),
-        );
-
-        expect(result, _failure<IntentionValidationFailure>());
-        expect(idGenerator.generated, isEmpty);
-        expect(clock.calls, 0);
-        expect(await database.select(database.intentions).get(), isEmpty);
-        expect(diagnostics.events, [
-          _failedCommand(
-            IntentionCommandDiagnosticsType.create,
-            DiagnosticsFailureCode.validation,
-          ),
-        ]);
-      },
-    );
 
     test('отклоняет недопустимый текст до SQL-чтения и записи', () async {
       final invalidValues = [

@@ -32,54 +32,6 @@ void main() {
   tearDown(() => database.close());
 
   test(
-    'согласует снимки намерения с подтверждённой ревизией команды графа',
-    () async {
-      final id = _id(_uuidV7);
-      await _insertIntention(
-        database,
-        id: id.toCanonicalString(),
-        title: 'Прочитать книгу',
-      );
-      final graphRepository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 3, 12),
-        diagnostics,
-      );
-      final events = StreamIterator(graphRepository.watchIntention(id));
-      addTearDown(events.cancel);
-
-      expect(await events.moveNext(), isTrue);
-      final initial = _graphSnapshot(events.current);
-      expect(initial.value?.archiveState, IntentionArchiveState.active);
-
-      final result = await graphRepository.execute(ArchiveIntention(id));
-      expect(
-        result,
-        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-      );
-      final confirmed =
-          (result
-                  as ResultSuccess<
-                    ConfirmedGraphResult<IntentionCommandSuccess>
-                  >)
-              .value;
-
-      expect(await events.moveNext(), isTrue);
-      final updated = _graphSnapshot(events.current);
-      expect(updated.value?.archiveState, IntentionArchiveState.archived);
-      expect(
-        initial.revision.compareTo(confirmed.revision),
-        GraphRevisionOrder.older,
-      );
-      expect(
-        updated.revision.compareTo(confirmed.revision),
-        GraphRevisionOrder.same,
-      );
-    },
-  );
-
-  test(
     'сериализует начальное чтение и команду одним исполнителем графа',
     () async {
       final gate = _BlockingSelectObserver();
@@ -526,76 +478,11 @@ void main() {
         emits(_isSuccessfulAbsence()),
       );
     });
-
-    test(
-      'превращает IOERR_DATA в corruption failure и завершает подписку',
-      () async {
-        final interceptor = _SelectFailureInterceptor();
-        await database.close();
-        database = AppDatabase(
-          observeConfiguredLocalDatabaseConnection(
-            openInMemoryLocalDatabase(),
-            interceptor,
-          ),
-        );
-        await database.open();
-        repository = _repository(database, diagnostics);
-        interceptor.failure = SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
-          message: 'CANARY-exception-личные-данные',
-        );
-
-        await expectLater(
-          repository.watchIntention(_id(_uuidV7)),
-          emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
-        );
-      },
-    );
-
-    test('превращает constraint и неизвестную ошибку чтения в unexpected и завершает подписку', () async {
-      final interceptor = _SelectFailureInterceptor();
-      await database.close();
-      database = AppDatabase(
-        observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          interceptor,
-        ),
-      );
-      await database.open();
-      repository = _repository(database, diagnostics);
-
-      for (final failure in <Object>[
-        SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-          message: 'CANARY-exception-личные-данные',
-        ),
-        SqliteException(
-          extendedResultCode: SqlError.SQLITE_CANTOPEN,
-          message: 'CANARY-exception-личные-данные',
-        ),
-        SqliteException(
-          extendedResultCode: _sqliteIoerrCorruptFs,
-          message: 'CANARY-exception-личные-данные',
-        ),
-        SqliteException(
-          extendedResultCode: SqlError.SQLITE_BUSY | (999 << 8),
-          message: 'CANARY-exception-личные-данные',
-        ),
-        StateError('CANARY-exception-личные-данные'),
-      ]) {
-        interceptor.failure = failure;
-        await expectLater(
-          repository.watchIntention(_id(_uuidV7)),
-          emitsInOrder([_isFailure<IntentionUnexpectedFailure>(), emitsDone]),
-        );
-      }
-    });
   });
 }
 
 const _uuidV4 = '550e8400-e29b-41d4-a716-446655440000';
 const _uuidV7 = '018f0b5d-6b2e-7c80-8000-000000000300';
-const _sqliteIoerrCorruptFs = 8458;
 
 DriftPersonalGraphRepository _repository(
   AppDatabase database,

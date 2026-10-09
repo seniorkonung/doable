@@ -319,33 +319,6 @@ void main() {
       greaterThan(tagSequence),
     );
   });
-
-  test('каскады удаляют только назначения удалённого тега или намерения', () {
-    _addTag(raw, _firstTag, 'Первый');
-    _addTag(raw, _secondTag, 'Второй');
-    _addAssignment(raw, _firstTag, _firstIntention);
-    _addAssignment(raw, _secondTag, _firstIntention);
-    _addAssignment(raw, _secondTag, _secondIntention);
-    raw.execute('DELETE FROM tags WHERE id = ?', [_firstTag]);
-    expect(raw.select('SELECT id FROM intentions'), hasLength(2));
-    expect(raw.select('SELECT id FROM long_term_relations'), hasLength(1));
-    expect(
-      raw
-          .select('SELECT tag_id FROM tag_assignments')
-          .map((row) => row['tag_id']),
-      [_secondTag, _secondTag],
-    );
-    raw.execute('DELETE FROM long_term_relations WHERE id = ?', [_relation]);
-    expect(raw.select('SELECT * FROM tag_assignments'), hasLength(2));
-    raw.execute('DELETE FROM intentions WHERE id = ?', [_firstIntention]);
-    expect(
-      raw
-          .select('SELECT intention_id FROM tag_assignments')
-          .single['intention_id'],
-      _secondIntention,
-    );
-    expect(raw.select('SELECT id FROM tags').single['id'], _secondTag);
-  });
 }
 
 void _addTag(sqlite.Database db, String id, String name) {

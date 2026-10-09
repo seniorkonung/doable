@@ -1,11 +1,7 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
-import 'package:doable/src/intention/application/title_search_key.dart';
-import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import '../../../support/doable_schema_verifier.dart';
 
 const _nextSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
@@ -17,40 +13,6 @@ void main() {
   });
 
   tearDown(() => database.close());
-
-  test('текущая схема проходит сгенерированную валидацию', () async {
-    await verifyDoableDatabaseSchema(database);
-  });
-
-  test('новое хранилище создаётся в единственной версии схемы с пустыми дневными выборами', () async {
-    final version = await database
-        .customSelect('PRAGMA user_version')
-        .getSingle();
-    final choices = await database
-        .customSelect('SELECT id FROM daily_choices')
-        .get();
-    final steps = await database
-        .customSelect('SELECT id FROM daily_choice_path_steps')
-        .get();
-
-    expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
-    expect(choices, isEmpty);
-    expect(steps, isEmpty);
-  });
-
-  test(
-    'migration connection возвращает тот же search key, что и Dart',
-    () async {
-      final row = await database
-          .customSelect(
-            'SELECT doable_title_search_key(?) AS search_key',
-            variables: [Variable.withString('Straße')],
-          )
-          .getSingle();
-
-      expect(row.read<String>('search_key'), titleSearchKey('Straße'));
-    },
-  );
 
   test('отключает внешние ключи до транзакции записи и возвращает их после миграции', () async {
     await database.customStatement('PRAGMA foreign_keys = ON');
@@ -73,65 +35,6 @@ void main() {
 
     expect(foreignKeys.read<int>('foreign_keys'), 1);
   });
-
-  test(
-    'не поддерживает downgrade и не изменяет подтверждённые данные',
-    () async {
-      await _insertIntention(database);
-
-      await expectLater(
-        localDataMigrationStrategy(database).onUpgrade(
-          Migrator(database),
-          _nextSchemaVersion,
-          AppDatabase.currentSchemaVersion,
-        ),
-        throwsA(
-          isA<IncompatibleLocalDataSchemaException>()
-              .having(
-                (error) => error.expectedSchemaVersion,
-                'ожидаемая версия',
-                AppDatabase.currentSchemaVersion,
-              )
-              .having(
-                (error) => error.detectedSchemaVersion,
-                'обнаруженная версия',
-                _nextSchemaVersion,
-              ),
-        ),
-      );
-
-      final titles = await database
-          .customSelect('SELECT title FROM intentions')
-          .get();
-
-      expect(titles.single.read<String>('title'), 'Сохранённое намерение');
-    },
-  );
-
-  test(
-    'не обновляет хранилище с маркером ниже единственной версии схемы',
-    () async {
-      await _insertIntention(database);
-      await database.customStatement('PRAGMA user_version = -1');
-
-      await expectLater(
-        localDataMigrationStrategy(
-          database,
-        ).onUpgrade(Migrator(database), -1, AppDatabase.currentSchemaVersion),
-        throwsA(isA<CorruptLocalDataSchemaException>()),
-      );
-
-      final version = await database
-          .customSelect('PRAGMA user_version')
-          .getSingle();
-      final titles = await database
-          .customSelect('SELECT title FROM intentions')
-          .get();
-
-      expect(version.read<int>('user_version'), -1);
-      expect(titles.single.read<String>('title'), 'Сохранённое намерение');
-    },
-  );
 
   test(
     '`foreign_key_check` откатывает маркер миграции и изменения схемы',

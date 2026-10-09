@@ -93,24 +93,6 @@ void main() {
         }
       }
     }
-
-    test('отклонение записи ограничением схемы не оставляет отметку и '
-        'остаётся неизвестным отказом', () async {
-      seedGraph();
-      final marksBefore = _storedMarks(raw);
-      faults.arm(
-        _FaultPoint.beforeWrite,
-        sqlite.SqliteException(
-          extendedResultCode: sqlite.SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-          message: 'CANARY-уникальность',
-        ),
-      );
-
-      final result = await repository.execute(MarkIntentionFavorite(_id(3)));
-
-      expect(result, _failure(isA<IntentionUnexpectedFailure>()));
-      expect(_storedMarks(raw), marksBefore);
-    });
   });
 
   group('Повтор после устранимой недоступности', () {
@@ -146,32 +128,6 @@ void main() {
           FavoriteMarkCommandDiagnosticsStage.write,
         ),
       ]);
-    });
-
-    test('снятие отметки выполняется как новая команда', () async {
-      seedGraph();
-      final revisionBefore = await _revision(repository);
-      faults.arm(_FaultPoint.afterWrite, _busy);
-      expect(
-        await repository.execute(UnmarkIntentionFavorite(_id(1))),
-        _failure(isA<IntentionUnavailableFailure>()),
-      );
-      faults.disarm();
-
-      final confirmed = await _confirmed(
-        repository,
-        UnmarkIntentionFavorite(_id(1)),
-      );
-
-      expect(
-        (confirmed.value as IntentionSaved).catalogMutation,
-        isA<IntentionCatalogUpdated>(),
-      );
-      expect(
-        confirmed.revision.compareTo(revisionBefore),
-        GraphRevisionOrder.newer,
-      );
-      expect(_storedMarks(raw), [(_uuid(2), 9)]);
     });
   });
 

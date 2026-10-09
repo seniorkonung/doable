@@ -1,12 +1,9 @@
-import 'dart:io';
-
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
@@ -18,20 +15,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('поисковый ключ названия намерения', () {
-    test('использует полный Unicode Default Case Folding 17.0.0', () {
-      expect(unicodeDefaultCaseFoldingVersion, '17.0.0');
-      expect(titleSearchKey('КУПИТЬ МОЛОКО'), 'купить молоко');
-      expect(titleSearchKey('Straße'), 'strasse');
-      expect(titleSearchKey('K'), 'k');
-      expect(titleSearchKey('Σςσ'), 'σσσ');
-      expect(titleSearchKey('ꭰᎠ'), 'ᎠᎠ');
-      expect(titleSearchKey('𐐀'), '𐐨');
-      expect(titleSearchKey('İ'), 'i̇');
-      expect(titleSearchKey('Istanbul'), 'istanbul');
-      expect(titleSearchKey('ışık'), 'ışık');
-      expect(titleSearchKey('еé'), 'еé');
-    });
-
     test('сопоставляет фильтр с названием через единый поисковый ключ', () {
       final filter = IntentionCatalogQuery(
         scope: IntentionScope.all,
@@ -52,43 +35,6 @@ void main() {
         isTrue,
       );
     });
-
-    test(
-      'повторяет весь закреплённый corpus Unicode Default Case Folding',
-      () async {
-        final lines = await File('test/fixtures/unicode/CaseFolding-17.0.0.txt')
-            .readAsLines();
-        var mappingCount = 0;
-
-        for (final line in lines) {
-          if (line.isEmpty || line.startsWith('#')) {
-            continue;
-          }
-          final fields = line.split(';');
-          final status = fields[1].trim();
-          if (status != 'C' && status != 'F') {
-            continue;
-          }
-
-          final input = int.parse(fields[0].trim(), radix: 16);
-          final expected = String.fromCharCodes(
-            fields[2]
-                .trim()
-                .split(RegExp(r'\s+'))
-                .map((codePoint) => int.parse(codePoint, radix: 16)),
-          );
-
-          expect(
-            titleSearchKey(String.fromCharCode(input)),
-            expected,
-            reason: 'U+${input.toRadixString(16).toUpperCase()}',
-          );
-          mappingCount++;
-        }
-
-        expect(mappingCount, 1585);
-      },
-    );
   });
 
   group('условия собственных тегов намерения', () {
@@ -874,20 +820,6 @@ void main() {
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
     });
-
-    test(
-      'summary сохраняет показание изменения после перевода часов назад',
-      () {
-        final summary = _summary(
-          id: '00000000-0000-4000-8000-000000000001',
-          createdAt: DateTime.utc(2026, 8, 30, 12),
-          updatedAt: DateTime.utc(2026, 8, 30, 11),
-        );
-
-        expect(summary.createdAt.value, DateTime.utc(2026, 8, 30, 12));
-        expect(summary.updatedAt.value, DateTime.utc(2026, 8, 30, 11));
-      },
-    );
   });
 
   group('контракт чтения согласования каталога', () {

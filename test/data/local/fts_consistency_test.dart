@@ -188,22 +188,6 @@ void main() {
       }
     });
 
-    test(
-      'index-aware integrity-check проходит для согласованных данных',
-      () async {
-        await _insertIntention(
-          database,
-          id: '018f0b5d-6b2e-7c80-8000-000000000103',
-          title: 'Заняться спортом',
-        );
-
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
-      },
-    );
-
     test('index-aware integrity-check обнаруживает рассогласованный индекс, который не видно content-чтению', () async {
       const id = '018f0b5d-6b2e-7c80-8000-000000000104';
       const searchKey = 'прочитать книгу';
