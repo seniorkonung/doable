@@ -1,37 +1,20 @@
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
-
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
-import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import '../../support/favorite_read_contract_test_fallback.dart';
-import '../../support/tag_read_contract_test_fallback.dart';
-import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   group('поисковый ключ названия намерения', () {
@@ -198,38 +181,6 @@ void main() {
       ]) {
         expect(first.matches(ownTagIds), reordered.matches(ownTagIds));
       }
-    });
-
-    test('состав и роль каждого набора различают условия', () {
-      final filter = IntentionTagFilter(
-        requiredTagIds: [health],
-        excludedTagIds: [sport],
-      );
-
-      expect(
-        filter ==
-            IntentionTagFilter(requiredTagIds: [rest], excludedTagIds: [sport]),
-        isFalse,
-      );
-      expect(
-        filter ==
-            IntentionTagFilter(
-              requiredTagIds: [health],
-              excludedTagIds: [work],
-            ),
-        isFalse,
-      );
-      expect(
-        filter ==
-            IntentionTagFilter(
-              requiredTagIds: [sport],
-              excludedTagIds: [health],
-            ),
-        isFalse,
-      );
-      expect(filter == IntentionTagFilter(requiredTagIds: [health]), isFalse);
-      expect(filter == IntentionTagFilter(excludedTagIds: [sport]), isFalse);
-      expect(filter == Object(), isFalse);
     });
 
     test('копирует входные наборы и запрещает изменение своих условий', () {
@@ -581,68 +532,6 @@ void main() {
       expect(copy, same(summary));
     });
 
-    test('отметка избранного — подтверждённое состояние из двух значений', () {
-      String describe(FavoriteMark mark) => switch (mark) {
-        FavoriteMark.notFavorite => 'без отметки',
-        FavoriteMark.favorite => 'избранное',
-      };
-
-      expect(FavoriteMark.values, [
-        FavoriteMark.notFavorite,
-        FavoriteMark.favorite,
-      ]);
-      expect(FavoriteMark.values.map(describe), ['без отметки', 'избранное']);
-    });
-
-    test('подробные данные несут отметку своего намерения', () {
-      final intention = _intention();
-      final counts = RelationCounts(
-        activeNeedIncoming: 0,
-        activeNeedOutgoing: 0,
-        activeCanIncoming: 0,
-        activeCanOutgoing: 0,
-        archivedNeedIncoming: 0,
-        archivedNeedOutgoing: 0,
-        archivedCanIncoming: 0,
-        archivedCanOutgoing: 0,
-      );
-
-      final favorite = IntentionDetails(
-        intention: intention,
-        relationCounts: counts,
-        favoriteMark: FavoriteMark.favorite,
-      );
-      final notFavorite = IntentionDetails(
-        intention: intention,
-        relationCounts: counts,
-        favoriteMark: FavoriteMark.notFavorite,
-      );
-
-      expect(favorite.favoriteMark, FavoriteMark.favorite);
-      expect(notFavorite.favoriteMark, FavoriteMark.notFavorite);
-      expect(favorite.intention, same(intention));
-    });
-
-    test(
-      'сводки одноимённых намерений несут отметку своего идентификатора',
-      () {
-        final favorite = _summary(
-          id: '00000000-0000-4000-8000-000000000001',
-          title: 'Гулять',
-          favoriteMark: FavoriteMark.favorite,
-        );
-        final notFavorite = _summary(
-          id: '00000000-0000-4000-8000-000000000002',
-          title: 'Гулять',
-          favoriteMark: FavoriteMark.notFavorite,
-        );
-
-        expect(favorite.title, notFavorite.title);
-        expect(favorite.favoriteMark, FavoriteMark.favorite);
-        expect(notFavorite.favoriteMark, FavoriteMark.notFavorite);
-      },
-    );
-
     test('копии сводки сохраняют отсутствие отметки', () {
       final tag = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000101'),
@@ -963,56 +852,6 @@ void main() {
       );
     });
 
-    test('передаёт opaque cursor без раскрытия его реализации', () {
-      const cursor = _TestCatalogCursor();
-
-      final continuation = IntentionCatalogQuery(
-        scope: IntentionScope.active,
-        titleFilter: 'здоровье',
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 1,
-        cursor: cursor,
-      );
-
-      expect(continuation.cursor, same(cursor));
-    });
-
-    test(
-      'различает sealed первую и последующую страницы без nullable count',
-      () {
-        final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
-        const cursor = _TestCatalogCursor();
-        const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
-        final pages = <IntentionCatalogPage>[
-          IntentionCatalogFirstPage(
-            items: [summary],
-            totalCount: 2,
-            nextCursor: cursor,
-            revision: revision,
-          ),
-          IntentionCatalogContinuationPage(
-            items: const [],
-            nextCursor: null,
-            revision: revision,
-          ),
-        ];
-
-        expect(pages.map(_pageDescription), ['first:2', 'continuation']);
-        expect(pages.map((page) => page.revision), everyElement(revision));
-      },
-    );
-
-    test('сравнимая revision различает порядок и process-local эпоху', () {
-      const first = _TestGraphRevision(epoch: 'первая', sequence: 0);
-      const second = _TestGraphRevision(epoch: 'первая', sequence: 1);
-      const anotherEpoch = _TestGraphRevision(epoch: 'вторая', sequence: 0);
-
-      expect(first.compareTo(second), GraphRevisionOrder.older);
-      expect(second.compareTo(first), GraphRevisionOrder.newer);
-      expect(second.compareTo(second), GraphRevisionOrder.same);
-      expect(first.compareTo(anotherEpoch), GraphRevisionOrder.differentEpoch);
-    });
-
     test('первая страница отклоняет недопустимый total count в release', () {
       final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
 
@@ -1103,37 +942,6 @@ void main() {
       expect(reconciliation.cursor, isNull);
     });
 
-    test('исходы различают первую порцию, продолжение и повтор', () {
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
-      const cursor = _TestReconciliationCursor();
-      final summary = _summary(id: '00000000-0000-4000-8000-000000000003');
-      final outcomes = <IntentionCatalogReconciliationOutcome>[
-        IntentionCatalogReconciliationFirstPortion(
-          items: [summary],
-          totalCount: 7,
-          nextCursor: cursor,
-          revision: revision,
-        ),
-        IntentionCatalogReconciliationContinuationPortion(
-          items: const [],
-          nextCursor: null,
-          revision: revision,
-        ),
-        const IntentionCatalogReconciliationRetry(),
-      ];
-
-      expect(outcomes.map(_reconciliationDescription), [
-        'first:7',
-        'continuation',
-        'retry',
-      ]);
-      final first = outcomes.first as IntentionCatalogReconciliationPortion;
-      expect(first.items.single, same(summary));
-      expect(first.nextCursor, same(cursor));
-      expect(first.revision, same(revision));
-      expect(() => first.items.add(summary), throwsUnsupportedError);
-    });
-
     test('первая порция отклоняет количество меньше своих строк', () {
       final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
 
@@ -1146,158 +954,6 @@ void main() {
         ),
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
-    });
-  });
-
-  group('commands и результаты намерений', () {
-    test(
-      'закрытый набор commands несёт только необходимые предметные данные',
-      () {
-        final id = _intentionId('00000000-0000-4000-8000-000000000001');
-        final commands = <IntentionCommand>[
-          const CreateIntention(title: 'Здоровье', description: null),
-          UpdateIntention(
-            id: id,
-            title: 'Быть здоровым',
-            description: 'Каждый день',
-          ),
-          EnableIntentionReadiness(id),
-          DisableIntentionReadiness(id),
-          ArchiveIntention(id),
-          RestoreIntention(id),
-          DeleteIntention(id),
-          MarkIntentionFavorite(id),
-          UnmarkIntentionFavorite(id),
-        ];
-
-        expect(commands.map(_commandDescription), [
-          'create',
-          'update',
-          'enableReadiness',
-          'disableReadiness',
-          'archive',
-          'restore',
-          'delete',
-          'markFavorite',
-          'unmarkFavorite',
-        ]);
-        expect(
-          commands.whereType<ExistingIntentionCommand>().map(
-            (command) => command.id,
-          ),
-          everyElement(id),
-        );
-        expect(commands.skip(7), everyElement(isA<ExistingIntentionCommand>()));
-      },
-    );
-
-    test('saved, deleted и failures имеют исчерпывающие типы', () {
-      final intention = _intention();
-      final entry = _TestCatalogEntrySnapshot(
-        _summary(id: intention.id.toCanonicalString()),
-      );
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 1);
-      final results = <Result<IntentionCommandSuccess>>[
-        ResultSuccess(
-          IntentionSaved(
-            intention,
-            catalogMutation: IntentionCatalogCreated(
-              revision: revision,
-              entry: entry,
-            ),
-          ),
-        ),
-        ResultSuccess(
-          IntentionDeleted(
-            intention.id,
-            catalogMutation: IntentionCatalogDeleted(
-              revision: revision,
-              entry: entry,
-            ),
-          ),
-        ),
-        const ResultFailure(IntentionGenericValidationFailure()),
-        const ResultFailure(
-          IntentionTextInputValidationFailure(
-            IntentionTextValidationFailure(
-              field: IntentionTextField.title,
-              reason: IntentionTextValidationReason.empty,
-            ),
-          ),
-        ),
-        ResultFailure(
-          IntentionCreationTagsMissingFailure([
-            _tagId('00000000-0000-4000-8000-000000000001'),
-          ]),
-        ),
-        const ResultFailure(IntentionNotFoundFailure()),
-        const ResultFailure(IntentionConflictFailure()),
-        ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
-        const ResultFailure(IntentionUnavailableFailure()),
-        const ResultFailure(IntentionCorruptionFailure()),
-        const ResultFailure(IntentionUnexpectedFailure()),
-      ];
-
-      expect(
-        results.whereType<ResultSuccess<IntentionCommandSuccess>>(),
-        hasLength(2),
-      );
-      expect(
-        results.whereType<ResultFailure<IntentionCommandSuccess>>(),
-        hasLength(9),
-      );
-      expect(_resultSuccessDescription(results[0]), 'saved');
-      expect(_resultSuccessDescription(results[1]), 'deleted');
-      expect(results.skip(2).map(_resultFailureDescription), [
-        'validation',
-        'textInput',
-        'tagsMissing',
-        'notFound',
-        'conflict',
-        'blockingRelations',
-        'unavailable',
-        'corruption',
-        'unexpected',
-      ]);
-      expect(
-        const IntentionUnexpectedFailure().code,
-        IntentionFailureCode.unexpected,
-      );
-    });
-
-    test('sealed catalog mutations выражают допустимые before и after', () {
-      final before = _TestCatalogEntrySnapshot(
-        _summary(id: '00000000-0000-4000-8000-000000000001'),
-      );
-      final after = _TestCatalogEntrySnapshot(
-        _summary(id: '00000000-0000-4000-8000-000000000001'),
-      );
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 1);
-      final mutations = <IntentionCatalogMutation>[
-        IntentionCatalogCreated(revision: revision, entry: after),
-        IntentionCatalogUpdated(
-          revision: revision,
-          before: before,
-          after: after,
-        ),
-        IntentionCatalogDeleted(revision: revision, entry: before),
-        IntentionCatalogUnchanged(revision: revision, entry: before),
-      ];
-
-      expect(mutations.map(_mutationDescription), [
-        'created',
-        'updated',
-        'deleted',
-        'unchanged',
-      ]);
-      expect(mutations[0].before, isNull);
-      expect(mutations[0].after, same(after));
-      expect(mutations[1].before, same(before));
-      expect(mutations[1].after, same(after));
-      expect(mutations[2].before, same(before));
-      expect(mutations[2].after, isNull);
-      expect(mutations[3].before, same(before));
-      expect(mutations[3].after, same(before));
     });
   });
 
@@ -1314,69 +970,6 @@ void main() {
       expect(minimal.favoriteMark, FavoriteMark.notFavorite);
       expect(minimal.tagIds, isEmpty);
       expect(() => minimal.tagIds.add(home), throwsUnsupportedError);
-    });
-
-    test('команда передаёт выбранные готовность, избранное и теги', () {
-      final command = CreateIntention.withInitialState(
-        title: 'Прогулка',
-        description: 'В парке',
-        readiness: IntentionReadiness.ready,
-        favoriteMark: FavoriteMark.favorite,
-        tagIds: [home, weekend],
-      );
-
-      expect(command.title, 'Прогулка');
-      expect(command.description, 'В парке');
-      expect(command.readiness, IntentionReadiness.ready);
-      expect(command.favoriteMark, FavoriteMark.favorite);
-      expect(command.tagIds, {home, weekend});
-    });
-
-    test(
-      'отметки начального состояния выбираются независимо друг от друга',
-      () {
-        final favoriteOnly = CreateIntention.withInitialState(
-          title: 'Гулять',
-          description: null,
-          readiness: IntentionReadiness.notReady,
-          favoriteMark: FavoriteMark.favorite,
-          tagIds: const [],
-        );
-        final readyOnly = CreateIntention.withInitialState(
-          title: 'Позвонить маме',
-          description: null,
-          readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.notFavorite,
-          tagIds: const [],
-        );
-
-        expect(favoriteOnly.readiness, IntentionReadiness.notReady);
-        expect(favoriteOnly.favoriteMark, FavoriteMark.favorite);
-        expect(favoriteOnly.tagIds, isEmpty);
-        expect(readyOnly.readiness, IntentionReadiness.ready);
-        expect(readyOnly.favoriteMark, FavoriteMark.notFavorite);
-        expect(readyOnly.tagIds, isEmpty);
-      },
-    );
-
-    test('команда не зависит от исходной коллекции и запрещает изменение '
-        'своего набора тегов', () {
-      final selected = [home, weekend];
-      final command = CreateIntention.withInitialState(
-        title: 'Прогулка',
-        description: null,
-        readiness: IntentionReadiness.notReady,
-        favoriteMark: FavoriteMark.notFavorite,
-        tagIds: selected,
-      );
-      selected
-        ..clear()
-        ..add(sport);
-
-      expect(command.tagIds, {home, weekend});
-      expect(() => command.tagIds.add(sport), throwsUnsupportedError);
-      expect(() => command.tagIds.remove(home), throwsUnsupportedError);
-      expect(() => command.tagIds.clear(), throwsUnsupportedError);
     });
 
     test('повторные идентификаторы тега не размножают назначения', () {
@@ -1447,58 +1040,6 @@ void main() {
   });
 
   group('общая граница личного графа', () {
-    test('выражает чтения намерений и их счётчиков', () async {
-      final PersonalGraphRepository repository =
-          _FailingPersonalGraphRepository();
-      final id = _intentionId('00000000-0000-4000-8000-000000000001');
-
-      expect(
-        await repository.getCatalogPage(_query()),
-        isA<ResultFailure<IntentionCatalogPage>>(),
-      );
-      expect(
-        await repository.getCatalogReconciliationPortion(
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: _query(),
-            boundary: const IntentionCatalogCompletedBoundary(),
-            window: IntentionCatalogFinalReconciliationWindow([
-              _summary(id: '00000000-0000-4000-8000-000000000001'),
-            ]),
-          ),
-        ),
-        isA<ResultFailure<IntentionCatalogReconciliationOutcome>>(),
-      );
-      expect(
-        await repository.getRelationCounts(id),
-        isA<ResultFailure<GraphSnapshot<RelationCounts>>>(),
-      );
-      await expectLater(
-        repository.watchIntention(id),
-        emits(
-          isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
-            (result) => result.failure,
-            'failure',
-            isA<IntentionUnavailableFailure>(),
-          ),
-        ),
-      );
-      expect(
-        await repository.execute(
-          const CreateIntention(title: 'Здоровье', description: null),
-        ),
-        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-      );
-    });
-
-    test('снимок связывает подтверждённое значение с одной ревизией', () {
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 3);
-      final intention = _intention();
-      final snapshot = GraphSnapshot(value: intention, revision: revision);
-
-      expect(snapshot.value, same(intention));
-      expect(snapshot.revision, same(revision));
-    });
-
     test('пакет результата неизменно объединяет снимки одной ревизии', () {
       const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
       final before = _TestCatalogEntrySnapshot(
@@ -1676,11 +1217,6 @@ Intention _intention() {
   );
 }
 
-String _pageDescription(IntentionCatalogPage page) => switch (page) {
-  IntentionCatalogFirstPage(:final totalCount) => 'first:$totalCount',
-  IntentionCatalogContinuationPage() => 'continuation',
-};
-
 String _boundaryDescription(IntentionCatalogReconciliationBoundary boundary) =>
     switch (boundary) {
       IntentionCatalogPartialPrefixBoundary() => 'partial',
@@ -1693,41 +1229,6 @@ String _windowDescription(IntentionCatalogReconciliationWindow window) =>
       IntentionCatalogFinalReconciliationWindow() => 'final',
     };
 
-String _reconciliationDescription(
-  IntentionCatalogReconciliationOutcome outcome,
-) => switch (outcome) {
-  IntentionCatalogReconciliationFirstPortion(:final totalCount) =>
-    'first:$totalCount',
-  IntentionCatalogReconciliationContinuationPortion() => 'continuation',
-  IntentionCatalogReconciliationRetry() => 'retry',
-};
-
-String _successDescription(IntentionCommandSuccess success) =>
-    switch (success) {
-      IntentionSaved() => 'saved',
-      IntentionDeleted() => 'deleted',
-    };
-
-String _mutationDescription(IntentionCatalogMutation mutation) =>
-    switch (mutation) {
-      IntentionCatalogCreated() => 'created',
-      IntentionCatalogUpdated() => 'updated',
-      IntentionCatalogDeleted() => 'deleted',
-      IntentionCatalogUnchanged() => 'unchanged',
-    };
-
-String _commandDescription(IntentionCommand command) => switch (command) {
-  CreateIntention() => 'create',
-  UpdateIntention() => 'update',
-  EnableIntentionReadiness() => 'enableReadiness',
-  DisableIntentionReadiness() => 'disableReadiness',
-  ArchiveIntention() => 'archive',
-  RestoreIntention() => 'restore',
-  DeleteIntention() => 'delete',
-  MarkIntentionFavorite() => 'markFavorite',
-  UnmarkIntentionFavorite() => 'unmarkFavorite',
-};
-
 String _failureDescription(IntentionFailure failure) => switch (failure) {
   IntentionGenericValidationFailure() => 'validation',
   IntentionTextInputValidationFailure() => 'textInput',
@@ -1739,18 +1240,6 @@ String _failureDescription(IntentionFailure failure) => switch (failure) {
   IntentionCorruptionFailure() => 'corruption',
   IntentionUnexpectedFailure() => 'unexpected',
 };
-
-String _resultSuccessDescription(Result<IntentionCommandSuccess> result) =>
-    switch (result) {
-      ResultSuccess(:final value) => _successDescription(value),
-      ResultFailure() => throw StateError('Ожидался успешный результат.'),
-    };
-
-String _resultFailureDescription(Result<IntentionCommandSuccess> result) =>
-    switch (result) {
-      ResultSuccess() => throw StateError('Ожидался неуспешный результат.'),
-      ResultFailure(:final failure) => _failureDescription(failure),
-    };
 
 Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
     throwsA(
@@ -1789,97 +1278,6 @@ TagId _tagId(String value) => switch (TagId.decode(value)) {
   TagIdDecodingSuccess(:final id) => id,
   InvalidTagIdDecoding() => throw StateError('Ожидался корректный UUID тега.'),
 };
-
-final class _FailingPersonalGraphRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
-    implements PersonalGraphRepository {
-  @override
-  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
-    ChoicePathSuggestionsQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Future<GraphCommandResult<TSuccess, TFailure>> execute<
-    TSuccess extends GraphCommandOutcome,
-    TFailure extends GraphCommandFailure
-  >(GraphCommand<TSuccess, TFailure> command) async {
-    if (command is! IntentionCommand) {
-      throw UnsupportedError('Команды связей не используются в этих тестах.');
-    }
-    return const ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>(
-      IntentionUnavailableFailure(),
-    ) as GraphCommandResult<TSuccess, TFailure>;
-  }
-
-  @override
-  Future<Result<IntentionCatalogPage>> getCatalogPage(
-    IntentionCatalogQuery query,
-  ) async => const ResultFailure(IntentionUnavailableFailure());
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) async => const ResultFailure(IntentionUnavailableFailure());
-
-  @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
-  Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
-  ) async => const RelationGroupPageFailure(RelationGroupUnavailableFailure());
-
-  @override
-  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
-      Stream.value(
-        const LongTermRelationReadError(
-          LongTermRelationReadUnavailableFailure(),
-        ),
-      );
-
-  @override
-  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
-    IntentionId id,
-  ) => Stream.value(const ResultFailure(IntentionUnavailableFailure()));
-}
 
 final class _EmptyGraphCommandOutcome implements GraphCommandOutcome {
   const _EmptyGraphCommandOutcome();

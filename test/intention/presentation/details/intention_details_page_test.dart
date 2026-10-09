@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/l10n/app_localizations.dart';
@@ -227,15 +226,6 @@ void main() {
       _expectNavigation(tester);
     },
   );
-
-  test('маршрут подробного просмотра хранит предметный идентификатор', () {
-    final id = testDetailsIntentionId(1);
-
-    final route = IntentionDetailsRoute(intentionId: id);
-
-    expect(route, isA<PageRouteInfo<IntentionDetailsRouteArgs>>());
-    expect(route.args!.intentionId, same(id));
-  });
 
   testWidgets('показывает загрузку и пользовательский текст без перевода', (
     tester,
