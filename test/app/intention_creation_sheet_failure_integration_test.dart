@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -27,7 +29,9 @@ import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/local_database_harness.dart';
 import '../support/intention_creation_storage_observer.dart';
+import '../support/intention_creation_origin.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 const _rawTitle = '  Рисовать акварель  ';
 const _title = 'Рисовать акварель';
@@ -181,12 +185,18 @@ void main() {
     },
   );
 
-  for (final leave in _Leave.values) {
+  for (final (leave, origin) in [
+    for (final origin in [
+      IntentionCreationOrigin.graph,
+      IntentionCreationOrigin.deep,
+    ])
+      for (final leave in _Leave.values) (leave, origin),
+  ]) {
     testWidgets(
       'подтверждённый сброс полного черновика через ${leave.description} '
-      'не пишет намерение, назначения или избранное и сохраняет тег редактора',
+      'над ${origin.description} не пишет намерение, назначения или избранное и сохраняет тег редактора',
       (tester) async {
-        final app = await _launch(tester);
+        final app = await _launch(tester, origin: origin);
         final before = _storedGraph(app.raw);
         final sport = await _prepare(tester, app);
         final revision = await _revision(tester, app);
@@ -220,7 +230,11 @@ void main() {
         expect(app.diagnostics.commands, hasLength(2));
         app.diagnostics.expectPrivateDataHidden(app.raw);
 
-        await _open(tester);
+        app.history.expectRestored(
+          tester,
+          app.container.read(appRouterProvider),
+        );
+        await _open(tester, app);
         expect(_text(tester, 'intention-editor-title'), isEmpty);
         expect(_text(tester, 'intention-editor-description'), isEmpty);
         expect(_chip(_home), findsNothing);
@@ -234,6 +248,14 @@ void main() {
         expect(_sheet, findsNothing);
         expect(_confirmation, findsNothing);
         expect(_message, findsNothing);
+        app.history.expectRestored(
+          tester,
+          app.container.read(appRouterProvider),
+        );
+        await app.history.expectUnderlyingDraft(
+          tester,
+          app.container.read(appRouterProvider),
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -421,15 +443,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final leave in _Leave.values) {
+  for (final (leave, origin) in [
+    for (final origin in [
+      IntentionCreationOrigin.graph,
+      IntentionCreationOrigin.deep,
+    ])
+      for (final leave in _Leave.values) (leave, origin),
+  ]) {
     for (final outcome in _Outcome.values) {
       for (final surface in _AtResult.values) {
         testWidgets(
           '${outcome.description} задержанной отправки; уход через ${leave.description} '
-          '${surface.description}: команда продолжается один раз, результат '
+          '${surface.description} над ${origin.description}: команда продолжается один раз, результат '
           'получает один владелец и чужая сессия не меняется',
           (tester) async {
-            final app = await _launch(tester);
+            final app = await _launch(tester, origin: origin);
             final sport = await _prepare(tester, app);
             final before = _storedGraph(app.raw);
             final revision = await _revision(tester, app);
@@ -476,7 +504,7 @@ void main() {
               expect(_sheet, findsNothing);
               expect(app.storage.isHolding, isTrue);
               if (surface == _AtResult.newOpening) {
-                await _open(tester);
+                await _open(tester, app);
                 await tester.enterText(
                   _key('intention-editor-title'),
                   'Другое намерение',
@@ -582,10 +610,12 @@ void main() {
                 router.current.name,
                 surface == _AtResult.newOpening
                     ? IntentionEditorRoute.name
-                    : AppShellRoute.name,
+                    : app.history.routes.last.name,
               );
               expect(
-                router.stackData.map((route) => route.name),
+                router.stackData
+                    .skip(app.history.routes.length)
+                    .map((route) => route.name),
                 isNot(contains(IntentionDetailsRoute.name)),
               );
             }
@@ -627,6 +657,22 @@ void main() {
             expect(_message, findsNothing);
             expect(app.creations, hasLength(1));
             expect(app.storage.creationAttempts, 1);
+            app.history.expectPrefix(app.container.read(appRouterProvider));
+            if (surface == _AtResult.confirmation &&
+                outcome == _Outcome.success) {
+              await tester.binding.handlePopRoute();
+              await tester.pumpAndSettle();
+            }
+            if (surface != _AtResult.newOpening) {
+              app.history.expectRestored(
+                tester,
+                app.container.read(appRouterProvider),
+              );
+              await app.history.expectUnderlyingDraft(
+                tester,
+                app.container.read(appRouterProvider),
+              );
+            }
             app.diagnostics.expectPrivateDataHidden(app.raw);
             expect(tester.takeException(), isNull);
           },
@@ -655,6 +701,7 @@ enum _AtResult {
 
 /// Все источники запроса закрытия вызываются настоящими действиями панели.
 enum _Leave {
+  button('кнопка закрытия'),
   barrier('нажатие по фону'),
   handle('свайп ручки'),
   back('системное «назад»');
@@ -664,6 +711,8 @@ enum _Leave {
 
   Future<void> request(WidgetTester tester, {bool changed = true}) async {
     switch (this) {
+      case button:
+        await tester.tap(_key('intention-editor-close'));
       case barrier:
         await tester.tapAt(Offset(20, tester.getRect(_sheet).top / 2));
       case handle:
@@ -686,6 +735,7 @@ final class _App {
     this.diagnostics,
     this.completions,
     this.storage,
+    this.history,
   );
 
   final sqlite.Database raw;
@@ -693,6 +743,7 @@ final class _App {
   final _Diagnostics diagnostics;
   final List<GraphCommandCompletion> completions;
   final IntentionCreationStorageObserver storage;
+  final IntentionCreationHistory history;
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
   List<IntentionCommandCompletion> get creations =>
@@ -700,7 +751,10 @@ final class _App {
   AppLocalizations get l10n => lookupAppLocalizations(const Locale('ru'));
 }
 
-Future<_App> _launch(WidgetTester tester) async {
+Future<_App> _launch(
+  WidgetTester tester, {
+  IntentionCreationOrigin origin = IntentionCreationOrigin.graph,
+}) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = [const Locale('ru')];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
@@ -717,6 +771,7 @@ Future<_App> _launch(WidgetTester tester) async {
   ]);
   final storage = IntentionCreationStorageObserver(snapshotGraph: _storedGraph);
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openFileBackedLocalDatabase(
         harness.databaseFile,
@@ -758,11 +813,22 @@ Future<_App> _launch(WidgetTester tester) async {
   await openIntentionGraph(tester, waitFor: _until);
   await _wait(tester, () => find.text('Гулять').evaluate().isNotEmpty);
   await tester.pumpAndSettle();
-  return _App(raw, ready.container, diagnostics, completions, storage);
+  final history = await origin.open(
+    tester,
+    ready.container.read(appRouterProvider),
+    participantId: _seededIntention,
+    waitFor: _until,
+  );
+  return _App(raw, ready.container, diagnostics, completions, storage, history);
 }
 
-Future<void> _open(WidgetTester tester) async {
-  await _tap(tester, _key('catalog-create-intention'));
+Future<void> _open(WidgetTester tester, _App app) async {
+  unawaited(
+    app.container
+        .read(appRouterProvider)
+        .push<void>(const IntentionEditorRoute()),
+  );
+  await _until(tester, _sheet);
   await tester.pumpAndSettle();
   expect(_sheet, findsOneWidget);
   expect(find.byType(IntentionEditorPage), findsOneWidget);
@@ -771,7 +837,7 @@ Future<void> _open(WidgetTester tester) async {
 /// Команда создаётся исключительно формой: все пять полей и отдельный тег
 /// подготавливаются реальными панелью, общим выбором и редактором тега.
 Future<TagId> _prepare(WidgetTester tester, _App app) async {
-  await _open(tester);
+  await _open(tester, app);
   await tester.enterText(_key('intention-editor-title'), _rawTitle);
   await tester.enterText(_key('intention-editor-description'), _description);
   await _tap(tester, _key('intention-editor-favorite'));
@@ -1087,7 +1153,7 @@ void _expectCreatedRoute(_App app, IntentionId id) {
   expect(router.current.name, IntentionDetailsRoute.name);
   expect(router.current.argsAs<IntentionDetailsRouteArgs>().intentionId, id);
   expect(router.stackData.map((route) => route.name), [
-    AppShellRoute.name,
+    ...app.history.routes.map((route) => route.name),
     IntentionDetailsRoute.name,
   ]);
   expect(_sheet, findsNothing);

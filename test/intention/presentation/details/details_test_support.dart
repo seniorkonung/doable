@@ -151,6 +151,8 @@ final class ControlledDetailsRepository
 
   Result<IntentionCatalogPage>? catalogResult;
   void Function(IntentionId id)? onWatchIntention;
+  Stream<LongTermRelationReadResult> Function(LongTermRelationId id)?
+  onWatchRelation;
 
   /// Запросы порций соседства в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
@@ -229,9 +231,10 @@ final class ControlledDetailsRepository
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
-      throw UnsupportedError(
+      onWatchRelation?.call(id) ??
+      (throw UnsupportedError(
         'Связи не наблюдаются в тесте подробного просмотра.',
-      );
+      ));
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

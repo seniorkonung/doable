@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +11,154 @@ import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
   group('DiagnosticsSink', () {
+    test(
+      'отказы настройки режима кодируют оба этапа и безопасные категории',
+      () {
+        final messages = <String>[];
+        final sink = DeveloperDiagnosticsSink(messages.add);
+
+        for (final stage in QuickCreationModeDiagnosticsStage.values) {
+          for (final code in DiagnosticsFailureCode.values) {
+            recordDiagnosticsSafely(
+              sink,
+              QuickCreationModeDiagnosticsEvent(
+                stage: stage,
+                status: DiagnosticsFailed(
+                  duration: const Duration(microseconds: 17),
+                  code: code,
+                ),
+              ),
+            );
+          }
+        }
+
+        expect(QuickCreationModeDiagnosticsStage.values.map((s) => s.name), [
+          'read',
+          'write',
+        ]);
+        expect(messages.map(jsonDecode), [
+          for (final stage in ['read', 'write'])
+            for (final code in DiagnosticsFailureCode.values)
+              {
+                'operation': 'quickCreationMode',
+                'stage': stage,
+                'outcome': 'failed',
+                'durationMicros': 17,
+                'failureCode': code.name,
+              },
+        ]);
+      },
+    );
+
+    test('отказ настройки не раскрывает содержимое, путь или исключение', () {
+      const contentCanary = 'CANARY-содержимое-файла-режима';
+      const userTextCanary = 'CANARY-пользовательский-текст';
+      const pathCanary = '/CANARY-личный-каталог/settings/quick_creation_mode';
+      const exceptionCanary = 'CANARY-исходное-исключение';
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      for (final stage in QuickCreationModeDiagnosticsStage.values) {
+        try {
+          throw const FileSystemException(
+            '$exceptionCanary: $contentCanary, $userTextCanary',
+            pathCanary,
+          );
+        } on FileSystemException {
+          recordDiagnosticsSafely(
+            sink,
+            QuickCreationModeDiagnosticsEvent(
+              stage: stage,
+              status: const DiagnosticsFailed(
+                duration: Duration(microseconds: 23),
+                code: DiagnosticsFailureCode.unavailable,
+              ),
+            ),
+          );
+        }
+      }
+
+      expect(messages.map(jsonDecode), [
+        for (final stage in ['read', 'write'])
+          {
+            'operation': 'quickCreationMode',
+            'stage': stage,
+            'outcome': 'failed',
+            'durationMicros': 23,
+            'failureCode': 'unavailable',
+          },
+      ]);
+      for (final canary in [
+        contentCanary,
+        userTextCanary,
+        pathCanary,
+        exceptionCanary,
+        'FileSystemException',
+      ]) {
+        expect(messages.join(), isNot(contains(canary)));
+      }
+    });
+
+    test('отказ получателя сохраняет исход чтения и записи настройки', () {
+      final sink = _ThrowingDiagnosticsSink();
+      const readEvent = QuickCreationModeDiagnosticsEvent(
+        stage: QuickCreationModeDiagnosticsStage.read,
+        status: DiagnosticsFailed(
+          duration: Duration(microseconds: 5),
+          code: DiagnosticsFailureCode.corruption,
+        ),
+      );
+      const writeEvent = QuickCreationModeDiagnosticsEvent(
+        stage: QuickCreationModeDiagnosticsStage.write,
+        status: DiagnosticsFailed(
+          duration: Duration(microseconds: 7),
+          code: DiagnosticsFailureCode.unavailable,
+        ),
+      );
+      const writeFailure = QuickCreationModeSaveFailed(
+        DiagnosticsFailureCode.unavailable,
+      );
+
+      QuickCreationMode readResult() {
+        recordDiagnosticsSafely(sink, readEvent);
+        return QuickCreationMode.intention;
+      }
+
+      QuickCreationModeSaveResult writeResult() {
+        recordDiagnosticsSafely(sink, writeEvent);
+        return writeFailure;
+      }
+
+      expect(readResult(), QuickCreationMode.intention);
+      expect(writeResult(), same(writeFailure));
+      expect(sink.attemptedEvents, [same(readEvent), same(writeEvent)]);
+    });
+
+    test('падающий писатель не повторяет события настройки режима', () {
+      var attempts = 0;
+      final sink = DeveloperDiagnosticsSink((_) {
+        attempts++;
+        throw StateError('CANARY-отказ-писателя');
+      });
+
+      for (final stage in QuickCreationModeDiagnosticsStage.values) {
+        expect(
+          () => recordDiagnosticsSafely(
+            sink,
+            QuickCreationModeDiagnosticsEvent(
+              stage: stage,
+              status: const DiagnosticsFailed(
+                duration: Duration(microseconds: 11),
+                code: DiagnosticsFailureCode.unavailable,
+              ),
+            ),
+          ),
+          returnsNormally,
+        );
+      }
+      expect(attempts, 2);
+    });
+
     test(
       'операции и этапы тегов кодируются закрытым набором безопасных полей',
       () {

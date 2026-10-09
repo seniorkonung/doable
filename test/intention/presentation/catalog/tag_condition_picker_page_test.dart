@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -29,6 +29,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
@@ -593,7 +594,7 @@ final class _Harness {
 
   final WidgetTester tester;
   final _Repository repository;
-  final AppRouter router;
+  final RootStackRouter router;
   final Future<IntentionTagConditionSelection?> result;
 
   /// Подтверждает команду тега от имени другого экрана приложения.
@@ -622,7 +623,23 @@ Future<_Harness> _open(
   List<IntentionTagCondition> conditions = const [],
 }) async {
   final repository = _Repository();
-  final router = AppRouter();
+  final router = RootStackRouter.build(
+    routes: [
+      AutoRoute(
+        page: AppShellRoute.page,
+        initial: true,
+        children: [
+          for (final destination in AppDestination.values)
+            NamedRouteDef(
+              name: destination.page.name,
+              builder: (_, _) => const Scaffold(),
+            ),
+        ],
+      ),
+      AutoRoute(page: TagCatalogRoute.page),
+      AutoRoute(page: TagConditionPickerRoute.page),
+    ],
+  );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
     router.dispose();
@@ -630,6 +647,7 @@ Future<_Harness> _open(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(
@@ -637,7 +655,8 @@ Future<_Harness> _open(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
-          deepLinkBuilder: (_) => DeepLink([TagCatalogRoute()]),
+          deepLinkBuilder: (_) =>
+              DeepLink([const AppShellRoute(), TagCatalogRoute()]),
         ),
       ),
     ),

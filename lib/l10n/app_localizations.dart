@@ -134,6 +134,54 @@ abstract class AppLocalizations {
   /// **'Intention graph'**
   String get appDestinationIntentionGraph;
 
+  /// Доступное название кнопки быстрого создания
+  ///
+  /// In en, this message translates to:
+  /// **'Quick create'**
+  String get quickCreationLabel;
+
+  /// Отдельное доступное действие открытия меню режимов быстрого создания
+  ///
+  /// In en, this message translates to:
+  /// **'Change mode'**
+  String get quickCreationChangeMode;
+
+  /// Заголовок меню выбора режима быстрого создания
+  ///
+  /// In en, this message translates to:
+  /// **'Quick creation mode'**
+  String get quickCreationMenuTitle;
+
+  /// Подсказка долгого нажатия на кнопку быстрого создания для экранного диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Touch and hold to change mode'**
+  String get quickCreationLongPressHint;
+
+  /// Название режима создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'New intention'**
+  String get quickCreationModeIntention;
+
+  /// Название режима создания долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation'**
+  String get quickCreationModeRelation;
+
+  /// Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice from an intention'**
+  String get quickCreationModeDailyChoiceFromIntention;
+
+  /// Название режима дневного выбора с поиском действия и построением пути снизу вверх
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice from an action'**
+  String get quickCreationModeDailyChoiceFromAction;
+
   /// Название списка избранных намерений на Главной
   ///
   /// In en, this message translates to:
@@ -4329,6 +4377,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Step {index} of {total}'**
   String choiceSuggestionStep(int index, int total);
+
+  /// Отмена всего создания до принятия команды или после отказа
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel creation'**
+  String get creationCancelAction;
+
+  /// Выход из создания после принятия команды или завершения потока без обещания отменить запись
+  ///
+  /// In en, this message translates to:
+  /// **'Leave creation'**
+  String get creationLeaveAction;
+
+  /// Объяснение выхода из создания во время принятой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Saving will continue after you leave creation.'**
+  String get creationSavingContinues;
 }
 
 class _AppLocalizationsDelegate

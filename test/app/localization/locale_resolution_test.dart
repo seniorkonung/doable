@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   group('разрешение системной локали', () {
@@ -285,6 +286,7 @@ void main() {
 }
 
 AppRuntime _testRuntime() => AppRuntime(
+  quickCreationModeStore: InMemoryQuickCreationModeStore(),
   connectionFactory: openInMemoryLocalDatabase,
   diagnosticsSink: InMemoryDiagnosticsSink(),
 );

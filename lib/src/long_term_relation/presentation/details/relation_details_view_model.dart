@@ -108,8 +108,19 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   /// Восстанавливает архивную связь, только если оба участника активны.
   void restore() => _startLifecycleChange(RelationDetailsLifecycleKind.restore);
 
-  /// Физически удаляет конкретную активную или архивную связь.
-  void delete() => _startLifecycleChange(RelationDetailsLifecycleKind.delete);
+  /// Возвращает успех только собственной принятой команды удаления.
+  /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
+  Future<bool> delete() async {
+    final relationId = _relationId;
+    final completion = await _startLifecycleChange(
+      RelationDetailsLifecycleKind.delete,
+    );
+    return switch (completion?.result) {
+      GraphResultSuccess(value: LongTermRelationDeleted(:final relation)) =>
+        relation.id == relationId,
+      _ => false,
+    };
+  }
 
   /// Повторяет доказанно устранимый отказ той же операции.
   void retryLifecycleChange() {
@@ -122,12 +133,14 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     }
   }
 
-  void _startLifecycleChange(RelationDetailsLifecycleKind kind) {
+  Future<LongTermRelationCommandCompletion>? _startLifecycleChange(
+    RelationDetailsLifecycleKind kind,
+  ) {
     final current = state;
     if (current is! RelationDetailsLoaded ||
         _isOperationRunning ||
         !_isLifecycleChangeApplicable(current, kind)) {
-      return;
+      return null;
     }
 
     final start = switch (kind) {
@@ -151,6 +164,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
           lifecycleChange: RelationDetailsLifecycleRunning(kind),
         );
         unawaited(_finishLifecycleChange(kind, future));
+        return future;
       case LongTermRelationCommandAlreadyRunning():
         state = current.copyWith(isOperationRunning: true);
       case GraphCommandCoordinatorDraining():
@@ -161,6 +175,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
           ),
         );
     }
+    return null;
   }
 
   bool _isLifecycleChangeApplicable(

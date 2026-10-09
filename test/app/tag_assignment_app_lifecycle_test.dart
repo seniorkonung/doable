@@ -32,6 +32,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   for (final (description, target) in [
@@ -46,6 +47,7 @@ void main() {
         late _ControlledReads repository;
         final diagnostics = InMemoryDiagnosticsSink();
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () =>
               openInMemoryLocalDatabase(setup: (database) => raw = database),
           diagnosticsSink: diagnostics,
@@ -274,6 +276,7 @@ void main() {
   test('открытые каталог, выбор и назначения видят общее переименование и удаление', () async {
     late sqlite.Database raw;
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openInMemoryLocalDatabase(setup: (database) => raw = database),
       diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -385,6 +388,7 @@ void main() {
       late _ControlledReads repository;
       final diagnostics = InMemoryDiagnosticsSink();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openInMemoryLocalDatabase(setup: (database) => raw = database),
         diagnosticsSink: diagnostics,
@@ -440,6 +444,7 @@ void main() {
       late _ControlledReads repository;
       final diagnostics = InMemoryDiagnosticsSink();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openInMemoryLocalDatabase(setup: (database) => raw = database),
         diagnosticsSink: diagnostics,
@@ -488,6 +493,7 @@ void main() {
       late _ControlledReads repository;
       final diagnostics = InMemoryDiagnosticsSink();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openInMemoryLocalDatabase(setup: (database) => raw = database),
         diagnosticsSink: diagnostics,
@@ -563,6 +569,7 @@ void main() {
       late _ControlledReads repository;
       final diagnostics = InMemoryDiagnosticsSink();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openInMemoryLocalDatabase(setup: (database) => raw = database),
         diagnosticsSink: diagnostics,
@@ -669,6 +676,7 @@ void main() {
       late _ControlledReads repository;
       final diagnostics = InMemoryDiagnosticsSink();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openInMemoryLocalDatabase(setup: (database) => raw = database),
         diagnosticsSink: diagnostics,

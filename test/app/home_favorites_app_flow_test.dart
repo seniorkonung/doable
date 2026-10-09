@@ -18,6 +18,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,7 @@ import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 // Названия намерений — данные человека: они одинаковы в обеих локалях.
 
@@ -373,6 +375,7 @@ final class _App {
   ) async {
     late sqlite.Database raw;
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => openFileBackedLocalDatabase(
         harness.databaseFile,
         setup: (database) => raw = database,
@@ -750,7 +753,7 @@ Future<void> _expectDetails(WidgetTester tester, int intention) async {
         .toCanonicalString(),
     tagFixtureId(intention),
   );
-  expect(find.byType(AppNavigationBar), findsNothing);
+  expect(find.byType(AppNavigationBar), findsOneWidget);
   for (final page in _rootPages.values) {
     expect(find.byType(page), findsNothing);
   }
@@ -859,6 +862,9 @@ Future<void> _createNeedRelation(
   final submit = find.byKey(const ValueKey('relation-editor-submit'));
   await _tap(tester, submit);
   await _waitFor(tester, () => submit.evaluate().isEmpty);
+  await _until(tester, find.byKey(const ValueKey('relation-details-phrase')));
+  expect(find.text('Перед сном'), findsOneWidget);
+  await _closeTop(tester, RelationDetailsPage);
   await _until(tester, find.byKey(_favoriteControl));
   await _acceptMessage(tester, null);
 }

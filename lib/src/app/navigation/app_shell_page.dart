@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 
 import 'app_destination.dart';
+import 'app_navigation.dart';
 import 'app_navigation_bar.dart';
 import 'app_shell_tab_insets.dart';
 
@@ -39,17 +40,7 @@ final class AppShellPage extends StatelessWidget {
                   child: _AppShellTabs(selected: selected, children: children),
                 ),
               ),
-              // Как и `Scaffold.bottomNavigationBar`, панель не получает
-              // верхний системный отступ: он относится к содержимому страницы.
-              MediaQuery.removePadding(
-                context: context,
-                removeTop: true,
-                child: AppNavigationBar(
-                  selected: selected,
-                  onSelected: (destination) =>
-                      tabsRouter.setActiveIndex(destination.index),
-                ),
-              ),
+              AppNavigation(sourceRoute: tabsRouter.current),
             ],
           ),
         );

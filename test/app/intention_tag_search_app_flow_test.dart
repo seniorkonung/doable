@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -38,6 +39,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 const _health = 301;
 const _sport = 302;
@@ -225,11 +228,12 @@ void main() {
         // Создание выбора: только активные готовые намерения, теги видны
         // без условий, условия каталога в поиск действия не переносятся.
         await openDailyChoices(tester, tap: _tap);
-        await _tap(
+        await openQuickCreation(
           tester,
-          find.byKey(const ValueKey('daily-choice-create-from-action')),
+          QuickCreationMode.dailyChoiceFromAction,
+          openedPage: find.byType(action),
+          wait: _until,
         );
-        await _until(tester, find.byType(action));
         await _expectResults(tester, action, [
           ('Ходить в зал', all),
           ('Ходить до магазина', health),
@@ -624,14 +628,17 @@ void main() {
         expect(_conditions(tester, page), ['Самочувствие', deletedSport]);
 
         // Список прокручен ниже начала до того, как удаление обязательного
-        // тега снимет его с экрана.
-        tester.view.physicalSize = const Size(1200, 700);
+        // тега снимет его с экрана. Пять строк превышают высоту выдачи без
+        // прежнего резерва под кнопку создания.
+        tester.view.physicalSize = const Size(1200, 600);
         await tester.pumpAndSettle();
+        expect(_catalogListPosition(tester).maxScrollExtent, greaterThan(0));
         // Жест начинается в видимой части списка: его нижняя часть под
         // параметрами поиска лежит за нижним краем экрана.
         final list = tester.getRect(_catalogList);
+        final contentBottom = tester.getRect(find.byType(page)).bottom;
         await tester.dragFrom(
-          Offset(list.center.dx, (list.top + 700) / 2),
+          Offset(list.center.dx, (list.top + contentBottom) / 2),
           const Offset(0, -200),
         );
         await tester.pumpAndSettle();
@@ -734,6 +741,7 @@ final class _App {
     late sqlite.Database raw;
     final fault = _RefreshFault();
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(setup: (database) => raw = database),
         fault,

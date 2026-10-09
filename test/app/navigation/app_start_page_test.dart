@@ -20,6 +20,7 @@ import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Намерение «Гулять»: в зависимости от состава графа оно активное или
 /// архивированное, с отметкой избранного или без неё.
@@ -169,8 +170,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(IntentionDetailsPage), findsOneWidget);
       expect(first.router.topRoute.name, IntentionDetailsRoute.name);
-      expect(find.byType(AppNavigationBar), findsNothing);
-      expect(_selectedBelow(tester), AppDestination.intentionGraph);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
+      expect(_selected(tester), AppDestination.intentionGraph);
 
       // Полное завершение и новый запуск на том же хранилище.
       await tester.pumpWidget(const SizedBox.shrink());
@@ -252,6 +253,7 @@ Future<void> _prepareStorage(
 Future<_App> _launch(WidgetTester tester, LocalDatabaseHarness harness) async {
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => openFileBackedLocalDatabase(
       harness.databaseFile,
       setup: (database) => raw = database,
@@ -296,13 +298,6 @@ void _expectStartPage(WidgetTester tester, _App app) {
 /// Пункт, который панель показывает выбранным.
 AppDestination _selected(WidgetTester tester) =>
     tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected;
-
-/// Выбранный пункт панели, закрытой страницей поверх оболочки.
-AppDestination _selectedBelow(WidgetTester tester) => tester
-    .widget<AppNavigationBar>(
-      find.byType(AppNavigationBar, skipOffstage: false),
-    )
-    .selected;
 
 void _storeIntention(
   sqlite.Database database,

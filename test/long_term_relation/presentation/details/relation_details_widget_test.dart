@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../neighborhood/neighborhood_test_support.dart';
+import '../../../support/ordinary_page_test_app.dart';
 import 'relation_details_test_support.dart';
 
 void main() {
@@ -969,7 +970,7 @@ void main() {
     );
   });
 
-  testWidgets('успешное удаление закрывает просмотр до позднего снимка', (
+  testWidgets('повтор удаления закрывает просмотр до позднего снимка', (
     tester,
   ) async {
     final repository = ControlledRelationDetailsRepository();
@@ -991,10 +992,8 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
+        child: OrdinaryPageTestApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
               body: FilledButton(
@@ -1014,6 +1013,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('open-relation-details')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -1029,8 +1029,18 @@ void main() {
       find.byKey(const ValueKey('relation-details-confirm-delete')),
     );
     await tester.pump();
-    repository.completeRelationDelete(
+    repository.failRelationCommand(
       0,
+      const LongTermRelationUnavailableFailure(),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(RelationDetailsPage), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-lifecycle-retry')),
+    );
+    await tester.pump();
+    repository.completeRelationDelete(
+      1,
       relation: details.relation,
       revision: const TestGraphRevision(2),
     );
@@ -1038,6 +1048,11 @@ void main() {
 
     expect(find.byKey(const ValueKey('open-relation-details')), findsOneWidget);
     expect(find.byKey(const ValueKey('relation-details-phrase')), findsNothing);
+    expect(repository.relationCommands, hasLength(2));
+    expect(
+      repository.relationCommands,
+      everyElement(isA<DeleteLongTermRelation>()),
+    );
 
     watch.emitDetails(details, revision: const TestGraphRevision(3));
     await tester.pump();
@@ -1081,10 +1096,8 @@ Future<ProviderContainer> _pumpRelationDetails(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
+      child: OrdinaryPageTestApp(
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => MediaQuery(
             data: MediaQuery.of(context).copyWith(textScaler: textScaler),

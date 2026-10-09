@@ -11,7 +11,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -25,12 +24,22 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart'
 import '../../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart';
 import '../../../support/app_root_pages.dart';
 import '../daily_choice_picker_tag_search_test_support.dart';
+import '../daily_choice_picker_context_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
+  defineDailyChoicePickerContextTests(
+    route: (pickerContext) =>
+        DailyChoiceActionPickerRoute(pickerContext: pickerContext),
+    keyPrefix: 'daily-choice-action',
+    readinessFilter: IntentionReadinessFilter.readyOnly,
+    emptyMessage: 'No active actions are available.',
+    noMatchesMessage: 'No actions match this title.',
+    detailsTooltip: 'Open action details',
+  );
   defineDailyChoicePickerTagSearchTests(
     DailyChoicePickerTagSearchCase(
-      route: const DailyChoiceActionPickerRoute(),
-      purpose: const SelectDailyChoiceAction(),
+      route: DailyChoiceActionPickerRoute(),
       keyPrefix: 'daily-choice-action',
       readinessFilter: IntentionReadinessFilter.readyOnly,
       rowReadiness: const [IntentionReadiness.ready],
@@ -51,7 +60,7 @@ void main() {
       addTearDown(router.dispose);
 
       final selection = router.push<IntentionId>(
-        const DailyChoiceActionPickerRoute(),
+        DailyChoiceActionPickerRoute(),
       );
       await _settleRoute(tester);
       expect(repository.queryAt(1).scope, IntentionScope.active);
@@ -113,7 +122,7 @@ void main() {
         addTearDown(router.dispose);
 
         final selection = router.push<IntentionId>(
-          const DailyChoiceActionPickerRoute(),
+          DailyChoiceActionPickerRoute(),
         );
         await _settleRoute(tester);
         // Условия поиска пусты: отметка показана без фильтра названия и тегов.
@@ -193,7 +202,7 @@ void main() {
       addTearDown(router.dispose);
       var selected = false;
       final selection = router.push<IntentionId>(
-        const DailyChoiceActionPickerRoute(),
+        DailyChoiceActionPickerRoute(),
       );
       unawaited(selection.then((_) => selected = true));
       await _settleRoute(tester);
@@ -261,7 +270,7 @@ void main() {
     final router = await _pumpApp(tester, repository);
     addTearDown(router.dispose);
 
-    unawaited(router.push<IntentionId>(const DailyChoiceActionPickerRoute()));
+    unawaited(router.push<IntentionId>(DailyChoiceActionPickerRoute()));
     await _settleRoute(tester);
     expect(find.text('Loading actions…'), findsOneWidget);
     repository.complete(1, const ResultFailure(IntentionUnavailableFailure()));
@@ -283,7 +292,7 @@ void main() {
       final router = await _pumpApp(tester, repository);
       addTearDown(router.dispose);
       final selection = router.push<IntentionId>(
-        const DailyChoiceActionPickerRoute(),
+        DailyChoiceActionPickerRoute(),
       );
       await _settleRoute(tester);
       _completeFirst(repository, 1, [
@@ -324,9 +333,7 @@ void main() {
     final router = await _pumpApp(tester, repository, pageSize: 50);
     addTearDown(router.dispose);
 
-    final selection = router.push<IntentionId>(
-      const DailyChoiceActionPickerRoute(),
-    );
+    final selection = router.push<IntentionId>(DailyChoiceActionPickerRoute());
     await _settleRoute(tester);
     expect(repository.queryAt(1).pageSize, 50);
     repository.complete(
@@ -404,9 +411,7 @@ void main() {
       textScaler: const TextScaler.linear(2),
     );
     addTearDown(router.dispose);
-    final selection = router.push<IntentionId>(
-      const DailyChoiceActionPickerRoute(),
-    );
+    final selection = router.push<IntentionId>(DailyChoiceActionPickerRoute());
     await _settleRoute(tester);
     _completeFirst(repository, 1, [
       testSummary(
@@ -562,6 +567,7 @@ Future<AppRouter> _pumpApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         catalogPagingPolicyProvider.overrideWithValue(
           CatalogPagingPolicy(

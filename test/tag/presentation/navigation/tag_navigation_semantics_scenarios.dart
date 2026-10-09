@@ -191,9 +191,15 @@ void _registerNavigationSemanticsScenarios() {
             isTrue,
           );
         }
-        FocusManager.instance.primaryFocus?.unfocus();
+        FocusScope.of(tester.element(active)).requestFocus();
         await tester.pump();
-        for (final control in [active, archived, ...items.map(_row), more]) {
+        for (final control in [
+          find.byType(BackButton),
+          active,
+          archived,
+          ...items.map(_row),
+          more,
+        ]) {
           await tester.sendKeyEvent(LogicalKeyboardKey.tab);
           await tester.pumpAndSettle();
           final focusedWidget =

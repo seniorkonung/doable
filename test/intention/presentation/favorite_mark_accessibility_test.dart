@@ -21,9 +21,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/ordinary_page_test_app.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 import 'details/details_test_support.dart';
+
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Масштаб текста проверки доступности четырёх поисков.
 const _textScaler = TextScaler.linear(2.5);
@@ -61,12 +64,12 @@ final _pages = [
     route: null,
     listKey: 'intention-catalog-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск действия',
     route: DailyChoiceActionPickerRoute(),
     listKey: 'daily-choice-action-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск исходного намерения',
     route: DailyChoiceSourcePickerRoute(),
     listKey: 'daily-choice-source-list',
@@ -102,6 +105,7 @@ void main() {
       final repository = ControlledDetailsRepository();
       final container = ProviderContainer(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         retry: (retryCount, error) => null,
@@ -332,10 +336,8 @@ Widget _detailsApp(
   Locale locale,
 ) => UncontrolledProviderScope(
   container: container,
-  child: MaterialApp(
+  child: OrdinaryPageTestApp(
     locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: _textScaler),
       child: GraphOperationPresenter(child: child ?? const SizedBox.shrink()),

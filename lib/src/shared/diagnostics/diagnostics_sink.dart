@@ -50,6 +50,23 @@ enum DiagnosticsFailureCode {
   unexpected,
 }
 
+/// Этап обращения к настройке режима быстрого создания.
+enum QuickCreationModeDiagnosticsStage { read, write }
+
+/// Отказ настройки установки, отдельный от команд и результатов личного графа.
+///
+/// Событие принимает только этап и безопасный отказ с длительностью и категорией.
+/// Содержимое файла, пользовательский текст, пути и исходные исключения
+/// не входят в контракт. Передача получателю — через [recordDiagnosticsSafely].
+final class QuickCreationModeDiagnosticsEvent extends DiagnosticsEvent {
+  const QuickCreationModeDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsFailed status,
+  }) : super(status);
+
+  final QuickCreationModeDiagnosticsStage stage;
+}
+
 enum IntentionCommandDiagnosticsType {
   create,
   update,

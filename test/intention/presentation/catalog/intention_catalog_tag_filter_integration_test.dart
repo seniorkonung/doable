@@ -31,6 +31,13 @@ import '../../../support/tag_storage_fixture.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
+final _actionSearchPurpose = SelectDailyChoiceAction(
+  session: IntentionSearchSession(),
+);
+final _sourceSearchPurpose = SelectDailyChoiceSource(
+  session: IntentionSearchSession(),
+);
+
 void main() {
   late AppDatabase database;
   late ProviderContainer container;
@@ -78,11 +85,12 @@ void main() {
   for (final (name, purpose, expectedIds)
       in <(String, IntentionCatalogPurpose, List<int>)>[
         ('каталог', const BrowseIntentionCatalog(), [10, 2, 1]),
-        ('действие', const SelectDailyChoiceAction(), [10, 1]),
-        ('исходное намерение', const SelectDailyChoiceSource(), [10, 2, 1]),
+        ('действие', _actionSearchPurpose, [10, 1]),
+        ('исходное намерение', _sourceSearchPurpose, [10, 2, 1]),
         (
           'участник активной связи',
           SelectRelationParticipant(
+            session: IntentionSearchSession(),
             excludedIntentionId: _intentionId(2),
             selectionContext:
                 RelationParticipantSelectionContext.activeRelation,
@@ -92,6 +100,7 @@ void main() {
         (
           'участник архивной связи',
           SelectRelationParticipant(
+            session: IntentionSearchSession(),
             excludedIntentionId: _intentionId(2),
             selectionContext:
                 RelationParticipantSelectionContext.archivedRelation,
@@ -1083,7 +1092,7 @@ void main() {
       test('начальная готовность определяет принадлежность выдаче выбора '
           'действия: ${readiness.name}', () async {
         final provider = intentionCatalogViewModelProvider(
-          const SelectDailyChoiceAction(),
+          _actionSearchPurpose,
         );
         final loaded = await loadFiltered(provider);
         expect(loaded.items.map((item) => item.id), [
@@ -1341,7 +1350,7 @@ void main() {
 
     test('условия разных назначений независимы и не сохраняются после '
         'закрытия поиска', () async {
-      const action = SelectDailyChoiceAction();
+      final action = _actionSearchPurpose;
       final actionCatalog = intentionCatalogViewModelProvider(action);
       final actionConditions = intentionTagConditionsViewModelProvider(action);
       final subscriptions = [

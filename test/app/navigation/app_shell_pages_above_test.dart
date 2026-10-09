@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
@@ -24,27 +28,39 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
+import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
+
+part 'app_shell_page_matrix.dart';
+part 'app_shell_unnamed_page_scenarios.dart';
 
 /// Активное готовое избранное намерение «Читать» с тегом «Дом»: исходный
 /// участник связи и исходное намерение дневного выбора.
@@ -64,6 +80,8 @@ const _tag = 301;
 final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
 
 void main() {
+  _registerPageMatrixTests();
+  _registerUnnamedPageTests();
   test('дочерние маршруты оболочки — только три корневые страницы без '
       'собственных стеков, остальные маршруты корневые', () {
     final router = AppRouter();
@@ -127,10 +145,8 @@ void main() {
     }
   });
 
-  testWidgets('с Главной страница намерения и подробный просмотр его связи '
-      'закрывают панель, а закрытие обеих возвращает на Главную', (
-    tester,
-  ) async {
+  testWidgets('страницы намерения и связи сохраняют панель, а закрытие обеих '
+      'возвращает на Главную', (tester) async {
     final router = await _start(tester);
     _expectRootPage(tester, router, AppDestination.home);
 
@@ -148,6 +164,15 @@ void main() {
       _relationId,
     );
 
+    await _open(
+      tester,
+      find.byKey(const ValueKey('relation-details-related-participant')),
+      IntentionDetailsPage,
+    );
+    _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+    await _close(tester, IntentionDetailsPage);
+    _expectAboveShell(tester, RelationDetailsPage, AppDestination.home);
+
     // «Назад» закрывает только верхнюю страницу и не меняет выбранный пункт.
     await _close(tester, RelationDetailsPage);
     _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
@@ -156,6 +181,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final page in [
+    RelationDetailsPage,
+    DailyChoiceDetailsPage,
+    TagNavigationPage,
+  ]) {
+    for (final destination in AppDestination.values) {
+      testWidgets('$page над формой связи сбрасывает всю историю выбором '
+          'пункта ${destination.index + 1}', (tester) async {
+        const origin = AppDestination.intentionGraph;
+        final router = await _start(tester);
+        await _select(tester, origin);
+        await _open(
+          tester,
+          _summary(IntentionCatalogPage, 'Читать'),
+          IntentionDetailsPage,
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+          RelationEditorPage,
+        );
+        _expectAboveShell(tester, RelationEditorPage, origin);
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-editor-open-source-details')),
+          IntentionDetailsPage,
+        );
+        if (page == TagNavigationPage) {
+          await _open(
+            tester,
+            find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(_tag)}')),
+            page,
+          );
+        } else if (page == DailyChoiceDetailsPage) {
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('relation-neighborhood-daily-source')),
+          );
+          await _open(
+            tester,
+            find.byKey(
+              ValueKey(
+                'relation-neighborhood-daily-row-${tagFixtureId(_choice)}',
+              ),
+            ),
+            page,
+          );
+        } else {
+          await _open(tester, _relationRow, page);
+        }
+        _expectAboveShell(tester, page, origin);
+
+        await _select(tester, destination);
+
+        _expectRootPage(tester, router, destination);
+        expect(router.stack.map((route) => route.name), [AppShellRoute.name]);
+        expect(
+          find.byType(RelationEditorPage, skipOffstage: false),
+          findsNothing,
+        );
+        expect(find.byType(page, skipOffstage: false), findsNothing);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('поиск действия из каталога дневных выборов занимает весь '
       'экран без панели, а его закрытие возвращает в каталог дневных '
       'выборов', (tester) async {
@@ -163,7 +255,12 @@ void main() {
     await _select(tester, AppDestination.dailyChoices);
     _expectRootPage(tester, router, AppDestination.dailyChoices);
 
-    await _open(tester, _createDailyChoice, DailyChoiceActionPickerPage);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.dailyChoiceFromAction,
+      openedPage: find.byType(DailyChoiceActionPickerPage),
+      wait: _until,
+    );
     _expectAboveShell(
       tester,
       DailyChoiceActionPickerPage,
@@ -183,8 +280,120 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('каталог тегов из каталога намерений занимает весь экран без '
-      'панели, а его закрытие возвращает в каталог намерений', (tester) async {
+  for (final destination in AppDestination.values) {
+    testWidgets(
+      'выбор пункта ${destination.index + 1} со страницы участника удаляет '
+      'незавершённую форму связи и правку намерения без сохранения',
+      (tester) async {
+        final router = await _start(tester);
+        await _open(
+          tester,
+          find.byType(HomeIntentionRow),
+          IntentionDetailsPage,
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+          RelationEditorPage,
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-editor-select-related')),
+          RelationParticipantPickerPage,
+        );
+        await _tap(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
+        await _gone(tester, RelationParticipantPickerPage);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('relation-editor-type-need')),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('relation-editor-priority-p2')),
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('relation-editor-description')),
+          'Несохранённый черновик связи',
+        );
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-editor-open-source-details')),
+          IntentionDetailsPage,
+        );
+        _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('intention-details-edit')),
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-details-edit-title')),
+          'Несохранённое название',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-details-edit-description')),
+          'Несохранённое описание',
+        );
+        tester.testTextInput.hide();
+        await tester.pumpAndSettle();
+        _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+
+        await _select(tester, destination);
+
+        _expectRootPage(tester, router, destination);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(
+          find.byType(RelationEditorPage, skipOffstage: false),
+          findsNothing,
+        );
+        expect(
+          find.byType(IntentionDetailsPage, skipOffstage: false),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        _expectRootPage(tester, router, AppDestination.home);
+        await _open(
+          tester,
+          find.byType(HomeIntentionRow),
+          IntentionDetailsPage,
+        );
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(const ValueKey('intention-details-title')),
+              )
+              .data,
+          'Читать',
+        );
+        expect(find.text('Несохранённое название'), findsNothing);
+        expect(find.text('Несохранённое описание'), findsNothing);
+        await _open(
+          tester,
+          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+          RelationEditorPage,
+        );
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey('relation-editor-description')),
+              )
+              .controller!
+              .text,
+          isEmpty,
+        );
+        expect(
+          find.byKey(
+            const ValueKey('relation-editor-participant-title-related'),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('каталог тегов из каталога намерений сохраняет панель, '
+      'а его закрытие возвращает в каталог намерений', (tester) async {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
     _expectRootPage(tester, router, AppDestination.intentionGraph);
@@ -198,17 +407,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('страницы, открытые из каталога намерений, занимают весь экран '
-      'без панели', (tester) async {
+  for (final page in [TagCatalogPage, TagNavigationPage]) {
+    for (final destination in [
+      AppDestination.intentionGraph,
+      AppDestination.home,
+    ]) {
+      testWidgets('$page из просмотра тегов возвращает к сохранённому корню '
+          '${destination.name} и удаляет историю', (tester) async {
+        final router = await _start(tester);
+        await _select(tester, AppDestination.intentionGraph);
+        await _open(tester, _openTags, TagCatalogPage);
+        if (page == TagNavigationPage) {
+          await _open(
+            tester,
+            find.byKey(ValueKey('tag-catalog-open-${tagFixtureId(_tag)}')),
+            TagNavigationPage,
+          );
+        }
+        _expectAboveShell(tester, page, AppDestination.intentionGraph);
+
+        await _select(tester, destination);
+
+        _expectRootPage(tester, router, destination);
+        expect(router.stack.map((route) => route.name), [AppShellRoute.name]);
+        expect(find.byType(TagCatalogPage, skipOffstage: false), findsNothing);
+        expect(
+          find.byType(TagNavigationPage, skipOffstage: false),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        _expectRootPage(tester, router, AppDestination.home);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('страница намерения над каталогом сохраняет панель, а формы '
+      'и выборы открываются без неё', (tester) async {
     const graph = AppDestination.intentionGraph;
     final router = await _start(tester);
     await _select(tester, graph);
 
     // Создание намерения — исключение: модальная панель над каталогом.
-    await _open(
+    await openQuickCreation(
       tester,
-      find.byKey(const ValueKey('catalog-create-intention')),
-      IntentionEditorPage,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
+      wait: _until,
     );
     _expectCreationSheetAboveCatalog(tester, router);
     await _close(tester, IntentionEditorPage);
@@ -291,6 +537,7 @@ void main() {
 
     // Подробный просмотр связи и форма её изменения.
     await _open(tester, _relationRow, RelationDetailsPage);
+    _expectAboveShell(tester, RelationDetailsPage, graph);
     await _open(
       tester,
       find.byKey(const ValueKey('relation-details-edit-relation')),
@@ -298,6 +545,7 @@ void main() {
     );
     _expectAboveShell(tester, RelationEditorPage, graph);
     await _close(tester, RelationEditorPage);
+    _expectAboveShell(tester, RelationDetailsPage, graph);
     await _close(tester, RelationDetailsPage);
 
     // Выбор пути от намерения.
@@ -314,9 +562,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('страницы, открытые из каталога дневных выборов, занимают весь '
-      'экран без панели, а их закрытие сохраняет выбранный день и календарь '
-      'каталога', (tester) async {
+  testWidgets('просмотр дневного выбора сохраняет панель, задачи скрывают её, '
+      'а возврат сохраняет выбранный день и календарь каталога', (
+    tester,
+  ) async {
     const daily = AppDestination.dailyChoices;
     final router = await _start(tester);
     await _select(tester, daily);
@@ -353,6 +602,7 @@ void main() {
     );
     _expectAboveShell(tester, DailyChoiceEditPage, daily);
     await _close(tester, DailyChoiceEditPage);
+    _expectAboveShell(tester, DailyChoiceDetailsPage, daily);
 
     // Замена пути: поиск действия, поиск исходного намерения, выбор пути и
     // подтверждение замены.
@@ -403,7 +653,12 @@ void main() {
 
     // Создание дневного выбора: выбор пути и форма создания открываются
     // прямо из корневой страницы и тоже закрывают панель.
-    await _open(tester, _createDailyChoice, DailyChoiceActionPickerPage);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.dailyChoiceFromAction,
+      openedPage: find.byType(DailyChoiceActionPickerPage),
+      wait: _until,
+    );
     await _open(
       tester,
       _summary(DailyChoiceActionPickerPage, 'Бегать'),
@@ -491,6 +746,12 @@ void main() {
       _intentionId(_run),
     );
 
+    await _close(tester, IntentionDetailsPage);
+    _expectAboveShell(tester, RelationDetailsPage, home);
+    await _close(tester, RelationDetailsPage);
+    _expectAboveShell(tester, DailyChoiceDetailsPage, home);
+    await _close(tester, DailyChoiceDetailsPage);
+    _expectAboveShell(tester, IntentionDetailsPage, home);
     await _closeAll(tester);
     _expectRootPage(tester, router, home);
     expect(tester.takeException(), isNull);
@@ -505,10 +766,6 @@ const _rootPages = {
 };
 
 final _openTags = find.byKey(const ValueKey('catalog-open-tags'));
-
-final _createDailyChoice = find.byKey(
-  const ValueKey('daily-choice-create-from-action'),
-);
 
 /// Строка связи «Читать» → «Бегать» в соседстве намерения.
 final _relationRow = find.byKey(
@@ -532,7 +789,7 @@ IntentionId _intentionId(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 /// Пункты панели, включая панель под открытой страницей.
-final _destinations = find.byType(NavigationDestination, skipOffstage: false);
+final _destinations = appNavigationDestinations(skipOffstage: false);
 
 /// Пункты панели, которые получает экранный диктор.
 final _announcedDestinations = find.semantics.byPredicate(
@@ -584,32 +841,56 @@ void _expectRootPage(
   expect(_announcedDestinations, findsExactly(3));
 }
 
-/// Страница [page] открыта поверх оболочки: занимает весь экран, панель не
-/// видна, а сменить пункт нельзя ни нажатием, ни через экранный диктор.
-/// Выбранным под страницей остаётся пункт [under].
-void _expectAboveShell(WidgetTester tester, Type page, AppDestination under) {
+/// Подключённые обычные страницы сохраняют панель над оболочкой.
+/// Все панели сохраняют пункт [under].
+void _expectAboveShell(
+  WidgetTester tester,
+  Type page,
+  AppDestination under, {
+  bool? expectedPanel,
+}) {
   final top = find.byType(page);
   expect(top, findsOneWidget, reason: '$page');
   expect(tester.getRect(top), Offset.zero & _screen(tester), reason: '$page');
 
-  expect(find.byType(AppNavigationBar), findsNothing, reason: '$page');
+  final ordinary =
+      expectedPanel ??
+      (page == IntentionDetailsPage ||
+          page == RelationDetailsPage ||
+          page == DailyChoiceDetailsPage ||
+          page == TagNavigationPage ||
+          (page == TagCatalogPage &&
+              switch (tester.widget<TagCatalogPage>(top).selectionContext) {
+                TagBrowseContext() => true,
+                TagAssignmentContext() || TagDraftContext() => false,
+              }));
+  expect(
+    find.byType(AppNavigationBar),
+    ordinary ? findsOneWidget : findsNothing,
+    reason: '$page',
+  );
   for (final rootPage in _rootPages.values) {
     expect(find.byType(rootPage), findsNothing, reason: '$page');
   }
   // Оболочка остаётся в дереве под страницей, но её пункты не получают
   // нажатий и не объявляются экранным диктором.
-  expect(_destinations, findsExactly(3), reason: '$page');
-  expect(_destinations.hitTestable(), findsNothing, reason: '$page');
-  expect(_announcedDestinations, findsNothing, reason: '$page');
+  final bars = tester.widgetList<AppNavigationBar>(
+    find.byType(AppNavigationBar, skipOffstage: false),
+  );
+  expect(_destinations, findsExactly(3 * bars.length), reason: '$page');
   expect(
-    tester
-        .widget<AppNavigationBar>(
-          find.byType(AppNavigationBar, skipOffstage: false),
-        )
-        .selected,
-    under,
+    _destinations.hitTestable(),
+    ordinary ? findsExactly(3) : findsNothing,
     reason: '$page',
   );
+  expect(
+    _announcedDestinations,
+    ordinary ? findsExactly(3) : findsNothing,
+    reason: '$page',
+  );
+  for (final bar in bars) {
+    expect(bar.selected, under, reason: '$page');
+  }
 }
 
 /// Панель создания намерения открыта поверх каталога намерений: каталог и
@@ -657,6 +938,7 @@ Future<AppRouter> _start(WidgetTester tester) async {
   addTearDown(tester.view.reset);
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -727,12 +1009,7 @@ void _seed(sqlite.Database database) {
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  await tester.tap(appNavigationDestination(destination));
   await _until(tester, find.byType(_rootPages[destination]!));
   await tester.pumpAndSettle();
 }
@@ -752,12 +1029,13 @@ Future<void> _close(WidgetTester tester, Type page) async {
 
 /// Закрывает системным действием «назад» все страницы поверх оболочки.
 Future<void> _closeAll(WidgetTester tester) async {
-  final bar = find.byType(AppNavigationBar);
-  for (var page = 0; page < 12 && bar.evaluate().isEmpty; page++) {
+  bool hasRootPage() =>
+      _rootPages.values.any((page) => find.byType(page).evaluate().isNotEmpty);
+  for (var page = 0; page < 12 && !hasRootPage(); page++) {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
   }
-  expect(bar, findsOneWidget);
+  expect(hasRootPage(), isTrue);
 }
 
 Future<void> _gone(WidgetTester tester, Type page) async {

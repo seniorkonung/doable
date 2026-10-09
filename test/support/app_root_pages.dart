@@ -21,6 +21,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Способ сценария дождаться появления элемента.
@@ -36,10 +37,41 @@ typedef RootPageWait = Future<void> Function(
 /// Способ сценария нажать элемент, дождавшись его появления.
 typedef RootPageTap = Future<void> Function(WidgetTester tester, Finder finder);
 
-/// Пункт панели основной навигации.
-Finder _destination(AppDestination destination) => find.descendant(
-  of: find.byType(AppNavigationBar),
-  matching: find.byIcon(destination.icon),
+/// Пункты основной навигации по их доступной роли, без действий панели.
+///
+/// [skipOffstage] позволяет проверить и панели под открытыми страницами.
+Finder appNavigationDestinations({bool skipOffstage = true}) => find.descendant(
+  of: find.byType(AppNavigationBar, skipOffstage: skipOffstage),
+  matching: find.byWidgetPredicate(
+    (widget) =>
+        widget is Semantics && widget.properties.role == SemanticsRole.tab,
+    description: 'пункт основной навигации',
+    skipOffstage: skipOffstage,
+  ),
+  skipOffstage: skipOffstage,
+);
+
+/// Пункт [destination] по назначению, роли и любому из его двух значков.
+///
+/// Возвращает весь пункт: он доступен для нажатия и проверки семантики как
+/// до выбора, так и после него, независимо от внутреннего виджета панели.
+Finder appNavigationDestination(
+  AppDestination destination, {
+  bool skipOffstage = true,
+}) => find.ancestor(
+  of: find.descendant(
+    of: appNavigationDestinations(skipOffstage: skipOffstage),
+    matching: find.byWidgetPredicate(
+      (widget) =>
+          widget is Icon &&
+          (widget.icon == destination.icon ||
+              widget.icon == destination.selectedIcon),
+      description: 'значок пункта ${destination.name}',
+      skipOffstage: skipOffstage,
+    ),
+    skipOffstage: skipOffstage,
+  ),
+  matching: appNavigationDestinations(skipOffstage: skipOffstage),
 );
 
 /// Ожидание по умолчанию: кадры без реального времени.
@@ -71,7 +103,7 @@ Future<void> openHome(
   WidgetTester tester, {
   RootPageWait waitFor = pumpUntilFound,
 }) async {
-  final entry = _destination(AppDestination.home);
+  final entry = appNavigationDestination(AppDestination.home);
   await waitFor(tester, entry);
   await tester.tap(entry);
   await tester.pump();
@@ -90,7 +122,7 @@ Future<void> openIntentionGraph(
   RootPageWait waitFor = pumpUntilFound,
   Finder? content,
 }) async {
-  final entry = _destination(AppDestination.intentionGraph);
+  final entry = appNavigationDestination(AppDestination.intentionGraph);
   await waitFor(tester, entry);
   await tester.tap(entry);
   await tester.pump();
@@ -105,7 +137,7 @@ Future<void> openIntentionGraph(
 Future<void> openDailyChoices(
   WidgetTester tester, {
   RootPageTap tap = tapWhenFound,
-}) => tap(tester, _destination(AppDestination.dailyChoices));
+}) => tap(tester, appNavigationDestination(AppDestination.dailyChoices));
 
 /// Открывает дневные выборы переходом маршрутизатора, без нажатия.
 ///

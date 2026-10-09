@@ -5,6 +5,8 @@ import '../../../intention/domain/intention.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../application/choice_path_suggestions.dart';
 import '../../application/daily_choice_details.dart';
+import '../daily_choice_creation_exit_action.dart';
+import '../daily_choice_creation_flow_session.dart';
 import 'choice_path_suggestions_state.dart';
 
 /// Показывает один согласованный снимок; выбор доступен только в готовом состоянии.
@@ -14,6 +16,7 @@ final class ChoicePathSuggestionsView extends StatelessWidget {
     required this.onSelected,
     this.onRetry,
     this.onRefresh,
+    this.creationSession,
     super.key,
   });
 
@@ -21,6 +24,7 @@ final class ChoicePathSuggestionsView extends StatelessWidget {
   final ValueChanged<AvailableChoicePathSuggestion> onSelected;
   final VoidCallback? onRetry;
   final VoidCallback? onRefresh;
+  final DailyChoiceCreationFlowSession? creationSession;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +85,7 @@ final class ChoicePathSuggestionsView extends StatelessWidget {
             total: items.length,
             suggestion: items[index],
             onSelected: () => onSelected(items[index]),
+            creationSession: creationSession,
           ),
       ],
     );
@@ -104,20 +109,32 @@ final class _SuggestionCard extends StatelessWidget {
     required this.total,
     required this.suggestion,
     required this.onSelected,
+    required this.creationSession,
   });
 
   final int index;
   final int total;
   final AvailableChoicePathSuggestion suggestion;
   final VoidCallback onSelected;
+  final DailyChoiceCreationFlowSession? creationSession;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final position = l10n.choiceSuggestionPosition(index + 1, total);
-    void openPreview() => Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => _SuggestionPreview(suggestion)),
-    );
+    void openPreview() {
+      if (creationSession?.canContinue == false) return;
+      late final MaterialPageRoute<void> route;
+      route = MaterialPageRoute(
+        builder: (_) => _SuggestionPreview(
+          suggestion,
+          creationSession: creationSession,
+          route: route,
+        ),
+      );
+      Navigator.of(context).push<void>(route);
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -167,9 +184,15 @@ final class _SuggestionCard extends StatelessWidget {
 }
 
 final class _SuggestionPreview extends StatelessWidget {
-  const _SuggestionPreview(this.suggestion);
+  const _SuggestionPreview(
+    this.suggestion, {
+    required this.creationSession,
+    required this.route,
+  });
 
   final AvailableChoicePathSuggestion suggestion;
+  final DailyChoiceCreationFlowSession? creationSession;
+  final Route<void> route;
 
   @override
   Widget build(BuildContext context) {
@@ -180,8 +203,18 @@ final class _SuggestionPreview extends StatelessWidget {
       body: SafeArea(
         child: ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: 2 + path.length * 2,
+          itemCount: 3 + path.length * 2,
           itemBuilder: (context, index) {
+            if (index == 2 + path.length * 2) {
+              final session = creationSession;
+              return session == null
+                  ? const SizedBox.shrink()
+                  : DailyChoiceCreationExitAction(
+                      session: session,
+                      ownerMatchId: session.rootMatchId,
+                      previewRoute: route,
+                    );
+            }
             if (index == 0) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

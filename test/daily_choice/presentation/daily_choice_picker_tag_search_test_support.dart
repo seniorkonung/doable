@@ -9,7 +9,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
@@ -25,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
 import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../support/app_root_pages.dart';
+import '../../intention/presentation/catalog/intention_picker_session_test_support.dart';
 
 /// Страница выбора намерения для дневного выбора и её ограничения поиска.
 ///
@@ -34,7 +34,6 @@ import '../../support/app_root_pages.dart';
 final class DailyChoicePickerTagSearchCase {
   const DailyChoicePickerTagSearchCase({
     required this.route,
-    required this.purpose,
     required this.keyPrefix,
     required this.readinessFilter,
     required this.rowReadiness,
@@ -43,7 +42,6 @@ final class DailyChoicePickerTagSearchCase {
   });
 
   final PageRouteInfo route;
-  final IntentionCatalogPurpose purpose;
 
   /// Общее начало ключей поля названия, списка и отмены страницы.
   final String keyPrefix;
@@ -61,6 +59,12 @@ final class DailyChoicePickerTagSearchCase {
 void defineDailyChoicePickerTagSearchTests(
   DailyChoicePickerTagSearchCase page,
 ) {
+  defineIntentionPickerSessionTests(
+    route: page.route,
+    filterKey: '${page.keyPrefix}-filter',
+    listKey: '${page.keyPrefix}-list',
+    readinessFilter: page.readinessFilter,
+  );
   for (final (language, ownTags, otherTags, noTags) in [
     ('en', 'Tags: Здоровье, Отдых', 'Tags: Семья', 'No tags'),
     ('ru', 'Теги: Здоровье, Отдых', 'Теги: Семья', 'Без тегов'),
@@ -744,7 +748,15 @@ Future<void> _applyConditions(
   final expectedQueries = repository.queries.length + conditions.length;
   for (final (tag, requirement) in conditions) {
     container
-        .read(intentionTagConditionsViewModelProvider(page.purpose).notifier)
+        .read(
+          intentionTagConditionsViewModelProvider(
+            tester
+                .widget<IntentionTagConditionsSection>(
+                  find.byType(IntentionTagConditionsSection),
+                )
+                .purpose,
+          ).notifier,
+        )
         .applySelection(
           IntentionTagConditionSelection(
             tag: tag,

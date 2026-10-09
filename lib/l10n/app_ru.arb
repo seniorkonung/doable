@@ -6,6 +6,14 @@
   "appDestinationHome": "Главная",
   "appDestinationDailyChoices": "Дневные выборы",
   "appDestinationIntentionGraph": "Граф намерений",
+  "quickCreationLabel": "Быстрое создание",
+  "quickCreationChangeMode": "Сменить режим",
+  "quickCreationMenuTitle": "Режим быстрого создания",
+  "quickCreationLongPressHint": "Нажмите и удерживайте, чтобы сменить режим",
+  "quickCreationModeIntention": "Новое намерение",
+  "quickCreationModeRelation": "Новая связь",
+  "quickCreationModeDailyChoiceFromIntention": "Дневной выбор от намерения",
+  "quickCreationModeDailyChoiceFromAction": "Дневной выбор от действия",
   "homeFavoritesHeading": "Избранные намерения",
   "homeLoading": "Загружаем избранные намерения…",
   "homeEmptyNoFavorites": "Избранных намерений пока нет. Чтобы добавить намерение сюда, отметьте его избранным на его странице.",
@@ -762,5 +770,8 @@
   "choiceSuggestionActionNotReady": "Маршрут недоступен: конечное действие больше не готово к действию.",
   "choiceSuggestionPreviewTitle": "Полный маршрут",
   "choiceSuggestionDirection": "Направление маршрута: от основания к действию",
-  "choiceSuggestionStep": "Переход {index} из {total}"
+  "choiceSuggestionStep": "Переход {index} из {total}",
+  "creationCancelAction": "Отменить создание",
+  "creationLeaveAction": "Выйти из создания",
+  "creationSavingContinues": "Сохранение продолжится после выхода из создания."
 }

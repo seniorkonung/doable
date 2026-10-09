@@ -8,8 +8,8 @@ final class AppRouter extends RootStackRouter {
   @override
   List<AutoRoute> get routes => [
     // Корневые страницы — дочерние маршруты оболочки без собственных стеков.
-    // Остальные маршруты открываются поверх оболочки и закрывают панель;
-    // единственное исключение — модальное создание намерения ниже.
+    // Остальные маршруты открываются поверх оболочки. Обычные страницы
+    // сохраняют панель, а страницы-задачи скрывают её своим каркасом.
     AutoRoute(
       page: AppShellRoute.page,
       initial: true,
@@ -27,8 +27,8 @@ final class AppRouter extends RootStackRouter {
     // Создание намерения — модальная нижняя панель над сохранённой корневой
     // страницей в этом же стеке (ADR-0018). Маршрут прозрачен и сам по фону
     // не закрывается: закрытие решает сессия создания, а вход и выход
-    // анимирует сама панель. Страницы, открытые из неё, — обычные маршруты
-    // над ней.
+    // анимирует сама панель. Из неё открываются только страницы-задачи
+    // выбора и редактирования тегов: они сохраняют защищённую сессию.
     CustomRoute<void>(
       page: IntentionEditorRoute.page,
       opaque: false,
@@ -39,6 +39,7 @@ final class AppRouter extends RootStackRouter {
     ),
     AutoRoute(page: IntentionDetailsRoute.page),
     AutoRoute(page: ChoicePathRoute.page),
+    AutoRoute(page: DailyChoiceCreationRoute.page),
     AutoRoute(page: DailyChoiceDetailsRoute.page),
     AutoRoute(page: DailyChoiceEditRoute.page),
     AutoRoute(page: RelationDetailsRoute.page),

@@ -8,6 +8,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/choice_path_draft.dart';
 import '../../domain/daily_choice_id.dart';
+import '../daily_choice_picker_context.dart';
 import '../path/choice_path_page.dart';
 import 'daily_choice_path_replace_page.dart';
 
@@ -33,10 +34,14 @@ final class _DailyChoicePathReplacementFlowState
       final router = context.router;
       final startingId = switch (direction) {
         ChoicePathDraftDirection.topDown => await router.push<IntentionId>(
-          const DailyChoiceSourcePickerRoute(),
+          DailyChoiceSourcePickerRoute(
+            pickerContext: const AuxiliaryDailyChoicePickerContext(),
+          ),
         ),
         ChoicePathDraftDirection.bottomUp => await router.push<IntentionId>(
-          const DailyChoiceActionPickerRoute(),
+          DailyChoiceActionPickerRoute(
+            pickerContext: const AuxiliaryDailyChoicePickerContext(),
+          ),
         ),
       };
       if (!mounted || startingId == null) return;

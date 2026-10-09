@@ -51,6 +51,7 @@ import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 // Названия намерений и тегов — данные человека: они одинаковы в обеих
 // локалях.
@@ -578,6 +579,7 @@ Future<_Launch> _launch(
   late sqlite.Database raw;
   final diagnostics = InMemoryDiagnosticsSink();
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openFileBackedLocalDatabase(
         install.harness.databaseFile,
@@ -831,10 +833,12 @@ List<String> _shownHome(WidgetTester tester) => [
 ];
 
 AppDestination _selected(WidgetTester tester) => tester
-    .widget<AppNavigationBar>(
+    .widgetList<AppNavigationBar>(
       find.byType(AppNavigationBar, skipOffstage: false),
     )
-    .selected;
+    .map((bar) => bar.selected)
+    .toSet()
+    .single;
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
@@ -6,6 +7,10 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
@@ -20,6 +25,11 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/presentation/presentation_frame_evidence.dart';
@@ -28,18 +38,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
+
+part 'ordinary_page_layout_scenarios.dart';
 
 /// Экран телефона: параметры поиска и выдача делят высоту, которую уменьшают
 /// панель, нижний безопасный отступ и клавиатура.
 const _screen = Size(400, 800);
 
-/// Локали интерфейса, в которых проверяется каталог дневных выборов: подписи
-/// кнопки создания дневного выбора и строк выдачи различаются длиной.
+/// Локали интерфейса, в которых проверяется каталог дневных выборов:
+/// подписи строк выдачи различаются длиной.
 const _locales = [Locale('ru'), Locale('en')];
 
 /// Размер порции каталога намерений и каталога дневных выборов.
@@ -102,6 +117,7 @@ const _keyboardOpen = _Insets(
 const _insetVariants = [_plain, _safeArea, _keyboardOpen];
 
 void main() {
+  _registerOrdinaryLayoutTests();
   group('нижние вставки области вкладок', () {
     for (final destination in AppDestination.values) {
       testWidgets('«${_names[destination]}»: содержимое получает вставки без '
@@ -136,7 +152,7 @@ void main() {
           // отступа и нижней безопасной области.
           for (final item in AppDestination.values) {
             final icon = find.descendant(
-              of: find.byType(AppNavigationBar),
+              of: appNavigationDestination(item),
               matching: find.byIcon(
                 item == destination ? item.selectedIcon : item.icon,
               ),
@@ -158,14 +174,14 @@ void main() {
   group('содержимое каталогов над панелью', () {
     for (final insets in _insetVariants) {
       testWidgets('каталог намерений, ${insets.name}: последняя строка выдачи, '
-          'загруженной до конца, полностью видна над панелью и не закрыта '
-          'созданием намерения', (tester) async {
+          'загруженной до конца, занимает доступную область до панели', (
+        tester,
+      ) async {
         const count = 40;
         await _start(tester, intentions: count, insets: insets);
         await _select(tester, AppDestination.intentionGraph);
         await _until(tester, find.text('Total intentions: $count'));
 
-        final create = find.byKey(const ValueKey('catalog-create-intention'));
         if (insets.keyboard > 0) {
           // Поле фильтра в фокусе остаётся над клавиатурой и сужает выдачу.
           await tester.enterText(_titleFilter, 'Намерение 00');
@@ -185,11 +201,6 @@ void main() {
           );
           expect(_titleFilter.hitTestable(), findsOneWidget);
           _expectFullyVisible(tester, _titleFilter, insets);
-          _expectMainAction(tester, create, insets);
-          expect(
-            tester.getRect(_titleFilter).overlaps(tester.getRect(create)),
-            isFalse,
-          );
         }
 
         await _scrollToEnd(tester, find.byType(IntentionCatalogPage));
@@ -198,26 +209,21 @@ void main() {
         // последним.
         final lastRow = _catalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(lastRow).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
 
       testWidgets('каталог намерений, ${insets.name}: один флинг от начала '
           'выдачи, загруженной до конца, доводит до конца список и страницу, '
-          'и последняя строка полностью видна над панелью и не закрыта '
-          'созданием намерения, а обратный флинг возвращает поле фильтра '
+          'и последняя строка занимает доступную область до панели, '
+          'а обратный флинг возвращает поле фильтра '
           'названия', (tester) async {
         // Двадцать строк одним флингом проходятся с запасом.
         const count = 20;
         await _start(tester, intentions: count, insets: insets);
         await _select(tester, AppDestination.intentionGraph);
         await _until(tester, find.text('Total intentions: $count'));
-        final create = find.byKey(const ValueKey('catalog-create-intention'));
         if (insets.keyboard > 0) {
           // Клавиатуру открывает поле фильтра в фокусе.
           await tester.enterText(_titleFilter, 'Намерение 00');
@@ -238,11 +244,7 @@ void main() {
         // последним.
         final lastRow = _catalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(lastRow).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
 
         await _flingCatalog(tester, const Offset(0, 300));
@@ -277,7 +279,6 @@ void main() {
         await _select(tester, AppDestination.intentionGraph);
         await _until(tester, find.text('Total intentions: $count'));
         final page = find.byType(IntentionCatalogPage);
-        final create = find.byKey(const ValueKey('catalog-create-intention'));
         if (insets.keyboard > 0) {
           // Клавиатуру открывает поле фильтра в фокусе, а выдача остаётся
           // больше одной порции.
@@ -300,15 +301,10 @@ void main() {
           matching: find.byType(FilledButton),
         );
         // Отступы состояния нажатий не принимают: полную видимость проверяют
-        // его сообщение и повтор, а отсутствие пересечения с кнопкой — всё
-        // состояние.
+        // его сообщение и повтор, а границу выдачи — всё состояние.
         _expectFullyVisible(tester, failure, insets);
         _expectFullyVisible(tester, retry, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(continuation).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, continuation, insets);
         expect(retry.hitTestable(), findsOneWidget);
 
         faults.isFailing = false;
@@ -319,11 +315,7 @@ void main() {
         expect(continuation, findsNothing);
         final lastRow = _catalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
-        _expectMainAction(tester, create, insets);
-        expect(
-          tester.getRect(lastRow).overlaps(tester.getRect(create)),
-          isFalse,
-        );
+        _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
@@ -333,7 +325,7 @@ void main() {
       for (final insets in _insetVariants) {
         testWidgets('каталог дневных выборов, ${locale.languageCode}, '
             '${insets.name}: продолжение выдачи и последняя строка видны над '
-            'панелью и не закрыты созданием дневного выбора', (tester) async {
+            'панелью без зарезервированного места', (tester) async {
           const count = _dailyChoicePageSize + 5;
           final l10n = lookupAppLocalizations(locale);
           await _start(
@@ -357,13 +349,7 @@ void main() {
 
           final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
           _expectFullyVisible(tester, loadMore, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(loadMore)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          _expectDailyChoiceEnd(tester, loadMore, insets);
           expect(loadMore.hitTestable(), findsOneWidget);
 
           await tester.tap(loadMore);
@@ -378,13 +364,7 @@ void main() {
 
           final lastRow = _dailyChoiceRow(count);
           _expectFullyVisible(tester, lastRow, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(lastRow)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          _expectDailyChoiceEnd(tester, lastRow, insets);
           expect(lastRow.hitTestable(), findsOneWidget);
 
           await tester.tap(lastRow);
@@ -407,7 +387,7 @@ void main() {
       for (final insets in [_safeArea, _keyboardOpen]) {
         testWidgets('каталог дневных выборов, ${locale.languageCode}, '
             '${insets.name}: отказ продолжения выдачи и повтор видны над '
-            'панелью и не закрыты созданием дневного выбора, а повтор '
+            'панелью без зарезервированного места, а повтор '
             'догружает выдачу', (tester) async {
           const count = _dailyChoicePageSize + 5;
           final l10n = lookupAppLocalizations(locale);
@@ -448,17 +428,7 @@ void main() {
           );
           _expectFullyVisible(tester, failure, insets);
           _expectFullyVisible(tester, retry, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(failure)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
-          expect(
-            tester.getRect(retry).overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          expect(find.byType(FloatingActionButton), findsNothing);
           expect(retry.hitTestable(), findsOneWidget);
 
           faults.isFailing = false;
@@ -474,13 +444,7 @@ void main() {
 
           final lastRow = _dailyChoiceRow(count);
           _expectFullyVisible(tester, lastRow, insets);
-          _expectMainAction(tester, _createDailyChoice, insets);
-          expect(
-            tester
-                .getRect(lastRow)
-                .overlaps(tester.getRect(_createDailyChoice)),
-            isFalse,
-          );
+          _expectDailyChoiceEnd(tester, lastRow, insets);
           expect(lastRow.hitTestable(), findsOneWidget);
           expect(tester.takeException(), isNull);
         });
@@ -491,8 +455,7 @@ void main() {
   group('сообщения общей поверхности над панелью', () {
     for (final destination in AppDestination.values) {
       testWidgets('«${_names[destination]}»: сообщение о результате операции '
-          'видно над панелью, а основное действие страницы поднимается над '
-          'ним и остаётся доступным', (tester) async {
+          'видно над панелью, а создание остаётся доступным', (tester) async {
         final app = await _start(tester, insets: _safeArea);
         await _select(tester, destination);
 
@@ -509,20 +472,24 @@ void main() {
         expect(_messageOf(2).hitTestable(), findsOneWidget);
         // Панель при видимом сообщении остаётся на месте и принимает нажатия.
         expect(bar.bottom, _screen.height);
-        expect(
-          find.byType(NavigationDestination).hitTestable(),
-          findsExactly(3),
-        );
+        expect(appNavigationDestinations().hitTestable(), findsExactly(3));
 
-        final action = _mainActions[destination];
-        if (action != null) {
-          final button = find.byKey(action.key);
-          expect(tester.getRect(button).bottom, lessThanOrEqualTo(message.top));
-          expect(button.hitTestable(), findsOneWidget);
-          await tester.tap(button);
-          await _until(tester, find.byType(action.opens));
-          await tester.pumpAndSettle();
-          expect(find.byType(action.opens), findsOneWidget);
+        if (destination != AppDestination.home) {
+          final create = quickCreationAction();
+          expect(
+            tester.getRect(create).top,
+            greaterThanOrEqualTo(message.bottom),
+          );
+          expect(create.hitTestable(), findsOneWidget);
+          await openQuickCreation(
+            tester,
+            destination == AppDestination.dailyChoices
+                ? QuickCreationMode.dailyChoiceFromAction
+                : QuickCreationMode.intention,
+            openedPage: destination == AppDestination.dailyChoices
+                ? find.byType(DailyChoiceActionPickerPage)
+                : find.byType(IntentionEditorPage),
+          );
         }
         expect(tester.takeException(), isNull);
       });
@@ -607,7 +574,7 @@ void main() {
       await _until(tester, find.byType(TagCatalogPage));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AppNavigationBar), findsNothing);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(_messageOf(2), findsOneWidget);
       expect(tester.takeException(), isNull);
 
@@ -635,24 +602,7 @@ const _rootPages = {
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-/// Основное действие корневой страницы и страница, которую оно открывает.
-/// У Главной основного действия нет.
-const _mainActions = <AppDestination, ({Key key, Type opens})>{
-  AppDestination.dailyChoices: (
-    key: ValueKey('daily-choice-create-from-action'),
-    opens: DailyChoiceActionPickerPage,
-  ),
-  AppDestination.intentionGraph: (
-    key: ValueKey('catalog-create-intention'),
-    opens: IntentionEditorPage,
-  ),
-};
-
 final _titleFilter = find.byKey(const ValueKey('catalog-filter-field'));
-
-final _createDailyChoice = find.byKey(
-  const ValueKey('daily-choice-create-from-action'),
-);
 
 /// Строка выдачи каталога дневных выборов с номером [number].
 Finder _dailyChoiceRow(int number) =>
@@ -735,9 +685,21 @@ final class _RootPageEvidence extends StatelessWidget {
 /// завершается отказом занятости.
 final class _ReadFaults extends LocalDatabaseConnectionObserver {
   var isFailing = false;
+  Completer<void>? _gate;
+
+  void pause() {
+    _gate = Completer<void>();
+    addTearDown(resume);
+  }
+
+  void resume() {
+    _gate?.complete();
+    _gate = null;
+  }
 
   @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
+  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+    await _gate?.future;
     if (!isFailing) return;
     throw sqlite.SqliteException(
       extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
@@ -748,9 +710,10 @@ final class _ReadFaults extends LocalDatabaseConnectionObserver {
 
 /// Запущенное приложение.
 final class _App {
-  _App(this.coordinator);
+  _App(this.coordinator, this.router);
 
   final GraphCommandCoordinator coordinator;
+  final AppRouter router;
 }
 
 /// Сообщает окну системные вставки [insets].
@@ -774,17 +737,23 @@ Future<_App> _start(
   _Insets insets = _plain,
   Locale locale = const Locale('en'),
   LocalDatabaseConnectionObserver? observer,
+  Size screen = _screen,
+  double textScale = 1,
+  void Function(sqlite.Database)? seedAdditional,
 }) async {
   // Общая поверхность показывает сообщения только работающему приложению.
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-  tester.view.physicalSize = _screen;
+  tester.binding.platformDispatcher.textScaleFactorTestValue = textScale;
+  addTearDown(tester.binding.platformDispatcher.clearTextScaleFactorTestValue);
+  tester.view.physicalSize = screen;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   _apply(tester, insets);
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () {
       final connection = openInMemoryLocalDatabase(
         setup: (database) => raw = database,
@@ -806,10 +775,15 @@ Future<_App> _start(
   });
   await tester.runAsync(runtime.bootstrap);
   _seed(raw, intentions: intentions, dailyChoices: dailyChoices);
+  seedAdditional?.call(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomeIntentionRow));
   await tester.pumpAndSettle();
-  return _App(runtime.commandCoordinator);
+  final ready = await runtime.bootstrap() as AppRuntimeReady;
+  return _App(
+    runtime.commandCoordinator,
+    ready.container.read(appRouterProvider),
+  );
 }
 
 /// Намерения, одна отметка избранного, связь и дневные выборы по ней на
@@ -902,9 +876,15 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
   // Видимая часть корневой страницы, суженная видимой частью каждой
   // объемлющей прокрутки.
   var visibleTop = tester.getRect(find.byType(AppBar)).bottom;
-  var visibleBottom = insets.contentBottom;
+  var visibleBottom =
+      tester.view.physicalSize.height / tester.view.devicePixelRatio -
+      math.max(insets.keyboard, insets.barExtent);
   var inScroll = false;
   element.visitAncestorElements((ancestor) {
+    if (ancestor.widget is AppBar) {
+      visibleTop = insets.safeTop;
+      return false;
+    }
     if (ancestor.widget is Scrollable) {
       inScroll = true;
       final viewport = ancestor.renderObject! as RenderBox;
@@ -928,6 +908,9 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
     lessThanOrEqualTo(visibleBottom + precisionErrorTolerance),
     reason: '$finder: нижний край видимой части',
   );
+  final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+  expect(rect.left, greaterThanOrEqualTo(-precisionErrorTolerance));
+  expect(rect.right, lessThanOrEqualTo(width + precisionErrorTolerance));
   if (!inScroll) return;
   // Нажатие ровно на границе элементу не принадлежит, поэтому точки
   // отступают от краёв внутрь.
@@ -942,9 +925,8 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
 }
 
 /// Ставит фокус в поле фильтра названия каталога намерений, не меняя поиск:
-/// поле видно над клавиатурой и не закрыто созданием намерения.
+/// поле видно над клавиатурой.
 Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
-  final create = find.byKey(const ValueKey('catalog-create-intention'));
   await tester.showKeyboard(_titleFilter);
   await tester.pumpAndSettle();
   expect(
@@ -961,43 +943,32 @@ Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
   );
   expect(_titleFilter.hitTestable(), findsOneWidget);
   _expectFullyVisible(tester, _titleFilter, insets);
-  _expectMainAction(tester, create, insets);
-  expect(
-    tester.getRect(_titleFilter).overlaps(tester.getRect(create)),
-    isFalse,
-  );
 }
 
-/// Выбор дня в начале каталога дневных выборов виден над клавиатурой,
-/// принимает нажатия и не закрыт созданием дневного выбора.
+/// Конец выдачи использует доступное место до панели либо клавиатуры.
+void _expectCatalogEnd(WidgetTester tester, Finder last, _Insets insets) {
+  expect(tester.getRect(last).bottom, moreOrLessEquals(insets.contentBottom));
+  expect(find.byKey(const ValueKey('catalog-create-intention')), findsNothing);
+}
+
+/// Выбор дня в начале каталога дневных выборов виден над клавиатурой
+/// и принимает нажатия.
 void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
   expect(dailyChoiceCatalogDay(_today).hitTestable(), findsOneWidget);
   _expectFullyVisible(tester, dailyChoiceCatalogDateControl, insets);
-  _expectMainAction(tester, _createDailyChoice, insets);
-  expect(
-    tester
-        .getRect(dailyChoiceCatalogDateControl)
-        .overlaps(tester.getRect(_createDailyChoice)),
-    isFalse,
-  );
+  expect(find.byType(FloatingActionButton), findsNothing);
 }
 
-/// Основное действие корневой страницы стоит в своём углу над панелью либо
-/// клавиатурой: содержимое заканчивается на их верхней границе, без зазора,
-/// и действие принимает нажатия.
-void _expectMainAction(WidgetTester tester, Finder action, _Insets insets) {
-  _expectFullyVisible(tester, action, insets);
-  expect(
-    tester.getRect(action).bottom,
-    moreOrLessEquals(insets.contentBottom - kFloatingActionButtonMargin),
-  );
-  expect(action.hitTestable(), findsOneWidget);
+/// Выдача дневных выборов заканчивается у панели либо клавиатуры без зазора.
+void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
+  expect(tester.getRect(last).bottom, moreOrLessEquals(insets.contentBottom));
+  expect(find.byType(FloatingActionButton), findsNothing);
 }
 
 /// Прокручивает корневую страницу [page] жестами до конца её выдачи.
 ///
 /// Жест начинается у левого верхнего края видимой части прокрутки выдачи —
-/// в точке, не закрытой основным действием страницы. Прокрутка выдачи —
+/// в точке, доступной для нажатия. Прокрутка выдачи —
 /// самая вложенная прокрутка страницы: собственный список выдачи каталога
 /// намерений либо прокрутка, которую выдача каталога дневных выборов делит с
 /// фильтрами. Когда список дошёл до своего края, тот же жест продолжает
@@ -1074,12 +1045,9 @@ ScrollPosition _catalogPageScroll(WidgetTester tester) => tester
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  final entry = appNavigationDestination(destination);
+  expect(entry.hitTestable(), findsOneWidget);
+  await tester.tap(entry);
   await _until(tester, find.byType(_rootPages[destination]!));
   await tester.pumpAndSettle();
 }

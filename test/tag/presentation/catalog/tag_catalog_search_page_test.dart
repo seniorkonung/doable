@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Tag, TagAssignment;
@@ -35,10 +36,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/tag_assignment_changed.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 part 'tag_catalog_draft_search_scenarios.dart';
 part 'tag_catalog_search_recovery_scenarios.dart';
@@ -173,7 +176,7 @@ void main() {
     testWidgets(
       '$description: одинаковые страницы имеют независимый ввод, новое открытие начинает поиск заново',
       (tester) async {
-        final router = AppRouter();
+        final router = _catalogRouter();
         final repository = await _pumpCatalog(
           tester,
           intentionId: intentionId,
@@ -476,7 +479,7 @@ void main() {
       testWidgets(
         '$description: возврат из редактора сохраняет поиск и показывает выбор до обновления снимка без автоматического назначения',
         (tester) async {
-          final router = AppRouter();
+          final router = _catalogRouter();
           final repository = await _pumpCatalog(
             tester,
             intentionId: intentionId,
@@ -1191,6 +1194,7 @@ Future<AppRouter> _pumpStoredCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(
@@ -1199,6 +1203,7 @@ Future<AppRouter> _pumpStoredCatalog(
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
           deepLinkBuilder: (_) => DeepLink([
+            const AppShellRoute(),
             TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
           ]),
         ),
@@ -1214,7 +1219,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
   IntentionId? intentionId,
   String language = 'ru',
   double scale = 1,
-  AppRouter? router,
+  RootStackRouter? router,
   ValueNotifier<IntentionId?>? sessionIntention,
 }) async {
   final repository = TagCatalogTestRepository();
@@ -1226,18 +1231,17 @@ Future<TagCatalogTestRepository> _pumpCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: router == null
-          ? MaterialApp(
+          ? OrdinaryPageTestApp(
               locale: Locale(language),
               builder: (context, child) => MediaQuery(
                 data: MediaQuery.of(context)
                     .copyWith(textScaler: TextScaler.linear(scale)),
                 child: child!,
               ),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
               home: sessionIntention == null
                   ? TagCatalogPage(
                       selectionContext: _selectionContext(intentionId),
@@ -1255,6 +1259,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(
                 deepLinkBuilder: (_) => DeepLink([
+                  const AppShellRoute(),
                   TagCatalogRoute(
                     selectionContext: _selectionContext(intentionId),
                   ),
@@ -1263,7 +1268,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
             ),
     ),
   );
-  if (router != null) await tester.pump();
+  await tester.pump();
   return repository;
 }
 
@@ -1325,3 +1330,22 @@ TagSelectionContext _selectionContext(IntentionId? intentionId) =>
       null => const TagBrowseContext(),
       final intentionId => TagAssignmentContext(intentionId),
     };
+
+/// Настоящий стек каталога и редактора с оболочкой без чтения корневых страниц.
+RootStackRouter _catalogRouter() => RootStackRouter.build(
+  routes: [
+    AutoRoute(
+      page: AppShellRoute.page,
+      initial: true,
+      children: [
+        for (final destination in AppDestination.values)
+          NamedRouteDef(
+            name: destination.page.name,
+            builder: (_, _) => const Scaffold(),
+          ),
+      ],
+    ),
+    AutoRoute(page: TagCatalogRoute.page),
+    AutoRoute(page: TagEditorRoute.page),
+  ],
+);

@@ -34,6 +34,7 @@ import '../../long_term_relation/presentation/details/relation_details_test_supp
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
     hide testRelationCounts;
 import '../../support/app_root_pages.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   testWidgets('навигация по тегу открывается по типизированному TagId', (
@@ -178,6 +179,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWithValue(repository),
           ],
           retry: (retryCount, error) => null,
@@ -230,7 +232,7 @@ void main() {
       expect(router.topRoute.name, DailyChoiceCatalogRoute.name);
       expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
 
-      unawaited(router.push<IntentionId>(const DailyChoiceSourcePickerRoute()));
+      unawaited(router.push<IntentionId>(DailyChoiceSourcePickerRoute()));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(router.current.name, DailyChoiceSourcePickerRoute.name);
@@ -494,6 +496,7 @@ Future<void> _pumpRouter(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,

@@ -19,6 +19,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
   for (var attempt = 0; attempt < 100; attempt++) {
@@ -81,6 +82,7 @@ void main() {
 
         late sqlite.Database raw;
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () =>
               openInMemoryLocalDatabase(setup: (database) => raw = database),
           diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -183,6 +185,7 @@ void main() {
 
       late sqlite.Database raw;
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openInMemoryLocalDatabase(setup: (database) => raw = database),
         diagnosticsSink: InMemoryDiagnosticsSink(),

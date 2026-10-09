@@ -5,6 +5,8 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
@@ -25,6 +27,7 @@ import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
@@ -59,11 +62,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Активные избранные намерения «Избранное 01» … «Избранное 40» на местах
 /// 1…40: список Главной длиннее экрана.
@@ -179,6 +184,148 @@ void main() {
     }
   });
 
+  group('сброс истории со страницы намерения', () {
+    testWidgets('позднее архивирование один раз согласует сохранённые корни '
+        'на настоящем хранилище после сброса истории', (tester) async {
+      final app = await _start(tester);
+      await _prepareDailyChoiceCatalog(tester, app);
+      final dailyBefore = _dailyChoiceParameters(tester, app);
+      final choicesBefore = app.dailyChoiceCatalog.items
+          .map((item) => item.id)
+          .toList();
+      await _select(tester, AppDestination.intentionGraph);
+      await _enterTitleFilter(tester, app, 'Избранное', total: _favoriteCount);
+      final catalogBefore = _intentionCatalogParameters(tester, app);
+      final firstPortions = app.repository.firstCatalogPortions;
+      final target = app.home.items.first;
+      final coordinator = app.container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final completions = <IntentionCommandCompletion>[];
+      final subscription = coordinator.intentionCompletions.listen(
+        completions.add,
+      );
+      addTearDown(subscription.cancel);
+      final router = app.container.read(appRouterProvider);
+      unawaited(router.push(IntentionDetailsRoute(intentionId: target.id)));
+      await _until(tester, find.byType(IntentionDetailsPage));
+      app.repository.holdNextCommand();
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('intention-details-archive')),
+      );
+      await _waitFor(tester, () => app.repository.isHolding);
+
+      await _select(tester, AppDestination.home);
+      expect(coordinator.isRunning(target.id), isTrue);
+      expect(app.home.items.any((item) => item.id == target.id), isTrue);
+      expect(completions, isEmpty);
+      expect(
+        app.raw.select('SELECT is_archived FROM intentions WHERE id = ?', [
+          target.id.toCanonicalString(),
+        ]).single['is_archived'],
+        0,
+      );
+
+      app.repository.releaseCommand();
+      await _waitFor(
+        tester,
+        () =>
+            completions.length == 1 &&
+            !app.home.items.any((item) => item.id == target.id),
+      );
+      await _settle(tester);
+      expect(app.repository.commands.single, isA<ArchiveIntention>());
+      expect(
+        completions.single.confirmedChange!.revision.compareTo(
+          app.home.revision,
+        ),
+        GraphRevisionOrder.same,
+      );
+      expect(
+        app.raw.select('SELECT is_archived FROM intentions WHERE id = ?', [
+          target.id.toCanonicalString(),
+        ]).single['is_archived'],
+        1,
+      );
+      expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
+      expect(
+        find.byType(IntentionDetailsPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(find.byKey(_message), findsOneWidget);
+      await _closeMessage(tester);
+
+      await _select(tester, AppDestination.intentionGraph);
+      expect(app.intentionCatalog.totalCount, _favoriteCount - 1);
+      expect(
+        app.intentionCatalog.items.any((item) => item.id == target.id),
+        isFalse,
+      );
+      expect(_intentionCatalogParameters(tester, app), catalogBefore);
+      expect(app.repository.firstCatalogPortions, firstPortions);
+      await _select(tester, AppDestination.dailyChoices);
+      expect(_dailyChoiceParameters(tester, app), dailyBefore);
+      expect(
+        app.dailyChoiceCatalog.items.map((item) => item.id),
+        choicesBefore,
+      );
+      await _closeMessage(tester);
+      expect(_builtMessages, findsNothing);
+      expect(app.repository.commands, hasLength(1));
+      expect(completions, hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final origin in AppDestination.values) {
+      for (final destination in AppDestination.values) {
+        testWidgets('из «${_names[origin]}» в «${_names[destination]}» '
+            'сохраняет состояние всех корневых страниц без повторного чтения', (
+          tester,
+        ) async {
+          final app = await _start(tester);
+          final before = <AppDestination, Map<String, Object?>>{};
+          for (final entry in _rootPageStates.entries) {
+            await entry.value.prepare(tester, app);
+            before[entry.key] = entry.value.view(tester, app);
+          }
+          await _select(tester, origin);
+          final router = app.container.read(appRouterProvider);
+          unawaited(
+            router.push(
+              IntentionDetailsRoute(intentionId: app.home.items.first.id),
+            ),
+          );
+          await _until(tester, find.byType(IntentionDetailsPage));
+          await tester.pumpAndSettle();
+          expect(_selected(tester), origin);
+          // Вторая страница создаёт глубокую историю над тем же пунктом.
+          unawaited(
+            router.push(
+              IntentionDetailsRoute(intentionId: app.home.items[1].id),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(_selected(tester), origin);
+
+          await _select(tester, destination);
+
+          expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
+          expect(
+            find.byType(IntentionDetailsPage, skipOffstage: false),
+            findsNothing,
+          );
+          expect(_selected(tester), destination);
+          for (final entry in _rootPageStates.entries) {
+            await _select(tester, entry.key);
+            expect(entry.value.view(tester, app), before[entry.key]);
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  });
+
   group('невыбранная корневая страница согласуется с подтверждёнными '
       'изменениями', () {
     testWidgets('переименование со страницы намерения, открытой с Главной, '
@@ -213,7 +360,6 @@ void main() {
         find.byKey(const ValueKey('intention-details-edit-submit')),
       );
       await _until(tester, find.text(newTitle));
-      await _closeTop(tester, IntentionDetailsPage);
       await _select(tester, AppDestination.intentionGraph);
 
       expect(_catalogRow(newTitle), findsOneWidget);
@@ -351,9 +497,14 @@ void main() {
       expect(states.whereType<DailyChoiceCatalogInitialLoad>(), isEmpty);
 
       // Продолжение новой ревизии дополняет выдачу без пропусков и повторов.
+      await _closeMessage(tester);
       final position = _dailyChoicePosition(tester);
       position.jumpTo(position.maxScrollExtent);
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('daily-choice-load-more')).hitTestable(),
+        findsOneWidget,
+      );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-load-more')));
       await _waitFor(
         tester,
@@ -635,7 +786,7 @@ void main() {
           final marksBefore = storedFavoriteMarks(app.raw);
           await _select(tester, AppDestination.intentionGraph);
           await _open(tester, _catalogRow(marked), IntentionDetailsPage);
-          app.repository.holdNextMarkCommand();
+          app.repository.holdNextCommand();
           if (fails) app.faults.failNextMarkWrite();
           await _tap(tester, find.byKey(_favoriteControl));
           // Операция принята и дошла до хранилища до смены пункта.
@@ -652,7 +803,7 @@ void main() {
 
           // Результат приходит, пока выбран другой пункт, и предъявляется
           // сразу на его странице, а не при возвращении к началу перехода.
-          app.repository.releaseMarkCommand();
+          app.repository.releaseCommand();
           await _until(tester, find.byKey(_message));
           await tester.pumpAndSettle();
 
@@ -804,6 +955,7 @@ Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
   final faults = _MarkWriteFaults();
   final diagnostics = InMemoryDiagnosticsSink();
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openInMemoryLocalDatabase(setup: (database) => raw = database),
       faults,
@@ -822,7 +974,7 @@ Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
     ),
   );
   addTearDown(() async {
-    repository.releaseMarkCommand();
+    repository.releaseCommand();
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });
@@ -1396,12 +1548,7 @@ Future<void> _selectDay(
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  await tester.tap(appNavigationDestination(destination));
   await _until(tester, find.byType(_rootPages[destination]!));
   await _settle(tester);
 }
@@ -1481,7 +1628,7 @@ final class _MarkWriteFaults extends LocalDatabaseConnectionObserver {
 }
 
 /// Реальный адаптер, который считает обращения корневых страниц к своим
-/// выдачам и команды, а команду отметки удерживает до [releaseMarkCommand].
+/// выдачам и команды, а команду намерения удерживает до [releaseCommand].
 /// Удержание происходит до транзакции, поэтому чтения не ждут.
 final class _ObservedRepository implements PersonalGraphRepository {
   _ObservedRepository(this._delegate);
@@ -1492,7 +1639,7 @@ final class _ObservedRepository implements PersonalGraphRepository {
   /// Команды, дошедшие до хранилища.
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
 
-  /// Команда отметки принята координатором и ждёт [releaseMarkCommand].
+  /// Команда намерения принята координатором и ждёт [releaseCommand].
   var isHolding = false;
 
   /// Обращения к выдаче каталога намерений: порции и чтения согласования.
@@ -1507,9 +1654,9 @@ final class _ObservedRepository implements PersonalGraphRepository {
   /// Чтения списка избранных намерений.
   var favoriteReads = 0;
 
-  void holdNextMarkCommand() => _gate = Completer<void>();
+  void holdNextCommand() => _gate = Completer<void>();
 
-  void releaseMarkCommand() {
+  void releaseCommand() {
     final gate = _gate;
     if (gate != null && !gate.isCompleted) gate.complete();
   }
@@ -1521,7 +1668,8 @@ final class _ObservedRepository implements PersonalGraphRepository {
   >(GraphCommand<TSuccess, TFailure> command) async {
     commands.add(command);
     if (command is MarkIntentionFavorite ||
-        command is UnmarkIntentionFavorite) {
+        command is UnmarkIntentionFavorite ||
+        command is ArchiveIntention) {
       final gate = _gate;
       if (gate != null) {
         isHolding = true;

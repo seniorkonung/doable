@@ -192,7 +192,18 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   void restore() => _startStateChange(IntentionDetailsStateChangeKind.restore);
 
-  void delete() => _startStateChange(IntentionDetailsStateChangeKind.delete);
+  /// Возвращает успех только собственной принятой команды удаления.
+  /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
+  Future<bool> delete() async {
+    final intentionId = _intentionId;
+    final completion = await _startStateChange(
+      IntentionDetailsStateChangeKind.delete,
+    );
+    return switch (completion?.result) {
+      ResultSuccess(value: IntentionDeleted(:final id)) => id == intentionId,
+      _ => false,
+    };
+  }
 
   /// Отмечает намерение избранным. Новое значение публикует только
   /// подтверждённый снимок: до него состояние несёт прежнюю отметку.
@@ -365,13 +376,15 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  void _startStateChange(IntentionDetailsStateChangeKind kind) {
+  Future<IntentionCommandCompletion>? _startStateChange(
+    IntentionDetailsStateChangeKind kind,
+  ) {
     final current = state;
     if (current is! IntentionDetailsLoaded ||
         current.edit != null ||
         _isOperationRunning ||
         !_isStateChangeApplicable(current, kind)) {
-      return;
+      return null;
     }
 
     final start = _coordinator.acceptExisting(
@@ -386,6 +399,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
           stateChange: IntentionDetailsStateChange.running(kind),
         );
         unawaited(_finishStateChange(kind, future));
+        return future;
       case IntentionCommandAlreadyRunning():
         state = current.copyWith(isOperationRunning: true);
       case GraphCommandCoordinatorDraining():
@@ -396,6 +410,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
           ),
         );
     }
+    return null;
   }
 
   Future<void> _finishStateChange(
@@ -410,8 +425,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
       _activeToken = null;
       final current = state;
-      // Success предъявляет оболочка; удаление завершает просмотр через канал
-      // согласования данных.
+      // Успех предъявляет оболочка; данные удаления согласуются отдельно
+      // от права вызывающей страницы закрыть собственный маршрут.
       switch (completion.result) {
         case ResultSuccess(value: IntentionSaved(:final intention))
             when intention.id == _intentionId &&

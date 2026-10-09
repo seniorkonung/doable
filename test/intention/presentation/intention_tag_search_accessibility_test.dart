@@ -12,6 +12,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -34,7 +35,6 @@ final class _SearchPage {
   const _SearchPage({
     required this.name,
     required this.route,
-    required this.purpose,
     required this.filterKey,
     required this.listKey,
   });
@@ -43,7 +43,6 @@ final class _SearchPage {
 
   /// Маршрут поверх каталога; каталог открыт сразу и маршрута не требует.
   final PageRouteInfo? route;
-  final IntentionCatalogPurpose purpose;
   final String filterKey;
   final String listKey;
 }
@@ -54,31 +53,24 @@ final _pages = [
   const _SearchPage(
     name: 'каталог намерений',
     route: null,
-    purpose: BrowseIntentionCatalog(),
     filterKey: 'catalog-filter-field',
     listKey: 'intention-catalog-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск действия',
     route: DailyChoiceActionPickerRoute(),
-    purpose: SelectDailyChoiceAction(),
     filterKey: 'daily-choice-action-filter',
     listKey: 'daily-choice-action-list',
   ),
-  const _SearchPage(
+  _SearchPage(
     name: 'поиск исходного намерения',
     route: DailyChoiceSourcePickerRoute(),
-    purpose: SelectDailyChoiceSource(),
     filterKey: 'daily-choice-source-filter',
     listKey: 'daily-choice-source-list',
   ),
   _SearchPage(
     name: 'поиск участника долговременной связи',
     route: RelationParticipantPickerRoute(
-      excludedIntentionId: _secondParticipant,
-      selectionContext: RelationParticipantSelectionContext.archivedRelation,
-    ),
-    purpose: SelectRelationParticipant(
       excludedIntentionId: _secondParticipant,
       selectionContext: RelationParticipantSelectionContext.archivedRelation,
     ),
@@ -114,9 +106,6 @@ void main() {
         final router = AppRouter();
         addTearDown(container.dispose);
         addTearDown(router.dispose);
-        final conditionsProvider = intentionTagConditionsViewModelProvider(
-          page.purpose,
-        );
         final list = find.byKey(PageStorageKey<String>(page.listKey));
 
         await tester.pumpWidget(
@@ -146,6 +135,14 @@ void main() {
           await _pumpFrames(tester);
         }
         expect(tester.takeException(), isNull);
+
+        final conditionsProvider = intentionTagConditionsViewModelProvider(
+          tester
+              .widget<IntentionTagConditionsSection>(
+                find.byType(IntentionTagConditionsSection),
+              )
+              .purpose,
+        );
 
         // Поле названия принимает ввод при открытой клавиатуре.
         final field = find.byKey(ValueKey(page.filterKey));

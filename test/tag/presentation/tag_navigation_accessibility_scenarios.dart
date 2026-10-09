@@ -23,6 +23,7 @@ void _registerNavigationEntryScenarios() {
         try {
           late sqlite.Database raw;
           final runtime = AppRuntime(
+            quickCreationModeStore: InMemoryQuickCreationModeStore(),
             connectionFactory: () =>
                 openInMemoryLocalDatabase(setup: (database) => raw = database),
             diagnosticsSink: InMemoryDiagnosticsSink(),

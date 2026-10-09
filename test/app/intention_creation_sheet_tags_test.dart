@@ -6,6 +6,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -25,12 +26,15 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 const _homeTag = 301;
 const _workTag = 302;
@@ -86,8 +90,8 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// хранилища.
 ///
 /// Набор черновика виден по элементам панели и по контексту открытого
-/// выбора, граф — по строкам хранилища. Панель открывается кнопкой каталога,
-/// а выбор — её действием, поэтому проверки не подменяют сборку контекста.
+/// выбора, граф — по строкам хранилища. Панель открывается через меню и
+/// общую кнопку, а выбор — её действием, сохраняя настоящую сборку контекста.
 void main() {
   testWidgets(
     'выбор из компактной панели добавляет несколько тегов только в черновик, '
@@ -377,7 +381,10 @@ void main() {
       final sheetElement = tester.element(_sheet);
 
       // Первый тег уже принадлежит исходному черновику до гонки действий.
+      await _expectProtectedNavigation(tester);
       await app.openChooser(tester);
+      await _expectProtectedNavigation(tester);
+      expect(find.byTooltip(l10n.tagNavigationTitle), findsNothing);
       final tagSet = app.chooserTagSet();
       await _tap(tester, _row(home));
       await _tap(tester, _addToDraft);
@@ -410,6 +417,7 @@ void main() {
       await _tap(tester, _createTag);
       await _until(tester, _tagEditorName);
       await tester.pumpAndSettle();
+      await _expectProtectedNavigation(tester);
       staleSubmit();
       await _letStorageRun(tester);
       expect(creations, isEmpty);
@@ -503,10 +511,6 @@ void main() {
         tester,
         find.byKey(const ValueKey('intention-details-title')),
       );
-      await _until(
-        tester,
-        find.byKey(ValueKey('tag-assignment-row-${shed.toCanonicalString()}')),
-      );
       await tester.pumpAndSettle();
       expect(tester.widget<IntentionDetailsPage>(page).intentionId, id);
       expect(
@@ -529,24 +533,32 @@ void main() {
         Icons.star,
       );
       for (final (tag, name) in [(home, 'Дом'), (shed, 'Сарай')]) {
-        expect(
-          find.descendant(
-            of: find.byKey(
-              ValueKey('tag-assignment-row-${tag.toCanonicalString()}'),
-            ),
-            matching: find.text(name),
+        final row = find.byKey(
+          ValueKey('tag-assignment-row-${tag.toCanonicalString()}'),
+        );
+        await tester.scrollUntilVisible(
+          row,
+          200,
+          scrollable: find.descendant(
+            of: page,
+            matching: find.byType(Scrollable),
           ),
+        );
+        await _until(tester, row);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: row, matching: find.text(name)),
           findsOneWidget,
         );
       }
-      expect(find.byType(AppNavigationBar), findsNothing);
+      expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(
-        find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
-        findsNothing,
+        appNavigationDestinations(skipOffstage: false).hitTestable(),
+        findsExactly(3),
       );
       expect(
         find.semantics.byPredicate((node) => node.role == SemanticsRole.tab),
-        findsNothing,
+        findsExactly(3),
       );
       expect(
         find.byType(IntentionEditorPage, skipOffstage: false),
@@ -797,6 +809,7 @@ final class _App {
 
     late sqlite.Database raw;
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openInMemoryLocalDatabase(setup: (database) => raw = database),
       diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -829,11 +842,14 @@ final class _App {
     );
   }
 
-  /// Открывает панель создания кнопкой каталога.
+  /// Открывает панель создания через меню и кнопку общей панели.
   Future<void> openPanel(WidgetTester tester) async {
-    await _tap(tester, find.byKey(const ValueKey('catalog-create-intention')));
-    await _until(tester, _sheet);
-    await tester.pumpAndSettle();
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: _sheet,
+      wait: _until,
+    );
     expect(router.current.name, IntentionEditorRoute.name);
   }
 
@@ -1002,4 +1018,26 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
+}
+
+/// Модальная сессия и её задачи не дают добраться до основной навигации
+/// нажатием, экранным диктором или последовательным обходом фокуса.
+Future<void> _expectProtectedNavigation(WidgetTester tester) async {
+  expect(
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
+  expect(
+    find.semantics.byPredicate((node) => node.role == SemanticsRole.tab),
+    findsNothing,
+  );
+  for (var step = 0; step < 12; step++) {
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    expect(
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<AppNavigationBar>(),
+      isNull,
+    );
+  }
 }

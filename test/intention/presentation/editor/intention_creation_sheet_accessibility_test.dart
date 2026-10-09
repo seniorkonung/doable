@@ -1,5 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -27,7 +28,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Доступность полного сценария нижней панели создания намерения: экранный
 /// диктор, клавиатура и guidelines Android на русском и английском.
@@ -54,8 +57,11 @@ void main() {
         final l10n = await AppLocalizations.delegate.load(locale);
         final sessions = _EditorSessions();
         await _openCatalog(tester, _repositoryWithTags(), sessions, locale);
-        await tester.tap(find.byKey(_catalogCreate));
-        await tester.pumpAndSettle();
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+        );
         final session = sessions.single;
         expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
         final fields = find.byKey(
@@ -114,8 +120,11 @@ void main() {
         final l10n = await AppLocalizations.delegate.load(locale);
         final sessions = _EditorSessions();
         await _openCatalog(tester, _repositoryWithTags(), sessions, locale);
-        await tester.tap(find.byKey(_catalogCreate));
-        await tester.pumpAndSettle();
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+        );
 
         for (final tags in [
           <Tag>[],
@@ -154,22 +163,31 @@ void main() {
         final repository = _repositoryWithTags();
         final router = await _openCatalog(tester, repository, sessions, locale);
 
-        // «+» без видимой надписи объясняет действие подсказкой.
-        final create = find.byKey(_catalogCreate);
+        // Общая кнопка без видимой надписи объясняет действие и текущий режим.
+        final create = quickCreationAction();
         expect(
           find.descendant(of: create, matching: find.byType(Text)),
           findsNothing,
         );
+        final createSemantics = tester.getSemantics(create);
         expect(
-          tester.getSemantics(create),
-          isSemantics(
-            tooltip: l10n.editorCreateAction,
-            isButton: true,
-            hasTapAction: true,
-          ),
+          createSemantics.label,
+          '${l10n.quickCreationLabel}, ${l10n.quickCreationModeIntention}',
         );
-        tester.semantics.tap(_nodeOf(tester, create));
-        await tester.pumpAndSettle();
+        expect(createSemantics.hint, l10n.quickCreationLongPressHint);
+        expect(createSemantics.flagsCollection.isButton, isTrue);
+        expect(
+          createSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+          activate: (tester, button) async {
+            tester.semantics.tap(_nodeOf(tester, button));
+          },
+        );
 
         // Панель называет себя заголовком, фокус ввода — в названии, а
         // каталог и основная навигация под ней экранному диктору недоступны.
@@ -329,8 +347,11 @@ void main() {
         final sessions = _EditorSessions();
         final repository = _repositoryWithTags();
         final router = await _openCatalog(tester, repository, sessions, locale);
-        await tester.tap(find.byKey(_catalogCreate));
-        await tester.pumpAndSettle();
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+        );
         await tester.enterText(find.byKey(_title), '   ');
         await tester.enterText(find.byKey(_description), _userDescription);
         sessions.notifier(tester)
@@ -536,7 +557,10 @@ void main() {
         );
         expect(
           _traversal(tester),
-          containsAll([l10n.editorCreateAction, l10n.catalogFilterLabel]),
+          containsAll([
+            '${l10n.quickCreationLabel}, ${l10n.quickCreationModeIntention}',
+            l10n.catalogFilterLabel,
+          ]),
         );
         expect(tester.takeException(), isNull);
         semantics.dispose();
@@ -551,9 +575,15 @@ void main() {
         final repository = _repositoryWithTags();
         final router = await _openCatalog(tester, repository, sessions, locale);
 
-        await _tabTo(tester, find.byKey(_catalogCreate));
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pumpAndSettle();
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+          activate: (tester, button) async {
+            await _tabTo(tester, button);
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          },
+        );
         expect(router.current.name, IntentionEditorRoute.name);
         expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
         await tester.enterText(find.byKey(_title), _userTitle);
@@ -722,8 +752,11 @@ void main() {
           final sessions = _EditorSessions();
           final repository = _repositoryWithTags();
           await _openCatalog(tester, repository, sessions, locale);
-          await tester.tap(find.byKey(_catalogCreate));
-          await tester.pumpAndSettle();
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
+          );
           await _expectGuidelines(tester, 'пустая панель');
 
           await tester.enterText(find.byKey(_title), _userTitle);
@@ -796,7 +829,6 @@ void main() {
   }
 }
 
-const _catalogCreate = ValueKey('catalog-create-intention');
 const _heading = ValueKey('intention-editor-heading');
 const _title = ValueKey('intention-editor-title');
 const _description = ValueKey('intention-editor-description');
@@ -1163,6 +1195,7 @@ Future<AppRouter> _openCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       observers: [sessions],

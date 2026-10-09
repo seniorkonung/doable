@@ -33,6 +33,8 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart'
 import '../../../support/app_root_pages.dart';
 import 'participant_picker_test_support.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 void main() {
   _defineTagSearchTests();
 
@@ -764,6 +766,7 @@ Future<AppRouter> _pumpAppWithCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         catalogPagingPolicyProvider.overrideWithValue(
           CatalogPagingPolicy(
@@ -1579,11 +1582,13 @@ const _emptyByConditions = 'No intentions match the tag conditions.';
 const _excludedIndex = 9;
 
 final _activeRelation = SelectRelationParticipant(
+  session: IntentionSearchSession(),
   excludedIntentionId: _testIntentionId(_excludedIndex),
   selectionContext: RelationParticipantSelectionContext.activeRelation,
 );
 
 final _archivedRelation = SelectRelationParticipant(
+  session: IntentionSearchSession(),
   excludedIntentionId: _testIntentionId(_excludedIndex),
   selectionContext: RelationParticipantSelectionContext.archivedRelation,
 );
@@ -1649,7 +1654,15 @@ Future<void> _applyConditions(
   final expectedQueries = repository.queries.length + conditions.length;
   for (final (tag, requirement) in conditions) {
     container
-        .read(intentionTagConditionsViewModelProvider(purpose).notifier)
+        .read(
+          intentionTagConditionsViewModelProvider(
+            tester
+                .widget<IntentionTagConditionsSection>(
+                  find.byType(IntentionTagConditionsSection),
+                )
+                .purpose,
+          ).notifier,
+        )
         .applySelection(
           IntentionTagConditionSelection(
             tag: tag,

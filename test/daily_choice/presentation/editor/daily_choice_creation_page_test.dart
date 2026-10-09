@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -9,6 +11,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -28,6 +31,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -36,8 +40,60 @@ void main() {
     );
   });
 
+  for (final succeeds in [true, false]) {
+    for (final disposed in [true, false]) {
+      testWidgets(
+        'сессия хранит отправку и поздний ${succeeds ? 'успех' : 'отказ'} ${disposed ? 'после освобождения' : 'во время закрытия'} подтверждения',
+        (tester) async {
+          final repository = _Repository();
+          final navigatorKey = GlobalKey<NavigatorState>();
+          await _pump(tester, repository, navigatorKey: navigatorKey);
+          final page = tester.widget<DailyChoiceCreationPage>(
+            find.byType(DailyChoiceCreationPage),
+          );
+          final session = page.session;
+          final form = tester.state(find.byType(DailyChoiceCreationPage));
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('daily-choice-submit')),
+          );
+          await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+          expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
+          navigatorKey.currentState!.pop();
+          if (disposed) {
+            await tester.pumpAndSettle();
+          } else {
+            await tester.pump();
+          }
+          expect(form.mounted, !disposed);
+          expect(session.canContinue, isFalse);
+
+          if (succeeds) {
+            repository.succeed(0);
+          } else {
+            repository.fail(0, const DailyChoiceUnavailableFailure());
+          }
+          await tester.pumpAndSettle();
+          expect(
+            session.state,
+            succeeds
+                ? isA<DailyChoiceCreationFlowSaved>()
+                : isA<DailyChoiceCreationFlowEditing>(),
+          );
+          expect(repository.commands, hasLength(1));
+          expect(find.text('Домашний экран'), findsOneWidget);
+          final message = find.byKey(const ValueKey('graph-operation-message'));
+          expect(message, findsOneWidget);
+          await tester.pump(const Duration(seconds: 8));
+          await tester.pumpAndSettle();
+          expect(message, findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets(
-    'успех предъявляется после результата команды, затем форма закрывается',
+    'успех предъявляется после результата команды, затем открывается созданный выбор',
     (tester) async {
       final repository = _Repository();
       final navigatorKey = GlobalKey<NavigatorState>();
@@ -53,7 +109,7 @@ void main() {
       repository.succeed(0);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('daily-choice-date')), findsNothing);
-      expect(find.text('Домашний экран'), findsOneWidget);
+      expect(find.text('Подробный просмотр выбора'), findsOneWidget);
       expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
     },
   );
@@ -222,7 +278,7 @@ void main() {
         );
         repository.succeed(1);
         await tester.pumpAndSettle();
-        expect(find.text('Домашний экран'), findsOneWidget);
+        expect(find.text('Подробный просмотр выбора'), findsOneWidget);
         expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
       },
     );
@@ -628,27 +684,37 @@ Future<void> _pump(
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   double textScale = 1,
 }) async {
-  final page = DailyChoiceCreationPage(
-    path: ConfirmedChoicePath([
-      ConfirmedChoicePathStep(
-        relationId: _relation(1),
-        sourceIntentionId: _intention(1),
-        relatedIntentionId: _intention(2),
-        type: LongTermRelationType.need,
+  final router = RootStackRouter.build(
+    navigatorKey: navigatorKey,
+    routes: [
+      NamedRouteDef(
+        name: 'HomeRoute',
+        initial: true,
+        builder: (_, _) => const Scaffold(body: Text('Домашний экран')),
       ),
-    ]),
-    steps: [DailyChoiceCreationStep.fromSummary(_step())],
-    initialDate: CalendarDate.fromParts(2026, 9, 24),
-    direction: direction,
+      NamedRouteDef(
+        name: ChoicePathRoute.name,
+        builder: (_, _) => const Scaffold(body: Text('Домашний экран')),
+      ),
+      AutoRoute(page: DailyChoiceCreationRoute.page),
+      NamedRouteDef(
+        name: DailyChoiceDetailsRoute.name,
+        builder: (_, _) =>
+            const Scaffold(body: Text('Подробный просмотр выбора')),
+      ),
+    ],
   );
+  addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        navigatorObservers: [?navigatorObserver],
+      child: MaterialApp.router(
+        routerConfig: router.config(
+          navigatorObservers: () => [?navigatorObserver],
+        ),
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -657,18 +723,40 @@ Future<void> _pump(
               .copyWith(textScaler: TextScaler.linear(textScale)),
           child: GraphOperationPresenter(child: child!),
         ),
-        home: navigatorKey == null
-            ? page
-            : const Scaffold(body: Text('Домашний экран')),
       ),
     ),
   );
-  if (navigatorKey != null) {
-    navigatorKey.currentState!.push(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
-    await tester.pumpAndSettle();
-  }
+  await tester.pumpAndSettle();
+  final history = router.stackData.map((route) => route.matchId).toList();
+  unawaited(
+    router.push(
+      ChoicePathRoute(sourceIntentionId: _intention(1), direction: direction),
+    ),
+  );
+  await tester.pumpAndSettle();
+  final session = DailyChoiceCreationFlowSession(
+    rootMatchId: router.stackData.last.matchId,
+    originalHistory: history,
+  );
+  unawaited(
+    router.push(
+      DailyChoiceCreationRoute(
+        session: session,
+        path: ConfirmedChoicePath([
+          ConfirmedChoicePathStep(
+            relationId: _relation(1),
+            sourceIntentionId: _intention(1),
+            relatedIntentionId: _intention(2),
+            type: LongTermRelationType.need,
+          ),
+        ]),
+        steps: [DailyChoiceCreationStep.fromSummary(_step())],
+        initialDate: CalendarDate.fromParts(2026, 9, 24),
+        direction: direction,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 final class _Repository

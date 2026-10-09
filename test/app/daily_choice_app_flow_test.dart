@@ -1,10 +1,13 @@
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -26,6 +29,8 @@ import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 /// Дата дневных выборов, которые сценарии создают через форму. Она же —
 /// локальное сегодня каталога: каталог открывается на дне этих записей.
@@ -88,7 +93,7 @@ Future<void> _createFromPath(WidgetTester tester) async {
   );
   await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
   await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-  await _until(tester, find.byKey(const ValueKey('choice-path-select-action')));
+  await _until(tester, find.byType(DailyChoiceDetailsPage));
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
@@ -149,6 +154,7 @@ void main() {
     // Каталог открывается на дне дневного выбора фикстуры и его повтора.
     final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () =>
           openFileBackedLocalDatabase(harness.databaseFile),
       diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -251,6 +257,7 @@ void main() {
       await seedDurabilityGraph(seeded);
       await harness.closePersistenceObjectGraph();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -359,10 +366,7 @@ void main() {
       );
       expect(_savedIds(harness), isEmpty);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-action')),
-      );
+      await _until(tester, find.byType(DailyChoiceDetailsPage));
       final saved = await _read(repository, _savedIds(harness).single);
       expect(saved.choice.date, CalendarDate.fromParts(2028, 2, 3));
       expect(saved.choice.description?.value, '  Подтверждённый текст  ');
@@ -389,6 +393,7 @@ void main() {
       // Каждый запуск открывает каталог на дне создаваемых записей.
       final localDate = ControlledDailyChoiceLocalDate(_formChoiceDate);
       AppRuntime start() => AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -419,6 +424,20 @@ void main() {
       );
       await _createFromPath(tester);
       final firstId = _savedIds(harness).single;
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('intention-details-choose-path')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+      );
       await _createFromPath(tester);
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));
@@ -597,6 +616,7 @@ void main() {
       // Каждый запуск открывает каталог на дне создаваемых записей.
       final localDate = ControlledDailyChoiceLocalDate(_formChoiceDate);
       AppRuntime start() => AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -611,21 +631,26 @@ void main() {
 
       await tester.pumpWidget(MainApp(runtime: runtime));
       await openDailyChoices(tester, tap: _tap);
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
-      );
-      await _tap(tester, find.text('Намерение 3'));
-      await _tap(
-        tester,
-        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
-      );
-      await _tap(
-        tester,
-        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
-      );
-
       for (var index = 0; index < 2; index++) {
+        if (index > 0) {
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.dailyChoiceFromAction,
+          openedPage: find.byType(DailyChoiceActionPickerPage),
+          wait: _until,
+        );
+        await _tap(tester, find.text('Намерение 3'));
+        await _tap(
+          tester,
+          find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+        );
+        await _tap(
+          tester,
+          find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+        );
         await _tap(
           tester,
           find.byKey(const ValueKey('choice-path-select-source')),
@@ -646,10 +671,8 @@ void main() {
           find.byKey(const ValueKey('daily-choice-completed')),
         );
         await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-        await _until(
-          tester,
-          find.byKey(const ValueKey('choice-path-select-source')),
-        );
+        await _until(tester, find.byType(DailyChoiceDetailsPage));
+        await tester.pumpAndSettle();
       }
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));

@@ -1,21 +1,32 @@
+import 'dart:async';
 import 'dart:ui' show Tristate;
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Узкий экран телефона: увеличенный текст занимает его целиком.
 const _screen = Size(360, 780);
@@ -37,9 +48,83 @@ final _names = {
 };
 
 void main() {
-  for (final MapEntry(key: locale, value: names) in _names.entries) {
+  for (final locale in [..._names.keys, const Locale('de', 'DE')]) {
+    final names = _names[locale] ?? _names[const Locale('en')]!;
     final code = locale.languageCode;
     final otherLocale = _names.keys.firstWhere((other) => other != locale);
+
+    testWidgets('обычные страницы сохраняют доступные названия, выбранный '
+        'пункт, подсказки и целые значки при тексте 2.5: $code', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      tester.view.physicalSize = _screen;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.textScaleFactorTestValue = _textScale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final router = await _start(tester, locale);
+
+      for (final selected in AppDestination.values) {
+        await tester.tap(appNavigationDestination(selected));
+        await tester.pumpAndSettle();
+        for (final route in <PageRouteInfo>[
+          IntentionDetailsRoute(
+            intentionId: (IntentionId.decode(
+              tagFixtureId(1),
+            ) as IntentionIdDecodingSuccess).id,
+          ),
+          RelationDetailsRoute(
+            relationId: (LongTermRelationId.decode(
+              tagFixtureId(101),
+            ) as LongTermRelationIdDecodingSuccess).id,
+          ),
+          DailyChoiceDetailsRoute(
+            choiceId: (DailyChoiceId.decode(
+              tagFixtureId(201),
+            ) as DailyChoiceIdDecodingSuccess).id,
+          ),
+          TagNavigationRoute(
+            tagId: (TagId.decode(
+              tagFixtureId(firstTagNumber),
+            ) as TagIdDecodingSuccess).id,
+          ),
+          TagCatalogRoute(),
+        ]) {
+          unawaited(router.push<void>(route));
+          await tester.pumpAndSettle();
+
+          _expectAnnounced(
+            tester,
+            names,
+            selected: selected,
+            rootHeaderVisible: false,
+          );
+          _expectWholeIcons(tester, selected: selected);
+          for (final name in names.values) {
+            expect(find.byTooltip(name), findsOneWidget);
+          }
+          final appBar = find.byType(AppBar);
+          final title = tester.widget<AppBar>(appBar).title!;
+          final rect = tester.getRect(find.byWidget(title));
+          expect(rect.top, greaterThanOrEqualTo(tester.getRect(appBar).top));
+          expect(rect.bottom, lessThanOrEqualTo(tester.getRect(appBar).bottom));
+          expect(
+            tester.getSemantics(find.byWidget(title)).flagsCollection.isHeader,
+            isTrue,
+          );
+          expect(tester.takeException(), isNull);
+        }
+        // Доступное действие пункта закрывает всю историю до его корня.
+        tester.semantics.tap(
+          find.semantics.byLabel(_destinationLabel(tester, names, selected)),
+        );
+        await tester.pumpAndSettle();
+        _expectAnnounced(tester, names, selected: selected);
+        expect(router.stack, hasLength(1));
+      }
+      semantics.dispose();
+    });
 
     testWidgets('экранный диктор получает название, роль пункта навигации, '
         'положение среди трёх пунктов и признак выбранного пункта на каждой '
@@ -150,11 +235,12 @@ void main() {
 
 /// Запускает приложение на хранилище в памяти, ждёт Главную и засевает граф
 /// намерениями, связями, тегами и дневным выбором.
-Future<void> _start(WidgetTester tester, Locale locale) async {
+Future<AppRouter> _start(WidgetTester tester, Locale locale) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -165,31 +251,33 @@ Future<void> _start(WidgetTester tester, Locale locale) async {
   });
   await tester.pumpWidget(MainApp(runtime: runtime));
   await tester.pumpAndSettle();
-  await runtime.bootstrap();
+  final ready = await runtime.bootstrap() as AppRuntimeReady;
   // Каталоги строятся при первом выборе пункта и читают уже засеянный граф.
   seedTagStorageFixture(raw);
   expect(find.byType(HomePage), findsOneWidget);
+  return ready.container.read(appRouterProvider);
 }
 
 final _bar = find.byType(AppNavigationBar);
 
-/// Пункт панели на своём месте слева направо.
-Finder _destination(AppDestination destination) => find.descendant(
-  of: _bar,
-  matching: find.byType(NavigationDestination).at(destination.index),
-);
-
 /// Значок пункта: залитый у выбранного, контурный у остальных.
 Finder _icon(AppDestination destination, {required bool isSelected}) =>
     find.descendant(
-      of: _bar,
+      of: appNavigationDestination(destination),
       matching: find.byIcon(
         isSelected ? destination.selectedIcon : destination.icon,
       ),
     );
 
 AppDestination _selected(WidgetTester tester) =>
-    tester.widget<AppNavigationBar>(_bar).selected;
+    AppDestination.values.singleWhere(
+      (destination) =>
+          tester
+              .getSemantics(appNavigationDestination(destination))
+              .flagsCollection
+              .isSelected ==
+          Tristate.isTrue,
+    );
 
 /// Корневая страница пункта.
 Type _rootPage(AppDestination destination) => switch (destination) {
@@ -218,14 +306,15 @@ String _destinationLabel(
 
 /// Экранный диктор проходит три пункта по порядку с названием, ролью,
 /// положением и признаком выбранного, а из корневых страниц слышит заголовок
-/// только открытой. Подписи пунктов в дереве остаются, но не рисуются.
+/// только открытой. Текстовые подписи в панели не рисуются.
 void _expectAnnounced(
   WidgetTester tester,
   Map<AppDestination, String> names, {
   required AppDestination selected,
+  bool rootHeaderVisible = true,
 }) {
   for (final destination in AppDestination.values) {
-    final node = tester.getSemantics(_destination(destination));
+    final node = tester.getSemantics(appNavigationDestination(destination));
     expect(node.label, _destinationLabel(tester, names, destination));
     expect(node.role, SemanticsRole.tab);
     expect(node.parent?.role, SemanticsRole.tabBar);
@@ -249,27 +338,30 @@ void _expectAnnounced(
         _destinationLabel(tester, names, destination),
     ],
   );
-  expect(
-    [
-      for (final node in traversal)
-        if (node.flagsCollection.isHeader && names.containsValue(node.label))
-          node.label,
-    ],
-    [names[selected]],
-  );
+  expect([
+    for (final node in traversal)
+      if (node.flagsCollection.isHeader && names.containsValue(node.label))
+        node.label,
+  ], rootHeaderVisible ? [names[selected]] : <String>[]);
 
-  for (final label in tester.widgetList<Text>(
+  expect(appNavigationDestinations(), findsExactly(3));
+  final panel = tester.renderObject(_bar);
+  for (final label in tester.renderObjectList<RenderParagraph>(
     find.descendant(of: _bar, matching: find.byType(Text)),
   )) {
-    final fade = tester.widget<FadeTransition>(
-      find
-          .ancestor(
-            of: find.byWidget(label),
-            matching: find.byType(FadeTransition),
-          )
-          .first,
-    );
-    expect(fade.opacity.value, 0, reason: label.data);
+    // Подписи могут отсутствовать либо быть скрыты любым способом отрисовки,
+    // без привязки к FadeTransition стандартной панели Material.
+    RenderObject child = label;
+    var painted = true;
+    while (child != panel) {
+      final parent = child.parent!;
+      if (!parent.paintsChild(child)) {
+        painted = false;
+        break;
+      }
+      child = parent;
+    }
+    expect(painted, isFalse, reason: label.text.toPlainText());
   }
 }
 
@@ -282,7 +374,9 @@ void _expectWholeIcons(
   final screen = Offset.zero & _screen;
   final bar = tester.getRect(_bar);
   for (final destination in AppDestination.values) {
-    final target = tester.getRect(_destination(destination));
+    final entry = appNavigationDestination(destination);
+    expect(entry.hitTestable(), findsOneWidget);
+    final target = tester.getRect(entry);
     final icon = tester.getRect(
       _icon(destination, isSelected: destination == selected),
     );
@@ -333,7 +427,10 @@ void _expectVisibleTitle(
 
 /// Значки панели слева направо вместе с их положением.
 List<(IconData?, Rect)> _barLayout(WidgetTester tester) {
-  final icons = find.descendant(of: _bar, matching: find.byType(Icon));
+  final icons = find.descendant(
+    of: appNavigationDestinations(),
+    matching: find.byType(Icon),
+  );
   return [
     for (final element in icons.evaluate())
       (

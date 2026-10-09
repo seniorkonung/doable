@@ -30,6 +30,8 @@ import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'daily_choice_calendar_test_support.dart';
 
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+
 // Обозначение сегодняшнего дня в каталоге следует за местными часами, которые
 // идут вместе с поддельным временем теста: полночь, сутки перевода часов и дни
 // в фоне проверяются без настоящего ожидания.
@@ -417,6 +419,7 @@ Future<AppRouter> _pumpApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         clock.override,
       ],

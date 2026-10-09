@@ -50,6 +50,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/favorite_read_contract_test_fallback.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
@@ -61,6 +62,7 @@ void main() {
         final repository = _ControlledPersonalGraphRepository();
         var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: openInMemoryLocalDatabase,
           diagnosticsSink: InMemoryDiagnosticsSink(),
           repositoryFactory: (_) {
@@ -96,6 +98,7 @@ void main() {
 
     test('по умолчанию предоставляет каталогу часы устройства', () async {
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: openInMemoryLocalDatabase,
         diagnosticsSink: InMemoryDiagnosticsSink(),
         repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
@@ -117,6 +120,7 @@ void main() {
           CalendarDate.fromParts(2026, 10, 5),
         );
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: openInMemoryLocalDatabase,
           diagnosticsSink: InMemoryDiagnosticsSink(),
           repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
@@ -142,6 +146,7 @@ void main() {
     test('повторяет bootstrap только после retryable outcome', () async {
       var connectionAttempts = 0;
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () {
           connectionAttempts += 1;
           if (connectionAttempts == 1) {
@@ -209,6 +214,7 @@ void main() {
       for (final scenario in scenarios) {
         var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: scenario.connectionFactory,
           diagnosticsSink: InMemoryDiagnosticsSink(),
           repositoryFactory: (_) {
@@ -227,6 +233,7 @@ void main() {
     test('закрывает готовую базу при отказе создания provider graph', () async {
       final closeObserver = _CloseTrackingObserver();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openInMemoryLocalDatabase(),
           closeObserver,
@@ -248,6 +255,7 @@ void main() {
       final repository = _ControlledPersonalGraphRepository();
       final closeObserver = _CloseTrackingObserver();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openInMemoryLocalDatabase(),
           closeObserver,
@@ -293,6 +301,7 @@ void main() {
         final repository = _ControlledPersonalGraphRepository();
         final closeObserver = _CloseTrackingObserver();
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
             openInMemoryLocalDatabase(),
             closeObserver,
@@ -350,6 +359,7 @@ void main() {
         final repository = _ControlledPersonalGraphRepository();
         final closeObserver = _CloseTrackingObserver();
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
             openInMemoryLocalDatabase(),
             closeObserver,
@@ -411,6 +421,7 @@ void main() {
       final repository = _ControlledPersonalGraphRepository();
       final closeObserver = _CloseTrackingObserver();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openInMemoryLocalDatabase(),
           closeObserver,
@@ -450,6 +461,7 @@ void main() {
       final repository = _ControlledPersonalGraphRepository();
       final closeObserver = _CloseTrackingObserver();
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openInMemoryLocalDatabase(),
           closeObserver,
@@ -487,6 +499,7 @@ void main() {
         final repository = _ControlledPersonalGraphRepository();
         final closeObserver = _CloseTrackingObserver();
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
             openInMemoryLocalDatabase(),
             closeObserver,
@@ -534,6 +547,7 @@ void main() {
         );
         var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
             openInMemoryLocalDatabase(),
             lifecycleObserver,

@@ -1,10 +1,10 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
@@ -14,6 +14,9 @@ import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
+import '../daily_choice_creation_flow_session.dart';
+import '../daily_choice_creation_exit_action.dart';
+import '../daily_choice_creation_completion.dart';
 import '../daily_choice_command_failure_message.dart';
 import '../path/choice_path_page.dart';
 import '../path/choice_path_view_model.dart';
@@ -48,8 +51,10 @@ final class DailyChoiceCreationStep {
 }
 
 /// Подтверждение одного видимого пути. Экран не меняет граф до нажатия кнопки.
+@RoutePage()
 final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
   const DailyChoiceCreationPage({
+    required this.session,
     required this.path,
     required this.steps,
     required this.initialDate,
@@ -57,6 +62,7 @@ final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
     super.key,
   }) : assert(steps.length > 0);
 
+  final DailyChoiceCreationFlowSession session;
   final ConfirmedChoicePath path;
   final List<DailyChoiceCreationStep> steps;
   final CalendarDate initialDate;
@@ -64,12 +70,15 @@ final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<DailyChoiceCreationPage> createState() =>
-      _DailyChoiceCreationPageState();
+      DailyChoiceCreationPageState();
 }
 
-final class _DailyChoiceCreationPageState
+final class DailyChoiceCreationPageState
     extends ConsumerState<DailyChoiceCreationPage> {
-  final _formKey = DailyChoiceCreationFormKey();
+  /// Идентичность этого подтверждения в корневом стеке, отдельно от корня.
+  /// https://pub.dev/documentation/auto_route/11.1.0/auto_route/RouteData/matchId.html
+  LocalKey get routeMatchId => context.routeData.matchId;
+
   final _dateController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _scrollController = ScrollController();
@@ -82,10 +91,32 @@ final class _DailyChoiceCreationPageState
     super.initState();
     _dateController.text = widget.initialDate.toCanonicalString();
     _visibleSteps = widget.steps;
+    widget.session.changes.addListener(_creationChanged);
+  }
+
+  void _creationChanged() {
+    // Удалённое подтверждение может ещё анимироваться, когда dispose корня
+    // завершает сессию внутри заблокированного дерева. Отложен только UI.
+    scheduleMicrotask(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void deactivate() {
+    widget.session.changes.removeListener(_creationChanged);
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    widget.session.changes.addListener(_creationChanged);
   }
 
   @override
   void dispose() {
+    widget.session.changes.removeListener(_creationChanged);
     _dateController.dispose();
     _descriptionController.dispose();
     _scrollController.dispose();
@@ -93,6 +124,7 @@ final class _DailyChoiceCreationPageState
   }
 
   void _changeDate(String text, DailyChoiceCreationViewModel model) {
+    if (!mounted || !widget.session.canContinue) return;
     try {
       model.changeDate(CalendarDate.parseCanonical(text));
       if (_dateInvalid) setState(() => _dateInvalid = false);
@@ -102,6 +134,7 @@ final class _DailyChoiceCreationPageState
   }
 
   void _submit(DailyChoiceCreationViewModel model) {
+    if (!mounted || !widget.session.canContinue) return;
     try {
       model.changeDate(CalendarDate.parseCanonical(_dateController.text));
       setState(() => _dateInvalid = false);
@@ -113,6 +146,7 @@ final class _DailyChoiceCreationPageState
   }
 
   Future<void> _refreshPath(DailyChoiceCreationViewModel model) async {
+    if (!mounted || !widget.session.canContinue) return;
     final generation = ++_pathRefreshGeneration;
     final startingId = switch (widget.direction) {
       ChoicePathDraftDirection.topDown =>
@@ -131,7 +165,10 @@ final class _DailyChoiceCreationPageState
         ),
       ),
     );
-    if (!mounted || generation != _pathRefreshGeneration || selection == null) {
+    if (!mounted ||
+        !widget.session.canContinue ||
+        generation != _pathRefreshGeneration ||
+        selection == null) {
       return;
     }
     if (!model.confirmRefreshedPath(selection.path)) return;
@@ -155,19 +192,25 @@ final class _DailyChoiceCreationPageState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final provider = dailyChoiceCreationViewModelProvider(
-      _formKey,
+      widget.session,
       widget.path,
       widget.initialDate,
     );
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
+    final canEdit = widget.session.canContinue;
     ref.listen(provider, (previous, next) {
-      if (next.event case DailyChoiceCreationCreated()) {
+      if (next.event case DailyChoiceCreationCreated(:final choiceId)) {
         model.consumeEvent();
-        // Успех после commit предъявляет общая оболочка, включая уход с экрана.
-        if (Navigator.of(context).canPop()) {
-          unawaited(Navigator.of(context).maybePop());
-        }
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+        unawaited(
+          completeDailyChoiceCreation(
+            router: context.router.root,
+            session: widget.session,
+            confirmationMatchId: routeMatchId,
+            choiceId: choiceId,
+          ),
+        );
       } else if (next.operation is DailyChoiceCreationFailed &&
           previous?.operation != next.operation) {
         _revealFailure();
@@ -211,6 +254,7 @@ final class _DailyChoiceCreationPageState
             const SizedBox(height: 24),
             TextField(
               key: const ValueKey('daily-choice-date'),
+              enabled: canEdit,
               controller: _dateController,
               keyboardType: TextInputType.datetime,
               decoration: InputDecoration(
@@ -227,9 +271,7 @@ final class _DailyChoiceCreationPageState
             TextField(
               key: const ValueKey('daily-choice-description'),
               controller: _descriptionController,
-              enabled:
-                  state.operation is! DailyChoiceCreationSubmitting &&
-                  state.operation is! DailyChoiceCreationSucceeded,
+              enabled: canEdit,
               minLines: 3,
               maxLines: 6,
               keyboardType: TextInputType.multiline,
@@ -246,11 +288,7 @@ final class _DailyChoiceCreationPageState
               title: Text(l10n.dailyChoiceCreationCompleted),
               subtitle: Text(l10n.dailyChoiceCreationCompletedHint),
               value: state.isCompleted,
-              onChanged:
-                  state.operation is DailyChoiceCreationSubmitting ||
-                      state.operation is DailyChoiceCreationSucceeded
-                  ? null
-                  : model.changeCompletion,
+              onChanged: canEdit ? model.changeCompletion : null,
             ),
             if (failureMessage != null) ...[
               const SizedBox(height: 12),
@@ -259,7 +297,7 @@ final class _DailyChoiceCreationPageState
                 message: failureMessage,
                 messageKey: const ValueKey('daily-choice-failure'),
               ),
-              if (state.needsPathRefresh)
+              if (canEdit && state.needsPathRefresh)
                 TextButton(
                   onPressed: () => unawaited(_refreshPath(model)),
                   child: Text(l10n.dailyChoiceCreationRefreshPath),
@@ -268,7 +306,9 @@ final class _DailyChoiceCreationPageState
             const SizedBox(height: 24),
             FilledButton(
               key: const ValueKey('daily-choice-submit'),
-              onPressed: state.canSubmit ? () => _submit(model) : null,
+              onPressed: canEdit && state.canSubmit
+                  ? () => _submit(model)
+                  : null,
               child: Text(switch (state.operation) {
                 DailyChoiceCreationSubmitting() =>
                   l10n.dailyChoiceCreationSaving,
@@ -278,14 +318,10 @@ final class _DailyChoiceCreationPageState
               }),
             ),
             const SizedBox(height: 8),
-            TextButton(
+            DailyChoiceCreationExitAction(
               key: const ValueKey('daily-choice-cancel'),
-              onPressed:
-                  state.operation is DailyChoiceCreationSubmitting ||
-                      state.operation is DailyChoiceCreationSucceeded
-                  ? null
-                  : () => unawaited(Navigator.of(context).maybePop()),
-              child: Text(l10n.dailyChoiceCreationCancel),
+              session: widget.session,
+              ownerMatchId: routeMatchId,
             ),
           ],
         ),

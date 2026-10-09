@@ -16,17 +16,20 @@ import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Намерения «Намерение 01» … «Намерение 40»: выдача каталога намерений
 /// длиннее экрана. Первое — избранное, исходное намерение дневных выборов.
@@ -187,6 +190,60 @@ void main() {
     expect(app.platform.exits, 0);
     // Страница закрыта: на Главной «назад» снова платформенный выход.
     expect(app.platform.frameworkHandlesBack, isFalse);
+    expect(tester.takeException(), isNull);
+  }, variant: _android);
+
+  testWidgets('«назад» со страницы участника сохраняет черновик формы связи '
+      'и пункт начала истории', (tester) async {
+    final app = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await tester.enterText(_titleFilter, 'Намерение 01');
+    await _open(
+      tester,
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is IntentionSummaryView && widget.title == 'Намерение 01',
+      ),
+      IntentionDetailsPage,
+    );
+    await _open(
+      tester,
+      find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+      RelationEditorPage,
+    );
+    const draft = 'Сохранить пояснение после просмотра участника';
+    final description = find.byKey(
+      const ValueKey('relation-editor-description'),
+    );
+    await tester.enterText(description, draft);
+    await _open(
+      tester,
+      find.byKey(const ValueKey('relation-editor-open-source-details')),
+      IntentionDetailsPage,
+    );
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.intentionGraph,
+    );
+
+    await _back(tester);
+
+    expect(find.byType(RelationEditorPage), findsOneWidget);
+    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(tester.widget<TextField>(description).controller!.text, draft);
+    expect(
+      find.byKey(const ValueKey('relation-editor-participant-title-source')),
+      findsOneWidget,
+    );
+    expect(app.platform.exits, 0);
+    await _back(tester);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.intentionGraph,
+    );
+    await _back(tester);
+    _expectRootPage(tester, app.router, AppDestination.intentionGraph);
     expect(tester.takeException(), isNull);
   }, variant: _android);
 
@@ -368,6 +425,7 @@ Future<_App> _start(WidgetTester tester) async {
   );
   late sqlite.Database raw;
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -488,12 +546,7 @@ Future<void> _back(WidgetTester tester) async {
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byType(NavigationDestination).at(destination.index),
-    ),
-  );
+  await tester.tap(appNavigationDestination(destination));
   await _until(tester, find.byType(_rootPages[destination]!));
   await tester.pumpAndSettle();
 }

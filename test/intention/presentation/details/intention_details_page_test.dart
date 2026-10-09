@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -29,7 +31,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
+
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -169,6 +174,7 @@ void main() {
 
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);
+      await tester.pumpAndSettle();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -218,6 +224,7 @@ void main() {
         {relation.relation.id},
       );
       expect(repository.relationGroupQueries, hasLength(2));
+      _expectNavigation(tester);
     },
   );
 
@@ -243,6 +250,7 @@ void main() {
     await waitForDetailRequests(repository, 1);
 
     expect(find.text('Loading intention…'), findsOneWidget);
+    _expectNavigation(tester);
     repository.detailRequests.single.add(ResultSuccess(intention));
     await tester.pump();
 
@@ -250,6 +258,7 @@ void main() {
     expect(find.text('  Описание\nбез преобразования  '), findsOneWidget);
     expect(find.text('Ready for action'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
+    _expectNavigation(tester);
   });
 
   testWidgets('показывает архивное состояние и отсутствие описания', (
@@ -287,6 +296,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         retry: (retryCount, error) => null,
@@ -336,8 +346,10 @@ void main() {
       await waitForDetailRequests(repository, 1);
       repository.detailRequests.single.add(ResultSuccess(intention));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.byKey(const ValueKey('intention-details-delete')),
+        200,
+        scrollable: _detailsScrollable,
       );
       await tester.pumpAndSettle();
 
@@ -467,6 +479,7 @@ void main() {
 
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
+      await tester.pump();
       await tester.tap(archive);
       await tester.pump();
       expect(repository.commands[1], isA<ArchiveIntention>());
@@ -539,6 +552,7 @@ void main() {
         await tester.pumpAndSettle();
         final archive = find.byKey(const ValueKey('intention-details-archive'));
         await tester.ensureVisible(archive);
+        await tester.pump();
         await tester.tap(archive);
         await tester.pump();
 
@@ -630,6 +644,7 @@ void main() {
 
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
+      await tester.pump();
       await tester.tap(archive);
       await tester.pump();
       counts = archivedCounts;
@@ -706,6 +721,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWithValue(repository),
           ],
           retry: (retryCount, error) => null,
@@ -776,6 +792,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Intention not found.'), findsOneWidget);
+    _expectNavigation(tester);
     expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
   });
 
@@ -804,6 +821,7 @@ void main() {
       await tester.pump();
 
       expect(find.text(message), findsOneWidget);
+      _expectNavigation(tester);
       expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
@@ -826,6 +844,7 @@ void main() {
       find.text('The intention couldn’t be loaded. Try again.'),
       findsOneWidget,
     );
+    _expectNavigation(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await tester.pump();
     await waitForDetailRequests(repository, 2);
@@ -858,6 +877,7 @@ void main() {
         child: _localizedApp(IntentionDetailsPage(intentionId: intention.id)),
       ),
     );
+    await tester.pump();
     await waitForDetailRequests(repository, 1);
 
     expect(find.text('Saving changes…'), findsOneWidget);
@@ -915,9 +935,7 @@ void main() {
         find.byKey(const ValueKey('intention-details-edit-description')),
         '  Новое описание\n',
       );
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await _tapEditSubmit(tester);
       await tester.pump();
 
       expect(repository.commands, hasLength(1));
@@ -935,7 +953,10 @@ void main() {
               '  Новое описание\n',
             ),
       );
-      expect(find.text('Прежнее название'), findsOneWidget);
+      expect(
+        find.text('Прежнее название', skipOffstage: false),
+        findsOneWidget,
+      );
       expect(find.text('Saving changes…'), findsNWidgets(2));
       expect(
         tester
@@ -1026,9 +1047,7 @@ void main() {
       };
       final entered = 'Исправляемый ввод $index';
       await tester.enterText(find.byKey(key), entered);
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await _tapEditSubmit(tester);
       repository.completeCommand(
         0,
         ResultFailure(
@@ -1080,9 +1099,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
       await tester.pump();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await _tapEditSubmit(tester);
       await tester.pump();
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -1140,6 +1157,7 @@ void main() {
         await tester.pumpAndSettle();
         final archive = find.byKey(const ValueKey('intention-details-archive'));
         await tester.ensureVisible(archive);
+        await tester.pump();
         await tester.tap(archive);
         await tester.pump();
 
@@ -1204,12 +1222,10 @@ void main() {
       find.byKey(const ValueKey('intention-details-edit-title')),
       saved.title,
     );
-    await tester.tap(
-      find.byKey(const ValueKey('intention-details-edit-submit')),
-    );
+    await _tapEditSubmit(tester);
     await tester.pump();
 
-    expect(find.text('До изменения'), findsOneWidget);
+    expect(find.text('До изменения', skipOffstage: false), findsOneWidget);
     expect(find.text('После изменения'), findsOneWidget);
     repository.completeCommand(
       0,
@@ -1220,6 +1236,13 @@ void main() {
     repository.detailRequests[1].add(ResultSuccess(saved));
     await tester.pump();
     await tester.pump();
+    await tester.ensureVisible(
+      find.byKey(
+        const ValueKey('intention-details-title'),
+        skipOffstage: false,
+      ),
+    );
+    await tester.pumpAndSettle();
 
     expect(find.textContaining('Changes saved.'), findsOneWidget);
     expect(
@@ -1284,9 +1307,7 @@ void main() {
         find.byKey(const ValueKey('intention-details-edit-submit')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await _tapEditSubmit(tester);
       await tester.pump();
       expect(find.text('Saving changes…'), findsNWidgets(2));
 
@@ -1332,6 +1353,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         retry: (retryCount, error) => null,
@@ -1408,6 +1430,7 @@ void main() {
 
     final delete = find.byKey(const ValueKey('intention-details-delete'));
     await tester.ensureVisible(delete);
+    await tester.pump();
     await tester.tap(delete);
     await tester.pumpAndSettle();
     await tester.tap(
@@ -1464,6 +1487,7 @@ void main() {
 
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
+      await tester.pump();
       await tester.tap(archive);
       await tester.pump();
       repository.completeCommand(
@@ -1618,6 +1642,7 @@ void main() {
 
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
+      await tester.pump();
       await tester.tap(archive);
       await tester.pump();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -2070,6 +2095,7 @@ void main() {
       // Отказ архивирования остаётся в области действий и убирает полосу.
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
+      await tester.pump();
       await tester.tap(archive);
       await tester.pump();
       expect(repository.commands.last, isA<ArchiveIntention>());
@@ -2330,7 +2356,24 @@ void main() {
   );
 }
 
+Future<void> _tapEditSubmit(WidgetTester tester) async {
+  final submit = find.byKey(const ValueKey('intention-details-edit-submit'));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(submit);
+  await tester.pumpAndSettle();
+  await tester.tap(submit);
+}
+
 const _favoriteMarkKey = ValueKey('intention-details-favorite-mark');
+
+void _expectNavigation(WidgetTester tester) {
+  expect(find.byType(AppNavigationBar), findsOneWidget);
+  expect(
+    tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+    AppDestination.home,
+  );
+}
+
 const _favoriteMarkFailureKey = ValueKey(
   'intention-details-favorite-mark-failure',
 );
@@ -2366,6 +2409,7 @@ Future<void> _pumpDetailsPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,
@@ -2381,16 +2425,15 @@ Future<void> _pumpDetailsPage(
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
     ProviderContainer(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,
     );
 
 Widget _localizedApp(Widget home, {Locale locale = const Locale('en')}) =>
-    MaterialApp(
+    OrdinaryPageTestApp(
       locale: locale,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) =>
           GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
       home: home,

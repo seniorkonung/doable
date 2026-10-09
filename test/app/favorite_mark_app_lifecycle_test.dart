@@ -42,6 +42,7 @@ import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
 
 /// Намерение «Гулять», отметка которого меняется.
 const _walk = 1;
@@ -268,6 +269,7 @@ final class _App {
     final faults = _MarkWriteFaults();
     final diagnostics = InMemoryDiagnosticsSink();
     final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
       connectionFactory: () => observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(setup: (database) => raw = database),
         faults,

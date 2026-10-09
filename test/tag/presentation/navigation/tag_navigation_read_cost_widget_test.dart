@@ -33,6 +33,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   for (final (pairs, repetition) in [(5003, 1), (5003, 2), (15003, 1)]) {
@@ -370,6 +371,7 @@ final class _App {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWithValue(repository),
           tagNavigationReaderProvider.overrideWithValue(measuredReads),
         ],

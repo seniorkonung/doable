@@ -27,6 +27,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/favorite_storage_fixture.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Узкий экран телефона: увеличенный текст занимает его целиком.
 const _screen = Size(360, 780);
@@ -419,7 +420,21 @@ void main() {
         _rowLabel(l10n, _rows[2]),
       ]);
       expect(
-        find.semantics.byAction(SemanticsAction.customAction),
+        find.semantics.byPredicate((node) {
+          final reorderActions = {
+            actions.reorderItemToStart,
+            actions.reorderItemUp,
+            actions.reorderItemDown,
+            actions.reorderItemToEnd,
+          };
+          return (node.getSemanticsData().customSemanticsActionIds ??
+                  const <int>[])
+              .any(
+                (id) => reorderActions.contains(
+                  CustomSemanticsAction.getAction(id)?.label,
+                ),
+              );
+        }),
         findsNothing,
       );
       expect(_announcements(l10n), findsNothing);
@@ -648,6 +663,7 @@ Future<_App> _start(
   late sqlite.Database raw;
   final observer = faults ?? _FavoriteStorageFaults();
   final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openInMemoryLocalDatabase(setup: (database) => raw = database),
       observer,

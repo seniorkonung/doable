@@ -176,7 +176,7 @@ void main() {
         testWidgets('у страницы одна вертикальная прокрутка: жест из '
             'календаря прокручивает страницу, горизонтальный листает неделю, '
             'а фильтры, подгрузка и последняя строка достижимы жестами над '
-            'основным действием и панелью', (tester) async {
+            'панелью без зарезервированного места', (tester) async {
           final repository = CatalogPageRepository();
           await _open(tester, repository, locale, textScale, today: _today);
           repository.completeFirst(
@@ -244,8 +244,9 @@ void main() {
         });
 
         testWidgets('начальные загрузка и отказ, отказ повтора и пустая '
-            'выдача показаны целиком и достижимы жестами над основным '
-            'действием и панелью', (tester) async {
+            'выдача показаны целиком и достижимы жестами над панелью', (
+          tester,
+        ) async {
           final repository = CatalogPageRepository();
           await _open(tester, repository, locale, textScale, today: _today);
           final l10n = _l10n(tester);
@@ -374,10 +375,6 @@ final _pageScroll = find.descendant(
   ),
 );
 
-final _createAction = find.byKey(
-  const ValueKey('daily-choice-create-from-action'),
-);
-
 /// Открывает каталог на узком телефоне с системным размером текста
 /// [textScale]; первое чтение остаётся незавершённым.
 Future<void> _open(
@@ -408,18 +405,15 @@ String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
   );
 }
 
-/// Видимая часть страницы: под шапкой и над основным действием, которое
-/// само стоит над панелью основной навигации.
+/// Видимая часть страницы: под шапкой и над панелью основной навигации.
 Rect _visibleArea(WidgetTester tester) {
   final appBar = tester.getRect(find.byType(AppBar));
-  final action = tester.getRect(_createAction);
   final bar = tester.getRect(find.byType(AppNavigationBar));
-  expect(action.bottom, lessThanOrEqualTo(bar.top));
-  return Rect.fromLTRB(0, appBar.bottom, _screen.width, action.top);
+  expect(find.byType(FloatingActionButton), findsNothing);
+  return Rect.fromLTRB(0, appBar.bottom, _screen.width, bar.top);
 }
 
-/// Элемент [finder] целиком лежит в видимой части страницы, над основным
-/// действием и панелью, и касание его середины достигает его.
+/// Элемент [finder] целиком лежит над панелью, и касание его середины достигает его.
 void _expectReachable(WidgetTester tester, Finder finder) {
   final rect = tester.getRect(finder);
   expect(
@@ -431,13 +425,13 @@ void _expectReachable(WidgetTester tester, Finder finder) {
 }
 
 /// Последний элемент выдачи [finder] на прокрученной до конца странице
-/// заканчивается над основным действием и панелью, и касание его видимой
+/// заканчивается у верхнего края панели, и касание его видимой
 /// части достигает его. При крупном тексте строка выше видимой части
 /// страницы, поэтому целиком она видна только по частям при прокрутке.
 void _expectAtEnd(WidgetTester tester, Finder finder) {
   final area = _visibleArea(tester);
   final rect = tester.getRect(finder);
-  expect(rect.bottom, lessThanOrEqualTo(area.bottom + _epsilon));
+  expect(rect.bottom, moreOrLessEquals(area.bottom, epsilon: _epsilon));
   expect(rect.bottom, greaterThan(area.top));
   _expectHit(tester, finder, rect.intersect(area).center);
 }

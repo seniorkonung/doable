@@ -23,9 +23,10 @@ import '../../../support/catalog_reconciliation_test_fallback.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Открывает каталог дневных выборов в оболочке приложения, как его видит
-/// человек: с панелью основной навигации и кнопкой создания дневного выбора.
+/// человек: с панелью основной навигации и общей кнопкой быстрого создания.
 ///
 /// Приложение собрано с делегатами локализации и правилами выбора локали
 /// приложения, поэтому [locale] — системная локаль устройства, а
@@ -52,6 +53,7 @@ Future<void> pumpCatalogPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         ControlledDailyChoiceLocalDate(today).override,
       ],

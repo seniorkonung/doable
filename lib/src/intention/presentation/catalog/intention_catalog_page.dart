@@ -20,9 +20,6 @@ import 'intention_tag_conditions_section.dart';
 /// охваты, фильтры и загруженные части не смешиваются.
 const _purpose = BrowseIntentionCatalog();
 
-/// Высота кнопки создания намерения вместе с отступами над нижним краем.
-const _createActionExtent = 56 + 2 * kFloatingActionButtonMargin;
-
 @RoutePage()
 final class IntentionCatalogPage extends ConsumerStatefulWidget {
   const IntentionCatalogPage({super.key});
@@ -62,22 +59,10 @@ final class _IntentionCatalogPageState
           ),
         ],
       ),
-      // Создание показывает только «+»: название действия дают подсказка и
-      // экранный диктор. Панель создания открывается над этим каталогом, а
-      // её результат согласуется через подтверждённые изменения, а не через
-      // результат маршрута.
-      floatingActionButton: FloatingActionButton(
-        key: const ValueKey('catalog-create-intention'),
-        tooltip: localizations.editorCreateAction,
-        onPressed: () {
-          context.router.push(const IntentionEditorRoute());
-        },
-        child: const Icon(Icons.add),
-      ),
       body: IntentionSearchLayout(
         // Загруженная выдача получает всю высоту тела страницы: прокрученные
         // до конца параметры и список оставляют последнюю строку и состояние
-        // продолжения над созданием намерения при любой высоте параметров.
+        // продолжения над панелью навигации при любой высоте параметров.
         // Начальные состояния и пустая выдача остаются под параметрами.
         resultsExtent: IntentionSearchResults.showsList(catalog)
             ? IntentionSearchResultsExtent.fullViewport
@@ -101,10 +86,8 @@ final class _IntentionCatalogPageState
           ),
           emptyMessage: (empty) => _emptyMessage(localizations, empty.query),
           totalCountLabel: localizations.catalogTotalCount,
-          // Якорь видимого намерения и место под кнопку создания намерения —
-          // единственные отличия выдачи каталога от страниц выбора.
+          // Каталог сохраняет позицию по видимому намерению.
           viewAnchor: IntentionSearchResultsViewAnchor.visibleIntention,
-          trailingInset: _createActionExtent,
           itemBuilder: (context, results, summary) => _IntentionSummaryTile(
             summary: summary,
             showArchiveState: results.query.scope == IntentionScope.all,

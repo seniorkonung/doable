@@ -26,6 +26,11 @@ final class DeveloperDiagnosticsSink implements DiagnosticsSink {
 }
 
 Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
+  QuickCreationModeDiagnosticsEvent(:final stage) => {
+    'operation': 'quickCreationMode',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
   TagCommandDiagnosticsEvent(:final commandType, :final stage) => {
     'operation': 'tagCommand',
     'commandType': commandType.name,

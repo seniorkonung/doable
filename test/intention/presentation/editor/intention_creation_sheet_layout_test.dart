@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -29,7 +30,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -637,8 +640,11 @@ void main() {
         await tester.pumpAndSettle();
         expectIntentionGraphRootPage(router);
 
-        await tester.tap(find.byKey(_catalogCreate));
-        await tester.pumpAndSettle();
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+        );
         expect(sessions.added, hasLength(2));
         expect(sessions.latest, isNot(same(first)));
         expect(sessions.disposed, contains(same(first)));
@@ -654,8 +660,11 @@ void main() {
         await tester.pumpAndSettle();
         expectIntentionGraphRootPage(router);
 
-        await tester.tap(find.byKey(_catalogCreate));
-        await tester.pumpAndSettle();
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+        );
         expect(sessions.added, hasLength(3));
         expect(sessions.latest, isNot(same(second)));
         expect(sessions.disposed, contains(same(second)));
@@ -1554,7 +1563,6 @@ const _readiness = ValueKey('intention-editor-readiness');
 const _chooseTags = ValueKey('intention-editor-choose-tags');
 const _readinessCancel = ValueKey('intention-editor-readiness-cancel');
 const _readinessConfirm = ValueKey('intention-editor-readiness-confirm');
-const _catalogCreate = ValueKey('catalog-create-intention');
 const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
 const _closeDiscard = ValueKey('intention-editor-close-discard');
@@ -1822,6 +1830,7 @@ Future<AppRouter> _openEditor(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       observers: [sessions],
@@ -1851,7 +1860,10 @@ Future<AppRouter> _openEditor(
   );
   await tester.pumpAndSettle();
   expect(find.byType(IntentionCatalogPage), findsOneWidget);
-  await tester.tap(find.byKey(_catalogCreate));
-  await tester.pumpAndSettle();
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.intention,
+    openedPage: find.byType(IntentionEditorPage),
+  );
   return router;
 }

@@ -6,6 +6,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -67,8 +68,12 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_creation_origin.dart';
+import '../support/intention_creation_storage_observer.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
 
 // Названия намерений и тегов — данные человека: они одинаковы в обеих
 // локалях.
@@ -128,7 +133,6 @@ const _creationTables = [
   'favorite_intentions',
 ];
 
-final _createIntention = find.byKey(const ValueKey('catalog-create-intention'));
 final _catalogList = find.byKey(
   const PageStorageKey<String>('intention-catalog-list'),
 );
@@ -151,8 +155,8 @@ final _tagEditorName = find.byKey(const ValueKey('tag-editor-name'));
 final _tagEditorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
-/// Сквозная проверка быстрого создания намерения: кнопка «+» настоящего
-/// каталога, компактная панель, общий выбор тегов и настоящий редактор тега
+/// Сквозная проверка быстрого создания намерения: меню и кнопка общей
+/// панели, компактная форма, общий выбор тегов и настоящий редактор тега
 /// на настоящих AppRouter, сессии черновика, координаторе команд, общей
 /// поверхности сообщений и Drift-адаптере через настроенное файловое
 /// соединение.
@@ -168,11 +172,317 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// открывает навигацию после результата, а заранее загруженной и скрытой во
 /// время создания остаётся Главная.
 void main() {
+  for (final origin in [
+    IntentionCreationOrigin.graph,
+    IntentionCreationOrigin.deep,
+  ]) {
+    for (final point in _CreatedNavigationFailure.values) {
+      for (final close
+          in point == _CreatedNavigationFailure.beforeRemoval
+              ? _CloseMethod.values
+              : [_CloseMethod.back]) {
+        testWidgets(
+          'отказ перехода ${point.description} над ${origin.description}: ${close.description} сохраняет успех и новую сессию',
+          (tester) async {
+            final install = await _install(tester, const Locale('ru'));
+            final router = _FailingCreatedRouteRouter(
+              synchronous: false,
+              point: point,
+            );
+            final storage = IntentionCreationStorageObserver(
+              snapshotGraph: _storedGraph,
+            );
+            final app = await _launch(
+              tester,
+              install,
+              seed: _seedGraph,
+              navigationRouter: router,
+              storage: storage,
+            );
+            await openIntentionGraph(tester, waitFor: _until);
+            final history = await origin.open(
+              tester,
+              router,
+              participantId: _intentionId(_walk),
+              waitFor: _until,
+            );
+            await _openSheet(tester, app);
+            await tester.enterText(
+              find.byKey(const ValueKey('intention-editor-title')),
+              _title,
+            );
+            final staleClose = tester
+                .widget<IconButton>(
+                  find.byKey(const ValueKey('intention-editor-close')),
+                )
+                .onPressed!;
+            storage.observeCreation();
+            storage.hold();
+            await _tap(tester, _submit);
+            await _waitFor(tester, () => storage.isHolding);
+            VoidCallback? staleDiscard;
+            if (point == _CreatedNavigationFailure.beforeRemoval) {
+              staleClose();
+              await tester.pumpAndSettle();
+              expect(
+                find.text(app.l10n.editorCloseSavingMessage),
+                findsOneWidget,
+              );
+              staleDiscard = tester
+                  .widget<FilledButton>(
+                    find.byKey(
+                      const ValueKey('intention-editor-close-discard'),
+                    ),
+                  )
+                  .onPressed!;
+            }
+            final errors = <FlutterErrorDetails>[];
+            final previousHandler = FlutterError.onError;
+            late IntentionCommandCompletion creation;
+            RouteData? nextBeforeFailure;
+            FlutterError.onError = errors.add;
+            try {
+              storage.release();
+              creation = await _creation(tester, app);
+              await _waitFor(tester, () => router.replacementAttempts == 1);
+              if (point == _CreatedNavigationFailure.afterNewSession) {
+                await tester.pumpAndSettle();
+                expect(
+                  router.current
+                      .argsAs<IntentionDetailsRouteArgs>()
+                      .intentionId,
+                  _createdId(creation),
+                );
+                await tester.binding.handlePopRoute();
+                await tester.pumpAndSettle();
+                history.expectRestored(tester, router);
+                await _acceptMessage(
+                  tester,
+                  app.l10n.graphOperationMessage(
+                    app.l10n.graphOperationCreate,
+                    _title,
+                    app.l10n.editorCreated,
+                  ),
+                );
+                await _openSheet(tester, app);
+                nextBeforeFailure = router.stackData.last;
+                await tester.enterText(
+                  find.byKey(const ValueKey('intention-editor-title')),
+                  'Черновик до позднего отказа',
+                );
+              }
+              router.releaseFailure();
+              await _waitFor(tester, () => errors.isNotEmpty);
+              await tester.pumpAndSettle();
+            } finally {
+              FlutterError.onError = previousHandler;
+            }
+            expect(errors, hasLength(1));
+            expect(errors.single.exception, same(router.failure));
+            expect(storage.creationAttempts, 1);
+            final id = _createdId(creation);
+            _expectStoredIntention(
+              app.raw,
+              id,
+              title: _title,
+              description: null,
+              readiness: IntentionReadiness.notReady,
+            );
+            history.expectPrefix(router);
+            if (point == _CreatedNavigationFailure.afterNewSession) {
+              staleClose();
+              await tester.pumpAndSettle();
+              expect(router.stackData.last, same(nextBeforeFailure));
+              expect(
+                _text(tester, 'intention-editor-title'),
+                'Черновик до позднего отказа',
+              );
+              expect(router.replacementAttempts, 1);
+              expect(_message, findsNothing);
+              expect(app.completions.whereType<IntentionCommandCompletion>(), [
+                same(creation),
+              ]);
+              expect(tester.takeException(), isNull);
+              return;
+            }
+            if (point == _CreatedNavigationFailure.beforeRemoval) {
+              expect(_sheet, findsOneWidget);
+              expect(tester.widget<FilledButton>(_submit).onPressed, isNull);
+              expect(
+                find.byType(AlertDialog, skipOffstage: false),
+                findsNothing,
+              );
+              await close.request(tester);
+              await tester.pumpAndSettle();
+            } else if (point == _CreatedNavigationFailure.afterResult) {
+              expect(
+                router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+                id,
+              );
+              staleClose();
+              await tester.pumpAndSettle();
+              expect(
+                router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+                id,
+              );
+              await tester.binding.handlePopRoute();
+              await tester.pumpAndSettle();
+            }
+            expect(_sheet, findsNothing);
+            history.expectRestored(tester, router);
+            await _acceptMessage(
+              tester,
+              app.l10n.graphOperationMessage(
+                app.l10n.graphOperationCreate,
+                _title,
+                app.l10n.editorCreated,
+              ),
+            );
+            await _openSheet(tester, app);
+            final nextForm = router.stackData.last;
+            await tester.enterText(
+              find.byKey(const ValueKey('intention-editor-title')),
+              'Новый черновик',
+            );
+            staleDiscard?.call();
+            staleClose();
+            await tester.pumpAndSettle();
+            expect(router.stackData.last, same(nextForm));
+            expect(_text(tester, 'intention-editor-title'), 'Новый черновик');
+            expect(router.replacementAttempts, 1);
+            expect(storage.creationAttempts, 1);
+            expect(app.completions.whereType<IntentionCommandCompletion>(), [
+              same(creation),
+            ]);
+            expect(find.byType(AlertDialog, skipOffstage: false), findsNothing);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+  for (final origin in IntentionCreationOrigin.values) {
+    testWidgets(
+      'общая кнопка над ${origin.description}: новый ID, теги и исходная история сохраняются без ожидания сообщения',
+      (tester) async {
+        final install = await _install(tester, const Locale('ru'));
+        final app = await _launch(tester, install, seed: _seedGraph);
+        await _searchCatalog(tester, app);
+        await _scrollCatalog(tester);
+        final catalogBefore = _catalog(app);
+        final viewBefore = _catalogView(tester);
+        final history = await origin.open(
+          tester,
+          app.router,
+          participantId: _intentionId(_walk),
+          waitFor: _until,
+        );
+        final sport = await _prepareFullDraft(
+          tester,
+          app,
+          tags: [_homeTag, _workTag],
+        );
+        final previous =
+            app.container
+                    .read(graphCommandCoordinatorProvider.notifier)
+                    .acceptTagRename(
+                      RenameTag(
+                        tagId: _tagId(_gardenTag),
+                        name: TagName.fromInput('Огород'),
+                      ),
+                    )
+                as TagCommandAccepted;
+        await _readStorage(tester, () => previous.future);
+        final previousMessage = app.l10n.graphOperationMessage(
+          app.l10n.graphOperationUpdate,
+          app.l10n.graphOperationTag,
+          app.l10n.tagRenamed,
+        );
+        await _until(tester, find.text(previousMessage).hitTestable());
+        await tester.pumpAndSettle();
+        final snackbar = tester.widget<SnackBar>(
+          find.byType(SnackBar).hitTestable(),
+        );
+        await _tap(tester, _submit);
+        final creation = await _creation(tester, app);
+        await _waitFor(tester, () => _sheet.evaluate().isEmpty);
+        await _expectCreatedPage(
+          tester,
+          app,
+          creation,
+          title: _title,
+          description: _description,
+          tags: ['Дом', 'Работа', _sport],
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          history: history,
+        );
+        expect(_createdId(creation), isNot(_intentionId(_namesake)));
+        expect(
+          tester.widget<SnackBar>(find.byType(SnackBar).hitTestable()),
+          same(snackbar),
+        );
+        expect(
+          _storedAssignments(app.raw, _createdId(creation)),
+          unorderedEquals([
+            _tagId(_homeTag).toCanonicalString(),
+            _tagId(_workTag).toCanonicalString(),
+            sport.toCanonicalString(),
+          ]),
+        );
+        history.expectPrefix(app.router);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        history.expectRestored(tester, app.router);
+        await _waitFor(
+          tester,
+          () => _catalogCurrentAt(app, creation.revision!),
+        );
+        _expectSameSearch(_catalog(app), catalogBefore);
+        expect(_ids(_catalog(app)), _ids(catalogBefore));
+        expect(_catalog(app).totalCount, catalogBefore.totalCount);
+        ScaffoldMessenger.of(tester.element(_message.hitTestable()))
+            .hideCurrentSnackBar();
+        await tester.pumpAndSettle();
+        await _acceptMessage(
+          tester,
+          app.l10n.graphOperationMessage(
+            app.l10n.graphOperationCreate,
+            _title,
+            app.l10n.editorCreated,
+          ),
+        );
+        await _openSheet(tester, app);
+        expect(_text(tester, 'intention-editor-title'), isEmpty);
+        expect(_text(tester, 'intention-editor-description'), isEmpty);
+        expect(_chipNames(tester), isEmpty);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('intention-editor-close')),
+        );
+        await tester.pumpAndSettle();
+        history.expectRestored(tester, app.router);
+        await history.expectUnderlyingDraft(tester, app.router);
+        if (origin == IntentionCreationOrigin.deep) {
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        if (origin != IntentionCreationOrigin.graph) {
+          await _select(tester, AppDestination.intentionGraph);
+        }
+        _expectSameView(_catalogView(tester), viewBefore);
+        expect(app.completions.whereType<IntentionCommandCompletion>(), [
+          same(creation),
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   for (final locale in const [Locale('ru'), Locale('en')]) {
     final code = locale.languageCode;
 
     testWidgets(
-      'намерение, подготовленное через «+» каталога, панель, общий выбор и '
+      'намерение, подготовленное через общую кнопку, панель, общий выбор и '
       'настоящий редактор тега, открывается по новому идентификатору при '
       'совпадении названия и сохраняется одним подтверждённым результатом, '
       'учитывается ровно один раз в выдаче с прежними условиями и позицией, '
@@ -710,7 +1020,7 @@ void main() {
 
     for (final systemBack in [false, true]) {
       testWidgets(
-        'намерение, подготовленное через «+» каталога, панель, общий выбор и '
+        'намерение, подготовленное через общую кнопку, панель, общий выбор и '
         'настоящий редактор тега с тегом, который исключают условия выдачи, не '
         'вставляется в неподходящую выдачу, сохраняя её условия, количество и '
         'позицию, а скрытая Главная и навигация по тегу отражают полный '
@@ -998,26 +1308,35 @@ Future<_Launch> _launch(
   _Install install, {
   void Function(sqlite.Database database)? seed,
   RootStackRouter? navigationRouter,
+  IntentionCreationStorageObserver? storage,
 }) async {
   late sqlite.Database raw;
   final diagnostics = InMemoryDiagnosticsSink();
   final writes = _WriteLog();
   final runtime = AppRuntime(
-    connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-      openFileBackedLocalDatabase(
-        install.harness.databaseFile,
-        setup: (database) => raw = database,
-      ),
-      writes,
-    ),
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
+    connectionFactory: () {
+      final connection = observeConfiguredLocalDatabaseConnection(
+        openFileBackedLocalDatabase(
+          install.harness.databaseFile,
+          setup: (database) => raw = database,
+        ),
+        writes,
+      );
+      return storage == null
+          ? connection
+          : observeConfiguredLocalDatabaseConnection(connection, storage);
+    },
     diagnosticsSink: diagnostics,
   );
   addTearDown(() async {
+    storage?.release();
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
   writes.connection = raw;
+  if (storage != null) storage.connection = raw;
   seed?.call(raw);
   final completions = <GraphCommandCompletion>[];
   final subscription = ready.container
@@ -1130,15 +1449,22 @@ Future<void> _scrollCatalogToTop(WidgetTester tester) async {
   expect(_catalogListPosition(tester).pixels, 0);
 }
 
-/// Открывает панель создания кнопкой «+» каталога.
+/// Открывает панель создания через меню и кнопку общей панели.
 Future<void> _openSheet(WidgetTester tester, _Launch app) async {
-  await _tap(tester, _createIntention);
-  await _until(tester, _sheet);
-  await tester.pumpAndSettle();
-  expect(_stack(app), [AppShellRoute.name, IntentionEditorRoute.name]);
+  final history = List.of(app.router.stackData);
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.intention,
+    openedPage: _sheet,
+    wait: _until,
+  );
+  expect(_stack(app), [
+    ...history.map((route) => route.name),
+    IntentionEditorRoute.name,
+  ]);
 }
 
-/// Готовит в панели, открытой «+» каталога, все пять полей черновика: сырое
+/// Готовит в панели, открытой общей кнопкой, все пять полей черновика: сырое
 /// название, описание, избранное, явно подтверждённую готовность и набор из
 /// существующих тегов [tags] и тега «Спорт», созданного настоящим редактором
 /// из общего выбора. Принимает сообщение о созданном теге, возвращается в
@@ -1150,7 +1476,18 @@ Future<TagId> _prepareFullDraft(
   required List<int> tags,
 }) async {
   final l10n = app.l10n;
+  final history = List.of(app.router.stackData);
   await _openSheet(tester, app);
+  expect(_text(tester, 'intention-editor-title'), isEmpty);
+  expect(_text(tester, 'intention-editor-description'), isEmpty);
+  expect(_chipNames(tester), isEmpty);
+  expect(_iconOf(tester, _favorite), Icons.star_border);
+  expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+  expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
+  expect(
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
   await tester.enterText(
     find.byKey(const ValueKey('intention-editor-title')),
     _rawTitle,
@@ -1170,8 +1507,10 @@ Future<TagId> _prepareFullDraft(
   await _tap(tester, _chooseTags);
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
+  expect(find.byType(AppNavigationBar), findsNothing);
+  expect(find.byTooltip(l10n.tagNavigationTitle), findsNothing);
   expect(_stack(app), [
-    AppShellRoute.name,
+    ...history.map((route) => route.name),
     IntentionEditorRoute.name,
     TagCatalogRoute.name,
   ]);
@@ -1197,11 +1536,11 @@ Future<TagId> _prepareFullDraft(
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
   expect(_stack(app), [
-    AppShellRoute.name,
+    ...history.map((route) => route.name),
     IntentionEditorRoute.name,
     TagCatalogRoute.name,
   ]);
-  expect(app.router.stackData[1], same(formRoute));
+  expect(app.router.stackData[history.length], same(formRoute));
   expect(
     app.router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
     isA<TagDraftContext>().having(
@@ -1218,6 +1557,7 @@ Future<TagId> _prepareFullDraft(
   await _until(tester, _tagEditorName);
   await tester.pumpAndSettle();
   expect(_stack(app).last, TagEditorRoute.name);
+  expect(find.byType(AppNavigationBar), findsNothing);
   staleSubmit();
   await tester.enterText(_tagEditorName, _sport);
   await _tap(tester, _tagEditorSubmit);
@@ -1236,7 +1576,10 @@ Future<TagId> _prepareFullDraft(
   await _tap(tester, find.byType(BackButton));
   await _waitFor(tester, () => find.byType(TagCatalogPage).evaluate().isEmpty);
   await tester.pumpAndSettle();
-  expect(_stack(app), [AppShellRoute.name, IntentionEditorRoute.name]);
+  expect(_stack(app), [
+    ...history.map((route) => route.name),
+    IntentionEditorRoute.name,
+  ]);
   expect(tester.element(_sheet), same(sheetElement));
   expect(app.router.stackData.last, same(formRoute));
   expect(tagSet.current.availability, IntentionDraftAvailability.editable);
@@ -1367,7 +1710,7 @@ Future<void> _select(WidgetTester tester, AppDestination destination) async {
 
 AppDestination _selected(WidgetTester tester) => tester
     .widget<AppNavigationBar>(
-      find.byType(AppNavigationBar, skipOffstage: false),
+      find.byType(AppNavigationBar, skipOffstage: false).first,
     )
     .selected;
 
@@ -1409,6 +1752,7 @@ Future<void> _expectCreatedPage(
   required List<String> tags,
   required IntentionReadiness readiness,
   required FavoriteMark favoriteMark,
+  IntentionCreationHistory? history,
 }) async {
   final id = _createdId(completion);
   expect(app.router.current.name, IntentionDetailsRoute.name);
@@ -1416,7 +1760,11 @@ Future<void> _expectCreatedPage(
     app.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
     id,
   );
-  expect(_stack(app), [AppShellRoute.name, IntentionDetailsRoute.name]);
+  expect(_stack(app), [
+    ...?history?.routes.map((route) => route.name),
+    if (history == null) AppShellRoute.name,
+    IntentionDetailsRoute.name,
+  ]);
   final page = find.byType(IntentionDetailsPage);
   await _until(tester, page);
   final container = ProviderScope.containerOf(
@@ -1488,13 +1836,17 @@ Future<void> _expectCreatedPage(
     favoriteMark == FavoriteMark.favorite ? Icons.star : Icons.star_border,
   );
   for (final tag in assignments.items) {
+    final row = find.byKey(
+      ValueKey('tag-assignment-row-${tag.id.toCanonicalString()}'),
+    );
+    await tester.scrollUntilVisible(
+      row,
+      200,
+      scrollable: find.descendant(of: page, matching: find.byType(Scrollable)),
+    );
+    await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: find.byKey(
-          ValueKey('tag-assignment-row-${tag.id.toCanonicalString()}'),
-        ),
-        matching: find.text(tag.name.value),
-      ),
+      find.descendant(of: row, matching: find.text(tag.name.value)),
       findsOneWidget,
     );
   }
@@ -1502,12 +1854,15 @@ Future<void> _expectCreatedPage(
     tester.getRect(page),
     Offset.zero & (tester.view.physicalSize / tester.view.devicePixelRatio),
   );
-  expect(find.byType(AppNavigationBar), findsNothing);
+  expect(find.byType(AppNavigationBar), findsOneWidget);
   expect(
-    find.byType(NavigationDestination, skipOffstage: false).hitTestable(),
-    findsNothing,
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsExactly(3),
   );
-  expect(_selected(tester), AppDestination.intentionGraph);
+  expect(
+    _selected(tester),
+    history?.origin.destination ?? AppDestination.intentionGraph,
+  );
   expect(
     find.byKey(const ValueKey('intention-creation-sheet'), skipOffstage: false),
     findsNothing,
@@ -2012,9 +2367,13 @@ Future<void> _waitFor(
 
 /// Настоящий стек приложения с отказом только открытия созданного намерения.
 final class _FailingCreatedRouteRouter extends RootStackRouter {
-  _FailingCreatedRouteRouter({required this.synchronous});
+  _FailingCreatedRouteRouter({
+    required this.synchronous,
+    this.point = _CreatedNavigationFailure.beforeRemoval,
+  });
 
   final bool synchronous;
+  final _CreatedNavigationFailure point;
   final failure = StateError('Управляемый отказ открытия созданного намерения');
   final _failureGate = Completer<void>();
   var replacementAttempts = 0;
@@ -2033,8 +2392,53 @@ final class _FailingCreatedRouteRouter extends RootStackRouter {
       return super.replace<T>(route, onFailure: onFailure);
     }
     replacementAttempts++;
+    switch (point) {
+      case _CreatedNavigationFailure.beforeRemoval:
+        break;
+      case _CreatedNavigationFailure.afterRemoval:
+        removeRoute(stackData.last, notify: false);
+      case _CreatedNavigationFailure.afterResult ||
+          _CreatedNavigationFailure.afterNewSession:
+        unawaited(super.replace<T>(route, onFailure: onFailure));
+    }
     if (synchronous) throw failure;
     return _failureGate.future.then<T?>((_) => throw failure);
+  }
+}
+
+enum _CreatedNavigationFailure {
+  beforeRemoval('до удаления панели'),
+  afterRemoval('после удаления панели'),
+  afterResult('после открытия результата'),
+  afterNewSession('после нового открытия');
+
+  const _CreatedNavigationFailure(this.description);
+  final String description;
+}
+
+enum _CloseMethod {
+  button('кнопка закрытия'),
+  barrier('нажатие на фон'),
+  handle('свайп ручки'),
+  back('системное «назад»');
+
+  const _CloseMethod(this.description);
+  final String description;
+
+  Future<void> request(WidgetTester tester) async {
+    switch (this) {
+      case button:
+        await tester.tap(find.byKey(const ValueKey('intention-editor-close')));
+      case barrier:
+        await tester.tapAt(Offset(20, tester.getRect(_sheet).top / 2));
+      case handle:
+        await tester.drag(
+          find.byKey(const ValueKey('intention-creation-sheet-handle')),
+          const Offset(0, 240),
+        );
+      case back:
+        await tester.binding.handlePopRoute();
+    }
   }
 }
 

@@ -33,8 +33,17 @@ import '../../../intention/presentation/details/details_test_support.dart'
 import '../../../support/app_root_pages.dart';
 import '../details/relation_details_test_support.dart' show testRelationDetails;
 import 'relation_form_test_support.dart';
+import 'relation_participant_selection_scenarios.dart';
+
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
+  defineRelationParticipantSelectionTests(openForm: _openForm);
+  defineRelationBlankCreationTests(
+    openForm: (tester, repository, locale) =>
+        _openForm(tester, repository, null, locale: locale),
+  );
+
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
@@ -680,7 +689,7 @@ void main() {
   );
 
   testWidgets(
-    'success закрывает форму и предъявляется один раз после занятого сообщения',
+    'успех открывает связь до предъявления сообщения и возвращает в исходную историю',
     (tester) async {
       const busyMessage =
           'Create — “new relation”: The relation couldn’t be created. Try '
@@ -700,12 +709,29 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
       await tester.pump();
-      repository.completeRelationCreated(1);
+      final created = repository.completeRelationCreated(1);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(router.current.name, RelationDetailsRoute.name);
+      repository.relationWatches.last.emitDetails(
+        testRelationDetails(
+          relationId: created.id,
+          sourceId: created.sourceIntentionId,
+          relatedId: created.relatedIntentionId,
+        ),
+        revision: const TestCatalogRevision(2),
+      );
       await tester.pumpAndSettle();
 
-      expectIntentionGraphRootPage(router);
+      expect(router.current.name, RelationDetailsRoute.name);
+      expect(repository.relationWatches.last.relationId, created.id);
+      expect(find.byType(RelationEditorPage), findsNothing);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.text(successMessage), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expectIntentionGraphRootPage(router);
 
       await _closeOperationMessage(tester);
 
@@ -1659,7 +1685,7 @@ RelationParticipantSummary _participantSummary({
 Future<AppRouter> _openForm(
   WidgetTester tester,
   ControlledRelationFormRepository repository,
-  RelationDirection direction, {
+  RelationDirection? direction, {
   Locale? locale = const Locale('en'),
 }) async {
   // Высокая поверхность держит поля формы построенными без прокрутки.
@@ -1671,6 +1697,7 @@ Future<AppRouter> _openForm(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,
@@ -1692,10 +1719,13 @@ Future<AppRouter> _openForm(
   unawaited(
     router.push(
       RelationEditorRoute(
-        editorContext: RelationCreationContext(
-          participant: _contextParticipant,
-          direction: direction,
-        ),
+        editorContext: switch (direction) {
+          null => const RelationBlankCreationContext(),
+          final direction => RelationCreationContext(
+            participant: _contextParticipant,
+            direction: direction,
+          ),
+        },
       ),
     ),
   );
@@ -1717,6 +1747,7 @@ Future<AppRouter> _openDetailsForEditing(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,

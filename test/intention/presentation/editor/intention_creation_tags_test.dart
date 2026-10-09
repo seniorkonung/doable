@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -20,7 +21,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Показ актуальности выбранных тегов в панели создания и исправление их
 /// отсутствия.
@@ -637,7 +640,7 @@ final class _EditorSessions extends ProviderObserver {
       );
 }
 
-/// Открывает панель создания кнопкой пустого каталога намерений.
+/// Открывает панель через быстрое создание над пустым каталогом намерений.
 Future<void> _openEditor(
   WidgetTester tester,
   ControlledCatalogRepository repository, {
@@ -649,6 +652,7 @@ Future<void> _openEditor(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       observers: observers,
@@ -677,6 +681,9 @@ Future<void> _openEditor(
     ),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
-  await tester.pumpAndSettle();
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.intention,
+    openedPage: find.byType(IntentionEditorPage),
+  );
 }

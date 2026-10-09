@@ -28,6 +28,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Intention graph';
 
   @override
+  String get quickCreationLabel => 'Quick create';
+
+  @override
+  String get quickCreationChangeMode => 'Change mode';
+
+  @override
+  String get quickCreationMenuTitle => 'Quick creation mode';
+
+  @override
+  String get quickCreationLongPressHint => 'Touch and hold to change mode';
+
+  @override
+  String get quickCreationModeIntention => 'New intention';
+
+  @override
+  String get quickCreationModeRelation => 'New relation';
+
+  @override
+  String get quickCreationModeDailyChoiceFromIntention =>
+      'Daily choice from an intention';
+
+  @override
+  String get quickCreationModeDailyChoiceFromAction =>
+      'Daily choice from an action';
+
+  @override
   String get homeFavoritesHeading => 'Favorite intentions';
 
   @override
@@ -2536,4 +2562,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String choiceSuggestionStep(int index, int total) {
     return 'Step $index of $total';
   }
+
+  @override
+  String get creationCancelAction => 'Cancel creation';
+
+  @override
+  String get creationLeaveAction => 'Leave creation';
+
+  @override
+  String get creationSavingContinues =>
+      'Saving will continue after you leave creation.';
 }

@@ -23,7 +23,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
+
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -48,6 +51,7 @@ void main() {
 
         final delete = find.byKey(const ValueKey('intention-details-delete'));
         await tester.ensureVisible(delete);
+        await tester.pump();
         await tester.tap(delete);
         await tester.pumpAndSettle();
 
@@ -127,6 +131,7 @@ void main() {
 
         final delete = find.byKey(const ValueKey('intention-details-delete'));
         await tester.ensureVisible(delete);
+        await tester.pump();
         await tester.tap(delete);
         await tester.pumpAndSettle();
         await tester.tap(
@@ -206,8 +211,9 @@ void main() {
           },
         );
 
-        final details = container.read(provider.notifier)..delete();
-        details.delete();
+        final details = container.read(provider.notifier);
+        final deletion = details.delete();
+        expect(await details.delete(), isFalse);
         expect(repository.commands, hasLength(1));
         expect(repository.commands.single, isA<DeleteIntention>());
         expect(
@@ -233,6 +239,7 @@ void main() {
         final (failureFor, canRetry) = scenarios[index];
         repository.completeCommand(0, ResultFailure(failureFor(intention.id)));
         await pumpEventQueue();
+        expect(await deletion, isFalse);
 
         expect(
           container.read(provider),
@@ -333,6 +340,7 @@ void main() {
 
     final delete = find.byKey(const ValueKey('intention-details-delete'));
     await tester.ensureVisible(delete);
+    await tester.pump();
     await tester.tap(delete);
     await tester.pumpAndSettle();
     await tester.tap(
@@ -404,6 +412,7 @@ void main() {
 
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);
+      await tester.pump();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -469,6 +478,7 @@ void main() {
 
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);
+      await tester.pump();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -591,6 +601,7 @@ void main() {
       await tester.pumpAndSettle();
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);
+      await tester.pump();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(
@@ -650,6 +661,7 @@ Future<void> _pumpDetailsPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         if (pagingPolicy case final policy?)
           relationNeighborhoodPagingPolicyProvider.overrideWithValue(policy),
@@ -664,17 +676,14 @@ Future<void> _pumpDetailsPage(
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
     ProviderContainer(
       overrides: [
+        inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,
     );
 
-Widget _localizedApp(Widget home) => MaterialApp(
-  locale: const Locale('en'),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
-  supportedLocales: AppLocalizations.supportedLocales,
-  home: home,
-);
+Widget _localizedApp(Widget home) =>
+    OrdinaryPageTestApp(locale: const Locale('en'), home: home);
 
 final class _DeleteTestRevision implements GraphRevision {
   const _DeleteTestRevision();

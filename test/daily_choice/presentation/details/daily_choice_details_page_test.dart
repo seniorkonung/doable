@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
@@ -36,6 +38,8 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
+import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
   setUp(() {
@@ -43,6 +47,45 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  testWidgets(
+    'панель дневного выбора доступна при загрузке, чтении, отсутствии '
+    'и отказах',
+    (tester) async {
+      final repository = _Repository();
+      addTearDown(repository.dispose);
+      await _pumpApp(tester, repository, const Locale('ru'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      void expectNavigation() {
+        expect(find.byType(AppNavigationBar), findsOneWidget);
+        expect(
+          tester
+              .widget<AppNavigationBar>(find.byType(AppNavigationBar))
+              .selected,
+          AppDestination.home,
+        );
+      }
+
+      expectNavigation();
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      expectNavigation();
+      repository.emitMissing(revision: 2);
+      await tester.pumpAndSettle();
+      expectNavigation();
+      for (final failure in [
+        const DailyChoiceReadUnavailableFailure(),
+        const DailyChoiceReadCorruptionFailure(),
+        const DailyChoiceReadUnexpectedFailure(),
+      ]) {
+        repository.fail(failure);
+        await tester.pumpAndSettle();
+        expectNavigation();
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'редактор открывается из подробностей и меняет только выбранные поля',
@@ -56,6 +99,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           child: MaterialApp.router(
@@ -129,6 +173,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
         ],
         child: MaterialApp.router(
@@ -221,6 +266,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           retry: (count, error) => null,
@@ -262,13 +308,12 @@ void main() {
   ) async {
     final repository = _Repository();
     addTearDown(repository.dispose);
-    await tester.pumpWidget(_app(repository, const Locale('ru')));
+    await _pumpApp(tester, repository, const Locale('ru'));
     repository.emit(_details());
     await tester.pumpAndSettle();
     expect(find.textContaining('2026-09-24'), findsOneWidget);
     expect(find.text('Выполнено'), findsOneWidget);
     expect(find.textContaining('Основание'), findsOneWidget);
-    expect(find.textContaining('Нужно'), findsWidgets);
     final semantics = tester.ensureSemantics();
     expect(
       tester
@@ -276,6 +321,11 @@ void main() {
           .label,
       contains('Основание'),
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('daily-choice-relation-1')),
+      150,
+    );
+    expect(find.textContaining('Нужно'), findsWidgets);
     expect(
       tester
           .getSemantics(find.byKey(const ValueKey('daily-choice-relation-1')))
@@ -304,9 +354,13 @@ void main() {
   ) async {
     final repository = _Repository();
     addTearDown(repository.dispose);
-    await tester.pumpWidget(_app(repository, const Locale('ru')));
+    await _pumpApp(tester, repository, const Locale('ru'));
     repository.emit(_details(oneStep: true));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('daily-choice-relation-1')),
+      150,
+    );
     expect(find.textContaining('Нужно'), findsWidgets);
     expect(find.textContaining('Промежуточное намерение'), findsNothing);
     await tester.scrollUntilVisible(
@@ -321,7 +375,7 @@ void main() {
   ) async {
     final repository = _Repository();
     addTearDown(repository.dispose);
-    await tester.pumpWidget(_app(repository, const Locale('en')));
+    await _pumpApp(tester, repository, const Locale('en'));
     repository.emit(_details());
     await tester.pumpAndSettle();
     repository.emit(
@@ -351,7 +405,7 @@ void main() {
   testWidgets('удаление и повреждение убирают путь целиком', (tester) async {
     final repository = _Repository();
     addTearDown(repository.dispose);
-    await tester.pumpWidget(_app(repository, const Locale('ru')));
+    await _pumpApp(tester, repository, const Locale('ru'));
     repository.emit(_details());
     await tester.pumpAndSettle();
     expect(find.textContaining('Основание'), findsOneWidget);
@@ -391,7 +445,7 @@ void main() {
       (tester) async {
         final repository = _Repository();
         addTearDown(repository.dispose);
-        await tester.pumpWidget(_app(repository, locale));
+        await _pumpApp(tester, repository, locale);
         repository.emit(_details());
         await tester.pumpAndSettle();
 
@@ -428,7 +482,7 @@ void main() {
     (tester) async {
       final repository = _Repository();
       addTearDown(repository.dispose);
-      await tester.pumpWidget(_app(repository, const Locale('ru')));
+      await _pumpApp(tester, repository, const Locale('ru'));
       repository.emit(_details());
       await tester.pumpAndSettle();
 
@@ -460,7 +514,7 @@ void main() {
     (tester) async {
       final repository = _Repository();
       addTearDown(repository.dispose);
-      await tester.pumpWidget(_app(repository, const Locale('ru')));
+      await _pumpApp(tester, repository, const Locale('ru'));
       repository.emit(_details());
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
@@ -492,6 +546,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            inMemoryQuickCreationModeOverride,
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           child: MaterialApp.router(
@@ -539,6 +594,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
         ],
         child: MaterialApp.router(
@@ -578,20 +634,29 @@ void main() {
   });
 }
 
-Widget _app(_Repository repository, Locale locale) => ProviderScope(
-  overrides: [
-    personalGraphRepositoryProvider.overrideWith((ref) => repository),
-  ],
-  child: MaterialApp(
-    locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: MediaQuery(
-      data: const MediaQueryData(textScaler: TextScaler.linear(1.8)),
-      child: DailyChoiceDetailsPage(choiceId: _choice(1)),
+Future<void> _pumpApp(
+  WidgetTester tester,
+  _Repository repository,
+  Locale locale,
+) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWith((ref) => repository),
+      ],
+      child: OrdinaryPageTestApp(
+        locale: locale,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.8)),
+          child: child!,
+        ),
+        home: DailyChoiceDetailsPage(choiceId: _choice(1)),
+      ),
     ),
-  ),
-);
+  );
+  await tester.pump();
+}
 
 String _uuid(int n) =>
     '018f0b5d-6b2e-7c80-8000-${n.toRadixString(16).padLeft(12, '0')}';

@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -26,6 +33,10 @@ import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
+
+part 'daily_choice_creation_route_scenarios.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -96,15 +107,56 @@ Future<void> _save(WidgetTester tester, {bool doubleTap = false}) async {
   if (doubleTap) await tester.tap(submit);
   await tester.pump();
   await _waitFor(tester, find.textContaining('Дневной выбор создан'));
-  await _waitFor(
-    tester,
-    find.byKey(const ValueKey('choice-path-select-action')),
-  );
+  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
   await tester.pumpAndSettle();
-  await _waitFor(
-    tester,
-    find.byKey(const ValueKey('choice-path-select-action')),
+  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+}
+
+Future<void> _restartPath(
+  WidgetTester tester,
+  List<int> relations, {
+  ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
+}) async {
+  final router =
+      (await (tester.widget<MainApp>(find.byType(MainApp)).runtime.bootstrap())
+              as AppRuntimeReady)
+          .container
+          .read(appRouterProvider);
+  expect(router.stackData.last.name, DailyChoiceDetailsRoute.name);
+  await tester.binding.handlePopRoute();
+  await tester.pumpAndSettle();
+  final history = [for (final route in router.stackData) route.matchId];
+  switch (direction) {
+    case ChoicePathDraftDirection.topDown:
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('intention-details-choose-path')),
+      );
+    case ChoicePathDraftDirection.bottomUp:
+      await openQuickCreation(
+        tester,
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: _waitFor,
+      );
+      await _tap(tester, find.text('Продолжение действия'));
+  }
+  await _waitFor(tester, find.byType(ChoicePathPage));
+  await tester.pumpAndSettle();
+  final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
+  expect(page.direction, direction);
+  expect(
+    page.sourceIntentionId,
+    _intention(direction == ChoicePathDraftDirection.topDown ? 1 : 3),
   );
+  final session = tester
+      .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+      .creationSession!;
+  expect(session.originalHistory, history);
+  expect(session.canContinue, isTrue);
+  for (final relation in relations) {
+    await _continue(tester, relation);
+  }
 }
 
 Future<void> _seed(LocalDatabaseHarness harness) async {
@@ -217,6 +269,8 @@ void main() {
     );
   });
 
+  _registerCreationRouteScenarios();
+
   for (final bottomUp in [false, true]) {
     testWidgets(
       'подсказка ${bottomUp ? 'снизу' : 'сверху'} создаёт отдельный выбор без наследования полей',
@@ -243,6 +297,7 @@ void main() {
             ? catalogToday
             : CalendarDate.fromParts(2024, 9, 24);
         final runtime = AppRuntime(
+          quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () =>
               openFileBackedLocalDatabase(harness.databaseFile),
           diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -264,15 +319,29 @@ void main() {
         if (bottomUp) {
           await openDailyChoices(tester, tap: _tap);
           await tester.pumpAndSettle();
-          await _tap(
+          await openQuickCreation(
             tester,
-            find.byKey(const ValueKey('daily-choice-create-from-action')),
+            QuickCreationMode.dailyChoiceFromAction,
+            openedPage: find.byType(DailyChoiceActionPickerPage),
+            wait: _waitFor,
           );
           await tester.pumpAndSettle();
           await _tap(tester, find.text('Продолжение действия'));
         } else {
           await _openPath(tester);
         }
+
+        await _waitFor(tester, find.byType(ChoicePathPage));
+        final router = ready.container.read(appRouterProvider);
+        expect(router.current.name, ChoicePathRoute.name);
+        final session = tester
+            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+            .creationSession!;
+        expect(session.rootMatchId, router.current.matchId);
+        expect(session.originalHistory, [
+          for (final route in router.stackData.take(router.stack.length - 1))
+            route.matchId,
+        ]);
 
         final suggestion = find.byKey(
           const ValueKey('choice-suggestion-select-0'),
@@ -296,6 +365,7 @@ void main() {
         );
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
+        expect(session.canContinue, isTrue);
         await _tap(tester, suggestion);
         await _waitFor(tester, find.byType(DailyChoiceCreationPage));
         expect(
@@ -358,7 +428,7 @@ void main() {
         expect(_savedIds(harness), hasLength(1));
 
         if (!bottomUp) {
-          await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+          await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
           expect(_savedIds(harness), hasLength(1));
           await _tap(tester, suggestion);
@@ -478,6 +548,7 @@ void main() {
       // Каталог открывается на дне выборов, которые сценарий создаёт
       // последними.
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -496,9 +567,11 @@ void main() {
 
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
-      await _tap(
+      await openQuickCreation(
         tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: _waitFor,
       );
       await tester.pumpAndSettle();
       await _tap(tester, find.text('Продолжение действия'));
@@ -551,7 +624,7 @@ void main() {
         find.byKey(const ValueKey('daily-choice-date')),
         '2024-09-24',
       );
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(_savedIds(harness), isEmpty);
       await _tap(
@@ -589,10 +662,10 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
-      );
+      await _restartPath(tester, [
+        102,
+        101,
+      ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -608,10 +681,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
-      );
+      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));
       expect(ids.toSet(), hasLength(2));
@@ -624,7 +694,9 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _tap(tester, find.byKey(const ValueKey('choice-path-back-1')));
+      await _restartPath(tester, [
+        102,
+      ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -660,10 +732,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
-      );
+      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       await tester.pumpAndSettle();
       final oneStepId = _savedIds(harness).last;
       final oneStep = await _read(repository, oneStepId);
@@ -674,6 +743,9 @@ void main() {
       expect(oneStep.choice.isCompleted, isTrue);
       expect(oneStep.path.map((step) => step.relation.id), [_relation(102)]);
 
+      await _restartPath(tester, [
+        102,
+      ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
         tester,
         find.byKey(const ValueKey('choice-path-select-source')),
@@ -693,10 +765,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
-      );
+      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       final allIds = _savedIds(harness);
       expect(allIds, hasLength(4));
       expect(allIds.toSet(), hasLength(4));
@@ -715,6 +784,7 @@ void main() {
       expect(duplicate.path.map((step) => step.relation.id), [_relation(102)]);
       expect((await _read(repository, oneStepId)).path, hasLength(1));
 
+      await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-1')));
@@ -743,6 +813,7 @@ void main() {
       await tester.runAsync(() => _seed(harness));
       // Каталог открывается на дне создаваемого выбора.
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -761,9 +832,11 @@ void main() {
 
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
-      await _tap(
+      await openQuickCreation(
         tester,
-        find.byKey(const ValueKey('daily-choice-create-from-action')),
+        QuickCreationMode.dailyChoiceFromAction,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+        wait: _waitFor,
       );
       await tester.pumpAndSettle();
       await _tap(tester, find.text('Продолжение действия'));
@@ -960,6 +1033,7 @@ void main() {
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       await tester.runAsync(() => _seed(harness));
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -999,8 +1073,7 @@ void main() {
         _relation(104),
       ]);
 
-      await _tap(tester, find.byKey(const ValueKey('choice-path-back-0')));
-      await _continue(tester, 101);
+      await _restartPath(tester, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final secondId = _savedIds(harness).last;
@@ -1008,6 +1081,7 @@ void main() {
       expect(second.choice.selectedIntentionId, _intention(2));
       expect(second.path.map((step) => step.relation.id), [_relation(101)]);
 
+      await _restartPath(tester, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final ids = _savedIds(harness);
@@ -1039,6 +1113,7 @@ void main() {
         await _seedPreviousChoice(harness);
       });
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -1163,6 +1238,7 @@ void main() {
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       await tester.runAsync(() => _seed(harness));
       final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -1225,7 +1301,7 @@ void main() {
       );
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
       expect(_savedIds(harness), isEmpty);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await _waitFor(tester, find.text('Choose a path to an action'));
       expect(_savedIds(harness), isEmpty);

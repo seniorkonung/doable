@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
@@ -62,6 +64,25 @@ final class _IntentionDetailsPageState
     });
   }
 
+  Future<void> _delete() async {
+    if (!mounted) return;
+    final intentionId = widget.intentionId;
+    final deleted = await ref
+        .read(intentionDetailsViewModelProvider(intentionId).notifier)
+        .delete();
+    // Результат принадлежит принявшему удаление экземпляру страницы.
+    // После ожидания сброшенный маршрут уже не вправе менять историю,
+    // даже если обратная анимация ещё удерживает его виджет.
+    // ModalRoute.of подписывает страницу на изменения маршрута,
+    // поэтому обращаемся к нему только перед успешным закрытием.
+    if (deleted &&
+        mounted &&
+        widget.intentionId == intentionId &&
+        (ModalRoute.of(context)?.isCurrent ?? false)) {
+      context.router.pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final intentionId = widget.intentionId;
@@ -72,13 +93,7 @@ final class _IntentionDetailsPageState
     // соседства; сам sliver переиспользует это состояние после загрузки
     // подробных данных намерения.
     ref.watch(relationNeighborhoodViewModelProvider(intentionId));
-    ref.listen(provider, (previous, next) {
-      // Сообщения об успехе предъявляет общий presenter оболочки.
-      if (next is IntentionDetailsDeleted) {
-        unawaited(context.router.maybePop());
-      }
-    });
-    return Scaffold(
+    return OrdinaryPageScaffold(
       appBar: AppBar(
         title: Text(localizations.detailsTitle),
         actions: [
@@ -118,6 +133,7 @@ final class _IntentionDetailsPageState
                 selectionMode: _selectionMode,
                 neighborhoodKey: _neighborhoodKey,
                 onShowBlockingRelations: _showBlockingRelations,
+                onDelete: _delete,
               ),
             ),
           ],
@@ -322,6 +338,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.selectionMode,
     required this.neighborhoodKey,
     required this.onShowBlockingRelations,
+    required this.onDelete,
   });
 
   final IntentionId intentionId;
@@ -329,6 +346,7 @@ final class _DetailsContent extends ConsumerWidget {
   final bool selectionMode;
   final GlobalKey neighborhoodKey;
   final VoidCallback onShowBlockingRelations;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -369,12 +387,18 @@ final class _DetailsContent extends ConsumerWidget {
         onRestore: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .restore,
-        onDelete: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .delete,
-        onRetryStateChange: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .retryStateChange,
+        onDelete: onDelete,
+        onRetryStateChange: () {
+          final provider = intentionDetailsViewModelProvider(intentionId);
+          final current = ref.read(provider);
+          if (current is IntentionDetailsLoaded &&
+              current.stateChange?.kind ==
+                  IntentionDetailsStateChangeKind.delete) {
+            if (current.stateChange!.canRetry) onDelete();
+          } else {
+            ref.read(provider.notifier).retryStateChange();
+          }
+        },
         onShowBlockingRelations: onShowBlockingRelations,
         onShowArchivedRelations: ref
             .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
@@ -514,7 +538,10 @@ final class _LoadedDetails extends StatelessWidget {
                 onShowArchivedRelations: onShowArchivedRelations,
                 onChoosePath: () => unawaited(
                   context.router.push(
-                    ChoicePathRoute(sourceIntentionId: intention.id),
+                    ChoicePathRoute(
+                      sourceIntentionId: intention.id,
+                      direction: ChoicePathDraftDirection.topDown,
+                    ),
                   ),
                 ),
               ),
@@ -976,15 +1003,18 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
           ),
         ],
         const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        // При увеличенном тексте действия переходят на следующие строки.
+        // https://api.flutter.dev/flutter/widgets/Wrap-class.html
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 12,
+          runSpacing: 12,
           children: [
             TextButton(
               key: const ValueKey('intention-details-edit-cancel'),
               onPressed: controlsEnabled ? widget.onCancel : null,
               child: Text(localizations.detailsCancelEditAction),
             ),
-            const SizedBox(width: 12),
             FilledButton(
               key: const ValueKey('intention-details-edit-submit'),
               onPressed: controlsEnabled && edit.canSubmit

@@ -83,6 +83,9 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     RelationParticipantRole role,
     GraphSnapshot<RelationParticipantSummary> selected,
   ) {
+    if (!ref.mounted || state.sessionState == RelationEditorSessionState.left) {
+      return false;
+    }
     final needsNewBasis = state.needsNewBasis(
       role,
       selected.value.id,
@@ -96,18 +99,27 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
   }
 
   void selectType(LongTermRelationType value) {
+    if (!ref.mounted || state.sessionState == RelationEditorSessionState.left) {
+      return;
+    }
     if (state.type != value) {
       state = state.withType(value);
     }
   }
 
   void selectPriority(RelationPriority value) {
+    if (!ref.mounted || state.sessionState == RelationEditorSessionState.left) {
+      return;
+    }
     if (state.priority != value) {
       state = state.withPriority(value);
     }
   }
 
   void changeDescription(String value) {
+    if (!ref.mounted || state.sessionState == RelationEditorSessionState.left) {
+      return;
+    }
     if (state.description != value) {
       state = state.withDescription(value);
     }
@@ -168,8 +180,25 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     }
   }
 
+  /// Прекращает создание до удаления маршрута, сохраняя принятую команду.
+  void leaveCreation() {
+    if (!ref.mounted ||
+        !_context.isCreating ||
+        state.sessionState == RelationEditorSessionState.left) {
+      return;
+    }
+    final failure = state.failurePresentation;
+    final token = _activeToken;
+    state = state.withOperation(
+      state.operation,
+      sessionState: RelationEditorSessionState.left,
+    );
+    if (failure != null) _coordinator.releaseInitiatorClaim(failure);
+    if (token != null) _coordinator.releaseInitiatorPresentation(token);
+  }
+
   void submit() {
-    if (!state.canSubmit) {
+    if (!ref.mounted || !state.canSubmit) {
       return;
     }
     final draft = state.completeness;
@@ -197,6 +226,7 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     }
 
     final start = switch (_context) {
+      RelationBlankCreationContext() ||
       RelationCreationContext() => _coordinator.acceptRelationCreation(
         _formKey,
         CreateLongTermRelation(
@@ -246,13 +276,13 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
       // Success предъявляет оболочка; форма получает его только для закрытия.
       state = switch (completion.result) {
         GraphResultSuccess(value: LongTermRelationCreated(:final relation))
-            when _context is RelationCreationContext =>
+            when _context.isCreating =>
           state.withOperation(
             RelationEditorSucceeded(relation),
             event: RelationEditorCreated(relation.id),
           ),
         GraphResultSuccess(value: LongTermRelationUpdated(:final relation))
-            when _context is RelationEditingContext =>
+            when !_context.isCreating =>
           state.withOperation(
             RelationEditorSucceeded(relation),
             event: RelationEditorUpdated(relation.id),

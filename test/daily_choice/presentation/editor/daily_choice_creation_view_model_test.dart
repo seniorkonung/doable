@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_state.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -18,6 +19,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -26,6 +28,74 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
+  test('успех фиксируется в сессии до публикации события перехода', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    final events = harness.container.listen(harness.provider, (_, next) {
+      if (next.event != null) {
+        expect(harness.session.state, isA<DailyChoiceCreationFlowSaved>());
+      }
+    });
+    addTearDown(events.close);
+    harness.model.submit();
+    expect(harness.session.state, isA<DailyChoiceCreationFlowSubmitting>());
+    harness.repository.succeed(0);
+    await pumpEventQueue();
+    expect(harness.state.event, isA<DailyChoiceCreationCreated>());
+    expect(
+      (harness.session.state as DailyChoiceCreationFlowSaved).choiceId,
+      harness.state.event!.choiceId,
+    );
+  });
+
+  for (final succeeds in [true, false]) {
+    test('поздний ${succeeds ? 'успех' : 'отказ'} освобождённой формы '
+        'не меняет другую сессию и не повторяет отправку', () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final oldModel = harness.model;
+      oldModel.submit();
+      harness.closeForm();
+      await pumpEventQueue();
+      expect(harness.container.exists(harness.provider), isFalse);
+
+      final otherSession = _session();
+      final otherProvider = dailyChoiceCreationViewModelProvider(
+        otherSession,
+        harness.path,
+        CalendarDate.fromParts(2024, 1, 1),
+      );
+      final other = harness.container.listen(otherProvider, (_, _) {});
+      addTearDown(other.close);
+      final otherModel = harness.container.read(otherProvider.notifier);
+      otherModel
+        ..changeDescription('Новый черновик')
+        ..submit();
+      expect(harness.repository.commands, hasLength(2));
+      final otherOperation = otherSession.state;
+
+      if (succeeds) {
+        harness.repository.succeed(0);
+      } else {
+        harness.repository.fail(0, const DailyChoiceUnavailableFailure());
+      }
+      await pumpEventQueue();
+      expect(
+        harness.session.state,
+        succeeds
+            ? isA<DailyChoiceCreationFlowSaved>()
+            : isA<DailyChoiceCreationFlowEditing>(),
+      );
+      expect(otherSession.state, same(otherOperation));
+      expect(
+        harness.container.read(otherProvider).description,
+        'Новый черновик',
+      );
+      oldModel.submit();
+      expect(harness.repository.commands, hasLength(2));
+    });
+  }
+
   test(
     'явная дата охватывает весь календарь; прошлая не включает выполнение',
     () {
@@ -141,16 +211,8 @@ void main() {
     addTearDown(container.dispose);
     final path = _path();
     final date = CalendarDate.fromParts(2024, 1, 1);
-    final first = dailyChoiceCreationViewModelProvider(
-      DailyChoiceCreationFormKey(),
-      path,
-      date,
-    );
-    final second = dailyChoiceCreationViewModelProvider(
-      DailyChoiceCreationFormKey(),
-      path,
-      date,
-    );
+    final first = dailyChoiceCreationViewModelProvider(_session(), path, date);
+    final second = dailyChoiceCreationViewModelProvider(_session(), path, date);
     final a = container.listen(first, (_, _) {});
     final b = container.listen(second, (_, _) {});
     addTearDown(a.close);
@@ -176,7 +238,7 @@ void main() {
   });
 
   test(
-    'тот же ключ блокирует отправку после пересоздания формы во время записи',
+    'та же сессия блокирует отправку после пересоздания формы во время записи',
     () async {
       final repository = _Repository();
       final container = ProviderContainer(
@@ -185,10 +247,14 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      final key = DailyChoiceCreationFormKey();
+      final session = _session();
       final path = _path();
       final date = CalendarDate.fromParts(2024, 1, 1);
-      final provider = dailyChoiceCreationViewModelProvider(key, path, date);
+      final provider = dailyChoiceCreationViewModelProvider(
+        session,
+        path,
+        date,
+      );
       final first = container.listen(provider, (_, _) {});
       container.read(provider.notifier).submit();
       first.close();
@@ -200,6 +266,8 @@ void main() {
       expect(repository.commands, hasLength(1));
       repository.succeed(0);
       await pumpEventQueue();
+      expect(session.state, isA<DailyChoiceCreationFlowSaved>());
+      container.read(provider.notifier).submit();
       expect(repository.commands, hasLength(1));
     },
   );
@@ -390,7 +458,7 @@ final class _Harness {
       ],
     );
     provider = dailyChoiceCreationViewModelProvider(
-      DailyChoiceCreationFormKey(),
+      session,
       path,
       date ?? CalendarDate.fromParts(2024, 1, 1),
     );
@@ -398,6 +466,7 @@ final class _Harness {
   }
 
   final _Repository repository;
+  final session = _session();
   final ConfirmedChoicePath path;
   late final ProviderContainer container;
   late final DailyChoiceCreationViewModelProvider provider;
@@ -524,3 +593,8 @@ ChoicePathStepId _stepId(int index) => switch (ChoicePathStepId.decode(
   ChoicePathStepIdDecodingSuccess(:final id) => id,
   InvalidChoicePathStepIdDecoding() => throw StateError('Некорректный ID.'),
 };
+
+DailyChoiceCreationFlowSession _session() => DailyChoiceCreationFlowSession(
+  rootMatchId: UniqueKey(),
+  originalHistory: const [],
+);
