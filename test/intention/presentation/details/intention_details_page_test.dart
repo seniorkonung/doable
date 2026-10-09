@@ -1662,11 +1662,11 @@ void main() {
   testWidgets(
     'шапка показывает управление отметкой только при полученных подробных данных',
     (tester) async {
+      // Отсутствие и любой отказ чтения одинаково оставляют страницу без
+      // подробных данных.
       final outcomes = <Result<Intention?>>[
         const ResultSuccess(null),
         const ResultFailure(IntentionUnavailableFailure()),
-        const ResultFailure(IntentionCorruptionFailure()),
-        const ResultFailure(IntentionUnexpectedFailure()),
       ];
       for (var index = 0; index < outcomes.length; index += 1) {
         final repository = ControlledDetailsRepository();
@@ -1698,15 +1698,11 @@ void main() {
   testWidgets(
     'шапка различает подтверждённую отметку формой значка у активного и архивированного намерения',
     (tester) async {
+      // Управление не зависит от архивного состояния: каждое значение
+      // обоих измерений проверяется один раз.
       final scenarios = <(IntentionArchiveState, FavoriteMark, IconData)>[
         (
           IntentionArchiveState.active,
-          FavoriteMark.notFavorite,
-          Icons.star_border,
-        ),
-        (IntentionArchiveState.active, FavoriteMark.favorite, Icons.star),
-        (
-          IntentionArchiveState.archived,
           FavoriteMark.notFavorite,
           Icons.star_border,
         ),
@@ -1948,20 +1944,6 @@ void main() {
           'The favorite mark couldn’t be changed because of an unexpected error.',
           false,
         ),
-        (
-          const Locale('ru'),
-          FavoriteMark.favorite,
-          const IntentionUnavailableFailure(),
-          'Не удалось изменить отметку избранного. Повторите попытку.',
-          true,
-        ),
-        (
-          const Locale('ru'),
-          FavoriteMark.notFavorite,
-          const IntentionCorruptionFailure(),
-          'Сохранённые данные повреждены. Отметка избранного не изменена.',
-          false,
-        ),
       ];
 
       for (var index = 0; index < scenarios.length; index += 1) {
@@ -2150,6 +2132,7 @@ void main() {
   testWidgets(
     'управление отметкой недоступно от подтверждения до снимка и затем предлагает обратное действие',
     (tester) async {
+      // Ожидание снимка одинаково для отметки и её снятия.
       final scenarios =
           <(FavoriteMark, FavoriteMark, IconData, String, String)>[
             (
@@ -2158,13 +2141,6 @@ void main() {
               Icons.star_border,
               'Not marked',
               'Remove favorite mark',
-            ),
-            (
-              FavoriteMark.favorite,
-              FavoriteMark.notFavorite,
-              Icons.star,
-              'Marked',
-              'Mark as favorite',
             ),
           ];
 

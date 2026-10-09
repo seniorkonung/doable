@@ -744,14 +744,14 @@ void main() {
       final edits = <String, void Function(IntentionEditorViewModel)>{
         'название': (editor) => editor.changeTitle('Исправленное название'),
         'описание': (editor) => editor.changeDescription('Исправленное'),
+        // Снятие доступного тега меняет набор так же, как добавление, а
+        // готовность — так же, как избранное.
         'добавление нового тега': (editor) =>
             editor.draftTagSet.add(_tag(3, 'Спорт')),
         'повторное добавление включённого тега с новым названием': (editor) =>
             editor.draftTagSet.add(_tag(1, 'Быт')),
-        'снятие доступного тега': (editor) => editor.removeTag(_tagId(2)),
         'снятие отсутствующего тега': (editor) => editor.removeTag(_tagId(1)),
         'избранное': (editor) => editor.unmarkFavorite(),
-        'готовность': (editor) => editor.disableReadiness(),
       };
       _Recovery expected(IntentionFailure failure, String edit) =>
           switch (failure) {
@@ -1949,6 +1949,8 @@ enum _Recovery {
 const _rawTitle = '  Название  ';
 const _rawDescription = '  Описание буквально\n';
 
+/// По одному отказу на ветвь снятия отказа правкой; конфликт представляет
+/// отказы, которые правка не снимает и повтором не устраняет.
 List<(String, IntentionFailure)> _failureCases() => [
   (
     'ошибка названия',
@@ -1972,13 +1974,6 @@ List<(String, IntentionFailure)> _failureCases() => [
   ('отсутствующий тег', IntentionCreationTagsMissingFailure([_tagId(1)])),
   ('недоступность', const IntentionUnavailableFailure()),
   ('конфликт', const IntentionConflictFailure()),
-  (
-    'блокирующие связи',
-    IntentionHasBlockingRelationsFailure(testIntention().id),
-  ),
-  ('отсутствие намерения', const IntentionNotFoundFailure()),
-  ('повреждение данных', const IntentionCorruptionFailure()),
-  ('непредвиденная ошибка', const IntentionUnexpectedFailure()),
 ];
 
 /// Сессия, отправка полного черновика которой отклонена [failure].

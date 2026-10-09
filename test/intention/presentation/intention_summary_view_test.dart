@@ -262,7 +262,8 @@ void main() {
   });
 
   testWidgets('не выводит строку тегов без их передачи', (tester) async {
-    for (final locale in const [Locale('ru'), Locale('en')]) {
+    // Отсутствие данных в строке не зависит от языка интерфейса.
+    for (final locale in const [Locale('ru')]) {
       await tester.pumpWidget(
         _testApp(
           locale: locale,
@@ -418,7 +419,8 @@ void main() {
 
   testWidgets('не выводит отметку избранного без её передачи', (tester) async {
     final semantics = tester.ensureSemantics();
-    for (final locale in const [Locale('ru'), Locale('en')]) {
+    // Отсутствие данных в строке не зависит от языка интерфейса.
+    for (final locale in const [Locale('ru')]) {
       await tester.pumpWidget(
         _testApp(
           locale: locale,

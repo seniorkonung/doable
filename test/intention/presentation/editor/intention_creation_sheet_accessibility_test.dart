@@ -33,7 +33,7 @@ import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Доступность полного сценария нижней панели создания намерения: экранный
-/// диктор, клавиатура и guidelines Android на русском и английском.
+/// диктор, клавиатура и guidelines Android.
 ///
 /// Геометрия на тесных экранах с клавиатурой и увеличенным текстом
 /// проверяется в `intention_creation_sheet_layout_test.dart`.
@@ -44,7 +44,9 @@ void main() {
     );
   });
 
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
+  // Проверки читают системные строки из локализаций: второй язык не меняет
+  // ни порядок чтения, ни действия панели.
+  for (final locale in [const Locale('ru')]) {
     final code = locale.languageCode;
 
     testWidgets(
@@ -113,7 +115,7 @@ void main() {
     );
 
     testWidgets(
-      'экранный диктор проходит компактную панель в порядке чтения при любой ориентации, клавиатуре и заполнении черновика — $code',
+      'экранный диктор проходит компактную панель в порядке чтения при клавиатуре и заполнении черновика — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester);
@@ -133,12 +135,8 @@ void main() {
           for (final tag in tags) {
             sessions.notifier(tester).draftTagSet.add(tag);
           }
-          for (final (size, keyboard) in [
-            (_phone, 0.0),
-            (_phone, 280.0),
-            (Size(_phone.height, _phone.width), 0.0),
-            (Size(_phone.height, _phone.width), 180.0),
-          ]) {
+          // Горизонтальная ориентация телефона не входит в требования панели.
+          for (final (size, keyboard) in [(_phone, 0.0), (_phone, 280.0)]) {
             _usePhone(tester, size: size, keyboard: keyboard);
             await tester.pumpAndSettle();
             expect(

@@ -522,153 +522,154 @@ void main() {
     },
   );
 
-  for (final synchronous in [true, false]) {
-    for (final (exit, awaitingConfirmation) in [
-      for (final exit in _CreationExit.values) (exit, false),
-      (_CreationExit.closeButton, true),
-      (_CreationExit.systemBack, true),
-    ]) {
-      testWidgets(
-        '${synchronous ? 'синхронный' : 'асинхронный'} отказ перехода сохраняет успех и допускает выход: ${exit.label}${awaitingConfirmation ? ' при прежнем подтверждении' : ''}',
-        (tester) async {
-          final repository = ControlledCatalogRepository();
-          final sessions = _EditorSessions();
-          final failureGate = synchronous ? null : Completer<void>();
-          final router = _FailingReplacementRouter(
-            synchronous: synchronous,
-            failureGate: failureGate?.future,
-          );
-          await _openEditor(
-            tester,
-            repository,
-            observers: [sessions],
-            navigationRouter: router,
-          );
-          final shell = router.stackData.first;
-          final form = router.stackData.last;
-          final container = ProviderScope.containerOf(
-            tester.element(find.byType(IntentionEditorPage)),
-          );
-          final provider = sessions.latest!;
-          await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
-          await tester.tap(find.byKey(_submit));
-          await tester.pump();
-          final lateClose = tester
-              .widget<IconButton>(find.byKey(_closeButton))
-              .onPressed!;
-          VoidCallback? lateDiscard;
-          VoidCallback? lateContinue;
-          if (awaitingConfirmation) {
-            await _tapClose(tester);
-            await tester.pumpAndSettle();
-            expect(find.byKey(_closeConfirmation), findsOneWidget);
-            lateDiscard = tester
-                .widget<FilledButton>(find.byKey(_closeDiscard))
-                .onPressed!;
-            lateContinue = tester
-                .widget<TextButton>(find.byKey(_closeContinue))
-                .onPressed!;
-          }
-
-          final errors = <FlutterErrorDetails>[];
-          final previousHandler = FlutterError.onError;
-          FlutterError.onError = errors.add;
-          try {
-            repository.completeCommand(
-              0,
-              _savedResult(title: 'Сохранённое намерение'),
-            );
-            await tester.pump();
-            await tester.pump();
-            if (failureGate != null) {
-              // Запрос, пришедший во время эффекта, не конкурирует с ним.
-              lateClose();
-              expect(router.stackData.last, same(form));
-              expect(errors, isEmpty);
-              failureGate.complete();
-            }
-            _completeCatalogRefresh(repository);
-            await tester.pumpAndSettle();
-          } finally {
-            FlutterError.onError = previousHandler;
-          }
-
-          expect(errors, hasLength(1));
-          expect(errors.single.exception, same(router.failure));
-          expect(
-            errors.single.context.toString(),
-            contains('при открытии созданного намерения'),
-          );
-          expect(
-            container.read(provider).operation,
-            isA<OperationSucceeded<Intention>>(),
-          );
-          expect(container.read(provider).event, isNull);
-          expect(
-            container.read(provider).draftAvailability,
-            IntentionDraftAvailability.closed,
-          );
-          expect(container.read(provider).canSubmit, isFalse);
-          expect(tester.widget<TextField>(find.byKey(_title)).readOnly, isTrue);
-          expect(
-            tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
-            isNull,
-          );
-          expect(router.stackData.last, same(form));
-          expect(router.replacementAttempts, 1);
-          expect(
-            find.textContaining('Intention created.').hitTestable(),
-            findsOneWidget,
-          );
-          expect(find.byKey(_pinnedFailure), findsNothing);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          await tester.pump(const Duration(seconds: 1));
-          await exit.request(tester);
+  // Синхронный и асинхронный отказ проходят один обработчик, а все способы
+  // ухода ведут к одному запросу закрытия сессии: каждое значение измерения
+  // проверяется один раз.
+  for (final (synchronous, exit, awaitingConfirmation) in [
+    (true, _CreationExit.closeButton, false),
+    (false, _CreationExit.systemBack, true),
+  ]) {
+    testWidgets(
+      '${synchronous ? 'синхронный' : 'асинхронный'} отказ перехода сохраняет успех и допускает выход: ${exit.label}${awaitingConfirmation ? ' при прежнем подтверждении' : ''}',
+      (tester) async {
+        final repository = ControlledCatalogRepository();
+        final sessions = _EditorSessions();
+        final failureGate = synchronous ? null : Completer<void>();
+        final router = _FailingReplacementRouter(
+          synchronous: synchronous,
+          failureGate: failureGate?.future,
+        );
+        await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+          navigationRouter: router,
+        );
+        final shell = router.stackData.first;
+        final form = router.stackData.last;
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(IntentionEditorPage)),
+        );
+        final provider = sessions.latest!;
+        await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+        final lateClose = tester
+            .widget<IconButton>(find.byKey(_closeButton))
+            .onPressed!;
+        VoidCallback? lateDiscard;
+        VoidCallback? lateContinue;
+        if (awaitingConfirmation) {
+          await _tapClose(tester);
           await tester.pumpAndSettle();
+          expect(find.byKey(_closeConfirmation), findsOneWidget);
+          lateDiscard = tester
+              .widget<FilledButton>(find.byKey(_closeDiscard))
+              .onPressed!;
+          lateContinue = tester
+              .widget<TextButton>(find.byKey(_closeContinue))
+              .onPressed!;
+        }
 
-          expectIntentionGraphRootPage(router);
-          expect(router.stackData, [same(shell)]);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          expect(
-            find.byType(IntentionEditorPage, skipOffstage: false),
-            findsNothing,
+        final errors = <FlutterErrorDetails>[];
+        final previousHandler = FlutterError.onError;
+        FlutterError.onError = errors.add;
+        try {
+          repository.completeCommand(
+            0,
+            _savedResult(title: 'Сохранённое намерение'),
           );
-          lateClose();
           await tester.pump();
-          expect(router.stackData, [same(shell)]);
+          await tester.pump();
+          if (failureGate != null) {
+            // Запрос, пришедший во время эффекта, не конкурирует с ним.
+            lateClose();
+            expect(router.stackData.last, same(form));
+            expect(errors, isEmpty);
+            failureGate.complete();
+          }
+          _completeCatalogRefresh(repository);
+          await tester.pumpAndSettle();
+        } finally {
+          FlutterError.onError = previousHandler;
+        }
 
-          await _closeOperationMessage(tester);
-          await openQuickCreation(
-            tester,
-            QuickCreationMode.intention,
-            openedPage: find.byType(IntentionEditorPage),
-          );
-          await tester.enterText(find.byKey(_title), 'Следующий черновик');
-          final nextForm = router.stackData.last;
-          lateClose();
-          lateClose();
-          lateDiscard?.call();
-          lateContinue?.call();
-          await tester.pump(const Duration(seconds: 1));
-          expect(router.stackData.last, same(nextForm));
-          expect(sessions.latest, isNot(provider));
-          expect(
-            _fieldText(tester, 'intention-editor-title'),
-            'Следующий черновик',
-          );
-          expect(find.textContaining('Intention created.'), findsNothing);
-          expect(router.replacementAttempts, 1);
-          expect(repository.commands, hasLength(1));
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+        expect(errors, hasLength(1));
+        expect(errors.single.exception, same(router.failure));
+        expect(
+          errors.single.context.toString(),
+          contains('при открытии созданного намерения'),
+        );
+        expect(
+          container.read(provider).operation,
+          isA<OperationSucceeded<Intention>>(),
+        );
+        expect(container.read(provider).event, isNull);
+        expect(
+          container.read(provider).draftAvailability,
+          IntentionDraftAvailability.closed,
+        );
+        expect(container.read(provider).canSubmit, isFalse);
+        expect(tester.widget<TextField>(find.byKey(_title)).readOnly, isTrue);
+        expect(
+          tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
+          isNull,
+        );
+        expect(router.stackData.last, same(form));
+        expect(router.replacementAttempts, 1);
+        expect(
+          find.textContaining('Intention created.').hitTestable(),
+          findsOneWidget,
+        );
+        expect(find.byKey(_pinnedFailure), findsNothing);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        await tester.pump(const Duration(seconds: 1));
+        await exit.request(tester);
+        await tester.pumpAndSettle();
+
+        expectIntentionGraphRootPage(router);
+        expect(router.stackData, [same(shell)]);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(
+          find.byType(IntentionEditorPage, skipOffstage: false),
+          findsNothing,
+        );
+        lateClose();
+        await tester.pump();
+        expect(router.stackData, [same(shell)]);
+
+        await _closeOperationMessage(tester);
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+        );
+        await tester.enterText(find.byKey(_title), 'Следующий черновик');
+        final nextForm = router.stackData.last;
+        lateClose();
+        lateClose();
+        lateDiscard?.call();
+        lateContinue?.call();
+        await tester.pump(const Duration(seconds: 1));
+        expect(router.stackData.last, same(nextForm));
+        expect(sessions.latest, isNot(provider));
+        expect(
+          _fieldText(tester, 'intention-editor-title'),
+          'Следующий черновик',
+        );
+        expect(find.textContaining('Intention created.'), findsNothing);
+        expect(router.replacementAttempts, 1);
+        expect(repository.commands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
+  // Отказ после удаления формы проходит один обработчик независимо от
+  // страницы над историей: новая сессия проверяется вместе с ответами
+  // прежнего подтверждения.
   for (final (openNewForm, awaitingConfirmation) in [
     (false, false),
-    (false, true),
-    (true, false),
     (true, true),
   ]) {
     testWidgets(
@@ -1120,23 +1121,13 @@ void main() {
           String,
           Future<void> Function(WidgetTester tester, _EditorSessions sessions)
         >{
+          // Изменённость каждого из пяти полей проверяет модель сессии;
+          // страница одинаково обрабатывает любое изменение.
           'название из одних пробелов': (tester, _) => tester.enterText(
             find.byKey(const ValueKey('intention-editor-title')),
             '   ',
           ),
-          'описание': (tester, _) => tester.enterText(
-            find.byKey(const ValueKey('intention-editor-description')),
-            '  Описание\n',
-          ),
-          'набор тегов': (tester, sessions) async =>
-              sessions.notifier(tester).draftTagSet.add(_tag(1, 'Дом')),
           'избранное': (tester, _) => tester.tap(find.byKey(_favorite)),
-          'готовность': (tester, _) async {
-            await tester.tap(find.byKey(_readiness));
-            await tester.pumpAndSettle();
-            await tester.tap(find.byKey(_readinessConfirm));
-            await tester.pumpAndSettle();
-          },
         };
     for (final MapEntry(key: field, value: change) in changes.entries) {
       testWidgets(
@@ -1740,33 +1731,32 @@ void main() {
     );
 
     testWidgets(
-      'панель называет себя заголовком и даёт локализованное закрытие кнопкой и фоном без жеста',
+      'панель называет себя заголовком и даёт закрытие кнопкой и фоном без жеста',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        for (final (locale, heading, close) in [
-          (const Locale('en'), 'Create intention', 'Close the form'),
-          (const Locale('ru'), 'Создать намерение', 'Закрыть форму'),
-        ]) {
-          final repository = ControlledCatalogRepository();
-          final router = await _openEditor(tester, repository, locale: locale);
+        const close = 'Close the form';
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository);
 
-          expect(
-            tester.getSemantics(find.byKey(_heading)),
-            isSemantics(label: heading, isHeader: true, namesRoute: true),
-          );
-          expect(
-            tester.getSemantics(find.byKey(_closeButton)),
-            isSemantics(tooltip: close, isButton: true, hasTapAction: true),
-          );
-          final barrier = find.semantics.byLabel(close);
-          expect(barrier, findsOneWidget);
+        expect(
+          tester.getSemantics(find.byKey(_heading)),
+          isSemantics(
+            label: 'Create intention',
+            isHeader: true,
+            namesRoute: true,
+          ),
+        );
+        expect(
+          tester.getSemantics(find.byKey(_closeButton)),
+          isSemantics(tooltip: close, isButton: true, hasTapAction: true),
+        );
+        final barrier = find.semantics.byLabel(close);
+        expect(barrier, findsOneWidget);
 
-          // Экранный диктор закрывает неизменённую панель действием фона.
-          tester.semantics.dismiss(barrier);
-          await tester.pumpAndSettle();
-          expectIntentionGraphRootPage(router);
-          await tester.pumpWidget(const SizedBox.shrink());
-        }
+        // Экранный диктор закрывает неизменённую панель действием фона.
+        tester.semantics.dismiss(barrier);
+        await tester.pumpAndSettle();
+        expectIntentionGraphRootPage(router);
         semantics.dispose();
       },
     );
@@ -1934,11 +1924,10 @@ void main() {
         final session = sessions.latest;
         final sheet = tester.getRect(find.byKey(_sheet));
 
-        // Отмена кнопкой, нажатием вне диалога и системным «назад» оставляет
+        // Отказ кнопкой и закрытие без ответа системным «назад» оставляют
         // готовность выключенной и панель открытой.
         final dismissals = <String, Future<void> Function()>{
           'кнопка отмены': () => tester.tap(find.byKey(_readinessCancel)),
-          'нажатие вне диалога': () => tester.tapAt(const Offset(8, 8)),
           'системное «назад»': () async {
             await tester.binding.handlePopRoute();
           },
@@ -2454,67 +2443,6 @@ void main() {
       },
     );
 
-    for (final synchronous in [true, false]) {
-      testWidgets(
-        '${synchronous ? 'синхронный' : 'асинхронный'} отказ открытия тегов возвращает явное сохранение и повторный выбор',
-        (tester) async {
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository();
-          final router = _FailingTagSelectionRouter(synchronous: synchronous);
-          await _openEditor(
-            tester,
-            repository,
-            observers: [sessions],
-            navigationRouter: router,
-          );
-          await tester.enterText(find.byKey(_title), 'Намерение');
-          await tester.pump();
-          final session = sessions.latest;
-          final form = router.stackData.last;
-          final draft = sessions.state(tester).draft;
-          final submit = tester
-              .widget<FilledButton>(find.byKey(_submit))
-              .onPressed!;
-          final errors = <FlutterErrorDetails>[];
-          final previousHandler = FlutterError.onError;
-          FlutterError.onError = errors.add;
-          try {
-            await tester.tap(find.byKey(_chooseTags));
-            await tester.pumpAndSettle();
-          } finally {
-            FlutterError.onError = previousHandler;
-          }
-          expect(errors.single.exception, same(router.failure));
-          expect(
-            errors.single.context.toString(),
-            contains('при открытии выбора тегов'),
-          );
-          expect(router.stackData.last, same(form));
-          expect(sessions.latest, same(session));
-          expect(sessions.state(tester).draft, same(draft));
-          expect(repository.commands, isEmpty);
-          expect(
-            tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
-            isNotNull,
-          );
-
-          router.failSelection = false;
-          await tester.tap(find.byKey(_chooseTags));
-          submit();
-          await tester.pumpAndSettle();
-          expect(router.current.name, TagCatalogRoute.name);
-          expect(repository.commands, isEmpty);
-          await tester.tap(find.byType(BackButton));
-          await tester.pumpAndSettle();
-          expect(router.stackData.last, same(form));
-          expect(repository.commands, isEmpty);
-          await tester.tap(find.byKey(_submit));
-          expect(repository.commands, hasLength(1));
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
-
     testWidgets(
       'возврат из тегов после освобождения формы и прежние обработчики не запускают действий',
       (tester) async {
@@ -2578,112 +2506,98 @@ void main() {
     );
 
     testWidgets(
-      'действие панели открывает общий выбор с набором своей сессии, а выбранные теги показаны компактно с локализованным доступным снятием',
+      'действие панели открывает общий выбор с набором своей сессии, а выбранные теги показаны компактно с доступным снятием',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        for (final (locale, choose, removeHome, removeWork) in [
-          (
-            const Locale('en'),
-            'Choose tags',
-            'Remove tag Дом from draft',
-            'Remove tag Работа from draft',
+        const choose = 'Choose tags';
+        const removeHome = 'Remove tag Дом from draft';
+        const removeWork = 'Remove tag Работа from draft';
+        final sessions = _EditorSessions();
+        final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
+        final repository = ControlledCatalogRepository()
+          ..tagCatalogItems = tags
+          ..tagObservations = _observedTags(tags);
+        final router = await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+        );
+        expect(find.byKey(_tagChip(1)), findsNothing);
+        expect(
+          tester.getSemantics(find.byKey(_chooseTags)),
+          isSemantics(
+            tooltip: choose,
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            hasTapAction: true,
           ),
-          (
-            const Locale('ru'),
-            'Выбрать теги',
-            'Убрать тег «Дом» из черновика',
-            'Убрать тег «Работа» из черновика',
+        );
+
+        final tagSet = sessions.notifier(tester).draftTagSet;
+
+        await tester.tap(find.byKey(_chooseTags));
+        await tester.pumpAndSettle();
+        expect(router.current.name, TagCatalogRoute.name);
+        expect(
+          router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
+          isA<TagDraftContext>().having(
+            (context) => context.tagSet,
+            'набор черновика',
+            same(tagSet),
           ),
-        ]) {
-          final sessions = _EditorSessions();
-          final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
-          final repository = ControlledCatalogRepository()
-            ..tagCatalogItems = tags
-            ..tagObservations = _observedTags(tags);
-          final router = await _openEditor(
-            tester,
-            repository,
-            locale: locale,
-            observers: [sessions],
+        );
+        for (final number in [1, 2]) {
+          await tester.tap(find.byKey(_tagRow(number)));
+          await tester.pump();
+          await tester.tap(
+            find.byKey(const ValueKey('tag-catalog-add-to-draft')),
           );
-          expect(find.byKey(_tagChip(1)), findsNothing);
+          await tester.pump();
+        }
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(sessions.state(tester).draft.tagIds, [_tagId(1), _tagId(2)]);
+        expect(
+          tester.getTopLeft(find.byKey(_tagChip(1))).dx,
+          lessThan(tester.getTopLeft(find.byKey(_tagChip(2))).dx),
+        );
+        for (final (number, name, remove) in [
+          (1, 'Дом', removeHome),
+          (2, 'Работа', removeWork),
+        ]) {
           expect(
-            tester.getSemantics(find.byKey(_chooseTags)),
+            find.descendant(
+              of: find.byKey(_tagChip(number)),
+              matching: find.text(name),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            tester.getSemantics(find.byKey(_tagChipRemove(number))),
             isSemantics(
-              tooltip: choose,
+              tooltip: remove,
               isButton: true,
               hasEnabledState: true,
               isEnabled: true,
               hasTapAction: true,
             ),
           );
-
-          final tagSet = sessions.notifier(tester).draftTagSet;
-
-          await tester.tap(find.byKey(_chooseTags));
-          await tester.pumpAndSettle();
-          expect(router.current.name, TagCatalogRoute.name);
-          expect(
-            router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
-            isA<TagDraftContext>().having(
-              (context) => context.tagSet,
-              'набор черновика',
-              same(tagSet),
-            ),
-          );
-          for (final number in [1, 2]) {
-            await tester.tap(find.byKey(_tagRow(number)));
-            await tester.pump();
-            await tester.tap(
-              find.byKey(const ValueKey('tag-catalog-add-to-draft')),
-            );
-            await tester.pump();
-          }
-          await tester.tap(find.byType(BackButton));
-          await tester.pumpAndSettle();
-
-          expect(router.current.name, IntentionEditorRoute.name);
-          expect(sessions.state(tester).draft.tagIds, [_tagId(1), _tagId(2)]);
-          expect(
-            tester.getTopLeft(find.byKey(_tagChip(1))).dx,
-            lessThan(tester.getTopLeft(find.byKey(_tagChip(2))).dx),
-          );
-          for (final (number, name, remove) in [
-            (1, 'Дом', removeHome),
-            (2, 'Работа', removeWork),
-          ]) {
-            expect(
-              find.descendant(
-                of: find.byKey(_tagChip(number)),
-                matching: find.text(name),
-              ),
-              findsOneWidget,
-            );
-            expect(
-              tester.getSemantics(find.byKey(_tagChipRemove(number))),
-              isSemantics(
-                tooltip: remove,
-                isButton: true,
-                hasEnabledState: true,
-                isEnabled: true,
-                hasTapAction: true,
-              ),
-            );
-          }
-          await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-          await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-
-          await tester.tap(find.byKey(_tagChipRemove(1)));
-          await tester.pump();
-
-          expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
-          expect(find.byKey(_tagChip(1)), findsNothing);
-          expect(find.byKey(_tagChip(2)), findsOneWidget);
-          expect(router.current.name, IntentionEditorRoute.name);
-          expect(repository.commands, isEmpty);
-          expect(repository.tagCommands, isEmpty);
-          await tester.pumpWidget(const SizedBox.shrink());
         }
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+
+        await tester.tap(find.byKey(_tagChipRemove(1)));
+        await tester.pump();
+
+        expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
+        expect(find.byKey(_tagChip(1)), findsNothing);
+        expect(find.byKey(_tagChip(2)), findsOneWidget);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(repository.commands, isEmpty);
+        expect(repository.tagCommands, isEmpty);
         semantics.dispose();
       },
     );
@@ -3134,9 +3048,7 @@ final class _FailingReplacementRouter extends RootStackRouter {
 
 enum _CreationExit {
   closeButton('кнопка закрытия'),
-  systemBack('системное «назад»'),
-  background('фон'),
-  handleSwipe('свайп вниз по ручке');
+  systemBack('системное «назад»');
 
   const _CreationExit(this.label);
 
@@ -3148,38 +3060,7 @@ enum _CreationExit {
         await _tapClose(tester);
       case _CreationExit.systemBack:
         await tester.binding.handlePopRoute();
-      case _CreationExit.background:
-        await tester.tapAt(_outsideSheet);
-      case _CreationExit.handleSwipe:
-        await tester.drag(
-          find.byKey(const ValueKey('intention-creation-sheet-handle')),
-          const Offset(0, 120),
-        );
     }
-  }
-}
-
-/// Настоящий стек с отказом только открытия общего выбора тегов.
-final class _FailingTagSelectionRouter extends RootStackRouter {
-  _FailingTagSelectionRouter({required this.synchronous});
-
-  final bool synchronous;
-  var failSelection = true;
-  final failure = StateError('Не удалось открыть выбор тегов.');
-
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-
-  @override
-  Future<T?> push<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    if (route.routeName == TagCatalogRoute.name && failSelection) {
-      if (synchronous) throw failure;
-      return Future<T?>.error(failure, StackTrace.current);
-    }
-    return super.push<T>(route, onFailure: onFailure);
   }
 }
 

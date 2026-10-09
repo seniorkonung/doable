@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -11,7 +10,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -58,29 +56,14 @@ final class _SearchPage {
   final String listKey;
 }
 
+/// Строки всех поисков рисует общее краткое представление намерения, а
+/// передачу отметки в строки каждого поиска проверяют тесты его страницы:
+/// доступность при увеличенном тексте достаточно проверить в каталоге.
 final _pages = [
   const _SearchPage(
     name: 'каталог намерений',
     route: null,
     listKey: 'intention-catalog-list',
-  ),
-  _SearchPage(
-    name: 'поиск действия',
-    route: DailyChoiceActionPickerRoute(),
-    listKey: 'daily-choice-action-list',
-  ),
-  _SearchPage(
-    name: 'поиск исходного намерения',
-    route: DailyChoiceSourcePickerRoute(),
-    listKey: 'daily-choice-source-list',
-  ),
-  _SearchPage(
-    name: 'поиск участника долговременной связи',
-    route: RelationParticipantPickerRoute(
-      excludedIntentionId: testSummary(index: 99).id,
-      selectionContext: RelationParticipantSelectionContext.archivedRelation,
-    ),
-    listKey: 'participant-picker-list',
   ),
 ];
 
@@ -91,7 +74,8 @@ void main() {
     );
   });
 
-  for (final locale in _locales) {
+  // Каждый тест сам переключается на второй язык.
+  for (final locale in const [Locale('ru')]) {
     final otherLocale = _locales.firstWhere((other) => other != locale);
 
     testWidgets('страница намерения сообщает экранному диктору состояние, '

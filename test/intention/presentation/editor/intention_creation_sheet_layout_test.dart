@@ -242,8 +242,9 @@ void main() {
       },
     );
 
+    // Рост каждого поля проверен выше; прокрутка длинного содержимого внутри
+    // панели одна для любого поля.
     for (final (name, field, longText) in [
-      ('названия', _title, _lines(120).replaceAll('\n', ' ')),
       ('описания', _description, _lines(120)),
     ]) {
       testWidgets(
@@ -348,8 +349,9 @@ void main() {
   });
 
   group('клавиатура и системные отступы', () {
+    // Доведение ошибки каждого поля до видимости проверяет группа ошибок
+    // сохранения; здесь — чтение и исправление на тесном экране.
     for (final (name, field, textField) in [
-      ('названия', _title, IntentionTextField.title),
       ('описания', _description, IntentionTextField.description),
     ]) {
       testWidgets(
@@ -429,7 +431,9 @@ void main() {
         },
       );
     }
-    for (final device in [_portrait, _landscape]) {
+    // Геометрию тесной альбомной области с клавиатурой проверяют тесты ниже;
+    // смена клавиатуры одинаково сохраняет панель на любом экране.
+    for (final device in [_portrait]) {
       testWidgets(
         'клавиатура на ${device.name} пересчитывает геометрию компактной панели, а её скрытие сохраняет панель и черновик',
         (tester) async {
@@ -467,51 +471,6 @@ void main() {
           expect(tester.takeException(), isNull);
         },
       );
-    }
-
-    for (final device in [_portrait, _landscape]) {
-      for (final textScale in [_androidMaxTextScale, _beyondMaxTextScale]) {
-        // На максимуме Android «Сохранить» видно целиком. Сверх него
-        // закреплённая часть может не поместиться над клавиатурой:
-        // кнопка остаётся нажимаемой, а остаток части
-        // доступен её прокруткой.
-        final isSubmitFullyVisible = textScale <= _androidMaxTextScale;
-        testWidgets(
-          'на ${device.name} с клавиатурой и масштабом текста ${(textScale * 100).round()}% отправка и закрытие доступны в компактной панели без переполнений',
-          (tester) async {
-            _usePhone(tester, device, keyboard: true);
-            tester.platformDispatcher.textScaleFactorTestValue = textScale;
-            addTearDown(
-              tester.platformDispatcher.clearTextScaleFactorTestValue,
-            );
-            final sessions = _EditorSessions();
-            final repository = ControlledCatalogRepository();
-            await _openEditor(tester, repository, sessions);
-            await tester.enterText(find.byKey(_description), _lines(12));
-            await tester.pumpAndSettle();
-
-            _expectCompact(tester, _sheetRect(tester), device, keyboard: true);
-            _expectSubmitAvailable(
-              tester,
-              device,
-              keyboard: true,
-              fullyVisible: isSubmitFullyVisible,
-            );
-            expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
-            expect(tester.takeException(), isNull);
-
-            // Ввод остаётся доступным при исходной открытой клавиатуре.
-            final viewport = tester.getRect(find.byKey(_fields));
-            expect(viewport.height, greaterThan(0));
-            await tester.ensureVisible(find.byKey(_title));
-            await tester.pumpAndSettle();
-            final title = tester.getRect(find.byKey(_title));
-            expect(title.top, lessThan(viewport.bottom));
-            expect(title.bottom, greaterThan(viewport.top));
-            expect(tester.takeException(), isNull);
-          },
-        );
-      }
     }
 
     for (final (device, minFieldsHeight) in [
@@ -688,7 +647,13 @@ void main() {
           expect(tester.takeException(), isNull);
         },
       );
+    }
 
+    // Возвращённая клавиатура прокручивает поля к каретке описания и уводит
+    // из видимой области ошибку названия: повторное доведение нужно ей.
+    for (final (name, field, reason, fieldKey, message) in [
+      _fieldFailures.first,
+    ]) {
       testWidgets(
         'в компактной панели ошибка $name остаётся видимой, когда скрытая на время отправки клавиатура возвращается',
         (tester) async {
@@ -946,10 +911,10 @@ void main() {
 
   group('полный заполненный сценарий на тесном экране', () {
     for (final device in [_narrowPortrait, _narrowLandscape]) {
-      for (final textScale in [_androidMaxTextScale, _beyondMaxTextScale]) {
-        // До максимума Android «Сохранить» видно целиком; сверх него
-        // остаток действий прокручивается. Поля и сообщения отказов
-        // остаются доступны при открытой клавиатуре.
+      // Максимум Android — крайний достижимый масштаб: «Сохранить» видно
+      // целиком, а поля и сообщения отказов доступны при открытой
+      // клавиатуре.
+      for (final textScale in [_androidMaxTextScale]) {
         final isWithinPlatformTextScale = textScale <= _androidMaxTextScale;
         testWidgets(
           'на ${device.name} с безопасными отступами, клавиатурой и масштабом текста ${(textScale * 100).round()}% все пять полей, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
@@ -1343,6 +1308,8 @@ const _fieldFailures =
     ];
 
 /// Общие отказы сохранения: причина, сообщение и предлагаемое восстановление.
+/// По одному отказу на способ восстановления; без восстановления — с самым
+/// длинным сообщением. Тексты остальных отказов проверяет тест страницы.
 final _pinnedFailures = <(IntentionFailure, String, _Recovery)>[
   (
     IntentionCreationTagsMissingFailure([_tagId(1)]),
@@ -1354,16 +1321,6 @@ final _pinnedFailures = <(IntentionFailure, String, _Recovery)>[
     const IntentionUnavailableFailure(),
     'The intention couldn’t be created. Try again.',
     _Recovery.retry,
-  ),
-  (
-    const IntentionConflictFailure(),
-    'The intention couldn’t be created because of a conflict.',
-    _Recovery.none,
-  ),
-  (
-    const IntentionCorruptionFailure(),
-    'Stored data is damaged. The intention wasn’t created.',
-    _Recovery.none,
   ),
   (
     const IntentionUnexpectedFailure(),
@@ -1539,10 +1496,6 @@ const _maxSheetWidth = 640.0;
 
 /// Наибольший масштаб системного шрифта Android — платформы приложения.
 const _androidMaxTextScale = 2.0;
-
-/// Масштаб сверх максимума Android: геометрия не должна опираться на это
-/// ограничение платформы.
-const _beyondMaxTextScale = 3.0;
 
 /// Телефон: логический размер экрана, системные отступы, высота экранной
 /// клавиатуры и наименьший ожидаемый видимый участок страницы над

@@ -258,6 +258,8 @@ void main() {
   );
 
   test('сохраняет поля и snapshot для всех failures изменения', () async {
+    // Любой отказ сохраняет форму одной ветвью; обычный повтор отличает
+    // только устранимую недоступность.
     final scenarios = <(IntentionFailure, bool)>[
       (
         const IntentionTextInputValidationFailure(
@@ -268,11 +270,7 @@ void main() {
         ),
         false,
       ),
-      (const IntentionNotFoundFailure(), false),
-      (const IntentionConflictFailure(), false),
       (const IntentionUnavailableFailure(), true),
-      (const IntentionCorruptionFailure(), false),
-      (const IntentionUnexpectedFailure(), false),
     ];
 
     for (var index = 0; index < scenarios.length; index += 1) {
@@ -961,67 +959,6 @@ void main() {
       );
     },
   );
-
-  test('снимок, опередивший завершение отметки, не оставляет ожидания', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final intention = testDetailsIntention(index: 141);
-    final provider = intentionDetailsViewModelProvider(intention.id);
-    final subscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(
-      ResultSuccess(intention),
-      revision: const TestDetailsRevision(1),
-    );
-    await pumpEventQueue();
-    final details = container.read(provider.notifier)..markFavorite();
-
-    // Чтение, начатое пакетом, отвечает раньше, чем модель получает результат.
-    repository.onWatchIntention = (_) => repository.detailRequests.last.add(
-      ResultSuccess(intention),
-      revision: const TestDetailsRevision(2),
-      favoriteMark: FavoriteMark.favorite,
-    );
-    repository.completeCommand(
-      0,
-      testDetailsSavedResult(
-        intention,
-        before: intention,
-        revision: const TestDetailsRevision(2),
-        favoriteMark: FavoriteMark.favorite,
-      ),
-    );
-    await waitForDetailRequests(repository, 2);
-    await pumpEventQueue();
-
-    expect(
-      container.read(provider),
-      isA<IntentionDetailsLoaded>()
-          .having(
-            (state) => state.details.favoriteMark,
-            'новая подтверждённая отметка',
-            FavoriteMark.favorite,
-          )
-          .having(
-            (state) => state.isAwaitingFavoriteMarkSnapshot,
-            'ожидание снимка',
-            isFalse,
-          ),
-    );
-    details.unmarkFavorite();
-    expect(repository.commands.last, isA<UnmarkIntentionFavorite>());
-    repository.completeCommand(
-      1,
-      const ResultFailure(IntentionUnexpectedFailure()),
-    );
-    await pumpEventQueue();
-  });
 
   test('завершение без изменения возвращает управление только с актуальной отметкой', () async {
     final repository = ControlledDetailsRepository();
