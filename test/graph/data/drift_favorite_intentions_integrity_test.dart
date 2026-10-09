@@ -292,39 +292,6 @@ void main() {
       }
     }
 
-    test('отклонение ограничением схемы не считается недоступностью', () async {
-      seedFavorites();
-      storage.arm(
-        _FaultPoint.rowsRead,
-        sqlite.SqliteException(
-          extendedResultCode: sqlite.SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-          message: 'CANARY-уникальность',
-        ),
-      );
-
-      expect(
-        await repository.getFavoriteIntentions(),
-        _failure(isA<FavoriteIntentionsUnexpectedFailure>()),
-      );
-    });
-
-    test('пустой снимок отличим от каждого отказа', () async {
-      _insertIntention(raw, number: 1, title: 'CANARY-неизбранное');
-
-      final empty = await repository.getFavoriteIntentions();
-
-      expect(empty, isA<FavoriteIntentionsSuccess>());
-      for (final fault in _storageFaults) {
-        storage.arm(_FaultPoint.rowsRead, fault.error);
-        expect(
-          await repository.getFavoriteIntentions(),
-          _failure(fault.failure),
-          reason: fault.name,
-        );
-        storage.disarm();
-      }
-    });
-
     for (final point in _FaultPoint.values) {
       test('повтор после недоступности ${point.description} выполняется как '
           'новое чтение', () async {

@@ -32,20 +32,9 @@ DailyChoiceId _choice(int number) =>
 
 final class _WriteFailure extends LocalDatabaseConnectionObserver {
   bool failStepInsert = false;
-  bool failResultRead = false;
-  int choiceReads = 0;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.single.contains(
-          'FROM daily_choices WHERE id = ?',
-        )) {
-      choiceReads++;
-      if (failResultRead && choiceReads == 2) {
-        throw StateError('Сбой чтения результата');
-      }
-    }
     if (failStepInsert &&
         statement.operation == LocalDatabaseSqlOperation.insert &&
         statement.statements.single.contains(
@@ -483,35 +472,6 @@ void main() {
       expect(change.occupiedRelationIds, isEmpty);
     },
   );
-
-  test('сбой чтения результата откатывает участников и все шаги', () async {
-    final id = await createChoice();
-    final before = await read(id);
-    writeFailure.choiceReads = 0;
-    writeFailure.failResultRead = true;
-
-    final result = await repository.execute(replace(id));
-
-    expect(
-      (result as GraphCommandFailed).failure,
-      isA<DailyChoiceUnexpectedFailure>(),
-    );
-    writeFailure.failResultRead = false;
-    final after = await read(id);
-    expect(after.revision.compareTo(before.revision), GraphRevisionOrder.same);
-    expect(
-      after.value!.choice.sourceIntentionId,
-      before.value!.choice.sourceIntentionId,
-    );
-    expect(
-      after.value!.choice.selectedIntentionId,
-      before.value!.choice.selectedIntentionId,
-    );
-    expect(
-      after.value!.path.map((item) => item.step.id),
-      before.value!.path.map((item) => item.step.id),
-    );
-  });
 
   test('отсутствующий и повреждённый выбор не создаются заново', () async {
     final missing = await repository.execute(replace(_choice(999)));

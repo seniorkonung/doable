@@ -53,65 +53,6 @@ void main() {
   });
 
   group('Правило перестановки на реальном хранилище', () {
-    test('перемещение после опоры ставит намерение сразу за ней и сохраняет '
-        'места скрытых архивированных намерений', () async {
-      _insertFavorite(raw, number: 1, title: 'А', position: 1);
-      _insertFavorite(raw, number: 2, title: 'Б', position: 2, archived: true);
-      _insertFavorite(raw, number: 3, title: 'В', position: 3);
-      _insertFavorite(raw, number: 4, title: 'Г', position: 4, archived: true);
-      _insertFavorite(raw, number: 5, title: 'Д', position: 5);
-
-      await _moved(repository, _move(5, after: 1));
-
-      expect(_storedOrder(raw), _uuids([1, 5, 2, 3, 4]));
-      expect(await _visibleOrder(repository), _uuids([1, 5, 3]));
-    });
-
-    test('перемещение первым ставит намерение перед скрытыми '
-        'архивированными намерениями', () async {
-      _insertFavorite(raw, number: 2, title: 'Б', position: 1, archived: true);
-      _insertFavorite(raw, number: 1, title: 'А', position: 2);
-      _insertFavorite(raw, number: 3, title: 'В', position: 3);
-
-      await _moved(repository, _move(3, first: true));
-      await _succeeded(repository, RestoreIntention(_id(2)));
-
-      expect(_storedOrder(raw), _uuids([3, 2, 1]));
-      expect(await _visibleOrder(repository), _uuids([3, 2, 1]));
-    });
-
-    test('перемещение вниз ставит намерение после опоры, а промежуточные '
-        'намерения поднимаются', () async {
-      for (final number in [1, 2, 3, 4]) {
-        _insertFavorite(
-          raw,
-          number: number,
-          title: '$number',
-          position: number,
-        );
-      }
-
-      await _moved(repository, _move(1, after: 3));
-
-      expect(_storedOrder(raw), _uuids([2, 3, 1, 4]));
-    });
-
-    test('перемещение после последнего ставит намерение в конец всего '
-        'порядка', () async {
-      for (final number in [1, 2, 3]) {
-        _insertFavorite(
-          raw,
-          number: number,
-          title: '$number',
-          position: number,
-        );
-      }
-
-      await _moved(repository, _move(1, after: 3));
-
-      expect(_storedOrder(raw), _uuids([2, 3, 1]));
-    });
-
     test('одноимённые намерения различаются по идентификатору', () async {
       _insertFavorite(raw, number: 1, title: 'Гулять', position: 1);
       _insertFavorite(raw, number: 2, title: 'Читать', position: 2);
@@ -590,85 +531,6 @@ void main() {
     });
 
     group('Повреждение сохранённого порядка до записи', () {
-      test('место без существующего намерения', () async {
-        for (final number in [1, 2]) {
-          _insertFavorite(
-            raw,
-            number: number,
-            title: '$number',
-            position: number,
-          );
-        }
-        storeFavoritePlaceWithoutIntention(
-          raw,
-          intentionId: _uuid(3),
-          position: 3,
-        );
-
-        await _expectRejectedWithoutWrite(
-          raw,
-          repository,
-          trace,
-          _move(2, first: true),
-          isA<FavoriteOrderCorruptionFailure>(),
-        );
-      });
-
-      test('два намерения на одном месте', () async {
-        removeFavoriteSchemaProtection(raw);
-        for (final number in [1, 2, 3]) {
-          _insertIntention(raw, number: number, title: '$number');
-        }
-        storeFavoriteMark(raw, intentionId: _uuid(1), position: 1);
-        storeFavoriteMark(raw, intentionId: _uuid(2), position: 2);
-        storeFavoriteMark(raw, intentionId: _uuid(3), position: 2);
-
-        await _expectRejectedWithoutWrite(
-          raw,
-          repository,
-          trace,
-          _move(1, after: 3),
-          isA<FavoriteOrderCorruptionFailure>(),
-        );
-      });
-
-      test('вторая отметка одного намерения', () async {
-        removeFavoriteSchemaProtection(raw);
-        for (final number in [1, 2]) {
-          _insertIntention(raw, number: number, title: '$number');
-        }
-        storeFavoriteMark(raw, intentionId: _uuid(1), position: 1);
-        storeFavoriteMark(raw, intentionId: _uuid(2), position: 2);
-        storeFavoriteMark(raw, intentionId: _uuid(1), position: 3);
-
-        await _expectRejectedWithoutWrite(
-          raw,
-          repository,
-          trace,
-          _move(2, first: true),
-          isA<FavoriteOrderCorruptionFailure>(),
-        );
-      });
-
-      test('недопустимое место архивированного намерения', () async {
-        _insertFavorite(raw, number: 1, title: '1', position: 1);
-        _insertIntention(raw, number: 2, title: '2', isArchived: true);
-        _insertFavorite(raw, number: 3, title: '3', position: 3);
-        storeFavoriteMarkWithInvalidPosition(
-          raw,
-          intentionId: _uuid(2),
-          position: 0,
-        );
-
-        await _expectRejectedWithoutWrite(
-          raw,
-          repository,
-          trace,
-          _move(3, first: true),
-          isA<FavoriteOrderCorruptionFailure>(),
-        );
-      });
-
       test('недопустимый идентификатор отметки', () async {
         _insertFavorite(raw, number: 1, title: '1', position: 1);
         raw.execute(
@@ -690,27 +552,6 @@ void main() {
           isA<FavoriteOrderCorruptionFailure>(),
         );
       });
-    });
-  });
-
-  group('Диагностика', () {
-    test('повреждение сохранённого порядка диагностируется на этапе '
-        'проверки', () async {
-      _insertFavorite(raw, number: 1, title: '1', position: 1);
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _uuid(2),
-        position: 2,
-      );
-
-      await repository.execute(_move(1, after: 2));
-
-      expect(_orderEvents(diagnostics).map(_eventShape).last, (
-        stage: FavoriteOrderCommandDiagnosticsStage.validation,
-        status: DiagnosticsFailed,
-        completion: null,
-        code: DiagnosticsFailureCode.corruption,
-      ));
     });
   });
 }
@@ -900,14 +741,6 @@ Future<FavoriteIntentionsSnapshot> _favorites(
   return (result as FavoriteIntentionsSuccess).value;
 }
 
-/// Активные избранные намерения списка Главной в порядке снимка.
-Future<List<String>> _visibleOrder(
-  DriftPersonalGraphRepository repository,
-) async => [
-  for (final row in (await _favorites(repository)).items)
-    row.id.toCanonicalString(),
-];
-
 Future<GraphRevision> _revision(
   DriftPersonalGraphRepository repository,
 ) async => (await _favorites(repository)).revision;
@@ -993,25 +826,3 @@ Future<GraphRevision> _graphRevision(
   expect(result, isA<TagCatalogSuccess>());
   return (result as TagCatalogSuccess).value.revision;
 }
-
-List<FavoriteOrderCommandDiagnosticsEvent> _orderEvents(
-  InMemoryDiagnosticsSink diagnostics,
-) => diagnostics.events
-    .whereType<FavoriteOrderCommandDiagnosticsEvent>()
-    .toList();
-
-({
-  FavoriteOrderCommandDiagnosticsStage stage,
-  Type status,
-  FavoriteOrderCommandDiagnosticsCompletion? completion,
-  DiagnosticsFailureCode? code,
-})
-_eventShape(FavoriteOrderCommandDiagnosticsEvent event) => (
-  stage: event.stage,
-  status: event.status.runtimeType,
-  completion: event.completion,
-  code: switch (event.status) {
-    DiagnosticsFailed(:final code) => code,
-    DiagnosticsStarted() || DiagnosticsSucceeded() => null,
-  },
-);

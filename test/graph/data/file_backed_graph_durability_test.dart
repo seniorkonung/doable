@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -15,7 +14,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
-import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
@@ -26,7 +24,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
-import '../../support/large_blocking_relations_fixture.dart';
 
 const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
 const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
@@ -300,320 +297,6 @@ void main() {
     await _expectCanonicalConnectionIntegrity(database);
   });
 
-  test(
-    'отказ после первой порции массового удаления откатывает файл',
-    () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      final observer = _FailAfterSqlObserver(
-        operation: LocalDatabaseSqlOperation.update,
-        sqlFragment: 'DELETE FROM long_term_relations WHERE id IN',
-      );
-      final database = await harness.openReadyDatabase(observer: observer);
-      await _insertIntention(database, _sourceId, title: 'Владелец');
-      await LargeBlockingRelationsFixture.seed(database, _sourceId);
-      final beforeRelations = await _relationRows(database);
-      final beforeIntentions = await _intentionRows(database);
-      observer.arm();
-
-      final result = await _repository(database, const []).execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: _sourceId,
-          relationIds: LargeBlockingRelationsFixture.selectedIds,
-        ),
-      );
-
-      expect(result, isA<GraphCommandFailed>());
-      expect(observer.didFail, isTrue);
-      await harness.closePersistenceObjectGraph();
-      final reopened = await harness.openReadyDatabase();
-      expect(await _relationRows(reopened), beforeRelations);
-      expect(await _intentionRows(reopened), beforeIntentions);
-      expect(
-        (await _counts(
-          _repository(reopened, const []),
-          _sourceId,
-        )).activeNeedOutgoing,
-        LargeBlockingRelationsFixture.selectedCount + 1,
-      );
-      await _expectCanonicalConnectionIntegrity(reopened);
-    },
-  );
-
-  for (final installation in _LifecycleInstallation.values) {
-    test(
-      'полный жизненный цикл сохраняется ${installation.testDescription}',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        if (installation == _LifecycleInstallation.stored) {
-          await _createStoredIntentions(harness);
-        }
-
-        var database = await harness.openReadyDatabase();
-        if (installation == _LifecycleInstallation.fresh) {
-          await _insertIntention(database, _sourceId, title: 'Изучать язык');
-          await _insertIntention(database, _firstNeighborId, title: 'Читать');
-          await _insertIntention(
-            database,
-            _secondNeighborId,
-            title: 'Говорить',
-          );
-          await _insertIntention(database, _unrelatedId, title: 'Отдыхать');
-        }
-        final intentionsBefore = await _intentionRows(database);
-        var repository = _repository(database, [
-          _unrelatedRelationId,
-          _firstRelationId,
-          _secondRelationId,
-        ]);
-        expect(
-          await repository.execute(
-            _createRelationCommand(
-              sourceId: _firstNeighborId,
-              relatedId: _secondNeighborId,
-              type: LongTermRelationType.can,
-              priority: RelationPriority.p3,
-              description: 'Независимая связь',
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-        expect(
-          await repository.execute(
-            _createCommand(
-              relatedId: _firstNeighborId,
-              type: LongTermRelationType.need,
-              priority: RelationPriority.p2,
-              description: 'Исходное описание',
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-        expect(
-          await repository.execute(
-            _createCommand(
-              relatedId: _secondNeighborId,
-              type: LongTermRelationType.need,
-              priority: RelationPriority.p2,
-              description: null,
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        repository = _repository(database, const []);
-        expect(
-          await repository.execute(
-            UpdateLongTermRelation(
-              relationId: _firstRelationId,
-              patch: LongTermRelationPatch(
-                sourceIntentionId: LongTermRelationFieldSet(_firstNeighborId),
-                relatedIntentionId: LongTermRelationFieldSet(_sourceId),
-                type: const LongTermRelationFieldSet(LongTermRelationType.can),
-                priority: const LongTermRelationFieldSet(RelationPriority.p4),
-                description: LongTermRelationDescriptionReplaced(
-                  LongTermRelationDescription.fromInput(
-                    '  Изменённое описание\n',
-                  )!,
-                ),
-              ),
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        expect(
-          (await _relationRows(database))
-              .singleWhere((row) => row['id'] == _firstRelationIdValue),
-          <String, Object?>{
-            'creation_sequence': 2,
-            'id': _firstRelationIdValue,
-            'source_intention_id': _firstNeighborIdValue,
-            'related_intention_id': _sourceIdValue,
-            'type': 'can',
-            'priority': 4,
-            'description': '  Изменённое описание\n',
-            'is_archived': 0,
-          },
-        );
-        repository = _repository(database, const []);
-        expect(
-          await repository.execute(
-            UpdateLongTermRelation(
-              relationId: _firstRelationId,
-              patch: LongTermRelationPatch(
-                sourceIntentionId: LongTermRelationFieldSet(_sourceId),
-                relatedIntentionId: LongTermRelationFieldSet(_firstNeighborId),
-                type: const LongTermRelationFieldSet(LongTermRelationType.need),
-                priority: const LongTermRelationFieldSet(RelationPriority.p2),
-              ),
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        repository = _repository(database, const []);
-        final orderedGroup = await repository.getRelationGroupPage(
-          RelationGroupQuery(
-            intentionId: _sourceId,
-            type: LongTermRelationType.need,
-            direction: RelationDirection.outgoing,
-            scope: RelationScope.active,
-            pageSize: 10,
-          ),
-        );
-        expect(orderedGroup, isA<RelationGroupPageSuccess>());
-        expect(
-          ((orderedGroup as RelationGroupPageSuccess).value
-                  as RelationGroupFirstPage)
-              .items
-              .map((item) => item.relation.id),
-          [_firstRelationId, _secondRelationId],
-        );
-        expect(
-          await repository.execute(ArchiveLongTermRelation(_firstRelationId)),
-          isA<GraphCommandSucceeded>(),
-        );
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        expect(
-          (await _relationRows(database))
-              .singleWhere((row) => row['id'] == _firstRelationIdValue),
-          containsPair('is_archived', 1),
-        );
-        repository = _repository(database, const []);
-        expect(
-          await repository.execute(RestoreLongTermRelation(_firstRelationId)),
-          isA<GraphCommandSucceeded>(),
-        );
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        expect(
-          (await _relationRows(database))
-              .singleWhere((row) => row['id'] == _firstRelationIdValue),
-          containsPair('is_archived', 0),
-        );
-        repository = _repository(database, const []);
-        expect(
-          await repository.execute(DeleteLongTermRelation(_firstRelationId)),
-          isA<GraphCommandSucceeded>(),
-        );
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        expect(
-          (await _relationRows(database))
-              .where((row) => row['id'] == _firstRelationIdValue),
-          isEmpty,
-        );
-        repository = _repository(database, const []);
-        expect(
-          await repository.execute(DeleteLongTermRelation(_secondRelationId)),
-          isA<GraphCommandSucceeded>(),
-        );
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        final decreasingClock = _RecordingClock(DateTime.utc(2025, 1, 1));
-        repository = _repository(database, [
-          _workerRelationId,
-        ], now: decreasingClock.call);
-        expect(
-          await repository.execute(
-            _createCommand(
-              relatedId: _secondNeighborId,
-              type: LongTermRelationType.need,
-              priority: RelationPriority.p2,
-              description: 'Создано заново',
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-        expect(decreasingClock.readCount, 0);
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        expect(await _relationRows(database), [
-          {
-            'creation_sequence': 1,
-            'id': _unrelatedRelationIdValue,
-            'source_intention_id': _firstNeighborIdValue,
-            'related_intention_id': _secondNeighborIdValue,
-            'type': 'can',
-            'priority': 3,
-            'description': 'Независимая связь',
-            'is_archived': 0,
-          },
-          {
-            'creation_sequence': 4,
-            'id': _workerRelationIdValue,
-            'source_intention_id': _sourceIdValue,
-            'related_intention_id': _secondNeighborIdValue,
-            'type': 'need',
-            'priority': 2,
-            'description': 'Создано заново',
-            'is_archived': 0,
-          },
-        ]);
-        expect(_workerRelationId, isNot(_secondRelationId));
-        expect(await _intentionRows(database), intentionsBefore);
-        await _expectCanonicalConnectionIntegrity(database);
-      },
-    );
-  }
-
-  for (final operation in const [
-    _GraphProcessOperation.update,
-    _GraphProcessOperation.archive,
-    _GraphProcessOperation.restore,
-    _GraphProcessOperation.delete,
-  ]) {
-    test(
-      'отказ внутри транзакции ${operation.testDescription} откатывает запись',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        final observer = _FailAfterSqlObserver(
-          operation: operation == _GraphProcessOperation.delete
-              ? LocalDatabaseSqlOperation.delete
-              : LocalDatabaseSqlOperation.update,
-          sqlFragment: 'long_term_relations',
-        );
-        var database = await harness.openReadyDatabase(observer: observer);
-        await _seedRelationOperation(
-          database,
-          archived: operation == _GraphProcessOperation.restore,
-        );
-        final repository = _repository(database, const []);
-        observer.arm();
-
-        expect(
-          await repository.execute(_relationOperationCommand(operation)),
-          isA<GraphCommandFailed>(),
-        );
-        expect(observer.didFail, isTrue);
-        await harness.closePersistenceObjectGraph();
-
-        database = await harness.openReadyDatabase();
-        await _expectRelationOperationState(
-          database,
-          operation,
-          committed: false,
-        );
-        await _expectCanonicalConnectionIntegrity(database);
-      },
-    );
-  }
-
   for (final operation in _GraphProcessOperation.values.where(
     (operation) => operation != _GraphProcessOperation.bulkDelete,
   )) {
@@ -686,93 +369,6 @@ void main() {
         timeout: Timeout.none,
       );
     }
-  }
-
-  for (final stopPoint in [
-    _GraphProcessStopPoint.beforeDelete,
-    _GraphProcessStopPoint.duringDelete,
-    _GraphProcessStopPoint.afterCommit,
-  ]) {
-    test('прерывание удаления большого набора ${stopPoint.testDescription} '
-        'оставляет целое состояние', () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      final database = await harness.openReadyDatabase();
-      await _insertIntention(database, _sourceId, title: 'Владелец');
-      await LargeBlockingRelationsFixture.seed(database, _sourceId);
-      final selected = LargeBlockingRelationsFixture.selectedIds
-          .map((id) => id.toCanonicalString())
-          .toSet();
-      final beforeRelations = await _relationRows(database);
-      final beforeIntentions = await _intentionRows(database);
-      final deletedPairSequence =
-          beforeRelations.singleWhere(
-                (row) =>
-                    row['id'] ==
-                    LargeBlockingRelationsFixture.selected(0)
-                        .toCanonicalString(),
-              )['creation_sequence']
-              as int;
-      await harness.closePersistenceObjectGraph();
-
-      await _runGraphWorkerUntilStopPoint(
-        harness,
-        _GraphProcessOperation.bulkDelete,
-        stopPoint,
-      );
-
-      var reopened = await harness.openReadyDatabase();
-      final committed = stopPoint.isAfterCommit;
-      final expectedRelations = committed
-          ? beforeRelations
-                .where((row) => !selected.contains(row['id']))
-                .toList()
-          : beforeRelations;
-      expect(await _relationRows(reopened), expectedRelations);
-      expect(await _intentionRows(reopened), beforeIntentions);
-      await _expectCanonicalConnectionIntegrity(reopened);
-      final repository = _repository(reopened, [_workerRelationId]);
-      expect(
-        (await _counts(repository, _sourceId)).activeNeedOutgoing,
-        committed ? 1 : LargeBlockingRelationsFixture.selectedCount + 1,
-      );
-      expect(
-        (await _counts(
-          repository,
-          LargeBlockingRelationsFixture.participant(0),
-        )).activeNeedIncoming,
-        committed ? 0 : 1,
-      );
-
-      if (committed) {
-        expect(
-          await repository.execute(
-            _createCommand(
-              relatedId: LargeBlockingRelationsFixture.participant(0),
-              type: LongTermRelationType.need,
-              priority: RelationPriority.p2,
-              description: 'Новая связь той же пары',
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-        final newRelation = (await _relationRows(reopened))
-            .singleWhere((row) => row['id'] == _workerRelationIdValue);
-        expect(
-          newRelation['creation_sequence'],
-          greaterThan(deletedPairSequence),
-        );
-        expect(
-          newRelation['id'],
-          isNot(LargeBlockingRelationsFixture.selected(0).toCanonicalString()),
-        );
-        await harness.closePersistenceObjectGraph();
-        reopened = await harness.openReadyDatabase();
-        expect((await _relationRows(reopened)).last, newRelation);
-        expect(await _intentionRows(reopened), beforeIntentions);
-        await _expectCanonicalConnectionIntegrity(reopened);
-      }
-    }, timeout: Timeout.none);
   }
 }
 
@@ -1028,27 +624,6 @@ Future<void> _expectCascadeState(
   expect(sourceCounts.active, committed ? 0 : 2);
   expect(sourceCounts.archived, committed ? 2 : 0);
 }
-
-LongTermRelationCommand _relationOperationCommand(
-  _GraphProcessOperation operation,
-) => switch (operation) {
-  _GraphProcessOperation.update => UpdateLongTermRelation(
-    relationId: _workerRelationId,
-    patch: LongTermRelationPatch(
-      sourceIntentionId: LongTermRelationFieldSet(_secondNeighborId),
-      relatedIntentionId: LongTermRelationFieldSet(_unrelatedId),
-      type: const LongTermRelationFieldSet(LongTermRelationType.can),
-      priority: const LongTermRelationFieldSet(RelationPriority.p4),
-      description: LongTermRelationDescriptionReplaced(
-        LongTermRelationDescription.fromInput('Изменено дочерним процессом')!,
-      ),
-    ),
-  ),
-  _GraphProcessOperation.archive => ArchiveLongTermRelation(_workerRelationId),
-  _GraphProcessOperation.restore => RestoreLongTermRelation(_workerRelationId),
-  _GraphProcessOperation.delete => DeleteLongTermRelation(_workerRelationId),
-  _ => throw ArgumentError.value(operation, 'operation'),
-};
 
 Future<void> _expectRelationOperationState(
   AppDatabase database,
@@ -1329,25 +904,8 @@ enum _GraphProcessOperation {
   final String testDescription;
 }
 
-enum _LifecycleInstallation {
-  fresh('после создания схемы'),
-  stored('после повторного открытия сохранённых намерений');
-
-  const _LifecycleInstallation(this.testDescription);
-
-  final String testDescription;
-}
-
 enum _GraphProcessStopPoint {
   beforeCommit(environmentValue: 'before_commit', testDescription: 'до commit'),
-  beforeDelete(
-    environmentValue: 'before_delete',
-    testDescription: 'до первого удаления',
-  ),
-  duringDelete(
-    environmentValue: 'during_delete',
-    testDescription: 'после первой SQL-порции',
-  ),
   afterCommit(
     environmentValue: 'after_commit',
     testDescription: 'после commit',

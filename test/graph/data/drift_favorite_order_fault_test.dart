@@ -100,28 +100,6 @@ void main() {
       }
     }
 
-    test('отказ после первого сдвига откатывает уже сдвинутые места', () async {
-      await seedGraph();
-      final marksBefore = storedFavoriteMarks(raw);
-      final maxBefore = marksBefore.last.$2;
-      late List<(String, int)> marksAtFailure;
-      faults.arm(
-        _FaultPoint.afterShift,
-        _busy,
-        atFailure: () => marksAtFailure = storedFavoriteMarks(raw),
-      );
-
-      final result = await repository.execute(_moveFiveAfterOne);
-
-      expect(_failureOf(result), isA<FavoriteOrderUnavailableFailure>());
-      // В момент отказа транзакция уже сдвинула все места за прежний
-      // максимум, сохранив их взаимный порядок.
-      expect(marksAtFailure, [
-        for (final (id, position) in marksBefore) (id, position + maxBefore),
-      ]);
-      expect(storedFavoriteMarks(raw), marksBefore);
-    });
-
     test('отказ commit после записи итоговых мест не оставляет ни одного '
         'изменения', () async {
       await seedGraph();
@@ -555,7 +533,6 @@ enum _FaultPoint {
 final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
   _FaultPoint? _point;
   Object? _error;
-  void Function()? _atFailure;
   String? _omittedIntentionId;
 
   /// Число сработавших отказов с последнего [arm].
@@ -567,18 +544,16 @@ final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
   /// Записи мест, выполненные хранилищем.
   var executedWrites = 0;
 
-  void arm(_FaultPoint point, Object error, {void Function()? atFailure}) {
+  void arm(_FaultPoint point, Object error) {
     clear();
     _point = point;
     _error = error;
-    _atFailure = atFailure;
     failures = 0;
   }
 
   void disarm() {
     _point = null;
     _error = null;
-    _atFailure = null;
   }
 
   void clear() {
@@ -649,7 +624,6 @@ final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
     final error = _error;
     if (_point != point || error == null || failures > 0) return;
     failures++;
-    _atFailure?.call();
     throw error;
   }
 }

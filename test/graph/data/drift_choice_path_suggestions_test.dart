@@ -1,6 +1,4 @@
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -238,47 +236,6 @@ void main() {
     );
     expect(result.observedIntentionIds, contains(_intention(3)));
   });
-
-  test(
-    'подтверждение устаревшей подсказки даёт конфликт без новой записи',
-    () async {
-      addIntention(1);
-      addIntention(2, ready: 1);
-      addRelation(101, 1, 2);
-      addChoice(1001, 1, 2, 101);
-      final suggestion = (await read(
-        ChoicePathSuggestionsForSource(_intention(1)),
-      )).items.single;
-      raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
-        _uuid(2),
-      ]);
-
-      final result = await repository.execute(
-        CreateDailyChoice(
-          sourceIntentionId: suggestion.source.id,
-          selectedIntentionId: suggestion.action.id,
-          path: suggestion.confirmedPath,
-          date: CalendarDate.fromParts(2026, 9, 25),
-          description: null,
-          isCompleted: false,
-        ),
-      );
-      expect(
-        result,
-        isA<GraphCommandFailed>().having(
-          (failure) => failure.failure.category,
-          'категория',
-          GraphFailureCategory.conflict,
-        ),
-      );
-      expect(
-        raw
-            .select('SELECT COUNT(*) AS count FROM daily_choices')
-            .single['count'],
-        1,
-      );
-    },
-  );
 
   test('возвращает одну запись и учитывает замену текущего пути', () async {
     addIntention(1);

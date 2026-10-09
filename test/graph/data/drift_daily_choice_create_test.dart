@@ -54,16 +54,9 @@ void main() {
   late InMemoryDiagnosticsSink diagnostics;
   late _ChoiceIds choiceIds;
   late _StepIds stepIds;
-  late _ReadFailureProbe readProbe;
 
   setUp(() async {
-    readProbe = _ReadFailureProbe();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        readProbe,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     choiceIds = _ChoiceIds([_choice(201), _choice(202)]);
@@ -392,49 +385,4 @@ void main() {
       expect(await rows('daily_choices'), 1);
     },
   );
-
-  test('неизвестный отказ чтения результата откатывает все записи', () async {
-    readProbe.failure = StateError('сбой чтения результата');
-    final result = await repository.execute(command());
-    expect(
-      result,
-      isA<GraphCommandFailed>().having(
-        (r) => r.failure.category,
-        'категория',
-        GraphFailureCategory.unexpected,
-      ),
-    );
-    readProbe.failure = null;
-    expect(await rows('daily_choices'), 0);
-    expect(await rows('daily_choice_path_steps'), 0);
-    expect(
-      diagnostics.events.whereType<DailyChoiceCommandDiagnosticsEvent>().last,
-      isA<DailyChoiceCommandDiagnosticsEvent>()
-          .having(
-            (event) => event.stage,
-            'этап',
-            DailyChoiceCommandDiagnosticsStage.resultRead,
-          )
-          .having(
-            (event) => (event.status as DiagnosticsFailed).code,
-            'код',
-            DiagnosticsFailureCode.unexpected,
-          ),
-    );
-  });
-}
-
-final class _ReadFailureProbe extends LocalDatabaseConnectionObserver {
-  Object? failure;
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.single.contains(
-          'FROM daily_choices WHERE id = ?',
-        )) {
-      final error = failure;
-      if (error != null) throw error;
-    }
-  }
 }

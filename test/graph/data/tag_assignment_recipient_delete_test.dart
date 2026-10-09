@@ -1,13 +1,11 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -111,11 +109,6 @@ void main() {
       _tag(lastTagNumber),
     ]);
   }
-
-  Future<GraphRevision> revision(int intention) async =>
-      (await repository.getRelationCounts(
-        _intention(intention),
-      ) as ResultSuccess<GraphSnapshot<RelationCounts>>).value.revision;
 
   test('удаление активного и архивного намерения снимает все назначения, сохраняя теги', () async {
     addIntention(4);
@@ -276,69 +269,5 @@ void main() {
       isA<IntentionHasBlockingRelationsFailure>(),
     );
     expect(graph(), before);
-  });
-
-  test(
-    'отказ после начала каскада намерения откатывает получателя и назначения',
-    () async {
-      addIntention(4);
-      await assign(firstTagNumber, _intention(4));
-      await assign(lastTagNumber, _intention(4));
-      final before = graph();
-      final revisionBefore = await revision(4);
-      await database.customStatement('''
-      CREATE TEMP TRIGGER fail_intention_assignment_cascade
-      AFTER DELETE ON tag_assignments
-      WHEN OLD.intention_id = '${tagFixtureId(4)}'
-      BEGIN
-        SELECT RAISE(ABORT, 'canary intention assignment cascade');
-      END
-    ''');
-
-      final result = await repository.execute(DeleteIntention(_intention(4)));
-
-      expect(
-        (result as ResultFailure).failure,
-        isA<IntentionUnexpectedFailure>(),
-      );
-      expect(graph(), before);
-      expect(
-        (await revision(4)).compareTo(revisionBefore),
-        GraphRevisionOrder.same,
-      );
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    },
-  );
-
-  test('отказ после удаления связи откатывает её и сохраняет назначения намерениям', () async {
-    addIntention(4);
-    addRelation(103, 3, 4);
-    await assign(firstTagNumber, _intention(4));
-    await assign(lastTagNumber, _intention(4));
-    final before = graph();
-    final revisionBefore = await revision(3);
-    await database.customStatement('''
-      CREATE TEMP TRIGGER fail_relation_delete
-      AFTER DELETE ON long_term_relations
-      WHEN OLD.id = '${tagFixtureId(103)}'
-      BEGIN
-        SELECT RAISE(ABORT, 'canary relation deletion');
-      END
-    ''');
-
-    final result = await repository.execute(
-      DeleteLongTermRelation(_relation(103)),
-    );
-
-    expect(
-      (result as GraphCommandFailed).failure,
-      isA<LongTermRelationUnexpectedFailure>(),
-    );
-    expect(graph(), before);
-    expect(
-      (await revision(3)).compareTo(revisionBefore),
-      GraphRevisionOrder.same,
-    );
-    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
   });
 }

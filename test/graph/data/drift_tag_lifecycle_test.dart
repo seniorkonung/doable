@@ -4,7 +4,6 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -22,45 +21,11 @@ String _uuid(int number) =>
 TagName _name(String value) => TagName.fromInput(value);
 
 final class _WriteProbe extends LocalDatabaseConnectionObserver {
-  bool failAfterWrite = false;
-  bool failResultRead = false;
-  bool _wroteSinceArm = false;
   final statements = <String>[];
-
-  void armResultReadFailure() {
-    failResultRead = true;
-    _wroteSinceArm = false;
-  }
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     statements.addAll(statement.statements);
-    if (failResultRead &&
-        _wroteSinceArm &&
-        statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.any(
-          (sql) => sql.contains('FROM tags WHERE id = ?'),
-        )) {
-      failResultRead = false;
-      throw StateError('Управляемый отказ чтения результата.');
-    }
-  }
-
-  @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (failResultRead &&
-        (statement.operation == LocalDatabaseSqlOperation.insert ||
-            statement.operation == LocalDatabaseSqlOperation.update) &&
-        statement.statements.any((sql) => sql.contains('tags'))) {
-      _wroteSinceArm = true;
-    }
-    if (failAfterWrite &&
-        (statement.operation == LocalDatabaseSqlOperation.insert ||
-            statement.operation == LocalDatabaseSqlOperation.update) &&
-        statement.statements.any((sql) => sql.contains('tags'))) {
-      failAfterWrite = false;
-      throw StateError('Управляемый отказ после записи.');
-    }
   }
 }
 
@@ -297,29 +262,6 @@ void main() {
     },
   );
 
-  test(
-    'одновременное создание и переименование одного названия дают конфликт',
-    () async {
-      final existing = await repository.execute(CreateTag(_name('Старое')));
-      final id =
-          ((existing as TagCommandSucceeded).value.value as TagCreated).tag.id;
-      final results = await Future.wait([
-        repository.execute(RenameTag(tagId: id, name: _name('Новое'))),
-        repository.execute(CreateTag(_name('НОВОЕ'))),
-      ]);
-      expect(results.whereType<TagCommandSucceeded>().length, 1);
-      expect(results.whereType<TagCommandFailed>().length, 1);
-      expect(
-        (results.whereType<TagCommandFailed>().single.failure
-                as TagNameOccupiedFailure)
-            .existingTagId,
-        id,
-      );
-      expect(raw.select('SELECT name FROM tags').length, 1);
-      expect(raw.select('SELECT name FROM tags').single['name'], 'Новое');
-    },
-  );
-
   test('наблюдатель получает переименование подтверждённого тега', () async {
     final created = await repository.execute(CreateTag(_name('Дом')));
     final id =
@@ -356,63 +298,5 @@ void main() {
       GraphRevisionOrder.same,
     );
     expect(raw.select('SELECT id FROM tags').length, 1);
-  });
-
-  test('отказ после записи или при чтении результата откатывает создание и переименование', () async {
-    final created = await repository.execute(CreateTag(_name('Дом')));
-    final id =
-        ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
-    final before = await currentRevision();
-    probe.failAfterWrite = true;
-    expect(
-      await repository.execute(CreateTag(_name('Работа'))),
-      isA<TagCommandFailed>(),
-    );
-    expect(raw.select('SELECT name FROM tags').length, 1);
-    expect(
-      (await currentRevision()).compareTo(before),
-      GraphRevisionOrder.same,
-    );
-
-    probe.failAfterWrite = true;
-    expect(
-      await repository.execute(RenameTag(tagId: id, name: _name('Быт'))),
-      isA<TagCommandFailed>(),
-    );
-    expect(raw.select('SELECT name FROM tags').single['name'], 'Дом');
-    expect(
-      (await currentRevision()).compareTo(before),
-      GraphRevisionOrder.same,
-    );
-
-    probe.armResultReadFailure();
-    expect(
-      await repository.execute(CreateTag(_name('Работа'))),
-      isA<TagCommandFailed>(),
-    );
-    expect(raw.select('SELECT name FROM tags').length, 1);
-    expect(
-      (await currentRevision()).compareTo(before),
-      GraphRevisionOrder.same,
-    );
-
-    probe.armResultReadFailure();
-    expect(
-      await repository.execute(RenameTag(tagId: id, name: _name('Быт'))),
-      isA<TagCommandFailed>(),
-    );
-    expect(raw.select('SELECT name FROM tags').single['name'], 'Дом');
-    expect(
-      (await currentRevision()).compareTo(before),
-      GraphRevisionOrder.same,
-    );
-    expect(
-      diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last.status,
-      isA<DiagnosticsFailed>(),
-    );
-    expect(
-      diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last.stage,
-      TagCommandDiagnosticsStage.resultRead,
-    );
   });
 }

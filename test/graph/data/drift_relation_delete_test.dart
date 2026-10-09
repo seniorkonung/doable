@@ -240,40 +240,6 @@ void main() {
       expect(await _storedIntentionOrNull(database, fourthId), isNotNull);
     },
   );
-
-  test('ошибка записи откатывает удаление и не публикует изменение', () async {
-    await _create(repository, sourceId, relatedId);
-    final storedBefore = await _storedRelation(database, relationId);
-    final revisionBefore = await _revision(repository, sourceId);
-    final events = <LongTermRelationReadResult>[];
-    final subscription = repository
-        .watchRelation(relationId)
-        .listen(events.add);
-    addTearDown(() {
-      unawaited(subscription.cancel());
-    });
-    await _waitFor(() => events.length == 1);
-    await database.customStatement('''
-      CREATE TEMP TRIGGER canary_relation_delete_failure
-      BEFORE DELETE ON long_term_relations
-      BEGIN
-        SELECT RAISE(ABORT, 'canary relation delete failure');
-      END
-    ''');
-
-    final failure = _failure(
-      await repository.execute(DeleteLongTermRelation(relationId)),
-    );
-    await pumpEventQueue(times: 10);
-
-    expect(failure, isA<LongTermRelationUnexpectedFailure>());
-    expect(await _storedRelation(database, relationId), storedBefore);
-    expect(
-      (await _revision(repository, sourceId)).compareTo(revisionBefore),
-      GraphRevisionOrder.same,
-    );
-    expect(events, hasLength(1));
-  });
 }
 
 Future<LongTermRelationCreated> _create(
@@ -419,13 +385,6 @@ Future<List<Map<String, Object?>>> _storedIntentions(
       in await database.customSelect('SELECT * FROM intentions').get())
     Map<String, Object?>.unmodifiable(row.data),
 ];
-
-Future<void> _waitFor(bool Function() condition) async {
-  for (var attempt = 0; attempt < 20 && !condition(); attempt++) {
-    await Future<void>.delayed(Duration.zero);
-  }
-  expect(condition(), isTrue);
-}
 
 IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,

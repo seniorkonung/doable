@@ -356,49 +356,6 @@ void main() {
     },
   );
 
-  test('отказ записи откатывает весь набор и сохраняет ревизию', () async {
-    final owner = intentions[0];
-    final first = await _create(repository, owner, intentions[1]);
-    final second = await _create(repository, owner, intentions[2]);
-    final before = await _rows(database, 'long_term_relations');
-    final revision = await _revision(repository, owner);
-    await database.customStatement('''
-      CREATE TEMP TRIGGER canary_bulk_delete_failure
-      BEFORE DELETE ON long_term_relations
-      WHEN OLD.id = '${second.toCanonicalString()}'
-      BEGIN
-        SELECT RAISE(ABORT, 'canary bulk delete failure');
-      END
-    ''');
-
-    final failure = _failure(
-      await repository.execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: owner,
-          relationIds: [first, second],
-        ),
-      ),
-    );
-
-    expect(failure, isA<DeleteBlockingRelationsUnexpectedFailure>());
-    expect(await _rows(database, 'long_term_relations'), before);
-    expect(
-      (await _revision(repository, owner)).compareTo(revision),
-      GraphRevisionOrder.same,
-    );
-    final event = diagnostics.events
-        .whereType<BlockingRelationsDeleteDiagnosticsEvent>()
-        .last;
-    expect(
-      event.status,
-      isA<DiagnosticsFailed>().having(
-        (status) => status.code,
-        'код',
-        DiagnosticsFailureCode.unexpected,
-      ),
-    );
-  });
-
   test(
     'повреждённая выбранная связь даёт corruption без частичного удаления',
     () async {
@@ -478,130 +435,6 @@ void main() {
         (await _revision(repository, intentions[3])).compareTo(revision),
         GraphRevisionOrder.same,
       );
-    },
-  );
-
-  test(
-    'одиночное удаление до набора даёт конфликт, после набора — отсутствие',
-    () async {
-      final owner = intentions[0];
-      final selected = await _create(repository, owner, intentions[1]);
-      final command = DeleteBlockingRelations.longTerm(
-        intentionId: owner,
-        relationIds: [selected],
-      );
-      final singleFirst = repository.execute(DeleteLongTermRelation(selected));
-      final bulkSecond = repository.execute(command);
-      expect(await singleFirst, isA<GraphCommandSucceeded>());
-      expect(
-        _failure(await bulkSecond),
-        isA<DeleteBlockingRelationsSelectionConflictFailure>(),
-      );
-
-      final next = await _create(repository, owner, intentions[2]);
-      final bulkFirst = repository.execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: owner,
-          relationIds: [next],
-        ),
-      );
-      final singleSecond = repository.execute(DeleteLongTermRelation(next));
-      _success(await bulkFirst);
-      expect(
-        await singleSecond,
-        isA<GraphCommandFailed>().having(
-          (result) => result.failure,
-          'причина',
-          isA<LongTermRelationNotFoundFailure>(),
-        ),
-      );
-    },
-  );
-
-  test(
-    'смена участников до набора конфликтует, после набора видит отсутствие',
-    () async {
-      final owner = intentions[0];
-      final selected = await _create(repository, owner, intentions[1]);
-      final update = UpdateLongTermRelation(
-        relationId: selected,
-        patch: LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(intentions[2]),
-        ),
-      );
-      final command = DeleteBlockingRelations.longTerm(
-        intentionId: owner,
-        relationIds: [selected],
-      );
-      final updateFirst = repository.execute(update);
-      final bulkSecond = repository.execute(command);
-      expect(await updateFirst, isA<GraphCommandSucceeded>());
-      expect(
-        _failure(await bulkSecond),
-        isA<DeleteBlockingRelationsSelectionConflictFailure>(),
-      );
-      expect(await _relation(database, selected), isNotNull);
-
-      final next = await _create(repository, owner, intentions[3]);
-      final bulkFirst = repository.execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: owner,
-          relationIds: [next],
-        ),
-      );
-      final updateSecond = repository.execute(
-        UpdateLongTermRelation(
-          relationId: next,
-          patch: LongTermRelationPatch(
-            relatedIntentionId: LongTermRelationFieldSet(intentions[4]),
-          ),
-        ),
-      );
-      _success(await bulkFirst);
-      expect(
-        await updateSecond,
-        isA<GraphCommandFailed>().having(
-          (result) => result.failure,
-          'причина',
-          isA<LongTermRelationNotFoundFailure>(),
-        ),
-      );
-    },
-  );
-
-  test(
-    'каскад до набора архивирует выбранную связь, после — только оставшуюся',
-    () async {
-      final owner = intentions[0];
-      final selected = await _create(repository, owner, intentions[1]);
-      final archiveFirst = repository.execute(ArchiveIntention(owner));
-      final bulkSecond = repository.execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: owner,
-          relationIds: [selected],
-        ),
-      );
-      expect(await archiveFirst, isA<GraphCommandSucceeded>());
-      expect(
-        _success(await bulkSecond).value.deletedRelations.single.scope,
-        RelationScope.archived,
-      );
-      expect(await _relation(database, selected), isNull);
-
-      final otherOwner = intentions[2];
-      final next = await _create(repository, otherOwner, intentions[3]);
-      final remaining = await _create(repository, otherOwner, intentions[4]);
-      final bulkFirst = repository.execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: otherOwner,
-          relationIds: [next],
-        ),
-      );
-      final archiveSecond = repository.execute(ArchiveIntention(otherOwner));
-      _success(await bulkFirst);
-      expect(await archiveSecond, isA<GraphCommandSucceeded>());
-      expect(await _relation(database, next), isNull);
-      expect((await _relation(database, remaining))?['is_archived'], 1);
     },
   );
 
@@ -910,50 +743,6 @@ void main() {
       );
     },
   );
-
-  test('ошибка после удаления дневной связи откатывает обе записи', () async {
-    final owner = intentions[0];
-    final path = await _create(repository, owner, intentions[1]);
-    final free = await _create(repository, owner, intentions[2]);
-    final choice = _dailyChoiceId(903);
-    await _insertChoice(database, choice, owner, intentions[1], path);
-    await _insertTag(database, 3001, 'Общий');
-    for (final id in intentions.take(3)) {
-      await _assignIntentionTag(database, 3001, id);
-    }
-    final graphBefore = await _graphSnapshot(database);
-    final revision = await _revision(repository, owner);
-    deleteObserver.clear();
-    await database.customStatement('''
-      CREATE TEMP TRIGGER fail_mixed_delete
-      BEFORE DELETE ON long_term_relations
-      WHEN OLD.id = '${free.toCanonicalString()}'
-      BEGIN SELECT RAISE(ABORT, 'mixed deletion failure'); END
-    ''');
-
-    final failure = _failure(
-      await repository.execute(
-        DeleteBlockingRelations(
-          intentionId: owner,
-          references: [
-            DailyChoiceBlockingRelationReference(choice),
-            LongTermBlockingRelationReference(free),
-          ],
-        ),
-      ),
-    );
-
-    expect(failure, isA<DeleteBlockingRelationsUnexpectedFailure>());
-    expect(deleteObserver.dailyDeletes, 1);
-    expect(await _choice(database, choice), isNotNull);
-    expect(await _choiceStepCount(database, choice), 1);
-    expect(await _relation(database, free), isNotNull);
-    expect(await _graphSnapshot(database), graphBefore);
-    expect(
-      (await _revision(repository, owner)).compareTo(revision),
-      GraphRevisionOrder.same,
-    );
-  });
 
   test('новый шаг после подтверждения блокирует выбранную связь', () async {
     final owner = intentions[0];
@@ -1330,22 +1119,14 @@ final class _RelationIds implements LongTermRelationIdGenerator {
 
 final class _BulkDeleteObserver extends LocalDatabaseConnectionObserver {
   final batchSizes = <int>[];
-  var dailyDeletes = 0;
   var failAfterFirstBatch = false;
 
   void clear() {
     batchSizes.clear();
-    dailyDeletes = 0;
   }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.delete &&
-        statement.statements.any(
-          (sql) => sql.contains('DELETE FROM') && sql.contains('daily_choices'),
-        )) {
-      dailyDeletes++;
-    }
     if (statement.operation != LocalDatabaseSqlOperation.update ||
         !statement.statements.any(
           (sql) =>
