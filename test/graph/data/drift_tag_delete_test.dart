@@ -288,6 +288,6 @@ void main() {
 
   test('широко используемый тег удаляется одним компактным каскадом', () async {
     await database.close();
-    await cost.measureWidelyAssignedTagDeletion();
+    await cost.expectWidelyAssignedTagDeletion();
   }, tags: ['slow']);
 }

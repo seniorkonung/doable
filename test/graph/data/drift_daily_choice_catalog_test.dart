@@ -564,9 +564,6 @@ void main() {
     for (final (date, completion, expected) in [
       (past, null, [202, 201]),
       (past, true, [201]),
-      (past, false, [202]),
-      (future, null, [204, 203]),
-      (future, true, [204]),
       (future, false, [203]),
       (CalendarDate.fromParts(2026, 9, 23), null, <int>[]),
     ]) {

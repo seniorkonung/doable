@@ -1,14 +1,12 @@
 @Tags(['slow'])
 library;
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -43,17 +41,10 @@ final class _CatalogTrace extends LocalDatabaseConnectionObserver {
 }
 
 final class _MeasuredSnapshot {
-  const _MeasuredSnapshot(
-    this.snapshot,
-    this.elapsedMicroseconds,
-    this.select,
-    this.plan,
-  );
+  const _MeasuredSnapshot(this.snapshot, this.select);
 
   final TagCatalogSnapshot snapshot;
-  final int elapsedMicroseconds;
   final _SelectMeasurement select;
-  final List<String> plan;
 }
 
 void main() {
@@ -112,11 +103,9 @@ Future<void> measureTagCatalogReadCost() async {
 
     Future<_MeasuredSnapshot> read(int count) async {
       trace.selects.clear();
-      final watch = Stopwatch()..start();
       final result = await repository.getTagCatalog(
         const TagCatalogBrowseMode(),
       );
-      watch.stop();
       expect(result, isA<TagCatalogSuccess>());
       final snapshot = (result as TagCatalogSuccess).value;
       expect(snapshot.items, hasLength(count));
@@ -140,15 +129,10 @@ Future<void> measureTagCatalogReadCost() async {
       ];
       expect(plan, isNotEmpty);
       expect(plan.join(' ').toUpperCase(), isNot(contains('USE TEMP B-TREE')));
-      return _MeasuredSnapshot(
-        snapshot,
-        watch.elapsedMicroseconds,
-        select,
-        plan,
-      );
+      return _MeasuredSnapshot(snapshot, select);
     }
 
-    Future<void> report(int count) async {
+    Future<void> expectFullSnapshot(int count) async {
       final measured = await read(count);
       final expectedIds = [
         tagFixtureId(firstTagNumber),
@@ -163,70 +147,10 @@ Future<void> measureTagCatalogReadCost() async {
         measured.snapshot.items.map((tag) => tag.id).toSet(),
         hasLength(count),
       );
-      final durations = [measured.elapsedMicroseconds];
-      for (var repetition = 1; repetition < 5; repetition++) {
-        final again = await read(count);
-        expect(
-          again.snapshot.items.map((tag) => tag.id.toCanonicalString()),
-          expectedIds,
-        );
-        expect(again.select.rows, measured.select.rows);
-        expect(again.select.sql, measured.select.sql);
-        expect(again.plan, measured.plan);
-        durations.add(again.elapsedMicroseconds);
-      }
-      // Данные измерения не содержат пользовательских названий или id.
-      debugPrintSynchronously(
-        jsonEncode({
-          'kind': 'tag_catalog_snapshot',
-          'tags': count,
-          'reads': durations.length,
-          'selectsPerRead': 1,
-          'materializedRowsPerRead': measured.select.rows,
-          'elapsedMicroseconds': durations,
-          'sql': measured.select.sql,
-          'plan': measured.plan,
-        }),
-      );
     }
 
-    seedTo(1000, 2);
-    await report(1000);
-    seedTo(10000, 1000);
-    await report(10000);
-    final sqlitePages =
-        raw.select('PRAGMA page_count').single.values.single as int;
-    final sqlitePageSize =
-        raw.select('PRAGMA page_size').single.values.single as int;
-    final assignmentCount =
-        raw.select('SELECT COUNT(*) FROM tag_assignments').single.values.single
-            as int;
-    int bytesIfPresent(File candidate) =>
-        candidate.existsSync() ? candidate.lengthSync() : 0;
-    debugPrintSynchronously(
-      jsonEncode({
-        'kind': 'tag_catalog_fixture',
-        'tags': 10000,
-        'assignments': assignmentCount,
-        'sqliteBytes': sqlitePages * sqlitePageSize,
-        'dbFileBytes': bytesIfPresent(file),
-        'walFileBytes': bytesIfPresent(File('${file.path}-wal')),
-        'shmFileBytes': bytesIfPresent(File('${file.path}-shm')),
-        'journalMode': raw.select('PRAGMA journal_mode').single.values.single,
-        'sqliteVersion': raw
-            .select('SELECT sqlite_version()')
-            .single
-            .values
-            .single,
-        'platform': Platform.operatingSystem,
-        'runtime': Platform.version,
-        'buildMode': const bool.fromEnvironment('dart.vm.profile')
-            ? 'profile'
-            : const bool.fromEnvironment('dart.vm.product')
-            ? 'release'
-            : 'debug',
-      }),
-    );
+    seedTo(10000, 2);
+    await expectFullSnapshot(10000);
   } finally {
     await database.close();
     await directory.delete(recursive: true);

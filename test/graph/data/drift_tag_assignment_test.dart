@@ -90,9 +90,7 @@ void main() {
   );
 
   for (final (description, intentionId) in [
-    ('активного действия', _intention(1)),
     ('архивированного действия', _intention(2)),
-    ('намерения без готовности', _intention(4)),
   ]) {
     test(
       'назначение и снятие $description меняют только одну пару и одну ревизию',

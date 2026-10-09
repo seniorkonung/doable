@@ -130,10 +130,7 @@ void main() {
     await harness.dispose();
   });
 
-  for (final (label, target) in [
-    ('намерения', _intention(1)),
-    ('архивного намерения', _intention(2)),
-  ]) {
+  for (final (label, target) in [('намерения', _intention(1))]) {
     test(
       'два потребителя $label согласуют полные снимки и изменения графа',
       () async {

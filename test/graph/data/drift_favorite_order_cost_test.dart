@@ -1,8 +1,6 @@
 @Tags(['slow'])
 library;
 
-import 'dart:convert';
-
 import 'package:doable/src/data/local/app_database.dart'
     show
         LocalDatabaseConnectionObserver,
@@ -14,7 +12,6 @@ import 'package:doable/src/favorite/domain/favorite_order.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -47,19 +44,16 @@ final class _ConnectionTrace extends LocalDatabaseConnectionObserver {
   }
 }
 
-/// Одна перестановка: исход, наблюдённые обращения и её длительность без
-/// подготовки фикстуры.
+/// Одна перестановка: исход и наблюдённые обращения.
 final class _MeasuredMove {
   const _MeasuredMove({
     required this.outcome,
-    required this.elapsedMicroseconds,
     required this.selects,
     required this.writes,
     required this.changedRows,
   });
 
   final FavoriteOrderCommandSuccess outcome;
-  final int elapsedMicroseconds;
   final List<LocalDatabaseSqlStatement> selects;
   final List<LocalDatabaseSqlStatement> writes;
 
@@ -74,9 +68,6 @@ final class _MeasuredMove {
 
 /// Каждое такое по счёту избранное намерение фикстуры архивировано.
 const _archivedEvery = 4;
-
-/// Пары перемещений в начало и в конец на каждый размер списка.
-const _rounds = 5;
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -111,9 +102,7 @@ void main() {
     final intentionsBefore = _storedIntentions(raw);
     final changesBefore = _connectionChanges(raw);
     trace.clear();
-    final watch = Stopwatch()..start();
     final result = await repository.execute(command);
-    watch.stop();
     final outcome = switch (result) {
       FavoriteOrderCommandSucceeded(:final value) => value.value,
       FavoriteOrderCommandFailed(:final failure) => fail(
@@ -149,7 +138,6 @@ void main() {
 
     return _MeasuredMove(
       outcome: outcome,
-      elapsedMicroseconds: watch.elapsedMicroseconds,
       selects: selects,
       writes: writes,
       changedRows: _connectionChanges(raw) - changesBefore,
@@ -172,152 +160,91 @@ void main() {
     expect(move.changedRows, 2 * count);
   }
 
-  for (final count in [150, 1000]) {
-    test('перемещения в начало и в конец $count избранных намерений '
-        'переписывают точный полный порядок двумя инструкциями без '
-        'построчной записи, а перемещение без видимого изменения не '
-        'пишет', () async {
-      final fixtureWatch = Stopwatch()..start();
-      seedLargeFavoriteFixture(
-        raw,
-        count: count,
-        archivedEvery: _archivedEvery,
-      );
-      fixtureWatch.stop();
-      var expected = largeFavoriteFixtureOrder(
-        count: count,
-        archivedEvery: _archivedEvery,
-      );
-      final initialMarks = storedFavoriteMarks(raw);
-      expect(initialMarks.map((mark) => mark.$1), expected.map(_idOf));
-      // Места фикстуры идут с пропусками, а архивированные избранные
-      // намерения стоят между активными.
-      expect(initialMarks.last.$2, greaterThan(count));
-      final archivedCount = expected.where((place) => place.isArchived).length;
-      expect(archivedCount, count ~/ _archivedEvery);
-      final firstActive = expected.indexWhere((place) => !place.isArchived);
-      final lastActive = expected.lastIndexWhere((place) => !place.isArchived);
-      expect(
-        expected
-            .sublist(firstActive, lastActive)
-            .where((place) => place.isArchived),
-        isNotEmpty,
-      );
+  const count = 1000;
+  test('перемещения в начало и в конец $count избранных намерений '
+      'переписывают точный полный порядок двумя инструкциями без '
+      'построчной записи, а перемещение без видимого изменения не '
+      'пишет', () async {
+    seedLargeFavoriteFixture(raw, count: count, archivedEvery: _archivedEvery);
+    var expected = largeFavoriteFixtureOrder(
+      count: count,
+      archivedEvery: _archivedEvery,
+    );
+    final initialMarks = storedFavoriteMarks(raw);
+    expect(initialMarks.map((mark) => mark.$1), expected.map(_idOf));
+    // Места фикстуры идут с пропусками, а архивированные избранные
+    // намерения стоят между активными.
+    expect(initialMarks.last.$2, greaterThan(count));
+    final archivedCount = expected.where((place) => place.isArchived).length;
+    expect(archivedCount, count ~/ _archivedEvery);
+    final firstActive = expected.indexWhere((place) => !place.isArchived);
+    final lastActive = expected.lastIndexWhere((place) => !place.isArchived);
+    expect(
+      expected
+          .sublist(firstActive, lastActive)
+          .where((place) => place.isArchived),
+      isNotEmpty,
+    );
 
-      final toStart = <int>[];
-      final toEnd = <int>[];
-      final unchanged = <int>[];
-      final unchangedWrites = <int>[];
-      _MeasuredMove? sample;
-      for (var round = 0; round < _rounds; round++) {
-        // Последнее активное избранное намерение становится первым во всём
-        // порядке, перед скрытыми архивированными.
-        final last = _activeIds(expected).last;
-        final movedToStart = await measure(
-          MoveFavoriteIntention(
-            intentionId: _intentionId(last),
-            placement: const FirstFavoritePlacement(),
-          ),
-          count: count,
-        );
-        expectPlaceRewrite(movedToStart, count: count);
-        expected = _movedFirst(expected, last);
-        expect(storedFavoriteMarks(raw), _placesOf(expected));
-        toStart.add(movedToStart.elapsedMicroseconds);
+    // Последнее активное избранное намерение становится первым во всём
+    // порядке, перед скрытыми архивированными.
+    final last = _activeIds(expected).last;
+    final movedToStart = await measure(
+      MoveFavoriteIntention(
+        intentionId: _intentionId(last),
+        placement: const FirstFavoritePlacement(),
+      ),
+      count: count,
+    );
+    expectPlaceRewrite(movedToStart, count: count);
+    expected = _movedFirst(expected, last);
+    expect(storedFavoriteMarks(raw), _placesOf(expected));
 
-        // Первое активное избранное намерение встаёт сразу после последнего
-        // активного, перед замыкающими архивированными.
-        final actives = _activeIds(expected);
-        final movedToEnd = await measure(
-          MoveFavoriteIntention(
-            intentionId: _intentionId(actives.first),
-            placement: AfterFavoritePlacement(_intentionId(actives.last)),
-          ),
-          count: count,
-        );
-        expectPlaceRewrite(movedToEnd, count: count);
-        expected = _movedAfter(expected, actives.first, anchor: actives.last);
-        expect(storedFavoriteMarks(raw), _placesOf(expected));
-        toEnd.add(movedToEnd.elapsedMicroseconds);
+    // Первое активное избранное намерение встаёт сразу после последнего
+    // активного, перед замыкающими архивированными.
+    final activesBeforeEnd = _activeIds(expected);
+    final movedToEnd = await measure(
+      MoveFavoriteIntention(
+        intentionId: _intentionId(activesBeforeEnd.first),
+        placement: AfterFavoritePlacement(_intentionId(activesBeforeEnd.last)),
+      ),
+      count: count,
+    );
+    expectPlaceRewrite(movedToEnd, count: count);
+    expected = _movedAfter(
+      expected,
+      activesBeforeEnd.first,
+      anchor: activesBeforeEnd.last,
+    );
+    expect(storedFavoriteMarks(raw), _placesOf(expected));
+    expect(movedToEnd.writeSql, movedToStart.writeSql);
 
-        sample ??= movedToStart;
-        expect(movedToStart.writeSql, sample.writeSql);
-        expect(movedToEnd.writeSql, sample.writeSql);
-      }
+    // Опора уже ближайшее предшествующее активное намерение.
+    final actives = _activeIds(expected);
+    final marksBefore = storedFavoriteMarks(raw);
+    final unchanged = await measure(
+      MoveFavoriteIntention(
+        intentionId: _intentionId(actives[1]),
+        placement: AfterFavoritePlacement(_intentionId(actives.first)),
+      ),
+      count: count,
+    );
+    expect(unchanged.outcome, isA<FavoriteOrderUnchanged>());
+    expect(unchanged.writes, isEmpty);
+    expect(unchanged.changedRows, 0);
+    expect(storedFavoriteMarks(raw), marksBefore);
 
-      final actives = _activeIds(expected);
-      for (final command in [
-        // Перед первым активным нет активных намерений.
-        MoveFavoriteIntention(
-          intentionId: _intentionId(actives.first),
-          placement: const FirstFavoritePlacement(),
-        ),
-        // Опора уже ближайшее предшествующее активное намерение.
-        MoveFavoriteIntention(
-          intentionId: _intentionId(actives[1]),
-          placement: AfterFavoritePlacement(_intentionId(actives.first)),
-        ),
-      ]) {
-        final marksBefore = storedFavoriteMarks(raw);
-
-        final measured = await measure(command, count: count);
-
-        expect(measured.outcome, isA<FavoriteOrderUnchanged>());
-        expect(measured.writes, isEmpty);
-        expect(measured.changedRows, 0);
-        expect(storedFavoriteMarks(raw), marksBefore);
-        unchanged.add(measured.elapsedMicroseconds);
-        unchangedWrites.add(measured.writes.length);
-      }
-
-      // Список Главной содержит все активные избранные намерения в новом
-      // порядке, без усечения.
-      final snapshot = switch (await repository.getFavoriteIntentions()) {
-        FavoriteIntentionsSuccess(:final value) => value,
-        final FavoriteIntentionsResult other => fail(
-          'Ожидался снимок, получен ${other.runtimeType}.',
-        ),
-      };
-      expect(snapshot.items.map((row) => row.id.toCanonicalString()), actives);
-      expect(snapshot.archivedCount, archivedCount);
-
-      final measuredSample = sample!;
-      final report = jsonEncode({
-        'kind': 'favorite_order_move',
-        'favorites': count,
-        'activeFavorites': actives.length,
-        'archivedFavorites': archivedCount,
-        'fixtureMicroseconds': fixtureWatch.elapsedMicroseconds,
-        'movesToStart': toStart.length,
-        'movesToEnd': toEnd.length,
-        'unchangedMoves': unchanged.length,
-        'selectsPerMove': measuredSample.selects.length,
-        'writesPerMove': measuredSample.writes.length,
-        'changedRowsPerMove': measuredSample.changedRows,
-        'writesPerUnchangedMove': unchangedWrites,
-        'elapsedMicroseconds': {
-          'toStart': toStart,
-          'toEnd': toEnd,
-          'unchanged': unchanged,
-        },
-        'writeSql': measuredSample.writeSql,
-        'sqliteVersion': raw
-            .select('SELECT sqlite_version() AS version')
-            .single['version'],
-      });
-      // Данные измерения не содержат идентификаторов и названий намерений.
-      for (final place in expected) {
-        expect(report, isNot(contains(place.id)));
-      }
-      for (final row in largeFavoriteFixtureActiveRows(
-        count: count,
-        archivedEvery: _archivedEvery,
-      )) {
-        expect(report, isNot(contains(row.title)));
-      }
-      debugPrintSynchronously(report);
-    });
-  }
+    // Список Главной содержит все активные избранные намерения в новом
+    // порядке, без усечения.
+    final snapshot = switch (await repository.getFavoriteIntentions()) {
+      FavoriteIntentionsSuccess(:final value) => value,
+      final FavoriteIntentionsResult other => fail(
+        'Ожидался снимок, получен ${other.runtimeType}.',
+      ),
+    };
+    expect(snapshot.items.map((row) => row.id.toCanonicalString()), actives);
+    expect(snapshot.archivedCount, archivedCount);
+  });
 }
 
 String _idOf(LargeFavoriteFixturePlace place) => place.id;

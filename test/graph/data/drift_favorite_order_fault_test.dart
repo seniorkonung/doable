@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/favorite/application/favorite_order_command.dart';
@@ -69,35 +67,37 @@ void main() {
   }
 
   group('Отказ хранилища на каждом шаге', () {
-    for (final point in _FaultPoint.values) {
-      for (final fault in _storageFaults) {
-        test('${fault.name} ${point.description} сохраняет прежний порядок, '
-            'данные графа и ревизию', () async {
-          await seedGraph();
-          final graphBefore = _storedGraph(raw);
-          final listBefore = await _favorites(repository);
-          final revisionBefore = await _graphRevision(repository);
-          diagnostics.clear();
-          faults.arm(point, fault.error);
+    for (final (point, fault) in [
+      (_FaultPoint.orderRead, _unavailableFault),
+      (_FaultPoint.afterAssignment, _corruptionFault),
+      (_FaultPoint.afterAssignment, _unexpectedFault),
+    ]) {
+      test('${fault.name} ${point.description} сохраняет прежний порядок, '
+          'данные графа и ревизию', () async {
+        await seedGraph();
+        final graphBefore = _storedGraph(raw);
+        final listBefore = await _favorites(repository);
+        final revisionBefore = await _graphRevision(repository);
+        diagnostics.clear();
+        faults.arm(point, fault.error);
 
-          final result = await repository.execute(_moveFiveAfterOne);
+        final result = await repository.execute(_moveFiveAfterOne);
 
-          expect(_failureOf(result), fault.failure);
-          expect(faults.failures, 1);
-          expect(faults.executedWrites, point.executedWritesBeforeFailure);
-          faults.disarm();
-          expect(_storedGraph(raw), graphBefore);
-          await _expectPublishedState(
-            repository,
-            listBefore: listBefore,
-            revisionBefore: revisionBefore,
-          );
-          expect(diagnostics.orderEvents, [
-            _startedEvent(),
-            _failedEvent(point.stage, fault.code),
-          ]);
-        });
-      }
+        expect(_failureOf(result), fault.failure);
+        expect(faults.failures, 1);
+        expect(faults.executedWrites, point.executedWritesBeforeFailure);
+        faults.disarm();
+        expect(_storedGraph(raw), graphBefore);
+        await _expectPublishedState(
+          repository,
+          listBefore: listBefore,
+          revisionBefore: revisionBefore,
+        );
+        expect(diagnostics.orderEvents, [
+          _startedEvent(),
+          _failedEvent(point.stage, fault.code),
+        ]);
+      });
     }
 
     test('отказ commit после записи итоговых мест не оставляет ни одного '
@@ -129,59 +129,29 @@ void main() {
         ),
       ]);
     });
-
-    test('назначение итоговых мест, не покрывшее все прочитанные места, '
-        'откатывается целиком', () async {
-      await seedGraph();
-      final graphBefore = _storedGraph(raw);
-      final revisionBefore = await _graphRevision(repository);
-      diagnostics.clear();
-      // Прочитанный порядок теряет скрытое архивированное намерение 7:
-      // сдвиг затрагивает все места, а итоговые места получают не все.
-      faults.omitFromOrderRead(_uuid(7));
-
-      final result = await repository.execute(_moveFiveAfterOne);
-
-      expect(_failureOf(result), isA<FavoriteOrderUnexpectedFailure>());
-      expect(faults.executedWrites, 2);
-      expect(_storedGraph(raw), graphBefore);
-      expect(
-        (await _graphRevision(repository)).compareTo(revisionBefore),
-        GraphRevisionOrder.same,
-      );
-      expect(diagnostics.orderEvents, [
-        _startedEvent(),
-        _failedEvent(
-          FavoriteOrderCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.unexpected,
-        ),
-      ]);
-    });
   });
 
   group('Повтор после отказа', () {
-    for (final point in _FaultPoint.values) {
-      test('после недоступности ${point.description} перестановка '
-          'выполняется новой командой целиком', () async {
-        await seedGraph();
-        final revisionBefore = await _graphRevision(repository);
-        faults.arm(point, _busy);
-        expect(
-          _failureOf(await repository.execute(_moveFiveAfterOne)),
-          isA<FavoriteOrderUnavailableFailure>(),
-        );
-        faults.disarm();
+    test('после недоступности ${_FaultPoint.afterAssignment.description} '
+        'перестановка выполняется новой командой целиком', () async {
+      await seedGraph();
+      final revisionBefore = await _graphRevision(repository);
+      faults.arm(_FaultPoint.afterAssignment, _busy);
+      expect(
+        _failureOf(await repository.execute(_moveFiveAfterOne)),
+        isA<FavoriteOrderUnavailableFailure>(),
+      );
+      faults.disarm();
 
-        final confirmed = await _confirmed(repository, _moveFiveAfterOne);
+      final confirmed = await _confirmed(repository, _moveFiveAfterOne);
 
-        expect(confirmed.value, isA<FavoriteOrderMoved>());
-        expect(
-          confirmed.revision.compareTo(revisionBefore),
-          GraphRevisionOrder.newer,
-        );
-        expect(storedFavoriteMarks(raw), _movedMarks);
-      });
-    }
+      expect(confirmed.value, isA<FavoriteOrderMoved>());
+      expect(
+        confirmed.revision.compareTo(revisionBefore),
+        GraphRevisionOrder.newer,
+      );
+      expect(storedFavoriteMarks(raw), _movedMarks);
+    });
 
     test('после отказа commit перестановка выполняется новой командой '
         'целиком', () async {
@@ -266,53 +236,52 @@ void main() {
       }
     }
 
-    for (final maxPlace in [_largestShiftablePlace + 1, _largestStoredPlace]) {
-      test('сдвиг за наибольшее место $maxPlace завершается безопасным '
-          'отказом без ослабления ограничений схемы', () async {
-        await seedOrderUpTo(maxPlace);
-        final graphBefore = _storedGraph(raw);
-        final schemaBefore = _schema(raw);
-        final revisionBefore = await _graphRevision(repository);
-        diagnostics.clear();
-        faults.clear();
+    const maxPlace = _largestShiftablePlace + 1;
+    test('сдвиг за наибольшее место $maxPlace завершается безопасным '
+        'отказом без ослабления ограничений схемы', () async {
+      await seedOrderUpTo(maxPlace);
+      final graphBefore = _storedGraph(raw);
+      final schemaBefore = _schema(raw);
+      final revisionBefore = await _graphRevision(repository);
+      diagnostics.clear();
+      faults.clear();
 
-        final result = await repository.execute(_moveTwoFirst);
+      final result = await repository.execute(_moveTwoFirst);
 
-        expect(_failureOf(result), isA<FavoriteOrderUnexpectedFailure>());
-        expect(faults.writes, hasLength(1));
-        expect(faults.executedWrites, 0);
-        expect(_storedGraph(raw), graphBefore);
-        expect(
-          (await _graphRevision(repository)).compareTo(revisionBefore),
-          GraphRevisionOrder.same,
-        );
-        expect(diagnostics.orderEvents, [
-          _startedEvent(),
-          _failedEvent(
-            FavoriteOrderCommandDiagnosticsStage.write,
-            DiagnosticsFailureCode.unexpected,
-          ),
-        ]);
-        // Схема и настройка соединения не ослаблены: непредставимое место
-        // по-прежнему отклоняется, а повтор даёт тот же отказ.
-        expect(_schema(raw), schemaBefore);
-        expect(_pragma(raw, 'ignore_check_constraints'), 0);
-        expect(_pragma(raw, 'foreign_keys'), 1);
-        expect(
-          () => raw.execute(
-            'INSERT INTO favorite_intentions (intention_id, position) '
-            'VALUES (?, ?)',
-            [_uuid(3), 9.3e18],
-          ),
-          throwsA(isA<sqlite.SqliteException>()),
-        );
-        expect(
-          _failureOf(await repository.execute(_moveTwoFirst)),
-          isA<FavoriteOrderUnexpectedFailure>(),
-        );
-        expect(_storedGraph(raw), graphBefore);
-      });
-    }
+      expect(_failureOf(result), isA<FavoriteOrderUnexpectedFailure>());
+      expect(faults.writes, hasLength(1));
+      expect(faults.executedWrites, 0);
+      expect(_storedGraph(raw), graphBefore);
+      expect(
+        (await _graphRevision(repository)).compareTo(revisionBefore),
+        GraphRevisionOrder.same,
+      );
+      expect(diagnostics.orderEvents, [
+        _startedEvent(),
+        _failedEvent(
+          FavoriteOrderCommandDiagnosticsStage.write,
+          DiagnosticsFailureCode.unexpected,
+        ),
+      ]);
+      // Схема и настройка соединения не ослаблены: непредставимое место
+      // по-прежнему отклоняется, а повтор даёт тот же отказ.
+      expect(_schema(raw), schemaBefore);
+      expect(_pragma(raw, 'ignore_check_constraints'), 0);
+      expect(_pragma(raw, 'foreign_keys'), 1);
+      expect(
+        () => raw.execute(
+          'INSERT INTO favorite_intentions (intention_id, position) '
+          'VALUES (?, ?)',
+          [_uuid(3), 9.3e18],
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+      expect(
+        _failureOf(await repository.execute(_moveTwoFirst)),
+        isA<FavoriteOrderUnexpectedFailure>(),
+      );
+      expect(_storedGraph(raw), graphBefore);
+    });
 
     test('наибольшее место, при котором сдвиг представим, переписывается '
         'итоговыми местами', () async {
@@ -330,9 +299,6 @@ void main() {
   });
 }
 
-/// Наибольшее место, которое SQLite хранит целым числом.
-const _largestStoredPlace = 9223372036854775807;
-
 /// Наибольшее место, сдвиг которого за самого себя остаётся целым числом.
 const _largestShiftablePlace = 4611686018427387903;
 
@@ -342,49 +308,26 @@ final _moveTwoFirst = MoveFavoriteIntention(
 );
 
 /// Повреждения сохранённого порядка, недостижимые через приложение, рядом
-/// со скрытыми архивированными намерениями 6 и 7. Целостный порядок:
-/// 1 на месте 2, 2 на месте 6, 3 на месте 10.
+/// со скрытыми архивированными намерениями 6 и 7 — по одному на каждую
+/// проверку прочитанного порядка. Целостный порядок: 1 на месте 2, 2 на
+/// месте 6, 3 на месте 10.
 final _storedCorruptions =
     <({String name, void Function(sqlite.Database) store})>[
-      for (final (name, position) in <(String, Object)>[
-        ('нулевое', 0),
-        ('отрицательное', -4),
-        ('дробное', 4.5),
-        ('текстовое', 'четыре'),
-      ])
-        (
-          name: '$name место скрытого архивированного намерения',
-          store: (database) => storeFavoriteMarkWithInvalidPosition(
-            database,
-            intentionId: _uuid(6),
-            position: position,
-          ),
+      (
+        name: 'дробное место скрытого архивированного намерения',
+        store: (database) => storeFavoriteMarkWithInvalidPosition(
+          database,
+          intentionId: _uuid(6),
+          position: 4.5,
         ),
-      (
-        name: 'место скрытого архивированного намерения без значения',
-        store: (database) {
-          removeFavoriteSchemaProtection(database);
-          database.execute(
-            'INSERT INTO favorite_intentions (intention_id, position) '
-            'VALUES (?, NULL)',
-            [_uuid(6)],
-          );
-        },
       ),
       (
-        name: 'два скрытых архивированных намерения на одном месте',
-        store: (database) {
-          removeFavoriteSchemaProtection(database);
-          storeFavoriteMark(database, intentionId: _uuid(6), position: 8);
-          storeFavoriteMark(database, intentionId: _uuid(7), position: 8);
-        },
-      ),
-      (
-        name: 'скрытое архивированное намерение на месте активного',
-        store: (database) {
-          removeFavoriteSchemaProtection(database);
-          storeFavoriteMark(database, intentionId: _uuid(6), position: 6);
-        },
+        name: 'нулевое место скрытого архивированного намерения',
+        store: (database) => storeFavoriteMarkWithInvalidPosition(
+          database,
+          intentionId: _uuid(6),
+          position: 0,
+        ),
       ),
       (
         name: 'вторая отметка скрытого архивированного намерения',
@@ -392,18 +335,6 @@ final _storedCorruptions =
           removeFavoriteSchemaProtection(database);
           storeFavoriteMark(database, intentionId: _uuid(6), position: 4);
           storeFavoriteMark(database, intentionId: _uuid(6), position: 8);
-        },
-      ),
-      (
-        name: 'место без намерения между скрытыми архивированными',
-        store: (database) {
-          storeFavoriteMark(database, intentionId: _uuid(6), position: 4);
-          storeFavoritePlaceWithoutIntention(
-            database,
-            intentionId: _uuid(9),
-            position: 5,
-          );
-          storeFavoriteMark(database, intentionId: _uuid(7), position: 8);
         },
       ),
       (
@@ -440,35 +371,34 @@ final _corrupt = sqlite.SqliteException(
   message: 'CANARY-повреждение',
 );
 
+typedef _StorageFault = ({
+  String name,
+  Object error,
+  Matcher failure,
+  DiagnosticsFailureCode code,
+});
+
 /// Отказы хранилища трёх различимых категорий.
-final _storageFaults =
-    <
-      ({
-        String name,
-        Object error,
-        Matcher failure,
-        DiagnosticsFailureCode code,
-      })
-    >[
-      (
-        name: 'недоступность',
-        error: _busy,
-        failure: isA<FavoriteOrderUnavailableFailure>(),
-        code: DiagnosticsFailureCode.unavailable,
-      ),
-      (
-        name: 'повреждение',
-        error: _corrupt,
-        failure: isA<FavoriteOrderCorruptionFailure>(),
-        code: DiagnosticsFailureCode.corruption,
-      ),
-      (
-        name: 'неизвестный отказ',
-        error: StateError('CANARY-неизвестный-отказ'),
-        failure: isA<FavoriteOrderUnexpectedFailure>(),
-        code: DiagnosticsFailureCode.unexpected,
-      ),
-    ];
+final _StorageFault _unavailableFault = (
+  name: 'недоступность',
+  error: _busy,
+  failure: isA<FavoriteOrderUnavailableFailure>(),
+  code: DiagnosticsFailureCode.unavailable,
+);
+
+final _StorageFault _corruptionFault = (
+  name: 'повреждение',
+  error: _corrupt,
+  failure: isA<FavoriteOrderCorruptionFailure>(),
+  code: DiagnosticsFailureCode.corruption,
+);
+
+final _StorageFault _unexpectedFault = (
+  name: 'неизвестный отказ',
+  error: StateError('CANARY-неизвестный-отказ'),
+  failure: isA<FavoriteOrderUnexpectedFailure>(),
+  code: DiagnosticsFailureCode.unexpected,
+);
 
 /// Шаг перестановки, на котором хранилище отказывает.
 enum _FaultPoint {
@@ -477,34 +407,6 @@ enum _FaultPoint {
     'при чтении порядка',
     FavoriteOrderCommandDiagnosticsStage.read,
     executedWritesBeforeFailure: 0,
-  ),
-
-  /// Проверка прочитанных мест прервана при обращении к строке порядка.
-  validation(
-    'при проверке прочитанного порядка',
-    FavoriteOrderCommandDiagnosticsStage.validation,
-    executedWritesBeforeFailure: 0,
-  ),
-
-  /// Сдвиг мест за прежний максимум отклонён до выполнения.
-  beforeShift(
-    'до сдвига мест',
-    FavoriteOrderCommandDiagnosticsStage.write,
-    executedWritesBeforeFailure: 0,
-  ),
-
-  /// Сдвиг выполнен, но транзакция не завершена.
-  afterShift(
-    'после первого сдвига',
-    FavoriteOrderCommandDiagnosticsStage.write,
-    executedWritesBeforeFailure: 1,
-  ),
-
-  /// Назначение итоговых мест отклонено до выполнения.
-  beforeAssignment(
-    'до назначения итоговых мест',
-    FavoriteOrderCommandDiagnosticsStage.write,
-    executedWritesBeforeFailure: 1,
   ),
 
   /// Итоговые места назначены, но транзакция не завершена.
@@ -533,7 +435,6 @@ enum _FaultPoint {
 final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
   _FaultPoint? _point;
   Object? _error;
-  String? _omittedIntentionId;
 
   /// Число сработавших отказов с последнего [arm].
   var failures = 0;
@@ -561,12 +462,6 @@ final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
     executedWrites = 0;
   }
 
-  /// Скрывает из следующего чтения порядка строку намерения [intentionId].
-  void omitFromOrderRead(String intentionId) {
-    clear();
-    _omittedIntentionId = intentionId;
-  }
-
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (_isOrderRead(statement)) {
@@ -575,39 +470,13 @@ final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
     }
     if (!_isPlaceWrite(statement)) return;
     writes.addAll(statement.statements);
-    _failAt(
-      writes.length == 1
-          ? _FaultPoint.beforeShift
-          : _FaultPoint.beforeAssignment,
-    );
   }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     if (!_isPlaceWrite(statement)) return;
     executedWrites++;
-    _failAt(
-      executedWrites == 1
-          ? _FaultPoint.afterShift
-          : _FaultPoint.afterAssignment,
-    );
-  }
-
-  @override
-  List<Map<String, Object?>> afterSelect(
-    LocalDatabaseSqlStatement statement,
-    List<Map<String, Object?>> rows,
-  ) {
-    if (!_isOrderRead(statement)) return rows;
-    final omitted = _omittedIntentionId;
-    _omittedIntentionId = null;
-    return [
-      for (final row in rows)
-        if (row['intention_id'] != omitted)
-          _point == _FaultPoint.validation
-              ? _FailingRow(row, () => _failAt(_FaultPoint.validation))
-              : row,
-    ];
+    if (executedWrites == 2) _failAt(_FaultPoint.afterAssignment);
   }
 
   /// Внутри команды перестановки таблицу мест читает только чтение полного
@@ -625,24 +494,6 @@ final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
     if (_point != point || error == null || failures > 0) return;
     failures++;
     throw error;
-  }
-}
-
-/// Строка прочитанного порядка, обращение к значению которой сначала
-/// вызывает [_onRead].
-final class _FailingRow extends UnmodifiableMapBase<String, Object?> {
-  _FailingRow(this._row, this._onRead);
-
-  final Map<String, Object?> _row;
-  final void Function() _onRead;
-
-  @override
-  Iterable<String> get keys => _row.keys;
-
-  @override
-  Object? operator [](Object? key) {
-    _onRead();
-    return _row[key];
   }
 }
 

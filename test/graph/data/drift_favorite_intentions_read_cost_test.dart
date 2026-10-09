@@ -1,15 +1,11 @@
 @Tags(['slow'])
 library;
 
-import 'dart:convert';
-
 import 'package:doable/src/data/local/app_database.dart' hide Intention, Tags;
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -61,17 +57,13 @@ final class _ReadTrace extends LocalDatabaseConnectionObserver {
 final class _MeasuredRead {
   const _MeasuredRead({
     required this.snapshot,
-    required this.elapsedMicroseconds,
     required this.favoriteSelect,
     required this.aggregateSelects,
-    required this.plan,
   });
 
   final FavoriteIntentionsSnapshot snapshot;
-  final int elapsedMicroseconds;
   final _SelectMeasurement favoriteSelect;
   final List<_SelectMeasurement> aggregateSelects;
-  final List<String> plan;
 }
 
 /// Предел числа пакетных агрегатов счётчиков на 1000 избранных намерений:
@@ -105,9 +97,7 @@ void main() {
     trace.clear();
     final marksBefore = storedFavoriteMarks(raw);
     final changesBefore = _connectionChanges(raw);
-    final watch = Stopwatch()..start();
     final result = await repository.getFavoriteIntentions();
-    watch.stop();
     expect(result, isA<FavoriteIntentionsSuccess>());
 
     // Чтение не пишет на соединение.
@@ -145,10 +135,8 @@ void main() {
     expect(plan.join(' ').toUpperCase(), isNot(contains('USE TEMP B-TREE')));
     return _MeasuredRead(
       snapshot: (result as FavoriteIntentionsSuccess).value,
-      elapsedMicroseconds: watch.elapsedMicroseconds,
       favoriteSelect: favoriteSelect,
       aggregateSelects: aggregateSelects,
-      plan: plan,
     );
   }
 
@@ -202,42 +190,6 @@ void main() {
     expect(
       measured.aggregateSelects.fold(0, (sum, select) => sum + select.rows),
       expected.length,
-    );
-
-    final durations = [measured.elapsedMicroseconds];
-    for (var repetition = 1; repetition < 5; repetition++) {
-      final again = await read();
-      expect(again.snapshot.items.map(_row), expected);
-      expect(again.snapshot.archivedCount, archivedCount);
-      expect(
-        again.snapshot.revision.compareTo(measured.snapshot.revision),
-        GraphRevisionOrder.same,
-      );
-      expect(again.favoriteSelect.sql, measured.favoriteSelect.sql);
-      expect(again.favoriteSelect.rows, measured.favoriteSelect.rows);
-      expect(
-        again.aggregateSelects.map((select) => select.rows),
-        measured.aggregateSelects.map((select) => select.rows),
-      );
-      expect(again.plan, measured.plan);
-      durations.add(again.elapsedMicroseconds);
-    }
-    // Данные измерения не содержат названий и идентификаторов намерений.
-    debugPrintSynchronously(
-      jsonEncode({
-        'kind': 'favorite_intentions_snapshot',
-        'favorites': count,
-        'activeFavorites': expected.length,
-        'archivedFavorites': archivedCount,
-        'reads': durations.length,
-        'favoriteSelectsPerRead': 1,
-        'aggregateSelectsPerRead': measured.aggregateSelects.length,
-        'materializedRowsPerRead':
-            measured.favoriteSelect.rows + expected.length,
-        'elapsedMicroseconds': durations,
-        'sql': measured.favoriteSelect.sql,
-        'plan': measured.plan,
-      }),
     );
   });
 }

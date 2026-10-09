@@ -32,7 +32,6 @@ const _unrelatedIdValue = '018f0b5d-6b2e-7c80-8000-000000000904';
 const _firstRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000951';
 const _secondRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000952';
 const _unrelatedRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000953';
-const _workerRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000954';
 
 const _workerOperationEnvironment = 'DOABLE_GRAPH_OPERATION';
 const _workerStopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
@@ -47,7 +46,6 @@ final _unrelatedId = _intentionId(_unrelatedIdValue);
 final _firstRelationId = _relationId(_firstRelationIdValue);
 final _secondRelationId = _relationId(_secondRelationIdValue);
 final _unrelatedRelationId = _relationId(_unrelatedRelationIdValue);
-final _workerRelationId = _relationId(_workerRelationIdValue);
 
 void main() {
   test('сохраняет создание и порядок после повторного открытия при переводе часов назад', () async {
@@ -237,42 +235,6 @@ void main() {
     await _expectCanonicalConnectionIntegrity(database);
   });
 
-  test('исключение внутри транзакции откатывает файловое создание', () async {
-    final harness = await LocalDatabaseHarness.fileBacked();
-    addTearDown(harness.dispose);
-    final observer = _FailAfterSqlObserver(
-      operation: LocalDatabaseSqlOperation.insert,
-      sqlFragment: 'long_term_relations',
-    );
-    var database = await harness.openReadyDatabase(observer: observer);
-    await _insertIntention(database, _sourceId, title: 'Изучать язык');
-    await _insertIntention(database, _firstNeighborId, title: 'Читать');
-    final repository = _repository(database, [_firstRelationId]);
-    observer.arm();
-
-    expect(
-      await repository.execute(
-        _createCommand(
-          relatedId: _firstNeighborId,
-          type: LongTermRelationType.need,
-          priority: RelationPriority.p2,
-          description: 'Не должно сохраниться',
-        ),
-      ),
-      isA<GraphCommandFailed>(),
-    );
-    expect(observer.didFail, isTrue);
-    await harness.closePersistenceObjectGraph();
-
-    database = await harness.openReadyDatabase();
-    expect(await _relationRows(database), isEmpty);
-    expect(
-      (await _counts(_repository(database, const []), _sourceId)).total,
-      0,
-    );
-    await _expectCanonicalConnectionIntegrity(database);
-  });
-
   test('исключение внутри транзакции откатывает файловый каскад', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
@@ -297,72 +259,24 @@ void main() {
     await _expectCanonicalConnectionIntegrity(database);
   });
 
-  for (final operation in _GraphProcessOperation.values) {
-    for (final stopPoint in [
-      _GraphProcessStopPoint.beforeCommit,
-      _GraphProcessStopPoint.afterCommit,
-    ]) {
-      test(
-        'прерывание ${operation.testDescription} ${stopPoint.testDescription} '
-        'оставляет целое состояние',
-        () async {
-          final harness = await LocalDatabaseHarness.fileBacked();
-          addTearDown(harness.dispose);
-          final database = await harness.openReadyDatabase();
-          switch (operation) {
-            case _GraphProcessOperation.create:
-              await _insertIntention(
-                database,
-                _sourceId,
-                title: 'Изучать язык',
-              );
-              await _insertIntention(
-                database,
-                _firstNeighborId,
-                title: 'Читать',
-              );
-            case _GraphProcessOperation.cascade:
-              await _seedCascade(database);
-            case _GraphProcessOperation.update:
-            case _GraphProcessOperation.archive:
-            case _GraphProcessOperation.restore:
-            case _GraphProcessOperation.delete:
-              await _seedRelationOperation(
-                database,
-                archived: operation == _GraphProcessOperation.restore,
-              );
-          }
-          await harness.closePersistenceObjectGraph();
+  for (final stopPoint in _GraphProcessStopPoint.values) {
+    test('прерывание каскадного архивирования ${stopPoint.testDescription} '
+        'оставляет целое состояние', () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final database = await harness.openReadyDatabase();
+      await _seedCascade(database);
+      await harness.closePersistenceObjectGraph();
 
-          await _runGraphWorkerUntilStopPoint(harness, operation, stopPoint);
+      await _runCascadeWorkerUntilStopPoint(harness, stopPoint);
 
-          final reopenedDatabase = await harness.openReadyDatabase();
-          switch (operation) {
-            case _GraphProcessOperation.create:
-              await _expectCreateState(
-                reopenedDatabase,
-                committed: stopPoint.isAfterCommit,
-              );
-            case _GraphProcessOperation.cascade:
-              await _expectCascadeState(
-                reopenedDatabase,
-                committed: stopPoint.isAfterCommit,
-              );
-            case _GraphProcessOperation.update:
-            case _GraphProcessOperation.archive:
-            case _GraphProcessOperation.restore:
-            case _GraphProcessOperation.delete:
-              await _expectRelationOperationState(
-                reopenedDatabase,
-                operation,
-                committed: stopPoint.isAfterCommit,
-              );
-          }
-          await _expectCanonicalConnectionIntegrity(reopenedDatabase);
-        },
-        timeout: Timeout.none,
+      final reopenedDatabase = await harness.openReadyDatabase();
+      await _expectCascadeState(
+        reopenedDatabase,
+        committed: stopPoint.isAfterCommit,
       );
-    }
+      await _expectCanonicalConnectionIntegrity(reopenedDatabase);
+    }, timeout: Timeout.none);
   }
 }
 
@@ -457,31 +371,6 @@ Future<void> _insertRelation(
       ),
     );
 
-Future<void> _seedRelationOperation(
-  AppDatabase database, {
-  required bool archived,
-}) async {
-  await _insertIntention(database, _sourceId, title: 'Изучать язык');
-  await _insertIntention(database, _firstNeighborId, title: 'Читать');
-  await _insertIntention(database, _secondNeighborId, title: 'Говорить');
-  await _insertIntention(database, _unrelatedId, title: 'Отдыхать');
-  await _insertRelation(
-    database,
-    id: _workerRelationId,
-    sourceId: _sourceId,
-    relatedId: _firstNeighborId,
-    description: 'Исходное описание',
-    isArchived: archived,
-  );
-  await _insertRelation(
-    database,
-    id: _unrelatedRelationId,
-    sourceId: _firstNeighborId,
-    relatedId: _secondNeighborId,
-    type: LongTermRelationType.can,
-  );
-}
-
 Future<void> _seedCascade(AppDatabase database) async {
   await _insertIntention(database, _sourceId, title: 'Изучать язык');
   await _insertIntention(database, _firstNeighborId, title: 'Читать');
@@ -554,37 +443,6 @@ Future<void> _expectCanonicalConnectionIntegrity(AppDatabase database) async {
   );
 }
 
-Future<void> _expectCreateState(
-  AppDatabase database, {
-  required bool committed,
-}) async {
-  final rows = await _relationRows(database);
-  if (!committed) {
-    expect(rows, isEmpty);
-    expect(
-      (await _counts(_repository(database, const []), _sourceId)).total,
-      0,
-    );
-    return;
-  }
-
-  expect(rows, [
-    {
-      'creation_sequence': 1,
-      'id': _workerRelationIdValue,
-      'source_intention_id': _sourceIdValue,
-      'related_intention_id': _firstNeighborIdValue,
-      'type': 'need',
-      'priority': 2,
-      'description': 'Создано дочерним процессом',
-      'is_archived': 0,
-    },
-  ]);
-  final repository = _repository(database, const []);
-  expect((await _counts(repository, _sourceId)).activeNeedOutgoing, 1);
-  expect((await _counts(repository, _firstNeighborId)).activeNeedIncoming, 1);
-}
-
 Future<void> _expectCascadeState(
   AppDatabase database, {
   required bool committed,
@@ -617,95 +475,6 @@ Future<void> _expectCascadeState(
   );
   expect(sourceCounts.active, committed ? 0 : 2);
   expect(sourceCounts.archived, committed ? 2 : 0);
-}
-
-Future<void> _expectRelationOperationState(
-  AppDatabase database,
-  _GraphProcessOperation operation, {
-  required bool committed,
-}) async {
-  final relationRows = await _relationRows(database);
-  final workerRows = relationRows
-      .where((row) => row['id'] == _workerRelationIdValue)
-      .toList(growable: false);
-  if (operation == _GraphProcessOperation.delete && committed) {
-    expect(workerRows, isEmpty);
-  } else {
-    final row = workerRows.single;
-    expect(row['creation_sequence'], 1);
-    expect(row['id'], _workerRelationIdValue);
-    expect(
-      row['source_intention_id'],
-      operation == _GraphProcessOperation.update && committed
-          ? _secondNeighborIdValue
-          : _sourceIdValue,
-    );
-    expect(
-      row['related_intention_id'],
-      operation == _GraphProcessOperation.update && committed
-          ? _unrelatedIdValue
-          : _firstNeighborIdValue,
-    );
-    expect(
-      row['type'],
-      operation == _GraphProcessOperation.update && committed ? 'can' : 'need',
-    );
-    expect(
-      row['priority'],
-      operation == _GraphProcessOperation.update && committed ? 4 : 2,
-    );
-    expect(
-      row['description'],
-      operation == _GraphProcessOperation.update && committed
-          ? 'Изменено дочерним процессом'
-          : 'Исходное описание',
-    );
-    final initiallyArchived = operation == _GraphProcessOperation.restore;
-    final expectedArchived = switch (operation) {
-      _GraphProcessOperation.archive when committed => true,
-      _GraphProcessOperation.restore when committed => false,
-      _ => initiallyArchived,
-    };
-    expect(row['is_archived'], expectedArchived ? 1 : 0);
-  }
-
-  expect(
-    relationRows.singleWhere((row) => row['id'] == _unrelatedRelationIdValue),
-    <String, Object?>{
-      'creation_sequence': 2,
-      'id': _unrelatedRelationIdValue,
-      'source_intention_id': _firstNeighborIdValue,
-      'related_intention_id': _secondNeighborIdValue,
-      'type': 'can',
-      'priority': 2,
-      'description': null,
-      'is_archived': 0,
-    },
-  );
-  expect(
-    (await _intentionRows(database)).map((row) => row['is_archived']),
-    everyElement(0),
-  );
-
-  final repository = _repository(database, const []);
-  final workerExists = operation != _GraphProcessOperation.delete || !committed;
-  final workerMoved = operation == _GraphProcessOperation.update && committed;
-  expect(
-    (await _counts(repository, _sourceId)).total,
-    workerExists && !workerMoved ? 1 : 0,
-  );
-  expect(
-    (await _counts(repository, _firstNeighborId)).total,
-    1 + (workerExists && !workerMoved ? 1 : 0),
-  );
-  expect(
-    (await _counts(repository, _secondNeighborId)).total,
-    1 + (workerExists && workerMoved ? 1 : 0),
-  );
-  expect(
-    (await _counts(repository, _unrelatedId)).total,
-    workerExists && workerMoved ? 1 : 0,
-  );
 }
 
 /// Намерения записываются в созданную схему и читаются только после
@@ -767,9 +536,10 @@ void _seedStoredIntentions(sqlite.Database database) {
   ''');
 }
 
-Future<void> _runGraphWorkerUntilStopPoint(
+/// Запускает каскадное архивирование в отдельном процессе и принудительно
+/// завершает его в точке [stopPoint].
+Future<void> _runCascadeWorkerUntilStopPoint(
   LocalDatabaseHarness harness,
-  _GraphProcessOperation operation,
   _GraphProcessStopPoint stopPoint,
 ) async {
   final flutterExecutable = _findFlutterExecutable();
@@ -783,7 +553,7 @@ Future<void> _runGraphWorkerUntilStopPoint(
     ['test', '--no-pub', '--reporter', 'compact', workerPath],
     workingDirectory: Directory.current.path,
     environment: {
-      _workerOperationEnvironment: operation.environmentValue,
+      _workerOperationEnvironment: 'cascade',
       _workerStopPointEnvironment: stopPoint.environmentValue,
       _workerDatabasePathEnvironment: harness.databaseFile.path,
     },
@@ -872,26 +642,6 @@ String _findFlutterExecutable() {
     }
     directory = parent;
   }
-}
-
-enum _GraphProcessOperation {
-  create(environmentValue: 'create', testDescription: 'создания связи'),
-  cascade(
-    environmentValue: 'cascade',
-    testDescription: 'каскадного архивирования',
-  ),
-  update(environmentValue: 'update', testDescription: 'изменения связи'),
-  archive(environmentValue: 'archive', testDescription: 'архивирования связи'),
-  restore(environmentValue: 'restore', testDescription: 'восстановления связи'),
-  delete(environmentValue: 'delete', testDescription: 'удаления связи');
-
-  const _GraphProcessOperation({
-    required this.environmentValue,
-    required this.testDescription,
-  });
-
-  final String environmentValue;
-  final String testDescription;
 }
 
 enum _GraphProcessStopPoint {

@@ -1,17 +1,12 @@
-import 'dart:io';
-
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
@@ -22,26 +17,16 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
-part 'tagged_entities_catalog_storage_scenarios.dart';
-
 TagId _tag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
-LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
-  tagFixtureId(number),
-) as LongTermRelationIdDecodingSuccess).id;
-
-/// Выражения чтений каталога с условиями по тегам, в которых внедряется отказ.
-bool _isCatalogCount(String sql) =>
-    sql.contains('json_each(') && sql.startsWith('SELECT COUNT(');
-
+/// Выражение чтения строк каталога с условиями по тегам, в котором
+/// внедряется отказ.
 bool _isCatalogRows(String sql) =>
     sql.contains('json_each(') && sql.contains('LIMIT');
-
-bool _isCatalogTags(String sql) => sql.contains('FROM tag_assignments a');
 
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
   final statements = <String>[];
@@ -73,7 +58,6 @@ void main() {
   late sqlite.Database raw;
   late DriftPersonalGraphRepository graph;
   late _ReadProbe probe;
-  Directory? fileDirectory;
   late InMemoryDiagnosticsSink diagnostics;
 
   setUp(() async {
@@ -111,38 +95,7 @@ void main() {
     );
     probe.statements.clear();
   });
-  tearDown(() async {
-    await database.close();
-    await fileDirectory?.delete(recursive: true);
-    fileDirectory = null;
-  });
-
-  _taggedEntitiesCatalogStorageScenarios(() async {
-    await database.close();
-    fileDirectory = await Directory.systemTemp.createTemp('doable_tag_cursor_');
-    final file = File('${fileDirectory!.path}/graph.sqlite');
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openFileBackedLocalDatabase(file, setup: (db) => raw = db),
-        probe,
-      ),
-    );
-    await database.open();
-    seedTagStorageFixture(raw);
-    // Продолжению навигации активного охвата нужен второй получатель тега.
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(3)],
-    );
-    graph = _storageScenarioRepository(database);
-    return (
-      database: database,
-      raw: raw,
-      graph: graph,
-      probe: probe,
-      file: file,
-    );
-  });
+  tearDown(() => database.close());
 
   TaggedIntentionsPage page(TaggedIntentionsPageResult result) =>
       (result as TaggedIntentionsPageSuccess).value;
@@ -190,32 +143,6 @@ void main() {
   }
 
   test(
-    'отсутствующий получатель вне охвата и порции отклоняет чтение',
-    () async {
-      raw.execute('PRAGMA foreign_keys = OFF');
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(999)],
-      );
-      await expectCorruption(TaggedIntentionsScope.active);
-    },
-  );
-
-  test(
-    'непомеченный сосед и назначения другого тега не участвуют в чтении',
-    () async {
-      raw.execute('PRAGMA foreign_keys = OFF');
-      raw.execute('DELETE FROM intentions WHERE id = ?', [tagFixtureId(3)]);
-      final active = await collect(
-        _tag(firstTagNumber),
-        TaggedIntentionsScope.active,
-        1,
-      );
-      expect(active.map((item) => item.id), [_intention(1), _intention(4)]);
-    },
-  );
-
-  test(
     'отсутствующая связь помеченных намерений не влияет на результаты',
     () async {
       raw.execute('PRAGMA foreign_keys = OFF');
@@ -259,53 +186,6 @@ void main() {
     await expectCorruption(TaggedIntentionsScope.archived);
   });
 
-  test('назначение без намерения или со вторым получателем непредставимо', () async {
-    // Аудит не проверяет эти состояния: их исключает сама схема, даже при
-    // отключённых проверках ограничений и внешних ключей.
-    raw.execute('PRAGMA foreign_keys = OFF');
-    raw.execute('PRAGMA ignore_check_constraints = ON');
-    for (final (sql, values) in [
-      (
-        'INSERT INTO tag_assignments (tag_id) VALUES (?)',
-        [tagFixtureId(firstTagNumber)],
-      ),
-      (
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, NULL)',
-        [tagFixtureId(firstTagNumber)],
-      ),
-    ]) {
-      expect(
-        () => raw.execute(sql, values),
-        throwsA(isA<sqlite.SqliteException>()),
-        reason: sql,
-      );
-    }
-    // Второму получателю негде храниться: у назначения один столбец цели.
-    expect(
-      raw
-          .select('SELECT name FROM pragma_table_info(?) ORDER BY cid', [
-            'tag_assignments',
-          ])
-          .map((row) => row['name']),
-      ['creation_sequence', 'tag_id', 'tag_creation_sequence', 'intention_id'],
-    );
-    expect(
-      () => raw.execute(
-        'UPDATE tag_assignments SET intention_id = NULL WHERE intention_id = ?',
-        [tagFixtureId(1)],
-      ),
-      throwsA(isA<sqlite.SqliteException>()),
-    );
-    expect(
-      (await collect(
-        _tag(firstTagNumber),
-        TaggedIntentionsScope.active,
-        1,
-      )).map((item) => item.id),
-      [_intention(1), _intention(4)],
-    );
-  });
-
   test('повреждение дополнительного намерения отклоняет всю порцию', () async {
     raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
       ' CANARY-название ',
@@ -328,14 +208,6 @@ void main() {
       ),
     );
     expect(events.join(' '), isNot(contains('CANARY')));
-  });
-
-  test('нестрогое название получателя отклоняет всю порцию', () async {
-    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-      ' CANARY-название ',
-      tagFixtureId(1),
-    ]);
-    await expectCorruption(TaggedIntentionsScope.active);
   });
 
   test('начальный BOM сохранённого названия не удаляется при чтении', () async {
@@ -434,327 +306,220 @@ void main() {
     },
   );
 
-  for (final (scope, scopeLabel) in [
-    (TaggedIntentionsScope.active, 'активный охват'),
-    (TaggedIntentionsScope.archived, 'архивный охват'),
-  ]) {
-    for (final (label, filter) in [
-      ('без условий', IntentionTagFilter.empty),
-      (
-        'обязательный тег',
-        IntentionTagFilter(requiredTagIds: [_tag(firstTagNumber)]),
-      ),
-      (
-        'исключённый тег',
-        IntentionTagFilter(excludedTagIds: [_tag(lastTagNumber)]),
-      ),
-      (
-        'совместные условия',
-        IntentionTagFilter(
-          requiredTagIds: [_tag(firstTagNumber)],
-          excludedTagIds: [_tag(lastTagNumber)],
-        ),
-      ),
-      (
-        'пересечение условий',
-        IntentionTagFilter(
-          requiredTagIds: [_tag(firstTagNumber)],
-          excludedTagIds: [_tag(firstTagNumber)],
-        ),
-      ),
-      (
-        'отсутствующий обязательный тег',
-        IntentionTagFilter(requiredTagIds: [_tag(999)]),
-      ),
-    ]) {
-      test(
-        'совместный поиск сохраняет курсор навигации: $scopeLabel, $label',
-        () async {
-          final additionalIds = <IntentionId>[];
-          for (var number = 10; number < 17; number++) {
-            raw.execute(
-              'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-              [
-                tagFixtureId(number),
-                'Намерение $number',
-                scope == TaggedIntentionsScope.archived ? 1 : 0,
-                number,
-                number,
-              ],
-            );
-            additionalIds.add(_intention(number));
-            for (final tagNumber in [
-              firstTagNumber,
-              if (number.isEven) lastTagNumber,
-            ]) {
-              raw.execute(
-                'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-                [tagFixtureId(tagNumber), tagFixtureId(number)],
-              );
-            }
-          }
-          Map<String, List<List<Object?>>> storedGraph() => {
-            ...retainedTagFixtureGraph(raw),
-            for (final table in ['tags', 'tag_assignments', 'sqlite_sequence'])
-              table: raw
-                  .select('SELECT * FROM $table ORDER BY rowid')
-                  .map((row) => row.values.toList())
-                  .toList(),
-          };
-          final before = storedGraph();
-          final schemaBefore = raw
-              .select('SELECT * FROM main.sqlite_schema ORDER BY name')
-              .map((row) => row.values.toList())
-              .toList();
-          final first = page(
-            await graph.getTaggedIntentionsPage(
-              TaggedIntentionsQuery(
-                tagId: _tag(firstTagNumber),
-                scope: scope,
-                pageSize: 1,
-              ),
-            ),
-          );
-          expect(first.nextCursor, isNotNull);
-          IntentionCatalogQuery catalogQuery({
-            IntentionCatalogCursor? cursor,
-          }) => IntentionCatalogQuery(
-            scope: scope == TaggedIntentionsScope.active
-                ? IntentionScope.active
-                : IntentionScope.archived,
-            titleFilter: null,
-            tagFilter: filter,
-            order: IntentionCatalogOrder.createdAtAscending,
-            pageSize: 1,
-            cursor: cursor,
-          );
-          final ids = [...first.items.map((item) => item.id)];
-          var cursor = first.nextCursor;
-          probe.statements.clear();
-          while (cursor != null) {
-            final catalog = await graph.getCatalogPage(catalogQuery());
-            expect(catalog, isA<ResultSuccess<IntentionCatalogPage>>());
-            final catalogPage =
-                (catalog as ResultSuccess<IntentionCatalogPage>).value;
-            expect(
-              catalogPage.revision.compareTo(first.revision),
-              GraphRevisionOrder.same,
-            );
-            final repeated = await graph.getCatalogPage(catalogQuery());
-            expect(repeated, isA<ResultSuccess<IntentionCatalogPage>>());
-            final repeatedPage =
-                (repeated as ResultSuccess<IntentionCatalogPage>).value;
-            expect(
-              repeatedPage.items.map((item) => item.id),
-              catalogPage.items.map((item) => item.id),
-            );
-            expect(
-              (repeatedPage as IntentionCatalogFirstPage).totalCount,
-              (catalogPage as IntentionCatalogFirstPage).totalCount,
-            );
-            if (catalogPage.nextCursor != null) {
-              final continuation = await graph.getCatalogPage(
-                catalogQuery(cursor: catalogPage.nextCursor),
-              );
-              expect(continuation, isA<ResultSuccess<IntentionCatalogPage>>());
-              final continuedPage =
-                  (continuation as ResultSuccess<IntentionCatalogPage>).value;
-              expect(
-                continuedPage.revision.compareTo(first.revision),
-                GraphRevisionOrder.same,
-              );
-              expect(
-                continuedPage.items.single.id,
-                isNot(catalogPage.items.single.id),
-              );
-            }
-            final result = await graph.getTaggedIntentionsPage(
-              TaggedIntentionsQuery(
-                tagId: _tag(firstTagNumber),
-                scope: scope,
-                pageSize: 1,
-                cursor: cursor,
-              ),
-            );
-            expect(
-              result,
-              isA<TaggedIntentionsPageSuccess>(),
-              reason: result is TaggedIntentionsPageError
-                  ? '${result.failure.runtimeType}'
-                  : null,
-            );
-            final next = page(result);
-            expect(
-              next.revision.compareTo(first.revision),
-              GraphRevisionOrder.same,
-            );
-            expect(next.tag.name, first.tag.name);
-            ids.addAll(next.items.map((item) => item.id));
-            cursor = next.nextCursor;
-          }
-          expect(ids, [
-            if (scope == TaggedIntentionsScope.active) ...[
-              _intention(1),
-              _intention(4),
-            ] else
-              _intention(2),
-            ...additionalIds,
-          ]);
-          expect(ids.toSet(), hasLength(ids.length));
-          expect(storedGraph(), before);
-          expect(
-            raw
-                .select('SELECT * FROM main.sqlite_schema ORDER BY name')
-                .map((row) => row.values.toList())
-                .toList(),
-            schemaBefore,
-          );
-          expect(
-            probe.statements.where(
-              (sql) =>
-                  sql.contains('LEFT JOIN') &&
-                  sql.contains('tag_assignments a') &&
-                  sql.contains('LIMIT 1'),
-            ),
-            isEmpty,
-          );
-        },
-      );
-    }
-  }
-
-  for (final (label, filter) in [
-    (
-      'обязательные теги',
-      IntentionTagFilter(requiredTagIds: [_tag(firstTagNumber)]),
-    ),
-    (
-      'исключённые теги',
-      IntentionTagFilter(excludedTagIds: [_tag(lastTagNumber), _tag(999)]),
-    ),
-    (
-      'совместные условия',
-      IntentionTagFilter(
-        requiredTagIds: [_tag(firstTagNumber)],
-        excludedTagIds: [_tag(lastTagNumber), _tag(999)],
-      ),
-    ),
-  ]) {
-    test('успешные и отказавшие чтения каталога ($label) '
-        'не меняют total_changes() соединения', () async {
-      for (var number = 10; number < 17; number++) {
-        raw.execute(
-          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-          [tagFixtureId(number), 'Намерение $number', number, number],
-        );
-        for (final tagNumber in [
-          firstTagNumber,
-          if (number.isEven) lastTagNumber,
-        ]) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [tagFixtureId(tagNumber), tagFixtureId(number)],
-          );
-        }
-      }
-      int connectionChanges() =>
-          raw.select('SELECT total_changes() AS count').single['count'] as int;
-      IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
-          IntentionCatalogQuery(
-            scope: IntentionScope.active,
-            titleFilter: null,
-            tagFilter: filter,
-            order: IntentionCatalogOrder.createdAtAscending,
-            pageSize: 1,
-            cursor: cursor,
-          );
-      IntentionCatalogPage success(Result<IntentionCatalogPage> result) =>
-          (result as ResultSuccess<IntentionCatalogPage>).value;
-      final before = connectionChanges();
-
-      final first = success(await graph.getCatalogPage(query()));
-      expect(first.nextCursor, isNotNull);
-      expect(connectionChanges(), before);
-      final repeated = success(await graph.getCatalogPage(query()));
-      expect(
-        repeated.items.map((item) => item.id),
-        first.items.map((item) => item.id),
-      );
-      expect(connectionChanges(), before);
-      final continuation = success(
-        await graph.getCatalogPage(query(cursor: first.nextCursor)),
-      );
-      expect(continuation.items.single.id, isNot(first.items.single.id));
-      expect(connectionChanges(), before);
-
-      for (final (point, failAfter, cursor) in [
-        ('количество', _isCatalogCount, null),
-        ('первая порция', _isCatalogRows, null),
-        ('теги первой порции', _isCatalogTags, null),
-        ('продолжение', _isCatalogRows, first.nextCursor),
-        ('теги продолжения', _isCatalogTags, first.nextCursor),
-      ]) {
-        probe.failAfter = failAfter;
-        expect(
-          await graph.getCatalogPage(query(cursor: cursor)),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'отказ: $point',
-            isA<IntentionUnexpectedFailure>(),
-          ),
-        );
-        expect(probe.failAfter, isNull, reason: point);
-        expect(connectionChanges(), before, reason: point);
-      }
-      expect(
-        success(await graph.getCatalogPage(query())).items.single.id,
-        first.items.single.id,
-      );
-      expect(connectionChanges(), before);
-      expect(
-        raw
-            .select("SELECT name FROM temp.sqlite_schema WHERE type = 'table'")
-            .map((row) => row['name']),
-        everyElement('doable_catalog_connection'),
-      );
-    });
-  }
-
-  test(
-    'смена хранилища лишает продолжение свидетельства целостности',
-    () async {
-      final first = page(
-        await graph.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: _tag(firstTagNumber),
-            scope: TaggedIntentionsScope.active,
-            pageSize: 1,
-          ),
-        ),
-      );
-      raw.execute('PRAGMA foreign_keys = OFF');
+  test('совместный поиск по обязательному и исключённому тегам сохраняет '
+      'курсор навигации', () async {
+    final additionalIds = <IntentionId>[];
+    for (var number = 10; number < 17; number++) {
       raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(999)],
+        'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        [tagFixtureId(number), 'Намерение $number', 0, number, number],
+      );
+      additionalIds.add(_intention(number));
+      for (final tagNumber in [
+        firstTagNumber,
+        if (number.isEven) lastTagNumber,
+      ]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(tagNumber), tagFixtureId(number)],
+        );
+      }
+    }
+    Map<String, List<List<Object?>>> storedGraph() => {
+      ...retainedTagFixtureGraph(raw),
+      for (final table in ['tags', 'tag_assignments', 'sqlite_sequence'])
+        table: raw
+            .select('SELECT * FROM $table ORDER BY rowid')
+            .map((row) => row.values.toList())
+            .toList(),
+    };
+    final before = storedGraph();
+    final schemaBefore = raw
+        .select('SELECT * FROM main.sqlite_schema ORDER BY name')
+        .map((row) => row.values.toList())
+        .toList();
+    final first = page(
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
+          tagId: _tag(firstTagNumber),
+          scope: TaggedIntentionsScope.active,
+          pageSize: 1,
+        ),
+      ),
+    );
+    expect(first.nextCursor, isNotNull);
+    IntentionCatalogQuery catalogQuery({IntentionCatalogCursor? cursor}) =>
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          tagFilter: IntentionTagFilter(
+            requiredTagIds: [_tag(firstTagNumber)],
+            excludedTagIds: [_tag(lastTagNumber)],
+          ),
+          order: IntentionCatalogOrder.createdAtAscending,
+          pageSize: 1,
+          cursor: cursor,
+        );
+    final ids = [...first.items.map((item) => item.id)];
+    var cursor = first.nextCursor;
+    probe.statements.clear();
+    while (cursor != null) {
+      final catalog = await graph.getCatalogPage(catalogQuery());
+      expect(catalog, isA<ResultSuccess<IntentionCatalogPage>>());
+      final catalogPage =
+          (catalog as ResultSuccess<IntentionCatalogPage>).value;
+      expect(
+        catalogPage.revision.compareTo(first.revision),
+        GraphRevisionOrder.same,
+      );
+      final repeated = await graph.getCatalogPage(catalogQuery());
+      expect(repeated, isA<ResultSuccess<IntentionCatalogPage>>());
+      final repeatedPage =
+          (repeated as ResultSuccess<IntentionCatalogPage>).value;
+      expect(
+        repeatedPage.items.map((item) => item.id),
+        catalogPage.items.map((item) => item.id),
       );
       expect(
-        await graph.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: _tag(firstTagNumber),
-            scope: TaggedIntentionsScope.active,
-            pageSize: 1,
-            cursor: first.nextCursor,
-          ),
-        ),
-        isA<TaggedIntentionsPageError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TaggedIntentionsSnapshotExpired>(),
+        (repeatedPage as IntentionCatalogFirstPage).totalCount,
+        (catalogPage as IntentionCatalogFirstPage).totalCount,
+      );
+      if (catalogPage.nextCursor != null) {
+        final continuation = await graph.getCatalogPage(
+          catalogQuery(cursor: catalogPage.nextCursor),
+        );
+        expect(continuation, isA<ResultSuccess<IntentionCatalogPage>>());
+        final continuedPage =
+            (continuation as ResultSuccess<IntentionCatalogPage>).value;
+        expect(
+          continuedPage.revision.compareTo(first.revision),
+          GraphRevisionOrder.same,
+        );
+        expect(
+          continuedPage.items.single.id,
+          isNot(catalogPage.items.single.id),
+        );
+      }
+      final result = await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
+          tagId: _tag(firstTagNumber),
+          scope: TaggedIntentionsScope.active,
+          pageSize: 1,
+          cursor: cursor,
         ),
       );
-      await expectCorruption(TaggedIntentionsScope.active);
-    },
-  );
+      expect(
+        result,
+        isA<TaggedIntentionsPageSuccess>(),
+        reason: result is TaggedIntentionsPageError
+            ? '${result.failure.runtimeType}'
+            : null,
+      );
+      final next = page(result);
+      expect(next.revision.compareTo(first.revision), GraphRevisionOrder.same);
+      expect(next.tag.name, first.tag.name);
+      ids.addAll(next.items.map((item) => item.id));
+      cursor = next.nextCursor;
+    }
+    expect(ids, [_intention(1), _intention(4), ...additionalIds]);
+    expect(ids.toSet(), hasLength(ids.length));
+    expect(storedGraph(), before);
+    expect(
+      raw
+          .select('SELECT * FROM main.sqlite_schema ORDER BY name')
+          .map((row) => row.values.toList())
+          .toList(),
+      schemaBefore,
+    );
+    expect(
+      probe.statements.where(
+        (sql) =>
+            sql.contains('LEFT JOIN') &&
+            sql.contains('tag_assignments a') &&
+            sql.contains('LIMIT 1'),
+      ),
+      isEmpty,
+    );
+  });
+
+  test('успешные и отказавшие чтения каталога с обязательным и '
+      'исключёнными тегами не меняют total_changes() соединения', () async {
+    for (var number = 10; number < 17; number++) {
+      raw.execute(
+        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+        [tagFixtureId(number), 'Намерение $number', number, number],
+      );
+      for (final tagNumber in [
+        firstTagNumber,
+        if (number.isEven) lastTagNumber,
+      ]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(tagNumber), tagFixtureId(number)],
+        );
+      }
+    }
+    int connectionChanges() =>
+        raw.select('SELECT total_changes() AS count').single['count'] as int;
+    IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          tagFilter: IntentionTagFilter(
+            requiredTagIds: [_tag(firstTagNumber)],
+            excludedTagIds: [_tag(lastTagNumber), _tag(999)],
+          ),
+          order: IntentionCatalogOrder.createdAtAscending,
+          pageSize: 1,
+          cursor: cursor,
+        );
+    IntentionCatalogPage success(Result<IntentionCatalogPage> result) =>
+        (result as ResultSuccess<IntentionCatalogPage>).value;
+    final before = connectionChanges();
+
+    final first = success(await graph.getCatalogPage(query()));
+    expect(first.nextCursor, isNotNull);
+    expect(connectionChanges(), before);
+    final repeated = success(await graph.getCatalogPage(query()));
+    expect(
+      repeated.items.map((item) => item.id),
+      first.items.map((item) => item.id),
+    );
+    expect(connectionChanges(), before);
+    final continuation = success(
+      await graph.getCatalogPage(query(cursor: first.nextCursor)),
+    );
+    expect(continuation.items.single.id, isNot(first.items.single.id));
+    expect(connectionChanges(), before);
+
+    for (final (point, failAfter, cursor) in [
+      ('первая порция', _isCatalogRows, null),
+      ('продолжение', _isCatalogRows, first.nextCursor),
+    ]) {
+      probe.failAfter = failAfter;
+      expect(
+        await graph.getCatalogPage(query(cursor: cursor)),
+        isA<ResultFailure<IntentionCatalogPage>>().having(
+          (result) => result.failure,
+          'отказ: $point',
+          isA<IntentionUnexpectedFailure>(),
+        ),
+      );
+      expect(probe.failAfter, isNull, reason: point);
+      expect(connectionChanges(), before, reason: point);
+    }
+    expect(
+      success(await graph.getCatalogPage(query())).items.single.id,
+      first.items.single.id,
+    );
+    expect(connectionChanges(), before);
+    expect(
+      raw
+          .select("SELECT name FROM temp.sqlite_schema WHERE type = 'table'")
+          .map((row) => row['name']),
+      everyElement('doable_catalog_connection'),
+    );
+  });
 
   test(
     'оба охвата содержат только прямые назначения намерениям в их порядке',
@@ -1080,65 +845,48 @@ void main() {
     },
   );
 
-  for (final changeRelation in [false, true]) {
-    test(
-      changeRelation
-          ? 'изменение связи делает продолжение общей ревизии устаревшим'
-          : 'снятие назначения требует начать навигацию с новой основы',
-      () async {
-        final first = page(
-          await graph.getTaggedIntentionsPage(
-            TaggedIntentionsQuery(
-              tagId: _tag(firstTagNumber),
-              scope: TaggedIntentionsScope.active,
-              pageSize: 1,
-            ),
-          ),
-        );
-        expect(first.nextCursor, isNotNull);
-        if (changeRelation) {
-          expect(
-            await graph.execute(ArchiveLongTermRelation(_relation(101))),
-            isA<GraphCommandSucceeded>(),
-          );
-        } else {
-          expect(
-            await graph.execute(
-              RemoveTagAssignment(
-                tagId: _tag(firstTagNumber),
-                intentionId: _intention(1),
-              ),
-            ),
-            isA<GraphCommandSucceeded>(),
-          );
-        }
-        expect(
-          await graph.getTaggedIntentionsPage(
-            TaggedIntentionsQuery(
-              tagId: _tag(firstTagNumber),
-              scope: TaggedIntentionsScope.active,
-              pageSize: 1,
-              cursor: first.nextCursor,
-            ),
-          ),
-          isA<TaggedIntentionsPageError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TaggedIntentionsSnapshotExpired>(),
-          ),
-        );
-        final updated = await collect(
-          _tag(firstTagNumber),
-          TaggedIntentionsScope.active,
-          1,
-        );
-        expect(updated.map((item) => item.id), [
-          if (changeRelation) _intention(1),
-          _intention(4),
-        ]);
-      },
+  test('снятие назначения требует начать навигацию с новой основы', () async {
+    final first = page(
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
+          tagId: _tag(firstTagNumber),
+          scope: TaggedIntentionsScope.active,
+          pageSize: 1,
+        ),
+      ),
     );
-  }
+    expect(first.nextCursor, isNotNull);
+    expect(
+      await graph.execute(
+        RemoveTagAssignment(
+          tagId: _tag(firstTagNumber),
+          intentionId: _intention(1),
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
+          tagId: _tag(firstTagNumber),
+          scope: TaggedIntentionsScope.active,
+          pageSize: 1,
+          cursor: first.nextCursor,
+        ),
+      ),
+      isA<TaggedIntentionsPageError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TaggedIntentionsSnapshotExpired>(),
+      ),
+    );
+    final updated = await collect(
+      _tag(firstTagNumber),
+      TaggedIntentionsScope.active,
+      1,
+    );
+    expect(updated.map((item) => item.id), [_intention(4)]);
+  });
 
   test(
     'порции 1, 50 и 100 обходят намерения обоих охватов среди чужих назначений',

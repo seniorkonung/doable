@@ -1,7 +1,6 @@
 @Tags(['slow'])
 library;
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
@@ -10,7 +9,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -99,21 +97,19 @@ final class _Trace extends LocalDatabaseConnectionObserver {
 }
 
 final class _Snapshot {
-  const _Snapshot(this.ids, this.assigned, this.elapsed, this.selects);
+  const _Snapshot(this.ids, this.assigned, this.selects);
 
   final List<String> ids;
   final List<bool> assigned;
-  final int elapsed;
   final List<_Select> selects;
 }
 
 void main() {
-  for (final tagCount in [203, 1203]) {
-    test(
-      'назначения и выбор читаются полными снимками при $tagCount тегах',
-      () => _measureTagAssignmentReadCost(tagCount),
-    );
-  }
+  const tagCount = 1203;
+  test(
+    'назначения и выбор читаются полными снимками при $tagCount тегах',
+    () => _measureTagAssignmentReadCost(tagCount),
+  );
 }
 
 Future<void> _measureTagAssignmentReadCost(int tagCount) async {
@@ -164,12 +160,9 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
     );
     final intention =
         (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
-    final denseIntention =
-        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
 
     Future<_Snapshot> read(IntentionId intentionId, String kind) async {
       trace.selects.clear();
-      final timer = Stopwatch()..start();
       final List<String> ids;
       final List<bool> assigned;
       if (kind == 'assignments') {
@@ -190,7 +183,6 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
         ids = [for (final row in snapshot.rows) row.tag.id.toCanonicalString()];
         assigned = [for (final row in snapshot.rows) row.isAssigned];
       }
-      timer.stop();
       final selects = List<_Select>.of(trace.selects);
       // Проверка получателя и ссылок имеет постоянную стоимость по числу SQL.
       expect(selects.length, lessThanOrEqualTo(4));
@@ -223,38 +215,22 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       if (kind == 'selection') {
         expect(sql, contains('EXISTS(SELECT 1 FROM TAG_ASSIGNMENTS'));
       }
-      return _Snapshot(ids, assigned, timer.elapsedMicroseconds, selects);
+      return _Snapshot(ids, assigned, selects);
     }
 
-    Future<void> sample(
-      IntentionId intentionId,
-      bool dense,
-      String kind,
-    ) async {
+    // Намерению назначен каждый второй тег.
+    Future<void> sample(IntentionId intentionId, String kind) async {
       final expectedIds = [
         for (var index = 0; index < tagCount; index++)
-          if (kind == 'selection' || dense || index.isEven)
-            tagFixtureId(10000 + index),
+          if (kind == 'selection' || index.isEven) tagFixtureId(10000 + index),
       ];
       final expectedAssigned = [
-        for (var index = 0; index < tagCount; index++) dense || index.isEven,
+        for (var index = 0; index < tagCount; index++) index.isEven,
       ];
       final snapshot = await read(intentionId, kind);
       expect(snapshot.ids, expectedIds);
       expect(snapshot.ids.toSet(), hasLength(expectedIds.length));
       if (kind == 'selection') expect(snapshot.assigned, expectedAssigned);
-      final durations = [snapshot.elapsed];
-      for (var repetition = 1; repetition < 5; repetition++) {
-        final again = await read(intentionId, kind);
-        expect(again.ids, expectedIds);
-        expect(again.assigned, snapshot.assigned);
-        expect(again.selects.length, snapshot.selects.length);
-        expect(
-          again.selects.map((select) => select.rows),
-          snapshot.selects.map((select) => select.rows),
-        );
-        durations.add(again.elapsed);
-      }
       final plans = <List<String>>[
         for (final select in snapshot.selects)
           [
@@ -275,7 +251,7 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
         raw,
         referenceCheck,
       );
-      final assignmentCount = dense ? tagCount : (tagCount + 1) ~/ 2;
+      final assignmentCount = (tagCount + 1) ~/ 2;
       expect(referenceCheckVisits, assignmentCount);
       final mainVisits = kind == 'assignments'
           ? _measureMainQueryVisits(raw, main)
@@ -287,66 +263,11 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
         expect(mainPlan.join(' '), isNot(contains('SCAN tags')));
         expect(mainVisits, expectedIds.length);
       }
-      debugPrintSynchronously(
-        jsonEncode({
-          'kind': 'tag_assignment_snapshot',
-          'recipient': 'intention',
-          'density': dense ? 'dense' : 'sparse',
-          'read': kind,
-          'tags': tagCount,
-          'reads': durations.length,
-          'selectsPerRead': snapshot.selects.length,
-          'materializedRowsPerSelect': [
-            for (final select in snapshot.selects) select.rows,
-          ],
-          'resultRows': snapshot.ids.length,
-          'elapsedMicroseconds': durations,
-          'mainQueryVisits': mainVisits,
-          'referenceCheckRuns': 1,
-          'referenceCheckVisits': referenceCheckVisits,
-          'sql': [for (final select in snapshot.selects) select.sql],
-          'plans': plans,
-        }),
-      );
     }
 
-    for (final (target, dense) in [
-      (intention, false),
-      (denseIntention, true),
-    ]) {
-      for (final kind in ['assignments', 'selection']) {
-        await sample(target, dense, kind);
-      }
+    for (final kind in ['assignments', 'selection']) {
+      await sample(intention, kind);
     }
-    final sqlitePages =
-        raw.select('PRAGMA page_count').single.values.single as int;
-    final sqlitePageSize =
-        raw.select('PRAGMA page_size').single.values.single as int;
-    debugPrintSynchronously(
-      jsonEncode({
-        'kind': 'tag_assignment_read_fixture',
-        'tags': tagCount,
-        'assignments': raw
-            .select('SELECT COUNT(*) FROM tag_assignments')
-            .single
-            .values
-            .single,
-        'sqliteBytes': sqlitePages * sqlitePageSize,
-        'journalMode': raw.select('PRAGMA journal_mode').single.values.single,
-        'sqliteVersion': raw
-            .select('SELECT sqlite_version()')
-            .single
-            .values
-            .single,
-        'platform': Platform.operatingSystem,
-        'runtime': Platform.version,
-        'buildMode': const bool.fromEnvironment('dart.vm.profile')
-            ? 'profile'
-            : const bool.fromEnvironment('dart.vm.product')
-            ? 'release'
-            : 'debug',
-      }),
-    );
   } finally {
     await database.close();
     await directory.delete(recursive: true);

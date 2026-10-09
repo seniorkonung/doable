@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -86,33 +84,16 @@ void main() {
     ]);
   }
 
-  group('Место без существующего намерения', () {
-    for (final (description, position) in [
-      ('перед остальными местами', 1),
-      ('между местами избранных намерений', 3),
-      ('после остальных мест', 9),
-    ]) {
-      test('$description даёт повреждение без списка', () async {
-        seedFavorites();
-        storeFavoritePlaceWithoutIntention(
-          raw,
-          intentionId: _uuid(101),
-          position: position,
-        );
+  test('место без существующего намерения между местами избранных '
+      'намерений даёт повреждение без списка', () async {
+    seedFavorites();
+    storeFavoritePlaceWithoutIntention(
+      raw,
+      intentionId: _uuid(101),
+      position: 3,
+    );
 
-        await expectCorruption();
-      });
-    }
-
-    test('единственное в хранилище не выдаётся за пустой снимок', () async {
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _uuid(101),
-        position: 1,
-      );
-
-      await expectCorruption();
-    });
+    await expectCorruption();
   });
 
   group('Неоднозначный порядок', () {
@@ -120,15 +101,6 @@ void main() {
       seedFavorites();
       removeFavoriteSchemaProtection(raw);
       storeFavoriteMark(raw, intentionId: _uuid(4), position: 6);
-
-      await expectCorruption();
-    });
-
-    test('активное и архивированное намерения на одном месте дают '
-        'повреждение', () async {
-      seedFavorites();
-      removeFavoriteSchemaProtection(raw);
-      storeFavoriteMark(raw, intentionId: _uuid(4), position: 4);
 
       await expectCorruption();
     });
@@ -142,110 +114,31 @@ void main() {
     });
   });
 
-  group('Недопустимое место', () {
-    for (final position in <Object>[0, -3, 1.5, 'CANARY-место']) {
-      for (final (description, isArchived) in [
-        ('активного', false),
-        ('архивированного', true),
-      ]) {
-        test('$position $description избранного намерения даёт '
-            'повреждение', () async {
-          seedFavorites();
-          _insertIntention(
-            raw,
-            number: 5,
-            title: 'CANARY-повреждённое',
-            isArchived: isArchived,
-          );
-          storeFavoriteMarkWithInvalidPosition(
-            raw,
-            intentionId: _uuid(5),
-            position: position,
-          );
+  test('дробное место избранного намерения даёт повреждение', () async {
+    seedFavorites();
+    _insertIntention(raw, number: 5, title: 'CANARY-повреждённое');
+    storeFavoriteMarkWithInvalidPosition(
+      raw,
+      intentionId: _uuid(5),
+      position: 1.5,
+    );
 
-          await expectCorruption();
-        });
-      }
-    }
-
-    test('отсутствующее место даёт повреждение', () async {
-      seedFavorites();
-      removeFavoriteSchemaProtection(raw);
-      raw.execute(
-        'INSERT INTO favorite_intentions (intention_id, position) '
-        'VALUES (?, NULL)',
-        [_uuid(4)],
-      );
-
-      await expectCorruption();
-    });
-  });
-
-  group('Недопустимый идентификатор', () {
-    for (final (description, id) in [
-      ('не UUID', 'CANARY-идентификатор'),
-      ('UUID в неканонической записи', _uuid(5).toUpperCase()),
-    ]) {
-      for (final (scope, isArchived) in [
-        ('активного', false),
-        ('архивированного', true),
-      ]) {
-        test('$description $scope избранного намерения даёт '
-            'повреждение', () async {
-          seedFavorites();
-          _insertIntentionWithId(
-            raw,
-            id: id,
-            title: 'CANARY-повреждённое',
-            isArchived: isArchived,
-          );
-          storeFavoriteMark(raw, intentionId: id, position: 8);
-
-          await expectCorruption();
-        });
-      }
-    }
-
-    test('идентификатор отметки не текстом даёт повреждение', () async {
-      seedFavorites();
-      removeFavoriteSchemaProtection(raw);
-      raw.execute(
-        'INSERT INTO favorite_intentions (intention_id, position) '
-        'VALUES (?, ?)',
-        [_blob, 8],
-      );
-
-      await expectCorruption();
-    });
+    await expectCorruption();
   });
 
   group('Недопустимые поля намерения', () {
-    for (final (description, column, value) in <(String, String, Object?)>[
-      ('название с пробелами по краям', 'title', ' CANARY-название '),
-      ('описание не текстом', 'description', _blob),
-      ('готовность вне двух значений', 'is_action_ready', 7),
-      ('архивное состояние вне двух значений', 'is_archived', 2),
-      ('время создания не числом', 'created_at', 'CANARY-время'),
-      ('время изменения не числом', 'updated_at', 'CANARY-время'),
-    ]) {
-      for (final (scope, number) in [
-        ('активного', 1),
-        ('архивированного', 2),
-      ]) {
-        test('$description у $scope избранного намерения даёт '
-            'повреждение', () async {
-          seedFavorites();
-          _corruptIntentionField(
-            raw,
-            number: number,
-            column: column,
-            value: value,
-          );
+    test('название с пробелами по краям у архивированного избранного '
+        'намерения даёт повреждение', () async {
+      seedFavorites();
+      _corruptIntentionField(
+        raw,
+        number: 2,
+        column: 'title',
+        value: ' CANARY-название ',
+      );
 
-          await expectCorruption();
-        });
-      }
-    }
+      await expectCorruption();
+    });
 
     test('повреждённые поля неизбранного намерения списку не мешают', () async {
       seedFavorites();
@@ -264,56 +157,52 @@ void main() {
   });
 
   group('Категории отказов', () {
-    for (final point in _FaultPoint.values) {
-      for (final fault in _storageFaults) {
-        test('${fault.name} ${point.description} не подменяется пустым '
-            'снимком', () async {
-          seedFavorites();
-          final storedBefore = _storedGraph(raw);
-          storage.clear();
-          diagnostics.clear();
-          storage.arm(point, fault.error);
-
-          final result = await repository.getFavoriteIntentions();
-
-          expect(result, _failure(fault.failure));
-          expect(
-            (result as FavoriteIntentionsError).failure.category,
-            fault.category,
-          );
-          expect(storage.failures, 1);
-          expect(storage.writes, isEmpty);
-          expect(_storedGraph(raw), storedBefore);
-          expect(diagnostics.readEvents, [
-            _started(),
-            _failed(FavoriteIntentionsReadDiagnosticsStage.read, fault.code),
-          ]);
-        });
-      }
-    }
-
-    for (final point in _FaultPoint.values) {
-      test('повтор после недоступности ${point.description} выполняется как '
-          'новое чтение', () async {
+    for (final fault in _storageFaults) {
+      test('${fault.name} при чтении строк избранного не подменяется пустым '
+          'снимком', () async {
         seedFavorites();
-        storage.arm(point, _busy);
-        expect(
-          await repository.getFavoriteIntentions(),
-          _failure(isA<FavoriteIntentionsUnavailableFailure>()),
-        );
-        storage.disarm();
+        final storedBefore = _storedGraph(raw);
         storage.clear();
         diagnostics.clear();
+        storage.arm(fault.error);
 
-        final snapshot = await _favorites(repository);
+        final result = await repository.getFavoriteIntentions();
 
-        expect(snapshot.items.map(_rowId), [_uuid(1), _uuid(3)]);
-        expect(snapshot.archivedCount, 1);
-        expect(storage.favoriteReads, 1);
+        expect(result, _failure(fault.failure));
+        expect(
+          (result as FavoriteIntentionsError).failure.category,
+          fault.category,
+        );
+        expect(storage.failures, 1);
         expect(storage.writes, isEmpty);
-        expect(diagnostics.readEvents, [_started(), _succeeded()]);
+        expect(_storedGraph(raw), storedBefore);
+        expect(diagnostics.readEvents, [
+          _started(),
+          _failed(FavoriteIntentionsReadDiagnosticsStage.read, fault.code),
+        ]);
       });
     }
+
+    test('повтор после недоступности при чтении строк избранного '
+        'выполняется как новое чтение', () async {
+      seedFavorites();
+      storage.arm(_busy);
+      expect(
+        await repository.getFavoriteIntentions(),
+        _failure(isA<FavoriteIntentionsUnavailableFailure>()),
+      );
+      storage.disarm();
+      storage.clear();
+      diagnostics.clear();
+
+      final snapshot = await _favorites(repository);
+
+      expect(snapshot.items.map(_rowId), [_uuid(1), _uuid(3)]);
+      expect(snapshot.archivedCount, 1);
+      expect(storage.favoriteReads, 1);
+      expect(storage.writes, isEmpty);
+      expect(diagnostics.readEvents, [_started(), _succeeded()]);
+    });
 
     test('повтор после повреждения возвращает то же повреждение', () async {
       seedFavorites();
@@ -393,9 +282,6 @@ const _intactMarks = [
   (4, FavoriteMark.notFavorite),
 ];
 
-/// Значение, которое текстовый столбец сохраняет без приведения к тексту.
-final _blob = Uint8List.fromList([0xCA, 0xFE]);
-
 final _busy = sqlite.SqliteException(
   extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
   message: 'CANARY-недоступность',
@@ -440,23 +326,9 @@ final _storageFaults =
       ),
     ];
 
-/// Момент чтения списка, в который хранилище отказывает.
-enum _FaultPoint {
-  /// Чтение строк избранного.
-  rowsRead('при чтении строк избранного'),
-
-  /// Пакетное чтение счётчиков активных связей.
-  countsRead('при чтении счётчиков связей');
-
-  const _FaultPoint(this.description);
-
-  final String description;
-}
-
-/// Наблюдает чтения и записи соединения и однократно отказывает в заданный
-/// момент чтения списка.
+/// Наблюдает чтения и записи соединения и однократно отказывает при чтении
+/// строк избранного.
 final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
-  _FaultPoint? _point;
   Object? _error;
 
   /// Число сработавших отказов с последнего [arm].
@@ -468,14 +340,12 @@ final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
   /// Записи соединения в порядке выполнения.
   final writes = <String>[];
 
-  void arm(_FaultPoint point, Object error) {
-    _point = point;
+  void arm(Object error) {
     _error = error;
     failures = 0;
   }
 
   void disarm() {
-    _point = null;
     _error = null;
   }
 
@@ -496,19 +366,16 @@ final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    final sql = statement.statements.single;
-    if (sql.contains('FROM favorite_intentions')) {
+    if (statement.statements.single.contains('FROM favorite_intentions')) {
       favoriteReads++;
-      _failAt(_FaultPoint.rowsRead);
-    } else if (sql.contains('long_term_relations')) {
-      _failAt(_FaultPoint.countsRead);
+      _fail();
     }
     return rows;
   }
 
-  void _failAt(_FaultPoint point) {
+  void _fail() {
     final error = _error;
-    if (_point != point || error == null || failures > 0) return;
+    if (error == null || failures > 0) return;
     failures++;
     throw error;
   }

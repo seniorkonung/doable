@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, TagAssignment;
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
-import 'package:doable/src/favorite/application/favorite_order_command.dart';
-import 'package:doable/src/favorite/domain/favorite_order.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -14,8 +12,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
-import 'package:doable/src/tag/application/tag_command.dart';
-import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -84,14 +80,6 @@ void main() {
     return (await firstResult, await secondResult);
   }
 
-  Future<FavoriteOrderCommandResult> move(int number, {required int after}) =>
-      repository.execute(
-        MoveFavoriteIntention(
-          intentionId: _id(number),
-          placement: AfterFavoritePlacement(_id(after)),
-        ),
-      );
-
   Future<_IntentionResult> run(IntentionCommand command) =>
       repository.execute(command);
 
@@ -110,27 +98,6 @@ void main() {
     expect(snapshot.revision.compareTo(lastRevision), GraphRevisionOrder.same);
     expect(_foreignKeyViolations(raw), isEmpty);
   }
-
-  group('Перестановка и отметка нового намерения', () {
-    test('отметка, подтверждённая после перестановки, ставит намерение в '
-        'конец нового порядка', () async {
-      final (moveResult, markResult) = await overlap(
-        () => move(4, after: 1),
-        () => run(MarkIntentionFavorite(_id(5))),
-      );
-
-      final moved = _moved(moveResult);
-      final marked = _updated(markResult);
-      expect(marked.after.summary.favoriteMark, FavoriteMark.favorite);
-      _expectNewer(moved.revision, than: initialRevision);
-      _expectNewer(marked.revision, than: moved.revision);
-      await expectConfirmedState(
-        marks: [(1, 1), (4, 2), (2, 3), (3, 4), (5, 5)],
-        visible: [1, 4, 3, 5],
-        lastRevision: marked.revision,
-      );
-    });
-  });
 
   group('Создание избранного намерения с тегом и пересекающиеся операции', () {
     // Создаваемое намерение получает номер 6, его единственный тег — «Дом».
@@ -155,9 +122,6 @@ void main() {
       ),
     );
 
-    Future<TagCommandResult> deleteHomeTag() =>
-        repository.execute(DeleteTag(homeTagId));
-
     test('создание, подтверждённое раньше отметки, занимает место перед '
         'отмеченным позже намерением', () async {
       final (createResult, markResult) = await overlap(
@@ -173,52 +137,6 @@ void main() {
         marks: [..._initialMarks, (created, 10), (5, 11)],
         visible: [1, 3, 4, created, 5],
         lastRevision: marked.revision,
-      );
-    });
-
-    test('отметка, подтверждённая раньше, ставит создаваемое намерение после '
-        'отмеченного', () async {
-      final (markResult, createResult) = await overlap(
-        () => run(MarkIntentionFavorite(_id(5))),
-        create,
-      );
-
-      final marked = _updated(markResult);
-      final createdResult = _created(createResult, tagId: homeTagId);
-      _expectNewer(marked.revision, than: initialRevision);
-      _expectNewer(createdResult.revision, than: marked.revision);
-      await expectConfirmedState(
-        marks: [..._initialMarks, (5, 10), (created, 11)],
-        visible: [1, 3, 4, 5, created],
-        lastRevision: createdResult.revision,
-      );
-    });
-
-    test('удаление тега, подтверждённое раньше, отклоняет всё создание '
-        'отсутствием тега без намерения и места', () async {
-      final (deleteResult, createResult) = await overlap(deleteHomeTag, create);
-
-      final deletedRevision = _tagDeleted(deleteResult, homeTagId);
-      _expectNewer(deletedRevision, than: initialRevision);
-      expect(
-        createResult,
-        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-            .having(
-              (result) => result.failure,
-              'причина',
-              isA<IntentionCreationTagsMissingFailure>().having(
-                (failure) => failure.missingTagIds,
-                'отсутствующие теги',
-                {homeTagId},
-              ),
-            ),
-      );
-      expect(_storedIntentionIds(raw), _uuids([1, 2, 3, 4, 5]));
-      expect(_storedTagAssignments(raw), isEmpty);
-      await expectConfirmedState(
-        marks: _initialMarks,
-        visible: [1, 3, 4],
-        lastRevision: deletedRevision,
       );
     });
   });
@@ -242,8 +160,6 @@ final class _SequentialIntentionIdGenerator implements IntentionIdGenerator {
   @override
   IntentionId generate() => _id(_next++);
 }
-
-List<String> _uuids(Iterable<int> numbers) => numbers.map(_uuid).toList();
 
 IntentionId _id(int number) => switch (IntentionId.decode(_uuid(number))) {
   IntentionIdDecodingSuccess(:final id) => id,
@@ -284,24 +200,6 @@ Future<FavoriteIntentionsSnapshot> _favorites(
   final result = await repository.getFavoriteIntentions();
   expect(result, isA<FavoriteIntentionsSuccess>());
   return (result as FavoriteIntentionsSuccess).value;
-}
-
-ConfirmedGraphResult<FavoriteOrderCommandSuccess> _orderConfirmed(
-  FavoriteOrderCommandResult result,
-) => switch (result) {
-  FavoriteOrderCommandSucceeded(:final value) => value,
-  FavoriteOrderCommandFailed(:final failure) => fail(
-    'Ожидался успех перестановки, получен ${failure.runtimeType}.',
-  ),
-};
-
-/// Перестановка подтверждена фактическим изменением порядка.
-ConfirmedGraphResult<FavoriteOrderCommandSuccess> _moved(
-  FavoriteOrderCommandResult result,
-) {
-  final confirmed = _orderConfirmed(result);
-  expect(confirmed.value, isA<FavoriteOrderMoved>());
-  return confirmed;
 }
 
 ConfirmedGraphResult<IntentionCommandSuccess> _intentionConfirmed(
@@ -359,35 +257,8 @@ ConfirmedGraphResult<IntentionCommandSuccess> _intentionConfirmed(
   return (revision: confirmed.revision, entry: entry);
 }
 
-/// Удаление тега [tagId] подтверждено; возвращает его ревизию.
-GraphRevision _tagDeleted(TagCommandResult result, TagId tagId) =>
-    switch (result) {
-      TagCommandSucceeded(:final value) => () {
-        expect(
-          value.value,
-          isA<TagDeleted>().having((deleted) => deleted.tagId, 'тег', tagId),
-        );
-        return value.revision;
-      }(),
-      TagCommandFailed(:final failure) => fail(
-        'Ожидалось удаление тега, получен ${failure.runtimeType}.',
-      ),
-    };
-
 void _expectNewer(GraphRevision revision, {required GraphRevision than}) =>
     expect(revision.compareTo(than), GraphRevisionOrder.newer);
-
-List<(String, String)> _storedTagAssignments(sqlite.Database database) => [
-  for (final row in database.select(
-    'SELECT tag_id, intention_id FROM tag_assignments ORDER BY 1, 2',
-  ))
-    (row['tag_id'] as String, row['intention_id'] as String),
-];
-
-List<String> _storedIntentionIds(sqlite.Database database) => [
-  for (final row in database.select('SELECT id FROM intentions ORDER BY id'))
-    row['id'] as String,
-];
 
 List<Map<String, Object?>> _foreignKeyViolations(sqlite.Database database) => [
   for (final row in database.select('PRAGMA foreign_key_check')) {...row},

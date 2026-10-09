@@ -30,82 +30,90 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('получает каждую из восьми групп одним общим путём', () async {
-    var fixture = 10;
-    for (final scope in RelationScope.values) {
-      for (final type in LongTermRelationType.values) {
-        for (final direction in RelationDirection.values) {
-          final participantId = _intentionId(_uuid(fixture));
-          await _insertIntention(
-            database,
-            participantId,
-            title: 'Участник $fixture',
-          );
-          await _insertRelation(
-            database,
-            id: _relationId(_uuid(100 + fixture)),
-            ownerId: ownerId,
-            participantId: participantId,
+  test(
+    'группа отбирает только свои связи по охвату, типу и направлению',
+    () async {
+      var fixture = 10;
+      for (final scope in RelationScope.values) {
+        for (final type in LongTermRelationType.values) {
+          for (final direction in RelationDirection.values) {
+            final participantId = _intentionId(_uuid(fixture));
+            await _insertIntention(
+              database,
+              participantId,
+              title: 'Участник $fixture',
+            );
+            await _insertRelation(
+              database,
+              id: _relationId(_uuid(100 + fixture)),
+              ownerId: ownerId,
+              participantId: participantId,
+              type: type,
+              direction: direction,
+              scope: scope,
+              priority: RelationPriority.p2,
+              description: fixture.isEven ? 'Описание $fixture' : null,
+            );
+            fixture++;
+          }
+        }
+      }
+
+      // Остальные семь групп отличаются от каждой запрошенной хотя бы одним
+      // признаком, поэтому одна связь в выдаче подтверждает все три отбора.
+      for (final (scope, type, direction) in [
+        (
+          RelationScope.active,
+          LongTermRelationType.need,
+          RelationDirection.outgoing,
+        ),
+        (
+          RelationScope.archived,
+          LongTermRelationType.can,
+          RelationDirection.incoming,
+        ),
+      ]) {
+        final result = await repository.getRelationGroupPage(
+          RelationGroupQuery(
+            intentionId: ownerId,
             type: type,
             direction: direction,
             scope: scope,
-            priority: RelationPriority.p2,
-            description: fixture.isEven ? 'Описание $fixture' : null,
-          );
-          fixture++;
-        }
-      }
-    }
+            pageSize: 100,
+          ),
+        );
 
-    for (final scope in RelationScope.values) {
-      for (final type in LongTermRelationType.values) {
-        for (final direction in RelationDirection.values) {
-          final result = await repository.getRelationGroupPage(
-            RelationGroupQuery(
-              intentionId: ownerId,
-              type: type,
-              direction: direction,
-              scope: scope,
-              pageSize: 100,
-            ),
-          );
-
-          final page = _page(result) as RelationGroupFirstPage;
-          expect(page.items, hasLength(1));
-          expect(page.nextCursor, isNull);
-          expect(page.counts.total, 8);
-          expect(
-            page.counts.forGroup(
-              scope: scope,
-              type: type,
-              direction: direction,
-            ),
-            1,
-          );
-          final summary = page.items.single;
-          expect(summary.relation.type, type);
-          expect(summary.relation.scope, scope);
-          expect(
-            direction == RelationDirection.outgoing
-                ? summary.relation.sourceIntentionId
-                : summary.relation.relatedIntentionId,
-            ownerId,
-          );
-          final owner = direction == RelationDirection.outgoing
-              ? summary.source
-              : summary.related;
-          final participant = direction == RelationDirection.outgoing
-              ? summary.related
-              : summary.source;
-          expect(owner.activeRelationCount, 4);
-          expect(
-            participant.activeRelationCount,
-            scope == RelationScope.active ? 1 : 0,
-          );
-        }
+        final page = _page(result) as RelationGroupFirstPage;
+        expect(page.items, hasLength(1));
+        expect(page.nextCursor, isNull);
+        expect(page.counts.total, 8);
+        expect(
+          page.counts.forGroup(scope: scope, type: type, direction: direction),
+          1,
+        );
+        final summary = page.items.single;
+        expect(summary.relation.type, type);
+        expect(summary.relation.scope, scope);
+        expect(
+          direction == RelationDirection.outgoing
+              ? summary.relation.sourceIntentionId
+              : summary.relation.relatedIntentionId,
+          ownerId,
+        );
+        final owner = direction == RelationDirection.outgoing
+            ? summary.source
+            : summary.related;
+        final participant = direction == RelationDirection.outgoing
+            ? summary.related
+            : summary.source;
+        expect(owner.activeRelationCount, 4);
+        expect(
+          participant.activeRelationCount,
+          scope == RelationScope.active ? 1 : 0,
+        );
       }
-    }
-  });
+    },
+  );
 
   test(
     'продолжает по приоритету и последовательности без пропусков и повторов',

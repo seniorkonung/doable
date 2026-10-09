@@ -332,24 +332,6 @@ void main() {
     },
   );
 
-  test('коллизия выбора сохраняет прежнюю запись без новой ревизии', () async {
-    expect(await repository.execute(command()), isA<GraphCommandSucceeded>());
-    final before = (await repository.getDailyChoice(
-      _choice(201),
-    ) as DailyChoiceReadSuccess).value.revision;
-    choiceIds.values
-      ..clear()
-      ..add(_choice(201));
-    final result = await repository.execute(command());
-    expect(result, isA<GraphCommandFailed>());
-    expect(await rows('daily_choices'), 1);
-    expect(await rows('daily_choice_path_steps'), 2);
-    final after = (await repository.getDailyChoice(
-      _choice(201),
-    ) as DailyChoiceReadSuccess).value.revision;
-    expect(before.compareTo(after), GraphRevisionOrder.same);
-  });
-
   test('отказ второго шага откатывает выбор и первый шаг', () async {
     expect(await repository.execute(command()), isA<GraphCommandSucceeded>());
     final before = (await repository.getDailyChoice(

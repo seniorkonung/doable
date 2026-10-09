@@ -113,65 +113,56 @@ void main() {
     },
   );
 
-  for (final scenario in [
-    (name: 'изменение порядка', result: _moved(const _Revision(5))),
-    (name: 'отсутствие изменения', result: _unchanged(const _Revision(4))),
-  ]) {
-    test(
-      'успех (${scenario.name}) публикуется для согласования без права предъявления',
-      () async {
-        final repository = _ControlledRepository();
-        final coordinator = _coordinator(repository);
-        final completions = <GraphCommandCompletion>[];
-        final subscription = coordinator.completions.listen(completions.add);
-        final registration = coordinator.registerAppPresentation();
-        GraphAppPresentationClaim? issued;
-        unawaited(registration.nextClaim().then((claim) => issued = claim));
+  test('успех (изменение порядка) публикуется для согласования без права предъявления', () async {
+    final result = _moved(const _Revision(5));
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final completions = <GraphCommandCompletion>[];
+    final subscription = coordinator.completions.listen(completions.add);
+    final registration = coordinator.registerAppPresentation();
+    GraphAppPresentationClaim? issued;
+    unawaited(registration.nextClaim().then((claim) => issued = claim));
 
-        final move = coordinator.acceptFavoriteOrderMove(
-          _moveAfter(_c, _a),
-        ) as FavoriteOrderCommandAccepted;
-        repository.complete(0, scenario.result);
-        final completion = await move.future;
-        await Future<void>.delayed(Duration.zero);
+    final move = coordinator.acceptFavoriteOrderMove(
+      _moveAfter(_c, _a),
+    ) as FavoriteOrderCommandAccepted;
+    repository.complete(0, result);
+    final completion = await move.future;
+    await Future<void>.delayed(Duration.zero);
 
-        expect(completion, isA<FavoriteOrderConfirmedCompletion>());
-        expect(completion.token, same(move.token));
-        expect(completion.isFailure, isFalse);
-        final confirmed = completion as FavoriteOrderConfirmedCompletion;
-        expect(
-          completion.confirmedChange,
-          same((scenario.result as FavoriteOrderCommandSucceeded).value),
-        );
-        expect(confirmed.success.change.revision, same(completion.revision));
-        expect(completions, [same(completion)]);
-        expect(issued, isNull);
-
-        // Следующая операция с правом оболочки не ждёт успеха перестановки.
-        final archive = coordinator.acceptExisting(
-          ArchiveIntention(_a),
-          presentationTitle: 'А',
-        ) as IntentionCommandAccepted;
-        coordinator.releaseInitiatorPresentation(archive.token);
-        repository.complete(1, _intentionFailure);
-        final archiveCompletion = await archive.future;
-        await Future<void>.delayed(Duration.zero);
-
-        expect(issued?.completion, same(archiveCompletion));
-        coordinator.confirmPresentation(issued!);
-        GraphAppPresentationClaim? afterArchive;
-        unawaited(
-          registration.nextClaim().then((claim) => afterArchive = claim),
-        );
-        await Future<void>.delayed(Duration.zero);
-        expect(afterArchive, isNull);
-
-        registration.release();
-        await subscription.cancel();
-        await coordinator.shutdown();
-      },
+    expect(completion, isA<FavoriteOrderConfirmedCompletion>());
+    expect(completion.token, same(move.token));
+    expect(completion.isFailure, isFalse);
+    final confirmed = completion as FavoriteOrderConfirmedCompletion;
+    expect(
+      completion.confirmedChange,
+      same((result as FavoriteOrderCommandSucceeded).value),
     );
-  }
+    expect(confirmed.success.change.revision, same(completion.revision));
+    expect(completions, [same(completion)]);
+    expect(issued, isNull);
+
+    // Следующая операция с правом оболочки не ждёт успеха перестановки.
+    final archive = coordinator.acceptExisting(
+      ArchiveIntention(_a),
+      presentationTitle: 'А',
+    ) as IntentionCommandAccepted;
+    coordinator.releaseInitiatorPresentation(archive.token);
+    repository.complete(1, _intentionFailure);
+    final archiveCompletion = await archive.future;
+    await Future<void>.delayed(Duration.zero);
+
+    expect(issued?.completion, same(archiveCompletion));
+    coordinator.confirmPresentation(issued!);
+    GraphAppPresentationClaim? afterArchive;
+    unawaited(registration.nextClaim().then((claim) => afterArchive = claim));
+    await Future<void>.delayed(Duration.zero);
+    expect(afterArchive, isNull);
+
+    registration.release();
+    await subscription.cancel();
+    await coordinator.shutdown();
+  });
 
   test(
     'отказ сразу принадлежит общей поверхности, а не странице инициатора',

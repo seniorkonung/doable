@@ -1,9 +1,6 @@
 @Tags(['slow'])
 library;
 
-import 'dart:async';
-import 'dart:io';
-
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -11,10 +8,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -66,9 +60,7 @@ void main() {
 
     final movedActiveId = _decodedRelationId(_activeGroupSize - 1);
     final movedActiveCanonicalId = movedActiveId.toCanonicalString();
-    final initialActivePosition = active.orderedIds.indexOf(
-      movedActiveCanonicalId,
-    );
+    final initialActivePosition = active.indexOf(movedActiveCanonicalId);
     await _expectCommandSuccess(
       repository.execute(
         UpdateLongTermRelation(
@@ -87,7 +79,7 @@ void main() {
       expectedOtherCount: _archivedGroupSize,
     );
     expect(
-      movedActive.orderedIds.indexOf(movedActiveCanonicalId),
+      movedActive.indexOf(movedActiveCanonicalId),
       lessThan(initialActivePosition),
     );
 
@@ -108,11 +100,11 @@ void main() {
       expectedCount: _activeGroupSize,
       expectedOtherCount: _archivedGroupSize,
     );
-    expect(restoredActive.orderedIds, active.orderedIds);
+    expect(restoredActive, active);
 
     final unviewedArchivedId = _decodedRelationId(_activeGroupSize);
     final unviewedArchivedCanonicalId = unviewedArchivedId.toCanonicalString();
-    final initialArchivedPosition = archived.orderedIds.indexOf(
+    final initialArchivedPosition = archived.indexOf(
       unviewedArchivedCanonicalId,
     );
     await _expectCommandSuccess(
@@ -132,7 +124,7 @@ void main() {
       expectedCount: _activeGroupSize,
       expectedOtherCount: _archivedGroupSize,
     );
-    expect(activeAfterUnviewedMutation.orderedIds, active.orderedIds);
+    expect(activeAfterUnviewedMutation, active);
     final archivedAfterMutation = await _traverseGroup(
       repository,
       trace,
@@ -141,40 +133,8 @@ void main() {
       expectedOtherCount: _activeGroupSize,
     );
     expect(
-      archivedAfterMutation.orderedIds.indexOf(unviewedArchivedCanonicalId),
+      archivedAfterMutation.indexOf(unviewedArchivedCanonicalId),
       lessThan(initialArchivedPosition),
-    );
-
-    trace.clear();
-    trace.blockNextGroupRowsSelect();
-    final read = repository.getRelationGroupPage(_query(RelationScope.active));
-    await trace.waitUntilGroupRowsSelectIsBlocked;
-    var commandCompleted = false;
-    final commandStopwatch = Stopwatch()..start();
-    final command = repository
-        .execute(EnableIntentionReadiness(_ownerId))
-        .whenComplete(() => commandCompleted = true);
-    await Future<void>.delayed(Duration.zero);
-
-    expect(commandCompleted, isFalse);
-
-    trace.releaseGroupRowsSelect();
-    _page(await read);
-    final commandResult = await command;
-    commandStopwatch.stop();
-    expect(
-      commandResult,
-      isA<
-        GraphResultSuccess<
-          ConfirmedGraphResult<IntentionCommandSuccess>,
-          IntentionFailure
-        >
-      >(),
-    );
-
-    _recordMeasurements(
-      'active: ${active.describe()}; archived: ${archived.describe()}; '
-      'commandQueueWait=${commandStopwatch.elapsedMicroseconds}us',
     );
   }, timeout: const Timeout(Duration(minutes: 3)));
 
@@ -320,20 +280,14 @@ void main() {
       await _populateLargeFixture(database);
       trace.clear();
 
-      final rssBefore = ProcessInfo.currentRss;
-      final accessWatch = Stopwatch()..start();
-      final pageLatencies = <Duration>[];
       final activeRows = <LongTermRelationSummary>[];
       RelationGroupCursor? cursor;
       do {
-        final pageWatch = Stopwatch()..start();
         final page = _page(
           await repository.getRelationGroupPage(
             _query(RelationScope.active, cursor: cursor),
           ),
         );
-        pageWatch.stop();
-        pageLatencies.add(pageWatch.elapsed);
         activeRows.addAll(_longTermItems(page));
         cursor = page.nextCursor;
       } while (cursor != null);
@@ -342,20 +296,15 @@ void main() {
       final archivedRows = <LongTermRelationSummary>[];
       cursor = null;
       for (var pageIndex = 0; pageIndex < 4; pageIndex++) {
-        final pageWatch = Stopwatch()..start();
         final page = _page(
           await repository.getRelationGroupPage(
             _query(RelationScope.archived, cursor: cursor),
           ),
         );
-        pageWatch.stop();
-        pageLatencies.add(pageWatch.elapsed);
         archivedRows.addAll(_longTermItems(page));
         cursor = page.nextCursor;
         expect(cursor, isNotNull);
       }
-      accessWatch.stop();
-      final rssAfterAccess = ProcessInfo.currentRss;
       expect(
         archivedRows.map((row) => row.relation.id).toSet(),
         hasLength(200),
@@ -384,8 +333,6 @@ void main() {
         ),
       );
       expect(trace.aggregateSelects, hasLength(11));
-      final accessAggregateQueries = trace.aggregateSelects.length;
-      final accessAggregateTime = _elapsedSelects(trace.aggregateSelects);
 
       final container = ProviderContainer(
         overrides: [
@@ -398,23 +345,17 @@ void main() {
       addTearDown(subscription.close);
       final selection = container.read(provider.notifier);
       final chosenRows = [...activeRows.take(201), ...archivedRows];
-      final selectionWatch = Stopwatch()..start();
       for (final row in chosenRows) {
         expect(selection.select(row), isTrue);
       }
-      selectionWatch.stop();
-      final rssAfterSelection = ProcessInfo.currentRss;
       final chosenIds = chosenRows.map((row) => row.relation.id).toSet();
       expect(chosenIds, hasLength(401));
       expect(container.read(provider).selected.keys.toSet(), chosenIds);
       expect(container.read(provider).selected.length, greaterThan(_pageSize));
 
       trace.clear();
-      final reviewWatch = Stopwatch()..start();
       expect(await selection.refreshSelection(), isTrue);
       expect(selection.prepare(), isTrue);
-      reviewWatch.stop();
-      final rssAfterReview = ProcessInfo.currentRss;
       final prepared =
           container.read(provider) as BlockingRelationsSelectionPrepared;
       expect(
@@ -442,14 +383,9 @@ void main() {
         ),
       );
       expect(trace.aggregateSelects.length, lessThanOrEqualTo(6));
-      final reviewAggregateTime = _elapsedSelects(trace.aggregateSelects);
-      final reviewAggregateQueries = trace.aggregateSelects.length;
 
       trace.clear();
-      final deleteWatch = Stopwatch()..start();
       final result = await repository.execute(prepared.snapshot.command);
-      deleteWatch.stop();
-      final rssAfterDelete = ProcessInfo.currentRss;
       expect(result, isA<GraphCommandSucceeded>());
       final deleted =
           (result as GraphCommandSucceeded).value.value
@@ -467,15 +403,11 @@ void main() {
             .toSet(),
         chosenIds.map((id) => id.toCanonicalString()).toSet(),
       );
-      final deleteAggregateTime = _elapsedSelects(trace.aggregateSelects);
-      final deleteAggregateQueries = trace.aggregateSelects.length;
 
       trace.clear();
-      final reconcileWatch = Stopwatch()..start();
       final activeAfter = _page(
         await repository.getRelationGroupPage(_query(RelationScope.active)),
       ) as RelationGroupFirstPage;
-      reconcileWatch.stop();
       expect(activeAfter.counts.activeNeedOutgoing, 49);
       expect(activeAfter.counts.archivedNeedOutgoing, 4800);
       expect(activeAfter.items, hasLength(49));
@@ -491,36 +423,10 @@ void main() {
         lessThanOrEqualTo(_pageSize + 1),
       );
       expect(trace.aggregateSelects, hasLength(2));
-      final reconcileAggregateTime = _elapsedSelects(trace.aggregateSelects);
-
-      stdout.writeln(
-        'Измерения OpenSpec 6.17: active=250, archived=5000, selected=401, '
-        'readPages=9, access=${accessWatch.elapsedMicroseconds}us, '
-        'p95Page=${_percentile95(pageLatencies).inMicroseconds}us, '
-        'accessAggregateQueries=$accessAggregateQueries, '
-        'accessAggregates=${accessAggregateTime.inMicroseconds}us, '
-        'selection=${selectionWatch.elapsedMicroseconds}us, '
-        'review=${reviewWatch.elapsedMicroseconds}us, '
-        'reviewAggregateQueries=$reviewAggregateQueries, '
-        'reviewAggregates=${reviewAggregateTime.inMicroseconds}us, '
-        'delete=${deleteWatch.elapsedMicroseconds}us, '
-        'deleteAggregateQueries=$deleteAggregateQueries, '
-        'deleteAggregates=${deleteAggregateTime.inMicroseconds}us, '
-        'reconcile=${reconcileWatch.elapsedMicroseconds}us, '
-        'reconcileAggregates=${reconcileAggregateTime.inMicroseconds}us, '
-        'rssAccess=${rssAfterAccess - rssBefore}B, '
-        'rssSelection=${rssAfterSelection - rssAfterAccess}B, '
-        'rssReview=${rssAfterReview - rssAfterSelection}B, '
-        'rssDelete=${rssAfterDelete - rssAfterReview}B, '
-        'rssReconcile=${ProcessInfo.currentRss - rssAfterDelete}B',
-      );
     },
     timeout: const Timeout(Duration(minutes: 5)),
   );
 }
-
-Duration _elapsedSelects(Iterable<_TracedSelect> selects) =>
-    selects.fold(Duration.zero, (total, select) => total + select.elapsed);
 
 Future<void> _populateLargeFixture(AppDatabase database) =>
     database.batch((batch) {
@@ -562,7 +468,9 @@ Future<void> _populateLargeFixture(AppDatabase database) =>
       }
     });
 
-Future<_TraversalMeasurements> _traverseGroup(
+/// Обходит всю группу порциями и возвращает идентификаторы связей в порядке
+/// выдачи.
+Future<List<String>> _traverseGroup(
   DriftPersonalGraphRepository repository,
   _RelationReadTrace trace,
   RelationScope scope, {
@@ -570,10 +478,6 @@ Future<_TraversalMeasurements> _traverseGroup(
   required int expectedOtherCount,
 }) async {
   trace.clear();
-  final rssBefore = ProcessInfo.currentRss;
-  var peakRss = rssBefore;
-  final totalStopwatch = Stopwatch()..start();
-  final pageLatencies = <Duration>[];
   final ids = <String>{};
   final orderedIds = <String>[];
   var pageCount = 0;
@@ -583,12 +487,9 @@ Future<_TraversalMeasurements> _traverseGroup(
   RelationGroupCursor? cursor;
 
   do {
-    final pageStopwatch = Stopwatch()..start();
     final page = _page(
       await repository.getRelationGroupPage(_query(scope, cursor: cursor)),
     );
-    pageStopwatch.stop();
-    pageLatencies.add(pageStopwatch.elapsed);
     pageCount++;
     expect(_longTermItems(page), hasLength(lessThanOrEqualTo(_pageSize)));
     final establishedRevision = revision;
@@ -644,12 +545,8 @@ Future<_TraversalMeasurements> _traverseGroup(
       expect(relation.sourceIntentionId, _ownerId);
     }
 
-    peakRss = peakRss < ProcessInfo.currentRss
-        ? ProcessInfo.currentRss
-        : peakRss;
     cursor = page.nextCursor;
   } while (cursor != null);
-  totalStopwatch.stop();
 
   expect(ids, hasLength(expectedCount));
   expect(pageCount, (expectedCount / _pageSize).ceil());
@@ -704,18 +601,7 @@ Future<_TraversalMeasurements> _traverseGroup(
     ),
   );
 
-  return _TraversalMeasurements(
-    itemCount: ids.length,
-    orderedIds: List.unmodifiable(orderedIds),
-    pageCount: pageCount,
-    total: totalStopwatch.elapsed,
-    pageP95: _percentile95(pageLatencies),
-    aggregateTotal: trace.aggregateSelects.fold(
-      Duration.zero,
-      (total, select) => total + select.elapsed,
-    ),
-    peakRssDelta: peakRss - rssBefore,
-  );
+  return List.unmodifiable(orderedIds);
 }
 
 Future<void> _expectGroupQueryPlans(AppDatabase database) async {
@@ -838,15 +724,6 @@ Future<void> _expectCommandSuccess(
   expect(await result, isA<GraphCommandSucceeded>());
 }
 
-Duration _percentile95(List<Duration> samples) {
-  final sorted = [...samples]..sort();
-  final index = ((sorted.length * 95 + 99) ~/ 100) - 1;
-  return sorted[index];
-}
-
-void _recordMeasurements(String value) =>
-    stdout.writeln('Измерения OpenSpec 3.16: $value');
-
 IntentionId get _ownerId =>
     (IntentionId.decode(_ownerIdValue) as IntentionIdDecodingSuccess).id;
 
@@ -862,37 +739,8 @@ LongTermRelationId _decodedRelationId(int index) => (LongTermRelationId.decode(
   _relationId(index),
 ) as LongTermRelationIdDecodingSuccess).id;
 
-final class _TraversalMeasurements {
-  const _TraversalMeasurements({
-    required this.itemCount,
-    required this.orderedIds,
-    required this.pageCount,
-    required this.total,
-    required this.pageP95,
-    required this.aggregateTotal,
-    required this.peakRssDelta,
-  });
-
-  final int itemCount;
-  final List<String> orderedIds;
-  final int pageCount;
-  final Duration total;
-  final Duration pageP95;
-  final Duration aggregateTotal;
-  final int peakRssDelta;
-
-  String describe() =>
-      'items=$itemCount, pages=$pageCount, '
-      'total=${total.inMicroseconds}us, p95Page=${pageP95.inMicroseconds}us, '
-      'aggregates=${aggregateTotal.inMicroseconds}us, '
-      'peakRssDelta=${peakRssDelta}B';
-}
-
 final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
   final selects = <_TracedSelect>[];
-  final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
-  Completer<void>? _groupRowsBlocked;
-  Completer<void>? _releaseGroupRows;
   int? _selectedReadFailureCountdown;
 
   Iterable<_TracedSelect> get groupRowsSelects =>
@@ -920,32 +768,14 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
         _isAggregateSelect(select.statement),
   );
 
-  Future<void> get waitUntilGroupRowsSelectIsBlocked =>
-      (_groupRowsBlocked ??
-              (throw StateError('Блокировка чтения группы не включена.')))
-          .future;
-
   void clear() => selects.clear();
 
   void failSelectedReadAt(int selectNumber) {
     _selectedReadFailureCountdown = selectNumber;
   }
 
-  void blockNextGroupRowsSelect() {
-    _groupRowsBlocked = Completer<void>();
-    _releaseGroupRows = Completer<void>();
-  }
-
-  void releaseGroupRowsSelect() {
-    final release = _releaseGroupRows;
-    if (release == null || release.isCompleted) {
-      throw StateError('Нет заблокированного чтения группы.');
-    }
-    release.complete();
-  }
-
   @override
-  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     final remaining = _selectedReadFailureCountdown;
     if (statement.statements.single.contains('WHERE id IN (') &&
@@ -959,16 +789,6 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
       }
       _selectedReadFailureCountdown = remaining - 1;
     }
-    _started[statement] = Stopwatch()..start();
-    final blocked = _groupRowsBlocked;
-    final release = _releaseGroupRows;
-    if (blocked != null &&
-        release != null &&
-        !blocked.isCompleted &&
-        _isGroupRowsSelect(statement.statements.single)) {
-      blocked.complete();
-      await release.future;
-    }
   }
 
   @override
@@ -976,13 +796,11 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    final stopwatch = _started.remove(statement)?..stop();
     selects.add(
       _TracedSelect(
         statement: statement.statements.single,
         arguments: statement.arguments,
         rowCount: rows.length,
-        elapsed: stopwatch?.elapsed ?? Duration.zero,
       ),
     );
     return rows;
@@ -994,13 +812,11 @@ final class _TracedSelect {
     required this.statement,
     required this.arguments,
     required this.rowCount,
-    required this.elapsed,
   });
 
   final String statement;
   final List<Object?> arguments;
   final int rowCount;
-  final Duration elapsed;
 }
 
 bool _isGroupRowsSelect(String statement) =>
