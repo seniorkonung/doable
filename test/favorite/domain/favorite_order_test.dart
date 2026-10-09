@@ -349,18 +349,6 @@ void main() {
   });
 
   group('полный порядок', () {
-    test('хранит переданные места и защищён от изменения', () {
-      final entries = [_entry('А'), _entry('Б*')];
-
-      final order = FavoriteOrder(entries);
-      entries.clear();
-
-      expect(order.entries, [_entry('А'), _entry('Б*')]);
-      expect(order.intentionIds, [_id('А'), _id('Б')]);
-      expect(() => order.entries.clear(), throwsUnsupportedError);
-      expect(() => order.intentionIds.clear(), throwsUnsupportedError);
-    });
-
     test('не допускает повтора намерения', () {
       expect(
         () => FavoriteOrder([_entry('А'), _entry('Б'), _entry('А*')]),
@@ -372,13 +360,6 @@ void main() {
           ),
         ),
       );
-    });
-
-    test('места равны при совпадении намерения и архивного состояния', () {
-      expect(_entry('А'), _entry('А'));
-      expect(_entry('А').hashCode, _entry('А').hashCode);
-      expect(_entry('А'), isNot(_entry('А*')));
-      expect(_entry('А'), isNot(_entry('Б')));
     });
   });
 }

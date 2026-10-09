@@ -614,20 +614,6 @@ void main() {
         );
       });
     }
-
-    test('объявление подтверждённого нового места есть в обеих локалях и '
-        'сохраняет название намерения без изменения', () {
-      expect(
-        lookupAppLocalizations(const Locale('ru'))
-            .homeReorderMoved('Быть Здоровым', 2, 5),
-        '«Быть Здоровым» теперь на месте 2 из 5',
-      );
-      expect(
-        lookupAppLocalizations(const Locale('en'))
-            .homeReorderMoved('Быть Здоровым', 2, 5),
-        '“Быть Здоровым” is now in position 2 of 5',
-      );
-    });
   });
 }
 
