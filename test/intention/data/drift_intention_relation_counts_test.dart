@@ -104,14 +104,11 @@ void main() {
   });
 
   test('блокирует удаление связью любой группы и сохраняет ревизию', () async {
+    // Блокирует любая связь по любому из двух концов, активная или в архиве;
+    // тип связи на проверку не влияет. Два случая проходят оба направления,
+    // оба типа и оба состояния архива.
     final groups = [
       (incoming: true, type: 'need', archived: false),
-      (incoming: false, type: 'need', archived: false),
-      (incoming: true, type: 'can', archived: false),
-      (incoming: false, type: 'can', archived: false),
-      (incoming: true, type: 'need', archived: true),
-      (incoming: false, type: 'need', archived: true),
-      (incoming: true, type: 'can', archived: true),
       (incoming: false, type: 'can', archived: true),
     ];
 

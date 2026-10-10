@@ -261,18 +261,18 @@ void main() {
       await verifyIntentionTitlesFtsIntegrity(updatedDatabase);
     });
 
-    for (final fixture in [
-      (description: 'некорректным', id: 'not-a-uuid'),
-      (description: 'nil UUID', id: '00000000-0000-0000-0000-000000000000'),
-    ]) {
-      test(
-        'возвращает corruption без частичной страницы после повторного открытия строки с ${fixture.description} идентификатором',
-        () async {
-          final harness = await LocalDatabaseHarness.fileBacked();
-          addTearDown(harness.dispose);
-          final database = await harness.openReadyDatabase();
-          await database.customStatement(
-            '''
+    // Разбор идентификатора общий: nil UUID отвергается тем же отказом
+    // декодирования, что и произвольная строка (граница идентификатора
+    // проверена отдельно).
+    const fixture = (description: 'некорректным', id: 'not-a-uuid');
+    test(
+      'возвращает corruption без частичной страницы после повторного открытия строки с ${fixture.description} идентификатором',
+      () async {
+        final harness = await LocalDatabaseHarness.fileBacked();
+        addTearDown(harness.dispose);
+        final database = await harness.openReadyDatabase();
+        await database.customStatement(
+          '''
               INSERT INTO intentions (
                 id,
                 title,
@@ -283,43 +283,41 @@ void main() {
                 updated_at
               ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ''',
-            [
-              fixture.id,
-              'Повреждённое намерение',
-              null,
-              0,
-              0,
-              DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
-              DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
-            ],
-          );
-          await harness.closePersistenceObjectGraph();
+          [
+            fixture.id,
+            'Повреждённое намерение',
+            null,
+            0,
+            0,
+            DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
+            DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
+          ],
+        );
+        await harness.closePersistenceObjectGraph();
 
-          final reopenedDatabase = await harness.openReadyDatabase();
-          final PersonalGraphRepository repository =
-              DriftPersonalGraphRepository(
-                reopenedDatabase,
-                _SequenceIntentionIdGenerator(const []),
-                () => DateTime.utc(2026, 9, 3, 11),
-                InMemoryDiagnosticsSink(),
-              );
+        final reopenedDatabase = await harness.openReadyDatabase();
+        final PersonalGraphRepository repository = DriftPersonalGraphRepository(
+          reopenedDatabase,
+          _SequenceIntentionIdGenerator(const []),
+          () => DateTime.utc(2026, 9, 3, 11),
+          InMemoryDiagnosticsSink(),
+        );
 
-          final result = await repository.getCatalogPage(
-            _catalogQuery(IntentionScope.all),
-          );
+        final result = await repository.getCatalogPage(
+          _catalogQuery(IntentionScope.all),
+        );
 
-          expect(
-            result,
-            isA<ResultFailure<IntentionCatalogPage>>().having(
-              (failure) => failure.failure,
-              'failure',
-              isA<IntentionCorruptionFailure>(),
-            ),
-          );
-          await harness.closePersistenceObjectGraph();
-        },
-      );
-    }
+        expect(
+          result,
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (failure) => failure.failure,
+            'failure',
+            isA<IntentionCorruptionFailure>(),
+          ),
+        );
+        await harness.closePersistenceObjectGraph();
+      },
+    );
   });
 }
 

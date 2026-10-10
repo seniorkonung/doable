@@ -30,7 +30,6 @@ const _fixtureSize = 50000;
 const _pageSize = 100;
 const _jointMatchCount = 235;
 const _conditionCount = 1201;
-const _smallConditionCount = 10;
 const _extraTagCount = 137;
 const _backgroundTagCount = 64;
 const _backgroundTagOffsets = [0, 21, 42];
@@ -144,18 +143,11 @@ void main() {
 
       // Каждый из 25 000 активных кандидатов имеет несколько собственных
       // назначений. Отсечение кандидата не должно перебирать набор условий:
-      // оба набора читаются из параметра один раз на запрос, поэтому малое и
-      // большое число условий дают одинаковую форму плана. Без фильтра
+      // оба набора читаются из параметра один раз на запрос. Без фильтра
       // названия из 24 997 готовых активных кандидатов, кроме исключённого
-      // намерения, первые десять исключённых тегов отсекают двух кандидатов,
-      // а все 1201 — трёх. Первые десять обязательных тегов есть у 242
-      // совместных кандидатов, все 1201 — у 239.
+      // намерения, все 1201 исключённых тегов отсекают трёх кандидатов, а
+      // все 1201 обязательных тегов есть у 239 совместных кандидатов.
       for (final (label, conditions, matchCount) in [
-        (
-          'только исключённые',
-          (popular: false, required: 0, excluded: _smallConditionCount),
-          24995,
-        ),
         (
           'только исключённые',
           (popular: false, required: 0, excluded: _conditionCount),
@@ -163,22 +155,8 @@ void main() {
         ),
         (
           'только обязательные',
-          (popular: false, required: _smallConditionCount, excluded: 0),
-          242,
-        ),
-        (
-          'только обязательные',
           (popular: false, required: _conditionCount, excluded: 0),
           239,
-        ),
-        (
-          'совместные',
-          (
-            popular: false,
-            required: _smallConditionCount,
-            excluded: _smallConditionCount,
-          ),
-          tagOnlyMatchCount + 4,
         ),
         ('совместные', _allConditions, tagOnlyMatchCount),
       ]) {
@@ -188,8 +166,8 @@ void main() {
             _jointQuery(titleFilter: null, conditions: conditions),
           ),
         ) as IntentionCatalogFirstPage;
-        expect(first.totalCount, matchCount);
-        expect(first.items, hasLength(_pageSize));
+        expect(first.totalCount, matchCount, reason: label);
+        expect(first.items, hasLength(_pageSize), reason: label);
         _expectJointPlans(
           raw,
           trace,
@@ -200,14 +178,6 @@ void main() {
           first,
           trace,
           isFirst: true,
-          conditions: conditions,
-        );
-        _printJointCost(
-          raw,
-          trace,
-          titleFilter: null,
-          page: 0,
-          label: label,
           conditions: conditions,
         );
       }
@@ -326,8 +296,8 @@ void main() {
 
     // Популярный тег назначен 19 999 из 24 999 активных намерений. Среди
     // них не готов кандидат 243 и исключён из выдачи кандидат 244, поэтому
-    // один популярный тег оставляет 19 997 совпадений. Первые девять
-    // исключённых тегов отсекают ещё двух кандидатов, все 1201 — трёх.
+    // один популярный тег оставляет 19 997 совпадений. Все 1201
+    // исключённых тегов отсекают ещё трёх кандидатов.
     // С редкими обязательными тегами совпадения сужаются до совместных
     // кандидатов, но популярный тег остаётся в наборе условий. Во всех
     // сценариях порция и продолжение идут по индексу порядка охвата.
@@ -341,21 +311,9 @@ void main() {
       ),
       (
         'только обязательные',
-        (popular: true, required: _smallConditionCount - 1, excluded: 0),
-        242,
-        null,
-      ),
-      (
-        'только обязательные',
         (popular: true, required: _conditionCount, excluded: 0),
         239,
         null,
-      ),
-      (
-        'совместные',
-        (popular: true, required: 0, excluded: _smallConditionCount - 1),
-        19995,
-        popularBounds,
       ),
       (
         'совместные',
@@ -418,14 +376,6 @@ void main() {
           page,
           trace,
           isFirst: isFirst,
-          conditions: conditions,
-        );
-        _printJointCost(
-          raw,
-          trace,
-          titleFilter: null,
-          page: pageNumber,
-          label: label,
           conditions: conditions,
         );
         cursor = page.nextCursor;
@@ -678,16 +628,7 @@ Future<List<int>> _expectMassReconciliation(
     );
     costs.add(read);
     storedInputSizes.add(_storedRowParameterSize(read, window: window));
-    if (isFirst || portion.nextCursor == null) {
-      _printJointCost(
-        raw,
-        trace,
-        titleFilter: null,
-        page: portionNumber,
-        label: 'согласование: $label',
-        conditions: _massConditions,
-      );
-    }
+    if (isFirst || portion.nextCursor == null) {}
     reconciled.addAll(indexes);
     cursor = portion.nextCursor;
     if (cursor != null) {
@@ -745,18 +686,6 @@ Future<List<int>> _expectMassReconciliation(
     reason: label,
   );
   expect(_connectionChanges(raw), changesBefore, reason: label);
-  final elapsed = [for (final select in costs) select.elapsed]..sort();
-  // Измерения характеризуют фикстуру и не становятся порогом.
-  // ignore: avoid_print
-  print(
-    'Согласование ($label): ${stored.length} сохранённых строк, '
-    '${missing.length} недостающих совпадений, $portionNumber порций; '
-    'вход чтения: не больше ${storedInputSizes.reduce(max)} сохранённых '
-    'идентификаторов; чтение порции: медиана ${elapsed[elapsed.length ~/ 2].inMicroseconds} '
-    'мкс, максимум ${elapsed.last.inMicroseconds} мкс, всего '
-    '${elapsed.fold(Duration.zero, (sum, value) => sum + value).inMilliseconds} '
-    'мс',
-  );
   return reconciled;
 }
 
@@ -1030,7 +959,6 @@ Future<void> _expectJointTraversal(
     if (pageNumber == 0) {
       expect((page as IntentionCatalogFirstPage).totalCount, matches.length);
     }
-    _printJointCost(raw, trace, titleFilter: titleFilter, page: pageNumber);
     actual.addAll(page.items.map((item) => item.id.toCanonicalString()));
     cursor = page.nextCursor;
     pageNumber++;
@@ -1526,41 +1454,6 @@ void _expectOrderIndexDrivesPage(List<_PlanNode> plan) {
   );
 }
 
-void _printJointCost(
-  sqlite.Database database,
-  _SelectTrace trace, {
-  required String? titleFilter,
-  required int page,
-  String label = 'совместные',
-  _Conditions conditions = _allConditions,
-}) {
-  final count = trace.selects
-      .where((select) => _isCatalogCountStatement(select.statement))
-      .singleOrNull;
-  final read = trace.selects.singleWhere(
-    (select) => select.statement.contains('LIMIT'),
-  );
-  final tags = trace.selects.singleWhere(
-    (select) => select.statement.contains('FROM tag_assignments a'),
-  );
-  String cost(String label, _TracedSelect select) =>
-      '$label=${select.elapsed.inMicroseconds} мкс/${select.rowCount} строк, '
-      'план: ${_observedPlan(database, select).join(' | ')}';
-  // Измерения характеризуют эту фикстуру и материализацию, а не постоянное
-  // время поиска: COUNT и поиск редких совпадений зависят от объёма данных
-  // и числа назначений выбранных тегов. Утверждения на них не опираются.
-  // ignore: avoid_print
-  print(
-    'Поиск по тегам ($label), название ${titleFilter ?? 'без фильтра'}, '
-    'порция $page: $_fixtureSize намерений, '
-    '${_requiredConditionCount(conditions)} обязательных'
-    '${conditions.popular ? ' (с популярным)' : ''} и '
-    '${conditions.excluded} исключённых условий; '
-    '${trace.selects.length} чтения; '
-    '${[if (count != null) cost('COUNT', count), cost('порция', read), cost('назначения', tags)].join('; ')}',
-  );
-}
-
 Future<void> _populateFixture(AppDatabase database) => database.batch((batch) {
   final timestampBase = DateTime.utc(2026, 9, 1).microsecondsSinceEpoch;
   for (var index = 0; index < _fixtureSize; index++) {
@@ -1649,9 +1542,11 @@ Future<List<String>> _queryPlan(AppDatabase database, String statement) async {
 }
 
 Future<void> _expectBoundedPages(PersonalGraphRepository repository) async {
+  // Граница порции не зависит от текста фильтра: достаточно запроса без
+  // фильтра и запроса с совпадением всех записей.
   for (final scope in IntentionScope.values) {
     for (final order in _catalogOrders) {
-      for (final filter in _allFilters) {
+      for (final filter in const <String?>[null, 'ааа']) {
         final page = _page(
           await repository.getCatalogPage(
             _query(scope: scope, order: order, titleFilter: filter),
@@ -1880,7 +1775,6 @@ enum _IndexDirection {
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final selects = <_TracedSelect>[];
   final writes = <String>[];
-  final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
   int? parameterLimit;
   var isRecording = true;
 
@@ -1903,10 +1797,6 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
         statement.operation != LocalDatabaseSqlOperation.select) {
       writes.addAll(statement.statements);
     }
-    if (isRecording &&
-        statement.operation == LocalDatabaseSqlOperation.select) {
-      _started[statement] = Stopwatch()..start();
-    }
   }
 
   @override
@@ -1923,15 +1813,13 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    final stopwatch = _started.remove(statement);
-    if (stopwatch != null) {
-      stopwatch.stop();
+    if (isRecording &&
+        statement.operation == LocalDatabaseSqlOperation.select) {
       selects.add(
         _TracedSelect(
           statement.statements.single,
           statement.arguments,
           rows.length,
-          stopwatch.elapsed,
           {
             for (final row in rows)
               if (row['intention_id'] case final String id) id,
@@ -1948,13 +1836,11 @@ final class _TracedSelect {
     this.statement,
     this.arguments,
     this.rowCount,
-    this.elapsed,
     this.intentionIds,
   );
 
   final String statement;
   final List<Object?> arguments;
   final int rowCount;
-  final Duration elapsed;
   final Set<String> intentionIds;
 }

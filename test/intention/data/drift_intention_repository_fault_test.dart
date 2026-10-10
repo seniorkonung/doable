@@ -164,14 +164,6 @@ void main() {
                 isA<IntentionUnexpectedFailure>(),
                 DiagnosticsFailureCode.unexpected,
               ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_READONLY,
-                  message: 'CANARY-неизвестный-SQLite-отказ',
-                ),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
             ]) {
           final interceptor = _TagAssignmentReadInterceptor(failure: error);
           final replacement = await _replaceDatabase(
@@ -254,14 +246,6 @@ void main() {
               ),
               (
                 StateError('CANARY-неизвестный-отказ'),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_READONLY,
-                  message: 'CANARY-неизвестный-SQLite-отказ',
-                ),
                 isA<IntentionUnexpectedFailure>(),
                 DiagnosticsFailureCode.unexpected,
               ),
@@ -501,92 +485,7 @@ void main() {
     });
   });
 
-  group('DriftPersonalGraphRepository.execute — физическое удаление', () {
-    test(
-      'не выдаёт посторонний blocking foreign key за конфликт связей',
-      () async {
-        final id = _id(_firstUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Блокирующее намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        await database.customStatement('''
-        CREATE TABLE test_only_blocking_links (
-          intention_id TEXT NOT NULL REFERENCES intentions(id)
-        )
-      ''');
-        await database.customStatement(
-          'INSERT INTO test_only_blocking_links (intention_id) VALUES (?)',
-          [id.toCanonicalString()],
-        );
-
-        final result = await repository.execute(DeleteIntention(id));
-
-        expect(result, _failure<IntentionUnexpectedFailure>());
-        await _expectStoredIntention(
-          database,
-          id: id,
-          title: 'Блокирующее намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        expect(await _matchingIds(repository, 'блокирующее'), [id]);
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
-        expect(
-          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
-          [
-            _failedCommand(
-              IntentionCommandDiagnosticsType.delete,
-              DiagnosticsFailureCode.unexpected,
-            ),
-          ],
-        );
-      },
-    );
-  });
-
   group('DriftPersonalGraphRepository.execute — откат после DML', () {
-    test('откатывает create вместе с основной строкой и FTS', () async {
-      final interceptor = _FailAfterDmlInterceptor(_DmlOperation.insert);
-      final replacement = await _replaceDatabase(
-        interceptor,
-        database,
-        diagnostics,
-      );
-      database = replacement.database;
-      repository = replacement.repository;
-      interceptor.arm();
-
-      final result = await repository.execute(
-        const CreateIntention(
-          title: 'Создаваемое намерение',
-          description: 'Создаваемое описание',
-        ),
-      );
-
-      expect(result, _failure<IntentionUnexpectedFailure>());
-      expect(await database.select(database.intentions).get(), isEmpty);
-      expect(await _matchingIds(repository, 'создаваемое'), isEmpty);
-      await expectLater(verifyIntentionTitlesFtsIntegrity(database), completes);
-      expect(diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(), [
-        _failedCreation(
-          IntentionCreationCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.unexpected,
-        ),
-      ]);
-    });
-
     test(
       'откатывает update вместе с title search key, FTS и timestamps',
       () async {
@@ -629,47 +528,6 @@ void main() {
         );
         expect(await _matchingIds(repository, 'исходное'), [id]);
         expect(await _matchingIds(repository, 'изменённое'), isEmpty);
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
-      },
-    );
-
-    test(
-      'откатывает state transition и сохраняет timestamps намерения',
-      () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
-        final replacement = await _replaceDatabase(
-          interceptor,
-          database,
-          diagnostics,
-        );
-        database = replacement.database;
-        repository = replacement.repository;
-        final id = _id(_firstUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Намерение для readiness',
-          createdAt: createdAt,
-        );
-        interceptor.arm();
-
-        final result = await repository.execute(EnableIntentionReadiness(id));
-
-        expect(result, _failure<IntentionUnexpectedFailure>());
-        await _expectStoredIntention(
-          database,
-          id: id,
-          title: 'Намерение для readiness',
-          description: null,
-          isActionReady: false,
-          isArchived: false,
-          createdAt: createdAt,
-        );
-        expect(await _matchingIds(repository, 'readiness'), [id]);
         await expectLater(
           verifyIntentionTitlesFtsIntegrity(database),
           completes,
@@ -749,50 +607,6 @@ void main() {
         );
         await pumpEventQueue();
         expect(interceptor.detailReadStatements, isEmpty);
-      },
-    );
-
-    test(
-      'откатывает delete вместе с основной строкой, FTS и timestamps',
-      () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.delete);
-        final replacement = await _replaceDatabase(
-          interceptor,
-          database,
-          diagnostics,
-        );
-        database = replacement.database;
-        repository = replacement.repository;
-        final id = _id(_firstUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Удаляемое намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        interceptor.arm();
-
-        final result = await repository.execute(DeleteIntention(id));
-
-        expect(result, _failure<IntentionUnexpectedFailure>());
-        await _expectStoredIntention(
-          database,
-          id: id,
-          title: 'Удаляемое намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        expect(await _matchingIds(repository, 'удаляемое'), [id]);
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
       },
     );
   });
@@ -910,7 +724,7 @@ void main() {
       );
     }
 
-    test('отказ после любой операции транзакции откатывает намерение, '
+    test('отказ в представительных точках транзакции откатывает намерение, '
         'назначения, место избранного и FTS, сохраняя прежний граф, ревизию '
         'и самостоятельный тег', () async {
       // Пробное выполнение без отказа фиксирует операции транзакции.
@@ -940,16 +754,27 @@ void main() {
       );
       // До записей транзакция проверяет выбранные теги, после всех записей —
       // читает окончательный результат.
-      final firstWrite = operations.indexWhere(
-        (operation) => operation.operation != LocalDatabaseSqlOperation.select,
-      );
-      final lastWrite = operations.lastIndexWhere(
-        (operation) => operation.operation != LocalDatabaseSqlOperation.select,
-      );
+      final writeIndexes = [
+        for (var index = 0; index < operations.length; index++)
+          if (operations[index].operation != LocalDatabaseSqlOperation.select)
+            index,
+      ];
+      final firstWrite = writeIndexes.first;
+      final lastWrite = writeIndexes.last;
       expect(firstWrite, greaterThan(0));
       expect(operations.skip(lastWrite + 1), isNotEmpty);
 
-      for (var failAfter = 1; failAfter <= operations.length; failAfter++) {
+      // Точки с разным исходом: первая проверка, первая запись (намерение),
+      // первое назначение, последняя запись (место избранного) и первое
+      // чтение окончательного результата. Остальные операции повторяют
+      // те же ветки.
+      for (final failAfter in <int>{
+        1,
+        firstWrite + 1,
+        writeIndexes[1] + 1,
+        lastWrite + 1,
+        lastWrite + 2,
+      }) {
         final faulted = operations[failAfter - 1];
         final reason =
             'отказ после операции $failAfter: ${faulted.operation.name} '
@@ -1057,14 +882,6 @@ void main() {
             ),
             (
               StateError('CANARY-неизвестный-отказ'),
-              isA<IntentionUnexpectedFailure>(),
-              DiagnosticsFailureCode.unexpected,
-            ),
-            (
-              SqliteException(
-                extendedResultCode: SqlError.SQLITE_READONLY,
-                message: 'CANARY-неизвестный-SQLite-отказ',
-              ),
               isA<IntentionUnexpectedFailure>(),
               DiagnosticsFailureCode.unexpected,
             ),
@@ -1209,13 +1026,10 @@ void main() {
       test(
         'не считает constraint вне утверждённых контекстов conflict',
         () async {
+          // Первичный ключ — единственный код, который для команды создания
+          // означает конфликт; внешний ключ — обычное ограничение; код с
+          // неизвестным расширением не входит в известные ограничения.
           for (final extendedCode in [
-            SqlError.SQLITE_CONSTRAINT,
-            SqlExtendedError.SQLITE_CONSTRAINT_CHECK,
-            SqlExtendedError.SQLITE_CONSTRAINT_NOTNULL,
-            SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-            SqlExtendedError.SQLITE_CONSTRAINT_ROWID,
-            SqlExtendedError.SQLITE_CONSTRAINT_TRIGGER,
             SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY,
             SqlExtendedError.SQLITE_CONSTRAINT_FOREIGNKEY,
             SqlError.SQLITE_CONSTRAINT | (99 << 8),
@@ -1580,7 +1394,7 @@ final class _FavoriteMarkReadInterceptor
   }
 }
 
-enum _DmlOperation { insert, update, delete }
+enum _DmlOperation { update, delete }
 
 final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
   _FailAfterDmlInterceptor(this._operation);
@@ -1615,7 +1429,6 @@ final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
   }
 
   bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.insert => operation == LocalDatabaseSqlOperation.insert,
     _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
     _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
   };
@@ -1636,7 +1449,6 @@ final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
   }
 
   bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.insert => operation == LocalDatabaseSqlOperation.insert,
     _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
     _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
   };

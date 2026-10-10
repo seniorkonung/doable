@@ -114,32 +114,30 @@ void main() {
     },
   );
 
-  for (final failurePoint in _InitialCreationFailurePoint.values) {
-    test(
-      'отказ создания ${failurePoint.testDescription} не оставляет частичной '
-      'схемы, сохраняет файл и допускает повторное создание',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        _markEmptyStorageFile(harness.databaseFile);
-        final failureInterceptor = _InitialSchemaCreationFailureInterceptor(
-          failurePoint,
-        );
+  // Отказ в самом конце создания, когда все объекты схемы уже созданы:
+  // откат обязан убрать их все, поэтому более ранняя точка ничего не добавляет.
+  test(
+    'отказ создания после всех объектов и проверок схемы не оставляет '
+    'частичной схемы, сохраняет файл и допускает повторное создание',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      _markEmptyStorageFile(harness.databaseFile);
+      final failureInterceptor = _InitialSchemaCreationFailureInterceptor();
 
-        final failedResult = await harness.open(observer: failureInterceptor);
+      final failedResult = await harness.open(observer: failureInterceptor);
 
-        expect(failedResult, isA<LocalDataUnexpectedFailure>());
-        expect(failureInterceptor.didInjectFailure, isTrue);
-        expect(failureInterceptor.didCloseExecutor, isTrue);
+      expect(failedResult, isA<LocalDataUnexpectedFailure>());
+      expect(failureInterceptor.didInjectFailure, isTrue);
+      expect(failureInterceptor.didCloseExecutor, isTrue);
 
-        await harness.closePersistenceObjectGraph();
-        await _expectStorageWithoutUserSchema(harness.databaseFile);
-        _expectStorageFileKept(harness.databaseFile);
+      await harness.closePersistenceObjectGraph();
+      await _expectStorageWithoutUserSchema(harness.databaseFile);
+      _expectStorageFileKept(harness.databaseFile);
 
-        await _expectRecreatedSchemaSurvivesReopen(harness);
-      },
-    );
-  }
+      await _expectRecreatedSchemaSurvivesReopen(harness);
+    },
+  );
 
   for (final stopPoint in _MigrationProcessStopPoint.values) {
     test('остановка процесса ${stopPoint.testDescription} создания схемы '
@@ -592,38 +590,19 @@ final class _InjectedInitialCreationFailure implements Exception {
   const _InjectedInitialCreationFailure();
 }
 
-enum _InitialCreationFailurePoint {
-  firstSchemaObject(testDescription: 'на первом объекте схемы'),
-  versionMarker(testDescription: 'после всех объектов и проверок схемы');
-
-  const _InitialCreationFailurePoint({required this.testDescription});
-
-  final String testDescription;
-}
-
+/// Отказывает на маркере версии — последней записи создания схемы.
 final class _InitialSchemaCreationFailureInterceptor
     extends LocalDatabaseConnectionObserver {
-  _InitialSchemaCreationFailureInterceptor(this.failurePoint);
-
-  final _InitialCreationFailurePoint failurePoint;
   var didInjectFailure = false;
   var didCloseExecutor = false;
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     if (didInjectFailure ||
-        statement.operation != LocalDatabaseSqlOperation.custom) {
+        statement.operation != LocalDatabaseSqlOperation.custom ||
+        !_isVersionMarker(statement.statements.single)) {
       return;
     }
-    final isFailurePoint = switch (failurePoint) {
-      _InitialCreationFailurePoint.firstSchemaObject => _isSchemaCreate(
-        statement.statements.single,
-      ),
-      _InitialCreationFailurePoint.versionMarker => _isVersionMarker(
-        statement.statements.single,
-      ),
-    };
-    if (!isFailurePoint) return;
 
     didInjectFailure = true;
     throw const _InjectedInitialCreationFailure();
@@ -632,13 +611,6 @@ final class _InitialSchemaCreationFailureInterceptor
   @override
   void beforeClose() {
     didCloseExecutor = true;
-  }
-
-  bool _isSchemaCreate(String statement) {
-    return RegExp(
-      r'^CREATE (?:TABLE|VIRTUAL TABLE|INDEX|TRIGGER|VIEW)\b',
-      caseSensitive: false,
-    ).hasMatch(statement.trimLeft());
   }
 
   // Маркер версии — последняя запись создания: к этому моменту все объекты

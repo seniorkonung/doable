@@ -128,14 +128,9 @@ void main() {
   });
 
   test('отклоняет неверные названия и дубликаты после Unicode folding', () {
-    for (final invalid in [
-      '',
-      ' Дом',
-      'Дом ',
-      'До\u0000м',
-      '\uFEFFДом',
-      'а' * 256,
-    ]) {
+    // Пустое название, окружающие пробелы, NUL и длина: начальный BOM и
+    // тонкости пробельных символов проверены в тесте функций SQLite.
+    for (final invalid in ['', ' Дом', 'До\u0000м', 'а' * 256]) {
       expect(
         () => _addTag(raw, _firstTag, invalid),
         throwsA(isA<sqlite.SqliteException>()),

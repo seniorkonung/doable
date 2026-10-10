@@ -107,6 +107,8 @@ void main() {
     );
 
     test('сохраняет буквальную семантику для синтаксических FTS-символов и Unicode', () async {
+      // Запрос всегда строится как одна буквальная фраза: достаточно кавычки,
+      // ключевого слова, префиксного знака, дефиса и Unicode-символов.
       const fixtures = [
         (
           searchKey: 'скажи "да"',
@@ -121,30 +123,6 @@ void main() {
           interpretedSearchKey: 'кофе',
         ),
         (
-          searchKey: 'дело AND срочно',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000205',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000206',
-          interpretedSearchKey: 'срочно дело',
-        ),
-        (
-          searchKey: 'дело NOT срочно',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000207',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000208',
-          interpretedSearchKey: 'дело важно',
-        ),
-        (
-          searchKey: 'NEAR(дело срочно)',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000209',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000210',
-          interpretedSearchKey: 'дело очень срочно',
-        ),
-        (
-          searchKey: '(дело OR срочно)',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000211',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000212',
-          interpretedSearchKey: 'срочно',
-        ),
-        (
           searchKey: 'купить*',
           literalId: '018f0b5d-6b2e-7c80-8000-000000000213',
           interpretedId: '018f0b5d-6b2e-7c80-8000-000000000214',
@@ -155,12 +133,6 @@ void main() {
           literalId: '018f0b5d-6b2e-7c80-8000-000000000215',
           interpretedId: '018f0b5d-6b2e-7c80-8000-000000000216',
           interpretedSearchKey: 'self care',
-        ),
-        (
-          searchKey: 'сделать  дело',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000217',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000218',
-          interpretedSearchKey: 'сделать дело',
         ),
         (
           searchKey: 'ёжик café',

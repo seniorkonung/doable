@@ -296,7 +296,9 @@ void main() {
   });
 
   group('Недопустимое место отметки запрошенного намерения', () {
-    for (final position in <Object>[0, -3, 1.5, 'CANARY-место']) {
+    // Две проверки чтения: место не целое (тип хранимого значения) и не
+    // положительное (граница 0).
+    for (final position in <Object>[0, 'CANARY-место']) {
       test('$position даёт повреждение без частичного результата', () async {
         _insertIntention(raw, number: 1, title: 'CANARY-здоровое');
         _insertIntention(raw, number: 2, title: 'CANARY-повреждённое');

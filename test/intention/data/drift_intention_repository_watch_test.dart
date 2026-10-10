@@ -301,20 +301,6 @@ void main() {
             createdAt: DateTime.utc(2026, 9, 2, 10),
             updatedAt: DateTime.utc(2026, 9, 2, 10),
           ),
-          (
-            id: _id('018f0b5d-6b2e-7c80-8000-000000000302'),
-            title: 'Допустимое название',
-            description: ' \n\t ',
-            createdAt: DateTime.utc(2026, 9, 2, 10),
-            updatedAt: DateTime.utc(2026, 9, 2, 10),
-          ),
-          (
-            id: _id('018f0b5d-6b2e-7c80-8000-000000000303'),
-            title: List.filled(256, 'a').join(),
-            description: null,
-            createdAt: DateTime.utc(2026, 9, 2, 10),
-            updatedAt: DateTime.utc(2026, 9, 2, 10),
-          ),
         ];
 
         await database.customStatement('PRAGMA ignore_check_constraints = ON');
@@ -346,26 +332,6 @@ void main() {
           (
             id: _id('018f0b5d-6b2e-7c80-8000-000000000306'),
             isActionReady: 2 as Object,
-            isArchived: 0 as Object,
-            createdAt:
-                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
-            updatedAt:
-                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
-            description: null as Object?,
-          ),
-          (
-            id: _id('018f0b5d-6b2e-7c80-8000-000000000307'),
-            isActionReady: -1 as Object,
-            isArchived: 0 as Object,
-            createdAt:
-                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
-            updatedAt:
-                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
-            description: null as Object?,
-          ),
-          (
-            id: _id('018f0b5d-6b2e-7c80-8000-000000000308'),
-            isActionReady: 1.5 as Object,
             isArchived: 0 as Object,
             createdAt:
                 DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,

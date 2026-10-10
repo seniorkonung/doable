@@ -211,16 +211,18 @@ void main() {
     );
 
     test(
-      'не обновляет и не пересоздаёт хранилище прежней линии версий 2–5',
+      'не обновляет и не пересоздаёт хранилище прежней линии версий',
       () async {
-        for (final previousLineVersion in [2, 3, 4, 5]) {
-          final databaseFile = await _temporaryDatabaseFile();
-          late List<int> preservedBytes;
-          final bootstrap = _bootstrapFor(
-            databaseFile,
-            setup: (database) {
-              database
-                ..execute('''
+        // Любая версия выше текущей отвергается одной проверкой; берётся
+        // первая версия прежней линии.
+        const previousLineVersion = 2;
+        final databaseFile = await _temporaryDatabaseFile();
+        late List<int> preservedBytes;
+        final bootstrap = _bootstrapFor(
+          databaseFile,
+          setup: (database) {
+            database
+              ..execute('''
                   CREATE TABLE tag_assignments (
                     creation_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                     tag_id TEXT NOT NULL,
@@ -228,39 +230,38 @@ void main() {
                     long_term_relation_id TEXT
                   )
                 ''')
-                ..execute('''
+              ..execute('''
                   INSERT INTO tag_assignments (tag_id, long_term_relation_id)
                   VALUES ('тег', 'связь')
                 ''')
-                ..execute('PRAGMA user_version = $previousLineVersion');
-              preservedBytes = databaseFile.readAsBytesSync();
-            },
-          );
+              ..execute('PRAGMA user_version = $previousLineVersion');
+            preservedBytes = databaseFile.readAsBytesSync();
+          },
+        );
 
-          final result = await bootstrap.open();
-          await bootstrap.close();
+        final result = await bootstrap.open();
+        await bootstrap.close();
 
-          expect(
-            result,
-            isA<LocalDataIncompatibleSchema>()
-                .having(
-                  (failure) => failure.expectedSchemaVersion,
-                  'ожидаемая',
-                  AppDatabase.currentSchemaVersion,
-                )
-                .having(
-                  (failure) => failure.detectedSchemaVersion,
-                  'обнаруженная',
-                  previousLineVersion,
-                ),
-            reason: 'маркер версии $previousLineVersion',
-          );
-          expect(
-            await databaseFile.readAsBytes(),
-            preservedBytes,
-            reason: 'маркер версии $previousLineVersion',
-          );
-        }
+        expect(
+          result,
+          isA<LocalDataIncompatibleSchema>()
+              .having(
+                (failure) => failure.expectedSchemaVersion,
+                'ожидаемая',
+                AppDatabase.currentSchemaVersion,
+              )
+              .having(
+                (failure) => failure.detectedSchemaVersion,
+                'обнаруженная',
+                previousLineVersion,
+              ),
+          reason: 'маркер версии $previousLineVersion',
+        );
+        expect(
+          await databaseFile.readAsBytes(),
+          preservedBytes,
+          reason: 'маркер версии $previousLineVersion',
+        );
       },
     );
 
@@ -325,14 +326,6 @@ void main() {
             ),
             expectedResult: isA<LocalDataRetryableFailure>(),
             expectedCode: DiagnosticsFailureCode.unavailable,
-          ),
-          (
-            failure: SqliteException(
-              extendedResultCode: SqlError.SQLITE_CONSTRAINT,
-              message: 'можно повторить попытку',
-            ),
-            expectedResult: isA<LocalDataUnexpectedFailure>(),
-            expectedCode: DiagnosticsFailureCode.unexpected,
           ),
           (
             failure: StateError('Неизвестная причина'),

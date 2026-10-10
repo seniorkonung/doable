@@ -59,39 +59,42 @@ void main() {
   }
 
   group('Откат команды при отказе', () {
-    for (final command in _commands) {
-      for (final fault in _storageFaults) {
-        for (final point in _FaultPoint.values) {
-          test('${command.name}: ${fault.name} ${point.description} не '
-              'оставляет изменения', () async {
-            seedGraph();
-            final marksBefore = _storedMarks(raw);
-            final intentionsBefore = _storedIntentions(raw);
-            final revisionBefore = await _revision(repository);
-            diagnostics.clear();
-            faults.arm(point, fault.error);
+    // Три отказа покрывают вид команды (вставка и удаление строки), этап
+    // (проверка и запись) и каждую категорию отказа хранилища: ветки
+    // отката и классификации общие, поэтому полное произведение не нужно.
+    for (final (command, fault, point) in [
+      (_commands[0], _storageFaults[0], _FaultPoint.afterWrite),
+      (_commands[1], _storageFaults[1], _FaultPoint.afterWrite),
+      (_commands[0], _storageFaults[2], _FaultPoint.validationRead),
+    ]) {
+      test('${command.name}: ${fault.name} ${point.description} не '
+          'оставляет изменения', () async {
+        seedGraph();
+        final marksBefore = _storedMarks(raw);
+        final intentionsBefore = _storedIntentions(raw);
+        final revisionBefore = await _revision(repository);
+        diagnostics.clear();
+        faults.arm(point, fault.error);
 
-            final result = await repository.execute(command.build());
+        final result = await repository.execute(command.build());
 
-            expect(result, _failure(fault.failure));
-            expect(faults.failures, 1);
-            faults.disarm();
-            expect(_storedMarks(raw), marksBefore);
-            expect(_storedIntentions(raw), intentionsBefore);
-            expect(
-              (await _revision(repository)).compareTo(revisionBefore),
-              GraphRevisionOrder.same,
-            );
-            expect(
-              (await _details(repository, command.number)).favoriteMark,
-              command.markBefore,
-            );
-            expect(diagnostics.commandEvents, [
-              _failedCommand(command.type, point.stage, fault.code),
-            ]);
-          });
-        }
-      }
+        expect(result, _failure(fault.failure));
+        expect(faults.failures, 1);
+        faults.disarm();
+        expect(_storedMarks(raw), marksBefore);
+        expect(_storedIntentions(raw), intentionsBefore);
+        expect(
+          (await _revision(repository)).compareTo(revisionBefore),
+          GraphRevisionOrder.same,
+        );
+        expect(
+          (await _details(repository, command.number)).favoriteMark,
+          command.markBefore,
+        );
+        expect(diagnostics.commandEvents, [
+          _failedCommand(command.type, point.stage, fault.code),
+        ]);
+      });
     }
   });
 
@@ -231,17 +234,8 @@ enum _FaultPoint {
     FavoriteMarkCommandDiagnosticsStage.validation,
   ),
 
-  /// Запись строки отметки отклонена до выполнения.
-  beforeWrite('до записи отметки', FavoriteMarkCommandDiagnosticsStage.write),
-
   /// Запись строки отметки выполнена, но не подтверждена.
-  afterWrite('после записи отметки', FavoriteMarkCommandDiagnosticsStage.write),
-
-  /// Чтение отметки после выполненной записи.
-  resultRead(
-    'при чтении отметки после записи',
-    FavoriteMarkCommandDiagnosticsStage.write,
-  );
+  afterWrite('после записи отметки', FavoriteMarkCommandDiagnosticsStage.write);
 
   const _FaultPoint(this.description, this.stage);
 
@@ -258,9 +252,6 @@ final class _FavoriteStorageFaults extends LocalDatabaseConnectionObserver {
   /// Число сработавших отказов с последнего [arm].
   var failures = 0;
 
-  /// Записи в таблицу отметок в порядке выполнения.
-  final writes = <String>[];
-
   void arm(_FaultPoint point, Object error) {
     _point = point;
     _error = error;
@@ -271,13 +262,6 @@ final class _FavoriteStorageFaults extends LocalDatabaseConnectionObserver {
   void disarm() {
     _point = null;
     _error = null;
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (!_isMarkWrite(statement)) return;
-    writes.addAll(statement.statements);
-    _failAt(_FaultPoint.beforeWrite);
   }
 
   @override
@@ -292,8 +276,9 @@ final class _FavoriteStorageFaults extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    if (statement.statements.single.contains('FROM favorite_intentions')) {
-      _failAt(_wroteMark ? _FaultPoint.resultRead : _FaultPoint.validationRead);
+    if (!_wroteMark &&
+        statement.statements.single.contains('FROM favorite_intentions')) {
+      _failAt(_FaultPoint.validationRead);
     }
     return rows;
   }

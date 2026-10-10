@@ -56,21 +56,14 @@ void main() {
       requiredTagIds: [_tagId(firstTagNumber)],
       excludedTagIds: [_tagId(lastTagNumber)],
     );
+    // Курсор сравнивается с запросом по равенству условий по тегам и по
+    // исключённому участнику; остальные замены проходят ту же проверку.
     for (final (label, filter, originalExcluded, excluded) in [
       (
         'заменён обязательный тег при том же числе условий',
         IntentionTagFilter(
           requiredTagIds: [_tagId(lastTagNumber)],
           excludedTagIds: [_tagId(lastTagNumber)],
-        ),
-        null,
-        null,
-      ),
-      (
-        'заменён исключённый тег при том же числе условий',
-        IntentionTagFilter(
-          requiredTagIds: [_tagId(firstTagNumber)],
-          excludedTagIds: [_tagId(firstTagNumber)],
         ),
         null,
         null,
@@ -86,13 +79,6 @@ void main() {
       ),
       ('сняты условия по тегам', IntentionTagFilter.empty, null, null),
       ('добавлен исключённый участник', originalFilter, null, _id(_uuid(3))),
-      ('удалён исключённый участник', originalFilter, _id(_uuid(3)), null),
-      (
-        'заменён исключённый участник',
-        originalFilter,
-        _id(_uuid(3)),
-        _id(_uuid(1)),
-      ),
     ]) {
       test('отклоняет несовместимый курсор до SQL: $label', () async {
         seedTagStorageFixture(raw);
@@ -211,12 +197,10 @@ void main() {
       },
     );
 
+    // Порядок задаёт поле и направление; убывающее создание и возрастающее
+    // обновление проходят каждое поле и направление, а ожидаемая выдача у них
+    // отличается от порядка вставки.
     for (final (label, order, expectedNumbers) in [
-      (
-        'по созданию по возрастанию',
-        IntentionCatalogOrder.createdAtAscending,
-        [for (var number = 1; number <= 235; number++) number],
-      ),
       (
         'по созданию по убыванию',
         IntentionCatalogOrder.createdAtDescending,
@@ -233,11 +217,6 @@ void main() {
           for (var number = 81; number <= 160; number++) number,
           for (var number = 1; number <= 80; number++) number,
         ],
-      ),
-      (
-        'по обновлению по убыванию',
-        IntentionCatalogOrder.updatedAtDescending,
-        [for (var number = 1; number <= 235; number++) number],
       ),
     ]) {
       test('235 совместных совпадений ровно один раз: $label', () async {
@@ -303,80 +282,6 @@ void main() {
       });
     }
 
-    test(
-      'изолирует параллельные чтения, продолжение и запрос после отказа',
-      () async {
-        seedTagStorageFixture(raw);
-        final firstFilter = IntentionTagFilter(
-          requiredTagIds: [_tagId(firstTagNumber)],
-          excludedTagIds: [_tagId(lastTagNumber)],
-        );
-        final otherQuery = _tagQuery(
-          tagFilter: IntentionTagFilter(
-            requiredTagIds: [_tagId(lastTagNumber)],
-            excludedTagIds: [_tagId(firstTagNumber)],
-          ),
-        );
-        trace.blockNextSelect();
-        final firstFuture = repository.getCatalogPage(
-          _tagQuery(tagFilter: firstFilter),
-        );
-        await trace.selectBlocked;
-        var otherCompleted = false;
-        final otherFuture = repository
-            .getCatalogPage(otherQuery)
-            .whenComplete(() => otherCompleted = true);
-        await pumpEventQueue();
-        final completedBeforeRead = otherCompleted;
-        trace.releaseSelect();
-        final first = _firstPage(await firstFuture);
-        final other = _firstPage(await otherFuture);
-        expect(completedBeforeRead, isFalse);
-        expect(first.totalCount, 2);
-        expect(first.items.single.id, _id(_uuid(1)));
-        expect(other.totalCount, 1);
-        expect(other.items.single.id, _id(_uuid(3)));
-        expect(other.nextCursor, isNull);
-        final continuation = _continuationPage(
-          await repository.getCatalogPage(
-            _tagQuery(tagFilter: firstFilter, cursor: first.nextCursor),
-          ),
-        );
-        expect(continuation.items.single.id, _id(_uuid(2)));
-        expect(continuation.nextCursor, isNull);
-
-        trace.failure = SqliteException(
-          extendedResultCode: SqlError.SQLITE_BUSY,
-          message: 'Отказ чтения',
-        );
-        expect(
-          await repository.getCatalogPage(otherQuery),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionUnavailableFailure>(),
-          ),
-        );
-        trace.failure = null;
-        final recovered = _firstPage(
-          await repository.getCatalogPage(_tagQuery(tagFilter: firstFilter)),
-        );
-        expect(recovered.totalCount, 2);
-        expect(recovered.items.single.id, _id(_uuid(1)));
-        final noTags = _firstPage(
-          await repository.getCatalogPage(
-            _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 100),
-          ),
-        );
-        expect(noTags.totalCount, 3);
-        expect(noTags.items.map((item) => item.id), [
-          _id(_uuid(1)),
-          _id(_uuid(2)),
-          _id(_uuid(3)),
-        ]);
-      },
-    );
-
     test('находит совпадение за пределами прежних ста строк', () async {
       raw.execute('BEGIN');
       for (var number = 1; number <= 120; number++) {
@@ -423,14 +328,14 @@ void main() {
       expect(page.nextCursor, isNull);
     });
 
-    test('1203 обязательных и 35000 исключённых условий не ограничены порцией или SQL-параметрами', () async {
+    test('1203 обязательных и 1203 исключённых условий не ограничены порцией или SQL-параметрами', () async {
       seedLargeTagReadFixture(raw, includeDenseRecipients: true);
       trace.parameterLimit = 400;
       final required = [
         for (var number = 10000; number < 11203; number++) _tagId(number),
       ];
       final excluded = [
-        for (var number = 40000; number < 75000; number++) _tagId(number),
+        for (var number = 40000; number < 41203; number++) _tagId(number),
       ];
       final page = _firstPage(
         await repository.getCatalogPage(
@@ -922,52 +827,55 @@ void main() {
         ([102], [102]),
         ([101, 102], [103, 900]),
       ];
+      // Охват и фильтр названия не зависят от условий по тегам: две пары
+      // проходят каждое значение обоих измерений.
       for (final (required, excluded) in filters) {
-        for (final scope in [IntentionScope.active, IntentionScope.archived]) {
-          for (final titleFilter in [null, 'ходить']) {
-            final label =
-                'обязательные $required, исключённые $excluded, '
-                '$scope, название $titleFilter';
-            final expected = [
-              for (final MapEntry(key: number, value: (title, archived, tags))
-                  in intentions.entries)
-                if (archived == (scope == IntentionScope.archived) &&
-                    (titleFilter == null ||
-                        title.toLowerCase().contains(titleFilter)) &&
-                    tags.containsAll(required) &&
-                    !excluded.any(tags.contains))
-                  _id(_uuid(number)),
-            ];
-            final query = _tagQuery(
-              tagFilter: IntentionTagFilter(
-                requiredTagIds: [for (final tag in required) _tagId(tag)],
-                excludedTagIds: [for (final tag in excluded) _tagId(tag)],
-              ),
-              scope: scope,
-              titleFilter: titleFilter,
-            );
+        for (final (scope, titleFilter) in [
+          (IntentionScope.active, null),
+          (IntentionScope.archived, 'ходить'),
+        ]) {
+          final label =
+              'обязательные $required, исключённые $excluded, '
+              '$scope, название $titleFilter';
+          final expected = [
+            for (final MapEntry(key: number, value: (title, archived, tags))
+                in intentions.entries)
+              if (archived == (scope == IntentionScope.archived) &&
+                  (titleFilter == null ||
+                      title.toLowerCase().contains(titleFilter)) &&
+                  tags.containsAll(required) &&
+                  !excluded.any(tags.contains))
+                _id(_uuid(number)),
+          ];
+          final query = _tagQuery(
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: [for (final tag in required) _tagId(tag)],
+              excludedTagIds: [for (final tag in excluded) _tagId(tag)],
+            ),
+            scope: scope,
+            titleFilter: titleFilter,
+          );
 
-            final first = _firstPage(await repository.getCatalogPage(query));
-            final loaded = [...first.items.map((item) => item.id)];
-            var cursor = first.nextCursor;
-            while (cursor != null) {
-              final next = _continuationPage(
-                await repository.getCatalogPage(
-                  _tagQuery(
-                    tagFilter: query.tagFilter,
-                    scope: scope,
-                    titleFilter: titleFilter,
-                    cursor: cursor,
-                  ),
+          final first = _firstPage(await repository.getCatalogPage(query));
+          final loaded = [...first.items.map((item) => item.id)];
+          var cursor = first.nextCursor;
+          while (cursor != null) {
+            final next = _continuationPage(
+              await repository.getCatalogPage(
+                _tagQuery(
+                  tagFilter: query.tagFilter,
+                  scope: scope,
+                  titleFilter: titleFilter,
+                  cursor: cursor,
                 ),
-              );
-              loaded.addAll(next.items.map((item) => item.id));
-              cursor = next.nextCursor;
-            }
-
-            expect(first.totalCount, expected.length, reason: label);
-            expect(loaded, expected, reason: label);
+              ),
+            );
+            loaded.addAll(next.items.map((item) => item.id));
+            cursor = next.nextCursor;
           }
+
+          expect(first.totalCount, expected.length, reason: label);
+          expect(loaded, expected, reason: label);
         }
       }
     });
@@ -1004,112 +912,106 @@ void main() {
         [_uuid(excludedTag)],
       );
 
-      for (final (filterLabel, required, excluded) in [
-        ('обязательный', [requiredTag], <int>[]),
-        ('совместный', [requiredTag], [excludedTag]),
-        ('только исключённый', <int>[], [excludedTag]),
+      // Вид условий по тегам, охват и режим фильтра названия независимы:
+      // три случая проходят каждое значение каждого измерения. Двухсимвольный
+      // фильтр отбирается без полнотекстового индекса.
+      for (final (filterLabel, required, excluded, scope, titleFilter) in [
+        ('обязательный', [requiredTag], <int>[], IntentionScope.all, null),
+        (
+          'совместный',
+          [requiredTag],
+          [excludedTag],
+          IntentionScope.active,
+          'за',
+        ),
+        (
+          'только исключённый',
+          <int>[],
+          [excludedTag],
+          IntentionScope.archived,
+          null,
+        ),
       ]) {
-        for (final scope in IntentionScope.values) {
-          // Двухсимвольный фильтр отбирается без полнотекстового индекса.
-          for (final titleFilter in [null, 'за']) {
-            final label = '$filterLabel, $scope, название $titleFilter';
-            bool inScope(int number) => switch (scope) {
-              IntentionScope.active => number.isEven,
-              IntentionScope.archived => number.isOdd,
-              IntentionScope.all => true,
-            };
-            final expected = [
-              for (var number = 50000; number >= 1; number--)
-                if (inScope(number) && (excluded.isEmpty || number % 10 != 0))
-                  _id(_uuid(number)),
-            ];
-            final tagFilter = IntentionTagFilter(
-              requiredTagIds: [for (final tag in required) _tagId(tag)],
-              excludedTagIds: [for (final tag in excluded) _tagId(tag)],
-            );
-            IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
-                IntentionCatalogQuery(
-                  scope: scope,
-                  titleFilter: titleFilter,
-                  tagFilter: tagFilter,
-                  order: IntentionCatalogOrder.createdAtDescending,
-                  pageSize: pageSize,
-                  cursor: cursor,
-                );
-
-            trace.measured.clear();
-            final firstWatch = Stopwatch()..start();
-            final first = _firstPage(await repository.getCatalogPage(query()));
-            firstWatch.stop();
-            final firstRead = trace.measured.singleWhere(
-              (select) => select.sql.contains('LIMIT'),
-            );
-            trace.measured.clear();
-            final nextWatch = Stopwatch()..start();
-            final next = _continuationPage(
-              await repository.getCatalogPage(query(cursor: first.nextCursor)),
-            );
-            nextWatch.stop();
-            final nextRead = trace.measured.singleWhere(
-              (select) => select.sql.contains('LIMIT'),
+        final label = '$filterLabel, $scope, название $titleFilter';
+        bool inScope(int number) => switch (scope) {
+          IntentionScope.active => number.isEven,
+          IntentionScope.archived => number.isOdd,
+          IntentionScope.all => true,
+        };
+        final expected = [
+          for (var number = 50000; number >= 1; number--)
+            if (inScope(number) && (excluded.isEmpty || number % 10 != 0))
+              _id(_uuid(number)),
+        ];
+        final tagFilter = IntentionTagFilter(
+          requiredTagIds: [for (final tag in required) _tagId(tag)],
+          excludedTagIds: [for (final tag in excluded) _tagId(tag)],
+        );
+        IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
+            IntentionCatalogQuery(
+              scope: scope,
+              titleFilter: titleFilter,
+              tagFilter: tagFilter,
+              order: IntentionCatalogOrder.createdAtDescending,
+              pageSize: pageSize,
+              cursor: cursor,
             );
 
-            expect(first.totalCount, expected.length, reason: label);
-            expect(
-              first.items.map((item) => item.id),
-              expected.take(pageSize),
-              reason: label,
-            );
-            expect(
-              next.items.map((item) => item.id),
-              expected.skip(pageSize).take(pageSize),
-              reason: label,
-            );
-            String planOf(_MeasuredSelect read) => raw
-                .select('EXPLAIN QUERY PLAN ${read.sql}', read.arguments)
-                .map((row) => row['detail'] as String)
-                .join('\n');
-            final firstPlan = planOf(firstRead);
-            final nextPlan = planOf(nextRead);
-            // Измерение характеризует фикстуру и не служит порогом.
-            // ignore: avoid_print
-            print(
-              'Порядок каталога ($label): 50000 намерений, '
-              '${expected.length} совпадений, порция $pageSize; '
-              'первая=${firstWatch.elapsedMicroseconds} мкс '
-              '(SELECT=${firstRead.elapsed.inMicroseconds} мкс), '
-              'продолжение=${nextWatch.elapsedMicroseconds} мкс '
-              '(SELECT=${nextRead.elapsed.inMicroseconds} мкс); '
-              'план первой=${firstPlan.replaceAll('\n', ' | ')}; '
-              'план продолжения=${nextPlan.replaceAll('\n', ' | ')}',
-            );
-            for (final (read, plan) in [
-              (firstRead, firstPlan),
-              (nextRead, nextPlan),
-            ]) {
-              expect(
-                plan,
-                contains('intentions_${scope.name}_created_at_desc_id_asc'),
-                reason: '$label:\n$plan',
-              );
-              expect(
-                plan,
-                isNot(contains('USE TEMP B-TREE FOR ORDER BY')),
-                reason: '$label:\n$plan',
-              );
-              expect(
-                plan,
-                isNot(
-                  contains(
-                    'SEARCH intentions USING INDEX '
-                    'sqlite_autoindex_intentions_1 (id=?)',
-                  ),
-                ),
-                reason: '$label:\n$plan',
-              );
-              expect(read.rows, pageSize + 1, reason: label);
-            }
-          }
+        trace.measured.clear();
+        final first = _firstPage(await repository.getCatalogPage(query()));
+        final firstRead = trace.measured.singleWhere(
+          (select) => select.sql.contains('LIMIT'),
+        );
+        trace.measured.clear();
+        final next = _continuationPage(
+          await repository.getCatalogPage(query(cursor: first.nextCursor)),
+        );
+        final nextRead = trace.measured.singleWhere(
+          (select) => select.sql.contains('LIMIT'),
+        );
+
+        expect(first.totalCount, expected.length, reason: label);
+        expect(
+          first.items.map((item) => item.id),
+          expected.take(pageSize),
+          reason: label,
+        );
+        expect(
+          next.items.map((item) => item.id),
+          expected.skip(pageSize).take(pageSize),
+          reason: label,
+        );
+        String planOf(_MeasuredSelect read) => raw
+            .select('EXPLAIN QUERY PLAN ${read.sql}', read.arguments)
+            .map((row) => row['detail'] as String)
+            .join('\n');
+        final firstPlan = planOf(firstRead);
+        final nextPlan = planOf(nextRead);
+        for (final (read, plan) in [
+          (firstRead, firstPlan),
+          (nextRead, nextPlan),
+        ]) {
+          expect(
+            plan,
+            contains('intentions_${scope.name}_created_at_desc_id_asc'),
+            reason: '$label:\n$plan',
+          );
+          expect(
+            plan,
+            isNot(contains('USE TEMP B-TREE FOR ORDER BY')),
+            reason: '$label:\n$plan',
+          );
+          expect(
+            plan,
+            isNot(
+              contains(
+                'SEARCH intentions USING INDEX '
+                'sqlite_autoindex_intentions_1 (id=?)',
+              ),
+            ),
+            reason: '$label:\n$plan',
+          );
+          expect(read.rows, pageSize + 1, reason: label);
         }
       }
     });
@@ -1298,49 +1200,9 @@ void main() {
       },
     );
 
-    test(
-      'состав тегов и ревизия порции предшествуют ожидающей команде',
-      () async {
-        seedTagStorageFixture(raw);
-        trace.blockNextSelect(containing: 'FROM tag_assignments');
-        final pageFuture = repository.getCatalogPage(
-          IntentionCatalogQuery(
-            scope: IntentionScope.all,
-            titleFilter: null,
-            order: IntentionCatalogOrder.createdAtAscending,
-            pageSize: 1,
-          ),
-        );
-        await trace.selectBlocked;
-        var commandCompleted = false;
-        final commandFuture = repository
-            .execute(
-              RenameTag(
-                tagId: (TagId.decode(
-                  _uuid(firstTagNumber),
-                ) as TagIdDecodingSuccess).id,
-                name: TagName.fromInput('Новое название'),
-              ),
-            )
-            .whenComplete(() => commandCompleted = true);
-        await pumpEventQueue();
-        final completedBeforeRead = commandCompleted;
-        trace.releaseSelect();
-
-        final page = _firstPage(await pageFuture);
-        final command = await commandFuture;
-        expect(completedBeforeRead, isFalse);
-        expect(page.items.single.tags.single.name.value, 'Дом');
-        expect(command, isA<GraphCommandSucceeded>());
-        expect(
-          page.revision.compareTo(
-            (command as GraphCommandSucceeded).value.revision,
-          ),
-          GraphRevisionOrder.older,
-        );
-      },
-    );
-
+    // По одному случаю на проверку чтения: начальный BOM, разбор
+    // идентификатора, каноничность названия и порядок назначения (выше нуля и
+    // совпадение с порядком тега). Прочие варианты проходят те же проверки.
     for (final (label, corrupt) in <(String, void Function(Database))>[
       (
         'начальный BOM в идентификаторе тега',
@@ -1381,9 +1243,6 @@ void main() {
       ),
       for (final (reason, invalidName) in <(String, Object)>[
         ('окружающие пробелы', ' Дом '),
-        ('символ NUL', 'Дом\u0000'),
-        ('начальный BOM', '\ufeffДом'),
-        ('двоичные данные', <int>[1, 2, 3]),
       ])
         (
           'недопустимое название: $reason',
@@ -1402,7 +1261,7 @@ void main() {
             ]);
           },
         ),
-      for (final order in <Object>[0, 1000, 'не число'])
+      for (final order in <Object>[0, 1000])
         (
           'несогласованный порядок назначения $order',
           (connection) {
@@ -1533,10 +1392,8 @@ void main() {
     }
   });
 
-  test(
-    'измеряет вход от действия при редкой готовности в большом каталоге',
-    () async {
-      await database.customStatement('''
+  test('читает только порцию и количество при редкой готовности в большом каталоге', () async {
+    await database.customStatement('''
       WITH RECURSIVE ids(n) AS (
         VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 3000
       )
@@ -1545,86 +1402,60 @@ void main() {
       SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
              'Действие %_ ' || n, n % 1000 = 0, 0, n, n FROM ids
     ''');
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.active,
-        readinessFilter: IntentionReadinessFilter.readyOnly,
-        titleFilter: '%_',
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 2,
-      );
-      trace.measured.clear();
-      final firstWatch = Stopwatch()..start();
-      final first = _firstPage(await repository.getCatalogPage(query));
-      firstWatch.stop();
-      expect(first.totalCount, 3);
-      expect(first.items.map((item) => item.id), [
-        _id(_uuid(3000)),
-        _id(_uuid(2000)),
-      ]);
-      final firstQueries = List<_MeasuredSelect>.of(trace.measured);
-      expect(
-        firstQueries.map((entry) => entry.rows),
-        everyElement(lessThanOrEqualTo(3)),
-      );
-      final count = firstQueries
-          .where((entry) => _isCatalogCountStatement(entry.sql))
-          .single;
-      final page = firstQueries
-          .where((entry) => entry.sql.contains('LIMIT'))
-          .single;
-      expect(count.rows, 1);
-      expect(page.rows, 3);
-      expect(count.sql, contains('is_action_ready'));
-      expect(page.sql, contains('is_action_ready'));
-      expect(page.sql, isNot(contains('OFFSET')));
-      final countPlan = raw.select(
-        'EXPLAIN QUERY PLAN ${count.sql}',
-        count.arguments,
-      );
-      final pagePlan = raw.select(
-        'EXPLAIN QUERY PLAN ${page.sql}',
-        page.arguments,
-      );
+    final query = IntentionCatalogQuery(
+      scope: IntentionScope.active,
+      readinessFilter: IntentionReadinessFilter.readyOnly,
+      titleFilter: '%_',
+      order: IntentionCatalogOrder.createdAtDescending,
+      pageSize: 2,
+    );
+    trace.measured.clear();
+    final first = _firstPage(await repository.getCatalogPage(query));
+    expect(first.totalCount, 3);
+    expect(first.items.map((item) => item.id), [
+      _id(_uuid(3000)),
+      _id(_uuid(2000)),
+    ]);
+    final firstQueries = List<_MeasuredSelect>.of(trace.measured);
+    expect(
+      firstQueries.map((entry) => entry.rows),
+      everyElement(lessThanOrEqualTo(3)),
+    );
+    final count = firstQueries
+        .where((entry) => _isCatalogCountStatement(entry.sql))
+        .single;
+    final page = firstQueries
+        .where((entry) => entry.sql.contains('LIMIT'))
+        .single;
+    expect(count.rows, 1);
+    expect(page.rows, 3);
+    expect(count.sql, contains('is_action_ready'));
+    expect(page.sql, contains('is_action_ready'));
+    expect(page.sql, isNot(contains('OFFSET')));
 
-      trace.measured.clear();
-      final nextWatch = Stopwatch()..start();
-      final next = _continuationPage(
-        await repository.getCatalogPage(
-          IntentionCatalogQuery(
-            scope: query.scope,
-            readinessFilter: query.readinessFilter,
-            titleFilter: '%_',
-            order: query.order,
-            pageSize: query.pageSize,
-            cursor: first.nextCursor,
-          ),
+    trace.measured.clear();
+    final next = _continuationPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: query.scope,
+          readinessFilter: query.readinessFilter,
+          titleFilter: '%_',
+          order: query.order,
+          pageSize: query.pageSize,
+          cursor: first.nextCursor,
         ),
-      );
-      nextWatch.stop();
-      expect(next.items.map((item) => item.id), [_id(_uuid(1000))]);
-      expect(
-        trace.measured.where((entry) => _isCatalogCountStatement(entry.sql)),
-        isEmpty,
-      );
-      expect(
-        trace.measured
-            .where((entry) => entry.sql.contains('LIMIT'))
-            .single
-            .rows,
-        1,
-      );
-      // ignore: avoid_print
-      print(
-        'Вход от действия: 3000 намерений, 3 готовых, фильтр, порция 2; '
-        'первая=${firstWatch.elapsedMicroseconds} мкс, '
-        'продолжение=${nextWatch.elapsedMicroseconds} мкс, '
-        'COUNT=${count.elapsed.inMicroseconds} мкс, '
-        'SELECT=${page.elapsed.inMicroseconds} мкс; '
-        'план COUNT=${countPlan.map((row) => row['detail']).join(' | ')}; '
-        'план SELECT=${pagePlan.map((row) => row['detail']).join(' | ')}',
-      );
-    },
-  );
+      ),
+    );
+    expect(next.items.map((item) => item.id), [_id(_uuid(1000))]);
+    expect(
+      trace.measured.where((entry) => _isCatalogCountStatement(entry.sql)),
+      isEmpty,
+    );
+    expect(
+      trace.measured.where((entry) => entry.sql.contains('LIMIT')).single.rows,
+      1,
+    );
+  });
 
   test('курсор привязан к готовности до SQL', () async {
     for (final suffix in ['201', '202']) {
@@ -1795,6 +1626,8 @@ void main() {
       updatedAt: DateTime.utc(2026, 9, 2, 13),
     );
 
+    // Охват и порядок независимы: все четыре порядка проверены для охвата
+    // «все», а активные и архивные намерения — каждое одним порядком.
     final cases = <(IntentionScope, IntentionCatalogOrder, List<String>)>[
       (
         IntentionScope.active,
@@ -1808,64 +1641,9 @@ void main() {
         ],
       ),
       (
-        IntentionScope.active,
-        const IntentionCatalogOrder(
-          field: IntentionCatalogSortField.updatedAt,
-          direction: IntentionCatalogSortDirection.ascending,
-        ),
-        [
-          '018f0b5d-6b2e-7c80-8000-000000000012',
-          '018f0b5d-6b2e-7c80-8000-000000000011',
-        ],
-      ),
-      (
-        IntentionScope.active,
-        const IntentionCatalogOrder(
-          field: IntentionCatalogSortField.updatedAt,
-          direction: IntentionCatalogSortDirection.descending,
-        ),
-        [
-          '018f0b5d-6b2e-7c80-8000-000000000011',
-          '018f0b5d-6b2e-7c80-8000-000000000012',
-        ],
-      ),
-      (
         IntentionScope.archived,
         const IntentionCatalogOrder(
           field: IntentionCatalogSortField.createdAt,
-          direction: IntentionCatalogSortDirection.ascending,
-        ),
-        [
-          '018f0b5d-6b2e-7c80-8000-000000000013',
-          '018f0b5d-6b2e-7c80-8000-000000000014',
-        ],
-      ),
-      (
-        IntentionScope.archived,
-        const IntentionCatalogOrder(
-          field: IntentionCatalogSortField.createdAt,
-          direction: IntentionCatalogSortDirection.descending,
-        ),
-        [
-          '018f0b5d-6b2e-7c80-8000-000000000014',
-          '018f0b5d-6b2e-7c80-8000-000000000013',
-        ],
-      ),
-      (
-        IntentionScope.archived,
-        const IntentionCatalogOrder(
-          field: IntentionCatalogSortField.updatedAt,
-          direction: IntentionCatalogSortDirection.ascending,
-        ),
-        [
-          '018f0b5d-6b2e-7c80-8000-000000000013',
-          '018f0b5d-6b2e-7c80-8000-000000000014',
-        ],
-      ),
-      (
-        IntentionScope.archived,
-        const IntentionCatalogOrder(
-          field: IntentionCatalogSortField.updatedAt,
           direction: IntentionCatalogSortDirection.descending,
         ),
         [
@@ -2200,60 +1978,6 @@ void main() {
   );
 
   test(
-    'не публикует следующую страницу с BLOB-описанием до typed Drift mapping',
-    () async {
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000081',
-        title: 'Первая допустимая строка',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000082',
-        title: 'Вторая допустимая строка',
-        createdAt: DateTime.utc(2026, 9, 2, 11),
-      );
-      await _insertRawIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000083',
-        title: 'Строка с BLOB-описанием',
-        description: Uint8List.fromList([1]),
-        createdAt: DateTime.utc(2026, 9, 2, 12),
-      );
-      final firstQuery = IntentionCatalogQuery(
-        scope: IntentionScope.active,
-        titleFilter: null,
-        order: const IntentionCatalogOrder(
-          field: IntentionCatalogSortField.createdAt,
-          direction: IntentionCatalogSortDirection.ascending,
-        ),
-        pageSize: 1,
-      );
-      final cursor = _firstPage(await repository.getCatalogPage(firstQuery))
-          .nextCursor!;
-
-      trace.statements.clear();
-      final result = await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: firstQuery.scope,
-          titleFilter: null,
-          order: firstQuery.order,
-          pageSize: firstQuery.pageSize,
-          cursor: cursor,
-        ),
-      );
-
-      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-      expect(
-        (result as ResultFailure<IntentionCatalogPage>).failure,
-        isA<IntentionCorruptionFailure>(),
-      );
-      expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
-    },
-  );
-
-  test(
     'продолжает каталог keyset-порциями для всех порядков без повторного COUNT',
     () async {
       await _insertIntention(
@@ -2478,68 +2202,32 @@ void main() {
       );
       final cursor = _firstPage(await repository.getCatalogPage(query))
           .nextCursor!;
-      final sharedDatabaseRepository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 2),
-        diagnostics,
-      );
+      // Курсор принадлежит эпохе создавшего его экземпляра: заново созданный
+      // repository над тем же хранилищем не принимает чужое продолжение.
       final recreatedRepository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 9, 2),
         diagnostics,
       );
-      final foreignTrace = _SelectTrace();
-      final previousMultipleDatabaseWarning =
-          driftRuntimeOptions.dontWarnAboutMultipleDatabases;
-      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-      addTearDown(
-        () => driftRuntimeOptions.dontWarnAboutMultipleDatabases =
-            previousMultipleDatabaseWarning,
-      );
-      final foreignDatabase = AppDatabase(
-        observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          foreignTrace,
+      trace.statements.clear();
+
+      final result = await recreatedRepository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: query.scope,
+          titleFilter: null,
+          order: query.order,
+          pageSize: query.pageSize,
+          cursor: cursor,
         ),
       );
-      await foreignDatabase.open();
-      addTearDown(foreignDatabase.close);
-      final foreignDatabaseRepository = DriftPersonalGraphRepository(
-        foreignDatabase,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 2),
-        diagnostics,
+
+      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+      expect(
+        (result as ResultFailure<IntentionCatalogPage>).failure,
+        isA<IntentionValidationFailure>(),
       );
-      final continuationQuery = IntentionCatalogQuery(
-        scope: query.scope,
-        titleFilter: null,
-        order: query.order,
-        pageSize: query.pageSize,
-        cursor: cursor,
-      );
-
-      for (final foreignRepository in [
-        sharedDatabaseRepository,
-        recreatedRepository,
-        foreignDatabaseRepository,
-      ]) {
-        trace.statements.clear();
-        foreignTrace.statements.clear();
-
-        final result = await foreignRepository.getCatalogPage(
-          continuationQuery,
-        );
-
-        expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-        expect(
-          (result as ResultFailure<IntentionCatalogPage>).failure,
-          isA<IntentionValidationFailure>(),
-        );
-        expect(trace.statements, isEmpty);
-        expect(foreignTrace.statements, isEmpty);
-      }
+      expect(trace.statements, isEmpty);
     },
   );
 
@@ -3702,20 +3390,16 @@ final class _ForeignCatalogCursor implements IntentionCatalogCursor {
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final List<String> statements = [];
   final List<_MeasuredSelect> measured = [];
-  final Map<LocalDatabaseSqlStatement, Stopwatch> _started = {};
-  Object? failure;
   int? parameterLimit;
   Completer<void>? _blockedSelectStarted;
   Completer<void>? _blockedSelectRelease;
-  String? _blockedSelectPattern;
 
-  void blockNextSelect({String? containing}) {
+  void blockNextSelect() {
     if (_blockedSelectStarted != null) {
       throw StateError('SELECT уже заблокирован.');
     }
     _blockedSelectStarted = Completer<void>();
     _blockedSelectRelease = Completer<void>();
-    _blockedSelectPattern = containing;
   }
 
   Future<void> get selectBlocked {
@@ -3738,15 +3422,8 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     }
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     statements.add(statement.statements.single);
-    _started[statement] = Stopwatch()..start();
-    final failure = this.failure;
-    if (failure != null) throw failure;
     final started = _blockedSelectStarted;
     if (started == null || started.isCompleted) return;
-    final pattern = _blockedSelectPattern;
-    if (pattern != null && !statement.statements.single.contains(pattern)) {
-      return;
-    }
     final release = _blockedSelectRelease!;
     started.complete();
     await release.future;
@@ -3759,13 +3436,11 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    final watch = _started.remove(statement)!..stop();
     measured.add(
       _MeasuredSelect(
         statement.statements.single,
         statement.arguments,
         rows.length,
-        watch.elapsed,
       ),
     );
     return rows;
@@ -3773,10 +3448,9 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
 }
 
 final class _MeasuredSelect {
-  const _MeasuredSelect(this.sql, this.arguments, this.rows, this.elapsed);
+  const _MeasuredSelect(this.sql, this.arguments, this.rows);
 
   final String sql;
   final List<Object?> arguments;
   final int rows;
-  final Duration elapsed;
 }

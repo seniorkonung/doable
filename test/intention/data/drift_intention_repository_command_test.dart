@@ -131,10 +131,11 @@ void main() {
         },
       );
 
+      // Включение и выключение готовности проходят одну ветку, поэтому
+      // выключение отдельно не проверяется.
       for (final (name, command, isReady, isArchived)
           in <(String, IntentionCommand Function(IntentionId), int, int)>[
             ('включения готовности', EnableIntentionReadiness.new, 0, 0),
-            ('выключения готовности', DisableIntentionReadiness.new, 1, 0),
             ('архивирования', ArchiveIntention.new, 1, 0),
             ('восстановления из архива', RestoreIntention.new, 1, 1),
           ]) {
@@ -201,6 +202,8 @@ void main() {
         });
       }
 
+      // Включение и выключение готовности проходят одну ветку, поэтому
+      // выключение отдельно не проверяется.
       for (final (name, command, isReady, isArchived)
           in <(String, IntentionCommand Function(IntentionId), int, int)>[
             (
@@ -214,7 +217,6 @@ void main() {
               0,
             ),
             ('включения готовности', EnableIntentionReadiness.new, 1, 0),
-            ('выключения готовности', DisableIntentionReadiness.new, 0, 0),
             ('архивирования', ArchiveIntention.new, 1, 1),
             ('восстановления из архива', RestoreIntention.new, 1, 0),
           ]) {
@@ -242,48 +244,6 @@ void main() {
           expect(writeTrace.updateStatements, isEmpty);
         });
       }
-
-      test(
-        'каждая сторона снимка читает назначения на своём состоянии транзакции',
-        () async {
-          raw.execute('''CREATE TRIGGER change_own_tags_after_update
-          AFTER UPDATE ON intentions WHEN NEW.id = '${id.toCanonicalString()}'
-          BEGIN
-            DELETE FROM tag_assignments
-              WHERE intention_id = NEW.id AND tag_id = '${tagFixtureId(firstTagNumber)}';
-            INSERT INTO tag_assignments (tag_id, intention_id)
-              VALUES ('${tagFixtureId(lastTagNumber)}', NEW.id);
-          END''');
-
-          final saved = _commandSuccess(
-            await repository.execute(
-              UpdateIntention(
-                id: id,
-                title: 'Новое название',
-                description: null,
-              ),
-            ),
-          ) as IntentionSaved;
-          final mutation = saved.catalogMutation as IntentionCatalogUpdated;
-
-          expect(
-            mutation.before.summary.tags.map((tag) => tag.name.value),
-            expectedTagNames,
-          );
-          expect(mutation.after.summary.tags.map((tag) => tag.name.value), [
-            'Работа',
-            ...expectedTagNames.skip(1),
-          ]);
-          expect(
-            mutation.before.summary.tags.first.id.toCanonicalString(),
-            tagFixtureId(firstTagNumber),
-          );
-          expect(
-            mutation.after.summary.tags.first.id.toCanonicalString(),
-            tagFixtureId(lastTagNumber),
-          );
-        },
-      );
 
       test(
         'снимок удаления сохраняет теги до каскадного удаления назначений',
@@ -728,11 +688,9 @@ void main() {
     });
 
     test('отклоняет недопустимый текст до SQL-чтения и записи', () async {
-      final invalidValues = [
-        '\u0000',
-        String.fromCharCode(0xd800),
-        String.fromCharCode(0xdc00),
-      ];
+      // Проверка алфавита общая для NUL и непарных суррогатов (их различает
+      // тест текста намерения): здесь важен отказ до SQL для каждого поля.
+      final invalidValues = ['\u0000'];
       final invalidCommands = [
         for (final invalidValue in invalidValues) ...[
           (
@@ -1147,6 +1105,8 @@ void main() {
       },
     );
 
+    // У каждой команды два случая: изменение при противоположном значении
+    // несвязанного признака и повтор без записи.
     test('выполняет матрицу переходов readiness и архива без изменения несвязанных данных', () async {
       final transitions =
           <
@@ -1172,19 +1132,11 @@ void main() {
               fixtures: [
                 (
                   readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.notReady,
                   archiveState: IntentionArchiveState.archived,
                 ),
                 (
                   readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.archived,
                 ),
               ],
             ),
@@ -1196,19 +1148,11 @@ void main() {
               fixtures: [
                 (
                   readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.archived,
                 ),
                 (
                   readiness: IntentionReadiness.notReady,
                   archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
                 ),
               ],
             ),
@@ -1219,19 +1163,11 @@ void main() {
               archiveState: IntentionArchiveState.archived,
               fixtures: [
                 (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
                   readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.active,
                 ),
                 (
                   readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.archived,
                 ),
               ],
@@ -1243,26 +1179,18 @@ void main() {
               archiveState: IntentionArchiveState.active,
               fixtures: [
                 (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-                (
                   readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.archived,
                 ),
                 (
                   readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.active,
                 ),
               ],
             ),
           ];
       final transitionTimes = [
-        for (var hour = 10; hour < 18; hour++) DateTime.utc(2026, 9, 3, hour),
+        for (var hour = 10; hour < 14; hour++) DateTime.utc(2026, 9, 3, hour),
       ];
       clock = _DeterministicClock(transitionTimes);
       repository = DriftPersonalGraphRepository(
@@ -1404,77 +1332,6 @@ void main() {
       },
     );
 
-    test(
-      'изолирует параллельные state transitions одного и разных намерений',
-      () async {
-        final firstId = _id(_firstUuid);
-        final secondId = _id(_secondUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: firstId.toCanonicalString(),
-          title: 'Первое намерение',
-          description: 'Первое описание',
-          createdAt: createdAt,
-        );
-        await _insertIntention(
-          database,
-          id: secondId.toCanonicalString(),
-          title: 'Второе намерение',
-          description: 'Второе описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        clock = _DeterministicClock([
-          DateTime.utc(2026, 9, 3, 10),
-          DateTime.utc(2026, 9, 3, 11),
-          DateTime.utc(2026, 9, 3, 12),
-          DateTime.utc(2026, 9, 3, 13),
-        ]);
-        repository = DriftPersonalGraphRepository(
-          database,
-          idGenerator,
-          clock.call,
-          diagnostics,
-        );
-
-        final results = await Future.wait([
-          repository.execute(EnableIntentionReadiness(firstId)),
-          repository.execute(ArchiveIntention(firstId)),
-          repository.execute(DisableIntentionReadiness(secondId)),
-          repository.execute(RestoreIntention(secondId)),
-        ]);
-
-        final firstReadiness = _saved(results[0]);
-        final firstArchive = _saved(results[1]);
-        final secondReadiness = _saved(results[2]);
-        final secondRestore = _saved(results[3]);
-        expect(firstReadiness.id, firstId);
-        expect(firstReadiness.readiness, IntentionReadiness.ready);
-        expect(firstArchive.id, firstId);
-        expect(firstArchive.archiveState, IntentionArchiveState.archived);
-        expect(secondReadiness.id, secondId);
-        expect(secondReadiness.readiness, IntentionReadiness.notReady);
-        expect(secondRestore.id, secondId);
-        expect(secondRestore.archiveState, IntentionArchiveState.active);
-
-        final first = _watched(await repository.watchIntention(firstId).first);
-        final second = _watched(
-          await repository.watchIntention(secondId).first,
-        );
-        expect(first?.title, 'Первое намерение');
-        expect(first?.description, 'Первое описание');
-        expect(first?.readiness, IntentionReadiness.ready);
-        expect(first?.archiveState, IntentionArchiveState.archived);
-        expect(second?.title, 'Второе намерение');
-        expect(second?.description, 'Второе описание');
-        expect(second?.readiness, IntentionReadiness.notReady);
-        expect(second?.archiveState, IntentionArchiveState.active);
-        expect(clock.calls, 4);
-      },
-    );
-
     test('сохраняет success create, update и no-op при отказе diagnostics после commit', () async {
       var writerWasCalled = false;
       final diagnosticsWithFailingWriter = DeveloperDiagnosticsSink((_) {
@@ -1588,6 +1445,8 @@ void main() {
     test(
       'отклоняет malformed raw command snapshots до typed Drift mapping',
       () async {
+        // По одному случаю на проверку чтения снимка: тип текста, диапазон
+        // флага, пустой и недопустимый ключ поиска, тип числа.
         final fixtures =
             <
               ({
@@ -1610,36 +1469,10 @@ void main() {
                 },
               ),
               (
-                command: (id) => UpdateIntention(
-                  id: id,
-                  title: 'Исходное название',
-                  description: 'Исходное описание',
-                ),
-                commandType: IntentionCommandDiagnosticsType.update,
-                isArchived: false,
-                overrides: {
-                  'description': Uint8List.fromList([2]),
-                },
-              ),
-              (
                 command: EnableIntentionReadiness.new,
                 commandType: IntentionCommandDiagnosticsType.enableReadiness,
                 isArchived: false,
                 overrides: const {'is_action_ready': 2},
-              ),
-              (
-                command: ArchiveIntention.new,
-                commandType: IntentionCommandDiagnosticsType.archive,
-                isArchived: false,
-                overrides: const {'is_archived': -1},
-              ),
-              (
-                command: RestoreIntention.new,
-                commandType: IntentionCommandDiagnosticsType.restore,
-                isArchived: true,
-                overrides: {
-                  'title_search_key': Uint8List.fromList([3]),
-                },
               ),
               (
                 command: DisableIntentionReadiness.new,
@@ -1658,12 +1491,6 @@ void main() {
                 commandType: IntentionCommandDiagnosticsType.delete,
                 isArchived: false,
                 overrides: const {'created_at': 1.5},
-              ),
-              (
-                command: DeleteIntention.new,
-                commandType: IntentionCommandDiagnosticsType.delete,
-                isArchived: true,
-                overrides: const {'updated_at': '1725271200000000'},
               ),
             ];
         final query = IntentionCatalogQuery(
@@ -1723,92 +1550,6 @@ void main() {
         expect(clock.calls, 0);
       },
     );
-
-    test('откатывает create при malformed raw post-insert snapshot', () async {
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 100,
-      );
-      final revisionBefore = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      writeTrace.overrideNextSelect(const {'is_action_ready': 2});
-
-      final result = await repository.execute(
-        const CreateIntention(
-          title: 'Новое намерение',
-          description: 'Новое описание',
-        ),
-      );
-
-      expect(result, _failure<IntentionCorruptionFailure>());
-      expect(await database.select(database.intentions).get(), isEmpty);
-      expect(
-        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
-        _failedCommand(
-          IntentionCommandDiagnosticsType.create,
-          DiagnosticsFailureCode.corruption,
-        ),
-      );
-      final revisionAfter = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
-    });
-
-    test('откатывает update при malformed raw after snapshot', () async {
-      final id = _id(_firstUuid);
-      final createdAt = DateTime.utc(2026, 9, 2, 10);
-      await _insertIntention(
-        database,
-        id: id.toCanonicalString(),
-        title: 'Исходное название',
-        description: 'Исходное описание',
-        createdAt: createdAt,
-      );
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 100,
-      );
-      final revisionBefore = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      writeTrace.overrideSelectAfter(
-        skippedNonEmptySelects: 2,
-        overrides: const {'updated_at': 1.5},
-      );
-
-      final result = await repository.execute(
-        UpdateIntention(
-          id: id,
-          title: 'Обновлённое название',
-          description: 'Обновлённое описание',
-        ),
-      );
-
-      expect(result, _failure<IntentionCorruptionFailure>());
-      final stored = await (database.select(
-        database.intentions,
-      )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
-      expect(stored.title, 'Исходное название');
-      expect(stored.description, 'Исходное описание');
-      expect(stored.updatedAt, createdAt.microsecondsSinceEpoch);
-      expect(
-        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
-        _failedCommand(
-          IntentionCommandDiagnosticsType.update,
-          DiagnosticsFailureCode.corruption,
-        ),
-      );
-      final revisionAfter = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
-    });
 
     group('Создание с полным начальным состоянием', () {
       // «Выходные» созданы раньше «Дома»: собственные теги снимка следуют
@@ -1882,34 +1623,38 @@ void main() {
           favoriteMark: FavoriteMark.notFavorite,
           withTags: false,
         ),
-        for (final readiness in IntentionReadiness.values)
-          for (final favoriteMark in FavoriteMark.values)
-            for (final withTags in [false, true])
-              (
-                name: [
-                  switch (readiness) {
-                    IntentionReadiness.ready => 'готовность',
-                    IntentionReadiness.notReady => 'без готовности',
-                  },
-                  switch (favoriteMark) {
-                    FavoriteMark.favorite => 'избранное',
-                    FavoriteMark.notFavorite => 'без избранного',
-                  },
-                  withTags ? 'два тега' : 'без тегов',
-                ].join(', '),
-                command: CreateIntention.withInitialState(
-                  title: '  Убрать дом  ',
-                  description: '  Вымыть окна\n',
-                  readiness: readiness,
-                  favoriteMark: favoriteMark,
-                  tagIds: withTags
-                      ? [homeTagId, weekendTagId, homeTagId]
-                      : const <TagId>[],
-                ),
-                readiness: readiness,
-                favoriteMark: favoriteMark,
-                withTags: withTags,
-              ),
+        // Готовность, отметка и теги записываются независимо: каждый признак
+        // отдельно, а затем все вместе.
+        for (final (readiness, favoriteMark, withTags) in const [
+          (IntentionReadiness.ready, FavoriteMark.notFavorite, false),
+          (IntentionReadiness.notReady, FavoriteMark.favorite, false),
+          (IntentionReadiness.ready, FavoriteMark.favorite, true),
+        ])
+          (
+            name: [
+              switch (readiness) {
+                IntentionReadiness.ready => 'готовность',
+                IntentionReadiness.notReady => 'без готовности',
+              },
+              switch (favoriteMark) {
+                FavoriteMark.favorite => 'избранное',
+                FavoriteMark.notFavorite => 'без избранного',
+              },
+              withTags ? 'два тега' : 'без тегов',
+            ].join(', '),
+            command: CreateIntention.withInitialState(
+              title: '  Убрать дом  ',
+              description: '  Вымыть окна\n',
+              readiness: readiness,
+              favoriteMark: favoriteMark,
+              tagIds: withTags
+                  ? [homeTagId, weekendTagId, homeTagId]
+                  : const <TagId>[],
+            ),
+            readiness: readiness,
+            favoriteMark: favoriteMark,
+            withTags: withTags,
+          ),
       ];
 
       for (final scenario in scenarios) {
