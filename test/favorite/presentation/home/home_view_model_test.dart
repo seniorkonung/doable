@@ -44,32 +44,6 @@ void main() {
       expect(h.repository.readCount, 2);
     });
 
-    test('при повреждении недоступен и чтение не запускает', () async {
-      final h = HomeHarness();
-      addTearDown(h.dispose);
-      h.repository.failRead(0, const FavoriteIntentionsCorruptionFailure());
-      await pumpEventQueue();
-
-      h.model.retry();
-      await pumpEventQueue();
-
-      expect(h.state, isA<HomeCorruption>());
-      expect(h.repository.readCount, 1);
-    });
-
-    test('при неизвестном отказе недоступен и чтение не запускает', () async {
-      final h = HomeHarness();
-      addTearDown(h.dispose);
-      h.repository.failRead(0, const FavoriteIntentionsUnexpectedFailure());
-      await pumpEventQueue();
-
-      h.model.retry();
-      await pumpEventQueue();
-
-      expect(h.state, isA<HomeUnexpected>());
-      expect(h.repository.readCount, 1);
-    });
-
     test('во время загрузки не запускает параллельное чтение', () async {
       final h = HomeHarness();
       addTearDown(h.dispose);

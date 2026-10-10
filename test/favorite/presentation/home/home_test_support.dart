@@ -319,15 +319,12 @@ final class HomeTestMove {
 }
 
 final class HomeTestRevision implements GraphRevision {
-  const HomeTestRevision(this.number, [this.epoch = 0]);
+  const HomeTestRevision(this.number);
 
   final int number;
-  final int epoch;
 
   @override
   GraphRevisionOrder compareTo(GraphRevision other) => switch (other) {
-    HomeTestRevision(epoch: final e) when e != epoch =>
-      GraphRevisionOrder.differentEpoch,
     HomeTestRevision(number: final n) when number < n =>
       GraphRevisionOrder.older,
     HomeTestRevision(number: final n) when number > n =>

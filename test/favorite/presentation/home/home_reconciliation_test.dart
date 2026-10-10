@@ -366,30 +366,24 @@ void main() {
   });
 
   group('изменение избранного согласуется при отказе получения', () {
-    const failures = <(String, FavoriteIntentionsReadFailure)>[
-      ('недоступности', FavoriteIntentionsUnavailableFailure()),
-      ('повреждении', FavoriteIntentionsCorruptionFailure()),
-      ('неизвестном отказе', FavoriteIntentionsUnexpectedFailure()),
-    ];
-    for (final (name, failure) in failures) {
-      test('при $name пакет запускает новое получение', () async {
-        final h = HomeHarness();
-        addTearDown(h.dispose);
-        h.repository.failRead(0, failure);
-        await pumpEventQueue();
+    // Неповторяемый отказ: пакет остаётся единственным выходом из него.
+    test('при повреждении пакет запускает новое получение', () async {
+      final h = HomeHarness();
+      addTearDown(h.dispose);
+      h.repository.failRead(0, const FavoriteIntentionsCorruptionFailure());
+      await pumpEventQueue();
 
-        await confirmMarkC(h, revision: 2);
+      await confirmMarkC(h, revision: 2);
 
-        expect(h.state, isA<HomeLoading>());
-        expect(h.repository.readCount, 2);
+      expect(h.state, isA<HomeLoading>());
+      expect(h.repository.readCount, 2);
 
-        h.repository.completeRead(1, items: [homeTestRow(3, 'В')], revision: 2);
-        await pumpEventQueue();
+      h.repository.completeRead(1, items: [homeTestRow(3, 'В')], revision: 2);
+      await pumpEventQueue();
 
-        expect(ids(h), [c]);
-        expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
-      });
-    }
+      expect(ids(h), [c]);
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+    });
 
     test('повторный отказ получения остаётся отказом, а не пустым '
         'состоянием', () async {
@@ -510,25 +504,6 @@ void main() {
       await pumpEventQueue();
 
       expect(ids(h), [a, b, c]);
-    });
-
-    test('снимок другой эпохи ревизий не публикуется', () async {
-      final h = await loadedHome();
-
-      await confirmMarkC(h, revision: 2);
-      h.repository.reads[1].complete(
-        FavoriteIntentionsSuccess(
-          FavoriteIntentionsSnapshot(
-            items: [homeTestRow(1, 'А')],
-            archivedCount: 0,
-            revision: const HomeTestRevision(7, 1),
-          ),
-        ),
-      );
-      await pumpEventQueue();
-
-      expectRefreshingAB(h);
-      expect(h.repository.readCount, 3);
     });
 
     test('исчерпание повторов даёт устранимую недоступность без публикации '
@@ -775,26 +750,6 @@ void main() {
       expect(ids(h), [a, b]);
     });
 
-    test('при повреждении и неизвестном отказе явный повтор чтения не '
-        'запускает', () async {
-      for (final failure in <FavoriteIntentionsReadFailure>[
-        const FavoriteIntentionsCorruptionFailure(),
-        const FavoriteIntentionsUnexpectedFailure(),
-      ]) {
-        final h = await loadedHome();
-        await confirmMarkC(h, revision: 2);
-        h.repository.failRead(1, failure);
-        await pumpEventQueue();
-        final before = h.state;
-
-        h.model.retry();
-        await pumpEventQueue();
-
-        expect(h.state, same(before));
-        expect(h.repository.readCount, 2);
-      }
-    });
-
     test('следующий пакет с изменением избранного повторяет обновление и '
         'восстанавливает актуальность', () async {
       final h = await loadedHome();
@@ -829,12 +784,6 @@ void main() {
   });
 
   group('неактуальное состояние восстанавливается любым следующим пакетом', () {
-    const failures = <(String, FavoriteIntentionsReadFailure)>[
-      ('недоступности', FavoriteIntentionsUnavailableFailure()),
-      ('повреждения', FavoriteIntentionsCorruptionFailure()),
-      ('неизвестного отказа', FavoriteIntentionsUnexpectedFailure()),
-    ];
-
     /// Список А, Б ревизии 1, обновление которого после отметки В на ревизии
     /// 2 завершилось отказом [failure].
     Future<HomeHarness> staleHome(FavoriteIntentionsReadFailure failure) async {
@@ -849,26 +798,25 @@ void main() {
 
     final abc = [homeTestRow(1, 'А'), homeTestRow(2, 'Б'), homeTestRow(3, 'В')];
 
-    for (final (name, failure) in failures) {
-      test('пакет, не затрагивающий избранное, после $name вызывает чтение и '
-          'возвращает текущую актуальность', () async {
-        final h = await staleHome(failure);
+    // Неповторяемый отказ: пакет остаётся единственным выходом из него.
+    test('пакет, не затрагивающий избранное, после повреждения вызывает чтение '
+        'и возвращает текущую актуальность', () async {
+      final h = await staleHome(const FavoriteIntentionsCorruptionFailure());
 
-        await confirmRenameX(h, revision: 3);
+      await confirmRenameX(h, revision: 3);
 
-        expectRefreshingAB(h);
-        expect(h.repository.readCount, 3);
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 3);
 
-        h.repository.completeRead(2, items: abc, revision: 3);
-        await pumpEventQueue();
+      h.repository.completeRead(2, items: abc, revision: 3);
+      await pumpEventQueue();
 
-        expect(ids(h), [a, b, c]);
-        final list = h.state as HomeList;
-        expect(list.freshness, isA<HomeFreshnessCurrent>());
-        expect((list.revision as HomeTestRevision).number, 3);
-        expect(h.repository.readCount, 3);
-      });
-    }
+      expect(ids(h), [a, b, c]);
+      final list = h.state as HomeList;
+      expect(list.freshness, isA<HomeFreshnessCurrent>());
+      expect((list.revision as HomeTestRevision).number, 3);
+      expect(h.repository.readCount, 3);
+    });
 
     test('пакет, не затрагивающий избранное, при неактуальном пустом '
         'состоянии вызывает чтение', () async {

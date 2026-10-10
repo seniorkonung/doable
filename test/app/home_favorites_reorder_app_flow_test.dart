@@ -128,10 +128,8 @@ const _homeOffset = 500.0;
 
 /// Куда человек уходит с Главной, пока принятая перестановка выполняется.
 enum _Departure {
-  dailyChoices(
-    'после перехода к дневным выборам',
-    daily_page.DailyChoiceCatalogPage,
-  ),
+  // Переход к любому другому пункту панели — одна ветка: отказ предъявляется
+  // на общей поверхности той страницы, на которую человек перешёл.
   intentionGraph(
     'после перехода к графу намерений',
     catalog_page.IntentionCatalogPage,
@@ -162,283 +160,284 @@ enum _Search {
 }
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    final code = locale.languageCode;
+  // Сценарии от языка не зависят: тексты Главной в обеих локалях проверяет
+  // home_accessibility_test.
+  const locale = Locale('ru');
 
-    for (final departure in _Departure.values) {
-      testWidgets('принятая перестановка ${departure.description} сначала '
-          'получает однократный отказ записи на текущей общей поверхности, а '
-          'затем сохраняется без сообщения; Главная согласована, а её '
-          'прокрутка и параметры каталогов сохранены на $code', (tester) async {
-        final semantics = tester.ensureSemantics();
-        final app = await _App.start(tester, locale, _seedLongList);
-        final l10n = app.l10n;
-
-        // Параметры обоих каталогов и прокрутка Главной.
-        await openIntentionGraph(tester, waitFor: _until);
-        await tester.enterText(
-          find.byKey(const ValueKey('catalog-filter-field')),
-          'Бегать',
-        );
-        await _until(tester, find.text(l10n.catalogTotalCount(1)));
-        await tester.pumpAndSettle();
-        final graph = _intentionGraphView(tester);
-        await openDailyChoices(tester, tap: _tap);
-        await _until(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('daily-choice-completion-filter')),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(l10n.dailyChoiceCatalogIncomplete).last);
-        await _until(tester, find.text(l10n.dailyChoiceCatalogTotalCount(1)));
-        await tester.pumpAndSettle();
-        final dailyChoices = _dailyChoicesView(tester);
-        await openHome(tester, waitFor: _until);
-        await tester.pumpAndSettle();
-        _homePosition(tester).jumpTo(_homeOffset);
-        await tester.pumpAndSettle();
-        final initial = [
-          for (var number = 1; number <= _longFavoriteCount; number++) number,
-        ];
-        await _expectConfirmedHome(tester, app, initial);
-        // Строки, с которыми работает сценарий, видны без прокрутки.
-        for (final number in [12, 15, 20]) {
-          expect(_homeRow(number).hitTestable(), findsOneWidget);
-        }
-
-        // Первая перестановка: «Избранное 12» — на одно место выше. Запись
-        // отказывает уже после ухода с Главной.
-        app.repository.holdNextMove();
-        app.faults.failNextPlaceWrite();
-        _moveBySemantics(
-          tester,
-          _rowLabel(l10n, _longTitle(12)),
-          (actions) => actions.reorderItemUp,
-        );
-        await _waitFor(tester, () => app.repository.isHoldingMove);
-        await tester.pumpAndSettle();
-        _expectSaving(tester, app, [
-          for (var number = 1; number <= 10; number++) number,
-          12,
-          11,
-          for (var number = 13; number <= _longFavoriteCount; number++) number,
-        ], moved: 12);
-
-        await _depart(tester, departure);
-        const renamed = 'Избранное 20 вечером';
-        if (departure == _Departure.pageAbove) {
-          // Выполняющаяся перестановка не мешает принять операцию намерения.
-          // Её результат публикуется в порядке принятия — после результата
-          // перестановки.
-          await _submitRename(tester, renamed);
-          await _until(tester, find.text(l10n.detailsOperationRunning));
-          expect(app.repository.isHoldingMove, isTrue);
-        }
-        app.repository.releaseMove();
-        final failure = find.text(l10n.favoriteOrderUnavailable);
-        await _until(tester, failure);
-        await tester.pumpAndSettle();
-        expect(find.byKey(_message), findsOneWidget);
-        expect(
-          find.descendant(of: find.byType(departure.page), matching: failure),
-          findsOneWidget,
-        );
-        expect(storedFavoriteMarks(app.raw), _places(initial));
-        if (departure == _Departure.pageAbove) {
-          await _hideMessage(tester);
-          await _until(
-            tester,
-            find.descendant(
-              of: find.byKey(_message),
-              matching: find.textContaining(renamed),
-            ),
-          );
-          expect(failure, findsNothing);
-          expect(
-            find.descendant(
-              of: find.byType(IntentionDetailsPage),
-              matching: find.text(renamed),
-            ),
-            findsOneWidget,
-          );
-        }
-        await _closeMessage(tester);
-
-        // Отказ не предъявляется повторно при возвращении на Главную, а
-        // Главная показывает последний подтверждённый порядок.
-        await _returnHome(tester, departure);
-        await _expectConfirmedHome(tester, app, initial);
-        expect(_homePosition(tester).pixels, _homeOffset);
-        if (departure == _Departure.pageAbove) {
-          expect(_homeTitle(app, 20), renamed);
-        }
-
-        // Вторая перестановка: «Избранное 15» — на одно место ниже.
-        final reordered = [
-          for (var number = 1; number <= 14; number++) number,
-          16,
-          15,
-          for (var number = 17; number <= _longFavoriteCount; number++) number,
-        ];
-        app.repository.holdNextMove();
-        _moveBySemantics(
-          tester,
-          _rowLabel(l10n, _longTitle(15)),
-          (actions) => actions.reorderItemDown,
-        );
-        await _waitFor(tester, () => app.repository.isHoldingMove);
-        await tester.pumpAndSettle();
-        _expectSaving(tester, app, reordered, moved: 15);
-
-        await _depart(tester, departure);
-        app.repository.releaseMove();
-        await _waitFor(
-          tester,
-          () => listEquals(storedFavoriteMarks(app.raw), _places(reordered)),
-        );
-        // Главная согласуется, пока закрыта, а успех сообщения не получает.
-        await _waitFor(tester, () => _isConfirmed(app, reordered));
-        await _settle(tester);
-        expect(_builtMessages, findsNothing);
-
-        await _returnHome(tester, departure);
-        await _expectConfirmedHome(tester, app, reordered);
-        expect(_homePosition(tester).pixels, _homeOffset);
-        expect(app.repository.moves, 2);
-
-        // Параметры каталогов не изменились.
-        await openIntentionGraph(tester, waitFor: _until);
-        await tester.pumpAndSettle();
-        expect(_intentionGraphView(tester), graph);
-        await openDailyChoices(tester, tap: _tap);
-        await _until(tester, find.byType(daily_page.DailyChoiceCatalogPage));
-        await tester.pumpAndSettle();
-        expect(_dailyChoicesView(tester), dailyChoices);
-        expect(_builtMessages, findsNothing);
-        expect(tester.takeException(), isNull);
-        semantics.dispose();
-      });
-    }
-
-    testWidgets('подтверждённая перестановка не меняет состав, порядок, '
-        'количество и отметки открытых каталога намерений и трёх поисков, а '
-        'намерения, их время, связи, теги и дневные выборы сохраняются на '
-        '$code', (tester) async {
+  for (final departure in _Departure.values) {
+    testWidgets('принятая перестановка ${departure.description} сначала '
+        'получает однократный отказ записи на текущей общей поверхности, а '
+        'затем сохраняется без сообщения; Главная согласована, а её '
+        'прокрутка и параметры каталогов сохранены', (tester) async {
       final semantics = tester.ensureSemantics();
-      final app = await _App.start(
-        tester,
-        locale,
-        (database) => _seedGraph(
-          database,
-          favorites: const [_walk, _read, _otherWalk, _swim],
-        ),
-      );
+      final app = await _App.start(tester, locale, _seedLongList);
       final l10n = app.l10n;
-      final stored = _storedGraph(app.raw);
-      await _expectConfirmedHome(tester, app, const [_walk, _read, _otherWalk]);
 
-      // Каталог намерений уже открыт, когда перестановка подтверждается.
-      await openIntentionGraph(
+      // Параметры обоих каталогов и прокрутка Главной.
+      await openIntentionGraph(tester, waitFor: _until);
+      await tester.enterText(
+        find.byKey(const ValueKey('catalog-filter-field')),
+        'Бегать',
+      );
+      await _until(tester, find.text(l10n.catalogTotalCount(1)));
+      await tester.pumpAndSettle();
+      final graph = _intentionGraphView(tester);
+      await openDailyChoices(tester, tap: _tap);
+      await _until(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      await _tap(
         tester,
-        waitFor: _until,
-        content: find.text(l10n.catalogTotalCount(5)),
+        find.byKey(const ValueKey('daily-choice-completion-filter')),
       );
       await tester.pumpAndSettle();
-      final catalog = _searchView(
-        tester,
-        catalog_page.IntentionCatalogPage,
-        l10n,
-      );
-      expect(catalog['строки'], [
-        ('Спать', false),
-        ('Бегать', false),
-        ('Читать', true),
-        ('Гулять', true),
-        ('Гулять', true),
-      ]);
+      await tester.tap(find.text(l10n.dailyChoiceCatalogIncomplete).last);
+      await _until(tester, find.text(l10n.dailyChoiceCatalogTotalCount(1)));
+      await tester.pumpAndSettle();
+      final dailyChoices = _dailyChoicesView(tester);
       await openHome(tester, waitFor: _until);
-      await _moveWhileOpen(
-        tester,
-        app,
-        moved: _otherWalk,
-        action: (actions) => actions.reorderItemToStart,
-        order: const [_otherWalk, _walk, _read, _swim],
-        open: () => openIntentionGraph(tester, waitFor: _until),
-        page: catalog_page.IntentionCatalogPage,
-        expected: catalog,
-      );
-      await openHome(tester, waitFor: _until);
-      await _expectConfirmedHome(tester, app, const [_otherWalk, _walk, _read]);
-
-      // Каждый поиск открыт поверх Главной, когда перестановка
-      // подтверждается.
-      for (final (search, moved, action, order, rows) in [
-        (
-          _Search.action,
-          _read,
-          (WidgetsLocalizations actions) => actions.reorderItemUp,
-          const [_otherWalk, _read, _walk, _swim],
-          const [
-            ('Спать', false),
-            ('Бегать', false),
-            ('Читать', true),
-            ('Гулять', true),
-          ],
-        ),
-        (
-          _Search.source,
-          _otherWalk,
-          (WidgetsLocalizations actions) => actions.reorderItemDown,
-          const [_read, _otherWalk, _walk, _swim],
-          const [
-            ('Спать', false),
-            ('Бегать', false),
-            ('Читать', true),
-            ('Гулять', true),
-            ('Гулять', true),
-          ],
-        ),
-        (
-          _Search.participant,
-          _walk,
-          (WidgetsLocalizations actions) => actions.reorderItemToStart,
-          const [_walk, _read, _otherWalk, _swim],
-          const [
-            ('Спать', false),
-            ('Читать', true),
-            ('Гулять', true),
-            ('Гулять', true),
-          ],
-        ),
-      ]) {
-        await _moveWhileOpen(
-          tester,
-          app,
-          moved: moved,
-          action: action,
-          order: order,
-          open: () => _openSearch(tester, app, search),
-          page: search.page,
-          expectedRows: rows,
-        );
-        await _popToRoot(tester, app);
-        await _expectConfirmedHome(tester, app, [
-          for (final intention in order)
-            if (intention != _swim) intention,
-        ]);
+      await tester.pumpAndSettle();
+      _homePosition(tester).jumpTo(_homeOffset);
+      await tester.pumpAndSettle();
+      final initial = [
+        for (var number = 1; number <= _longFavoriteCount; number++) number,
+      ];
+      await _expectConfirmedHome(tester, app, initial);
+      // Строки, с которыми работает сценарий, видны без прокрутки.
+      for (final number in [12, 15, 20]) {
+        expect(_homeRow(number).hitTestable(), findsOneWidget);
       }
 
-      // Перестановка меняет только порядок избранных: намерения с их
-      // временем, связи с приоритетами, дневные выборы, теги и их
-      // назначения сохранены.
-      expect(_storedGraph(app.raw), stored);
-      expect(app.repository.moves, 4);
+      // Первая перестановка: «Избранное 12» — на одно место выше. Запись
+      // отказывает уже после ухода с Главной.
+      app.repository.holdNextMove();
+      app.faults.failNextPlaceWrite();
+      _moveBySemantics(
+        tester,
+        _rowLabel(l10n, _longTitle(12)),
+        (actions) => actions.reorderItemUp,
+      );
+      await _waitFor(tester, () => app.repository.isHoldingMove);
+      await tester.pumpAndSettle();
+      _expectSaving(tester, app, [
+        for (var number = 1; number <= 10; number++) number,
+        12,
+        11,
+        for (var number = 13; number <= _longFavoriteCount; number++) number,
+      ], moved: 12);
+
+      await _depart(tester, departure);
+      const renamed = 'Избранное 20 вечером';
+      if (departure == _Departure.pageAbove) {
+        // Выполняющаяся перестановка не мешает принять операцию намерения.
+        // Её результат публикуется в порядке принятия — после результата
+        // перестановки.
+        await _submitRename(tester, renamed);
+        await _until(tester, find.text(l10n.detailsOperationRunning));
+        expect(app.repository.isHoldingMove, isTrue);
+      }
+      app.repository.releaseMove();
+      final failure = find.text(l10n.favoriteOrderUnavailable);
+      await _until(tester, failure);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_message), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(departure.page), matching: failure),
+        findsOneWidget,
+      );
+      expect(storedFavoriteMarks(app.raw), _places(initial));
+      if (departure == _Departure.pageAbove) {
+        await _hideMessage(tester);
+        await _until(
+          tester,
+          find.descendant(
+            of: find.byKey(_message),
+            matching: find.textContaining(renamed),
+          ),
+        );
+        expect(failure, findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(IntentionDetailsPage),
+            matching: find.text(renamed),
+          ),
+          findsOneWidget,
+        );
+      }
+      await _closeMessage(tester);
+
+      // Отказ не предъявляется повторно при возвращении на Главную, а
+      // Главная показывает последний подтверждённый порядок.
+      await _returnHome(tester, departure);
+      await _expectConfirmedHome(tester, app, initial);
+      expect(_homePosition(tester).pixels, _homeOffset);
+      if (departure == _Departure.pageAbove) {
+        expect(_homeTitle(app, 20), renamed);
+      }
+
+      // Вторая перестановка: «Избранное 15» — на одно место ниже.
+      final reordered = [
+        for (var number = 1; number <= 14; number++) number,
+        16,
+        15,
+        for (var number = 17; number <= _longFavoriteCount; number++) number,
+      ];
+      app.repository.holdNextMove();
+      _moveBySemantics(
+        tester,
+        _rowLabel(l10n, _longTitle(15)),
+        (actions) => actions.reorderItemDown,
+      );
+      await _waitFor(tester, () => app.repository.isHoldingMove);
+      await tester.pumpAndSettle();
+      _expectSaving(tester, app, reordered, moved: 15);
+
+      await _depart(tester, departure);
+      app.repository.releaseMove();
+      await _waitFor(
+        tester,
+        () => listEquals(storedFavoriteMarks(app.raw), _places(reordered)),
+      );
+      // Главная согласуется, пока закрыта, а успех сообщения не получает.
+      await _waitFor(tester, () => _isConfirmed(app, reordered));
+      await _settle(tester);
+      expect(_builtMessages, findsNothing);
+
+      await _returnHome(tester, departure);
+      await _expectConfirmedHome(tester, app, reordered);
+      expect(_homePosition(tester).pixels, _homeOffset);
+      expect(app.repository.moves, 2);
+
+      // Параметры каталогов не изменились.
+      await openIntentionGraph(tester, waitFor: _until);
+      await tester.pumpAndSettle();
+      expect(_intentionGraphView(tester), graph);
+      await openDailyChoices(tester, tap: _tap);
+      await _until(tester, find.byType(daily_page.DailyChoiceCatalogPage));
+      await tester.pumpAndSettle();
+      expect(_dailyChoicesView(tester), dailyChoices);
       expect(_builtMessages, findsNothing);
       expect(tester.takeException(), isNull);
       semantics.dispose();
     });
   }
+
+  testWidgets('подтверждённая перестановка не меняет состав, порядок, '
+      'количество и отметки открытых каталога намерений и трёх поисков, а '
+      'намерения, их время, связи, теги и дневные выборы сохраняются', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final app = await _App.start(
+      tester,
+      locale,
+      (database) => _seedGraph(
+        database,
+        favorites: const [_walk, _read, _otherWalk, _swim],
+      ),
+    );
+    final l10n = app.l10n;
+    final stored = _storedGraph(app.raw);
+    await _expectConfirmedHome(tester, app, const [_walk, _read, _otherWalk]);
+
+    // Каталог намерений уже открыт, когда перестановка подтверждается.
+    await openIntentionGraph(
+      tester,
+      waitFor: _until,
+      content: find.text(l10n.catalogTotalCount(5)),
+    );
+    await tester.pumpAndSettle();
+    final catalog = _searchView(
+      tester,
+      catalog_page.IntentionCatalogPage,
+      l10n,
+    );
+    expect(catalog['строки'], [
+      ('Спать', false),
+      ('Бегать', false),
+      ('Читать', true),
+      ('Гулять', true),
+      ('Гулять', true),
+    ]);
+    await openHome(tester, waitFor: _until);
+    await _moveWhileOpen(
+      tester,
+      app,
+      moved: _otherWalk,
+      action: (actions) => actions.reorderItemToStart,
+      order: const [_otherWalk, _walk, _read, _swim],
+      open: () => openIntentionGraph(tester, waitFor: _until),
+      page: catalog_page.IntentionCatalogPage,
+      expected: catalog,
+    );
+    await openHome(tester, waitFor: _until);
+    await _expectConfirmedHome(tester, app, const [_otherWalk, _walk, _read]);
+
+    // Каждый поиск открыт поверх Главной, когда перестановка
+    // подтверждается.
+    for (final (search, moved, action, order, rows) in [
+      (
+        _Search.action,
+        _read,
+        (WidgetsLocalizations actions) => actions.reorderItemUp,
+        const [_otherWalk, _read, _walk, _swim],
+        const [
+          ('Спать', false),
+          ('Бегать', false),
+          ('Читать', true),
+          ('Гулять', true),
+        ],
+      ),
+      (
+        _Search.source,
+        _otherWalk,
+        (WidgetsLocalizations actions) => actions.reorderItemDown,
+        const [_read, _otherWalk, _walk, _swim],
+        const [
+          ('Спать', false),
+          ('Бегать', false),
+          ('Читать', true),
+          ('Гулять', true),
+          ('Гулять', true),
+        ],
+      ),
+      (
+        _Search.participant,
+        _walk,
+        (WidgetsLocalizations actions) => actions.reorderItemToStart,
+        const [_walk, _read, _otherWalk, _swim],
+        const [
+          ('Спать', false),
+          ('Читать', true),
+          ('Гулять', true),
+          ('Гулять', true),
+        ],
+      ),
+    ]) {
+      await _moveWhileOpen(
+        tester,
+        app,
+        moved: moved,
+        action: action,
+        order: order,
+        open: () => _openSearch(tester, app, search),
+        page: search.page,
+        expectedRows: rows,
+      );
+      await _popToRoot(tester, app);
+      await _expectConfirmedHome(tester, app, [
+        for (final intention in order)
+          if (intention != _swim) intention,
+      ]);
+    }
+
+    // Перестановка меняет только порядок избранных: намерения с их
+    // временем, связи с приоритетами, дневные выборы, теги и их
+    // назначения сохранены.
+    expect(_storedGraph(app.raw), stored);
+    expect(app.repository.moves, 4);
+    expect(_builtMessages, findsNothing);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 }
 
 /// Запущенное приложение на постоянном хранилище [LocalDatabaseHarness] с
@@ -987,9 +986,6 @@ void _moveBySemantics(
 /// страницу «Избранное 20».
 Future<void> _depart(WidgetTester tester, _Departure departure) async {
   switch (departure) {
-    case _Departure.dailyChoices:
-      await openDailyChoices(tester, tap: _tap);
-      await _until(tester, find.byType(daily_page.DailyChoiceCatalogPage));
     case _Departure.intentionGraph:
       await openIntentionGraph(tester, waitFor: _until);
     case _Departure.pageAbove:
@@ -1005,7 +1001,7 @@ Future<void> _depart(WidgetTester tester, _Departure departure) async {
 /// Возвращается на Главную тем же путём, каким с неё ушёл.
 Future<void> _returnHome(WidgetTester tester, _Departure departure) async {
   switch (departure) {
-    case _Departure.dailyChoices || _Departure.intentionGraph:
+    case _Departure.intentionGraph:
       await openHome(tester, waitFor: _until);
     case _Departure.pageAbove:
       await _closeTop(tester, IntentionDetailsPage);

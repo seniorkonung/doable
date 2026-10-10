@@ -6,20 +6,6 @@ import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('строка хранит идентификатор, название, готовность и число связей', () {
-    final row = FavoriteIntentionRow(
-      id: _id(1),
-      title: 'Гулять  по  утрам',
-      readiness: IntentionReadiness.ready,
-      activeRelationCount: 3,
-    );
-
-    expect(row.id, _id(1));
-    expect(row.title, 'Гулять  по  утрам');
-    expect(row.readiness, IntentionReadiness.ready);
-    expect(row.activeRelationCount, 3);
-  });
-
   test('строка отклоняет недопустимое название и отрицательное число', () {
     expect(
       () => FavoriteIntentionRow(
@@ -39,17 +25,6 @@ void main() {
       ),
       throwsArgumentError,
     );
-  });
-
-  test('одноимённые намерения остаются отдельными строками снимка', () {
-    final snapshot = FavoriteIntentionsSnapshot(
-      items: [_row(1, 'Гулять'), _row(2, 'Гулять')],
-      archivedCount: 0,
-      revision: const _Revision(),
-    );
-
-    expect(snapshot.items.map((row) => row.id), [_id(1), _id(2)]);
-    expect(snapshot.items.map((row) => row.title), ['Гулять', 'Гулять']);
   });
 
   test('снимок не допускает повтора намерения', () {

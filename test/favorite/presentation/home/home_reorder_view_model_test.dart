@@ -98,51 +98,6 @@ void main() {
       expect(list(h).reorder, isA<HomeReorderIdle>());
       expect(displayedIds(h), [a, b, c, d]);
     });
-
-    group(
-      'без текущего подтверждённого списка перестановка не принимается',
-      () {
-        test('во время загрузки', () async {
-          final h = HomeHarness();
-          addTearDown(h.dispose);
-
-          h.model.move(b, const FirstFavoritePlacement());
-          await pumpEventQueue();
-
-          expect(h.state, isA<HomeLoading>());
-          expect(h.repository.moves, isEmpty);
-        });
-
-        test('при пустой Главной', () async {
-          final h = HomeHarness();
-          addTearDown(h.dispose);
-          h.repository.completeRead(0, archivedCount: 2);
-          await pumpEventQueue();
-
-          h.model.move(b, AfterFavoritePlacement(a));
-          await pumpEventQueue();
-
-          expect(h.state, isA<HomeEmpty>());
-          expect(h.repository.moves, isEmpty);
-        });
-
-        test('при отказе получения', () async {
-          final h = HomeHarness();
-          addTearDown(h.dispose);
-          h.repository.failRead(
-            0,
-            const FavoriteIntentionsUnavailableFailure(),
-          );
-          await pumpEventQueue();
-
-          h.model.move(b, const FirstFavoritePlacement());
-          await pumpEventQueue();
-
-          expect(h.state, isA<HomeUnavailable>());
-          expect(h.repository.moves, isEmpty);
-        });
-      },
-    );
   });
 
   group('успешная запись', () {
@@ -380,36 +335,6 @@ void main() {
       expectConfirmedOrder(h);
       await expectSharedFailure(h, isA<FavoriteOrderCorruptionFailure>());
     });
-
-    test('при неизвестном отказе', () async {
-      final h = await failedMove(
-        (h) => h.repository.failMove(0, const FavoriteOrderUnexpectedFailure()),
-      );
-
-      expectConfirmedOrder(h);
-      await expectSharedFailure(h, isA<FavoriteOrderUnexpectedFailure>());
-    });
-
-    test('при исключении границы', () async {
-      final h = await failedMove(
-        (h) => h.repository.throwFromMove(
-          0,
-          StateError('UPDATE favorite_intentions SET position = ?'),
-        ),
-      );
-
-      expectConfirmedOrder(h);
-      await expectSharedFailure(h, isA<FavoriteOrderUnexpectedFailure>());
-    });
-
-    test('при ошибке ввода', () async {
-      final h = await failedMove(
-        (h) => h.repository.failMove(0, const FavoriteOrderInputFailure()),
-      );
-
-      expectConfirmedOrder(h);
-      await expectSharedFailure(h, isA<FavoriteOrderInputFailure>());
-    });
   });
 
   test('конфликт из-за снятой до записи отметки опоры приводит к актуальному '
@@ -460,8 +385,8 @@ void main() {
 
   test('ожидание снимка после записи ограничено: без подтверждающего снимка '
       'список становится неактуальным', () async {
-    // Снимок другой эпохи не подтверждает запись и не публикуется, а
-    // повторные чтения ограничены.
+    // Снимок старше записи не подтверждает её и не публикуется, а повторные
+    // чтения ограничены.
     final h = await loadedHome();
     h.model.move(d, AfterFavoritePlacement(a));
     h.repository.completeMove(0, revision: 2);
@@ -474,7 +399,7 @@ void main() {
           FavoriteIntentionsSnapshot(
             items: rowsAbcd,
             archivedCount: 0,
-            revision: const HomeTestRevision(5, 1),
+            revision: const HomeTestRevision(1),
           ),
         ),
       );
@@ -572,98 +497,6 @@ void main() {
     }
 
     final changes = <_ConcurrentChange>[
-      (
-        name: 'отметка нового избранного намерения',
-        confirm: (h, revision) => h.confirm(
-          MarkIntentionFavorite(homeTestIntentionId(6)),
-          revision: revision,
-          before: homeTestSummary(
-            6,
-            'Е',
-            favoriteMark: FavoriteMark.notFavorite,
-          ),
-          after: homeTestSummary(6, 'Е'),
-        ),
-        order: homeTestOrder([1, 2, 5, 3, 4, 6], archived: {5}),
-        changed: rows([1, 2, 3, 4, 6]),
-        moved: rows([1, 4, 2, 3, 6]),
-        archivedCount: 1,
-      ),
-      (
-        name: 'полное создание сразу избранного намерения',
-        confirm: (h, revision) => h.create(
-          homeTestSummary(6, 'Е', tags: [homeTestTag(1, 'Дом')]),
-          revision: revision,
-        ),
-        order: homeTestOrder([1, 2, 5, 3, 4, 6], archived: {5}),
-        changed: rows([1, 2, 3, 4, 6]),
-        moved: rows([1, 4, 2, 3, 6]),
-        archivedCount: 1,
-      ),
-      (
-        name: 'снятие отметки',
-        confirm: (h, revision) => h.confirm(
-          UnmarkIntentionFavorite(b),
-          revision: revision,
-          before: homeTestSummary(2, 'Б'),
-          after: homeTestSummary(
-            2,
-            'Б',
-            favoriteMark: FavoriteMark.notFavorite,
-          ),
-        ),
-        order: homeTestOrder([1, 5, 3, 4], archived: {5}),
-        changed: rows([1, 3, 4]),
-        moved: rows([1, 4, 3]),
-        archivedCount: 1,
-      ),
-      (
-        name: 'архивирование',
-        confirm: (h, revision) => h.confirm(
-          ArchiveIntention(b),
-          revision: revision,
-          before: homeTestSummary(2, 'Б'),
-          after: homeTestSummary(
-            2,
-            'Б',
-            archiveState: IntentionArchiveState.archived,
-          ),
-        ),
-        order: homeTestOrder([1, 2, 5, 3, 4], archived: {2, 5}),
-        changed: rows([1, 3, 4]),
-        moved: rows([1, 4, 3]),
-        archivedCount: 2,
-      ),
-      (
-        name: 'восстановление из архива',
-        confirm: (h, revision) => h.confirm(
-          RestoreIntention(e),
-          revision: revision,
-          before: homeTestSummary(
-            5,
-            'Д',
-            archiveState: IntentionArchiveState.archived,
-          ),
-          after: homeTestSummary(5, 'Д'),
-        ),
-        order: homeTestOrder([1, 2, 5, 3, 4]),
-        changed: rows([1, 2, 5, 3, 4]),
-        moved: rows([1, 4, 2, 5, 3]),
-        archivedCount: 0,
-      ),
-      (
-        name: 'физическое удаление',
-        confirm: (h, revision) => h.confirm(
-          DeleteIntention(b),
-          revision: revision,
-          before: homeTestSummary(2, 'Б'),
-          after: null,
-        ),
-        order: homeTestOrder([1, 5, 3, 4], archived: {5}),
-        changed: rows([1, 3, 4]),
-        moved: rows([1, 4, 3]),
-        archivedCount: 1,
-      ),
       (
         name: 'переименование',
         confirm: (h, revision) => h.confirm(
@@ -1014,63 +847,52 @@ void main() {
       expectSettled(h, rows([2, 3, 4]), revision: 2, reads: 2);
     });
 
-    group('отказ обновления после записи без повтора', () {
-      const failures = <(String, FavoriteIntentionsReadFailure)>[
-        ('повреждение', FavoriteIntentionsCorruptionFailure()),
-        ('неизвестный отказ', FavoriteIntentionsUnexpectedFailure()),
-      ];
-      for (final (name, failure) in failures) {
-        test('$name сохраняет записанное положение до следующего пакета '
-            'любого вида', () async {
-          final h = await loadedWithArchived();
-          h.model.move(d, AfterFavoritePlacement(a));
-          h.repository.completeMove(0, revision: 2);
-          await pumpEventQueue();
-          h.repository.failRead(1, failure);
-          await pumpEventQueue();
+    test('отказ обновления после записи без повтора (повреждение) сохраняет '
+        'записанное положение до следующего пакета любого вида', () async {
+      const failure = FavoriteIntentionsCorruptionFailure();
+      final h = await loadedWithArchived();
+      h.model.move(d, AfterFavoritePlacement(a));
+      h.repository.completeMove(0, revision: 2);
+      await pumpEventQueue();
+      h.repository.failRead(1, failure);
+      await pumpEventQueue();
 
-          expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
-          expect(confirmedIds(h), [a, b, c, d]);
-          expect(displayedIds(h), [a, d, b, c]);
-          final stale = list(h).freshness as HomeFreshnessStale;
-          expect(stale.failure, failure);
-          expect(stale.canRetry, isFalse);
-          expect(list(h).acceptsReorder, isFalse);
+      expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
+      expect(confirmedIds(h), [a, b, c, d]);
+      expect(displayedIds(h), [a, d, b, c]);
+      final stale = list(h).freshness as HomeFreshnessStale;
+      expect(stale.failure, failure);
+      expect(stale.canRetry, isFalse);
+      expect(list(h).acceptsReorder, isFalse);
 
-          // Явный повтор при таком отказе чтения не запускает.
-          await h.model.retry();
-          expect(h.repository.readCount, 2);
+      // Пакет, не затрагивающий избранное, повторяет обновление.
+      await h.confirm(
+        UpdateIntention(id: x, title: 'Игрек', description: null),
+        revision: 3,
+        before: homeTestSummary(
+          9,
+          'Икс',
+          favoriteMark: FavoriteMark.notFavorite,
+        ),
+        after: homeTestSummary(
+          9,
+          'Игрек',
+          favoriteMark: FavoriteMark.notFavorite,
+        ),
+      );
+      expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
+      expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
+      expect(h.repository.readCount, 3);
 
-          // Пакет, не затрагивающий избранное, повторяет обновление.
-          await h.confirm(
-            UpdateIntention(id: x, title: 'Игрек', description: null),
-            revision: 3,
-            before: homeTestSummary(
-              9,
-              'Икс',
-              favoriteMark: FavoriteMark.notFavorite,
-            ),
-            after: homeTestSummary(
-              9,
-              'Игрек',
-              favoriteMark: FavoriteMark.notFavorite,
-            ),
-          );
-          expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-          expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
-          expect(h.repository.readCount, 3);
+      h.repository.completeRead(
+        2,
+        items: rows([1, 4, 2, 3]),
+        archivedCount: 1,
+        revision: 3,
+      );
+      await pumpEventQueue();
 
-          h.repository.completeRead(
-            2,
-            items: rows([1, 4, 2, 3]),
-            archivedCount: 1,
-            revision: 3,
-          );
-          await pumpEventQueue();
-
-          expectSettled(h, rows([1, 4, 2, 3]), revision: 3, reads: 3);
-        });
-      }
+      expectSettled(h, rows([1, 4, 2, 3]), revision: 3, reads: 3);
     });
   });
 

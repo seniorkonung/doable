@@ -79,71 +79,69 @@ const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    final code = locale.languageCode;
+  // Сценарий от языка не зависит: тексты Главной в обеих локалях проверяет
+  // home_accessibility_test.
+  const locale = Locale('ru');
 
-    testWidgets('место без существующего намерения даёт на Главной отдельное '
-        'неповторяемое повреждение, а каталог намерений, поиски и страница '
-        'намерения продолжают работать с целостными отметками на $code', (
+  testWidgets('место без существующего намерения даёт на Главной отдельное '
+      'неповторяемое повреждение, а каталог намерений, поиски и страница '
+      'намерения продолжают работать с целостными отметками', (tester) async {
+    final install = await _install(tester, locale);
+    final l10n = install.l10n;
+    final app = await _launch(
       tester,
-    ) async {
-      final install = await _install(tester, locale);
-      final l10n = install.l10n;
-      final app = await _launch(
-        tester,
-        install,
-        seed: (database) {
-          _seedGraph(database, favorites: const [_walk, _read]);
-          storeFavoritePlaceWithoutIntention(
-            database,
-            intentionId: tagFixtureId(_missing),
-            position: 3,
-          );
-        },
-      );
-      _expectCorruption(tester, l10n);
-      // Повреждение не исправляется: место без намерения остаётся.
-      final marks = [
-        (tagFixtureId(_walk), 1),
-        (tagFixtureId(_read), 2),
-        (tagFixtureId(_missing), 3),
-      ];
-      expect(storedFavoriteMarks(app.raw), marks);
+      install,
+      seed: (database) {
+        _seedGraph(database, favorites: const [_walk, _read]);
+        storeFavoritePlaceWithoutIntention(
+          database,
+          intentionId: tagFixtureId(_missing),
+          position: 3,
+        );
+      },
+    );
+    _expectCorruption(tester, l10n);
+    // Повреждение не исправляется: место без намерения остаётся.
+    final marks = [
+      (tagFixtureId(_walk), 1),
+      (tagFixtureId(_read), 2),
+      (tagFixtureId(_missing), 3),
+    ];
+    expect(storedFavoriteMarks(app.raw), marks);
 
-      // Каталог намерений и три поиска показывают целостные отметки.
-      await _select(tester, AppDestination.intentionGraph);
-      await _expectSearches(tester, app, l10n);
+    // Каталог намерений и три поиска показывают целостные отметки.
+    await _select(tester, AppDestination.intentionGraph);
+    await _expectSearches(tester, app, l10n);
 
-      // Страница избранного намерения показывает его отметку, а отметка
-      // другого намерения подтверждается и видна в каталоге.
-      await _openFromCatalog(tester, _walk);
-      expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
-      await _closeDetails(tester);
-      final reads = install.homeReads.reads;
-      await _openFromCatalog(tester, _run);
-      expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
-      await _toggleMark(tester);
-      expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
-      await _closeDetails(tester);
-      await _expectStars(
-        tester,
-        IntentionCatalogPage,
-        l10n,
-        shown: _titles.keys.toList(),
-        favorites: const {_walk, _read, _run},
-      );
-      expect(storedFavoriteMarks(app.raw), [...marks, (tagFixtureId(_run), 4)]);
+    // Страница избранного намерения показывает его отметку, а отметка
+    // другого намерения подтверждается и видна в каталоге.
+    await _openFromCatalog(tester, _walk);
+    expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
+    await _closeDetails(tester);
+    final reads = install.homeReads.reads;
+    await _openFromCatalog(tester, _run);
+    expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
+    await _toggleMark(tester);
+    expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
+    await _closeDetails(tester);
+    await _expectStars(
+      tester,
+      IntentionCatalogPage,
+      l10n,
+      shown: _titles.keys.toList(),
+      favorites: const {_walk, _read, _run},
+    );
+    expect(storedFavoriteMarks(app.raw), [...marks, (tagFixtureId(_run), 4)]);
 
-      // Подтверждённое изменение избранного перечитывает список, и
-      // повреждение остаётся отдельным результатом, а не списком с
-      // пропуском.
-      await _waitFor(tester, () => install.homeReads.reads > reads);
-      await _select(tester, AppDestination.home);
-      _expectCorruption(tester, l10n);
-      expect(find.byKey(_message), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-  }
+    // Подтверждённое изменение избранного перечитывает список, и
+    // повреждение остаётся отдельным результатом, а не списком с
+    // пропуском.
+    await _waitFor(tester, () => install.homeReads.reads > reads);
+    await _select(tester, AppDestination.home);
+    _expectCorruption(tester, l10n);
+    expect(find.byKey(_message), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 /// Установка приложения: постоянное хранилище и наблюдение чтений списка

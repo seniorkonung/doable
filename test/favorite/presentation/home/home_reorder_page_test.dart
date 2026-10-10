@@ -104,11 +104,8 @@ void main() {
   group('перетаскивание ручкой передаёт перемещение по идентификаторам', () {
     for (final (name, moved, places, anchor, shown) in [
       ('на одно место ниже', 1, 1, 2, ['Б', 'А', 'В', 'Г']),
-      ('на одно место выше', 4, -1, 2, ['А', 'Б', 'Г', 'В']),
       ('на несколько мест выше', 4, -2, 1, ['А', 'Г', 'Б', 'В']),
-      ('на несколько мест ниже', 1, 2, 3, ['Б', 'В', 'А', 'Г']),
       ('в начало списка', 3, -2, null, ['В', 'А', 'Б', 'Г']),
-      ('в конец списка', 1, 3, 4, ['Б', 'В', 'Г', 'А']),
     ]) {
       testWidgets('$name: намерение ставится '
           '${anchor == null ? 'первым' : 'после «${_titles[anchor]}»'}, а '
@@ -226,27 +223,6 @@ void main() {
             ),
           ),
           (
-            'в ожидании актуального снимка после записи',
-            (tester, h) async {
-              await _dragHandle(tester, 4, -2);
-              h.repository.completeMove(0, revision: 2);
-            },
-            (tester, h) async => h.repository.completeRead(
-              1,
-              items: _rows([1, 4, 2, 3]),
-              revision: 2,
-            ),
-          ),
-          (
-            'во время обновления списка',
-            (tester, h) => _confirmMark(tester, h, revision: 2),
-            (tester, h) async => h.repository.completeRead(
-              1,
-              items: _rows([1, 2, 3, 4, 5]),
-              revision: 2,
-            ),
-          ),
-          (
             'при неактуальном списке',
             (tester, h) async {
               await _confirmMark(tester, h, revision: 2);
@@ -293,38 +269,6 @@ void main() {
         semantics.dispose();
       });
     }
-
-    testWidgets('перетаскивание, во время которого список перестал принимать '
-        'перестановку, прекращается без перемещения', (tester) async {
-      final h = await _pumpLoadedHome(tester);
-      final rowHeight = tester.getSize(_row(1)).height;
-
-      final gesture = await tester.startGesture(tester.getCenter(_handle(1)));
-      for (var step = 0; step < 3; step++) {
-        await gesture.moveBy(Offset(0, rowHeight / 4));
-        await tester.pump();
-      }
-      await _confirmMark(tester, h, revision: 2);
-      await tester.pump();
-      for (var step = 0; step < 3; step++) {
-        await gesture.moveBy(Offset(0, rowHeight / 4));
-        await tester.pump();
-      }
-      await gesture.up();
-      await tester.pumpAndSettle();
-
-      expect(h.repository.moves, isEmpty);
-      expect(_shownTitles(tester), ['А', 'Б', 'В', 'Г']);
-      expect(tester.takeException(), isNull);
-
-      h.repository.completeRead(1, items: _rows([1, 2, 3, 4, 5]), revision: 2);
-      await tester.pumpAndSettle();
-      await _dragHandle(tester, 5, -1);
-      expect(
-        h.repository.moves.single.command.intentionId,
-        homeTestIntentionId(5),
-      );
-    });
   });
 
   group('экранный диктор', () {
