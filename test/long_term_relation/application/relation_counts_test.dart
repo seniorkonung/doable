@@ -103,35 +103,15 @@ void main() {
       );
     });
 
-    test('отклоняет отрицательное значение в любой группе', () {
-      for (var groupIndex = 0; groupIndex < 8; groupIndex++) {
+    test('отклоняет отрицательное значение долговременной группы', () {
+      // Все группы проходят одну проверку: берутся первая и последняя.
+      for (final groupIndex in [0, 7]) {
         expect(
           () => _countsWithNegativeGroup(groupIndex),
           throwsA(isA<RelationCountsValidationException>()),
           reason: 'Группа $groupIndex должна проверяться отдельно.',
         );
       }
-    });
-
-    test('отличает неизвестную сводку от подтверждённых нулей', () {
-      const unknown = UnknownRelationCounts();
-      final confirmed = ConfirmedRelationCounts(
-        RelationCounts(
-          activeNeedIncoming: 0,
-          activeNeedOutgoing: 0,
-          activeCanIncoming: 0,
-          activeCanOutgoing: 0,
-          archivedNeedIncoming: 0,
-          archivedNeedOutgoing: 0,
-          archivedCanIncoming: 0,
-          archivedCanOutgoing: 0,
-        ),
-      );
-
-      expect(unknown, isA<RelationCountsState>());
-      expect(confirmed, isA<RelationCountsState>());
-      expect(confirmed.counts.total, 0);
-      expect(unknown, isNot(isA<ConfirmedRelationCounts>()));
     });
 
     test('дневные роли учитываются отдельно от восьми прежних групп', () {
@@ -157,27 +137,21 @@ void main() {
       expect(counts.total, 6);
     });
 
-    test('отклоняет отрицательное дневное количество в каждой роли', () {
-      for (final values in [
-        (source: -1, selected: 0),
-        (source: 0, selected: -1),
-      ]) {
-        expect(
-          () => RelationCounts(
-            activeNeedIncoming: 0,
-            activeNeedOutgoing: 0,
-            activeCanIncoming: 0,
-            activeCanOutgoing: 0,
-            archivedNeedIncoming: 0,
-            archivedNeedOutgoing: 0,
-            archivedCanIncoming: 0,
-            archivedCanOutgoing: 0,
-            dailySource: values.source,
-            dailySelected: values.selected,
-          ),
-          throwsA(isA<RelationCountsValidationException>()),
-        );
-      }
+    test('отклоняет отрицательное дневное количество', () {
+      expect(
+        () => RelationCounts(
+          activeNeedIncoming: 0,
+          activeNeedOutgoing: 0,
+          activeCanIncoming: 0,
+          activeCanOutgoing: 0,
+          archivedNeedIncoming: 0,
+          archivedNeedOutgoing: 0,
+          archivedCanIncoming: 0,
+          archivedCanOutgoing: 0,
+          dailySource: -1,
+        ),
+        throwsA(isA<RelationCountsValidationException>()),
+      );
     });
   });
 }

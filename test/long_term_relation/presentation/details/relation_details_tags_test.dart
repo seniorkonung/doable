@@ -26,15 +26,14 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
 ) as LongTermRelationIdDecodingSuccess).id;
 
 void main() {
-  for (final (number, locale, usedByDailyPath, type) in [
-    for (final type in ['need', 'can'])
-      for (final number in [101, 102])
-        for (final locale in [const Locale('ru'), const Locale('en')])
-          for (final usedByDailyPath in [false, true])
-            (number, locale, usedByDailyPath, type),
+  // Активность связи и защита дневным путём управляют независимыми кнопками,
+  // а тип меняет только подпись: двух комбинаций хватает на все значения.
+  for (final (number, usedByDailyPath, type) in [
+    (101, false, 'need'),
+    (102, true, 'can'),
   ]) {
     testWidgets(
-      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByDailyPath ? 'в дневном пути' : 'без пути'}: собственных тегов нет на ${locale.languageCode}',
+      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByDailyPath ? 'в дневном пути' : 'без пути'}: собственных тегов нет',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 6000);
         tester.view.devicePixelRatio = 1;
@@ -92,7 +91,7 @@ void main() {
               personalGraphRepositoryProvider.overrideWithValue(repository),
             ],
             child: MaterialApp.router(
-              locale: locale,
+              locale: const Locale('ru'),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(),

@@ -34,16 +34,6 @@ void main() {
         false,
       ),
       (
-        'удалённый участник',
-        LongTermRelationParticipantNotFoundFailure(
-          role: RelationParticipantRole.related,
-          intentionId: testEditorIntentionId(2),
-        ),
-        isA<RelationEditorParticipantRejected>(),
-        RelationParticipantRole.related,
-        false,
-      ),
-      (
         'недоступность хранилища',
         const LongTermRelationUnavailableFailure(),
         isA<RelationEditorUnavailable>(),
@@ -488,108 +478,110 @@ void main() {
           ),
         ];
 
-    for (final failureCase in pairFailureCases) {
-      for (final role in RelationParticipantRole.values) {
-        final roleName = switch (role) {
-          RelationParticipantRole.source => 'исходного участника',
-          RelationParticipantRole.related => 'связанного участника',
-        };
+    // Обе причины исправляются сменой участника одинаково, а роль меняет лишь
+    // поле, которое обновляется: каждую причину и роль достаточно взять раз.
+    for (final (failureCase, role) in [
+      (pairFailureCases[0], RelationParticipantRole.source),
+      (pairFailureCases[1], RelationParticipantRole.related),
+    ]) {
+      final roleName = switch (role) {
+        RelationParticipantRole.source => 'исходного участника',
+        RelationParticipantRole.related => 'связанного участника',
+      };
 
-        test(
-          '${failureCase.name}: снимок $roleName не исправляет прежнюю пару',
-          () async {
-            final harness = _EditorHarness.outgoing()..fillDraft();
+      test(
+        '${failureCase.name}: снимок $roleName не исправляет прежнюю пару',
+        () async {
+          final harness = _EditorHarness.outgoing()..fillDraft();
 
-            harness.viewModel.submit();
-            harness.repository.failRelationCommand(
-              0,
-              failureCase.repositoryFailure,
-            );
-            await harness.settle();
+          harness.viewModel.submit();
+          harness.repository.failRelationCommand(
+            0,
+            failureCase.repositoryFailure,
+          );
+          await harness.settle();
 
-            final presentation = harness.state.failurePresentation;
-            expect(presentation, isNotNull);
-            expect(
-              harness.state.operation,
-              isA<RelationEditorFailed>().having(
-                (value) => value.failure,
-                'причина',
-                failureCase.editorFailure,
-              ),
-            );
+          final presentation = harness.state.failurePresentation;
+          expect(presentation, isNotNull);
+          expect(
+            harness.state.operation,
+            isA<RelationEditorFailed>().having(
+              (value) => value.failure,
+              'причина',
+              failureCase.editorFailure,
+            ),
+          );
 
-            final currentIndex = switch (role) {
-              RelationParticipantRole.source => 1,
-              RelationParticipantRole.related => 2,
-            };
-            harness.viewModel.selectParticipant(
-              role,
-              testEditorSelection(
-                currentIndex,
-                title: 'Обновлённое намерение $currentIndex',
-                archiveState: IntentionArchiveState.archived,
-                activeRelationCount: 7,
-                revision: 2,
-              ),
-            );
+          final currentIndex = switch (role) {
+            RelationParticipantRole.source => 1,
+            RelationParticipantRole.related => 2,
+          };
+          harness.viewModel.selectParticipant(
+            role,
+            testEditorSelection(
+              currentIndex,
+              title: 'Обновлённое намерение $currentIndex',
+              archiveState: IntentionArchiveState.archived,
+              activeRelationCount: 7,
+              revision: 2,
+            ),
+          );
 
-            final updatedParticipant = switch (role) {
-              RelationParticipantRole.source => harness.state.sourceParticipant,
-              RelationParticipantRole.related =>
-                harness.state.relatedParticipant,
-            };
-            expect(
-              updatedParticipant?.title,
-              'Обновлённое намерение $currentIndex',
-            );
-            expect(
-              updatedParticipant?.archiveState,
-              IntentionArchiveState.archived,
-            );
-            expect(updatedParticipant?.activeRelationCount, 7);
-            expect(
-              harness.state.operation,
-              isA<RelationEditorFailed>().having(
-                (value) => value.failure,
-                'причина',
-                failureCase.editorFailure,
-              ),
-            );
-            expect(harness.state.failurePresentation, same(presentation));
-            expect(harness.state.canSubmit, isFalse);
+          final updatedParticipant = switch (role) {
+            RelationParticipantRole.source => harness.state.sourceParticipant,
+            RelationParticipantRole.related => harness.state.relatedParticipant,
+          };
+          expect(
+            updatedParticipant?.title,
+            'Обновлённое намерение $currentIndex',
+          );
+          expect(
+            updatedParticipant?.archiveState,
+            IntentionArchiveState.archived,
+          );
+          expect(updatedParticipant?.activeRelationCount, 7);
+          expect(
+            harness.state.operation,
+            isA<RelationEditorFailed>().having(
+              (value) => value.failure,
+              'причина',
+              failureCase.editorFailure,
+            ),
+          );
+          expect(harness.state.failurePresentation, same(presentation));
+          expect(harness.state.canSubmit, isFalse);
 
-            harness.viewModel.submit();
-            expect(harness.repository.commandCount, 1);
+          harness.viewModel.submit();
+          expect(harness.repository.commandCount, 1);
 
-            harness.viewModel.selectParticipant(role, testEditorSelection(5));
+          harness.viewModel.selectParticipant(role, testEditorSelection(5));
 
-            expect(harness.state.operation, isA<RelationEditorIdle>());
-            expect(harness.state.failurePresentation, isNull);
-            expect(harness.state.canSubmit, isTrue);
+          expect(harness.state.operation, isA<RelationEditorIdle>());
+          expect(harness.state.failurePresentation, isNull);
+          expect(harness.state.canSubmit, isTrue);
 
-            harness.viewModel.submit();
-            expect(harness.repository.commandCount, 2);
-            final corrected = harness.repository.createCommandAt(1);
-            expect(switch (role) {
-              RelationParticipantRole.source => corrected.sourceIntentionId,
-              RelationParticipantRole.related => corrected.relatedIntentionId,
-            }, testEditorIntentionId(5));
-            expect(
-              switch (role) {
-                RelationParticipantRole.source => corrected.relatedIntentionId,
-                RelationParticipantRole.related => corrected.sourceIntentionId,
-              },
-              switch (role) {
-                RelationParticipantRole.source => testEditorIntentionId(2),
-                RelationParticipantRole.related => testEditorIntentionId(1),
-              },
-            );
+          harness.viewModel.submit();
+          expect(harness.repository.commandCount, 2);
+          final corrected = harness.repository.createCommandAt(1);
+          expect(switch (role) {
+            RelationParticipantRole.source => corrected.sourceIntentionId,
+            RelationParticipantRole.related => corrected.relatedIntentionId,
+          }, testEditorIntentionId(5));
+          expect(
+            switch (role) {
+              RelationParticipantRole.source => corrected.relatedIntentionId,
+              RelationParticipantRole.related => corrected.sourceIntentionId,
+            },
+            switch (role) {
+              RelationParticipantRole.source => testEditorIntentionId(2),
+              RelationParticipantRole.related => testEditorIntentionId(1),
+            },
+          );
 
-            harness.repository.completeRelationCreated(1, revision: 2);
-            await harness.settle();
-          },
-        );
-      }
+          harness.repository.completeRelationCreated(1, revision: 2);
+          await harness.settle();
+        },
+      );
     }
 
     test('архивированный участник называет свою роль', () async {

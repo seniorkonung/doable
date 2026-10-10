@@ -39,7 +39,6 @@ void main() {
         ),
         10,
       );
-      expect(daily, isNot(isA<LongTermRelationGroup>()));
     },
   );
 

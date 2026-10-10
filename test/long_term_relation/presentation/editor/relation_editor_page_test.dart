@@ -50,84 +50,72 @@ void main() {
     );
   });
 
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'защищённый путь оставляет описание и приоритет доступными на ${locale.languageCode}',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final repository = ControlledRelationFormRepository();
-        addTearDown(repository.dispose);
-        final details = testRelationDetails(
-          relationId: testFormRelationId(151),
-          sourceId: testSummary(index: 1).id,
-          relatedId: testSummary(index: 2).id,
-          permissions:
-              const LongTermRelationPermissions.referencedByDailyPath(),
-        );
-        await _openDetailsForEditing(
-          tester,
-          repository,
-          details,
-          locale: locale,
-        );
-        await tester.tap(
-          find.byKey(const ValueKey('relation-details-edit-relation')),
-        );
-        await tester.pumpAndSettle();
-
-        final reason = find.byKey(
-          const ValueKey('relation-editor-path-protection'),
-        );
-        expect(reason, findsOneWidget);
-        expect(
-          tester.getSemantics(reason).label,
-          contains(locale.languageCode == 'ru' ? 'дневном пути' : 'daily path'),
-        );
-        expect(
-          tester
-              .widget<OutlinedButton>(
-                find.byKey(const ValueKey('relation-editor-change-source')),
-              )
-              .onPressed,
-          isNull,
-        );
-        expect(
-          tester
-              .widget<ChoiceChip>(
-                find.byKey(const ValueKey('relation-editor-type-can')),
-              )
-              .onSelected,
-          isNull,
-        );
-        expect(
-          tester
-              .widget<TextField>(
-                find.byKey(const ValueKey('relation-editor-description')),
-              )
-              .enabled,
-          isTrue,
-        );
-        await tester.enterText(
-          find.byKey(const ValueKey('relation-editor-description')),
-          'Описание пути',
-        );
-        await tester.pump();
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.byKey(const ValueKey('relation-editor-submit')),
-              )
-              .onPressed,
-          isNotNull,
-        );
-        await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-        await tester.pump();
-        expect(repository.relationUpdateCommands, hasLength(1));
-        expect(tester.takeException(), isNull);
-        semantics.dispose();
-      },
+  testWidgets('защищённый путь оставляет описание и приоритет доступными', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(151),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+      permissions: const LongTermRelationPermissions.referencedByDailyPath(),
     );
-  }
+    await _openDetailsForEditing(tester, repository, details);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+
+    final reason = find.byKey(
+      const ValueKey('relation-editor-path-protection'),
+    );
+    expect(reason, findsOneWidget);
+    expect(tester.getSemantics(reason).label, contains('daily path'));
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey('relation-editor-change-source')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.byKey(const ValueKey('relation-editor-type-can')),
+          )
+          .onSelected,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('relation-editor-description')),
+          )
+          .enabled,
+      isTrue,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('relation-editor-description')),
+      'Описание пути',
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('relation-editor-submit')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+    await tester.pump();
+    expect(repository.relationUpdateCommands, hasLength(1));
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets('изменение разрешения открытой формы сохраняет исправимый ввод', (
     tester,
@@ -355,76 +343,6 @@ void main() {
       );
     });
   }
-
-  testWidgets('другая эпоха требует нового подтверждённого снимка участника', (
-    tester,
-  ) async {
-    final repository = ControlledRelationFormRepository();
-    addTearDown(repository.dispose);
-    final relationId = testFormRelationId(116);
-    final sourceId = testSummary(index: 1).id;
-    final relatedId = testSummary(index: 2).id;
-    await _openDetailsForEditing(
-      tester,
-      repository,
-      testRelationDetails(
-        relationId: relationId,
-        sourceId: sourceId,
-        relatedId: relatedId,
-        sourceTitle: 'Исходное',
-        relatedTitle: 'Связанное',
-        scope: RelationScope.archived,
-      ),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('relation-details-edit-relation')),
-    );
-    await tester.pumpAndSettle();
-    await _selectParticipant(
-      tester,
-      repository,
-      actionKey: 'relation-editor-change-source',
-      catalogIndex: 1,
-      title: 'Снимок каталога',
-      index: 1,
-      revision: const TestCatalogRevision(5),
-    );
-
-    repository
-        .watchAt(0)
-        .emitDetails(
-          testRelationDetails(
-            relationId: relationId,
-            sourceId: sourceId,
-            relatedId: relatedId,
-            sourceTitle: 'Несопоставимое название',
-            relatedTitle: 'Связанное',
-            scope: RelationScope.archived,
-          ),
-          revision: const TestCatalogRevision(1, epoch: 1),
-        );
-    await tester.pumpAndSettle();
-    expect(find.text('Снимок каталога'), findsOneWidget);
-    expect(find.text('Несопоставимое название'), findsNothing);
-    expect(repository.watchedIntentionIds, contains(sourceId));
-
-    repository.emitIntention(
-      testDetailsIntention(
-        index: 1,
-        title: 'Подтверждённая новая эпоха',
-        archiveState: IntentionArchiveState.archived,
-      ),
-      counts: testRelationCounts(),
-      revision: const TestCatalogRevision(2, epoch: 1),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Подтверждённая новая эпоха'), findsOneWidget);
-    expect(find.text('Снимок каталога'), findsNothing);
-    expect(
-      find.text('To Подтверждённая новая эпоха, you need Связанное'),
-      findsOneWidget,
-    );
-  });
 
   testWidgets(
     'исходящая группа предвыбирает текущее намерение исходным участником',

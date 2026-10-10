@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui' show CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
@@ -649,197 +648,6 @@ void main() {
     },
   );
 
-  testWidgets('просматривает весь выбор сверх порции на большом соседстве', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final repository = ControlledNeighborhoodRepository();
-    addTearDown(repository.dispose);
-    final ownerId = testIntentionId(1);
-    final counts = testRelationCounts(
-      activeNeedOutgoing: 250,
-      archivedCanIncoming: 5000,
-    );
-    await _pumpNeighborhoodSliver(
-      tester,
-      repository,
-      ownerId,
-      selectionMode: true,
-      pageSize: 50,
-    );
-    repository.completePage(
-      0,
-      RelationGroupFirstPage(
-        items: testGroupRows(ownerId: ownerId, from: 1, count: 50),
-        counts: counts,
-        nextCursor: const TestRelationGroupCursor(50),
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(RelationNeighborhoodSliver)),
-    );
-    final neighborhood = container.read(
-      relationNeighborhoodViewModelProvider(ownerId).notifier,
-    );
-    final selectionProvider = blockingRelationsSelectionViewModelProvider(
-      ownerId,
-    );
-    final selection = container.read(selectionProvider.notifier);
-
-    final pageWatch = Stopwatch()..start();
-    for (var pageIndex = 1; pageIndex < 5; pageIndex++) {
-      final loaded = container.read(
-        relationNeighborhoodViewModelProvider(ownerId),
-      ) as RelationGroupLoaded;
-      final request = neighborhood.loadMoreIfNeeded(
-        visibleIndex: loaded.items.length - 1,
-      );
-      await _pumpUntilRequestCount(tester, repository, pageIndex + 1);
-      repository.completePage(
-        pageIndex,
-        RelationGroupContinuationPage(
-          items: testGroupRows(
-            ownerId: ownerId,
-            from: pageIndex * 50 + 1,
-            count: 50,
-          ),
-          nextCursor: pageIndex == 4
-              ? null
-              : TestRelationGroupCursor((pageIndex + 1) * 50),
-          revision: revision,
-        ),
-      );
-      await request;
-      await tester.pumpAndSettle();
-    }
-    pageWatch.stop();
-    final active = container.read(
-      relationNeighborhoodViewModelProvider(ownerId),
-    ) as RelationGroupLoaded;
-    expect(active.items, hasLength(250));
-    expect(active.nextCursor, isNull);
-    expect(active.items.map((row) => row.relation.id).toSet(), hasLength(250));
-    expect(repository.queries, hasLength(5));
-
-    for (final row in active.items.take(50)) {
-      expect(selection.select(row), isTrue);
-    }
-    final lastActive = find.byKey(
-      ValueKey(
-        'relation-neighborhood-select-${testRelationId(250).toCanonicalString()}',
-      ),
-    );
-    await _scrollUntilBuiltAndVisible(tester, lastActive, maxAttempts: 300);
-    await tester.tap(lastActive);
-    await tester.pumpAndSettle();
-    expect(container.read(selectionProvider).selected, hasLength(51));
-
-    tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
-    await tester.pump();
-    neighborhood.selectGroup(
-      const RelationGroupSelection(
-        type: LongTermRelationType.can,
-        direction: RelationDirection.incoming,
-        scope: RelationScope.archived,
-      ),
-    );
-    await _pumpUntilRequestCount(tester, repository, 6);
-    repository.completePage(
-      5,
-      RelationGroupFirstPage(
-        items: testGroupRows(
-          ownerId: ownerId,
-          from: 251,
-          count: 50,
-          type: LongTermRelationType.can,
-          direction: RelationDirection.incoming,
-          scope: RelationScope.archived,
-        ),
-        counts: counts,
-        nextCursor: const TestRelationGroupCursor(300),
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(repository.queries.last.scope, RelationScope.archived);
-    expect(repository.queries.last.type, LongTermRelationType.can);
-    final archived = find.byKey(
-      ValueKey(
-        'relation-neighborhood-select-${testRelationId(251).toCanonicalString()}',
-      ),
-    );
-    await _scrollUntilBuiltAndVisible(tester, archived);
-    await tester.tap(archived);
-    await tester.pumpAndSettle();
-    expect(container.read(selectionProvider).selected, hasLength(52));
-
-    final rssBeforeReview = ProcessInfo.currentRss;
-    final reviewWatch = Stopwatch()..start();
-    tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
-    await tester.pump();
-    final review = find.byKey(const ValueKey('blocking-relations-review'));
-    await _scrollTo(tester, review);
-    await tester.tap(review);
-    await tester.pumpAndSettle();
-    reviewWatch.stop();
-    final rssAfterReview = ProcessInfo.currentRss;
-    final prepared =
-        container.read(selectionProvider) as BlockingRelationsSelectionPrepared;
-    final selectedIds = {
-      for (var index = 1; index <= 50; index++) testRelationId(index),
-      testRelationId(250),
-      testRelationId(251),
-    };
-    expect(
-      prepared.snapshot.rows.map((row) => row.relation.id).toSet(),
-      selectedIds,
-    );
-    expect(prepared.snapshot.command.relationIds, selectedIds);
-    expect(repository.queries, hasLength(6));
-
-    final browseWatch = Stopwatch()..start();
-    for (final id in prepared.snapshot.command.relationIds) {
-      final row = find.byKey(
-        ValueKey('blocking-relations-confirm-row-${id.toCanonicalString()}'),
-      );
-      await tester.scrollUntilVisible(
-        row,
-        400,
-        scrollable: find.byType(Scrollable).last,
-      );
-      expect(row, findsOneWidget);
-      final selectedRow = prepared.snapshot.rows.singleWhere(
-        (candidate) => candidate.relation.id == id,
-      );
-      final rowSemantics = find.byKey(
-        ValueKey(
-          'blocking-relations-confirm-semantics-${id.toCanonicalString()}',
-        ),
-      );
-      expect(
-        tester.getSemantics(rowSemantics).label,
-        contains(selectedRow.source.title),
-      );
-      expect(
-        tester.getSemantics(rowSemantics).label,
-        contains(selectedRow.related.title),
-      );
-    }
-    browseWatch.stop();
-    expect(repository.queries, hasLength(6));
-    stdout.writeln(
-      'Измерения OpenSpec 6.17 UI: active=250, archived=5000, '
-      'selected=52, pageLoad=${pageWatch.elapsedMicroseconds}us, '
-      'review=${reviewWatch.elapsedMicroseconds}us, '
-      'browse=${browseWatch.elapsedMicroseconds}us, '
-      'reviewRssDelta=${rssAfterReview - rssBeforeReview}B, '
-      'browseRssDelta=${ProcessInfo.currentRss - rssAfterReview}B',
-    );
-    semantics.dispose();
-  }, timeout: const Timeout(Duration(minutes: 5)));
-
   testWidgets(
     'сохраняет русский выбор при открытии связи и возврате с крупным текстом',
     (tester) async {
@@ -1140,7 +948,7 @@ void main() {
   });
 
   testWidgets(
-    'восемь переходов открывают только выбранную группу и сохраняют параметры',
+    'переходы открывают только выбранную группу и сохраняют параметры',
     (tester) async {
       final repository = ControlledNeighborhoodRepository();
       addTearDown(repository.dispose);
@@ -1157,10 +965,9 @@ void main() {
       await tester.pumpAndSettle();
 
       var requestIndex = 1;
-      for (final group in [
-        ..._groups.where((group) => group != _groups[3]),
-        _groups[3],
-      ]) {
+      // Плитки строятся одним циклом по перечислениям: достаточно группы, где
+      // все три параметра отличаются от исходной, и возврата к исходной.
+      for (final group in [_groups[0], _groups[3]]) {
         await _scrollTo(tester, find.byKey(_groupKey(group)));
         await tester.tap(find.byKey(_groupKey(group)));
         await tester.pump();

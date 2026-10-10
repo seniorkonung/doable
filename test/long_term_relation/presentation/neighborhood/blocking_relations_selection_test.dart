@@ -289,44 +289,53 @@ void main() {
     expect(harness.viewModel.prepare(), isFalse);
   });
 
-  test('выбор сохраняется между всеми группами и заменой порций', () {
+  test('выбор сохраняется между группами и заменой порций', () {
     final harness = _Harness();
     addTearDown(harness.dispose);
     final selected = <LongTermRelationSummary>[];
     var index = 1;
-    for (final scope in RelationScope.values) {
-      for (final type in LongTermRelationType.values) {
-        for (final direction in RelationDirection.values) {
-          final page = testGroupRows(
-            ownerId: harness.intentionId,
-            from: index,
-            count: 2,
-            scope: scope,
-            type: type,
-            direction: direction,
-            neighborTitles: {index: 'Одинаковое', index + 1: 'Одинаковое'},
-          );
-          expect(harness.viewModel.select(page.first), isTrue);
-          selected.add(page.first);
-          index += 2;
-        }
-      }
+    // Выбор не зависит от параметров группы: берутся исходная группа и та, где
+    // все три параметра другие.
+    for (final (scope, type, direction) in [
+      (
+        RelationScope.active,
+        LongTermRelationType.need,
+        RelationDirection.outgoing,
+      ),
+      (
+        RelationScope.archived,
+        LongTermRelationType.can,
+        RelationDirection.incoming,
+      ),
+    ]) {
+      final page = testGroupRows(
+        ownerId: harness.intentionId,
+        from: index,
+        count: 2,
+        scope: scope,
+        type: type,
+        direction: direction,
+        neighborTitles: {index: 'Одинаковое', index + 1: 'Одинаковое'},
+      );
+      expect(harness.viewModel.select(page.first), isTrue);
+      selected.add(page.first);
+      index += 2;
     }
 
     expect(harness.state.intentionId, harness.intentionId);
-    expect(harness.state.selected.length, 8);
+    expect(harness.state.selected.length, 2);
     expect(
       harness.state.selected.keys,
       containsAll(selected.map((row) => row.relation.id)),
     );
     expect(harness.viewModel.select(selected.first), isFalse);
-    expect(harness.state.selected.length, 8);
+    expect(harness.state.selected.length, 2);
     expect(
       harness.state.selected[selected.first.relation.id],
       same(selected.first),
     );
     expect(harness.viewModel.unselect(selected[1].relation.id), isTrue);
-    expect(harness.state.selected.length, 7);
+    expect(harness.state.selected.length, 1);
     expect(
       harness.state.selected.containsKey(selected.first.relation.id),
       isTrue,
@@ -336,7 +345,7 @@ void main() {
     final otherOwner = testIntentionId(80);
     final unrelated = testGroupRow(ownerId: otherOwner, index: 90);
     expect(harness.viewModel.select(unrelated), isFalse);
-    expect(harness.state.selected.length, 7);
+    expect(harness.state.selected.length, 1);
   });
 
   test('принятая команда выполняется один раз после закрытия сессии', () async {

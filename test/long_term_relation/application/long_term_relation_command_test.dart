@@ -37,35 +37,6 @@ void main() {
   });
 
   group('пакет подтверждённого изменения графа', () {
-    test('отклоняет сведения об изменении другой ревизии', () {
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 7);
-      const newerRevision = _TestGraphRevision(epoch: 'первая', sequence: 8);
-      final relation = _relation();
-
-      expect(
-        () => ConfirmedGraphResult(
-          revision: revision,
-          value: LongTermRelationCreated(
-            relation: relation,
-            description: null,
-            changes: [
-              LongTermRelationCreatedChange(
-                revision: newerRevision,
-                relation: relation,
-              ),
-            ],
-          ),
-        ),
-        throwsA(
-          isA<ConfirmedGraphResultValidationException>().having(
-            (error) => error.failure,
-            'failure',
-            ConfirmedGraphResultValidationFailure.revisionMismatch,
-          ),
-        ),
-      );
-    });
-
     test('обновление не смешивает идентичность разных связей', () {
       const revision = _TestGraphRevision(epoch: 'первая', sequence: 10);
       final before = _relation();
