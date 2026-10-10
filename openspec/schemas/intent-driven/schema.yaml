@@ -369,7 +369,9 @@ artifacts:
 
       - Follow the supplied template. Use the phase heading as the only new `##`
         heading and checkboxes only for primary tasks. End the package with a tracked
-        checkpoint proving the phase's `Ready to advance` condition.
+        checkpoint that checks the phase's `Ready to advance` condition with the
+        repository's verification commands. Report the results in the session; do
+        not write documents to record them.
 
       - Include strict change validation when implementation affects behaviour
         specs.
