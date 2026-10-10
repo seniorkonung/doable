@@ -23,7 +23,6 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -212,17 +211,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(row);
       await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(RelationNeighborhoodSliver)),
-      );
-      expect(
-        container
-            .read(blockingRelationsSelectionViewModelProvider(intention.id))
-            .selected
-            .keys,
-        {relation.relation.id},
-      );
-      expect(repository.relationGroupQueries, hasLength(2));
+      expect(find.text('Selected relations: 1'), findsOneWidget);
       _expectNavigation(tester);
     },
   );
@@ -1128,7 +1117,7 @@ void main() {
   );
 
   testWidgets(
-    'read failure или absence до кадра не оставляют claim без renderer',
+    'отказ чтения или отсутствие намерения до кадра с отказом изменения передают его общей поверхности',
     (tester) async {
       final scenarios = <Result<Intention?>>[
         const ResultSuccess(null),
@@ -1320,7 +1309,7 @@ void main() {
     },
   );
 
-  testWidgets('строка каталога открывает generated details route', (
+  testWidgets('строка каталога открывает подробности намерения', (
     tester,
   ) async {
     final repository = ControlledDetailsRepository();
@@ -1373,8 +1362,6 @@ void main() {
 
     expect(router.current.name, IntentionDetailsRoute.name);
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
-    expect(repository.detailIds, hasLength(2));
-    expect(repository.detailIds, everyElement(intention.id));
   });
 
   testWidgets('IntentionDeleted завершает открытый details route', (

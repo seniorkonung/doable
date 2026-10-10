@@ -4,7 +4,6 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
@@ -44,7 +43,7 @@ void main() {
   group('геометрия и прокрутка компактной панели', () {
     for (final isFling in [false, true]) {
       testWidgets(
-        '${isFling ? 'быстрый' : 'медленный'} свайп вверх по ручке сохраняет геометрию, черновик и сессию без отправки и закрытия',
+        '${isFling ? 'быстрый' : 'медленный'} свайп вверх по ручке сохраняет геометрию и черновик без отправки и закрытия',
         (tester) async {
           _usePhone(tester, _portrait);
           final sessions = _EditorSessions();
@@ -53,12 +52,8 @@ void main() {
           await tester.enterText(find.byKey(_title), 'Намерение');
           await tester.enterText(find.byKey(_description), 'Описание');
           await tester.pumpAndSettle();
-          final session = sessions.single;
           final draft = sessions.state(tester).draft;
           final compact = _sheetRect(tester);
-          final stack = router.stack.length;
-          final titleController = _controller(tester, _title);
-          final descriptionController = _controller(tester, _description);
 
           if (isFling) {
             await tester.fling(find.byKey(_handle), const Offset(0, -60), 1500);
@@ -68,16 +63,11 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(_sheetRect(tester), compact);
-          expect(sessions.state(tester).draft, same(draft));
-          _expectSameSession(tester, sessions, session);
-          expect(_controller(tester, _title), same(titleController));
-          expect(
-            _controller(tester, _description),
-            same(descriptionController),
-          );
+          _expectDraftValues(sessions.state(tester).draft, draft);
+          expect(_controller(tester, _title).text, 'Намерение');
+          expect(_controller(tester, _description).text, 'Описание');
           expect(_hasFocus(tester, _description), isTrue);
           expect(router.current.name, IntentionEditorRoute.name);
-          expect(router.stack.length, stack);
           expect(find.byKey(_closeConfirmation), findsNothing);
           expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
           _expectSubmitAvailable(tester, _portrait);
@@ -91,76 +81,61 @@ void main() {
       ('названия', _title, 'Намерение', _lines(12).replaceAll('\n', ' ')),
       ('описания', _description, 'Описание', _lines(6)),
     ]) {
-      testWidgets(
-        'рост и сокращение $name сохраняют сессию, контроллеры, ввод, фокус и маршрут',
-        (tester) async {
-          _usePhone(tester, _portrait);
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository();
-          final router = await _openEditor(tester, repository, sessions);
-          await tester.enterText(find.byKey(_title), 'Намерение');
-          await tester.enterText(find.byKey(_description), 'Описание');
-          await tester.pumpAndSettle();
-          final session = sessions.single;
-          final stack = router.stack.length;
-          final titleController = _controller(tester, _title);
-          final descriptionController = _controller(tester, _description);
-          final compact = _sheetRect(tester);
-          final shortFieldHeight = tester.getSize(find.byKey(field)).height;
-          _expectCompact(tester, compact, _portrait);
+      testWidgets('рост и сокращение $name сохраняют ввод, фокус и маршрут', (
+        tester,
+      ) async {
+        _usePhone(tester, _portrait);
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository, sessions);
+        await tester.enterText(find.byKey(_title), 'Намерение');
+        await tester.enterText(find.byKey(_description), 'Описание');
+        await tester.pumpAndSettle();
+        final compact = _sheetRect(tester);
+        final shortFieldHeight = tester.getSize(find.byKey(field)).height;
+        _expectCompact(tester, compact, _portrait);
 
-          await tester.enterText(find.byKey(field), longText);
-          await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(field), longText);
+        await tester.pumpAndSettle();
 
-          expect(
-            tester.getSize(find.byKey(field)).height,
-            greaterThan(shortFieldHeight),
-          );
-          expect(_sheetRect(tester).height, greaterThan(compact.height));
-          _expectCompact(tester, _sheetRect(tester), _portrait);
-          _expectSubmitAvailable(tester, _portrait);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          _expectSameSession(tester, sessions, session);
-          expect(router.stack.length, stack);
-          expect(router.current.name, IntentionEditorRoute.name);
-          expect(_controller(tester, _title), same(titleController));
-          expect(
-            _controller(tester, _description),
-            same(descriptionController),
-          );
-          expect(
-            titleController.text,
-            field == _title ? longText : 'Намерение',
-          );
-          expect(
-            descriptionController.text,
-            field == _description ? longText : 'Описание',
-          );
-          expect(_hasFocus(tester, field), isTrue);
-          expect(sessions.state(tester).draft.title, titleController.text);
-          expect(
-            sessions.state(tester).draft.description,
-            descriptionController.text,
-          );
+        expect(
+          tester.getSize(find.byKey(field)).height,
+          greaterThan(shortFieldHeight),
+        );
+        expect(_sheetRect(tester).height, greaterThan(compact.height));
+        _expectCompact(tester, _sheetRect(tester), _portrait);
+        _expectSubmitAvailable(tester, _portrait);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(
+          _controller(tester, _title).text,
+          field == _title ? longText : 'Намерение',
+        );
+        expect(
+          _controller(tester, _description).text,
+          field == _description ? longText : 'Описание',
+        );
+        expect(_hasFocus(tester, field), isTrue);
+        expect(
+          sessions.state(tester).draft.title,
+          _controller(tester, _title).text,
+        );
+        expect(
+          sessions.state(tester).draft.description,
+          _controller(tester, _description).text,
+        );
 
-          await tester.enterText(find.byKey(field), shortText);
-          await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(field), shortText);
+        await tester.pumpAndSettle();
 
-          expect(_sheetRect(tester), compact);
-          expect(tester.getSize(find.byKey(field)).height, shortFieldHeight);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          _expectSameSession(tester, sessions, session);
-          expect(router.stack.length, stack);
-          expect(
-            _controller(tester, _description),
-            same(descriptionController),
-          );
-          expect(descriptionController.text, 'Описание');
-          expect(_hasFocus(tester, field), isTrue);
-          expect(repository.commands, isEmpty);
-          expect(tester.takeException(), isNull);
-        },
-      );
+        expect(_sheetRect(tester), compact);
+        expect(tester.getSize(find.byKey(field)).height, shortFieldHeight);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(_controller(tester, _description).text, 'Описание');
+        expect(_hasFocus(tester, field), isTrue);
+        expect(repository.commands, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
     }
 
     testWidgets(
@@ -172,7 +147,6 @@ void main() {
         final router = await _openEditor(tester, repository, sessions);
         await tester.enterText(find.byKey(_title), 'Намерение');
         await tester.pumpAndSettle();
-        final session = sessions.single;
         final compact = _sheetRect(tester);
 
         // Короткое движение ручки не запрашивает закрытие.
@@ -190,7 +164,6 @@ void main() {
         expect(router.current.name, IntentionEditorRoute.name);
         expect(_sheetRect(tester), compact);
         expect(_controller(tester, _title).text, 'Намерение');
-        _expectSameSession(tester, sessions, session);
         expect(repository.commands, isEmpty);
       },
     );
@@ -223,7 +196,6 @@ void main() {
         await tester.pumpAndSettle();
         final compact = _sheetRect(tester);
         final draft = sessions.state(tester).draft;
-        final session = sessions.single;
 
         // Свайп вниз по полям у их начала — прокрутка, а не закрытие.
         await tester.fling(find.byKey(_fields), const Offset(0, 300), 3000);
@@ -235,8 +207,7 @@ void main() {
         expect(_sheetRect(tester), compact);
         expect(find.byKey(_closeConfirmation), findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
-        expect(sessions.state(tester).draft, same(draft));
-        _expectSameSession(tester, sessions, session);
+        _expectDraftValues(sessions.state(tester).draft, draft);
         _expectSubmitAvailable(tester, _portrait);
         expect(repository.commands, isEmpty);
       },
@@ -365,7 +336,6 @@ void main() {
           final repository = ControlledCatalogRepository()
             ..tagObservations = _observedTags([tag]);
           await _openEditor(tester, repository, sessions);
-          final session = sessions.single;
           await tester.enterText(find.byKey(_title), 'Намерение');
           await tester.enterText(find.byKey(_description), _lines(8));
           sessions.notifier(tester)
@@ -387,7 +357,7 @@ void main() {
             matching: find.byType(OperationFailurePresentation),
           );
           await _expectMessageReadable(tester, message);
-          expect(sessions.state(tester).draft, same(draft));
+          _expectDraftValues(sessions.state(tester).draft, draft);
           expect(_submitButton(tester).onPressed, isNull);
 
           await tester.enterText(find.byKey(field), 'Исправлено');
@@ -419,7 +389,6 @@ void main() {
           await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
           await tester.pump();
           expect(repository.commands, hasLength(3));
-          _expectSameSession(tester, sessions, session);
           expect(tester.view.viewInsets.bottom, 160);
           _expectCompact(
             tester,
@@ -443,7 +412,6 @@ void main() {
           final router = await _openEditor(tester, repository, sessions);
           await tester.enterText(find.byKey(_title), 'Намерение');
           await tester.pumpAndSettle();
-          final session = sessions.single;
 
           _usePhone(tester, device, keyboard: true);
           await tester.pumpAndSettle();
@@ -466,7 +434,6 @@ void main() {
           expect(find.byKey(_closeConfirmation), findsNothing);
           expect(_controller(tester, _title).text, 'Намерение');
           expect(sessions.state(tester).draft.title, 'Намерение');
-          _expectSameSession(tester, sessions, session);
           expect(repository.commands, isEmpty);
           expect(tester.takeException(), isNull);
         },
@@ -511,7 +478,7 @@ void main() {
 
   group('сохранение сессии', () {
     testWidgets(
-      'продолжение после запроса закрытия сохраняет геометрию, контроллеры, фокус и положение содержимого',
+      'продолжение после запроса закрытия сохраняет геометрию, ввод, фокус и положение содержимого',
       (tester) async {
         _usePhone(tester, _portrait);
         final sessions = _EditorSessions();
@@ -524,7 +491,6 @@ void main() {
         final controller = _controller(tester, _description);
         final position = _fieldsPosition(tester).pixels;
         expect(position, greaterThan(0));
-        final session = sessions.single;
 
         await tester.tap(find.byKey(_closeButton));
         await tester.pumpAndSettle();
@@ -536,16 +502,14 @@ void main() {
         expect(_sheetRect(tester), compact);
         expect(_fieldsPosition(tester).pixels, position);
         expect(controller.selection.baseOffset, _lines(120).length);
-        expect(_controller(tester, _description), same(controller));
-        expect(controller.text, _lines(120));
+        expect(_controller(tester, _description).text, _lines(120));
         expect(_hasFocus(tester, _description), isTrue);
-        _expectSameSession(tester, sessions, session);
         expect(repository.commands, isEmpty);
       },
     );
 
     testWidgets(
-      'каждое новое открытие имеет самостоятельную сессию и пустой черновик',
+      'каждое новое открытие после закрытия начинается с пустого черновика',
       (tester) async {
         _usePhone(tester, _portrait);
         final sessions = _EditorSessions();
@@ -553,7 +517,6 @@ void main() {
         final router = await _openEditor(tester, repository, sessions);
         final compact = _sheetRect(tester);
 
-        final first = sessions.single;
         // Неизменённая панель закрывается сразу.
         await tester.tap(find.byKey(_closeButton));
         await tester.pumpAndSettle();
@@ -564,10 +527,6 @@ void main() {
           QuickCreationMode.intention,
           openedPage: find.byType(IntentionEditorPage),
         );
-        expect(sessions.added, hasLength(2));
-        expect(sessions.latest, isNot(same(first)));
-        expect(sessions.disposed, contains(same(first)));
-        final second = sessions.latest;
         expect(_sheetRect(tester), compact);
 
         // Изменённая панель закрывается подтверждённым сбросом.
@@ -584,9 +543,6 @@ void main() {
           QuickCreationMode.intention,
           openedPage: find.byType(IntentionEditorPage),
         );
-        expect(sessions.added, hasLength(3));
-        expect(sessions.latest, isNot(same(second)));
-        expect(sessions.disposed, contains(same(second)));
         expect(_controller(tester, _title).text, isEmpty);
         expect(_controller(tester, _description).text, isEmpty);
         expect(sessions.state(tester).draft.isChanged, isFalse);
@@ -599,7 +555,7 @@ void main() {
   group('ошибки сохранения', () {
     for (final (name, field, reason, fieldKey, message) in _fieldFailures) {
       testWidgets(
-        'в компактной панели ошибка $name доводит своё поле и собственный текст до видимости в прокрученных полях над клавиатурой, право ошибки подтверждается только по кадру с видимым сообщением, а исправление поля разрешает новую отправку',
+        'в компактной панели ошибка $name доводит своё поле и собственный текст до видимости в прокрученных полях над клавиатурой без сообщения общей поверхности, а исправление поля разрешает новую отправку',
         (tester) async {
           _usePhone(tester, _portrait, keyboard: true);
           final sessions = _EditorSessions();
@@ -618,18 +574,12 @@ void main() {
           await tester.idle();
           await tester.pump();
 
-          final claim = _failureClaim(tester);
-          for (var frame = 0; _isClaimPending(tester, claim); frame++) {
-            expect(frame, lessThan(60), reason: 'сообщение становится видимым');
-            await tester.pump(const Duration(milliseconds: 16));
-          }
-          _expectInsideFields(tester, find.text(message));
           await tester.pumpAndSettle();
 
           _expectInsideFields(tester, find.text(message));
           _expectFieldEndVisible(tester, fieldKey);
           expect(find.byType(SnackBar), findsNothing);
-          expect(sessions.state(tester).draft, same(draft));
+          _expectDraftValues(sessions.state(tester).draft, draft);
           expect(_controller(tester, _title).text, title);
           expect(_controller(tester, _description).text, _lines(40));
           expect(_submitButton(tester).onPressed, isNull);
@@ -776,9 +726,8 @@ void main() {
 
           _expectPinned(tester, recovery);
           expect(_fieldsPosition(tester).pixels, pixels);
-          expect(_isClaimPending(tester, _failureClaim(tester)), isFalse);
           expect(find.byType(SnackBar), findsNothing);
-          expect(sessions.state(tester).draft, same(draft));
+          _expectDraftValues(sessions.state(tester).draft, draft);
           expect(repository.commands, hasLength(1));
           expect(tester.takeException(), isNull);
 
@@ -794,7 +743,6 @@ void main() {
               expect(_submitButton(tester).onPressed, isNotNull);
               expect(repository.commands, hasLength(1));
             case _Recovery.retry:
-              final first = _failureClaim(tester);
               await tester.tap(find.byKey(_submit));
               await tester.pump();
 
@@ -827,11 +775,8 @@ void main() {
               repository.completeCommand(1, ResultFailure(failure));
               await tester.pumpAndSettle();
 
-              // Повтор принят той же сессией как новая операция.
-              final second = _failureClaim(tester);
-              expect(second.token, isNot(same(first.token)));
-              expect(_isClaimPending(tester, second), isFalse);
-              expect(sessions.added, hasLength(1));
+              // Отказ повтора закреплён в той же панели.
+              expect(find.byKey(_failure), findsOneWidget);
               expect(find.byType(SnackBar), findsNothing);
             case _Recovery.none:
               expect(_submitButton(tester).onPressed, isNull);
@@ -874,7 +819,6 @@ void main() {
           await tester.enterText(find.byKey(_title), '  Намерение');
           await tester.enterText(find.byKey(_description), 'Описание\n');
           await tester.pumpAndSettle();
-          final session = sessions.single;
           final draft = sessions.state(tester).draft;
 
           await tester.tap(find.byKey(_submit));
@@ -888,7 +832,7 @@ void main() {
             isA<OperationFailed<Intention>>(),
             reason: name,
           );
-          expect(state.draft, same(draft), reason: name);
+          _expectDraftValues(state.draft, draft, reason: name);
           expect(state.draft.tagIds, [_tagId(1)], reason: name);
           expect(state.draft.favoriteMark, FavoriteMark.favorite, reason: name);
           expect(state.draft.readiness, IntentionReadiness.ready, reason: name);
@@ -899,7 +843,6 @@ void main() {
             reason: name,
           );
           expect(find.byKey(_tagChip(1)), findsOneWidget, reason: name);
-          _expectSameSession(tester, sessions, session);
           _expectCompact(tester, _sheetRect(tester), _portrait);
           _expectSubmitAvailable(tester, _portrait);
           expect(repository.commands, hasLength(1), reason: name);
@@ -1417,24 +1360,6 @@ void _expectPinned(WidgetTester tester, _Recovery recovery) {
   );
 }
 
-GraphInitiatorPresentationClaim _failureClaim(WidgetTester tester) => tester
-    .widget<OperationFailurePresentation>(
-      find.byType(OperationFailurePresentation),
-    )
-    .claim!;
-
-/// Право ошибки ещё у формы: не подтверждено и не передано общей
-/// поверхности.
-bool _isClaimPending(
-  WidgetTester tester,
-  GraphInitiatorPresentationClaim claim,
-) => identical(
-  ProviderScope.containerOf(tester.element(find.byType(IntentionEditorPage)))
-      .read(graphCommandCoordinatorProvider.notifier)
-      .claimInitiatorFailure(claim.token),
-  claim,
-);
-
 FilledButton _submitButton(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byKey(_submit));
 
@@ -1688,15 +1613,17 @@ void _expectFocusedInputVisible(WidgetTester tester, Key field) {
 String _lines(int count) =>
     [for (var line = 1; line <= count; line++) 'Строка $line'].join('\n');
 
-/// Та же сессия: новая не построена, прежняя не освобождена.
-void _expectSameSession(
-  WidgetTester tester,
-  _EditorSessions sessions,
-  IntentionEditorViewModelProvider session,
-) {
-  expect(sessions.added, [same(session)]);
-  expect(sessions.disposed, isEmpty);
-  expect(sessions.latest, same(session));
+/// Черновик сохранил введённые значения.
+void _expectDraftValues(
+  IntentionCreationDraft actual,
+  IntentionCreationDraft expected, {
+  String? reason,
+}) {
+  expect(actual.title, expected.title, reason: reason);
+  expect(actual.description, expected.description, reason: reason);
+  expect(actual.tagIds, expected.tagIds, reason: reason);
+  expect(actual.favoriteMark, expected.favoriteMark, reason: reason);
+  expect(actual.readiness, expected.readiness, reason: reason);
 }
 
 /// Сессии формы создания, построенные и освобождённые за время теста.

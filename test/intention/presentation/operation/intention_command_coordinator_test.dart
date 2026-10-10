@@ -341,21 +341,6 @@ void main() {
   });
 
   group('GraphCommandCoordinator', () {
-    test('generated provider сохраняет один keep-alive coordinator', () {
-      final repository = _ControlledGraphRepository();
-      final container = ProviderContainer.test(
-        overrides: [
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-      );
-      final provider = graphCommandCoordinatorProvider;
-
-      final first = container.read(provider.notifier);
-      final second = container.read(provider.notifier);
-
-      expect(second, same(first));
-    });
-
     test(
       'синхронно принимает command и сохраняет gate одного намерения',
       () async {

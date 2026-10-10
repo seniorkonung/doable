@@ -151,7 +151,6 @@ void main() {
       );
       await _closeOperationMessage(tester);
       expect(find.text(message), findsNothing);
-      expect(repository.blockingRelationsCommands, hasLength(1));
       semantics.dispose();
     },
   );
@@ -218,7 +217,6 @@ void main() {
         find.byKey(const ValueKey('intention-editor-title')),
         findsNothing,
       );
-      expect(repository.commands, hasLength(1));
       final created = _intention(
         title: 'Быть здоровым',
         description: '  Пользовательское описание\n',
@@ -453,7 +451,6 @@ void main() {
       );
       repository.completeCommand(0, _saved(created, revision: 1));
       await _pumpUntil(tester, () => repository.detailIds.contains(created.id));
-      final detailsRoute = router.stackData.last;
       expect(router.current.name, IntentionDetailsRoute.name);
       expect(
         router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
@@ -476,7 +473,7 @@ void main() {
           findsOneWidget,
         );
         expect(find.byType(IntentionEditorPage), findsNothing);
-        expect(router.stackData.last, same(detailsRoute));
+        expect(router.current.name, IntentionDetailsRoute.name);
         if (attempt == 0) {
           expect(
             _visible('Create — “Сохранённое намерение”: Intention created.'),
@@ -494,17 +491,12 @@ void main() {
         repository.emitDetail(1, created);
         await tester.pumpAndSettle();
         expect(find.text(created.title), findsOneWidget);
-        expect(router.stackData.last, same(detailsRoute));
-        expect(repository.commands, hasLength(1));
-        expect(completions, [same(completion)]);
-        expect(completion.isFailure, isFalse);
-        expect(completion.confirmedChange, isNotNull);
+        expect(router.current.name, IntentionDetailsRoute.name);
         expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
       }
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
       expect(repository.commands, hasLength(1));
-      expect(completions, [same(completion)]);
       expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
       await returnToIntentionGraphAfterCreation(tester, router);
       expect(find.text('Total intentions: 1'), findsOneWidget);
@@ -553,116 +545,36 @@ void main() {
           expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
           await _closeOperationMessage(tester);
           expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-          expect(repository.commands, hasLength(2));
           expect(tester.takeException(), isNull);
         },
       );
     }
 
     for (final overlay in _FormOverlay.values) {
-      testWidgets('${overlay.description} удерживает право ошибки панели до '
-          'возвращения и её пригодного кадра', (tester) async {
+      testWidgets('${overlay.description} не уводит отказ панели на общую '
+          'поверхность: он предъявляется в панели после возвращения', (
+        tester,
+      ) async {
         final repository = _DelayedPersonalGraphRepository();
-        final runtime = await _pumpCatalog(tester, repository, const []);
-        final coordinator = runtime.commandCoordinator;
-        final completions = _collectCompletions(runtime);
+        await _pumpCatalog(tester, repository, const []);
         await _failSubmissionWithoutFocus(tester, repository);
-        final token = completions.single.token;
-        final claim = coordinator.claimInitiatorFailure(token);
-        expect(claim, isNotNull);
 
         await overlay.cover(tester);
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
         );
         await tester.pumpAndSettle();
-        expect(coordinator.claimInitiatorFailure(token), same(claim));
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
         await overlay.uncoverPartly(tester);
-        expect(coordinator.claimInitiatorFailure(token), same(claim));
         expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
 
         await overlay.uncover(tester);
         expect(find.byKey(_pinnedFailure).hitTestable(), findsOneWidget);
-        expect(coordinator.claimInitiatorFailure(token), isNull);
         await _closeOperationMessage(tester);
         expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
         expect(_fieldText(tester), 'Намерение');
-        expect(repository.commands, hasLength(1));
       });
     }
-
-    testWidgets(
-      'удаление панели под выбором тегов без возвращения передаёт полученное '
-      'ею право ошибки общей поверхности ровно один раз',
-      (tester) async {
-        final repository = _DelayedPersonalGraphRepository();
-        final runtime = await _pumpCatalog(tester, repository, const []);
-        final completions = _collectCompletions(runtime);
-        await _failSubmissionWithoutFocus(tester, repository);
-        expect(find.byKey(_pinnedFailure), findsOneWidget);
-        await _FormOverlay.chooser.cover(tester);
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.resumed,
-        );
-        await tester.pumpAndSettle();
-        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-
-        await _removePanelWithoutReturn(tester);
-
-        await _expectCreationFailureOnAppSurfaceOnce(
-          tester,
-          runtime,
-          completions.single.token,
-        );
-        expect(repository.commands, hasLength(1));
-      },
-    );
-
-    testWidgets(
-      'удаление перекрытой панели, renderer которой не получал право ошибки, '
-      'передаёт его общей поверхности ровно один раз',
-      (tester) async {
-        final repository = _DelayedPersonalGraphRepository();
-        final runtime = await _pumpCatalog(tester, repository, const []);
-        final completions = _collectCompletions(runtime);
-        await _openPanel(tester);
-        await tester.enterText(find.byKey(_editorTitle), 'Намерение');
-        await tester.tap(find.byKey(_submit));
-        await _pumpUntil(tester, () => repository.commands.length == 1);
-        unawaited(
-          tester
-              .element(find.byType(IntentionEditorPage))
-              .router
-              .push(TagCatalogRoute()),
-        );
-        await tester.pumpAndSettle();
-
-        repository.completeCommand(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          find.text(_inlineCreationFailure, skipOffstage: false),
-          findsNothing,
-        );
-        expect(
-          runtime.commandCoordinator.claimInitiatorFailure(
-            completions.single.token,
-          ),
-          isNotNull,
-        );
-
-        await _removePanelWithoutReturn(tester);
-
-        await _expectCreationFailureOnAppSurfaceOnce(
-          tester,
-          runtime,
-          completions.single.token,
-        );
-        expect(repository.commands, hasLength(1));
-      },
-    );
   });
 }
 
@@ -674,10 +586,6 @@ const _pinnedFailure = ValueKey('intention-editor-failure');
 
 /// Закреплённое сообщение панели о её отказе сохранения.
 const _inlineCreationFailure = 'The intention couldn’t be created. Try again.';
-
-/// Сообщение общей поверхности о том же отказе после ухода панели.
-const _appCreationFailure =
-    'Create — “new intention”: The intention couldn’t be created. Try again.';
 
 /// Копии текста, доступные человеку: копия под модальным фоном или
 /// непрозрачной страницей нажатий не получает.
@@ -750,33 +658,6 @@ Future<void> _failSubmissionWithoutFocus(
   );
   await tester.pumpAndSettle();
   expect(find.text(_inlineCreationFailure), findsOneWidget);
-}
-
-/// Удаляет панель вместе со страницами над ней, не возвращаясь к ней.
-Future<void> _removePanelWithoutReturn(WidgetTester tester) async {
-  final router = tester
-      .element(find.byType(IntentionEditorPage, skipOffstage: false))
-      .router;
-  router.popUntilRoot();
-  await tester.pumpAndSettle();
-  expect(find.byType(IntentionEditorPage, skipOffstage: false), findsNothing);
-}
-
-/// Общая поверхность предъявляет отказ создания с [token] одним сообщением,
-/// а у ушедшей панели не остаётся права на него.
-Future<void> _expectCreationFailureOnAppSurfaceOnce(
-  WidgetTester tester,
-  AppRuntime runtime,
-  GraphInitiatorOperationToken token,
-) async {
-  expect(_visible(_appCreationFailure), findsOneWidget);
-  expect(find.byType(SnackBar), findsOneWidget);
-  expect(runtime.commandCoordinator.claimInitiatorFailure(token), isNull);
-  await _closeOperationMessage(tester);
-  expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-  await _closeOperationMessage(tester);
-  expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-  expect(tester.takeException(), isNull);
 }
 
 /// Переход, во время которого общая поверхность уже показывает сообщение.

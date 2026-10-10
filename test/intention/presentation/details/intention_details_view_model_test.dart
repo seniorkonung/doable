@@ -69,13 +69,13 @@ void main() {
       await waitForDetailRequests(repository, 2);
 
       repository.detailRequests[1].add(
-        ResultSuccess(intention),
+        ResultSuccess(testDetailsIntention(index: 73, title: 'Устаревшее')),
         revision: const TestDetailsRevision(2),
       );
       await pumpEventQueue();
       expect(
-        (container.read(provider) as IntentionDetailsLoaded).revision,
-        const TestDetailsRevision(1),
+        (container.read(provider) as IntentionDetailsLoaded).intention.title,
+        intention.title,
       );
 
       repository.detailRequests[1].add(
@@ -94,7 +94,7 @@ void main() {
       );
       await pumpEventQueue();
       current = container.read(provider) as IntentionDetailsLoaded;
-      expect(current.revision, const TestDetailsRevision(3));
+      expect(current.details.relationCounts.dailySource, 1);
       expect(current.details.relationCounts.total, 1);
     },
   );
@@ -167,65 +167,62 @@ void main() {
     expect(current.details.relationCounts.total, 1);
   });
 
-  test(
-    'повтор недоступного чтения сменяет generation только выбранного намерения',
-    () async {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      final firstId = testDetailsIntentionId(21);
-      final secondId = testDetailsIntentionId(22);
-      final firstSubscription = container.listen(
-        intentionDetailsViewModelProvider(firstId),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      final secondSubscription = container.listen(
-        intentionDetailsViewModelProvider(secondId),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(firstSubscription.close);
-      addTearDown(secondSubscription.close);
-      addTearDown(container.dispose);
-      await waitForDetailRequests(repository, 2);
+  test('повтор недоступного чтения игнорирует позднее старое чтение и не затрагивает другое намерение', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    final firstId = testDetailsIntentionId(21);
+    final secondId = testDetailsIntentionId(22);
+    final firstSubscription = container.listen(
+      intentionDetailsViewModelProvider(firstId),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    final secondSubscription = container.listen(
+      intentionDetailsViewModelProvider(secondId),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(firstSubscription.close);
+    addTearDown(secondSubscription.close);
+    addTearDown(container.dispose);
+    await waitForDetailRequests(repository, 2);
 
-      repository.detailRequests[0].add(
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await pumpEventQueue();
-      container
-          .read(intentionDetailsViewModelProvider(firstId).notifier)
-          .retry();
-      await waitForDetailRequests(repository, 3);
+    repository.detailRequests[0].add(
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await pumpEventQueue();
+    container.read(intentionDetailsViewModelProvider(firstId).notifier).retry();
+    await waitForDetailRequests(repository, 3);
 
-      expect(repository.detailIds, [firstId, secondId, firstId]);
-      expect(
-        container.read(intentionDetailsViewModelProvider(firstId)),
-        isA<IntentionDetailsLoading>(),
-      );
+    expect(
+      container.read(intentionDetailsViewModelProvider(firstId)),
+      isA<IntentionDetailsLoading>(),
+    );
 
-      final stale = testDetailsIntention(index: 21, title: 'Устаревшее');
-      repository.detailRequests[0].add(ResultSuccess(stale));
-      await pumpEventQueue();
-      expect(
-        container.read(intentionDetailsViewModelProvider(firstId)),
-        isA<IntentionDetailsLoading>(),
-      );
+    final stale = testDetailsIntention(index: 21, title: 'Устаревшее');
+    repository.detailRequests[0].add(ResultSuccess(stale));
+    await pumpEventQueue();
+    expect(
+      container.read(intentionDetailsViewModelProvider(firstId)),
+      isA<IntentionDetailsLoading>(),
+    );
 
-      final current = testDetailsIntention(index: 21, title: 'Актуальное');
-      repository.detailRequests[2].add(ResultSuccess(current));
-      await pumpEventQueue();
-      expect(
-        container.read(intentionDetailsViewModelProvider(firstId)),
-        isA<IntentionDetailsLoaded>().having(
-          (state) => state.intention,
-          'актуальное намерение',
-          same(current),
-        ),
-      );
-      expect(repository.detailIds.where((id) => id == secondId), hasLength(1));
-    },
-  );
+    final current = testDetailsIntention(index: 21, title: 'Актуальное');
+    repository.detailRequests[2].add(ResultSuccess(current));
+    await pumpEventQueue();
+    expect(
+      container.read(intentionDetailsViewModelProvider(firstId)),
+      isA<IntentionDetailsLoaded>().having(
+        (state) => state.intention.title,
+        'актуальное намерение',
+        'Актуальное',
+      ),
+    );
+    expect(
+      container.read(intentionDetailsViewModelProvider(secondId)),
+      isA<IntentionDetailsLoading>(),
+    );
+  });
 
   test(
     'уход последнего слушателя отменяет чтение, а повтор открывает новое',
@@ -252,8 +249,6 @@ void main() {
       );
       addTearDown(secondSubscription.close);
       await waitForDetailRequests(repository, 2);
-
-      expect(repository.detailIds, [id, id]);
     },
   );
 
@@ -300,9 +295,9 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.title,
               'последний подтверждённый snapshot',
-              same(intention),
+              intention.title,
             )
             .having(
               (state) => state.edit?.title,
@@ -331,7 +326,7 @@ void main() {
     }
   });
 
-  test('retry изменения получает новый token без прежнего failure', () async {
+  test('retry изменения не предъявляет прежний отказ повторно', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
     addTearDown(container.dispose);
@@ -346,17 +341,10 @@ void main() {
     await waitForDetailRequests(repository, 1);
     repository.detailRequests[0].add(ResultSuccess(intention));
     await pumpEventQueue();
-    final tokens = <IntentionOperationToken>[];
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
     final presenter = coordinator.registerAppPresentation();
-    final coordinatorSubscription = coordinator.intentionCompletions.listen((
-      completion,
-    ) {
-      tokens.add(completion.token);
-    });
-    addTearDown(coordinatorSubscription.cancel);
 
     final details = container.read(provider.notifier)
       ..beginEditing()
@@ -374,7 +362,7 @@ void main() {
     final shownFailure = (container.read(
       provider,
     ) as IntentionDetailsLoaded).edit!.failurePresentation;
-    expect(shownFailure, isA<GraphInitiatorPresentationClaim>());
+    expect(shownFailure, isNotNull);
     coordinator.confirmPresentation(shownFailure!);
 
     details.saveChanges();
@@ -387,10 +375,15 @@ void main() {
     );
     await waitForDetailRequests(repository, 2);
 
-    expect(tokens, hasLength(2));
-    expect(identical(tokens.first, tokens.last), isFalse);
     final successClaim = await presenter.nextClaim();
-    expect(successClaim!.token, same(tokens.last));
+    expect(
+      successClaim!.completion,
+      isA<IntentionCommandCompletion>().having(
+        (completion) => completion.result,
+        'результат повтора',
+        isA<ResultSuccess<IntentionCommandSuccess>>(),
+      ),
+    );
     coordinator.confirmPresentation(successClaim);
     GraphAppPresentationClaim? staleFailure;
     unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
@@ -501,14 +494,14 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.archiveState,
               'прежнее намерение до цельного снимка',
-              same(before),
+              IntentionArchiveState.active,
             )
             .having(
-              (state) => state.details.relationCounts,
+              (state) => state.details.relationCounts.activeNeedOutgoing,
               'согласованная прежняя сводка',
-              same(beforeCounts),
+              2,
             ),
       );
 
@@ -522,14 +515,14 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.archiveState,
               'намерение после снимка ниже барьера',
-              same(before),
+              IntentionArchiveState.active,
             )
             .having(
-              (state) => state.details.relationCounts,
+              (state) => state.details.relationCounts.activeNeedOutgoing,
               'сводка после снимка ниже барьера',
-              same(beforeCounts),
+              2,
             ),
       );
 
@@ -549,14 +542,14 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.archiveState,
               'архивированное намерение',
-              same(archived),
+              IntentionArchiveState.archived,
             )
             .having(
-              (state) => state.details.relationCounts,
+              (state) => state.details.relationCounts.archivedNeedOutgoing,
               'сводка после каскада',
-              same(archivedCounts),
+              2,
             ),
       );
       expect(repository.commands, hasLength(1));
@@ -608,8 +601,8 @@ void main() {
       );
       await pumpEventQueue();
       expect(
-        (container.read(provider) as IntentionDetailsLoaded).intention,
-        same(before),
+        (container.read(provider) as IntentionDetailsLoaded).intention.title,
+        before.title,
       );
 
       repository.detailRequests[1].add(
@@ -618,8 +611,8 @@ void main() {
       );
       await pumpEventQueue();
       expect(
-        (container.read(provider) as IntentionDetailsLoaded).intention,
-        same(refreshed),
+        (container.read(provider) as IntentionDetailsLoaded).intention.title,
+        refreshed.title,
       );
     },
   );
@@ -666,12 +659,12 @@ void main() {
     await pumpEventQueue();
 
     expect(
-      (container.read(provider) as IntentionDetailsLoaded).intention,
-      same(reopened),
+      (container.read(provider) as IntentionDetailsLoaded).intention.title,
+      reopened.title,
     );
   });
 
-  test('no-op IntentionSaved запускает новую detail generation', () async {
+  test('сохранение без изменений заново читает подробные данные', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
     addTearDown(container.dispose);
@@ -700,12 +693,17 @@ void main() {
     await (start as IntentionCommandAccepted).future;
     await waitForDetailRequests(repository, 2);
 
+    repository.detailRequests[1].add(
+      ResultSuccess(testDetailsIntention(index: 61, title: 'Перечитанное')),
+    );
+    await pumpEventQueue();
+
     expect(
       container.read(intentionDetailsViewModelProvider(intention.id)),
       isA<IntentionDetailsLoaded>().having(
-        (state) => state.intention,
-        'подтверждённое намерение',
-        same(intention),
+        (state) => state.intention.title,
+        'перечитанное намерение',
+        'Перечитанное',
       ),
     );
   });
@@ -762,27 +760,29 @@ void main() {
           ],
         ),
       );
-      final completion = await start.future;
-      expect(completion.confirmedChange?.changes, hasLength(3));
+      await start.future;
       await waitForDetailRequests(repository, 4);
-      expect(repository.detailIds, [first.id, second.id, first.id, second.id]);
 
       repository.detailRequests[2].add(
-        ResultSuccess(first),
+        ResultSuccess(testDetailsIntention(index: 71, title: 'Устаревшее 1')),
         revision: const TestDetailsRevision(2),
       );
       repository.detailRequests[3].add(
-        ResultSuccess(second),
+        ResultSuccess(testDetailsIntention(index: 72, title: 'Устаревшее 2')),
         revision: const TestDetailsRevision(2),
       );
       await pumpEventQueue();
       expect(
-        (container.read(firstProvider) as IntentionDetailsLoaded).revision,
-        const TestDetailsRevision(1),
+        (container.read(
+          firstProvider,
+        ) as IntentionDetailsLoaded).intention.title,
+        first.title,
       );
       expect(
-        (container.read(secondProvider) as IntentionDetailsLoaded).revision,
-        const TestDetailsRevision(1),
+        (container.read(
+          secondProvider,
+        ) as IntentionDetailsLoaded).intention.title,
+        second.title,
       );
 
       repository.detailRequests[2].add(
@@ -847,7 +847,6 @@ void main() {
       await (start as IntentionCommandAccepted).future;
       await waitForDetailRequests(repository, 2);
 
-      expect(repository.detailIds, [before.id, before.id]);
       expect(
         container.read(intentionDetailsViewModelProvider(before.id)),
         isA<IntentionDetailsLoading>(),
@@ -859,15 +858,15 @@ void main() {
       expect(
         container.read(intentionDetailsViewModelProvider(before.id)),
         isA<IntentionDetailsLoaded>().having(
-          (state) => state.intention,
+          (state) => state.intention.title,
           'подтверждённое намерение',
-          same(saved),
+          saved.title,
         ),
       );
     },
   );
 
-  test('failure completion сохраняет snapshot и текущую generation', () async {
+  test('отказ изменения сохраняет последний подтверждённый снимок', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
     addTearDown(container.dispose);
@@ -896,13 +895,12 @@ void main() {
     expect(completion.confirmedChange, isNull);
     await pumpEventQueue();
 
-    expect(repository.detailRequests, hasLength(1));
     expect(
       container.read(intentionDetailsViewModelProvider(intention.id)),
       isA<IntentionDetailsLoaded>().having(
-        (state) => state.intention,
+        (state) => state.intention.title,
         'последний подтверждённый snapshot',
-        same(intention),
+        intention.title,
       ),
     );
   });

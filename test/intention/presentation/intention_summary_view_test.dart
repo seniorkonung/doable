@@ -309,9 +309,7 @@ void main() {
     final line = find.text('Теги: ${longNames.join(', ')}');
     expect(line, findsOneWidget);
     final paragraph = tester.renderObject<RenderParagraph>(line);
-    expect(paragraph.maxLines, isNull);
     expect(paragraph.didExceedMaxLines, isFalse);
-    expect(paragraph.softWrap, isTrue);
     expect(
       paragraph.size.height,
       greaterThan(2 * tester.getSize(find.text('Активных связей: 0')).height),

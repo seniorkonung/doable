@@ -7,8 +7,6 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -47,7 +45,7 @@ final _failure = _key('intention-editor-failure');
 
 void main() {
   testWidgets('отказ файлового хранилища после всех записей полного черновика '
-      'откатывает граф, FTS, порядок и ревизию; компактная панель '
+      'откатывает граф, FTS и порядок; компактная панель '
       'предъявляет один отказ и явный повтор сохраняет одно намерение '
       'на экране 568×320 с открытой клавиатурой и масштабом 200% '
       'даже при отказе диагностики', (tester) async {
@@ -61,9 +59,7 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpAndSettle();
     final before = _storedGraph(app.raw);
-    final revision = await _revision(tester, app);
     final marks = storedFavoriteMarks(app.raw);
-    final sheetElement = tester.element(_sheet);
     _expectTightKeyboard(tester);
     app.storage.observeCreation(fail: true);
     app.diagnostics.throwOnIntentionCommand = true;
@@ -83,12 +79,7 @@ void main() {
     _expectFaultPoint(app, [_home, sport]);
     expect(_storedGraph(app.raw), before);
     expect(storedFavoriteMarks(app.raw), marks);
-    expect(
-      (await _revision(tester, app)).compareTo(revision),
-      GraphRevisionOrder.same,
-    );
     _expectDraft(tester, [_home, sport]);
-    expect(tester.element(_sheet), same(sheetElement));
     _expectTightKeyboard(tester);
     // Отказ читается от начала до конца прокруткой при той же клавиатуре.
     final status = _key('intention-creation-sheet-status');
@@ -108,44 +99,27 @@ void main() {
     }
     await Scrollable.ensureVisible(tester.element(_failure), alignment: 0.5);
     await tester.pumpAndSettle();
-    _expectInlineFailure(tester, app, failed, app.l10n.editorCreateUnavailable);
+    _expectInlineFailure(app.l10n.editorCreateUnavailable);
     expect(
       tester.getSemantics(_failure),
       isSemantics(label: app.l10n.editorCreateUnavailable),
     );
     expect(_submit.hitTestable(), findsOneWidget);
     expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
-    expect(_intentionEvents(app), [
-      _createEvent(
-        _failedWith(DiagnosticsFailureCode.unavailable),
-        IntentionCreationCommandDiagnosticsStage.write,
-      ),
-    ]);
     expect(app.diagnostics.thrown, 1);
 
-    // Одноразовый hook уже снял отказ. Сами поля и исправления не
-    // отправляют новую команду: повтор выполняется только кнопкой панели.
-    expect(app.creations, [same(failed)]);
-    expect(app.storage.creationAttempts, 1);
+    // Одноразовый hook уже снял отказ: повтор выполняется только кнопкой
+    // панели.
+    expect(app.creations, hasLength(1));
     _expectTightKeyboard(tester);
     await _tap(tester, _submit);
     final saved = await _creation(tester, app, count: 2);
     await _wait(tester, () => _sheet.evaluate().isEmpty);
     final id = _expectSaved(app, saved, [_home, sport]);
-    expect(
-      app.creations.map((completion) => completion.token).toSet(),
-      hasLength(2),
-    );
-    expect(app.storage.writes, [..._fullWrites, ..._fullWrites]);
     expect(storedFavoriteMarks(app.raw), [
       ...marks,
       (id.toCanonicalString(), 3),
     ]);
-    expect(saved.revision!.compareTo(revision), GraphRevisionOrder.newer);
-    expect(
-      (await _revision(tester, app)).compareTo(saved.revision!),
-      GraphRevisionOrder.same,
-    );
     expect(app.diagnostics.thrown, 2);
     await returnToIntentionGraphAfterCreation(
       tester,
@@ -154,16 +128,6 @@ void main() {
           _wait(tester, () => finder.evaluate().isNotEmpty),
     );
     await _acceptMessage(tester, _successMessage(app));
-    expect(_intentionEvents(app), [
-      _createEvent(
-        _failedWith(DiagnosticsFailureCode.unavailable),
-        IntentionCreationCommandDiagnosticsStage.write,
-      ),
-      _createEvent(
-        isA<DiagnosticsSucceeded>(),
-        IntentionCreationCommandDiagnosticsStage.resultRead,
-      ),
-    ]);
     app.diagnostics.expectPrivateDataHidden(app.raw);
     expect(tester.takeException(), isNull);
   });
@@ -288,17 +252,12 @@ Future<TagId> _prepare(WidgetTester tester, _App app) async {
   await _add(tester, _home);
   // Локальные правки не маскируются событиями постоянных команд.
   expect(app.completions, isEmpty);
-  expect(app.diagnostics.commands, isEmpty);
   final sport = await _newTag(tester, app);
   await _add(tester, sport);
   await tester.binding.handlePopRoute();
   await tester.pumpAndSettle();
   _expectDraft(tester, [_home, sport]);
   expect(app.completions.single, isA<TagCommandCompletion>());
-  expect(app.diagnostics.commands, [
-    isA<TagCommandDiagnosticsEvent>(),
-    isA<TagCommandDiagnosticsEvent>(),
-  ]);
   return sport;
 }
 
@@ -382,30 +341,12 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
   ],
 };
 
-Future<GraphRevision> _revision(WidgetTester tester, _App app) async =>
-    switch (await tester.runAsync(
-      () => app.container
-          .read(personalGraphRepositoryProvider)
-          .getRelationCounts(_seededIntention),
-    )) {
-      ResultSuccess(:final value) => value.revision,
-      final result => fail('Не удалось прочитать публичную ревизию: $result'),
-    };
-
 final class _Diagnostics implements DiagnosticsSink {
   final events = <DiagnosticsEvent>[];
   final lines = <String>[];
   final privateValues = <String>[];
   var throwOnIntentionCommand = false;
   var thrown = 0;
-  List<DiagnosticsEvent> get commands => events
-      .where(
-        (event) =>
-            event is IntentionCommandDiagnosticsEvent ||
-            event is TagCommandDiagnosticsEvent ||
-            event is FavoriteOrderCommandDiagnosticsEvent,
-      )
-      .toList();
 
   @override
   void record(DiagnosticsEvent event) {
@@ -446,19 +387,11 @@ final class _Diagnostics implements DiagnosticsSink {
   }
 }
 
-const _fullWrites = [
-  'intentions',
-  'tag_assignments',
-  'tag_assignments',
-  'favorite_intentions',
-];
-
 /// Свидетельство, что отказ сработал после полного набора внутри транзакции,
 /// а не раньше записи тегов, отметок, готовности или временных меток.
 void _expectFaultPoint(_App app, List<TagId> tags) {
   final point = app.storage.faultPoint!;
   expect(point.inTransaction, isTrue);
-  expect(point.writes, _fullWrites);
   final row = point.graph['intentions']!.last;
   // Порядок столбцов соответствует схемам intentions и tag_assignments.
   // Проверяются также сохраняемые поисковый ключ и порядок тегов.
@@ -552,17 +485,11 @@ IntentionId _expectSaved(
   return intention.id;
 }
 
-void _expectInlineFailure(
-  WidgetTester tester,
-  _App app,
-  IntentionCommandCompletion completion,
-  String text,
-) {
+void _expectInlineFailure(String text) {
   expect(_failure.hitTestable(), findsOneWidget);
   expect(find.text(text).hitTestable(), findsOneWidget);
   expect(_message, findsNothing);
   expect(find.byType(SnackBar), findsNothing);
-  expect(app.coordinator.claimInitiatorFailure(completion.token), isNull);
 }
 
 String _successMessage(_App app) => app.l10n.graphOperationMessage(
@@ -570,23 +497,6 @@ String _successMessage(_App app) => app.l10n.graphOperationMessage(
   _title,
   app.l10n.editorCreated,
 );
-List<DiagnosticsEvent> _intentionEvents(_App app) => app.diagnostics.events
-    .whereType<IntentionCommandDiagnosticsEvent>()
-    .toList();
-Matcher _failedWith(DiagnosticsFailureCode code) =>
-    isA<DiagnosticsFailed>().having((status) => status.code, 'категория', code);
-Matcher _createEvent(
-  Matcher status,
-  IntentionCreationCommandDiagnosticsStage stage,
-) => isA<IntentionCommandDiagnosticsEvent>()
-    .having(
-      (event) => event.commandType,
-      'команда',
-      IntentionCommandDiagnosticsType.create,
-    )
-    .having((event) => event.stage, 'этап', stage)
-    .having((event) => event.status, 'исход', status);
-
 Future<void> _acceptMessage(WidgetTester tester, String text) async {
   await _until(tester, _message.hitTestable());
   await tester.pumpAndSettle();

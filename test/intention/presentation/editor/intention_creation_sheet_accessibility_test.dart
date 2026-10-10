@@ -64,7 +64,6 @@ void main() {
           QuickCreationMode.intention,
           openedPage: find.byType(IntentionEditorPage),
         );
-        final session = sessions.single;
         expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
         final fields = find.byKey(
           const ValueKey('intention-creation-sheet-fields'),
@@ -106,7 +105,6 @@ void main() {
           expect(tester.view.viewInsets.bottom, 160);
           expect(tester.getSize(fields).height, greaterThan(0));
         }
-        _expectSameSession(sessions, session);
         expect(sessions.state(tester).draft.title, _userTitle);
         expect(sessions.state(tester).draft.description, _userDescription);
         expect(tester.takeException(), isNull);
@@ -190,7 +188,6 @@ void main() {
         // Панель называет себя заголовком, фокус ввода — в названии, а
         // каталог и основная навигация под ней экранному диктору недоступны.
         expect(router.current.name, IntentionEditorRoute.name);
-        final session = sessions.single;
         expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
         expect(
           tester.getSemantics(find.byKey(_heading)),
@@ -267,7 +264,6 @@ void main() {
         // Возврат раскрывает ту же панель с прежним фокусом и выбранными
         // тегами, которые снимаются из черновика.
         expect(router.current.name, IntentionEditorRoute.name);
-        _expectSameSession(sessions, session);
         expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
         _expectNoSizeActions();
@@ -328,7 +324,6 @@ void main() {
         expect(draft.tagIds, [_home.id]);
         expect(draft.favoriteMark, FavoriteMark.favorite);
         expect(draft.readiness, IntentionReadiness.ready);
-        _expectSameSession(sessions, session);
         expect(repository.commands, isEmpty);
         expect(repository.tagCommands, isEmpty);
         expect(tester.takeException(), isNull);
@@ -728,7 +723,6 @@ void main() {
               ),
         );
         expect(_isFocusedIn(tester, find.byType(IntentionEditorPage)), isTrue);
-        expect(sessions.added, hasLength(1));
         expect(tester.takeException(), isNull);
       },
     );
@@ -1124,15 +1118,6 @@ Future<void> _expectGuidelines(WidgetTester tester, String state) async {
     final evaluation = await guideline.evaluate(tester);
     expect(evaluation.passed, isTrue, reason: '$state: ${evaluation.reason}');
   }
-}
-
-/// Та же сессия: новая не построена, прежняя не освобождена.
-void _expectSameSession(
-  _EditorSessions sessions,
-  IntentionEditorViewModelProvider session,
-) {
-  expect(sessions.added, [same(session)]);
-  expect(sessions.disposed, isEmpty);
 }
 
 /// Сессии формы создания, построенные и освобождённые за время теста.

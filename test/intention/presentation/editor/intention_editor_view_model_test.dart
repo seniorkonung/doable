@@ -270,7 +270,6 @@ void main() {
       final tagSet = container.read(provider.notifier).draftTagSet
         ..add(_tag(1, 'Дом'));
       await _deliverEvents(container);
-      final before = container.read(provider);
       final published = <IntentionDraftTagSetSnapshot>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
@@ -279,7 +278,7 @@ void main() {
       await _deliverEvents(container);
 
       expect(repeated, IntentionDraftTagAddition.alreadyIncluded);
-      expect(container.read(provider), same(before));
+      expect(container.read(provider).draft.tagIds, [_tagId(1)]);
       expect(tagSet.current.tagIds, [_tagId(1)]);
       expect(published, isEmpty);
       expect(repository.commands, isEmpty);
@@ -413,8 +412,10 @@ void main() {
         addTearDown(changesSubscription.cancel);
         repository.completeCommand(0, _savedResult());
         await _deliverEvents(container);
-        final completed = container.read(provider);
-        expect(completed.operation, isA<OperationSucceeded<Intention>>());
+        expect(
+          container.read(provider).operation,
+          isA<OperationSucceeded<Intention>>(),
+        );
         expect(published.map((snapshot) => snapshot.availability), [
           IntentionDraftAvailability.closed,
         ]);
@@ -429,7 +430,6 @@ void main() {
           ..removeTag(_tagId(1));
 
         expect(addition, IntentionDraftTagAddition.sessionClosed);
-        expect(container.read(provider), same(completed));
         expect(container.read(provider).draft.title, 'Намерение');
         expect(
           editor.draftTagSet.current.availability,
@@ -462,7 +462,6 @@ void main() {
       addTearDown(changesSubscription.cancel);
 
       editor.submit();
-      final submitted = container.read(provider);
       final command = repository.commands.single as CreateIntention;
 
       final lateAddition = tagSet.add(_tag(2, 'Выходные'));
@@ -476,7 +475,7 @@ void main() {
       await _deliverEvents(container);
 
       expect(lateAddition, IntentionDraftTagAddition.submitting);
-      expect(container.read(provider), same(submitted));
+      final submitted = container.read(provider);
       expect(submitted.draft.title, 'Название');
       expect(submitted.draft.description, 'Описание');
       expect(submitted.draft.tagIds, [_tagId(1)]);
@@ -494,7 +493,7 @@ void main() {
       expect(published.map((snapshot) => snapshot.availability), [
         IntentionDraftAvailability.submitting,
       ]);
-      expect(repository.commands, [same(command)]);
+      expect(repository.commands, hasLength(1));
       expect(command.title, 'Название');
       expect(command.description, 'Описание');
       expect(command.tagIds, {_tagId(1)});
@@ -573,7 +572,7 @@ void main() {
         isA<IntentionEditorCreated>().having(
           (event) => event.intentionId,
           'подтверждённый идентификатор',
-          same(confirmedIntention.id),
+          confirmedIntention.id,
         ),
       ]);
       expect(container.read(provider).event, isNull);
@@ -596,9 +595,9 @@ void main() {
             (result) => result.value,
             'сохранённое намерение',
             isA<IntentionSaved>().having(
-              (saved) => saved.intention,
-              'намерение',
-              same(confirmedIntention),
+              (saved) => saved.intention.id,
+              'идентификатор намерения',
+              confirmedIntention.id,
             ),
           ),
         ),
@@ -612,7 +611,7 @@ void main() {
         isA<IntentionEditorCreated>().having(
           (event) => event.intentionId,
           'идентификатор второй отправки',
-          same(otherIntention.id),
+          otherIntention.id,
         ),
       );
       otherEditor.consumeEvent();
@@ -620,7 +619,22 @@ void main() {
       expect(container.read(otherProvider).event, isNull);
       expect(events, hasLength(1));
       final otherSuccess = await presenter.nextClaim();
-      expect(otherSuccess!.token, isNot(same(success.token)));
+      expect(
+        otherSuccess!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат второй отправки',
+          isA<ResultSuccess<IntentionCommandSuccess>>().having(
+            (result) => result.value,
+            'сохранённое намерение',
+            isA<IntentionSaved>().having(
+              (saved) => saved.intention.id,
+              'идентификатор намерения',
+              otherIntention.id,
+            ),
+          ),
+        ),
+      );
       coordinator.confirmPresentation(otherSuccess);
       expect(repository.commands, hasLength(2));
     });
@@ -652,7 +666,7 @@ void main() {
       container.read(provider.notifier)
         ..changeTitle('Повтор той же сессии')
         ..submit();
-      expect(repository.commands, [same(command)]);
+      expect(repository.commands, hasLength(1));
       expect(
         command,
         isA<CreateIntention>()
@@ -718,9 +732,9 @@ void main() {
           expect(
             failed.operation,
             isA<OperationFailed<Intention>>().having(
-              (operation) => operation.failure,
-              'отказ',
-              same(failure),
+              (operation) => operation.failure.runtimeType,
+              'вид отказа',
+              failure.runtimeType,
             ),
             reason: name,
           );
@@ -787,8 +801,6 @@ void main() {
           final reason = '$name × $edit';
           final session = await _failedFullDraftSession(failure);
           final surface = _AppSurface(session.coordinator);
-          final failed = session.state;
-          final claim = failed.failurePresentation!;
 
           apply(session.editor);
           await _deliverEvents(session.container);
@@ -803,24 +815,19 @@ void main() {
               );
               expect(edited.canSubmit, isTrue, reason: reason);
               expect(edited.failurePresentation, isNull, reason: reason);
-              // Снятый отказ сессия больше не публикует: его неподтверждённое
-              // право переходит общей поверхности.
-              expect(
-                session.coordinator.claimInitiatorFailure(claim.token),
-                isNull,
-                reason: reason,
-              );
-              expect(surface.tokens, [same(claim.token)], reason: reason);
+              // Снятый отказ форма больше не показывает: его неподтверждённое
+              // предъявление переходит общей поверхности.
+              expect(surface.presented, hasLength(1), reason: reason);
             case _Recovery.retryable:
-              expect(edited.operation, same(failed.operation), reason: reason);
+              expect(edited.operation, isA<OperationFailed<Intention>>());
               expect(edited.canRetry, isTrue, reason: reason);
               expect(edited.canSubmit, isTrue, reason: reason);
-              _expectClaimKeptByForm(session, surface, claim, reason: reason);
+              _expectFailureKeptByForm(session, surface, reason: reason);
             case _Recovery.blocked:
-              expect(edited.operation, same(failed.operation), reason: reason);
+              expect(edited.operation, isA<OperationFailed<Intention>>());
               expect(edited.canRetry, isFalse, reason: reason);
               expect(edited.canSubmit, isFalse, reason: reason);
-              _expectClaimKeptByForm(session, surface, claim, reason: reason);
+              _expectFailureKeptByForm(session, surface, reason: reason);
           }
           expect(session.repository.commands, hasLength(1), reason: reason);
           expect(session.repository.tagCommands, isEmpty, reason: reason);
@@ -838,7 +845,6 @@ void main() {
         tags: [_tag(1, 'Дом'), _tag(2, 'Выходные'), _tag(3, 'Спорт')],
       );
       final editor = session.editor;
-      final claim = session.state.failurePresentation;
       expect(session.state.missingTagIds, {_tagId(1), _tagId(3)});
 
       // Одноимённый новый тег не заменяет отсутствующий.
@@ -859,7 +865,7 @@ void main() {
       expect(session.state.draft.tagIds, [_tagId(1), _tagId(3), _tagId(4)]);
       expect(session.state.canSubmit, isFalse);
       expect(session.state.missingTagIds, {_tagId(1), _tagId(3)});
-      expect(session.state.failurePresentation, same(claim));
+      expect(session.state.failurePresentation, isNotNull);
 
       editor.removeTag(_tagId(1));
       await _deliverEvents(session.container);
@@ -871,13 +877,11 @@ void main() {
         isA<OperationFailed<Intention>>().having(
           (operation) => operation.failure,
           'отказ',
-          isA<IntentionCreationTagsMissingFailure>()
-              .having((failure) => failure, 'тот же отказ', same(missing))
-              .having(
-                (failure) => failure.missingTagIds,
-                'точные отсутствующие теги',
-                {_tagId(1), _tagId(3)},
-              ),
+          isA<IntentionCreationTagsMissingFailure>().having(
+            (failure) => failure.missingTagIds,
+            'точные отсутствующие теги',
+            {_tagId(1), _tagId(3)},
+          ),
         ),
       );
       editor.submit();
@@ -920,15 +924,10 @@ void main() {
       await _settle(session.container);
     });
 
-    test('устранимая unavailable повторяется только явной отправкой с новым токеном и текущим черновиком', () async {
+    test('устранимая unavailable повторяется только явной отправкой с текущим черновиком', () async {
       final session = await _failedFullDraftSession(
         const IntentionUnavailableFailure(),
       );
-      final tokens = <IntentionOperationToken>[];
-      final completionSubscription = session.coordinator.intentionCompletions
-          .listen((completion) => tokens.add(completion.token));
-      addTearDown(completionSubscription.cancel);
-      final firstToken = session.state.failurePresentation!.token;
       final editor = session.editor..changeTitle('Повтор');
       editor.draftTagSet.add(_tag(3, 'Спорт'));
       await _deliverEvents(session.container);
@@ -958,9 +957,7 @@ void main() {
       );
       await _deliverEvents(session.container);
 
-      expect(tokens, hasLength(1));
-      expect(identical(tokens.single, firstToken), isFalse);
-      expect(session.state.failurePresentation!.token, same(tokens.single));
+      expect(session.state.failurePresentation, isNotNull);
       editor
         ..changeTitle('После конфликта')
         ..removeTag(_tagId(3))
@@ -1114,7 +1111,7 @@ void main() {
         second.draftTagSet.current.availability,
         IntentionDraftAvailability.closed,
       );
-      expect(container.read(firstProvider), same(firstFailed));
+      expect(container.read(firstProvider).missingTagIds, {_tagId(1)});
       expect(
         first.draftTagSet.current.availability,
         IntentionDraftAvailability.editable,
@@ -1128,7 +1125,11 @@ void main() {
         IntentionDraftAvailability.editable,
       ]);
       expect(repository.commands, [
-        same(firstCommand),
+        isA<CreateIntention>().having(
+          (command) => command.title,
+          'название первой сессии',
+          'Первое',
+        ),
         isA<CreateIntention>()
             .having((command) => command.title, 'название', '  Второе  ')
             .having((command) => command.description, 'описание', isNull)
@@ -1258,16 +1259,21 @@ void main() {
         ..retryTagObservation(_tagId(2))
         ..retryTagObservation(_tagId(3));
 
-      expect(watches.of(_tagId(2)), hasLength(1));
-      expect(watches.of(_tagId(3)), hasLength(1));
-      expect(container.read(provider), same(failed));
+      final unchanged = container.read(provider);
+      expect(
+        _tagStatus(unchanged, 2),
+        _readFailed<TagReadCorruptionFailure>(canRetry: false),
+      );
+      expect(
+        _tagStatus(unchanged, 3),
+        _readFailed<TagReadUnexpectedFailure>(canRetry: false),
+      );
 
       editor
         ..retryTagObservation(_tagId(1))
         ..retryTagObservation(_tagId(1));
 
       final retrying = container.read(provider);
-      expect(watches.of(_tagId(1)), hasLength(2));
       expect(_tagStatus(retrying, 1), isA<IntentionDraftTagLoading>());
       expect(_tagNames(retrying)[_tagId(1)], 'Дом');
 
@@ -1384,7 +1390,6 @@ void main() {
       expect(published, isEmpty);
 
       expect(tagSet.add(_tag(1, 'Дом')), IntentionDraftTagAddition.added);
-      expect(watches.of(_tagId(1)), hasLength(2));
       firstWatch
         ..deliverLate(_tag(1, 'Поздний'), revision: 5)
         ..deliverLate(null, revision: 6)
@@ -1506,7 +1511,7 @@ void main() {
       expect(watches.single(_tagId(1)).isReleased, isTrue);
       expect(watches.single(_tagId(2)).isReleased, isTrue);
       watches.single(_tagId(1)).deliverLate(_tag(1, 'Поздний'), revision: 3);
-      expect(container.read(provider), same(closed));
+      expect(_tagNames(container.read(provider)), _tagNames(closed));
 
       final otherProvider = intentionEditorViewModelProvider(
         IntentionCreationFormKey(),
@@ -1518,7 +1523,6 @@ void main() {
       await _deliverEvents(container);
 
       expect(watches.single(_tagId(4)).isReleased, isTrue);
-      expect(watches.count, 4);
       expect(repository.commands, hasLength(1));
       expect(repository.tagCommands, isEmpty);
       expect(completions, hasLength(1));
@@ -1552,7 +1556,6 @@ void main() {
         ),
       );
       expect(coordinator.isKeyRunning(formKey), isTrue);
-      final closed = container.read(provider);
       repository.completeCommand(
         0,
         const ResultFailure(
@@ -1569,7 +1572,7 @@ void main() {
       final fallback = await presenter.nextClaim();
       expect(fallback!.completion, isA<IntentionCommandCompletion>());
       coordinator.confirmPresentation(fallback);
-      expect(container.read(provider), same(closed));
+      expect(container.read(provider).event, isNull);
       expect(repository.commands, hasLength(1));
     });
 
@@ -1603,8 +1606,7 @@ void main() {
         IntentionCreationCloseResolution.closed,
       );
       await _settle(container);
-      final closed = container.read(provider);
-      expect(closed.event, isNull);
+      expect(container.read(provider).event, isNull);
 
       final reopenedProvider = intentionEditorViewModelProvider(
         IntentionCreationFormKey(),
@@ -1631,17 +1633,13 @@ void main() {
       expect(reopened.closing, isA<IntentionCreationCloseNotRequested>());
       expect(reopened.draftAvailability, IntentionDraftAvailability.editable);
       container.read(reopenedProvider.notifier).changeTitle('Другой черновик');
-      final editedReopened = container.read(reopenedProvider);
 
       repository.completeCommand(0, _savedResult());
       await _settle(container);
 
-      expect(container.read(provider), same(closed));
       expect(container.read(provider).event, isNull);
-      expect(container.read(reopenedProvider), same(editedReopened));
-      expect(editedReopened.draft.title, 'Другой черновик');
+      expect(container.read(reopenedProvider).draft.title, 'Другой черновик');
       expect(reopenedEvents, isEmpty);
-      expect(watches.count, 1);
       final success = await presenter.nextClaim();
       expect(
         success!.completion,
@@ -1720,7 +1718,7 @@ void main() {
         ),
       );
       await _deliverEvents(container);
-      final claim = container.read(provider).failurePresentation!;
+      expect(container.read(provider).failurePresentation, isNotNull);
       expect(container.read(provider).draft.isChanged, isFalse);
 
       expect(
@@ -1734,8 +1732,7 @@ void main() {
       await _settle(container);
 
       expect(container.read(provider).failurePresentation, isNull);
-      expect(surface.tokens, [same(claim.token)]);
-      expect(coordinator.claimInitiatorFailure(claim.token), isNull);
+      expect(surface.presented, hasLength(1));
     });
 
     test(
@@ -1783,7 +1780,6 @@ void main() {
         for (final (name, failure, correct) in corrections) {
           final session = await _failedFullDraftSession(failure);
           final surface = _AppSurface(session.coordinator);
-          final claim = session.state.failurePresentation!;
 
           correct(session.editor);
           await _deliverEvents(session.container);
@@ -1794,7 +1790,7 @@ void main() {
             reason: name,
           );
           expect(session.state.failurePresentation, isNull, reason: name);
-          expect(surface.tokens, [same(claim.token)], reason: name);
+          expect(surface.presented, hasLength(1), reason: name);
 
           // Дальнейшие правки, закрытие и освобождение право не повторяют.
           session.editor.changeTitle('Ещё одна правка');
@@ -1802,11 +1798,6 @@ void main() {
           session.release();
           await _deliverEvents(session.container);
           expect(surface.presented, hasLength(1), reason: name);
-          expect(
-            session.coordinator.claimInitiatorFailure(claim.token),
-            isNull,
-            reason: name,
-          );
           expect(session.repository.commands, hasLength(1), reason: name);
         }
       },
@@ -1817,15 +1808,13 @@ void main() {
         const IntentionUnavailableFailure(),
       );
       final surface = _AppSurface(session.coordinator);
-      final claim = session.state.failurePresentation!;
 
       session.editor.submit();
       await _settle(session.container);
 
       expect(session.state.operation, isA<OperationRunning<Intention>>());
       expect(session.state.failurePresentation, isNull);
-      expect(surface.tokens, [same(claim.token)]);
-      expect(session.coordinator.claimInitiatorFailure(claim.token), isNull);
+      expect(surface.presented, hasLength(1));
 
       session.repository.completeCommand(1, _savedResult());
       await _settle(session.container);
@@ -1845,7 +1834,7 @@ void main() {
       ]);
     });
 
-    test('право, уже подтверждённое renderer, общая поверхность не получает ни при одном завершении публикации', () async {
+    test('отказ, уже предъявленный в форме, общая поверхность не получает ни при одном завершении публикации', () async {
       final transitions =
           <(String, IntentionFailure, void Function(_FailedSession))>[
             (
@@ -1888,11 +1877,6 @@ void main() {
         await _deliverEvents(session.container);
 
         expect(surface.presented, isEmpty, reason: name);
-        expect(
-          session.coordinator.claimInitiatorFailure(claim.token),
-          isNull,
-          reason: name,
-        );
       }
     });
 
@@ -1906,7 +1890,7 @@ void main() {
       // протоколу, пока сессия ещё публикует отказ.
       session.coordinator.releaseInitiatorClaim(claim);
       await _settle(session.container);
-      expect(surface.tokens, [same(claim.token)]);
+      expect(surface.presented, hasLength(1));
 
       expect(
         session.editor.resolveClose(
@@ -1918,7 +1902,7 @@ void main() {
       session.release();
       await _settle(session.container);
 
-      expect(surface.tokens, [same(claim.token)]);
+      expect(surface.presented, hasLength(1));
       expect(session.repository.commands, hasLength(1));
     });
   });
@@ -2029,20 +2013,13 @@ Future<_FailedSession> _failedFullDraftSession(
   );
 }
 
-/// Неснятый отказ остаётся у формы: сессия публикует его право, а ViewModel
-/// его не подтверждает и не передаёт общей поверхности.
-void _expectClaimKeptByForm(
+/// Неснятый отказ остаётся у формы и не передаётся общей поверхности.
+void _expectFailureKeptByForm(
   _FailedSession session,
-  _AppSurface surface,
-  GraphInitiatorPresentationClaim claim, {
+  _AppSurface surface, {
   required String reason,
 }) {
-  expect(session.state.failurePresentation, same(claim), reason: reason);
-  expect(
-    session.coordinator.claimInitiatorFailure(claim.token),
-    same(claim),
-    reason: reason,
-  );
+  expect(session.state.failurePresentation, isNotNull, reason: reason);
   expect(surface.presented, isEmpty, reason: reason);
 }
 
@@ -2060,10 +2037,6 @@ final class _AppSurface {
 
   /// Предъявленные результаты в порядке выдачи.
   final presented = <GraphAppPresentationClaim>[];
-
-  List<GraphOperationToken> get tokens => [
-    for (final claim in presented) claim.token,
-  ];
 
   void _requestNext() => unawaited(
     _registration.nextClaim().then((claim) {

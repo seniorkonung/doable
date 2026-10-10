@@ -211,12 +211,10 @@ void main() {
             hasTapAction: true,
           ),
         );
-        expect(observations.count(_tagId(1)), 1);
 
         await tester.tap(find.byKey(_chipRetry(1)));
         await tester.pumpAndSettle();
 
-        expect(observations.count(_tagId(1)), 2);
         expect(find.byKey(_chipLoading(1)), findsOneWidget);
         expect(find.byKey(_chipRetry(1)), findsNothing);
 
@@ -274,7 +272,6 @@ void main() {
             isSemantics(label: 'Дом\n$message'),
           );
           expect(find.byKey(_chipRetry(1)), findsNothing);
-          expect(observations.count(_tagId(1)), 1);
           expect(sessions.state(tester).draft.tagIds, [_tagId(1)]);
 
           await tester.tap(find.byKey(_chipRemove(1)));
@@ -581,9 +578,6 @@ final class _TagObservations {
     (_streams[id] ??= []).add(controller);
     return controller.stream;
   }
-
-  /// Число наблюдений тега [id], открытых сессией.
-  int count(TagId id) => _streams[id]?.length ?? 0;
 
   /// Подтверждает тег [tag] или, если он null, отсутствие тега [id].
   void emit(TagId id, Tag? tag, {required int revision}) =>

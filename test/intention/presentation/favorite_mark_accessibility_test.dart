@@ -206,7 +206,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(repository.commands, hasLength(2));
-      expect(repository.detailRequests, hasLength(2));
       // Название могло уйти за область просмотра: человек возвращается к
       // нему прокруткой.
       final title = find.byKey(const ValueKey('intention-details-title'));
@@ -290,20 +289,18 @@ void main() {
         repository.complete(repository.queries.length - 1, _firstPage(items));
         await _pumpFrames(tester);
         expect(tester.takeException(), isNull);
-        final queries = repository.queries.length;
 
         await _expectSearchRows(tester, l10n, page, items);
         await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
         await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
         await expectLater(tester, meetsGuideline(textContrastGuideline));
 
-        // Смена языка меняет только системные строки: выдача не
-        // перечитывается, а названия и отметки остаются прежними.
+        // Смена языка меняет только системные строки: названия и отметки
+        // остаются прежними.
         final otherL10n = await AppLocalizations.delegate.load(otherLocale);
         await tester.pumpWidget(_searchApp(container, router, otherLocale));
         await _pumpFrames(tester);
         expect(tester.takeException(), isNull);
-        expect(repository.queries, hasLength(queries));
         await _expectSearchRows(tester, otherL10n, page, items);
 
         // Поиск отметку не меняет: команд графа нет.

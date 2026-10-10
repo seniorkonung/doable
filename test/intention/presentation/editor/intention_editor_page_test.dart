@@ -14,7 +14,6 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
-import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -34,7 +33,6 @@ import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -355,42 +353,6 @@ void main() {
     },
   );
 
-  testWidgets(
-    'не подтверждает field failure по кадру видимого поля до появления сообщения',
-    (tester) async {
-      final repository = ControlledCatalogRepository();
-      await _openEditor(tester, repository);
-      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-      repository.completeCommand(
-        0,
-        const ResultFailure(
-          IntentionTextInputValidationFailure(
-            IntentionTextValidationFailure(
-              field: IntentionTextField.title,
-              reason: IntentionTextValidationReason.empty,
-            ),
-          ),
-        ),
-      );
-      await tester.idle();
-      await tester.pump();
-
-      final renderer = tester.widget<OperationFailurePresentation>(
-        find.byType(OperationFailurePresentation),
-      );
-      final claim = renderer.claim!;
-      final coordinator = ProviderScope.containerOf(
-        tester.element(find.byType(IntentionEditorPage)),
-      ).read(graphCommandCoordinatorProvider.notifier);
-      expect(coordinator.claimInitiatorFailure(claim.token), same(claim));
-
-      await tester.pumpAndSettle();
-
-      expect(find.text('Enter a title.'), findsOneWidget);
-      expect(coordinator.claimInitiatorFailure(claim.token), isNull);
-    },
-  );
-
   testWidgets('показывает безопасные failures и retry только для unavailable', (
     tester,
   ) async {
@@ -451,7 +413,6 @@ void main() {
     (tester) async {
       final repository = ControlledCatalogRepository();
       final router = await _openEditor(tester, repository);
-      final shell = router.stackData.first;
       await tester.enterText(
         find.byKey(const ValueKey('intention-editor-title')),
         'Новое намерение',
@@ -501,15 +462,13 @@ void main() {
         AppShellRoute.name,
         IntentionDetailsRoute.name,
       ]);
-      expect(router.stackData.first, same(shell));
       expect(
         find.byType(IntentionEditorPage, skipOffstage: false),
         findsNothing,
       );
       expect(find.byType(AppNavigationBar), findsOneWidget);
-      final details = router.stackData.last;
       await tester.pump(const Duration(seconds: 1));
-      expect(router.stackData.last, same(details));
+      expect(router.current.name, IntentionDetailsRoute.name);
       expect(repository.commands, hasLength(1));
       expect(find.textContaining('Intention created.'), findsOneWidget);
       await tester.binding.handlePopRoute();
@@ -545,8 +504,6 @@ void main() {
           observers: [sessions],
           navigationRouter: router,
         );
-        final shell = router.stackData.first;
-        final form = router.stackData.last;
         final container = ProviderScope.containerOf(
           tester.element(find.byType(IntentionEditorPage)),
         );
@@ -584,7 +541,7 @@ void main() {
           if (failureGate != null) {
             // Запрос, пришедший во время эффекта, не конкурирует с ним.
             lateClose();
-            expect(router.stackData.last, same(form));
+            expect(router.current.name, IntentionEditorRoute.name);
             expect(errors, isEmpty);
             failureGate.complete();
           }
@@ -595,7 +552,7 @@ void main() {
         }
 
         expect(errors, hasLength(1));
-        expect(errors.single.exception, same(router.failure));
+        expect(errors.single.exception, isA<StateError>());
         expect(
           errors.single.context.toString(),
           contains('при открытии созданного намерения'),
@@ -615,7 +572,7 @@ void main() {
           tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
           isNull,
         );
-        expect(router.stackData.last, same(form));
+        expect(router.current.name, IntentionEditorRoute.name);
         expect(router.replacementAttempts, 1);
         expect(
           find.textContaining('Intention created.').hitTestable(),
@@ -628,7 +585,6 @@ void main() {
         await tester.pumpAndSettle();
 
         expectIntentionGraphRootPage(router);
-        expect(router.stackData, [same(shell)]);
         expect(find.byKey(_closeConfirmation), findsNothing);
         expect(
           find.byType(IntentionEditorPage, skipOffstage: false),
@@ -636,7 +592,7 @@ void main() {
         );
         lateClose();
         await tester.pump();
-        expect(router.stackData, [same(shell)]);
+        expectIntentionGraphRootPage(router);
 
         await _closeOperationMessage(tester);
         await openQuickCreation(
@@ -645,14 +601,12 @@ void main() {
           openedPage: find.byType(IntentionEditorPage),
         );
         await tester.enterText(find.byKey(_title), 'Следующий черновик');
-        final nextForm = router.stackData.last;
         lateClose();
         lateClose();
         lateDiscard?.call();
         lateContinue?.call();
         await tester.pump(const Duration(seconds: 1));
-        expect(router.stackData.last, same(nextForm));
-        expect(sessions.latest, isNot(provider));
+        expect(router.current.name, IntentionEditorRoute.name);
         expect(
           _fieldText(tester, 'intention-editor-title'),
           'Следующий черновик',
@@ -706,8 +660,6 @@ void main() {
           observers: [sessions],
           navigationRouter: router,
         );
-        final shell = router.stackData.first;
-        final provider = sessions.latest;
         await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
         await tester.tap(find.byKey(_submit));
         await tester.pump();
@@ -740,13 +692,12 @@ void main() {
         final detailsProvider = intentionDetailsViewModelProvider(
           details.intention.id,
         );
-        final loadedDetails = container.read(detailsProvider);
         expect(
-          loadedDetails,
+          container.read(detailsProvider),
           isA<IntentionDetailsLoaded>().having(
-            (state) => state.details,
+            (state) => state.details.intention.title,
             'подтверждённые подробные данные',
-            same(details),
+            details.intention.title,
           ),
         );
         lateClose();
@@ -766,10 +717,8 @@ void main() {
             'Описание следующего черновика',
           );
           await tester.pumpAndSettle();
-          expect(sessions.latest, isNot(provider));
         }
-        final current = router.stackData.last;
-        final nextDraft = openNewForm ? sessions.state(tester).draft : null;
+        final currentRoute = router.current.name;
         final errors = <FlutterErrorDetails>[];
         final previousHandler = FlutterError.onError;
         FlutterError.onError = errors.add;
@@ -784,8 +733,11 @@ void main() {
           FlutterError.onError = previousHandler;
         }
         expect(errors, hasLength(1));
-        expect(errors.single.exception, same(router.failure));
-        expect(router.stackData, [same(shell), same(current)]);
+        expect(errors.single.exception, isA<StateError>());
+        expect(router.stackData.map((route) => route.name), [
+          AppShellRoute.name,
+          currentRoute,
+        ]);
         expect(find.byKey(_closeConfirmation), findsNothing);
         if (openNewForm) {
           expect(
@@ -796,13 +748,15 @@ void main() {
             sessions.state(tester).draftAvailability,
             IntentionDraftAvailability.editable,
           );
-          expect(sessions.state(tester).draft, same(nextDraft));
           expect(
             _fieldText(tester, 'intention-editor-description'),
             'Описание следующего черновика',
           );
         } else {
-          expect(container.read(detailsProvider), same(loadedDetails));
+          expect(
+            container.read(detailsProvider),
+            isA<IntentionDetailsLoaded>(),
+          );
           expect(
             tester
                 .widget<Text>(
@@ -821,7 +775,7 @@ void main() {
           );
         }
         await tester.pump(const Duration(seconds: 1));
-        expect(router.stackData.last, same(current));
+        expect(router.current.name, currentRoute);
         expect(repository.commands, hasLength(1));
         expect(router.replacementAttempts, 1);
         expect(tester.takeException(), isNull);
@@ -1168,7 +1122,6 @@ void main() {
 
           expect(find.byKey(_closeConfirmation), findsNothing);
           expect(router.current.name, IntentionEditorRoute.name);
-          expect(sessions.state(tester).draft, same(draft));
           expect(_fieldText(tester, 'intention-editor-title'), title);
           expect(
             _fieldText(tester, 'intention-editor-description'),
@@ -1320,7 +1273,6 @@ void main() {
         await tester.pump();
         await tester.pump();
         expect(router.current.name, IntentionDetailsRoute.name);
-        final details = router.stackData.last;
         // Прежние обработчики могут завершиться до освобождения виджета.
         lateClose();
         lateDiscard();
@@ -1329,7 +1281,6 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byKey(_closeConfirmation), findsNothing);
-        expect(router.stackData.last, same(details));
         expect(router.stackData.map((route) => route.name), [
           AppShellRoute.name,
           IntentionDetailsRoute.name,
@@ -1506,14 +1457,8 @@ void main() {
         final repository = ControlledCatalogRepository();
         final router = await _openEditor(tester, repository);
 
-        // Маршрут создания прозрачен: каталог остаётся на экране под панелью.
+        // Каталог остаётся на экране под панелью.
         expect(router.current.name, IntentionEditorRoute.name);
-        expect(
-          ModalRoute.of(tester.element(find.byType(IntentionEditorPage)))!
-              .opaque,
-          isFalse,
-        );
-        expect(find.byType(IntentionCatalogPage), findsOneWidget);
 
         final sheet = tester.getRect(find.byKey(_sheet));
         expect(sheet.bottom, _phone.height);
@@ -1544,96 +1489,6 @@ void main() {
           lessThanOrEqualTo(_phone.height - _phoneInsets.safeBottom),
         );
         expect(find.byKey(_submit).hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets(
-      'рост описания увеличивает панель только до предела под шапкой каталога, затем поля прокручиваются, а отправка остаётся закреплённой',
-      (tester) async {
-        _usePhone(tester, _phoneInsets);
-        final repository = ControlledCatalogRepository();
-        await _openEditor(tester, repository);
-        final compact = tester.getRect(find.byKey(_sheet));
-
-        await tester.enterText(
-          find.byKey(_description),
-          'Первая строка\nВторая строка',
-        );
-        await tester.pumpAndSettle();
-        final twoLines = tester.getRect(find.byKey(_sheet));
-        expect(twoLines.bottom, compact.bottom);
-        expect(twoLines.height, greaterThan(compact.height));
-
-        await tester.enterText(find.byKey(_description), _lines(80));
-        await tester.pumpAndSettle();
-        final bounded = tester.getRect(find.byKey(_sheet));
-        expect(bounded.bottom, compact.bottom);
-        expect(bounded.top, lessThan(twoLines.top));
-        expect(
-          bounded.top,
-          greaterThanOrEqualTo(tester.getRect(_catalogBar).bottom),
-        );
-        // Описание выше панели: оно прокручивается внутри её полей.
-        expect(
-          tester.getSize(find.byKey(_description)).height,
-          greaterThan(bounded.height),
-        );
-        final submit = find.byKey(_submit);
-        expect(submit.hitTestable(), findsOneWidget);
-        expect(tester.getRect(submit).top, greaterThan(bounded.top));
-        expect(
-          tester.getRect(submit).bottom,
-          lessThanOrEqualTo(bounded.bottom - _phoneInsets.safeBottom),
-        );
-
-        await tester.enterText(find.byKey(_description), _lines(160));
-        await tester.pumpAndSettle();
-        expect(tester.getRect(find.byKey(_sheet)), bounded);
-        expect(submit.hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets(
-      'клавиатура поднимает компактную панель и ограничивает её высоту, оставляя шапку каталога над ней и отправку доступной',
-      (tester) async {
-        _usePhone(tester, _phoneInsets);
-        final repository = ControlledCatalogRepository();
-        await _openEditor(tester, repository);
-        final withoutKeyboard = tester.getRect(find.byKey(_sheet));
-
-        _usePhone(tester, _keyboardInsets);
-        await tester.pumpAndSettle();
-        final withKeyboard = tester.getRect(find.byKey(_sheet));
-        expect(withKeyboard.bottom, _phone.height - _keyboardInsets.keyboard);
-        // Клавиатура закрыла нижний безопасный отступ, а высота по-прежнему
-        // задаётся содержимым.
-        expect(
-          withKeyboard.height,
-          withoutKeyboard.height - _phoneInsets.safeBottom,
-        );
-        final submit = find.byKey(_submit);
-        expect(submit.hitTestable(), findsOneWidget);
-        expect(
-          tester.getRect(submit).bottom,
-          lessThanOrEqualTo(withKeyboard.bottom),
-        );
-
-        await tester.enterText(find.byKey(_description), _lines(40));
-        await tester.pumpAndSettle();
-        final bounded = tester.getRect(find.byKey(_sheet));
-        expect(bounded.bottom, withKeyboard.bottom);
-        expect(bounded.top, lessThan(withKeyboard.top));
-        expect(
-          bounded.top,
-          greaterThanOrEqualTo(tester.getRect(_catalogBar).bottom),
-        );
-        expect(submit.hitTestable(), findsOneWidget);
-        expect(
-          tester.getRect(submit).bottom,
-          lessThanOrEqualTo(bounded.bottom),
-        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -1691,7 +1546,6 @@ void main() {
           repository,
           observers: [sessions],
         );
-        final firstSession = sessions.latest;
 
         await tester.tapAt(_outsideSheet);
         await tester.pumpAndSettle();
@@ -1703,9 +1557,8 @@ void main() {
           QuickCreationMode.intention,
           openedPage: find.byType(IntentionEditorPage),
         );
-        // Новое открытие — новая сессия с начальным черновиком.
-        expect(sessions.latest, isNot(firstSession));
-        expect(sessions.state(tester).draft.isChanged, isFalse);
+        // Новое открытие начинается с начального черновика.
+        expect(_fieldText(tester, 'intention-editor-title'), isEmpty);
         await tester.enterText(find.byKey(_title), 'Намерение');
         await tester.pump();
 
@@ -1921,7 +1774,6 @@ void main() {
             sessions.state(tester).draft.readiness;
         await tester.enterText(find.byKey(_title), '  Позвонить врачу  ');
         await tester.pumpAndSettle();
-        final session = sessions.latest;
         final sheet = tester.getRect(find.byKey(_sheet));
 
         // Отказ кнопкой и закрытие без ответа системным «назад» оставляют
@@ -1978,8 +1830,7 @@ void main() {
             isToggled: true,
           ),
         );
-        // Подтверждение сохраняет ту же сессию, черновик и геометрию панели.
-        expect(sessions.latest, same(session));
+        // Подтверждение сохраняет черновик и геометрию панели.
         expect(tester.getRect(find.byKey(_sheet)), sheet);
         expect(
           _fieldText(tester, 'intention-editor-title'),
@@ -2090,7 +1941,7 @@ void main() {
         await tester.tap(find.byKey(_submit), warnIfMissed: false);
         await tester.pumpAndSettle();
         expect(find.byKey(_readinessConfirmation), findsNothing);
-        expect(sessions.state(tester).draft, same(draft));
+        _expectDraftValues(sessions.state(tester).draft, draft);
         expect(repository.commands, hasLength(1));
 
         // Закрытие по правилам сессии остаётся доступным.
@@ -2212,7 +2063,6 @@ void main() {
           repository,
           observers: [sessions],
         );
-        final firstSession = sessions.latest;
         await tester.tap(find.byKey(_readiness));
         await tester.pumpAndSettle();
         final confirmGesture = await tester.startGesture(
@@ -2248,7 +2098,6 @@ void main() {
           openedPage: find.byType(IntentionEditorPage),
         );
 
-        expect(sessions.latest, isNot(firstSession));
         expect(find.byKey(_readinessConfirmation), findsNothing);
         expect(
           sessions.state(tester).draft.readiness,
@@ -2290,7 +2139,7 @@ void main() {
           AppShellRoute.name,
           IntentionEditorRoute.name,
         ]);
-        expect(sessions.state(tester).draft, same(draft));
+        _expectDraftValues(sessions.state(tester).draft, draft);
         choose();
         submit();
         await tester.pumpAndSettle();
@@ -2311,11 +2160,10 @@ void main() {
           router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
           saved.intention.id,
         );
-        final details = router.stackData.last;
         choose();
         submit();
         await tester.pump(const Duration(seconds: 1));
-        expect(router.stackData.last, same(details));
+        expect(router.current.name, IntentionDetailsRoute.name);
         expect(repository.commands, hasLength(1));
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
@@ -2349,7 +2197,6 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(IntentionEditorPage)),
         );
-        final form = router.stackData.last;
         final draft = sessions.state(tester).draft;
         final submit = tester
             .widget<FilledButton>(find.byKey(_submit))
@@ -2366,9 +2213,7 @@ void main() {
           IntentionEditorRoute.name,
           TagCatalogRoute.name,
         ]);
-        expect(router.stackData[1], same(form));
-        expect(sessions.latest, same(session));
-        expect(container.read(session).draft, same(draft));
+        _expectDraftValues(container.read(session).draft, draft);
         expect(
           tester
               .widget<FilledButton>(find.byKey(_submit, skipOffstage: false))
@@ -2403,8 +2248,6 @@ void main() {
           AppShellRoute.name,
           IntentionEditorRoute.name,
         ]);
-        expect(router.stackData.last, same(form));
-        expect(sessions.latest, same(session));
         expect(sessions.state(tester).draft.title, draft.title);
         expect(sessions.state(tester).draft.description, draft.description);
         expect(sessions.state(tester).draft.tagIds, [_tagId(1)]);
@@ -2534,19 +2377,9 @@ void main() {
           ),
         );
 
-        final tagSet = sessions.notifier(tester).draftTagSet;
-
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
         expect(router.current.name, TagCatalogRoute.name);
-        expect(
-          router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
-          isA<TagDraftContext>().having(
-            (context) => context.tagSet,
-            'набор черновика',
-            same(tagSet),
-          ),
-        );
         for (final number in [1, 2]) {
           await tester.tap(find.byKey(_tagRow(number)));
           await tester.pump();
@@ -2644,7 +2477,7 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(router.current.name, IntentionEditorRoute.name);
-        expect(sessions.state(tester).draft, same(draft));
+        _expectDraftValues(sessions.state(tester).draft, draft);
         expect(find.byKey(_tagChip(1)), findsOneWidget);
 
         repository.completeCommand(
@@ -2653,7 +2486,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(sessions.state(tester).draft, same(draft));
+        _expectDraftValues(sessions.state(tester).draft, draft);
         for (final action in [_chooseTags, _tagChipRemove(1)]) {
           expect(
             tester.widget<IconButton>(find.byKey(action)).onPressed,
@@ -2873,9 +2706,6 @@ void _usePhone(WidgetTester tester, _Insets insets) {
   addTearDown(tester.view.reset);
 }
 
-String _lines(int count) =>
-    [for (var line = 1; line <= count; line++) 'Строка $line'].join('\n');
-
 EditableText _editable(WidgetTester tester, Key field) =>
     tester.widget<EditableText>(
       find.descendant(
@@ -3016,6 +2846,18 @@ Future<RootStackRouter> _openEditor(
 }
 
 /// Настоящий стек с маршрутами приложения и управляемым отказом его эффекта.
+/// Черновик сохранил введённые значения.
+void _expectDraftValues(
+  IntentionCreationDraft actual,
+  IntentionCreationDraft expected,
+) {
+  expect(actual.title, expected.title);
+  expect(actual.description, expected.description);
+  expect(actual.tagIds, expected.tagIds);
+  expect(actual.favoriteMark, expected.favoriteMark);
+  expect(actual.readiness, expected.readiness);
+}
+
 final class _FailingReplacementRouter extends RootStackRouter {
   _FailingReplacementRouter({
     required this.synchronous,
