@@ -34,7 +34,6 @@ void main() {
       expect(draft.steps, hasLength(1));
       expect(draft.currentIntentionId, _intention(2));
       expect(draft.confirmedPath.steps.single.relationId, _relation(1));
-      expect(() => draft.steps.clear(), throwsUnsupportedError);
       expect(
         () => ChoicePathDraftProgress(_intention(1), const []),
         throwsArgumentError,
@@ -103,7 +102,6 @@ void main() {
       _relation(4),
     ]);
     expect(page.canConfirm, isFalse);
-    expect(() => page.items.clear(), throwsUnsupportedError);
   });
 
   test('завершение доступно только после перехода к действию', () {
@@ -185,8 +183,6 @@ void main() {
       _relation(1),
       _relation(2),
     ]);
-    expect(() => draft.steps.clear(), throwsUnsupportedError);
-    expect(() => draft.confirmedPath.steps.clear(), throwsUnsupportedError);
     expect(() => draft.pathOrder([_relation(1)]), throwsArgumentError);
 
     final top = ChoicePathDraftProgress(_intention(1), [

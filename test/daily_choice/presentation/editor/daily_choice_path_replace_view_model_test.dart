@@ -186,11 +186,8 @@ void main() {
 
   test('закрытие модели не отменяет принятую команду и передаёт результат оболочке', () async {
     final harness = _Harness();
-    final registration = harness.coordinator.registerAppPresentation();
-    addTearDown(() async {
-      registration.release();
-      await harness.dispose();
-    });
+    addTearDown(harness.dispose);
+    final completion = harness.coordinator.completions.first;
     harness.repository.completeRead(harness.repository.details);
     await pumpEventQueue();
     harness.model
@@ -198,9 +195,7 @@ void main() {
       ..confirm();
     harness.model.dispose();
     harness.repository.succeed();
-    final claim = await registration.nextClaim();
-    expect(claim?.completion, isA<DailyChoiceCommandCompletion>());
-    harness.coordinator.confirmPresentation(claim!);
+    expect(await completion, isA<DailyChoiceCommandCompletion>());
     expect(harness.repository.commands, hasLength(1));
   });
 }

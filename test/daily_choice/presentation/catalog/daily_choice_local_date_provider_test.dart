@@ -5,28 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('источник локальной даты каталога', () {
-    test('по умолчанию предоставляет показание часов устройства', () {
+    test('по умолчанию читает местную дату устройства при каждом вызове', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
+      final source = container.read(dailyChoiceLocalDateSourceProvider);
 
-      expect(
-        container.read(dailyChoiceLocalDateSourceProvider),
-        same(readDeviceLocalDay),
-      );
+      final before = DateTime.now();
+      final date = source().date;
+      final after = DateTime.now();
+
+      // Чтение может совпасть с местной полуночью, поэтому допустим день
+      // любого из окружающих моментов.
+      expect(date, anyOf(_localDateOf(before), _localDateOf(after)));
     });
-
-    test(
-      'дата устройства читается из местных года, месяца и дня при вызове',
-      () {
-        final before = DateTime.now();
-        final date = readDeviceLocalDay().date;
-        final after = DateTime.now();
-
-        // Чтение может совпасть с местной полуночью, поэтому допустим день
-        // любого из окружающих моментов.
-        expect(date, anyOf(_localDateOf(before), _localDateOf(after)));
-      },
-    );
 
     test('показание устройства отсчитывает время до местной полуночи '
         'следующей даты', () {

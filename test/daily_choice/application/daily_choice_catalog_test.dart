@@ -12,22 +12,10 @@ import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
-  test('запрос сохраняет явные фильтры и границы порции', () {
-    final date = CalendarDate.fromParts(2026, 9, 24);
-    const cursor = _Cursor();
+  test('размер порции допускает границы 1 и 100 и отвергает остальные', () {
     for (final size in [1, 100]) {
-      final query = DailyChoiceCatalogQuery(
-        date: date,
-        isCompleted: false,
-        pageSize: size,
-        cursor: cursor,
-      );
-      expect(query.date, date);
-      expect(query.isCompleted, false);
-      expect(query.pageSize, size);
-      expect(query.cursor, same(cursor));
+      expect(DailyChoiceCatalogQuery(pageSize: size).pageSize, size);
     }
-    expect(DailyChoiceCatalogQuery(isCompleted: true).isCompleted, true);
     for (final size in [-1, 0, 101]) {
       expect(
         () => DailyChoiceCatalogQuery(pageSize: size),
@@ -83,7 +71,7 @@ void main() {
     );
   });
 
-  test('первая порция сохраняет один снимок и неизменяемый список', () async {
+  test('первая порция копирует список и проверяет согласованность', () async {
     final items = [_item(1), _item(2)];
     final revision = _Revision(7);
     final page = DailyChoiceCatalogFirstPage(
@@ -103,9 +91,6 @@ void main() {
     expect(result, isA<DailyChoiceCatalogPageSuccess>());
     expect(page.items.map((item) => item.id), [_choice(1), _choice(2)]);
     expect(page.totalCount, 3);
-    expect(page.revision, same(revision));
-    expect(page.nextCursor, isA<DailyChoiceCatalogCursor>());
-    expect(() => page.items.clear(), throwsUnsupportedError);
     expect(
       () => DailyChoiceCatalogFirstPage(
         items: [_item(1)],

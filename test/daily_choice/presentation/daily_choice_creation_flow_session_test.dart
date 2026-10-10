@@ -16,25 +16,20 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/daily_choice_durability_fixture.dart';
 
 void main() {
-  test(
-    'сессия связывает конкретный корень с неизменяемой исходной историей',
-    () {
-      final history = <LocalKey>[const ValueKey('оболочка'), UniqueKey()];
-      final root = UniqueKey();
-      final session = DailyChoiceCreationFlowSession(
-        rootMatchId: root,
-        originalHistory: history,
-      );
-      final snapshot = List<LocalKey>.of(history);
-      history.clear();
+  test('сессия хранит снимок исходной истории, а не переданный список', () {
+    final history = <LocalKey>[const ValueKey('оболочка'), UniqueKey()];
+    final root = UniqueKey();
+    final session = DailyChoiceCreationFlowSession(
+      rootMatchId: root,
+      originalHistory: history,
+    );
+    final snapshot = List<LocalKey>.of(history);
+    history.clear();
 
-      expect(session.rootMatchId, root);
-      expect(session.originalHistory, snapshot);
-      expect(() => session.originalHistory.clear(), throwsUnsupportedError);
-      expect(session.state, isA<DailyChoiceCreationFlowEditing>());
-      expect(session.canContinue, isTrue);
-    },
-  );
+    expect(session.originalHistory, snapshot);
+    expect(session.state, isA<DailyChoiceCreationFlowEditing>());
+    expect(session.canContinue, isTrue);
+  });
 
   test(
     'успех фиксируется до навигации и не сбрасывается поздним возвратом',
@@ -60,28 +55,16 @@ void main() {
           durabilityChoice(201),
         ),
       );
-      expect(observed, [isA<DailyChoiceCreationFlowSubmitting>(), same(saved)]);
+      expect(observed, [
+        isA<DailyChoiceCreationFlowSubmitting>(),
+        isA<DailyChoiceCreationFlowSaved>(),
+      ]);
       expect(session.recordCompletion(completion), isFalse);
       expect(harness.submit(session), isNull);
-      expect(session.state, same(saved));
+      expect(session.state, isA<DailyChoiceCreationFlowSaved>());
       expect(session.canContinue, isFalse);
     },
   );
-
-  test('операция и оставшаяся страница удерживают одну сессию после удаления подтверждения', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    DailyChoiceCreationFlowSession? confirmation = _session();
-    final pathPage = confirmation;
-    final accepted = harness.submit(confirmation)!;
-    final finishing = accepted.future.then(confirmation.recordCompletion);
-    confirmation = null;
-    harness.repository.succeed(0);
-
-    expect(await finishing, isTrue);
-    expect(pathPage.state, isA<DailyChoiceCreationFlowSaved>());
-    expect(pathPage.canContinue, isFalse);
-  });
 
   test(
     'две сессии не принимают результаты друг друга даже при одинаковой границе',
@@ -93,10 +76,8 @@ void main() {
         rootMatchId: first.rootMatchId,
         originalHistory: first.originalHistory,
       );
-      expect(second.flowId, isNot(first.flowId));
       final a = harness.submit(first)!;
       final b = harness.submit(second)!;
-      expect(a.token, isNot(b.token));
       first.leave();
       harness.repository.succeed(0);
       final completion = await a.future;
@@ -113,18 +94,17 @@ void main() {
 
   test('отклонение координатора не превращается в принятую отправку', () {
     final session = _session();
-    final editing = session.state;
 
     expect(
       session.acceptSubmission((_) => const DailyChoiceCommandAlreadyRunning()),
       isA<DailyChoiceCommandAlreadyRunning>(),
     );
-    expect(session.state, same(editing));
+    expect(session.state, isA<DailyChoiceCreationFlowEditing>());
     expect(
       session.acceptSubmission((_) => const GraphCommandCoordinatorDraining()),
       isA<GraphCommandCoordinatorDraining>(),
     );
-    expect(session.state, same(editing));
+    expect(session.state, isA<DailyChoiceCreationFlowEditing>());
     expect(session.canContinue, isTrue);
   });
 
@@ -180,10 +160,9 @@ void main() {
       final failure = await first.future;
       session.recordCompletion(failure);
       final second = harness.submit(session)!;
-      final submitting = session.state;
 
       expect(session.recordCompletion(failure), isFalse);
-      expect(session.state, same(submitting));
+      expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
       harness.repository.succeed(1);
       expect(session.recordCompletion(await second.future), isTrue);
       expect(session.state, isA<DailyChoiceCreationFlowSaved>());

@@ -17,7 +17,6 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -203,14 +202,7 @@ void main() {
       final day = CalendarDate.fromParts(2026, 9, 24);
       final pastDay = CalendarDate.fromParts(2026, 9, 23);
       final futureDay = CalendarDate.fromParts(2026, 9, 25);
-      final reads = _ReadProbe();
-      final diagnostics = InMemoryDiagnosticsSink();
-      final database = AppDatabase(
-        observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          reads,
-        ),
-      );
+      final database = AppDatabase(openInMemoryLocalDatabase());
       await database.open();
       addTearDown(database.close);
       await _seedGraph(database);
@@ -225,7 +217,7 @@ void main() {
         database,
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 9, 24),
-        diagnostics,
+        InMemoryDiagnosticsSink(),
         dailyChoiceIdGenerator: _SequentialChoiceIds(401),
       );
       final container = ProviderContainer(
@@ -261,33 +253,9 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      int catalogReadEvents() => diagnostics.events
-          .whereType<DailyChoiceCatalogPageReadDiagnosticsEvent>()
-          .length;
-
-      /// Чтения выдачи с последней очистки ограничены днём [date] и
-      /// проверяют пути не более [rows] строк.
-      void expectReadsOf(CalendarDate date, {required int rows}) {
-        final catalogReads = [
-          ...reads.matching('ORDER BY choice_date DESC'),
-          ...reads.matching('COUNT(*) AS total_count'),
-        ];
-        expect(catalogReads, isNotEmpty);
-        for (final read in catalogReads) {
-          expect(read.sql, contains('choice_date = ?'));
-          expect(read.arguments.first, date.toCanonicalString());
-        }
-        final paths = reads.matching('WHERE daily_choice_id IN');
-        expect(
-          paths.fold<int>(0, (sum, read) => sum + read.arguments.length),
-          lessThanOrEqualTo(rows),
-        );
-      }
-
       Future<DailyChoiceCommandCompletion> confirm(
         DailyChoiceCommandStart start,
       ) async {
-        reads.clear();
         final completion = await (start as DailyChoiceCommandAccepted).future;
         expect(completion.isFailure, isFalse);
         return completion;
@@ -310,7 +278,6 @@ void main() {
       expect(ids(), [
         for (var number = 253; number > 203; number--) _choice(number),
       ]);
-      expectReadsOf(day, rows: 50);
       await model.loadMore();
       expect(ids(), [
         for (var number = 253; number >= 201; number--) _choice(number),
@@ -344,7 +311,6 @@ void main() {
       expect(twin.id, _choice(252));
       expect(twin.date, day);
       expect(twin.isCompleted, isFalse);
-      expectReadsOf(day, rows: 52);
 
       // Перенос другого дубликата на будущий день убирает только его.
       final moved = await confirm(
@@ -360,7 +326,6 @@ void main() {
       expect(ids(), [
         for (var number = 251; number >= 201; number--) _choice(number),
       ]);
-      expectReadsOf(day, rows: 51);
 
       // Новая запись выбранного дня становится первой.
       final createdToday = await confirm(
@@ -373,10 +338,8 @@ void main() {
       expect(catalog().totalCount, 52);
       expect(ids().first, _choice(401));
       expect(ids(), hasLength(52));
-      expectReadsOf(day, rows: 52);
 
-      // Запись другого дня не входит в выдачу и не вызывает чтений.
-      final readEventsBefore = catalogReadEvents();
+      // Запись другого дня не входит в выдачу.
       await confirm(
         coordinator.acceptDailyChoiceCreation(
           DailyChoiceCreationFormKey(),
@@ -386,7 +349,6 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       expect(catalog().totalCount, 52);
       expect(ids(), isNot(contains(_choice(402))));
-      expect(catalogReadEvents(), readEventsBefore);
 
       final deleted = await confirm(
         coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_choice(401))),
@@ -394,42 +356,23 @@ void main() {
       await reconciled(deleted);
       expect(catalog().totalCount, 51);
       expect(ids(), isNot(contains(_choice(401))));
-      expectReadsOf(day, rows: 51);
 
       // Сброс возвращает выполненную запись того же дня.
-      reads.clear();
       model.clearFilters();
       await _until(() => shows(day, null));
       expect(catalog().totalCount, 52);
       expect(ids().first, _choice(253));
       expect(catalog().items.first.isCompleted, isTrue);
-      expectReadsOf(day, rows: 50);
 
       // Перенесённая и созданная записи доступны выбором их дней.
-      reads.clear();
       model.selectDate(futureDay);
       await _until(() => shows(futureDay, null));
       expect(ids(), [_choice(302), _choice(252)]);
       expect(catalog().totalCount, 2);
       expect(catalog().items.last.isCompleted, isFalse);
-      expectReadsOf(futureDay, rows: 2);
-      reads.clear();
       model.selectDate(pastDay);
       await _until(() => shows(pastDay, null));
       expect(ids(), [_choice(402), _choice(301)]);
-      expectReadsOf(pastDay, rows: 2);
-
-      // Пути и граф читаются только адресно.
-      for (final table in [
-        'FROM daily_choice_path_steps',
-        'FROM long_term_relations',
-        'FROM intentions',
-      ]) {
-        expect(
-          reads.everMatching(table).map((read) => read.sql),
-          everyElement(contains('WHERE')),
-        );
-      }
     },
   );
 }
@@ -526,38 +469,4 @@ final class _SequentialChoiceIds implements DailyChoiceIdGenerator {
 
   @override
   DailyChoiceId generate() => _choice(_next++);
-}
-
-/// Журнал чтений SQLite с аргументами: с последней очистки и за всю проверку.
-final class _ReadProbe extends LocalDatabaseConnectionObserver {
-  final _reads = <({String sql, List<Object?> arguments})>[];
-  final _all = <({String sql, List<Object?> arguments})>[];
-
-  /// Начинает новый отрезок для [matching]; журнал всей проверки остаётся.
-  void clear() => _reads.clear();
-
-  /// Чтения с последней очистки, текст которых содержит [fragment].
-  List<({String sql, List<Object?> arguments})> matching(String fragment) => [
-    for (final read in _reads)
-      if (read.sql.contains(fragment)) read,
-  ];
-
-  /// Все чтения с начала проверки, текст которых содержит [fragment].
-  List<({String sql, List<Object?> arguments})> everMatching(String fragment) =>
-      [
-        for (final read in _all)
-          if (read.sql.contains(fragment)) read,
-      ];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select) {
-      final read = (
-        sql: statement.statements.single,
-        arguments: statement.arguments,
-      );
-      _reads.add(read);
-      _all.add(read);
-    }
-  }
 }

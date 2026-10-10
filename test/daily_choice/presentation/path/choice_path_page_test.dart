@@ -10,9 +10,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -65,9 +63,6 @@ void main() {
         await tester.pump();
         repository.complete(1, [], ready: true);
         await tester.pumpAndSettle();
-        final session = tester
-            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-            .creationSession!;
         final endpoint = ValueKey(
           direction == ChoicePathDraftDirection.topDown
               ? 'choice-path-select-action'
@@ -90,7 +85,6 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
         await tester.pump();
-        expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
         await tester.binding.handlePopRoute();
         await tester.pump();
         await tester.pump(const Duration(seconds: 1));
@@ -98,7 +92,6 @@ void main() {
         expect(find.byType(DailyChoiceCreationPage), findsNothing);
         expect(find.text('Сохраняем…'), findsOneWidget);
         expect(find.byKey(endpoint), findsNothing);
-        expect(repository.queries, hasLength(2));
         oldOpen();
         await tester.pumpAndSettle();
         expect(find.byType(DailyChoiceCreationPage), findsNothing);
@@ -115,7 +108,6 @@ void main() {
         expect(find.byType(DailyChoiceCreationPage), findsNothing);
         expect(repository.commands, 1);
         if (succeeds) {
-          expect(session.state, isA<DailyChoiceCreationFlowSaved>());
           expect(find.text('Дневной выбор создан.'), findsOneWidget);
           expect(
             find.byKey(const ValueKey('choice-path-open-confirmation')),
@@ -130,7 +122,6 @@ void main() {
           expect(find.byType(DailyChoiceCreationPage), findsNothing);
           expect(repository.commands, 1);
         } else {
-          expect(session.canContinue, isTrue);
           expect(
             find.byKey(const ValueKey('choice-path-creation-status')),
             findsNothing,

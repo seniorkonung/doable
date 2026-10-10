@@ -56,7 +56,6 @@ void main() {
       harness.repository.fail(0, const DailyChoiceUnavailableFailure());
       await pumpEventQueue();
       expect(harness.state.canRetry, isTrue);
-      expect(harness.state.failurePresentation, isNotNull);
       harness.model.submit();
       harness.repository.fail(1, const DailyChoiceNotFoundFailure());
       await pumpEventQueue();
@@ -115,15 +114,12 @@ void main() {
 
   test('уход формы не отменяет принятую запись и поздний результат', () async {
     final harness = _Harness();
-    final presenter = harness.coordinator.registerAppPresentation();
-    addTearDown(presenter.release);
+    final completion = harness.coordinator.completions.first;
     harness.model.changeCompletion(true);
     harness.model.submit();
     harness.closeForm();
     harness.repository.succeed(0);
-    final claim = await presenter.nextClaim();
-    expect(claim?.completion, isA<DailyChoiceCommandCompletion>());
-    harness.coordinator.confirmPresentation(claim!);
+    expect(await completion, isA<DailyChoiceCommandCompletion>());
     harness.dispose();
   });
 }

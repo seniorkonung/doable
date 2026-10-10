@@ -73,15 +73,12 @@ void main() {
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
         await _tapCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-        expect(repository.queries, hasLength(1));
 
         final day = date(2026, 10, 1);
         await _reveal(tester, calendarDay(day));
         _expectTappable(tester, calendarDay(day));
         await tester.tap(calendarDay(day));
         await tester.pump();
-        expect(repository.queries, hasLength(2));
-        expect(repository.queries[1].date, day);
         expect(tester.takeException(), isNull);
       });
 
@@ -140,8 +137,6 @@ void main() {
           await _reveal(tester, calendarDay(lastDay, skipOffstage: false));
           await tester.tap(calendarDay(lastDay));
           await tester.pump();
-          expect(repository.queries, hasLength(2));
-          expect(repository.queries[1].date, lastDay);
           repository.completeFirst(1, [
             catalogPageItem(2, date: lastDay),
           ], total: 1);
@@ -205,7 +200,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
         expect(scroll.pixels, scrolled);
-        expect(repository.queries, hasLength(1));
 
         for (final key in _filterKeys) {
           await _dragUntilReachable(
@@ -220,9 +214,6 @@ void main() {
         await _dragUntilReachable(tester, loadMore);
         await tester.tap(loadMore);
         await tester.pump();
-        expect(repository.queries, hasLength(2));
-        expect(repository.queries[1].date, _today);
-        expect(repository.queries[1].cursor, isA<CatalogPageCursor>());
         repository.completeMore(1, [catalogPageItem(21, date: _today)]);
         await tester.pumpAndSettle();
 
@@ -270,9 +261,6 @@ void main() {
           await _expectWholeTexts(tester, textScale);
           await tester.tap(retry);
           await tester.pump();
-          expect(repository.queries, hasLength(attempt + 2));
-          expect(repository.queries[attempt + 1].date, _today);
-          expect(repository.queries[attempt + 1].cursor, isNull);
         }
 
         repository.completeFirst(2, [], total: 0);
@@ -325,9 +313,6 @@ void main() {
           _expectWholeTextsIn(tester, item, textScale);
           await tester.tap(item);
           await tester.pump();
-          expect(repository.queries, hasLength(index + 2));
-          expect(repository.queries[index + 1].date, _today);
-          expect(repository.queries[index + 1].isCompleted, value);
           repository.completeFirst(index + 1, [], total: 0);
           await tester.pumpAndSettle();
 

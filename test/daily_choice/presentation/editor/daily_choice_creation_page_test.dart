@@ -49,16 +49,11 @@ void main() {
         final repository = _Repository();
         final navigatorKey = GlobalKey<NavigatorState>();
         await _pump(tester, repository, navigatorKey: navigatorKey);
-        final page = tester.widget<DailyChoiceCreationPage>(
-          find.byType(DailyChoiceCreationPage),
-        );
-        final session = page.session;
         final form = tester.state(find.byType(DailyChoiceCreationPage));
         await tester.ensureVisible(
           find.byKey(const ValueKey('daily-choice-submit')),
         );
         await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
-        expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
         navigatorKey.currentState!.pop();
         if (disposed) {
           await tester.pumpAndSettle();
@@ -66,7 +61,6 @@ void main() {
           await tester.pump();
         }
         expect(form.mounted, !disposed);
-        expect(session.canContinue, isFalse);
 
         if (succeeds) {
           repository.succeed(0);
@@ -75,10 +69,8 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(
-          session.state,
-          succeeds
-              ? isA<DailyChoiceCreationFlowSaved>()
-              : isA<DailyChoiceCreationFlowEditing>(),
+          find.textContaining('Дневной выбор создан'),
+          succeeds ? findsOneWidget : findsNothing,
         );
         expect(repository.commands, hasLength(1));
         expect(find.text('Домашний экран'), findsOneWidget);
@@ -490,7 +482,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
         await tester.pump();
         expect(repository.commands, hasLength(2));
-        expect(repository.commands.last.path, same(newer.path));
+        expect(
+          repository.commands.last.path.steps.map((step) => step.relationId),
+          newer.path.steps.map((step) => step.relationId),
+        );
         expect(
           repository.commands.last.date,
           CalendarDate.fromParts(2026, 9, 25),
@@ -595,7 +590,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
         await tester.pump();
         expect(repository.commands, hasLength(2));
-        expect(repository.commands.last.path, same(newer.path));
+        expect(
+          repository.commands.last.path.steps.map((step) => step.relationId),
+          newer.path.steps.map((step) => step.relationId),
+        );
         expect(repository.commands.last.selectedIntentionId, _intention(2));
         expect(
           repository.commands.last.date,

@@ -33,7 +33,7 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('choice-suggestion-select-0')));
-    expect(selected, same(item));
+    expect(selected?.originChoiceId, item.originChoiceId);
   });
 
   testWidgets('раскрывает длинный путь и различает одинаковые названия', (
@@ -70,7 +70,7 @@ void main() {
       find.byKey(const ValueKey('choice-suggestion-select-1')),
     );
     await tester.tap(find.byKey(const ValueKey('choice-suggestion-select-1')));
-    expect(selected, same(second));
+    expect(selected?.originChoiceId, second.originChoiceId);
   });
 
   testWidgets('пустая выдача не показывает недоступные маршруты', (

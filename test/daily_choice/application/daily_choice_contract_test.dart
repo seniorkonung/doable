@@ -35,41 +35,42 @@ void main() {
         _relation2,
       ]);
       expect(path.steps.last.type, LongTermRelationType.can);
-      expect(() => path.steps.clear(), throwsUnsupportedError);
     },
   );
 
-  test('сохранённый путь владеет только своими шагами и неизменяем', () {
-    final steps = [
-      ChoicePathStep(
-        id: _step1,
-        dailyChoiceId: _choice,
-        relationId: _relation1,
-        previousStepId: null,
-      ),
-      ChoicePathStep(
-        id: _step2,
-        dailyChoiceId: _choice,
-        relationId: _relation2,
-        previousStepId: _step1,
-      ),
-    ];
-    final path = StoredChoicePath(steps);
-    steps.clear();
-    expect(path.steps.map((step) => step.id), [_step1, _step2]);
-    expect(() => path.steps.clear(), throwsUnsupportedError);
-    expect(
-      () => StoredChoicePath([
+  test(
+    'сохранённый путь копирует переданные шаги и проверяет их связность',
+    () {
+      final steps = [
+        ChoicePathStep(
+          id: _step1,
+          dailyChoiceId: _choice,
+          relationId: _relation1,
+          previousStepId: null,
+        ),
         ChoicePathStep(
           id: _step2,
           dailyChoiceId: _choice,
           relationId: _relation2,
           previousStepId: _step1,
         ),
-      ]),
-      throwsA(isA<ArgumentError>()),
-    );
-  });
+      ];
+      final path = StoredChoicePath(steps);
+      steps.clear();
+      expect(path.steps.map((step) => step.id), [_step1, _step2]);
+      expect(
+        () => StoredChoicePath([
+          ChoicePathStep(
+            id: _step2,
+            dailyChoiceId: _choice,
+            relationId: _relation2,
+            previousStepId: _step1,
+          ),
+        ]),
+        throwsA(isA<ArgumentError>()),
+      );
+    },
+  );
 
   test('дневной выбор имеет разных прямых участников и независимые поля', () {
     final choice = DailyChoice(

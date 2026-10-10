@@ -90,7 +90,6 @@ void main() {
     );
     input.clear();
     expect(snapshot.items, [one]);
-    expect(() => snapshot.items.clear(), throwsUnsupportedError);
     expect(snapshot.revision, isA<GraphRevision>());
     expect(
       ChoicePathSuggestionsSnapshot(

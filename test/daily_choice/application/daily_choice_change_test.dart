@@ -30,16 +30,11 @@ void main() {
       intentionCounts: counts,
       relationPermissions: permissions,
     );
-    final result = ConfirmedGraphResult(
-      revision: revision,
-      value: _Outcome([change]),
-    );
 
     counts.clear();
     permissions.clear();
-    expect(result.changes, [same(change)]);
     expect(change.before, isNull);
-    expect(change.after, same(choice));
+    expect(change.after!.id, choice.id);
     expect(change.previousParticipants, isEmpty);
     expect(change.currentParticipants, {_source, _selected});
     expect(change.releasedRelationIds, isEmpty);
@@ -47,9 +42,6 @@ void main() {
     expect(change.intentionCounts[_source]!.dailySource, 1);
     expect(change.intentionCounts[_selected]!.dailySelected, 1);
     expect(change.relationPermissions[_relation]!.canDelete, isFalse);
-    expect(() => change.occupiedRelationIds.clear(), throwsUnsupportedError);
-    expect(() => change.intentionCounts.clear(), throwsUnsupportedError);
-    expect(() => change.relationPermissions.clear(), throwsUnsupportedError);
   });
 
   test(

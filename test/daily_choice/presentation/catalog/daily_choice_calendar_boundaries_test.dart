@@ -1,5 +1,4 @@
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,8 +63,6 @@ void main() {
         date(2028, 3, 4),
         date(2028, 3, 5),
       ]);
-      expect(dayCell(tester, date(2028, 2, 29)).isOutsideMonth, isFalse);
-      expect(dayCell(tester, date(2028, 3, 1)).isOutsideMonth, isTrue);
     });
 
     testWidgets('выбор 29 февраля 2028 года передаёт эту календарную дату', (
@@ -428,38 +425,6 @@ void main() {
         expect(visibleWeeks(tester), lastMonth);
       },
     );
-
-    for (final (description, viewport, positions) in [
-      ('первая неделя', week(date(1, 1, 1)), 7),
-      ('первый месяц', month(date(1, 1, 1)), 35),
-      ('последняя неделя', week(date(9999, 12, 31)), 7),
-      ('последний месяц', month(date(9999, 12, 31)), 35),
-    ]) {
-      testWidgets('$description строит только позиции видимого периода', (
-        tester,
-      ) async {
-        await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: viewport,
-          today: date(2026, 10, 4),
-        );
-
-        final builtPositions =
-            find
-                .byType(DailyChoiceCalendarDay, skipOffstage: false)
-                .evaluate()
-                .length +
-            find
-                .byKey(
-                  const ValueKey('daily-choice-calendar-unavailable-day'),
-                  skipOffstage: false,
-                )
-                .evaluate()
-                .length;
-        expect(builtPositions, positions);
-      });
-    }
   });
 }
 

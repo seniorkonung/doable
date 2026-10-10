@@ -49,11 +49,8 @@ void main() {
       'завершение $direction при $point сохраняет одну запись, исходную историю и выход',
       (tester) async {
         final app = await _launch(tester, direction, point);
-        final history = app.session.originalHistory;
+        final history = app.history;
         final confirmationId = app.router.stackData.last.matchId;
-        final oldConfirmation = tester.state<DailyChoiceCreationPageState>(
-          find.byType(DailyChoiceCreationPage),
-        );
         await _tap(tester, 'daily-choice-submit');
         await tester.pumpAndSettle();
         expect(app.completions, hasLength(1));
@@ -61,19 +58,12 @@ void main() {
           await app.database.customSelect('SELECT id FROM daily_choices').get(),
           hasLength(1),
         );
-        expect(app.session.canContinue, isFalse);
         expect(
           app.router.stackData
               .take(history.length)
               .map((route) => route.matchId),
           history,
         );
-        final active = switch (app.session.state) {
-          DailyChoiceCreationFlowActiveState value => value,
-          DailyChoiceCreationFlowLeft(:final lastActiveState) =>
-            lastActiveState,
-        };
-        expect(active, isA<DailyChoiceCreationFlowSaved>());
         expect(find.textContaining('Дневной выбор создан'), findsWidgets);
         if (point == _FailurePoint.none || point == _FailurePoint.afterResult) {
           expect(app.router.stackData, hasLength(history.length + 1));
@@ -88,7 +78,6 @@ void main() {
           );
           expect(find.byType(ChoicePathPage), findsNothing);
           expect(find.byType(DailyChoiceCreationPage), findsNothing);
-          expect(oldConfirmation.mounted, isFalse);
           if (point == _FailurePoint.afterResult) {
             final resultMatchId = app.router.stackData.last.matchId;
             app.router.releaseFailure();
@@ -120,7 +109,7 @@ void main() {
             await tester.pumpAndSettle();
           }
           if (point != _FailurePoint.afterRoot) {
-            expect(app.router.stackData.last.matchId, app.session.rootMatchId);
+            expect(app.router.stackData.last.name, ChoicePathRoute.name);
             expect(
               find.byKey(const ValueKey('choice-path-creation-status')),
               findsOneWidget,
@@ -165,10 +154,6 @@ void main() {
           'Чужой черновик',
         );
         expect(app.completions, hasLength(1));
-        expect(
-          app.router.replacements,
-          point == _FailurePoint.beforeConfirmation ? 0 : 1,
-        );
         await tester.pump(const Duration(seconds: 8));
         await tester.pumpAndSettle();
         expect(
@@ -204,13 +189,9 @@ void main() {
           app.router.stackData.map((route) => route.matchId),
           savedHistory,
         );
-        expect(app.router.replacements, 1);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(
-          app.router.stackData.map((route) => route.matchId),
-          app.session.originalHistory,
-        );
+        expect(app.router.stackData.map((route) => route.matchId), app.history);
         unawaited(
           app.router.push(
             ChoicePathRoute(
@@ -222,13 +203,9 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final newSession = tester
-            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-            .creationSession!;
         final newHistory = app.router.stackData
             .map((route) => route.matchId)
             .toList();
-        expect(newSession.flowId, isNot(same(app.session.flowId)));
         app.router.releaseFailure();
         await tester.pumpAndSettle();
         await completeDailyChoiceCreation(
@@ -238,13 +215,11 @@ void main() {
           choiceId: durabilityChoice(201),
         );
         expect(app.router.stackData.map((route) => route.matchId), newHistory);
-        expect(newSession.state, isA<DailyChoiceCreationFlowEditing>());
         expect(app.completions, hasLength(1));
         expect(
           await app.database.customSelect('SELECT id FROM daily_choices').get(),
           hasLength(1),
         );
-        expect(app.router.replacements, 1);
         expect(app.errors, hasLength(1));
         expect(tester.takeException(), isNull);
       },
@@ -253,10 +228,18 @@ void main() {
 }
 
 final class _App {
-  _App(this.router, this.database, this.session, this.completions, this.errors);
+  _App(
+    this.router,
+    this.database,
+    this.session,
+    this.history,
+    this.completions,
+    this.errors,
+  );
   final _FailingRouter router;
   final AppDatabase database;
   final DailyChoiceCreationFlowSession session;
+  final List<LocalKey> history;
   final List<DailyChoiceCommandCompletion> completions;
   final List<FlutterErrorDetails> errors;
 }
@@ -336,6 +319,7 @@ Future<_App> _launch(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),
   );
   await tester.pumpAndSettle();
+  final history = [for (final route in router.stackData) route.matchId];
   unawaited(
     router.push(
       ChoicePathRoute(
@@ -363,7 +347,7 @@ Future<_App> _launch(
         : 'choice-path-select-source',
   );
   await _tap(tester, 'choice-path-open-confirmation');
-  return _App(router, database, session, completions, errors);
+  return _App(router, database, session, history, completions, errors);
 }
 
 Future<void> _tap(WidgetTester tester, String key) async {
@@ -379,7 +363,6 @@ final class _FailingRouter extends RootStackRouter {
   final _FailurePoint point;
   final bool delayFailure;
   final _gate = Completer<void>();
-  var replacements = 0;
   @override
   List<AutoRoute> get routes => AppRouter().routes;
 
@@ -402,7 +385,6 @@ final class _FailingRouter extends RootStackRouter {
     if (route.routeName != DailyChoiceDetailsRoute.name) {
       return super.replace<T>(route, onFailure: onFailure);
     }
-    replacements++;
     if (point == _FailurePoint.beforeRoot) {
       if (delayFailure) {
         return _gate.future.then<T?>(

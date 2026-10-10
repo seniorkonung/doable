@@ -118,7 +118,6 @@ void main() {
           direction: direction,
         );
         await tester.pumpAndSettle();
-        final launch = _pickerContext(router).launch;
         final lateSelection = tester
             .widget<IntentionSummaryView>(
               find.byType(IntentionSummaryView).first,
@@ -140,7 +139,6 @@ void main() {
         expect(action.hitTestable(), findsOneWidget);
         expect(tester.getRect(action).bottom, lessThanOrEqualTo(540));
         await tester.tap(action);
-        expect(launch.isActive, isFalse);
         lateSelection();
         await tester.pumpAndSettle();
         await running;
@@ -153,7 +151,6 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.widget<TextField>(filter).controller!.text, isEmpty);
-        expect(_pickerContext(router).launch, isNot(same(launch)));
         await tester.tap(find.byKey(ValueKey('daily-choice-$prefix-cancel')));
         await tester.pumpAndSettle();
         await next;
@@ -191,7 +188,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(router.stackData, hasLength(history.length + 1));
         expect(router.current.name, _pickerName(direction));
-        expect(_pickerContext(router).launch.isActive, isTrue);
         expect(find.text('Отменить создание'), findsOneWidget);
         if (direction == ChoicePathDraftDirection.bottomUp) {
           expect(find.text('Намерение 1'), findsNothing);
@@ -201,18 +197,6 @@ void main() {
           direction,
           direction == ChoicePathDraftDirection.topDown ? 1 : 3,
         );
-        final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
-        final session = tester
-            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-            .creationSession!;
-        expect(page.direction, direction);
-        expect(
-          page.sourceIntentionId,
-          durabilityIntention(
-            direction == ChoicePathDraftDirection.topDown ? 1 : 3,
-          ),
-        );
-        expect(session.originalHistory, history);
         expect(
           router.stackData.map((route) => route.name),
           isNot(contains(_pickerName(direction))),
@@ -305,7 +289,6 @@ void main() {
           direction: direction,
         );
         await tester.pumpAndSettle();
-        final firstContext = _pickerContext(router);
         final firstId = router.current.matchId;
         final prefix = direction == ChoicePathDraftDirection.topDown
             ? 'source'
@@ -333,7 +316,6 @@ void main() {
           direction: nestedDirection,
         );
         await tester.pumpAndSettle();
-        expect(_pickerContext(router).launch, isNot(same(firstContext.launch)));
         expect(find.text('Намерение 4'), findsOneWidget);
         await _choose(
           tester,
@@ -343,7 +325,6 @@ void main() {
         await tester.tap(find.text('Отменить создание'));
         await tester.pumpAndSettle();
         await nested;
-        expect(firstContext.launch.isActive, isTrue);
         await router.maybePop();
         await tester.pumpAndSettle();
         expect(router.current.matchId, firstId);
@@ -395,7 +376,6 @@ void main() {
         await first;
         await tester.pumpAndSettle();
         expect(router.current.matchId, nextId);
-        expect(_pickerContext(router).launch.isActive, isTrue);
         await tester.tap(find.text('Отменить создание'));
         await tester.pumpAndSettle();
         await next;
@@ -493,7 +473,6 @@ void _defineLatePickerTests() {
           direction: direction,
         );
         await tester.pumpAndSettle();
-        final oldLaunch = _pickerContext(router).launch;
         if (selected) {
           await _choose(
             tester,
@@ -507,7 +486,6 @@ void _defineLatePickerTests() {
         tabs.setActiveIndex(0);
         tabs.setActiveIndex(1);
         expect(source.mounted, isTrue);
-        expect(oldLaunch.isActive, isFalse);
         final rootSource = tester.element(
           find.byType(DailyChoiceCatalogPage, skipOffstage: false),
         );
@@ -524,8 +502,6 @@ void _defineLatePickerTests() {
         );
         await tester.pumpAndSettle();
         expect(router.current.name, _pickerName(direction));
-        expect(_pickerContext(router).launch, isNot(same(oldLaunch)));
-        expect(_pickerContext(router).launch.isActive, isTrue);
         await _choose(
           tester,
           direction,

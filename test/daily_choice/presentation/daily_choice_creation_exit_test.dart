@@ -11,7 +11,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -78,12 +77,8 @@ void main() {
         expect(exit.state, CreationExitState.submitting);
         expect(find.text('Выйти из создания'), findsOneWidget);
         exit.onExit();
-        expect(app.session.state, isA<DailyChoiceCreationFlowLeft>());
         await tester.pumpAndSettle();
-        expect(
-          app.router.stackData.map((r) => r.matchId),
-          app.session.originalHistory,
-        );
+        expect(app.router.stackData.map((r) => r.matchId), app.history);
         unawaited(
           app.router.push(
             ChoicePathRoute(
@@ -144,8 +139,6 @@ void main() {
         await tester.tap(
           find.descendant(of: exit, matching: find.byType(TextButton)),
         );
-        expect(app.session.state, isA<DailyChoiceCreationFlowLeft>());
-        expect(app.session.canContinue, isFalse);
         await tester.pumpAndSettle();
         await _expectOriginalHistory(tester, app);
         expect(app.completions, isEmpty);
@@ -182,7 +175,6 @@ void main() {
           submit();
           exit();
         }
-        expect(app.session.canContinue, isFalse);
         await tester.pumpAndSettle();
         expect(app.repository.commands, cancelFirst ? 0 : 1);
         if (!cancelFirst) {
@@ -220,8 +212,6 @@ void main() {
           app.errors.single.toString(),
           isNot(contains(durabilityUuid(201))),
         );
-        expect(app.session.state, isA<DailyChoiceCreationFlowLeft>());
-        expect(app.router.leftBeforeRemoval, isTrue);
         if (failure == _Failure.confirmation) {
           expect(app.router.current.matchId, confirmation);
           expect(
@@ -272,7 +262,6 @@ void main() {
       await _tap(tester, 'daily-choice-submit');
       app.repository.result.complete(false);
       await tester.pumpAndSettle();
-      expect(app.session.canContinue, isTrue);
       expect(find.text('Сохранить ввод после отказа'), findsOneWidget);
       expect(
         tester
@@ -312,9 +301,8 @@ void main() {
           .onExit();
       await tester.pumpAndSettle();
       expect(app.errors, hasLength(1));
-      expect(app.router.current.matchId, app.session.rootMatchId);
+      expect(app.router.current.name, ChoicePathRoute.name);
       expect(app.router.pagelessRoutesObserver.hasPagelessTopRoute, isFalse);
-      expect(app.session.canContinue, isFalse);
       expect(
         find.byKey(const ValueKey('choice-suggestion-select-0')),
         findsNothing,
@@ -352,7 +340,6 @@ void main() {
         );
         app.repository.result.complete(false);
         await tester.pumpAndSettle();
-        expect(app.session.canContinue, isFalse);
         final retry = tester.widget<CreationExitAction>(
           find.byType(CreationExitAction),
         );
@@ -383,16 +370,13 @@ void main() {
           .widget<CreationExitAction>(find.byType(CreationExitAction))
           .onExit;
       rootExit();
-      expect(app.session.canContinue, isTrue);
       expect(app.router.pagelessRoutesObserver.hasPagelessTopRoute, isTrue);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       previewExit();
-      expect(app.session.canContinue, isTrue);
       await _tap(tester, 'choice-suggestion-select-0');
       rootExit();
       previewExit();
-      expect(app.session.canContinue, isTrue);
       expect(app.router.current.name, DailyChoiceCreationRoute.name);
       tester
           .widget<CreationExitAction>(find.byType(CreationExitAction))
@@ -413,7 +397,6 @@ void main() {
       );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(app.session.canContinue, isTrue);
       await _tap(tester, 'choice-suggestion-select-0');
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
@@ -422,11 +405,9 @@ void main() {
       tester.testTextInput.hide();
       await tester.pumpAndSettle();
       expect(find.byType(DailyChoiceCreationPage), findsOneWidget);
-      expect(app.session.canContinue, isTrue);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(app.router.current.matchId, app.session.rootMatchId);
-      expect(app.session.canContinue, isTrue);
+      expect(app.router.current.name, ChoicePathRoute.name);
       await _tap(tester, 'choice-suggestion-select-0');
       tester
           .widget<CreationExitAction>(find.byType(CreationExitAction))
@@ -444,14 +425,14 @@ final class _App {
     this.router,
     this.database,
     this.repository,
-    this.session,
+    this.history,
     this.completions,
     this.errors,
   );
   final _Router router;
   final AppDatabase database;
   final _Repository repository;
-  final DailyChoiceCreationFlowSession session;
+  final List<LocalKey> history;
   final List<DailyChoiceCommandCompletion> completions;
   final List<FlutterErrorDetails> errors;
 }
@@ -527,6 +508,7 @@ Future<_App> _launch(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),
   );
   await tester.pumpAndSettle();
+  final history = [for (final route in router.stackData) route.matchId];
   unawaited(
     router.push(
       ChoicePathRoute(
@@ -538,10 +520,6 @@ Future<_App> _launch(
     ),
   );
   await tester.pumpAndSettle();
-  final session = tester
-      .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-      .creationSession!;
-  router.session = session;
   switch (step) {
     case _Step.path:
       break;
@@ -551,7 +529,7 @@ Future<_App> _launch(
       await _tap(tester, 'choice-suggestion-select-0');
       expect(find.byType(DailyChoiceCreationPage), findsOneWidget);
   }
-  return _App(router, database, repository, session, completions, errors);
+  return _App(router, database, repository, history, completions, errors);
 }
 
 Future<void> _tap(WidgetTester tester, String key) async {
@@ -562,10 +540,7 @@ Future<void> _tap(WidgetTester tester, String key) async {
 }
 
 Future<void> _expectOriginalHistory(WidgetTester tester, _App app) async {
-  expect(
-    app.router.stackData.map((route) => route.matchId),
-    app.session.originalHistory,
-  );
+  expect(app.router.stackData.map((route) => route.matchId), app.history);
   expect(app.router.pagelessRoutesObserver.hasPagelessTopRoute, isFalse);
   expect(find.byType(IntentionDetailsPage), findsOneWidget);
   await tester.binding.handlePopRoute();
@@ -583,14 +558,11 @@ Future<void> _expectOriginalHistory(WidgetTester tester, _App app) async {
 
 final class _Router extends RootStackRouter {
   var failure = _Failure.none;
-  DailyChoiceCreationFlowSession? session;
-  var leftBeforeRemoval = false;
   @override
   List<AutoRoute> get routes => AppRouter().routes;
 
   @override
   void removeRoute(RouteData route, {bool notify = true}) {
-    leftBeforeRemoval = session?.state is DailyChoiceCreationFlowLeft;
     final shouldFail = switch (failure) {
       _Failure.none => false,
       _Failure.confirmation => route.name == DailyChoiceCreationRoute.name,

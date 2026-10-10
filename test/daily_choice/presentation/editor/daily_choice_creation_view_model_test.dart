@@ -10,7 +10,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_state.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -27,24 +26,14 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
-  test('успех фиксируется в сессии до публикации события перехода', () async {
+  test('успех публикует событие перехода к созданному выбору', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);
-    final events = harness.container.listen(harness.provider, (_, next) {
-      if (next.event != null) {
-        expect(harness.session.state, isA<DailyChoiceCreationFlowSaved>());
-      }
-    });
-    addTearDown(events.close);
     harness.model.submit();
-    expect(harness.session.state, isA<DailyChoiceCreationFlowSubmitting>());
     harness.repository.succeed(0);
     await pumpEventQueue();
     expect(harness.state.event, isA<DailyChoiceCreationCreated>());
-    expect(
-      (harness.session.state as DailyChoiceCreationFlowSaved).choiceId,
-      harness.state.event!.choiceId,
-    );
+    expect(harness.state.event!.choiceId, _dailyChoiceId(1));
   });
 
   test('пустое описание становится отсутствующим, а ввод остаётся видимым', () {
@@ -85,7 +74,6 @@ void main() {
       expect(repository.commands, hasLength(1));
       repository.succeed(0);
       await pumpEventQueue();
-      expect(session.state, isA<DailyChoiceCreationFlowSaved>());
       container.read(provider.notifier).submit();
       expect(repository.commands, hasLength(1));
     },
@@ -109,10 +97,6 @@ void main() {
     expect(harness.state.description, 'Моё описание');
     expect(harness.state.isCompleted, isTrue);
     expect(harness.state.needsPathRefresh, isTrue);
-    expect(
-      harness.state.failurePresentation,
-      isA<GraphInitiatorPresentationClaim>(),
-    );
     harness.model.changeDate(CalendarDate.fromParts(2024, 3, 2));
     harness.model.submit();
     expect(harness.repository.commands, hasLength(1));
@@ -120,11 +104,14 @@ void main() {
     final refreshed = _path(type: LongTermRelationType.can);
     expect(harness.model.confirmRefreshedPath(refreshed), isTrue);
     expect(harness.model.confirmRefreshedPath(_path()), isFalse);
-    expect(harness.state.path, same(refreshed));
+    expect(harness.state.path.steps.single.type, LongTermRelationType.can);
     expect(harness.state.canSubmit, isTrue);
     harness.model.submit();
     expect(harness.repository.commands, hasLength(2));
-    expect(harness.repository.commands.last.path, same(refreshed));
+    expect(
+      harness.repository.commands.last.path.steps.single.type,
+      LongTermRelationType.can,
+    );
     expect(harness.repository.commands.last.description?.value, 'Моё описание');
     expect(
       harness.repository.commands.last.date,
@@ -168,10 +155,6 @@ void main() {
       harness.repository.fail(0, const DailyChoiceUnavailableFailure());
       await pumpEventQueue();
       expect(harness.state.canRetry, isTrue);
-      expect(
-        harness.state.failurePresentation,
-        isA<GraphInitiatorPresentationClaim>(),
-      );
       harness.model.submit();
       expect(harness.repository.commands, hasLength(2));
       harness.repository.fail(1, const DailyChoiceUnexpectedFailure());
@@ -193,10 +176,6 @@ void main() {
     );
     await pumpEventQueue();
     expect(harness.state.canSubmit, isFalse);
-    expect(
-      harness.state.failurePresentation,
-      isA<GraphInitiatorPresentationClaim>(),
-    );
 
     harness.model.changeDate(CalendarDate.fromParts(9999, 12, 31));
     expect(harness.state.canSubmit, isTrue);

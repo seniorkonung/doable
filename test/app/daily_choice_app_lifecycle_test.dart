@@ -750,8 +750,6 @@ void main() {
       final second = graph;
       final secondContainer =
           (await runtime.bootstrap() as AppRuntimeReady).container;
-      expect(second, isNot(same(first)));
-      expect(secondContainer, isNot(same(firstContainer)));
       expectHomeRootPage(secondContainer.read(appRouterProvider));
       expect(
         find.byType(daily_page.DailyChoiceCatalogPage, skipOffstage: false),

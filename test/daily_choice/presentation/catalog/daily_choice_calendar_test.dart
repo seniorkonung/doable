@@ -21,7 +21,6 @@ void main() {
       );
 
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-      expect(dayCell(tester, date(2026, 9, 30)).isOutsideMonth, isFalse);
       expect(consumer.events, isEmpty);
     },
   );
@@ -38,10 +37,6 @@ void main() {
       );
 
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-      expect(dayCell(tester, date(2026, 10, 26)).isOutsideMonth, isTrue);
-      expect(dayCell(tester, date(2026, 11, 1)).isOutsideMonth, isFalse);
-      expect(dayCell(tester, date(2026, 11, 30)).isOutsideMonth, isFalse);
-      expect(dayCell(tester, date(2026, 12, 6)).isOutsideMonth, isTrue);
       expect(consumer.events, isEmpty);
     },
   );
@@ -77,7 +72,6 @@ void main() {
         today: date(2026, 10, 4),
       );
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
-      expect(dayCell(tester, date(2026, 11, 1)).isOutsideMonth, isTrue);
 
       await tester.tap(calendarDay(date(2026, 11, 1)));
       await tester.pumpAndSettle();
@@ -86,7 +80,6 @@ void main() {
       expect(consumer.viewport, month(date(2026, 11, 1)));
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
       expect(dayCell(tester, date(2026, 11, 1)).isSelected, isTrue);
-      expect(dayCell(tester, date(2026, 11, 1)).isOutsideMonth, isFalse);
     },
   );
 

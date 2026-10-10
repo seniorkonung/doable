@@ -44,6 +44,7 @@ void main() {
 
   testWidgets('в местную полночь отмечает новый сегодняшний день, не меняя '
       'выбор, просмотр, выдачу и прокрутку', (tester) async {
+    final semantics = tester.ensureSemantics();
     final clock = _LocalClock(tester, start: _local(2026, 10, 6, 23, 30));
     final repository = _Repository();
     await _openCatalog(tester, repository, clock);
@@ -70,30 +71,25 @@ void main() {
     final catalog = _catalogState(tester);
     expect(catalog, isA<DailyChoiceCatalogLoaded>());
     expect(catalog.selection.isCompleted, false);
-    final viewport = month(date(2026, 10, 6));
-    expect(_calendar(tester).viewport, viewport);
-    expect(_calendar(tester).today, date(2026, 10, 6));
-    expect(dayCell(tester, date(2026, 10, 6)).isToday, isTrue);
-    final reads = clock.readCount;
+    final shownWeeks = visibleWeeks(tester);
+    expect(shownWeeks, weeksFrom(date(2026, 9, 28), 5));
+    expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);
 
     // Подготовка заняла часть оставшегося до полуночи поддельного времени.
     await tester.pump(clock.untilNextDate - const Duration(seconds: 1));
-    expect(_calendar(tester).today, date(2026, 10, 6));
-    expect(clock.readCount, reads);
+    expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 1));
-    expect(clock.readCount, reads + 1);
-    expect(_calendar(tester).today, date(2026, 10, 7));
-    expect(dayCell(tester, date(2026, 10, 7)).isToday, isTrue);
-    expect(dayCell(tester, date(2026, 10, 6)).isToday, isFalse);
+    expect(_todayMarker(tester, date(2026, 10, 7)), findsOneWidget);
+    expect(_todayMarker(tester, date(2026, 10, 6)), findsNothing);
     // Новый сегодняшний день не выбирается сам: выбор, охват, просмотр,
     // загруженная выдача и прокрутка остаются прежними, чтений нет.
-    expect(_calendar(tester).selectedDate, date(2026, 10, 6));
-    expect(dayCell(tester, date(2026, 10, 6)).isSelected, isTrue);
-    expect(_calendar(tester).viewport, viewport);
-    expect(_catalogState(tester), same(catalog));
+    _expectSelected(tester, date(2026, 10, 6));
+    expect(visibleWeeks(tester), shownWeeks);
+    _expectCatalogUnchanged(tester, catalog);
     expect(repository.queries, hasLength(2));
     expect(_catalogScroll(tester).pixels, 300);
+    semantics.dispose();
   });
 
   // Расчёт промежутка до местной полуночи на обоих переходах проверяет
@@ -101,6 +97,7 @@ void main() {
   // проверено, что страница ждёт именно этот промежуток, а не 24 часа.
   testWidgets('при переводе часов на летнее время сутки длятся 23 часа, и '
       'сегодняшний день сменяется в их местную полночь', (tester) async {
+    final semantics = tester.ensureSemantics();
     final transitionDay = date(2026, 3, 8);
     const transitionLength = Duration(hours: 23);
     final clock = _LocalClock(tester, start: _local(2026, 3, 7, 23));
@@ -108,35 +105,35 @@ void main() {
     await _openCatalog(tester, repository, clock);
     repository.completeFirst([], total: 0);
     await tester.pump();
-    final selected = _calendar(tester).selectedDate;
-    final reads = clock.readCount;
+    // Месяц показывает и сутки перехода, и следующую за ними дату.
+    await tester.tap(find.byTooltip(_l10n.dailyChoiceCalendarExpand));
+    await _settle(tester);
+    _expectSelected(tester, date(2026, 3, 7));
 
-    await tester.pump(const Duration(hours: 1));
-    expect(_calendar(tester).today, transitionDay);
-    expect(clock.readCount, reads + 1);
+    await tester.pump(clock.untilNextDate);
+    expect(_todayMarker(tester, transitionDay), findsOneWidget);
 
     // Следующая дата начинается не через фиксированные 24 часа, а в
     // действительную местную полночь.
     await tester.pump(transitionLength - const Duration(seconds: 1));
-    expect(_calendar(tester).today, transitionDay);
-    expect(clock.readCount, reads + 1);
+    expect(_todayMarker(tester, transitionDay), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 1));
-    expect(_calendar(tester).today, _nextDay(transitionDay));
-    expect(clock.readCount, reads + 2);
-    expect(_calendar(tester).selectedDate, selected);
+    expect(_todayMarker(tester, _nextDay(transitionDay)), findsOneWidget);
+    _expectSelected(tester, date(2026, 3, 7));
     expect(repository.queries, hasLength(1));
+    semantics.dispose();
   });
 
-  testWidgets('каждое возвращение в приложение перечитывает часы, а до '
-      'полуночи остаётся один таймер', (tester) async {
+  testWidgets('возвращения в приложение не сдвигают местную полночь, в которую '
+      'сегодняшний день сменяется', (tester) async {
+    final semantics = tester.ensureSemantics();
     final clock = _LocalClock(tester, start: _local(2026, 10, 6, 21));
     final repository = _Repository();
     await _openCatalog(tester, repository, clock);
     repository.completeFirst(_items(date(2026, 10, 6)), total: 40);
     await tester.pump();
     final catalog = _catalogState(tester);
-    final reads = clock.readCount;
 
     for (var resume = 1; resume <= 3; resume++) {
       await tester.pump(const Duration(minutes: 10));
@@ -144,39 +141,37 @@ void main() {
       await tester.pump(const Duration(minutes: 10));
       _returnToForeground(tester);
       await tester.pump();
-      expect(clock.readCount, reads + resume);
-      expect(_calendar(tester).today, date(2026, 10, 6));
+      expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);
     }
-    expect(_catalogState(tester), same(catalog));
+    _expectCatalogUnchanged(tester, catalog);
     expect(repository.queries, hasLength(1));
 
-    // С 22:00 до полуночи: прежние таймеры заменены, срабатывает только один.
+    // С 22:00 до полуночи: день сменяется ровно в полночь, а не раньше.
     await tester.pump(const Duration(hours: 1, minutes: 59, seconds: 59));
-    expect(clock.readCount, reads + 3);
+    expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    expect(clock.readCount, reads + 4);
-    expect(_calendar(tester).today, date(2026, 10, 7));
+    expect(_todayMarker(tester, date(2026, 10, 7)), findsOneWidget);
 
     await tester.pump(const Duration(hours: 23, minutes: 59, seconds: 59));
-    expect(clock.readCount, reads + 4);
+    expect(_todayMarker(tester, date(2026, 10, 7)), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    expect(clock.readCount, reads + 5);
-    expect(_calendar(tester).today, date(2026, 10, 8));
-    expect(_calendar(tester).selectedDate, date(2026, 10, 6));
-    expect(_catalogState(tester), same(catalog));
+    expect(_todayMarker(tester, date(2026, 10, 8)), findsOneWidget);
+    _expectSelected(tester, date(2026, 10, 6));
+    _expectCatalogUnchanged(tester, catalog);
     expect(repository.queries, hasLength(1));
+    semantics.dispose();
   });
 
   testWidgets('после нескольких дней приостановки в фоне возвращение '
       'отмечает день возвращения и переносит таймер', (tester) async {
+    final semantics = tester.ensureSemantics();
     final clock = _LocalClock(tester, start: _local(2026, 10, 6, 22));
     final repository = _Repository();
     await _openCatalog(tester, repository, clock);
     repository.completeFirst(_items(date(2026, 10, 6)), total: 40);
     await tester.pump();
     final catalog = _catalogState(tester);
-    final viewport = _calendar(tester).viewport;
-    final reads = clock.readCount;
+    final weeks = visibleWeeks(tester);
 
     // Приостановленный процесс не выполняет таймеры, а часы устройства идут:
     // процесс возвращается 9 октября в 11:00.
@@ -184,41 +179,39 @@ void main() {
     clock.suspend(const Duration(days: 2, hours: 13));
     _returnToForeground(tester);
     await tester.pump();
-    expect(clock.readCount, reads + 1);
-    expect(_calendar(tester).today, date(2026, 10, 9));
-    expect(_calendar(tester).selectedDate, date(2026, 10, 6));
-    expect(_calendar(tester).viewport, viewport);
-    expect(_catalogState(tester), same(catalog));
+    expect(_todayMarker(tester, date(2026, 10, 9)), findsOneWidget);
+    _expectSelected(tester, date(2026, 10, 6));
+    expect(visibleWeeks(tester), weeks);
+    _expectCatalogUnchanged(tester, catalog);
     expect(repository.queries, hasLength(1));
 
-    // Таймер до прежней полуночи заменён таймером до полуночи 10 октября.
+    // Следующая смена дня — в полночь 10 октября, а не по прежнему таймеру.
     await tester.pump(const Duration(hours: 12, minutes: 59, seconds: 59));
-    expect(clock.readCount, reads + 1);
+    expect(_todayMarker(tester, date(2026, 10, 9)), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    expect(clock.readCount, reads + 2);
-    expect(_calendar(tester).today, date(2026, 10, 10));
+    expect(_todayMarker(tester, date(2026, 10, 10)), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('дни, прошедшие в фоне с работающими таймерами, отмечаются при '
       'возвращении', (tester) async {
+    final semantics = tester.ensureSemantics();
     final clock = _LocalClock(tester, start: _local(2026, 10, 6, 22));
     final repository = _Repository();
     await _openCatalog(tester, repository, clock);
     repository.completeFirst([], total: 0);
     await tester.pump();
-    final reads = clock.readCount;
 
     _sendToBackground(tester);
-    await tester.pump(const Duration(days: 3));
     // Три местные полуночи прошли в фоне.
-    expect(clock.readCount, reads + 3);
+    await tester.pump(const Duration(days: 3));
     _returnToForeground(tester);
     await tester.pump();
 
-    expect(clock.readCount, reads + 4);
-    expect(_calendar(tester).today, date(2026, 10, 9));
-    expect(_calendar(tester).selectedDate, date(2026, 10, 6));
+    expect(_todayMarker(tester, date(2026, 10, 9)), findsOneWidget);
+    _expectSelected(tester, date(2026, 10, 6));
     expect(repository.queries, hasLength(1));
+    semantics.dispose();
   });
 
   testWidgets('после закрытия каталога часы не читаются, а таймер и '
@@ -242,22 +235,23 @@ void main() {
 
   testWidgets('если приложение оставалось на Главной до следующего дня, первое '
       'открытие каталога выбирает день открытия', (tester) async {
+    final semantics = tester.ensureSemantics();
     final clock = _LocalClock(tester, start: _local(2026, 10, 6, 22));
     final repository = _Repository();
     final router = await _pumpApp(tester, repository, clock);
     expect(find.byType(HomePage), findsOneWidget);
 
     await tester.pump(const Duration(hours: 3));
-    expect(clock.readCount, 0);
     openDailyChoicesOn(router);
     await tester.pump();
     await tester.pump();
 
     expect(repository.queries.single.date, date(2026, 10, 7));
     expect(repository.queries.single.isCompleted, isNull);
-    expect(_calendar(tester).selectedDate, date(2026, 10, 7));
-    expect(_calendar(tester).today, date(2026, 10, 7));
-    expect(_calendar(tester).viewport, week(date(2026, 10, 7)));
+    _expectSelected(tester, date(2026, 10, 7));
+    expect(_todayMarker(tester, date(2026, 10, 7)), findsOneWidget);
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+    semantics.dispose();
   });
 }
 
@@ -368,8 +362,38 @@ void _returnToForeground(WidgetTester tester) {
   }
 }
 
-DailyChoiceCalendar _calendar(WidgetTester tester) =>
-    tester.widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar));
+/// Полная дата с днём недели в том виде, в каком её называет календарь.
+String _fullDate(WidgetTester tester, CalendarDate value) {
+  final context = tester.element(find.byType(DailyChoiceCalendar));
+  return MaterialLocalizations.of(context)
+      .formatFullDate(DateTime.utc(value.year, value.month, value.day));
+}
+
+/// День [value] назван сегодняшним: так его читает экранный диктор.
+Finder _todayMarker(WidgetTester tester, CalendarDate value) =>
+    find.bySemanticsLabel(
+      '${_fullDate(tester, value)}, ${_l10n.dailyChoiceCalendarToday}',
+    );
+
+/// Шапка календаря называет выбранной дату [value].
+void _expectSelected(WidgetTester tester, CalendarDate value) => expect(
+  find.text(_l10n.dailyChoiceCalendarSelectedDate(_fullDate(tester, value))),
+  findsOneWidget,
+);
+
+/// Выдача каталога осталась такой же, как была: те же строки, количество,
+/// день и охват.
+void _expectCatalogUnchanged(
+  WidgetTester tester,
+  DailyChoiceCatalogState before,
+) {
+  final now = _catalogState(tester) as DailyChoiceCatalogLoaded;
+  final was = before as DailyChoiceCatalogLoaded;
+  expect(now.items.map((item) => item.id), was.items.map((item) => item.id));
+  expect(now.totalCount, was.totalCount);
+  expect(now.selection.date, was.selection.date);
+  expect(now.selection.isCompleted, was.selection.isCompleted);
+}
 
 DailyChoiceCatalogState _catalogState(WidgetTester tester) =>
     ProviderScope.containerOf(
