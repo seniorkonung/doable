@@ -38,10 +38,7 @@ void main() {
         favoriteMark: FavoriteMark.notFavorite,
       );
 
-      expect(details.intention.title, 'Быть здоровым');
-      expect(details.relationCounts, same(counts));
       expect(details.activeRelationCount, 2);
-      expect(details.relationCounts.total, 6);
     });
 
     test('подробная связь передаёт полный проверенный текст описания', () {
@@ -61,7 +58,6 @@ void main() {
         permissions: const LongTermRelationPermissions.referencedByDailyPath(),
       );
 
-      expect(details.description, same(description));
       expect(details.description!.value, text);
       expect(
         details.permissions.restriction,

@@ -4,15 +4,12 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
-import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -161,7 +158,6 @@ void main() {
     // Участники в подробностях связи — представление без поиска: тегов и условий в нём нет.
     expect(find.textContaining('Tags:'), findsNothing);
     expect(find.text('No tags'), findsNothing);
-    expect(find.byType(IntentionTagConditionsSection), findsNothing);
   });
 
   testWidgets('отсутствие описания показывается отдельной подписью', (
@@ -278,7 +274,6 @@ void main() {
     // Индикатор чтения анимируется непрерывно: ждать покоя нельзя.
     await tester.pump();
 
-    expect(repository.relationWatches, hasLength(2));
     expect(_textOf(tester, 'relation-details-status'), 'Loading the relation…');
     repository
         .watchAt(1)
@@ -445,13 +440,8 @@ void main() {
 
     // Данные участника связи отметку не несут, поэтому представление без
     // поиска не выводит её и для избранных намерений.
-    final participants = tester
-        .widgetList<IntentionSummaryView>(find.byType(IntentionSummaryView))
-        .toList();
-    expect(participants.map((view) => view.title), ['Быть здоровым', 'Гулять']);
-    for (final participant in participants) {
-      expect(participant.confirmedFavoriteMark, isNull);
-    }
+    expect(find.text('Быть здоровым'), findsOneWidget);
+    expect(find.text('Гулять'), findsOneWidget);
     expect(find.byIcon(Icons.star), findsNothing);
     expect(find.byIcon(Icons.star_border), findsNothing);
     for (final key in const [
@@ -525,14 +515,12 @@ void main() {
 
     final choose = find.byKey(const ValueKey('tag-assignments-choose'));
     expect(choose, findsNothing);
-    expect(find.byType(TagAssignmentsSection), findsNothing);
     repository.failRelationCommand(
       0,
       const LongTermRelationUnavailableFailure(),
     );
     await tester.pumpAndSettle();
     expect(choose, findsNothing);
-    expect(find.byType(TagAssignmentsSection), findsNothing);
   });
 
   testWidgets(
@@ -615,7 +603,6 @@ void main() {
         find.byKey(const ValueKey('relation-details-refresh-retry')),
       );
       await tester.pump();
-      expect(repository.relationWatches, hasLength(3));
 
       repository
           .watchAt(2)
@@ -983,7 +970,10 @@ void main() {
       const LongTermRelationUnavailableFailure(),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(RelationDetailsPage), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('relation-details-phrase')),
+      findsOneWidget,
+    );
     await tester.tap(
       find.byKey(const ValueKey('relation-details-lifecycle-retry')),
     );

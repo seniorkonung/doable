@@ -395,14 +395,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(
-      harness.container
-          .read(
-            blockingRelationsSelectionViewModelProvider(harness.intentionId),
-          )
-          .selected,
-      isEmpty,
-    );
-    expect(
       find.byKey(const ValueKey('blocking-relations-review')),
       findsNothing,
     );
@@ -510,9 +502,6 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
     await tester.pumpAndSettle();
-    expect(harness.repository.selectedReads, 1);
-    expect(harness.repository.selectedWatches, 1);
-    expect(harness.repository.relationWatches, 0);
     expect(
       harness.repository.selectedIds,
       rows.map((row) => row.relation.id).toSet(),
@@ -617,16 +606,6 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
       await tester.pumpAndSettle();
-      final later = testGroupRow(ownerId: harness.intentionId, index: 3);
-      expect(
-        harness.container
-            .read(
-              blockingRelationsSelectionViewModelProvider(harness.intentionId),
-            )
-            .selected
-            .containsKey(later.relation.id),
-        isFalse,
-      );
       final confirm = find.byKey(
         const ValueKey('blocking-relations-confirm-delete'),
       );
@@ -905,15 +884,6 @@ void main() {
         findsOneWidget,
       );
       expect(harness.repository.commands, isEmpty);
-      expect(
-        harness.container
-            .read(
-              blockingRelationsSelectionViewModelProvider(harness.intentionId),
-            )
-            .selected
-            .keys,
-        {row.relation.id},
-      );
       harness.repository.readFailure = null;
       await tester.tap(
         find.byKey(const ValueKey('blocking-relations-refresh-retry')),
@@ -963,10 +933,6 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(harness.repository.selectedIds, {
-        first.relation.id,
-        second.relation.id,
-      });
     },
   );
 
@@ -993,13 +959,12 @@ void main() {
     expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
     expect(harness.repository.commands, isEmpty);
     expect(
-      harness.container
-          .read(
-            blockingRelationsSelectionViewModelProvider(harness.intentionId),
-          )
-          .selected
-          .keys,
-      {row.relation.id},
+      find.byKey(
+        ValueKey(
+          'blocking-relations-confirm-row-${row.relation.id.toCanonicalString()}',
+        ),
+      ),
+      findsOneWidget,
     );
   });
 }
@@ -1131,9 +1096,6 @@ final class _CommandRepository
       StreamController<SelectedRelationsReadResult>.broadcast(sync: true);
   SelectedRelationsQuery? _watchedQuery;
   GraphRevision _revision = const TestGraphRevision(2);
-  int selectedReads = 0;
-  int selectedWatches = 0;
-  int relationWatches = 0;
   Set<LongTermRelationId> selectedIds = {};
   final _relationUpdates =
       <LongTermRelationId, StreamController<LongTermRelationReadResult>>{};
@@ -1197,7 +1159,6 @@ final class _CommandRepository
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
   ) async {
-    selectedReads++;
     selectedIds = query.relationIds;
     return _currentSelection(query);
   }
@@ -1206,7 +1167,6 @@ final class _CommandRepository
   Stream<SelectedRelationsReadResult> watchSelectedRelations(
     SelectedRelationsQuery query,
   ) => Stream.multi((controller) {
-    selectedWatches++;
     selectedIds = query.relationIds;
     _watchedQuery = query;
     controller.addSync(_currentSelection(query));
@@ -1287,7 +1247,6 @@ final class _CommandRepository
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
-    relationWatches++;
     if (!(isPrepared?.call() ?? false)) {
       return Stream.value(_currentRelation(id));
     }

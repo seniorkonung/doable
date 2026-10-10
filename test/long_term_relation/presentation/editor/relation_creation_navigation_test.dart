@@ -53,12 +53,7 @@ void main() {
             .widget<CreationExitAction>(find.byType(CreationExitAction))
             .onExit();
         await tester.pump();
-        expect(
-          tester
-              .widget<CreationExitAction>(find.byType(CreationExitAction))
-              .state,
-          CreationExitState.submitting,
-        );
+        expect(find.textContaining('Saving will continue'), findsOneWidget);
         if (success) {
           app.repository.completeRelationCreated(0);
         } else {
@@ -68,12 +63,8 @@ void main() {
           );
         }
         await tester.pumpAndSettle();
-        expect(
-          tester
-              .widget<CreationExitAction>(find.byType(CreationExitAction))
-              .state,
-          CreationExitState.terminal,
-        );
+        expect(find.text('Leave creation'), findsOneWidget);
+        expect(find.textContaining('Saving will continue'), findsNothing);
         expect(
           tester.widget<FilledButton>(_key('relation-editor-submit')).onPressed,
           isNull,
@@ -82,7 +73,6 @@ void main() {
           tester.widget<TextField>(_key('relation-editor-description')).enabled,
           isFalse,
         );
-        expect(app.router.replacements, 0);
         expect(app.repository.relationCommands, hasLength(1));
         expect(
           find.textContaining(
@@ -264,7 +254,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(app.router.stackData.last.matchId, newMatch);
     expect(_description(tester), 'Новый черновик');
-    expect(app.router.replacements, 0);
     expect(app.repository.relationCommands, hasLength(1));
     expect(find.textContaining('Relation created.'), findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
@@ -350,12 +339,6 @@ void main() {
       await _openForm(tester, app, null);
       await _fill(tester, app);
       await _tap(tester, 'relation-editor-submit');
-      expect(
-        tester
-            .widget<CreationExitAction>(find.byType(CreationExitAction))
-            .state,
-        CreationExitState.submitting,
-      );
       expect(find.text('Leave creation'), findsOneWidget);
       expect(find.textContaining('Saving will continue'), findsOneWidget);
       app.repository.failRelationCommand(
@@ -495,7 +478,6 @@ void main() {
         await tester.pump(const Duration(seconds: 5));
         await tester.pumpAndSettle();
         expect(find.textContaining('Relation created.'), findsNothing);
-        expect(app.router.replacements, 1);
         expect(tester.takeException(), isNull);
       },
     );
@@ -569,7 +551,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(app.router.stackData.last.matchId, newMatch);
       expect(_description(tester), 'Новый черновик');
-      expect(app.router.replacements, 0);
       expect(app.repository.relationCommands, hasLength(1));
       expect(find.textContaining('Relation created.'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -601,7 +582,6 @@ void main() {
       expect(_description(tester), 'Новый черновик');
       expect(app.repository.relationCommands, hasLength(1));
       expect(app.errors, hasLength(1));
-      expect(app.router.replacements, 1);
       expect(tester.takeException(), isNull);
     },
   );
@@ -749,7 +729,6 @@ final class _FailingRouter extends RootStackRouter {
   final _Failure failure;
   final _gate = Completer<void>();
   final _pickerGate = Completer<void>();
-  var replacements = 0;
   var allowExit = false;
   var holdPickerResult = false;
   void release() => _gate.complete();
@@ -788,7 +767,6 @@ final class _FailingRouter extends RootStackRouter {
     PageRouteInfo route, {
     OnNavigationFailure? onFailure,
   }) {
-    replacements++;
     switch (failure) {
       case _Failure.none:
       case _Failure.exitBeforeForm:

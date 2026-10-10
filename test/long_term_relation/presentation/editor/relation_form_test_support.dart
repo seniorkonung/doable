@@ -82,7 +82,6 @@ final class ControlledRelationFormRepository
   final relationCommands = <CreateLongTermRelation>[];
   final relationUpdateCommands = <UpdateLongTermRelation>[];
   final relationWatches = <ControlledRelationWatch>[];
-  final watchedIntentionIds = <IntentionId>[];
   final _intentionStreams =
       <
         IntentionId,
@@ -250,7 +249,6 @@ final class ControlledRelationFormRepository
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) {
-    watchedIntentionIds.add(id);
     final controller = _intentionStreams.putIfAbsent(
       id,
       () =>

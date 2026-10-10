@@ -10,7 +10,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,7 +116,6 @@ void main() {
         final l10n = AppLocalizations.of(
           tester.element(find.byKey(const ValueKey('relation-details-phrase'))),
         );
-        expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(
           find.byKey(const ValueKey('tag-assignments-choose')),
           findsNothing,
@@ -202,7 +200,6 @@ void main() {
                 .toCanonicalString(),
             tagFixtureId(participantNumber),
           );
-          expect(find.byType(TagAssignmentsSection), findsOneWidget);
           expect(
             find.byKey(const ValueKey('tag-assignments-choose')),
             findsOneWidget,
@@ -219,7 +216,6 @@ void main() {
           await tester.pumpAndSettle();
         }
         expect(router.current.name, RelationDetailsRoute.name);
-        expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(_storedGraph(raw), graphBefore);
         expect(tester.takeException(), isNull);
         router.pop();

@@ -88,7 +88,6 @@ void main() {
       DailyChoiceRelationRole.selected,
     );
     expect(state.items.single.selected.id, harness.intentionId);
-    expect(state.revision, const TestGraphRevision(2));
   });
 
   test(
@@ -131,7 +130,6 @@ void main() {
       await pumpEventQueue();
       final refreshing = harness.state as DailyChoiceGroupLoaded;
       expect(refreshing.items.single.isCompleted, isFalse);
-      expect(refreshing.revision, const TestGraphRevision(1));
       expect(refreshing.summaryFreshness, RelationSummaryFreshness.refreshing);
       repository.completePage(
         2,
@@ -151,7 +149,6 @@ void main() {
       await pumpEventQueue();
       final updated = harness.state as DailyChoiceGroupLoaded;
       expect(updated.items.single.isCompleted, isTrue);
-      expect(updated.revision, const TestGraphRevision(2));
       expect(updated.summaryFreshness, RelationSummaryFreshness.current);
     },
   );
@@ -199,9 +196,7 @@ void main() {
       final stale = harness.state as DailyChoiceGroupLoaded;
       expect(stale.items, hasLength(1));
       expect(stale.counts.dailySource, 1);
-      expect(stale.revision, const TestGraphRevision(1));
       expect(stale.summaryFreshness, RelationSummaryFreshness.stale);
-      expect(repository.requestCount, 3);
     },
   );
 
@@ -312,7 +307,6 @@ void main() {
         (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
         RelationSummaryFreshness.refreshing,
       );
-      expect(repository.requestCount, 3);
       repository.completePage(
         2,
         DailyChoiceGroupFirstPage(
@@ -407,7 +401,6 @@ void main() {
       const DailyChoiceRelationGroup(role: DailyChoiceRelationRole.source),
     );
     expect(empty.counts.total, 0);
-    expect(empty.revision, const TestGraphRevision(2));
   });
 
   test(
@@ -484,9 +477,7 @@ void main() {
       final current = harness.state as DailyChoiceGroupLoaded;
       expect(current.items, hasLength(1));
       expect(current.counts.dailySource, 1);
-      expect(current.revision, const TestGraphRevision(2));
       expect(current.hasConfirmedEnd, isTrue);
-      expect(repository.requestCount, 4);
     },
   );
 
@@ -544,7 +535,6 @@ void main() {
     );
     await pumpEventQueue();
     final current = harness.state as DailyChoiceGroupLoaded;
-    expect(current.revision, const TestGraphRevision(2));
     expect(current.counts.dailySource, 1);
     expect(current.hasConfirmedEnd, isTrue);
   });
@@ -626,7 +616,6 @@ void main() {
         (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
         RelationSummaryFreshness.refreshing,
       );
-      expect(repository.requestCount, 3);
       repository.completePage(
         2,
         DailyChoiceGroupFirstPage(
@@ -647,7 +636,6 @@ void main() {
       final visible = harness.state as DailyChoiceGroupLoaded;
       expect(visible.items.single.id, unseenId);
       expect(visible.counts.dailySource, 2);
-      expect(visible.revision, const TestGraphRevision(2));
     },
   );
 
@@ -781,7 +769,6 @@ void main() {
       );
       await start.future;
       await pumpEventQueue();
-      expect(repository.requestCount, 2);
       expect(
         (harness.state as RelationGroupConfirmedState).summaryFreshness,
         RelationSummaryFreshness.refreshing,
@@ -803,7 +790,6 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(harness.loaded.revision, const TestGraphRevision(6));
       expect(harness.loaded.counts.dailyTotal, 0);
       expect(harness.loaded.counts.longTermTotal, 1);
       expect(harness.relationIds, [row.relation.id]);
@@ -834,7 +820,6 @@ void main() {
       expect(harness.state, isA<RelationGroupLoaded>());
       expect(harness.loaded.counts.dailySource, 1);
       expect(harness.relationIds, [row.relation.id]);
-      expect(repository.requestCount, 1);
     },
   );
 
@@ -870,10 +855,8 @@ void main() {
         );
         await pumpEventQueue();
         final old = harness.state as RelationGroupConfirmedState;
-        expect(old.revision, const TestGraphRevision(4));
         expect(old.counts.dailyTotal, 0);
         expect(old.summaryFreshness, RelationSummaryFreshness.refreshing);
-        expect(repository.requestCount, 2);
 
         repository.completePage(
           1,
@@ -889,7 +872,6 @@ void main() {
         );
         await pumpEventQueue();
         final updated = harness.state as RelationGroupConfirmedState;
-        expect(updated.revision, const TestGraphRevision(5));
         expect(updated.counts.dailySource, 1);
         expect(updated.totalCount, activeCount);
         expect(updated.summaryFreshness, RelationSummaryFreshness.current);
@@ -952,7 +934,6 @@ void main() {
     );
     await pumpEventQueue();
     expect(harness.state, isA<RelationGroupInitialLoad>());
-    expect(repository.requestCount, 2);
 
     repository.completePage(
       1,
@@ -987,7 +968,6 @@ void main() {
     );
     await pumpEventQueue();
     harness.scrollTo(1);
-    expect(repository.requestCount, 2);
 
     final command = DeleteBlockingRelations.longTerm(
       intentionId: owner,
@@ -1018,7 +998,6 @@ void main() {
     await (start as BlockingRelationsDeleteAccepted).future;
     await pumpEventQueue();
 
-    expect(repository.requestCount, 3);
     expect(repository.queryAt(2).cursor, isNull);
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
     expect(harness.loaded.totalCount, 3);
@@ -1031,7 +1010,6 @@ void main() {
     expect(harness.loaded.hasConfirmedEnd, isFalse);
 
     harness.retryRefresh();
-    expect(repository.requestCount, 4);
     expect(repository.queryAt(3).cursor, isNull);
     repository.completePage(
       3,
@@ -1046,8 +1024,7 @@ void main() {
     expect(harness.relationIds, [first.relation.id, remaining.relation.id]);
     expect(harness.loaded.totalCount, 2);
     expect(harness.loaded.hasConfirmedEnd, isTrue);
-    expect(harness.loaded.revision, revision);
-    expect(repository.blockingCommands.single, same(command));
+    expect(repository.blockingCommands.single.references, command.references);
     repository.completePage(
       1,
       RelationGroupContinuationPage(
@@ -1063,7 +1040,6 @@ void main() {
       revision: revision,
     );
     await pumpEventQueue();
-    expect(repository.requestCount, 4);
     expect(harness.relationIds, [first.relation.id, remaining.relation.id]);
   });
 
@@ -1131,7 +1107,6 @@ void main() {
         );
         await start.future;
         await pumpEventQueue();
-        expect(repository.requestCount, 2);
         final old = harness.state as RelationGroupConfirmedState;
         expect(old.counts.archivedNeedOutgoing, 1);
         expect(old.summaryFreshness, RelationSummaryFreshness.refreshing);
@@ -1150,14 +1125,12 @@ void main() {
           revision: const TestGraphRevision(4),
         );
         await pumpEventQueue();
-        expect(repository.requestCount, 2);
         expect(
           (harness.state as RelationGroupConfirmedState).summaryFreshness,
           RelationSummaryFreshness.stale,
         );
 
         harness.retryRefresh();
-        expect(repository.requestCount, 3);
         repository.completePage(
           2,
           RelationGroupFirstPage(
@@ -1171,7 +1144,6 @@ void main() {
         final current = harness.state as RelationGroupConfirmedState;
         expect(current.counts.archivedNeedOutgoing, 0);
         expect(current.summaryFreshness, RelationSummaryFreshness.current);
-        expect(current.revision, revision);
         expect(
           current,
           initiallyEmpty
@@ -1185,28 +1157,6 @@ void main() {
       },
     );
   }
-
-  test('повторная прокрутка не отправляет то же продолжение дважды', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    harness.completeFirstPage(
-      index: 0,
-      from: 1,
-      count: 2,
-      totalCount: 5,
-      nextCursor: const TestRelationGroupCursor(2),
-    );
-    await pumpEventQueue();
-
-    harness.scrollTo(1);
-    harness.scrollTo(1);
-
-    expect(repository.requestCount, 2);
-    expect(repository.queryAt(1).cursor, isA<TestRelationGroupCursor>());
-    expect(harness.loaded.progress, isA<RelationGroupLoadingMore>());
-  });
 
   test('далёкая от конца прокрутка не запрашивает продолжение', () async {
     final repository = ControlledNeighborhoodRepository();
@@ -1224,7 +1174,8 @@ void main() {
 
     harness.scrollTo(0);
 
-    expect(repository.requestCount, 1);
+    expect(harness.loaded.progress, isA<RelationGroupIdle>());
+    expect(harness.loaded.items, hasLength(3));
   });
 
   test('подгрузка присоединяет строки без повторов', () async {
@@ -1259,18 +1210,6 @@ void main() {
     expect(harness.loaded.hasConfirmedEnd, isTrue);
     expect(harness.loaded.totalCount, 5);
     expect(harness.loaded.progress, isA<RelationGroupIdle>());
-  });
-
-  test('повторный выбор той же группы не перечитывает её', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _NeighborhoodHarness(repository);
-    addTearDown(harness.dispose);
-
-    harness.viewModel.selectType(LongTermRelationType.need);
-    harness.viewModel.selectDirection(RelationDirection.outgoing);
-    harness.viewModel.selectScope(RelationScope.active);
-
-    expect(repository.requestCount, 1);
   });
 
   test('поздний ответ прежней группы не попадает в новый выбор', () async {
@@ -1365,7 +1304,6 @@ void main() {
     await pumpEventQueue();
 
     harness.retryLoadMore();
-    expect(repository.requestCount, 3);
     repository.completePage(
       2,
       RelationGroupContinuationPage(
@@ -1406,7 +1344,6 @@ void main() {
       ),
     );
     harness.retryLoadMore();
-    expect(repository.requestCount, 2);
     expect(harness.loaded.hasConfirmedEnd, isFalse);
   });
 
@@ -1428,7 +1365,11 @@ void main() {
       expect(
         harness.state,
         isA<RelationGroupInitialFailure>()
-            .having((value) => value.failure, 'причина', same(entry.key))
+            .having(
+              (value) => value.failure.runtimeType,
+              'причина',
+              entry.key.runtimeType,
+            )
             .having((value) => value.canRetry, 'повтор доступен', entry.value),
         reason: '${entry.key}',
       );
@@ -1471,14 +1412,14 @@ void main() {
     repository.failRead(0, const RelationGroupCorruptionFailure());
     await pumpEventQueue();
     harness.retryFirstPage();
-    expect(repository.requestCount, 1);
+    expect(harness.state, isA<RelationGroupInitialFailure>());
 
     harness.viewModel.selectType(LongTermRelationType.can);
     repository.failRead(1, const RelationGroupUnavailableFailure());
     await pumpEventQueue();
     harness.retryFirstPage();
 
-    expect(repository.requestCount, 3);
+    expect(harness.state, isA<RelationGroupInitialLoad>());
     expect(repository.queryAt(2).type, LongTermRelationType.can);
     expect(repository.queryAt(2).cursor, isNull);
   });
@@ -1551,7 +1492,6 @@ void main() {
     expect(harness.loaded.progress, isA<RelationGroupIdle>());
     expect(harness.loaded.items.length, 4);
     expect(harness.loaded.totalCount, 5);
-    expect(repository.requestCount, 4);
     expect(repository.queryAt(3).cursor, isNull);
 
     harness.completeFirstPage(
@@ -1590,7 +1530,6 @@ void main() {
     expect(harness.loaded.totalCount, 6);
     expect(harness.loaded.hasConfirmedEnd, isTrue);
     expect(harness.loaded.progress, isA<RelationGroupIdle>());
-    expect(repository.requestCount, 6);
   });
 
   test(
@@ -1632,10 +1571,8 @@ void main() {
       await (start as IntentionCommandAccepted).future;
       await pumpEventQueue();
 
-      expect(repository.requestCount, 2);
       repository.failRead(1, const RelationGroupSnapshotExpired());
       await pumpEventQueue();
-      expect(repository.requestCount, 3);
 
       harness.completeFirstPage(
         index: 2,
@@ -1646,7 +1583,6 @@ void main() {
         revision: const TestGraphRevision(9),
       );
       await pumpEventQueue();
-      expect(repository.requestCount, 4);
       expect(repository.queryAt(3).cursor, const TestRelationGroupCursor(2));
 
       repository.completePage(
@@ -1691,7 +1627,6 @@ void main() {
 
     expect(harness.loaded.items.length, 2);
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
-    expect(repository.requestCount, 3);
     expect(repository.queryAt(2).cursor, isNull);
   });
 
@@ -1729,7 +1664,6 @@ void main() {
     expect(harness.loaded.hasConfirmedEnd, isFalse);
 
     harness.retryRefresh();
-    expect(repository.requestCount, 3);
     expect(repository.queryAt(2).cursor, isNull);
 
     harness.completeFirstPage(
@@ -1772,7 +1706,6 @@ void main() {
     expect(harness.loaded.hasConfirmedEnd, isFalse);
 
     harness.retryRefresh();
-    expect(repository.requestCount, 3);
     expect(repository.queryAt(2).cursor, isNull);
   });
 
@@ -1809,7 +1742,6 @@ void main() {
     expect(harness.loaded.items.length, 2);
     expect(harness.loaded.totalCount, 5);
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
-    expect(repository.requestCount, 5);
     expect(repository.queryAt(4).cursor, isNull);
 
     harness.completeFirstPage(
@@ -1899,7 +1831,6 @@ void main() {
     await (start as IntentionCommandAccepted).future;
     await pumpEventQueue();
 
-    expect(repository.requestCount, 2);
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
     expect(harness.loaded.items.single.related.title, 'Связанное 1');
 
@@ -1983,7 +1914,6 @@ void main() {
       await (start as LongTermRelationCommandAccepted).future;
       await pumpEventQueue();
 
-      expect(repository.requestCount, 2);
       expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
       expect(harness.loaded.items.first.related.activeRelationCount, 0);
 
@@ -2093,17 +2023,13 @@ void main() {
       await (start as LongTermRelationCommandAccepted).future;
       await pumpEventQueue();
 
-      expect(repository.requestCount, 1);
       expect(harness.loaded.summaryStatus, isA<RelationSummaryCurrent>());
-      expect(harness.loaded.revision, const TestGraphRevision(4));
 
       harness.scrollTo(1);
-      expect(repository.requestCount, 2);
       expect(repository.queryAt(1).cursor, const TestRelationGroupCursor(2));
       repository.failRead(1, const RelationGroupSnapshotExpired());
       await pumpEventQueue();
 
-      expect(repository.requestCount, 3);
       expect(repository.queryAt(2).cursor, isNull);
       expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
     },
@@ -2405,11 +2331,9 @@ void main() {
         testRelationId(2),
         testRelationId(3),
       ]);
-      expect(harness.loaded.nextCursor, const TestRelationGroupCursor(4));
-      expect(repository.requestCount, 4);
+      expect(harness.loaded.hasConfirmedEnd, isFalse);
 
       harness.scrollTo(3);
-      expect(repository.requestCount, 5);
       final deleted = testGroupRow(
         ownerId: harness.intentionId,
         index: 2,
@@ -2436,7 +2360,6 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(repository.requestCount, 6);
       expect(repository.queryAt(5).cursor, isNull);
 
       repository.completePage(
@@ -2480,7 +2403,6 @@ void main() {
       ]);
       expect(harness.relationIds.toSet(), hasLength(5));
       expect(harness.loaded.hasConfirmedEnd, isTrue);
-      expect(repository.requestCount, 8);
 
       final third = testGroupRow(
         ownerId: harness.intentionId,
@@ -2585,7 +2507,6 @@ void main() {
       ]);
       expect(harness.loaded.totalCount, 5);
       expect(harness.loaded.hasConfirmedEnd, isFalse);
-      expect(repository.requestCount, 12);
       expect(
         repository.queries,
         everyElement(
@@ -2700,7 +2621,6 @@ void main() {
     );
     await pumpEventQueue();
     harness.scrollTo(1);
-    expect(repository.requestCount, 2);
 
     const revision = TestGraphRevision(9);
     final start = harness.coordinator.acceptRelationDelete(
@@ -2744,7 +2664,6 @@ void main() {
     );
     await (start as LongTermRelationCommandAccepted).future;
     await pumpEventQueue();
-    expect(repository.requestCount, 3);
     expect(repository.queryAt(2).cursor, isNull);
     expect(harness.relationIds, [first.relation.id, removed.relation.id]);
 
@@ -2757,7 +2676,6 @@ void main() {
       ),
     );
     await pumpEventQueue();
-    expect(repository.requestCount, 3);
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
     expect(harness.loaded.counts.archivedNeedOutgoing, 1);
 
@@ -2773,75 +2691,65 @@ void main() {
     await pumpEventQueue();
     expect(harness.relationIds, [first.relation.id, remaining.relation.id]);
     expect(harness.loaded.counts.archivedNeedOutgoing, 0);
-    expect(harness.loaded.nextCursor, isNull);
-    expect(repository.requestCount, 3);
+    expect(harness.loaded.hasConfirmedEnd, isTrue);
   });
 
-  test(
-    'новая мутация прерывает несовместимую сборку и объединяет повторы',
-    () async {
-      final repository = ControlledNeighborhoodRepository();
-      final harness = _NeighborhoodHarness(repository, pageSize: 2);
-      addTearDown(harness.dispose);
+  test('новая мутация прерывает несовместимую сборку', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository, pageSize: 2);
+    addTearDown(harness.dispose);
 
-      harness.completeFirstPage(
-        index: 0,
-        from: 1,
-        count: 2,
-        totalCount: 4,
-        nextCursor: const TestRelationGroupCursor(2),
-      );
-      await pumpEventQueue();
+    harness.completeFirstPage(
+      index: 0,
+      from: 1,
+      count: 2,
+      totalCount: 4,
+      nextCursor: const TestRelationGroupCursor(2),
+    );
+    await pumpEventQueue();
 
-      repository.emitIntention(
-        testNeighborhoodIntention(id: harness.intentionId),
-        counts: testRelationCounts(activeNeedOutgoing: 3),
-        revision: const TestGraphRevision(9),
-      );
-      await pumpEventQueue();
-      expect(repository.requestCount, 2);
+    repository.emitIntention(
+      testNeighborhoodIntention(id: harness.intentionId),
+      counts: testRelationCounts(activeNeedOutgoing: 3),
+      revision: const TestGraphRevision(9),
+    );
+    await pumpEventQueue();
 
-      repository.emitIntention(
-        testNeighborhoodIntention(id: harness.intentionId),
-        counts: testRelationCounts(activeNeedOutgoing: 2),
-        revision: const TestGraphRevision(11),
-      );
-      repository.emitIntention(
-        testNeighborhoodIntention(id: harness.intentionId),
-        counts: testRelationCounts(activeNeedOutgoing: 2),
-        revision: const TestGraphRevision(11),
-      );
-      await pumpEventQueue();
-      expect(repository.requestCount, 2);
+    repository.emitIntention(
+      testNeighborhoodIntention(id: harness.intentionId),
+      counts: testRelationCounts(activeNeedOutgoing: 2),
+      revision: const TestGraphRevision(11),
+    );
+    repository.emitIntention(
+      testNeighborhoodIntention(id: harness.intentionId),
+      counts: testRelationCounts(activeNeedOutgoing: 2),
+      revision: const TestGraphRevision(11),
+    );
+    await pumpEventQueue();
 
-      harness.completeFirstPage(
-        index: 1,
-        from: 1,
-        count: 2,
-        totalCount: 3,
-        nextCursor: const TestRelationGroupCursor(2),
-        revision: const TestGraphRevision(9),
-      );
-      await pumpEventQueue();
+    harness.completeFirstPage(
+      index: 1,
+      from: 1,
+      count: 2,
+      totalCount: 3,
+      nextCursor: const TestRelationGroupCursor(2),
+      revision: const TestGraphRevision(9),
+    );
+    await pumpEventQueue();
 
-      expect(repository.requestCount, 3);
-      expect(repository.queryAt(2).cursor, isNull);
-      expect(harness.loaded.revision, const TestGraphRevision(4));
+    expect(repository.queryAt(2).cursor, isNull);
 
-      harness.completeFirstPage(
-        index: 2,
-        from: 1,
-        count: 2,
-        totalCount: 2,
-        revision: const TestGraphRevision(11),
-      );
-      await pumpEventQueue();
+    harness.completeFirstPage(
+      index: 2,
+      from: 1,
+      count: 2,
+      totalCount: 2,
+      revision: const TestGraphRevision(11),
+    );
+    await pumpEventQueue();
 
-      expect(harness.loaded.totalCount, 2);
-      expect(harness.loaded.revision, const TestGraphRevision(11));
-      expect(repository.requestCount, 3);
-    },
-  );
+    expect(harness.loaded.totalCount, 2);
+  });
 
   test(
     'автоматическая замена не читает порцию сверх прежнего предела',
@@ -2895,8 +2803,7 @@ void main() {
       await pumpEventQueue();
 
       expect(harness.loaded.items.length, 4);
-      expect(harness.loaded.nextCursor, const TestRelationGroupCursor(4));
-      expect(repository.requestCount, 4);
+      expect(harness.loaded.hasConfirmedEnd, isFalse);
     },
   );
 

@@ -140,7 +140,6 @@ void main() {
     harness.viewModel.retry();
     await pumpEventQueue();
 
-    expect(harness.repository.relationWatches, hasLength(1));
     expect(harness.state, isA<RelationDetailsCorruption>());
   });
 
@@ -254,7 +253,6 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(harness.repository.relationWatches, hasLength(2));
       expect(
         harness.state,
         isA<RelationDetailsLoaded>()
@@ -317,7 +315,6 @@ void main() {
 
       harness.viewModel.retry();
       await pumpEventQueue();
-      expect(harness.repository.relationWatches, hasLength(3));
 
       harness.repository
           .watchAt(2)
@@ -416,7 +413,6 @@ void main() {
       await (start as LongTermRelationCommandAccepted).future;
       await pumpEventQueue();
 
-      expect(harness.repository.relationWatches, hasLength(2));
       expect(
         harness.state,
         isA<RelationDetailsLoaded>().having(

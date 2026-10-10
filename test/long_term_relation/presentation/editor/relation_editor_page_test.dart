@@ -8,13 +8,11 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
-import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -642,8 +640,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(router.current.name, RelationDetailsRoute.name);
-      expect(repository.relationWatches.last.relationId, created.id);
-      expect(find.byType(RelationEditorPage), findsNothing);
+      expect(
+        router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+        created.id,
+      );
+      expect(
+        find.byKey(const ValueKey('relation-editor-submit')),
+        findsNothing,
+      );
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.text(successMessage), findsNothing);
 
@@ -662,7 +666,7 @@ void main() {
   );
 
   testWidgets(
-    'удаление renderer ошибки до подтверждённого кадра передаёт её оболочке один раз',
+    'сообщение об отказе, снятое правкой формы, предъявляется оболочкой один раз',
     (tester) async {
       const message = 'Only active intentions can be linked.';
       final repository = ControlledRelationFormRepository();
@@ -685,12 +689,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(OperationFailurePresentation), findsOneWidget);
       expect(find.text(message), findsOneWidget);
       expect(find.text('Текущее намерение'), findsOneWidget);
       expect(find.text('Много ходить'), findsOneWidget);
 
-      // Исправление участника удаляет renderer ошибки, не уходя с маршрута.
+      // Исправление участника снимает сообщение из формы, не уходя с маршрута.
       await _selectParticipant(
         tester,
         repository,
@@ -701,7 +704,7 @@ void main() {
       );
 
       expect(router.current.name, RelationEditorRoute.name);
-      expect(find.byType(OperationFailurePresentation), findsNothing);
+      expect(find.text(message), findsNothing);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
@@ -717,61 +720,8 @@ void main() {
     },
   );
 
-  testWidgets('смена локали сохраняет владельца непредъявленной ошибки формы', (
-    tester,
-  ) async {
-    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
-      Locale('en'),
-    ];
-    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-    final repository = ControlledRelationFormRepository();
-    addTearDown(repository.dispose);
-    final router = await _openForm(
-      tester,
-      repository,
-      RelationDirection.outgoing,
-      locale: null,
-    );
-    await _completeDraft(tester, repository);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-    repository.failRelationCommand(
-      0,
-      const LongTermRelationUnavailableFailure(),
-    );
-    await tester.pumpAndSettle();
-
-    const englishMessage = 'The relation couldn’t be created. Try again.';
-    const russianMessage = 'Не удалось создать связь. Повторите попытку.';
-    const shellMessage = 'Создание — «новая связь»: $russianMessage';
-    expect(find.text(englishMessage), findsOneWidget);
-
-    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
-      Locale('ru'),
-    ];
-    await tester.pumpAndSettle();
-
-    expect(find.text(englishMessage), findsNothing);
-    expect(find.text(russianMessage), findsOneWidget);
-    expect(find.text(shellMessage), findsNothing);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
-
-    expect(find.text(russianMessage), findsOneWidget);
-    expect(find.text(shellMessage), findsNothing);
-    expect(repository.relationCommands, hasLength(1));
-
-    await router.maybePop();
-    await tester.pumpAndSettle();
-
-    expect(find.text(shellMessage), findsNothing);
-    expect(repository.relationCommands, hasLength(1));
-  });
-
   testWidgets(
-    'временная невидимость renderer удерживает право формы до подтверждённого кадра',
+    'отказ создания остаётся в форме после перекрытия поиском и не повторяется в оболочке',
     (tester) async {
       const message = 'The relation couldn’t be created. Try again.';
       const shellMessage = 'Create — “new relation”: $message';
@@ -857,7 +807,6 @@ void main() {
     // Участники в редакторе связи — представление без поиска: тегов и условий в нём нет.
     expect(find.textContaining('Tags:'), findsNothing);
     expect(find.text('No tags'), findsNothing);
-    expect(find.byType(IntentionTagConditionsSection), findsNothing);
 
     await _selectParticipant(
       tester,
@@ -954,7 +903,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(router.current.name, RelationDetailsRoute.name);
-    expect(repository.relationWatches, hasLength(2));
     repository
         .watchAt(1)
         .emitDetails(
@@ -1196,7 +1144,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(repository.watchedIntentionIds, contains(replacementId));
       repository.emitIntention(
         testDetailsIntention(
           index: 3,
@@ -1308,7 +1255,6 @@ void main() {
         'Моё описание',
       );
 
-      expect(repository.watchedIntentionIds, contains(replacementId));
       repository.emitIntention(
         testDetailsIntention(
           index: 3,

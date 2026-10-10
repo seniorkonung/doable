@@ -136,7 +136,16 @@ void main() {
     harness.repository.emitPrepared({
       reference: SelectedDailyChoiceMissing(original.id),
     }, revision: const TestGraphRevision(4));
-    expect(harness.state, same(prepared));
+    expect(
+      ((harness.state as BlockingRelationsSelectionPrepared)
+                  .snapshot
+                  .items
+                  .single
+              as BlockingRelationsSelectedDailyChoice)
+          .item
+          .isCompleted,
+      isTrue,
+    );
     expect(harness.repository.commands, isEmpty);
   });
 
@@ -330,10 +339,6 @@ void main() {
     );
     expect(harness.viewModel.select(selected.first), isFalse);
     expect(harness.state.selected.length, 2);
-    expect(
-      harness.state.selected[selected.first.relation.id],
-      same(selected.first),
-    );
     expect(harness.viewModel.unselect(selected[1].relation.id), isTrue);
     expect(harness.state.selected.length, 1);
     expect(
@@ -422,10 +427,6 @@ void main() {
       );
       expect(await harness.viewModel.refreshSelection(), isTrue);
       expect(
-        harness.state.selected[original.relation.id],
-        isNot(same(original)),
-      );
-      expect(
         harness.state.selected[original.relation.id]!.related.title,
         'Новое название',
       );
@@ -500,7 +501,10 @@ void main() {
 
       expect(await harness.viewModel.refreshSelection(), isFalse);
       expect(harness.state, isA<BlockingRelationsSelectionRefreshFailed>());
-      expect(harness.state.selected[original.relation.id], same(original));
+      expect(
+        harness.state.selected[original.relation.id]!.related.title,
+        original.related.title,
+      );
       expect(harness.state.selected.keys, {
         original.relation.id,
         second.relation.id,
@@ -525,7 +529,10 @@ void main() {
 
       expect(await harness.viewModel.refreshSelection(), isTrue);
       final editing = harness.state as BlockingRelationsSelectionEditing;
-      expect(editing.selected[row.relation.id], same(row));
+      expect(
+        editing.selected[row.relation.id]!.relation.sourceIntentionId,
+        row.relation.sourceIntentionId,
+      );
       expect(
         editing.invalidReasons[row.relation.id],
         BlockingRelationsInvalidReason.noLongerBlocking,

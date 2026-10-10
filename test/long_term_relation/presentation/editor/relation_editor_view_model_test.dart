@@ -1,5 +1,6 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -349,53 +350,62 @@ void main() {
       },
     );
 
-    test('отказ сохраняет обе ссылки, а исправленная отправка получает новый token', () async {
-      final harness = _EditorHarness.editing(testEditorRelationDetails());
-      final tokens = <LongTermRelationOperationToken>[];
-      final subscription = harness.coordinator.completions.listen((completion) {
-        if (completion is LongTermRelationCommandCompletion) {
-          tokens.add(completion.token);
-        }
-      });
-      addTearDown(subscription.cancel);
+    test(
+      'отказ сохраняет обе ссылки, а исправленная отправка уходит снова',
+      () async {
+        final harness = _EditorHarness.editing(testEditorRelationDetails());
 
-      harness.viewModel
-        ..selectParticipant(
-          RelationParticipantRole.related,
-          testEditorSelection(3),
-        )
-        ..submit();
-      harness.repository.failRelationCommand(
-        0,
-        LongTermRelationParticipantArchivedFailure(
-          role: RelationParticipantRole.related,
-          intentionId: testEditorIntentionId(3),
-        ),
-      );
-      await harness.settle();
+        harness.viewModel
+          ..selectParticipant(
+            RelationParticipantRole.related,
+            testEditorSelection(3),
+          )
+          ..submit();
+        harness.repository.failRelationCommand(
+          0,
+          LongTermRelationParticipantArchivedFailure(
+            role: RelationParticipantRole.related,
+            intentionId: testEditorIntentionId(3),
+          ),
+        );
+        await harness.settle();
 
-      expect(harness.state.sourceParticipant?.id, testEditorIntentionId(1));
-      expect(harness.state.relatedParticipant?.id, testEditorIntentionId(3));
+        expect(harness.state.sourceParticipant?.id, testEditorIntentionId(1));
+        expect(harness.state.relatedParticipant?.id, testEditorIntentionId(3));
 
-      harness.viewModel
-        ..selectParticipant(
-          RelationParticipantRole.related,
-          testEditorSelection(4),
-        )
-        ..submit();
-      expect(harness.repository.commandCount, 2);
-      expect(tokens, hasLength(1));
+        harness.viewModel
+          ..selectParticipant(
+            RelationParticipantRole.related,
+            testEditorSelection(4),
+          )
+          ..submit();
+        expect(harness.repository.commandCount, 2);
+        expect(
+          harness.repository.updateCommandAt(1).patch.relatedIntentionId,
+          isA<LongTermRelationFieldSet<IntentionId>>().having(
+            (field) => field.value,
+            'исправленный участник',
+            testEditorIntentionId(4),
+          ),
+        );
 
-      harness.repository.failRelationCommand(
-        1,
-        const LongTermRelationUnavailableFailure(),
-      );
-      await harness.settle();
+        harness.repository.failRelationCommand(
+          1,
+          const LongTermRelationUnavailableFailure(),
+        );
+        await harness.settle();
 
-      expect(tokens, hasLength(2));
-      expect(identical(tokens.first, tokens.last), isFalse);
-      expect(harness.state.relatedParticipant?.id, testEditorIntentionId(4));
-    });
+        expect(
+          harness.state.operation,
+          isA<RelationEditorFailed>().having(
+            (operation) => operation.failure,
+            'причина',
+            isA<RelationEditorUnavailable>(),
+          ),
+        );
+        expect(harness.state.relatedParticipant?.id, testEditorIntentionId(4));
+      },
+    );
 
     test(
       'отсутствующая связь сохраняет черновик и блокирует тот же контекст',
@@ -548,7 +558,6 @@ void main() {
               failureCase.editorFailure,
             ),
           );
-          expect(harness.state.failurePresentation, same(presentation));
           expect(harness.state.canSubmit, isFalse);
 
           harness.viewModel.submit();
