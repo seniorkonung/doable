@@ -201,23 +201,6 @@ List<LargeFavoriteFixtureRow> largeFavoriteFixtureActiveRows({
       ),
 ];
 
-/// Место большой фикстуры в едином порядке вместе с архивным состоянием
-/// намерения.
-typedef LargeFavoriteFixturePlace = ({String id, bool isArchived});
-
-/// Весь единый порядок, который создаёт [seedLargeFavoriteFixture], включая
-/// архивированные избранные намерения, в порядке мест.
-List<LargeFavoriteFixturePlace> largeFavoriteFixtureOrder({
-  required int count,
-  int archivedEvery = 0,
-}) => [
-  for (final index in _largeFavoriteIndexesInOrder(count))
-    (
-      id: largeFavoriteFixtureId(index),
-      isArchived: _isLargeFavoriteArchived(index, archivedEvery),
-    ),
-];
-
 /// Число архивированных избранных намерений большой фикстуры.
 int largeFavoriteFixtureArchivedCount({
   required int count,

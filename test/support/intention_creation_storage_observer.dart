@@ -11,23 +11,16 @@ final class IntentionCreationStorageObserver
   IntentionCreationStorageObserver({required this.snapshotGraph});
 
   /// Сценарий определяет состав проверяемого графа; observer отвечает только
-  /// за задержку, записи и фиксацию состояния в точке отказа соединения.
+  /// за задержку и фиксацию состояния в точке отказа соединения.
   final Map<String, List<List<Object?>>> Function(sqlite.Database)
   snapshotGraph;
 
   late sqlite.Database connection;
-  final writes = <String>[];
   var _observing = false;
   var _fail = false;
   Completer<void>? _gate;
   var isHolding = false;
-  var creationAttempts = 0;
-  ({
-    bool inTransaction,
-    List<String> writes,
-    Map<String, List<List<Object?>>> graph,
-  })?
-  faultPoint;
+  ({bool inTransaction, Map<String, List<List<Object?>>> graph})? faultPoint;
   static final _table = RegExp(
     r'^\s*(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+\w+)?|DELETE\s+FROM)\s+"?(\w+)"?',
     caseSensitive: false,
@@ -54,7 +47,6 @@ final class IntentionCreationStorageObserver
         )) {
       return;
     }
-    creationAttempts++;
     final gate = _gate;
     if (gate == null) return;
     isHolding = true;
@@ -80,12 +72,10 @@ final class IntentionCreationStorageObserver
         }
       }
     }
-    writes.addAll(tables);
     if (_fail && tables.contains('favorite_intentions')) {
       _fail = false;
       faultPoint = (
         inTransaction: !connection.autocommit,
-        writes: List.unmodifiable(writes),
         graph: snapshotGraph(connection),
       );
       throw sqlite.SqliteException(
