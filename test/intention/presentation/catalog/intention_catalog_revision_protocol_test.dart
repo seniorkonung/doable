@@ -219,6 +219,91 @@ void main() {
   });
 
   test(
+    'отказ продолжения сохраняет изменение, применённое во время подгрузки',
+    () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        pageSize: 2,
+        prefetchRemaining: 1,
+      );
+      final subscription = container.listen(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      final original = testSummary(index: 4, title: 'Прежнее');
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [original, testSummary(index: 3)],
+            totalCount: 4,
+            nextCursor: const TestCatalogCursor(),
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
+
+      final notifier = container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
+      );
+      final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
+      await waitForCatalogQueries(repository, 2);
+      final updated = testSummary(index: 4, title: 'Подтверждённое');
+      await completeCatalogCommand(
+        container,
+        repository,
+        UpdateIntention(
+          id: original.id,
+          title: updated.title,
+          description: null,
+        ),
+        IntentionSaved(
+          testIntention(index: 4, title: updated.title),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(2),
+            before: TestCatalogEntrySnapshot(original),
+            after: TestCatalogEntrySnapshot(updated),
+          ),
+        ),
+      );
+      repository.complete(
+        1,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await load;
+
+      final current =
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
+              as IntentionCatalogLoaded;
+      expect(current.items.map((item) => item.title), [
+        'Подтверждённое',
+        testSummary(index: 3).title,
+      ]);
+      expect(current.totalCount, 4);
+      expect(
+        current.continuation,
+        isA<IntentionCatalogContinuationUnavailable>(),
+      );
+    },
+  );
+
+  test(
     'удерживает новую continuation до всех предшествующих completions',
     () async {
       final repository = ControlledCatalogRepository();
