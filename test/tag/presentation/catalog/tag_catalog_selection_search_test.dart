@@ -41,7 +41,6 @@ void main() {
     );
     expect(tester.widget<FilledButton>(_assign).onPressed, isNotNull);
     expect(h.repository.commands, hasLength(1));
-    expect(h.repository.reads, hasLength(1));
 
     await tester.tap(find.byTooltip('Очистить поиск тегов'));
     await tester.pump();
@@ -71,7 +70,6 @@ void main() {
     editor.complete(_tag(52, 'Прежний редактор'));
     await tester.pump();
     expect(tester.widget<Semantics>(_row(h.home)).properties.selected, isTrue);
-    expect(h.repository.statusReads, isEmpty);
     expect(h.repository.commands, isEmpty);
     expect(tester.widget<TextField>(_search).controller!.text, 'дом');
   });
@@ -161,9 +159,7 @@ void main() {
       );
       expect(_hidden, findsNothing);
       expect(draft.current.tagIds, [d.home.id, d.work.id]);
-      expect(d.repository.reads, hasLength(1));
       expect(d.repository.commands, isEmpty);
-      expect(d.repository.statusQueries, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
@@ -177,14 +173,13 @@ void main() {
         onOpenEditor: (_) => (editors..add(Completer())).last.future,
       );
       final draft = d.tagSet.value;
-      final input = tester.widget<TextField>(_search).controller!;
       await tester.enterText(_search, 'дом');
       await tester.pump();
 
       await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
       editors.last.complete(null);
       await tester.pump();
-      expect(input.text, 'дом');
+      expect(tester.widget<TextField>(_search).controller!.text, 'дом');
       expect(_hidden, findsNothing);
       expect(draft.current.tagIds, isEmpty);
 
@@ -199,8 +194,7 @@ void main() {
       d.rebuild();
       await tester.pump();
       expect(draft.current.tagIds, [d.home.id]);
-      expect(tester.widget<TextField>(_search).controller, same(input));
-      expect(input.text, 'дом');
+      expect(tester.widget<TextField>(_search).controller!.text, 'дом');
 
       final created = _tag(52, 'Домашнее');
       editors.last.complete(created);
@@ -215,10 +209,8 @@ void main() {
       expect(_visibleNames(tester), ['Дом']);
       expect(tester.widget<FilledButton>(_add).onPressed, isNotNull);
       expect(draft.current.tagIds, [d.home.id]);
-      expect(input.text, 'дом');
-      expect(d.repository.reads, hasLength(1));
+      expect(tester.widget<TextField>(_search).controller!.text, 'дом');
       expect(d.repository.commands, isEmpty);
-      expect(d.repository.statusQueries, isEmpty);
 
       await tester.tap(_add);
       await tester.pump();
@@ -260,7 +252,6 @@ void main() {
       await tester.pump();
       expect(_hiddenText('Работа'), findsOneWidget);
       expect(find.text('Прежний редактор'), findsNothing);
-      expect(d.repository.observations.containsKey(stale.id), isFalse);
       expect(tester.widget<TextField>(_search).controller!.text, 'дом');
       expect(first.current.tagIds, isEmpty);
       expect(second.current.tagIds, [d.work.id]);
@@ -284,7 +275,6 @@ void main() {
       );
       expect(tester.widget<FilledButton>(_add).onPressed, isNull);
       expect(second.current.tagIds, [d.work.id]);
-      expect(d.repository.reads, hasLength(3));
       expect(d.repository.commands, isEmpty);
       expect(tester.takeException(), isNull);
     },

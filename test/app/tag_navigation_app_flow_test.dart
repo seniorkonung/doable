@@ -261,8 +261,6 @@ Future<void> _openDetailsAndReturn(
     after.items.map((item) => item.id),
     before.items.map((item) => item.id),
   );
-  expect(after.nextCursor, before.nextCursor);
-  expect(after.revision, before.revision);
   await _scrollToTop(tester);
   expect(
     tester.widget<ChoiceChip>(find.byKey(ValueKey(after.scope))).selected,

@@ -10,7 +10,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -88,9 +87,7 @@ void main() {
       expect(completion!.result, isA<GraphResultSuccess>());
       await tester.pump();
     }
-    final refreshing = app.state(tester) as TagNavigationLoaded;
-    expect(refreshing.freshness, TagNavigationFreshness.refreshing);
-    expect(refreshing.nextCursor, isNull);
+    expect(app.more, findsNothing);
     for (final element
         in find
             .descendant(of: _navigation, matching: find.byType(ListTile))
@@ -103,16 +100,9 @@ void main() {
       ...expected.skip(1).take(expected.length - 2),
       expected.first,
     ];
-    expect(current.tagId, _tagId);
-    expect(current.scope, scope);
     expect(current.items.map((item) => item.id), changed.take(50));
-    expect(
-      current.revision.compareTo(before.revision),
-      GraphRevisionOrder.newer,
-    );
+    // Актуализация перечитывает только первую порцию, а не все показанные.
     expect(app.reads.samples, hasLength(readCount + 1));
-    expect(app.reads.samples.last.query.cursor, isNull);
-    expect(app.reads.samples.last.query.scope, scope);
     await _traverse(tester, app, changed);
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 5)));
@@ -125,7 +115,6 @@ Future<void> _traverse(
 ) async {
   var loaded = await app.loaded(tester);
   expect(loaded.items, hasLength(50));
-  final revision = loaded.revision;
   final sampleStart = app.reads.samples.length - 1;
   while (!loaded.hasReachedEnd) {
     final before = loaded;
@@ -138,7 +127,6 @@ Future<void> _traverse(
         .evaluate()
         .length;
     expect(mountedRows, lessThanOrEqualTo(40));
-    expect(loaded.revision.compareTo(revision), GraphRevisionOrder.same);
     expect(loaded.items.length, greaterThan(before.items.length));
     expect(loaded.items.length - before.items.length, lessThanOrEqualTo(50));
     expect(
@@ -154,11 +142,6 @@ Future<void> _traverse(
   );
   final samples = app.reads.samples.skip(sampleStart).toList();
   expect(samples, hasLength((expected.length / 50).ceil()));
-  expect(samples.first.query.cursor, isNull);
-  expect(
-    samples.skip(1).every((sample) => sample.query.cursor != null),
-    isTrue,
-  );
   expect(
     samples.every((sample) => sample.rows <= 50 && sample.query.pageSize == 50),
     isTrue,

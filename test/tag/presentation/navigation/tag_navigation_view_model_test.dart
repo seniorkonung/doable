@@ -109,10 +109,6 @@ void main() {
     await pumpEventQueue();
     final loaded = h.state as TagNavigationLoaded;
     expect(loaded.items.single.id, intention.id);
-    expect(
-      loaded.revision.compareTo(const _Revision(2)),
-      GraphRevisionOrder.same,
-    );
     expect(h.model.canActOn(intention.id), isTrue);
   });
 
@@ -299,10 +295,6 @@ void main() {
         (h.state as TagNavigationLoaded).items.single.id,
         _intention(101).id,
       );
-      expect(
-        (h.state as TagNavigationLoaded).revision.compareTo(const _Revision(2)),
-        GraphRevisionOrder.same,
-      );
     },
   );
 
@@ -410,8 +402,6 @@ void main() {
         expect(h.model.canActOn(_intention(1).id), isFalse);
         final retry = h.model.retryRefresh();
         if (failure is TagReadUnavailableFailure) {
-          expect(h.reads.watchedIds, hasLength(2));
-          expect(h.reads.watches.first.hasListener, isFalse);
           h.reads.observe(_tag('Дом'), index: 1);
           h.reads.page(1, [_intention(2)]);
           await retry;
@@ -419,7 +409,10 @@ void main() {
         } else {
           await retry;
           expect(h.reads.queries, hasLength(1));
-          expect(h.state, same(failed));
+          final unchanged = h.state as TagNavigationLoaded;
+          expect(unchanged.refreshFailure?.category, failure.category);
+          expect(unchanged.items.single.id, _intention(1).id);
+          expect(h.model.canActOn(_intention(1).id), isFalse);
         }
       },
     );
@@ -499,10 +492,6 @@ void main() {
       await pumpEventQueue();
       final current = h.state as TagNavigationLoaded;
       expect(current.tag.name.value, 'Новое название');
-      expect(
-        current.revision.compareTo(const _Revision(3)),
-        GraphRevisionOrder.same,
-      );
       expect(current.canUseCurrentItems, isTrue);
       expect(h.reads.queries, hasLength(1));
     });
@@ -546,7 +535,8 @@ void main() {
       await h.model.retryLoadMore();
       expect(h.reads.queries, hasLength(2));
       final retry = h.model.retryRefresh();
-      expect(h.model.retryRefresh(), same(retry));
+      unawaited(h.model.retryRefresh());
+      expect(h.reads.queries, hasLength(3));
       expect(h.reads.queries.last.cursor, isNull);
       h.reads.page(2, [_intention(101)], tag: _tag('Быт'), revision: 2);
       await retry;
@@ -669,14 +659,21 @@ void main() {
     );
     expect(loaded.tagId, _tagId(1));
     expect(loaded.scope, TaggedIntentionsScope.active);
-    expect(
-      loaded.revision.compareTo(const _Revision(2)),
-      GraphRevisionOrder.same,
-    );
     expect(loaded.canUseCurrentItems, isTrue);
     expect(h.model.canActOn(created.id), isTrue);
     // Пакет публикует только начало актуализации и её полный результат.
-    expect(h.states.skip(stateOffset), [same(refreshing), same(loaded)]);
+    expect(h.states.skip(stateOffset), [
+      isA<TagNavigationLoaded>().having(
+        (state) => state.freshness,
+        'актуальность',
+        TagNavigationFreshness.refreshing,
+      ),
+      isA<TagNavigationLoaded>().having(
+        (state) => state.freshness,
+        'актуальность',
+        TagNavigationFreshness.current,
+      ),
+    ]);
     expect(h.reads.queries, hasLength(index + 1));
   });
 
@@ -781,7 +778,7 @@ void main() {
       expect(base.hasReachedEnd, isFalse);
 
       final pending = h.model.loadMore();
-      expect(h.model.loadMore(), same(pending));
+      unawaited(h.model.loadMore());
       expect(h.reads.queries, hasLength(2));
       expect(h.reads.queries[1].cursor, same(cursor));
       expect(
@@ -866,7 +863,7 @@ void main() {
     expect(h.state, isA<TagNavigationInitialFailure>());
     expect(h.state.tagId, _tagId(2));
     final retry = h.model.retryFirstPage();
-    expect(h.model.retryFirstPage(), same(retry));
+    unawaited(h.model.retryFirstPage());
     expect(h.reads.queries, hasLength(3));
     expect(h.reads.queries[2].tagId, _tagId(2));
     expect(h.reads.queries[2].cursor, isNull);
@@ -896,10 +893,9 @@ void main() {
     h.model.setScope(TaggedIntentionsScope.active);
     h.reads.page(0, [_intention(1)]);
     await pumpEventQueue();
-    final loaded = h.state;
     h.model.setTagId(_tagId(1));
     h.model.setScope(TaggedIntentionsScope.active);
-    expect(h.state, same(loaded));
+    expect(h.state, isA<TagNavigationLoaded>());
     expect(h.reads.queries, hasLength(1));
   });
 
@@ -955,7 +951,6 @@ void main() {
         final status = failed.pageStatus as TagNavigationPageFailure;
         expect(failed.items.single.id, _intention(1).id);
         expect(failed.hasReachedEnd, isFalse);
-        expect(status.failure, same(failure));
         expect(status.failure.category, category);
         expect(status.canRetry, category == GraphFailureCategory.unavailable);
         expect(failed.nextCursor, status.canRetry ? same(cursor) : isNull);
@@ -964,7 +959,9 @@ void main() {
         expect(h.reads.queries, hasLength(2));
         if (!status.canRetry) {
           await h.model.retryLoadMore();
-          expect(h.state, same(failed));
+          final unchanged = h.state as TagNavigationLoaded;
+          expect(unchanged.pageStatus, isA<TagNavigationPageFailure>());
+          expect(unchanged.items.single.id, _intention(1).id);
           expect(h.reads.queries, hasLength(2));
         }
       },

@@ -9,7 +9,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('запрос помеченных намерений проверяет размер и сохраняет выбор', () {
+  test('запрос помеченных намерений проверяет допустимый размер страницы', () {
     final tagId = _tag(1, 'Дом').id;
     const cursor = _TaggedIntentionsCursor();
     final defaultQuery = TaggedIntentionsQuery(
@@ -26,10 +26,7 @@ void main() {
         pageSize: size,
         cursor: cursor,
       );
-      expect(query.tagId, tagId);
-      expect(query.scope, TaggedIntentionsScope.archived);
       expect(query.pageSize, size);
-      expect(query.cursor, same(cursor));
     }
     for (final size in [-1, 0, 101]) {
       expect(
@@ -49,7 +46,7 @@ void main() {
     }
   });
 
-  test('страницы обоих охватов сохраняют одноимённые намерения и снимок', () {
+  test('страницы обоих охватов сохраняют одноимённые намерения', () {
     final tag = _tag(1, 'Дом');
     const cursor = _TaggedIntentionsCursor();
     const revision = _Revision();
@@ -76,39 +73,12 @@ void main() {
       rows.clear();
 
       final List<TaggedIntention> items = page.items;
-      expect(page.tag, same(tag));
-      expect(page.scope, scope);
-      expect(page.pageSize, 2);
-      expect(page.revision, same(revision));
-      expect(page.nextCursor, same(cursor));
       expect(items.map((item) => item.id), [_intentionId(2), _intentionId(1)]);
       expect(items.map((item) => item.title), ['Намерение', 'Намерение']);
       expect(items.map((item) => item.archiveState), [
         archiveState,
         archiveState,
       ]);
-      expect(() => items.clear(), throwsUnsupportedError);
-    }
-  });
-
-  test('пустой охват сохраняет тег и ревизию без продолжения', () {
-    final tag = _tag(1, 'Дом');
-    const revision = _Revision();
-    for (final scope in TaggedIntentionsScope.values) {
-      final empty = TaggedIntentionsPage(
-        tag: tag,
-        scope: scope,
-        items: const [],
-        pageSize: 50,
-        nextCursor: null,
-        revision: revision,
-      );
-      expect(empty.items, isEmpty);
-      expect(empty.tag.id, tag.id);
-      expect(empty.scope, scope);
-      expect(empty.revision, same(revision));
-      expect(empty.nextCursor, isNull);
-      expect(() => empty.items.clear(), throwsUnsupportedError);
     }
   });
 

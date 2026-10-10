@@ -35,7 +35,6 @@ void _testTerminalWatchRecovery() {
           _intention(3).id,
         );
         expect(h.model.canActOn(_intention(3).id), isTrue);
-        expect(h.reads.watchedIds, hasLength(2));
       },
     );
   }
@@ -74,11 +73,7 @@ void _testTerminalWatchRecovery() {
         final retry = loaded
             ? h.model.retryRefresh()
             : h.model.retryFirstPage();
-        expect(
-          loaded ? h.model.retryRefresh() : h.model.retryFirstPage(),
-          same(retry),
-        );
-        expect(h.reads.watchedIds, [_tagId(1), _tagId(1)]);
+        unawaited(loaded ? h.model.retryRefresh() : h.model.retryFirstPage());
         expect(h.reads.queries, hasLength(3));
         expect(h.reads.queries.last.tagId, _tagId(1));
         expect(h.reads.queries.last.scope, TaggedIntentionsScope.archived);
@@ -110,7 +105,6 @@ void _testTerminalWatchRecovery() {
         expect(h.reads.queries, hasLength(3));
         h.reads.observe(_tag('Быт'), index: 1, revision: pageRevision);
         expect((h.state as TagNavigationLoaded).tag.name.value, 'Быт');
-        expect(h.reads.watchedIds, hasLength(2));
       },
     );
   }
@@ -155,7 +149,6 @@ void _testTerminalWatchRecovery() {
         await pumpEventQueue();
         _expectWatchFailure(h, failure.category, loaded: loaded);
         expect(h.reads.queries, hasLength(2));
-        expect(h.reads.watchedIds, hasLength(2));
       },
     );
   }

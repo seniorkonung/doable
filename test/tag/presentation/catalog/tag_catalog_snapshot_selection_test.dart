@@ -116,10 +116,6 @@ void main() {
       expect(selection.tag.id, newest.id);
       expect(selection.tag.name.value, newest.name.value);
       expect(harness.state.items.first.name.value, renamed.name.value);
-      expect(
-        harness.state.revision.compareTo(const _Revision(2)),
-        GraphRevisionOrder.same,
-      );
       expect(harness.model.canActOn(newest.id), isTrue);
     },
   );

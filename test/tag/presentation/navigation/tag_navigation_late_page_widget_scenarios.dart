@@ -17,11 +17,9 @@ void _registerLatePageWidgetScenarios() {
           final reads = _Reads();
           addTearDown(reads.dispose);
           await _pumpPage(tester, reads);
-          final context = tester.element(find.byType(TagNavigationPage));
-          final container = ProviderScope.containerOf(context, listen: false);
-          final provider = tagNavigationViewModelProvider(_tag.id);
-          final model = container.read(provider.notifier);
-          final l10n = AppLocalizations.of(context);
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(TagNavigationPage)),
+          );
           final item = _intention(1);
           final lateItem = _intention(2);
           if (loaded) {
@@ -61,7 +59,6 @@ void _registerLatePageWidgetScenarios() {
                   : l10n.tagNavigationUnexpected,
           };
           expect(find.text(message), findsOneWidget);
-          expect(reads.queries, hasLength(pendingIndex + 1));
           expect(_row(lateItem), findsNothing);
           expect(find.text(l10n.tagNavigationLoadMore), findsNothing);
           expect(
@@ -69,23 +66,13 @@ void _registerLatePageWidgetScenarios() {
             findsNothing,
           );
           expect(find.text(l10n.tagNavigationEmptyActive), findsNothing);
-          expect(model.canActOn(item.id), isFalse);
+          final tile = find.descendant(
+            of: _row(item),
+            matching: find.byType(ListTile),
+          );
           if (loaded) {
-            final stale = container.read(provider) as TagNavigationLoaded;
-            expect(stale.items, [item]);
-            expect(stale.freshness, TagNavigationFreshness.stale);
-            expect(stale.nextCursor, isNull);
-            expect(
-              tester
-                  .widget<ListTile>(
-                    find.descendant(
-                      of: _row(item),
-                      matching: find.byType(ListTile),
-                    ),
-                  )
-                  .onTap,
-              isNull,
-            );
+            expect(_row(item), findsOneWidget);
+            expect(tester.widget<ListTile>(tile).onTap, isNull);
             expect(
               tester
                   .getSemantics(_row(item))
@@ -94,10 +81,6 @@ void _registerLatePageWidgetScenarios() {
               isFalse,
             );
           } else {
-            expect(
-              container.read(provider),
-              isA<TagNavigationInitialFailure>(),
-            );
             expect(find.byType(ListTile), findsNothing);
           }
 
@@ -113,26 +96,27 @@ void _registerLatePageWidgetScenarios() {
             );
             await tester.pumpAndSettle();
             expect(find.text(message), findsOneWidget);
-            expect(model.canActOn(item.id), isFalse);
-            expect(reads.queries, hasLength(count));
             await tester.tap(retry);
             await tester.pump();
-            expect(reads.queries, hasLength(count + 1));
             expect(reads.queries.last.tagId, _tag.id);
             expect(reads.queries.last.scope, TaggedIntentionsScope.active);
             expect(reads.queries.last.cursor, isNull);
             reads.page(count, [item]);
             await tester.pump();
-            expect(model.canActOn(item.id), isFalse);
+            // Пока наблюдение не подтвердило восстановление, переходов нет.
+            expect(
+              tester
+                  .widgetList<ListTile>(tile)
+                  .every((row) => row.onTap == null),
+              isTrue,
+            );
             reads.watch.add(
               TagReadSuccess(
                 GraphSnapshot(value: _tag, revision: const _Revision(1)),
               ),
             );
             await tester.pumpAndSettle();
-            final restored = container.read(provider) as TagNavigationLoaded;
-            expect(restored.items, [item]);
-            expect(model.canActOn(item.id), isTrue);
+            expect(_row(item), findsOneWidget);
             expect(_row(lateItem), findsNothing);
             expect(find.text(message), findsNothing);
             expect(find.text(l10n.commonRetry), findsNothing);

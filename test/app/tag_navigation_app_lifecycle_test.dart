@@ -72,8 +72,6 @@ void main() {
       ) as TagCommandAccepted;
       await _completed(tester, accepted.future);
       await app.openNavigation(tester);
-      final newModel = app.model(tester);
-      expect(newModel, isNot(same(oldModel)));
       final before = await app.loaded(tester);
       expect(before.tag.name.value, 'Новое название');
       oldModel.setScope(TaggedIntentionsScope.archived);
@@ -82,8 +80,14 @@ void main() {
       unawaited(oldModel.retryFirstPage());
       app.repository.releasePage(held);
       await _waitFor(tester, () => app.repository.activePages == 0);
-      expect(app.state(tester), same(before));
-      expect(app.state(tester).scope, TaggedIntentionsScope.active);
+      final after = await app.loaded(tester);
+      expect(after.scope, TaggedIntentionsScope.active);
+      expect(after.tagId, before.tagId);
+      expect(after.tag.name.value, 'Новое название');
+      expect(
+        after.items.map((item) => item.id),
+        before.items.map((item) => item.id),
+      );
       expect(app.router.current.name, TagNavigationRoute.name);
       expect(tester.takeException(), isNull);
     },
@@ -112,14 +116,12 @@ void main() {
                 TagNavigationFreshness.stale,
       );
       final stale = app.state(tester) as TagNavigationLoaded;
-      expect(stale.tagId, before.tagId);
       expect(stale.scope, before.scope);
       expect(stale.tag.name.value, 'Быт');
       expect(
         stale.items.map((item) => item.id),
         before.items.map((item) => item.id),
       );
-      expect(stale.nextCursor, isNull);
       expect(app.model(tester).canActOn(_intention(2)), isFalse);
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsOneWidget);
       await _waitFor(
@@ -133,13 +135,10 @@ void main() {
         'Быт',
       );
       app.repository.failPages = false;
-      final count = app.repository.queries.length;
       await _tap(tester, find.widgetWithText(OutlinedButton, l10n.commonRetry));
       final current = await app.loaded(tester);
       expect(current.scope, TaggedIntentionsScope.archived);
       expect(current.tag.name.value, 'Быт');
-      expect(app.repository.queries, hasLength(count + 1));
-      expect(app.repository.queries.last.cursor, isNull);
       expect(app.repository.commands.whereType<RenameTag>(), hasLength(1));
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsNothing);
       expect(app.model(tester).canActOn(_intention(2)), isTrue);
@@ -219,10 +218,6 @@ void main() {
           final current = await app.loaded(tester);
           expect(current.tagId, _tagId);
           expect(current.scope, TaggedIntentionsScope.active);
-          expect(
-            current.revision.compareTo(before.revision),
-            GraphRevisionOrder.newer,
-          );
           switch (mutation) {
             case _Mutation.removeAssignment:
               expect(

@@ -54,7 +54,7 @@ void _registerNavigationSemanticsScenarios() {
               l10n.tagNavigationEmptyActive,
             );
           } else {
-            expect(find.byType(OutlinedButton), findsNothing);
+            expect(find.text(l10n.commonRetry), findsNothing);
           }
           expect(tester.takeException(), isNull);
         } finally {
@@ -114,7 +114,8 @@ void _registerNavigationSemanticsScenarios() {
         expect(node.flagsCollection.isEnabled, Tristate.isFalse);
         expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
       }
-      expect(find.byType(OutlinedButton), findsNothing);
+      expect(find.text(l10n.commonRetry), findsNothing);
+      expect(find.text(l10n.tagNavigationLoadMore), findsNothing);
       expect(tester.takeException(), isNull);
     } finally {
       semantics.dispose();

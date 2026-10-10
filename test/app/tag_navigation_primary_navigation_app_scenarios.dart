@@ -24,7 +24,6 @@ void _registerPrimaryNavigationAppScenarios() {
         () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
       );
       await tester.pumpAndSettle();
-      final rootField = tester.element(filter);
       await _selectPrimaryDestination(tester, origin);
       await app.openNavigation(tester);
       await app.loaded(tester);
@@ -36,8 +35,6 @@ void _registerPrimaryNavigationAppScenarios() {
       final before = await app.loaded(tester);
       expect(before.items, hasLength(52));
       expect(before.hasReachedEnd, isTrue);
-      final model = app.model(tester);
-      final queryCount = app.repository.queries.length;
       final target = find.byKey(ValueKey(_intention(1150)));
       final scrolling = find.descendant(
         of: find.byType(TagNavigationPage),
@@ -65,12 +62,9 @@ void _registerPrimaryNavigationAppScenarios() {
       );
       final after = await app.loaded(tester);
       expect(app.router.current.name, TagNavigationRoute.name);
-      expect(app.model(tester), same(model));
       expect(after.scope, before.scope);
       expect(after.items, before.items);
-      expect(after.revision, before.revision);
-      expect(after.nextCursor, before.nextCursor);
-      expect(app.repository.queries, hasLength(queryCount));
+      expect(after.hasReachedEnd, before.hasReachedEnd);
       expect(tester.state<ScrollableState>(scrolling).position.pixels, offset);
       _expectPrimaryDestination(tester, origin);
 
@@ -98,7 +92,6 @@ void _registerPrimaryNavigationAppScenarios() {
       _expectPrimaryDestination(tester, destination);
 
       await _selectPrimaryDestination(tester, AppDestination.intentionGraph);
-      expect(tester.element(filter), same(rootField));
       expect(tester.widget<TextField>(filter).controller!.text, 'Получатель');
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();

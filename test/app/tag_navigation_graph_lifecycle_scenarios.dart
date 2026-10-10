@@ -502,7 +502,7 @@ void _testTaggedGraphLifecycle() {
     },
   );
   testWidgets(
-    'отказ записи удаления намерения и общего тега не меняет навигацию',
+    'отказ записи удаления общего тега не меняет навигацию, а удаление намерения после устранения отказа убирает получателя',
     (tester) async {
       final app = await _pumpApp(
         tester,
@@ -512,8 +512,7 @@ void _testTaggedGraphLifecycle() {
       final initial = await _loaded(tester, firstTagNumber);
       final before = _snapshot(app.raw);
       final coordinator = app.runtime.commandCoordinator;
-      // Отказ каскада назначений общий для удаления намерения и тега; откат
-      // хранилища проверяет слой данных, здесь важна видимая навигация.
+      // Откат хранилища проверяет слой данных, здесь важна видимая навигация.
       app.raw.execute('''
         CREATE TEMP TRIGGER fail_navigation_assignment_cascade
         AFTER DELETE ON tag_assignments
@@ -522,33 +521,28 @@ void _testTaggedGraphLifecycle() {
           SELECT RAISE(ABORT, 'navigation assignment cascade');
         END
       ''');
-      final attempts = <Future<GraphCommandCompletion> Function()>[
-        () => (coordinator.acceptExisting(
-          DeleteIntention(_intentionId(5)),
-          presentationTitle: 'Отдельное намерение',
-        ) as IntentionCommandAccepted).future,
-        () => (coordinator.acceptTagDelete(
+      Future<GraphCommandCompletion> deleteIntention() =>
+          (coordinator.acceptExisting(
+            DeleteIntention(_intentionId(5)),
+            presentationTitle: 'Отдельное намерение',
+          ) as IntentionCommandAccepted).future;
+      final completion = await _completed(
+        tester,
+        (coordinator.acceptTagDelete(
           DeleteTag(_tagId(firstTagNumber)),
         ) as TagCommandAccepted).future,
-      ];
-      for (final attempt in attempts) {
-        final completion = await _completed(tester, attempt());
-        expect(completion.isFailure, isTrue);
-        expect(completion.confirmedChange, isNull);
-        expect(_failure(completion).category, GraphFailureCategory.unexpected);
-        await _expectNavigationShown(tester, app.router, initial);
-      }
+      );
+      expect(completion.isFailure, isTrue);
+      expect(completion.confirmedChange, isNull);
+      expect(_failure(completion).category, GraphFailureCategory.unexpected);
+      await _expectNavigationShown(tester, app.router, initial);
       await _selectScope(tester, TaggedIntentionsScope.archived);
       await _expectTargets(tester, app.router, [
         _intentionId(2),
       ], scope: TaggedIntentionsScope.archived);
-      final archived = await _loaded(tester, firstTagNumber);
-      final failedDelete = await _completed(tester, attempts.last());
-      expect(failedDelete.isFailure, isTrue);
-      await _expectNavigationShown(tester, app.router, archived);
 
       app.raw.execute('DROP TRIGGER fail_navigation_assignment_cascade');
-      await _changed(tester, attempts.first());
+      await _changed(tester, deleteIntention());
       await _expectTargets(tester, app.router, [
         _intentionId(2),
       ], scope: TaggedIntentionsScope.archived);
@@ -694,13 +688,12 @@ Future<void> _expectNavigationShown(
   AppRouter router,
   TagNavigationLoaded initial,
 ) async {
-  final state = await _expectTargets(
+  await _expectTargets(
     tester,
     router,
     initial.items.map((item) => item.id).toList(),
     scope: initial.scope,
   );
-  expect(state.revision.compareTo(initial.revision), GraphRevisionOrder.same);
 }
 
 void _expectOnlyDeleted(

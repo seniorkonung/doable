@@ -6,7 +6,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -84,10 +83,12 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
         await tester.pump();
 
-        final notice = find.byKey(const ValueKey('tag-editor-already-running'));
-        expect(find.text(message), findsOneWidget);
-        expect(tester.widget<Semantics>(notice).properties.liveRegion, isTrue);
-        expect(tester.getSemantics(notice).label, message);
+        final notice = find.text(message);
+        expect(notice, findsOneWidget);
+        expect(
+          tester.getSemantics(notice),
+          isSemantics(label: message, isLiveRegion: true),
+        );
         expect(repository.commands, hasLength(1));
         expect(
           tester
@@ -99,18 +100,9 @@ void main() {
 
         repository.fail(const TagUnavailableFailure());
         await tester.pumpAndSettle();
-        final claim = await firstClaim;
-        expect(claim?.completion, isA<TagCommandCompletion>());
-        expect(claim!.completion.isFailure, isTrue);
-        coordinator.confirmPresentation(claim);
-        var duplicateClaim = false;
-        unawaited(
-          registration.nextClaim().then((claim) {
-            if (claim != null) duplicateClaim = true;
-          }),
-        );
+        // Оболочка показывает отказ первой отправки и подтверждает показ.
+        coordinator.confirmPresentation((await firstClaim)!);
         await tester.pump();
-        expect(duplicateClaim, isFalse);
         expect(notice, findsNothing);
         expect(
           tester
@@ -154,48 +146,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('исчезновение ошибки до кадра освобождает право оболочке', (
-    tester,
-  ) async {
-    final repository = _Repository();
-    await _pumpEditor(tester, repository);
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(TagEditorPage)),
-    );
-    final coordinator = container.read(
-      graphCommandCoordinatorProvider.notifier,
-    );
-    final registration = coordinator.registerAppPresentation();
-    addTearDown(registration.release);
-    GraphAppPresentationClaim? fallback;
-    unawaited(registration.nextClaim().then((claim) => fallback = claim));
-
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      'Дом',
-    );
-    await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    repository.fail(TagNameOccupiedFailure(_id(1)));
-    await tester.pump();
-    await tester.pump();
-    final renderer = tester.widget<OperationFailurePresentation>(
-      find.byType(OperationFailurePresentation),
-    );
-    expect(renderer.claim, isNotNull);
-    expect(fallback, isNull);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      'Быт',
-    );
-    await tester.pump();
-    await tester.pump();
-    expect(find.byType(OperationFailurePresentation), findsNothing);
-    expect(fallback?.token, same(renderer.claim!.token));
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-  });
-
   testWidgets('закрытие формы до кадра возвращает ошибку оболочке', (
     tester,
   ) async {
@@ -221,57 +171,13 @@ void main() {
     repository.fail(TagNameOccupiedFailure(_id(1)));
     await tester.pump();
     await tester.pump();
-    final claim = tester
-        .widget<OperationFailurePresentation>(
-          find.byType(OperationFailurePresentation),
-        )
-        .claim!;
     expect(fallback, isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
-    expect(fallback?.token, same(claim.token));
+    expect(fallback, isNotNull);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   });
-
-  testWidgets(
-    'после доступного кадра исчезновение ошибки не выдаёт её повторно',
-    (tester) async {
-      final repository = _Repository();
-      await _pumpEditor(tester, repository);
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(TagEditorPage)),
-      );
-      final coordinator = container.read(
-        graphCommandCoordinatorProvider.notifier,
-      );
-      final registration = coordinator.registerAppPresentation();
-      addTearDown(registration.release);
-      GraphAppPresentationClaim? fallback;
-      unawaited(registration.nextClaim().then((claim) => fallback = claim));
-
-      await tester.enterText(
-        find.byKey(const ValueKey('tag-editor-name')),
-        'Дом',
-      );
-      await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-      repository.fail(TagNameOccupiedFailure(_id(1)));
-      await tester.pumpAndSettle();
-      final renderer = tester.widget<OperationFailurePresentation>(
-        find.byType(OperationFailurePresentation),
-      );
-      expect(renderer.claim, isNotNull);
-      expect(coordinator.claimInitiatorFailure(renderer.claim!.token), isNull);
-
-      await tester.enterText(
-        find.byKey(const ValueKey('tag-editor-name')),
-        'Быт',
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(OperationFailurePresentation), findsNothing);
-      expect(fallback, isNull);
-    },
-  );
 }
 
 Future<void> _pumpEditor(

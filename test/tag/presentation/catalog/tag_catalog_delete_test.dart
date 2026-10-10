@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -174,7 +173,7 @@ void main() {
         findsNothing,
       );
       expect(
-        find.byKey(const ValueKey('graph-operation-message')),
+        find.textContaining('Тег удалён вместе со всеми назначениями.'),
         findsOneWidget,
       );
     },
@@ -215,10 +214,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
     await _pumpUntil(
       tester,
-      () => find
-          .byKey(const ValueKey('tag-delete-failure'))
-          .evaluate()
-          .isNotEmpty,
+      () => find.textContaining('непредвиденной ошибки').evaluate().isNotEmpty,
     );
     expect(find.textContaining('непредвиденной ошибки'), findsWidgets);
     expect(
@@ -249,10 +245,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
     await _pumpUntil(
       tester,
-      () => find
-          .byKey(const ValueKey('tag-delete-failure'))
-          .evaluate()
-          .isNotEmpty,
+      () => find.textContaining('больше нет').evaluate().isNotEmpty,
     );
     expect(find.textContaining('больше нет'), findsWidgets);
     expect(raw.select('SELECT id FROM tags').single['id'], _id(302));
@@ -276,13 +269,6 @@ void main() {
           ],
         );
         addTearDown(container.dispose);
-        final completions = <GraphCommandCompletion>[];
-        final subscription = container
-            .read(graphCommandCoordinatorProvider.notifier)
-            .completions
-            .listen(completions.add);
-        addTearDown(subscription.cancel);
-
         Widget host(Widget child) => UncontrolledProviderScope(
           container: container,
           child: OrdinaryPageTestApp(
@@ -312,29 +298,24 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
         await tester.pumpAndSettle();
 
-        final notice = find.byKey(const ValueKey('tag-delete-already-running'));
-        expect(find.text(busyMessage), findsOneWidget);
-        expect(tester.widget<Semantics>(notice).properties.liveRegion, isTrue);
-        expect(tester.widget<Semantics>(notice).properties.label, busyMessage);
-        expect(find.bySemanticsLabel(busyMessage), findsOneWidget);
+        final notice = find.text(busyMessage);
+        expect(notice, findsOneWidget);
+        expect(
+          tester.getSemantics(notice),
+          isSemantics(label: busyMessage, isLiveRegion: true),
+        );
         expect(repository.commands, 1);
 
         repository.finish(succeeds: succeeds);
         await tester.pumpAndSettle();
         expect(notice, findsNothing);
-        final result = find.byKey(const ValueKey('graph-operation-message'));
-        expect(result, findsOneWidget);
         final expectedResult = succeeds
             ? resultMessage
             : 'Не удалось выполнить действие с тегом.';
-        expect(find.textContaining(expectedResult), findsOneWidget);
-        expect(
-          tester.widget<Semantics>(result).properties.label,
-          contains(expectedResult),
-        );
+        final result = find.textContaining(expectedResult);
+        expect(result, findsOneWidget);
+        expect(tester.getSemantics(result).label, contains(expectedResult));
         expect(repository.commands, 1);
-        expect(completions, hasLength(1));
-        expect(completions.single, isA<TagCommandCompletion>());
         semantics.dispose();
       },
     );

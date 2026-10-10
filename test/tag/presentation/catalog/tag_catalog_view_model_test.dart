@@ -926,8 +926,8 @@ void main() {
     await pumpEventQueue();
     expect(h.repository.queries, hasLength(4));
     expect(
-      (h.state as TagCatalogLoaded).revision,
-      isA<_Revision>().having((revision) => revision.number, 'номер', 3),
+      (h.state as TagCatalogLoaded).items.single.name.value,
+      'Последнее имя',
     );
 
     h.repository.page(3, [

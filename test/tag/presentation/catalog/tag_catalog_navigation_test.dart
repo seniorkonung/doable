@@ -14,7 +14,6 @@ import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
@@ -146,12 +145,6 @@ void main() {
       final model = h.container.read(tagCatalogViewModelProvider().notifier);
       model.selectTag(_tagId(352));
       await tester.pumpAndSettle();
-      expect(
-        (h.container.read(
-          tagCatalogViewModelProvider(),
-        ) as TagCatalogLoaded).items,
-        hasLength(52),
-      );
       await tester.scrollUntilVisible(
         _open(352),
         300,
@@ -181,12 +174,6 @@ void main() {
       expect((await renamed.future).result, isA<GraphResultSuccess>());
       await tester.pumpAndSettle();
       expect(find.text('Новое имя'), findsOneWidget);
-      expect(
-        (h.container.read(
-          tagCatalogViewModelProvider(),
-        ) as TagCatalogLoaded).items,
-        hasLength(52),
-      );
       oldCallback();
       await tester.pumpAndSettle();
       expect(

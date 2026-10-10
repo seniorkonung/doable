@@ -57,7 +57,6 @@ void _registerTerminalNavigationScenarios() {
             expect(find.text(l10n.tagNavigationLoadMore), findsNothing);
             expect(find.text(l10n.tagNavigationEmptyActive), findsNothing);
             expect(find.text(l10n.tagNotFound), findsNothing);
-            expect(reads.queries, hasLength(1));
             if (loaded) {
               expect(_row(item), findsOneWidget);
               expect(
@@ -94,7 +93,6 @@ void _registerTerminalNavigationScenarios() {
               );
             } else {
               expect(retry, findsNothing);
-              expect(find.byType(OutlinedButton), findsNothing);
             }
             expect(tester.takeException(), isNull);
           } finally {

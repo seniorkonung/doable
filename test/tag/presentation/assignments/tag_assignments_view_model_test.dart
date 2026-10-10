@@ -336,10 +336,7 @@ void main() {
     expect((h.state as TagAssignmentsLoaded).items, isEmpty);
     h.reads.page(2, [], revision: 3);
     await pumpEventQueue();
-    expect(
-      (h.state as TagAssignmentsLoaded).revision.compareTo(const _Revision(3)),
-      GraphRevisionOrder.same,
-    );
+    expect((h.state as TagAssignmentsLoaded).canUseCurrentItems, isTrue);
 
     h.changes.add(
       _Package(const _Revision(4), [
@@ -372,7 +369,9 @@ void main() {
     );
     await pumpEventQueue();
 
-    expect(h.state, same(loaded));
+    final after = h.state as TagAssignmentsLoaded;
+    expect(after.items.map((tag) => tag.id), loaded.items.map((tag) => tag.id));
+    expect(after.canUseCurrentItems, isTrue);
     expect(h.reads.queries, hasLength(1));
     expect(h.model.canActOn(_id(1)), isTrue);
     expect(h.model.canActOn(_id(2)), isTrue);
@@ -411,12 +410,8 @@ void main() {
       (_id(1), 'Дом'),
       (_id(2), 'Работа'),
     ]);
-    expect(
-      loaded.revision.compareTo(const _Revision(2)),
-      GraphRevisionOrder.same,
-    );
     expect(loaded.canUseCurrentItems, isTrue);
-    expect(states, [same(loaded)]);
+    expect(states, [isA<TagAssignmentsLoaded>()]);
     expect(h.reads.queries, hasLength(3));
   });
 
@@ -446,7 +441,7 @@ void main() {
       final stale = h.state as TagAssignmentsLoaded;
       expect(stale.items.map((tag) => tag.id), [_id(1)]);
       expect(stale.freshness, TagAssignmentsFreshness.stale);
-      expect(stale.refreshFailure, same(failure));
+      expect(stale.refreshFailure?.category, failure.category);
       expect(h.model.canActOn(_id(1)), isFalse);
 
       final retry = h.model.retryRefresh();
@@ -456,14 +451,13 @@ void main() {
         await retry;
         final current = h.state as TagAssignmentsLoaded;
         expect(current.items.map((tag) => tag.id), [_id(1)]);
-        expect(
-          current.revision.compareTo(const _Revision(2)),
-          GraphRevisionOrder.same,
-        );
+        expect(current.canUseCurrentItems, isTrue);
         expect(h.model.canActOn(_id(1)), isTrue);
       } else {
         await retry;
-        expect(h.state, same(stale));
+        final unchanged = h.state as TagAssignmentsLoaded;
+        expect(unchanged.freshness, TagAssignmentsFreshness.stale);
+        expect(unchanged.refreshFailure?.category, failure.category);
         expect(h.reads.queries, hasLength(2));
       }
     });

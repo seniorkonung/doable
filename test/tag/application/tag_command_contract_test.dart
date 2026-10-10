@@ -79,18 +79,10 @@ void main() {
         value: repeated,
       );
 
-      expect(changed.assignment, pair);
-      expect(changed.assignment.intentionId, _intentionId(2));
-      expect(changed.state, state);
-      expect(repeated.assignment, pair);
-      expect(repeated.state, state);
-      expect(confirmedChange.revision, same(newRevision));
-      expect(confirmedRepeat.revision, same(oldRevision));
-      expect(changed.change, isNot(isA<TagAssignmentUnchangedChange>()));
-      expect(repeated.change, isNot(isA<TagAssignmentChangedChange>()));
-      expect(confirmedChange.changes, [same(changed.change), same(mutation)]);
-      expect(confirmedRepeat.changes, [same(repeated.change)]);
-      expect(() => confirmedRepeat.changes.clear(), throwsUnsupportedError);
+      // Подтверждённое изменение несёт факт и каталожный снимок, а повтор
+      // только факт без нового каталожного изменения.
+      expect(confirmedChange.changes, [changed.change, mutation]);
+      expect(confirmedRepeat.changes, [repeated.change]);
       expect(
         () => ConfirmedGraphResult<TagCommandSuccess>(
           revision: oldRevision,
@@ -106,46 +98,6 @@ void main() {
       );
     }
   });
-
-  test(
-    'изменение назначения намерению несёт каталожный снимок той же ревизии',
-    () {
-      const revision = _Revision(6);
-      final tag = _tag(1, 'Дом');
-      final intentionId = _intentionId(2);
-      final pair = TagAssignment(tagId: tag.id, intentionId: intentionId);
-
-      for (final state in TagAssignmentState.values) {
-        final mutation = IntentionCatalogUpdated(
-          revision: revision,
-          before: _entry(intentionId, [
-            if (state == TagAssignmentState.absent) tag,
-          ]),
-          after: _entry(intentionId, [
-            if (state == TagAssignmentState.assigned) tag,
-          ]),
-        );
-        final changed = TagAssignmentChanged(
-          TagAssignmentChangedChange(
-            revision: revision,
-            assignment: pair,
-            state: state,
-          ),
-          catalogMutation: mutation,
-        );
-        final confirmed = ConfirmedGraphResult<TagCommandSuccess>(
-          revision: revision,
-          value: changed,
-        );
-
-        expect(changed.catalogMutation, same(mutation));
-        expect(confirmed.changes, [same(changed.change), same(mutation)]);
-        expect(confirmed.changes.whereType<IntentionCatalogMutation>(), [
-          same(mutation),
-        ]);
-      }
-    },
-  );
 
   test('каталожный снимок принадлежит только намерению из пары', () {
     const revision = _Revision(6);

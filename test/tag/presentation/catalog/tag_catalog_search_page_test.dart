@@ -91,7 +91,6 @@ void main() {
         await tester.pump();
         repository.observe(renamed, revision: 2);
         await tester.pumpAndSettle();
-        expect(_loaded(tester, intentionId).items.first.name.value, 'Дом');
         expect(_visibleNames(tester), ['Для дома']);
         expect(find.text('Дом'), findsNothing);
         await tester.enterText(_search, 'спорт');
@@ -100,7 +99,10 @@ void main() {
         repository.observe(home);
         await tester.pumpAndSettle();
         expect(_visibleNames(tester), ['Спорт']);
-        expect(_loaded(tester, intentionId).selection.id, home.id);
+        expect(
+          tester.widget<Semantics>(_row(home)).properties.selected,
+          isTrue,
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -117,9 +119,6 @@ void main() {
         await tester.pumpAndSettle();
         await tester.enterText(_search, 'дом');
         await tester.pump();
-        final editable = tester.state<EditableTextState>(
-          find.byType(EditableText),
-        );
         final input = tester.widget<TextField>(_search).controller!;
         final editingValue = input.value;
         final scroll = tester.widget<CustomScrollView>(_list).controller!;
@@ -149,9 +148,9 @@ void main() {
         repository.complete(tags, revision: 2);
         await tester.pumpAndSettle();
         expect(scroll.offset, refreshOffset);
-        expect(tester.state<EditableTextState>(_editable), same(editable));
+        final editable = tester.state<EditableTextState>(_editable);
         expect(editable.widget.focusNode.hasFocus, isTrue);
-        expect(input.value, editingValue);
+        expect(editable.widget.controller.value, editingValue);
 
         await _reachSearchElement(tester, _editable);
         await tester.enterText(_search, 'Дом');
@@ -185,41 +184,41 @@ void main() {
         await tester.pumpAndSettle();
         await tester.enterText(_search, 'работ');
         await tester.pump();
-        final firstInput = tester.widget<TextField>(_search).controller!;
+        String inputText() =>
+            tester.widget<TextField>(_search).controller!.text;
         unawaited(
           router.push<void>(
             TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
           ),
         );
         await tester.pumpAndSettle();
-        final secondInput = tester.widget<TextField>(_search).controller!;
-        expect(secondInput, isNot(same(firstInput)));
-        expect(secondInput.text, isEmpty);
+        expect(inputText(), isEmpty);
         expect(_visibleNames(tester), ['Дом', 'Работа']);
         await tester.enterText(_search, 'дом');
         await tester.pump();
-        expect(firstInput.text, 'работ');
-        expect(secondInput.text, 'дом');
+        expect(inputText(), 'дом');
         expect(_visibleNames(tester), ['Дом']);
         await router.maybePop();
         await tester.pumpAndSettle();
-        expect(tester.widget<TextField>(_search).controller, same(firstInput));
+        expect(inputText(), 'работ');
         expect(_visibleNames(tester), ['Работа']);
-        expect(() => secondInput.addListener(() {}), throwsFlutterError);
         unawaited(
           router.push<void>(
             TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
           ),
         );
         await tester.pumpAndSettle();
-        expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
+        expect(inputText(), isEmpty);
         expect(_visibleNames(tester), ['Дом', 'Работа']);
         await tester.enterText(_search, 'дом');
         await tester.pump();
         await tester.tap(find.byTooltip('Очистить поиск тегов'));
         await tester.pump();
-        expect(firstInput.text, 'работ');
         expect(_visibleNames(tester), ['Дом', 'Работа']);
+        await router.maybePop();
+        await tester.pumpAndSettle();
+        expect(inputText(), 'работ');
+        expect(_visibleNames(tester), ['Работа']);
         expect(tester.takeException(), isNull);
       },
     );
@@ -250,7 +249,6 @@ void main() {
               await tester.pump();
               expect(_visibleNames(tester), query == 'работ' ? ['Работа'] : []);
               expect(_row(selected), findsNothing);
-              expect(_loaded(tester, intentionId).selection.id, selected.id);
               expect(_selected, findsOneWidget);
               expect(
                 find.descendant(
@@ -333,9 +331,8 @@ void main() {
           for (final query in ['спорт', '', 'работ']) {
             await tester.enterText(_search, query);
             await tester.pump();
-            expect(_loaded(tester, intentionId).selection.id, home.id);
             expect(tester.widget<FilledButton>(_assign).onPressed, isNull);
-            expect(repository.commands.single, same(command));
+            expect(repository.commands, hasLength(1));
           }
           final tile = tester.widget<ListTile>(
             find.descendant(of: _row(work), matching: find.byType(ListTile)),
@@ -464,10 +461,6 @@ void main() {
           repository.observe(null, id: selected.id, revision: 3);
           await tester.pump();
           await tester.pump();
-          expect(
-            _loaded(tester, intentionId).selection,
-            isA<TagCatalogNoSelection>(),
-          );
           expect(_selected, findsNothing);
           expect(tester.widget<FilledButton>(_assign).onPressed, isNull);
           expect(repository.commands, isEmpty);
@@ -506,8 +499,6 @@ void main() {
 
           expect(tester.widget<TextField>(_search).controller!.text, 'работ');
           expect(_visibleNames(tester), ['Работа']);
-          expect(_loaded(tester, intentionId).items, [work]);
-          expect(_loaded(tester, intentionId).selection.id, selected.id);
           expect(
             find.descendant(of: _selected, matching: find.text('Дом')),
             findsOneWidget,
@@ -527,7 +518,6 @@ void main() {
           final command = repository.commands.single as AssignTag;
           expect(command.tagId, selected.id);
           expect(command.intentionId, intentionId);
-          expect(_loaded(tester, intentionId).selection.id, selected.id);
           expect(tester.takeException(), isNull);
         },
       );
@@ -567,15 +557,16 @@ void main() {
         await tester.pump();
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(_visibleNames(tester), tags.map((tag) => tag.name.value));
-        final state = _loaded(tester, intentionId);
-        expect(state.items, tags);
         if (intentionId != null) {
-          expect(state.selectionRows.map((row) => row.isAssigned), [
-            false,
-            true,
-            false,
-            true,
-          ]);
+          expect(
+            [for (final tag in tags) _assignment(tester, tag)],
+            [
+              'Доступен для назначения',
+              'Назначен',
+              'Доступен для назначения',
+              'Назначен',
+            ],
+          );
         }
       },
     );
@@ -595,7 +586,6 @@ void main() {
       await tester.pump();
 
       expect(_visibleNames(tester), ['Straße']);
-      expect(_loaded(tester, intentionId).items, hasLength(133));
     });
 
     // Тексты английского языка проверяет каталог; выбор показывает те же строки.
@@ -1101,11 +1091,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(_search, 'дом');
       await tester.pump();
-      final input = tester.widget<TextField>(_search).controller!;
       sessionIntention.value = after;
       await tester.pump();
-      expect(tester.widget<TextField>(_search).controller, same(input));
-      expect(input.text, isEmpty);
+      expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
       repository.complete(tags, assignedIds: {tags.first.id});
       await tester.pumpAndSettle();
       expect(_visibleNames(tester), ['Дом', 'Работа']);

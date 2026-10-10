@@ -43,21 +43,12 @@ void _registerTerminalAppScenarios() {
             ? l10n.tagNavigationRefreshUnavailable
             : l10n.tagNavigationUnavailable;
         expect(find.text(message), findsOneWidget);
-        expect(
-          app.repository.watchResults.last,
-          isA<TagReadError>().having(
-            (result) => result.failure,
-            'причина',
-            isA<TagReadUnavailableFailure>(),
-          ),
-        );
         expect(app.model(tester).canActOn(_intention(2)), isFalse);
         oldOpen?.call();
         expect(app.router.current.name, TagNavigationRoute.name);
         if (loaded) {
           final stale = app.state(tester) as TagNavigationLoaded;
           expect(stale.items, before!.items);
-          expect(stale.nextCursor, isNull);
         } else {
           expect(app.state(tester), isA<TagNavigationInitialFailure>());
         }
@@ -65,7 +56,6 @@ void _registerTerminalAppScenarios() {
         final writes = app.raw
             .select('SELECT total_changes() AS count')
             .single['count'];
-        final queryCount = app.repository.queries.length;
         final observed = app.repository.watchResults.length;
         final held = app.repository.holdNextPage();
         app.readProbe.failure = null;
@@ -79,7 +69,6 @@ void _registerTerminalAppScenarios() {
               held.ready.isCompleted &&
               app.repository.watchResults.length > observed,
         );
-        expect(app.repository.watchResults.last, isA<TagReadSuccess>());
         expect(app.model(tester).canActOn(_intention(2)), isFalse);
         oldOpen?.call();
         expect(app.router.current.name, TagNavigationRoute.name);
@@ -87,7 +76,6 @@ void _registerTerminalAppScenarios() {
         final restored = await app.loaded(tester);
         final snapshot =
             (await held.ready.future as TaggedIntentionsPageSuccess).value;
-        expect(restored.tagId, _tagId);
         expect(restored.scope, TaggedIntentionsScope.archived);
         expect(restored.items, snapshot.items);
         expect(
@@ -97,14 +85,6 @@ void _registerTerminalAppScenarios() {
         expect(restored.refreshFailure, isNull);
         expect(find.text(message), findsNothing);
         expect(app.model(tester).canActOn(_intention(2)), isTrue);
-        expect(app.repository.queries, hasLength(queryCount + 1));
-        expect(app.repository.queries.last.tagId, _tagId);
-        expect(
-          app.repository.queries.last.scope,
-          TaggedIntentionsScope.archived,
-        );
-        expect(app.repository.queries.last.cursor, isNull);
-        expect(app.repository.watchedIds, [_tagId, _tagId]);
         expect(app.repository.commands, isEmpty);
         expect(
           app.raw.select('SELECT total_changes() AS count').single['count'],

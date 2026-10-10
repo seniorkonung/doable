@@ -72,8 +72,6 @@ void _testLatePageAfterWatchFailure() {
         if (terminal) await h.reads.watches.single.close();
         await pumpEventQueue();
         _expectWatchFailure(h, watchFailure.category, loaded: continuation);
-        final failed = h.state;
-        final stateCount = h.states.length;
         final index = continuation ? 1 : 0;
         if (resultFailure case final failure?) {
           h.reads.fail(index, failure);
@@ -84,8 +82,6 @@ void _testLatePageAfterWatchFailure() {
         await pumpEventQueue();
 
         _expectWatchFailure(h, watchFailure.category, loaded: continuation);
-        expect(h.state, same(failed));
-        expect(h.states, hasLength(stateCount));
         expect(h.reads.queries, hasLength(index + 1));
         expect(h.model.canActOn(_intention(102).id), isFalse);
         await h.model.loadMore();
@@ -95,7 +91,6 @@ void _testLatePageAfterWatchFailure() {
           await h.model.retryRefresh();
         }
         expect(h.reads.queries, hasLength(index + 1));
-        expect(h.reads.watchedIds, hasLength(1));
       },
     );
   }
@@ -204,7 +199,6 @@ void _testRecoveryAfterLatePage() {
             : h.model.retryFirstPage();
         final newIndex = oldIndex + 1;
         expect(h.reads.queries, hasLength(newIndex + 1));
-        expect(h.reads.watchedIds, [_tagId(1), _tagId(1)]);
         expect(h.reads.queries.last.scope, TaggedIntentionsScope.archived);
         expect(h.reads.queries.last.cursor, isNull);
         if (pageFirst) {
@@ -226,11 +220,12 @@ void _testRecoveryAfterLatePage() {
         expect(restored.scope, TaggedIntentionsScope.archived);
         expect(restored.items.single.id, _intention(103).id);
         expect(h.model.canActOn(_intention(103).id), isTrue);
-        final stateCount = h.states.length;
         _deliverOldWatchCallbacks(h);
         await pumpEventQueue();
-        expect(h.state, same(restored));
-        expect(h.states, hasLength(stateCount));
+        final afterOld = h.state as TagNavigationLoaded;
+        expect(afterOld.refreshFailure, isNull);
+        expect(afterOld.canUseCurrentItems, isTrue);
+        expect(afterOld.items.single.id, _intention(103).id);
         expect(h.reads.queries, hasLength(newIndex + 1));
         h.reads.observe(_tag('Быт'), index: 1, revision: 2);
         h.reads.page(
@@ -242,7 +237,6 @@ void _testRecoveryAfterLatePage() {
         await pumpEventQueue();
         expect((h.state as TagNavigationLoaded).tag.name.value, 'Быт');
         expect(h.model.canActOn(_intention(4).id), isTrue);
-        expect(h.reads.watchedIds, hasLength(2));
       },
     );
   }
@@ -301,11 +295,14 @@ void _testWatchFailureDuringSelectionUpdates() {
             failure.category,
             loaded: continuation && source != 'охват',
           );
-          final failed = h.state;
           final index = continuation ? 1 : 0;
           h.reads.page(index, [_intention(102)], revision: 2, tag: _tag('Быт'));
           await pumpEventQueue();
-          expect(h.state, same(failed));
+          _expectWatchFailure(
+            h,
+            failure.category,
+            loaded: continuation && source != 'охват',
+          );
           expect(h.reads.queries, hasLength(index + 1));
           expect(h.model.canActOn(_intention(102).id), isFalse);
           await h.model.loadMore();

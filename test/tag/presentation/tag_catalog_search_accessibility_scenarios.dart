@@ -157,9 +157,6 @@ void _registerCatalogSearchScenarios() {
           final create = find.byKey(const ValueKey('tag-catalog-create'));
           await tester.enterText(search, 'STRASS');
           await tester.pumpAndSettle();
-          final input = tester.state<EditableTextState>(
-            find.byType(EditableText),
-          );
           expect(
             tester.getSemantics(find.byType(EditableText)).label,
             contains(l10n.tagCatalogSearch),
@@ -201,10 +198,13 @@ void _registerCatalogSearchScenarios() {
             isTrue,
           );
           expect(
-            tester.state<EditableTextState>(find.byType(EditableText)),
-            same(input),
+            tester
+                .state<EditableTextState>(find.byType(EditableText))
+                .widget
+                .focusNode
+                .hasFocus,
+            isTrue,
           );
-          expect(input.widget.focusNode.hasFocus, isTrue);
           _expectAction(tester.getSemantics(create));
           expect(tester.getSemantics(create).tooltip, l10n.tagCatalogCreate);
           final hidden = find.byKey(
@@ -285,7 +285,14 @@ void _registerCatalogSearchScenarios() {
           await tester.tap(clear);
           await tester.pumpAndSettle();
           expect(tester.widget<TextField>(search).controller!.text, isEmpty);
-          expect(input.widget.focusNode.hasFocus, isTrue);
+          expect(
+            tester
+                .state<EditableTextState>(find.byType(EditableText))
+                .widget
+                .focusNode
+                .hasFocus,
+            isTrue,
+          );
           expect(find.text('Дом'), findsOneWidget);
           expect(find.text(tagName), findsOneWidget);
           if (target != null) {

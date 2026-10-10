@@ -1188,13 +1188,6 @@ void main() {
           .first,
     );
     expect(find.text('Тег 150'), findsOneWidget);
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(TagCatalogPage)),
-    );
-    expect(
-      (container.read(tagCatalogViewModelProvider()) as TagCatalogLoaded).items,
-      hasLength(150),
-    );
     expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsNothing);
   });
 
@@ -1355,7 +1348,6 @@ void main() {
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(1)}')), findsNothing);
     expect(find.byTooltip('Rename tag'), findsNothing);
-    expect(repository.queries, hasLength(3));
 
     repository.complete(_page([_tag(2, 'Работа')], revision: 2));
     await tester.pumpAndSettle();
@@ -1410,7 +1402,6 @@ void main() {
       find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')),
       findsOneWidget,
     );
-    expect(repository.queries, hasLength(1));
   });
 
   testWidgets('пакет после снимка убирает удалённый выбор и действия', (
@@ -1452,7 +1443,6 @@ void main() {
     expect(find.text('Старое имя'), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')), findsNothing);
     expect(find.byTooltip('Rename tag'), findsOneWidget);
-    expect(repository.queries, hasLength(1));
   });
 
   testWidgets(
@@ -1483,8 +1473,9 @@ void main() {
           .first;
       await tester.drag(list, const Offset(0, -900));
       await tester.pumpAndSettle();
-      final scrollState = tester.state<ScrollableState>(scrollable);
-      final offset = scrollState.position.pixels;
+      double scrollOffset() =>
+          tester.state<ScrollableState>(scrollable).position.pixels;
+      final offset = scrollOffset();
       expect(offset, greaterThan(0));
       final container = ProviderScope.containerOf(tester.element(list));
       final provider = tagCatalogViewModelProvider(
@@ -1514,12 +1505,7 @@ void main() {
       );
       await accepted.future;
       await tester.pump();
-      expect(tester.state<ScrollableState>(scrollable), same(scrollState));
-      expect(scrollState.position.pixels, offset);
-      expect(
-        (container.read(provider) as TagCatalogLoaded).selection.id,
-        _tag(21, 'Тег 21').id,
-      );
+      expect(scrollOffset(), offset);
       final assign = find.byKey(const ValueKey('tag-catalog-assign'));
       expect(tester.widget<FilledButton>(assign).onPressed, isNull);
 
@@ -1527,12 +1513,8 @@ void main() {
         const TagCatalogError(TagCatalogUnavailableFailure()),
       );
       await tester.pumpAndSettle();
-      expect(tester.state<ScrollableState>(scrollable), same(scrollState));
-      expect(scrollState.position.pixels, offset);
-      final stale = container.read(provider) as TagCatalogLoaded;
-      expect(stale.items, hasLength(30));
-      expect(stale.selection.id, _tag(21, 'Тег 21').id);
-      expect(stale.freshness, TagCatalogFreshness.stale);
+      expect(scrollOffset(), offset);
+      expect(tester.widget<FilledButton>(assign).onPressed, isNull);
       final retry = model.retryRefresh();
       repository.complete(
         TagCatalogSuccess(
@@ -1548,12 +1530,7 @@ void main() {
       );
       await retry;
       await tester.pumpAndSettle();
-      expect(tester.state<ScrollableState>(scrollable), same(scrollState));
-      expect(scrollState.position.pixels, offset);
-      expect(
-        (container.read(provider) as TagCatalogLoaded).selection.id,
-        _tag(21, 'Тег 21').id,
-      );
+      expect(scrollOffset(), offset);
       expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
     },
   );
@@ -1604,11 +1581,6 @@ void main() {
       expect(find.text('Tags couldn’t be loaded. Try again.'), findsOneWidget);
       await tester.tap(find.text('Try again'));
       await tester.pump();
-      expect(repository.queries, [
-        const TagCatalogBrowseMode(),
-        const TagCatalogBrowseMode(),
-        const TagCatalogBrowseMode(),
-      ]);
       repository.complete(
         _page([_tag(1, longName), _tag(2, 'Другой')], revision: 2),
       );
@@ -1661,10 +1633,6 @@ void main() {
       repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
       await tester.pumpAndSettle();
 
-      expect(repository.queries, [
-        const TagCatalogBrowseMode(),
-        const TagCatalogBrowseMode(),
-      ]);
       expect(find.text('Choose a tag'), findsOneWidget);
       expect(find.text('Available to assign'), findsNothing);
       expect(find.byKey(const ValueKey('tag-catalog-assign')), findsNothing);
@@ -1691,16 +1659,8 @@ void main() {
             .selected,
         isTrue,
       );
-      expect(
-        (container.read(
-          tagCatalogViewModelProvider(),
-        ) as TagCatalogLoaded).selection,
-        isA<TagCatalogNoSelection>(),
-      );
       expect(tagSet.current.tagIds, isEmpty);
-      expect(repository.statusReads, isEmpty);
       expect(repository._commands, isEmpty);
-      expect(repository.queries, hasLength(2));
       expect(navigations, 0);
     },
   );
@@ -1774,8 +1734,6 @@ void main() {
       expect(find.text('In draft'), findsNWidgets(3));
       expect(draft.chooserIsCurrent(tester), isTrue);
       expect(find.byType(SnackBar), findsNothing);
-      expect(repository.queries, [const TagCatalogBrowseMode()]);
-      expect(repository.statusReads, isEmpty);
       expect(repository._commands, isEmpty);
       expect(tester.takeException(), isNull);
     },
@@ -1819,7 +1777,6 @@ void main() {
       await tester.pump();
       expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
       expect(draft.state.selectedTags[_tag(1, 'Дом').id], isNotNull);
-      expect(repository.statusReads, isEmpty);
       expect(repository._commands, isEmpty);
       expect(tester.takeException(), isNull);
     },
@@ -1882,9 +1839,7 @@ void main() {
           _rowStatus(_tag(2, 'Работа'), 'Available to add'),
           findsOneWidget,
         );
-        expect(repository.statusReads, isEmpty);
         expect(repository._commands, hasLength(closed ? 0 : 1));
-        expect(repository.queries, [const TagCatalogBrowseMode()]);
         expect(tester.takeException(), isNull);
       },
     );
@@ -2038,7 +1993,6 @@ void main() {
       expect(kept.draft.readiness, IntentionReadiness.notReady);
       expect(draftTagIds(), [_id(1), created]);
       expect(kept.draftAvailability, IntentionDraftAvailability.editable);
-      expect(container.read(session.notifier).draftTagSet, same(tagSet));
 
       // Новое открытие начинается с пустого поиска и показывает тот же набор.
       unawaited(

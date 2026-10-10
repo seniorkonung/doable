@@ -21,7 +21,6 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -493,7 +492,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(message), findsOneWidget);
       expect(_row(item), findsOneWidget);
-      expect(find.byType(OutlinedButton), findsNothing);
+      expect(find.text('Повторить'), findsNothing);
       expect(
         tester
             .widget<ListTile>(
