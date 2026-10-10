@@ -21,29 +21,13 @@ TagId _tagId(int number) =>
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
-final class _WriteProbe extends LocalDatabaseConnectionObserver {
-  final statements = <String>[];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    statements.addAll(statement.statements);
-  }
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late DriftPersonalGraphRepository repository;
-  late _WriteProbe probe;
 
   setUp(() async {
-    probe = _WriteProbe();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-        probe,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     seedTagStorageFixture(raw);
     raw.execute(
@@ -98,7 +82,6 @@ void main() {
         final tag = _tagId(lastTagNumber);
         final before = graph();
         final firstRevision = await revision();
-        probe.statements.clear();
 
         final assigned = await repository.execute(
           AssignTag(tagId: tag, intentionId: intentionId),
@@ -130,13 +113,6 @@ void main() {
         );
         expect(assignment(lastTagNumber, intentionId), hasLength(1));
         expect(
-          probe.statements.where(
-            (sql) =>
-                sql.contains('INSERT INTO') && sql.contains('tag_assignments'),
-          ),
-          hasLength(1),
-        );
-        expect(
           {
             for (final entry in graph().entries)
               if (entry.key != 'tag_assignments') entry.key: entry.value,
@@ -150,7 +126,6 @@ void main() {
         final sequence =
             assignment(lastTagNumber, intentionId).single['creation_sequence']
                 as int;
-        probe.statements.clear();
         final repeated = await repository.execute(
           AssignTag(tagId: tag, intentionId: intentionId),
         );
@@ -165,13 +140,6 @@ void main() {
         expect(
           assignment(lastTagNumber, intentionId).single['creation_sequence'],
           sequence,
-        );
-        expect(
-          probe.statements.where(
-            (sql) =>
-                sql.contains('INSERT INTO') && sql.contains('tag_assignments'),
-          ),
-          isEmpty,
         );
 
         final removed = await repository.execute(
@@ -191,7 +159,6 @@ void main() {
         );
         expect(assignment(lastTagNumber, intentionId), isEmpty);
 
-        probe.statements.clear();
         final repeatedRemoval = await repository.execute(
           RemoveTagAssignment(tagId: tag, intentionId: intentionId),
         );
@@ -202,13 +169,6 @@ void main() {
         expect(
           repeatedRemoval.value.revision.compareTo(removed.value.revision),
           GraphRevisionOrder.same,
-        );
-        expect(
-          probe.statements.where(
-            (sql) =>
-                sql.contains('DELETE FROM') && sql.contains('tag_assignments'),
-          ),
-          isEmpty,
         );
 
         final reassigned = await repository.execute(

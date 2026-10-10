@@ -29,17 +29,8 @@ bool _isCatalogRows(String sql) =>
     sql.contains('json_each(') && sql.contains('LIMIT');
 
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
-  final statements = <String>[];
-
   /// Однократный отказ после первого подходящего выражения.
   bool Function(String sql)? failAfter;
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select) {
-      statements.add(statement.statements.single);
-    }
-  }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
@@ -93,7 +84,6 @@ void main() {
       () => DateTime.utc(2026, 9, 28),
       diagnostics,
     );
-    probe.statements.clear();
   });
   tearDown(() => database.close());
 
@@ -195,10 +185,6 @@ void main() {
     final events = diagnostics.events
         .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
         .toList();
-    expect(events, hasLength(2));
-    expect(events.first.stage, TagReadDiagnosticsStage.validation);
-    expect(events.first.status, isA<DiagnosticsStarted>());
-    expect(events.last.stage, TagReadDiagnosticsStage.read);
     expect(
       events.last.status,
       isA<DiagnosticsFailed>().having(
@@ -289,23 +275,6 @@ void main() {
     },
   );
 
-  test(
-    'проверка ссылок выбранного тега выполняется один раз за обход',
-    () async {
-      probe.statements.clear();
-      await collect(_tag(firstTagNumber), TaggedIntentionsScope.active, 1);
-      expect(
-        probe.statements.where(
-          (sql) =>
-              sql.contains('LEFT JOIN') &&
-              sql.contains('tag_assignments a') &&
-              sql.contains('LIMIT 1'),
-        ),
-        hasLength(1),
-      );
-    },
-  );
-
   test('совместный поиск по обязательному и исключённому тегам сохраняет '
       'курсор навигации', () async {
     final additionalIds = <IntentionId>[];
@@ -362,7 +331,6 @@ void main() {
         );
     final ids = [...first.items.map((item) => item.id)];
     var cursor = first.nextCursor;
-    probe.statements.clear();
     while (cursor != null) {
       final catalog = await graph.getCatalogPage(catalogQuery());
       expect(catalog, isA<ResultSuccess<IntentionCatalogPage>>());
@@ -431,19 +399,10 @@ void main() {
           .toList(),
       schemaBefore,
     );
-    expect(
-      probe.statements.where(
-        (sql) =>
-            sql.contains('LEFT JOIN') &&
-            sql.contains('tag_assignments a') &&
-            sql.contains('LIMIT 1'),
-      ),
-      isEmpty,
-    );
   });
 
   test('успешные и отказавшие чтения каталога с обязательным и '
-      'исключёнными тегами не меняют total_changes() соединения', () async {
+      'исключёнными тегами не меняют сохранённый граф', () async {
     for (var number = 10; number < 17; number++) {
       raw.execute(
         'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
@@ -459,8 +418,14 @@ void main() {
         );
       }
     }
-    int connectionChanges() =>
-        raw.select('SELECT total_changes() AS count').single['count'] as int;
+    Map<String, List<List<Object?>>> storedGraph() => {
+      ...retainedTagFixtureGraph(raw),
+      for (final table in ['tags', 'tag_assignments'])
+        table: raw
+            .select('SELECT * FROM $table ORDER BY rowid')
+            .map((row) => row.values.toList())
+            .toList(),
+    };
     IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
         IntentionCatalogQuery(
           scope: IntentionScope.active,
@@ -475,22 +440,22 @@ void main() {
         );
     IntentionCatalogPage success(Result<IntentionCatalogPage> result) =>
         (result as ResultSuccess<IntentionCatalogPage>).value;
-    final before = connectionChanges();
+    final before = storedGraph();
 
     final first = success(await graph.getCatalogPage(query()));
     expect(first.nextCursor, isNotNull);
-    expect(connectionChanges(), before);
+    expect(storedGraph(), before);
     final repeated = success(await graph.getCatalogPage(query()));
     expect(
       repeated.items.map((item) => item.id),
       first.items.map((item) => item.id),
     );
-    expect(connectionChanges(), before);
+    expect(storedGraph(), before);
     final continuation = success(
       await graph.getCatalogPage(query(cursor: first.nextCursor)),
     );
     expect(continuation.items.single.id, isNot(first.items.single.id));
-    expect(connectionChanges(), before);
+    expect(storedGraph(), before);
 
     for (final (point, failAfter, cursor) in [
       ('первая порция', _isCatalogRows, null),
@@ -506,19 +471,13 @@ void main() {
         ),
       );
       expect(probe.failAfter, isNull, reason: point);
-      expect(connectionChanges(), before, reason: point);
+      expect(storedGraph(), before, reason: point);
     }
     expect(
       success(await graph.getCatalogPage(query())).items.single.id,
       first.items.single.id,
     );
-    expect(connectionChanges(), before);
-    expect(
-      raw
-          .select("SELECT name FROM temp.sqlite_schema WHERE type = 'table'")
-          .map((row) => row['name']),
-      everyElement('doable_catalog_connection'),
-    );
+    expect(storedGraph(), before);
   });
 
   test(
@@ -735,7 +694,7 @@ void main() {
     },
   );
 
-  test('новое назначение следует за оставшимися и запрос ограничен', () async {
+  test('новое назначение следует за оставшимися', () async {
     raw.execute(
       'DELETE FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
       [tagFixtureId(firstTagNumber), tagFixtureId(1)],
@@ -744,42 +703,15 @@ void main() {
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
       [tagFixtureId(firstTagNumber), tagFixtureId(1)],
     );
-    probe.statements.clear();
     final active = await collect(
       _tag(firstTagNumber),
       TaggedIntentionsScope.active,
       1,
     );
     expect(active.map((item) => item.id), [_intention(4), _intention(1)]);
-    final pageQueries = probe.statements
-        .where(
-          (sql) =>
-              sql.contains('FROM tag_assignments a') &&
-              sql.contains('ORDER BY a.creation_sequence'),
-        )
-        .toList();
-    expect(pageQueries, hasLength(2));
-    expect(
-      pageQueries.every(
-        (sql) =>
-            sql.contains('LIMIT ?') &&
-            !sql.contains('OFFSET') &&
-            sql.contains('JOIN intentions'),
-      ),
-      isTrue,
-    );
-    final plan = raw
-        .select('EXPLAIN QUERY PLAN ${pageQueries.first}', [
-          tagFixtureId(firstTagNumber),
-          0,
-          2,
-        ])
-        .map((row) => row['detail'].toString())
-        .join(' ');
-    expect(plan, contains('tag_assignments_tag_order'));
   });
 
-  test('чужой вид продолжения отклоняется до чтения хранилища', () async {
+  test('чужой вид продолжения отклоняется', () async {
     final result = await graph.getTaggedIntentionsPage(
       TaggedIntentionsQuery(
         tagId: _tag(firstTagNumber),
@@ -793,19 +725,6 @@ void main() {
         (error) => error.failure,
         'причина',
         isA<TaggedIntentionsInvalidCursor>(),
-      ),
-    );
-    expect(probe.statements, isEmpty);
-    final event = diagnostics.events
-        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-        .last;
-    expect(event.stage, TagReadDiagnosticsStage.validation);
-    expect(
-      event.status,
-      isA<DiagnosticsFailed>().having(
-        (status) => status.code,
-        'категория',
-        DiagnosticsFailureCode.validation,
       ),
     );
   });

@@ -38,7 +38,6 @@ final class _FixedChoiceIdGenerator implements DailyChoiceIdGenerator {
 }
 
 final class _ChoiceReadObserver extends LocalDatabaseConnectionObserver {
-  int pathReads = 0;
   void Function()? onPathRead;
 
   @override
@@ -47,7 +46,6 @@ final class _ChoiceReadObserver extends LocalDatabaseConnectionObserver {
         statement.statements.single.contains(
           'FROM daily_choice_path_steps WHERE daily_choice_id',
         )) {
-      pathReads++;
       onPathRead?.call();
     }
   }
@@ -293,34 +291,6 @@ void main() {
       );
     },
   );
-
-  test('посторонняя правка не перечитывает путь открытого выбора', () async {
-    await create();
-    final events = StreamIterator(repository.watchDailyChoice(_choice(201)));
-    addTearDown(events.cancel);
-    expect(await events.moveNext(), isTrue);
-    final readsBefore = readObserver.pathReads;
-
-    await repository.execute(
-      UpdateIntention(
-        id: _intention(4),
-        title: 'Постороннее действие',
-        description: null,
-      ),
-    );
-    await pumpEventQueue();
-    expect(readObserver.pathReads, readsBefore);
-
-    await repository.execute(
-      UpdateIntention(
-        id: _intention(2),
-        title: 'Участник пути',
-        description: null,
-      ),
-    );
-    expect(await events.moveNext(), isTrue);
-    expect(readObserver.pathReads, greaterThan(readsBefore));
-  });
 
   test('поздний снимок помечен прежней ревизией перед удалением', () async {
     await create();

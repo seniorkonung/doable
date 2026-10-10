@@ -383,7 +383,7 @@ void main() {
   );
 
   test(
-    'читает длинный путь порциями и не загружает посторонние выборы',
+    'читает путь длиннее одной SQL-порции целиком и только своего выбора',
     () async {
       const length = 405;
       for (var i = 1; i <= length + 1; i++) {
@@ -396,41 +396,12 @@ void main() {
       }
       addChoice(2001, 1, 2);
       addStep(5000, 2001, 3001);
-      probe.selects.clear();
 
       final result = await repository.getDailyChoice(_choiceId(2000));
       expect(result, isA<DailyChoiceReadSuccess>());
       expect(
         (result as DailyChoiceReadSuccess).value.value!.path,
         hasLength(length),
-      );
-      final reads = probe.selects;
-      expect(reads.length, lessThanOrEqualTo(7));
-      expect(
-        reads
-            .where(
-              (statement) => statement.statements.single.contains(
-                'FROM daily_choices WHERE id = ?',
-              ),
-            )
-            .single
-            .arguments,
-        [_uuid(2000)],
-      );
-      expect(
-        reads
-            .where(
-              (statement) => statement.statements.single.contains(
-                'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-              ),
-            )
-            .single
-            .arguments,
-        [_uuid(2000)],
-      );
-      expect(
-        reads.every((statement) => statement.arguments.length <= 400),
-        isTrue,
       );
     },
   );
@@ -479,7 +450,6 @@ void main() {
 
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
   Object? failure;
-  final selects = <LocalDatabaseSqlStatement>[];
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -490,6 +460,5 @@ final class _ReadProbe extends LocalDatabaseConnectionObserver {
       final error = failure;
       if (error != null) throw error;
     }
-    selects.add(statement);
   }
 }

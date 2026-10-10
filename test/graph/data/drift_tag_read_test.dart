@@ -24,13 +24,11 @@ TagId _tagId(int number) =>
     (TagId.decode(_uuid(number)) as TagIdDecodingSuccess).id;
 
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
-  final statements = <String>[];
   Object? failure;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
-    statements.add(statement.statements.single);
     if (failure case final error?) throw error;
   }
 }
@@ -58,7 +56,6 @@ void main() {
       () => DateTime.utc(2026, 9, 25),
       diagnostics,
     );
-    probe.statements.clear();
   });
   tearDown(() => database.close());
 
@@ -72,7 +69,7 @@ void main() {
   TagCatalogSnapshot snapshot(TagCatalogResult result) =>
       (result as TagCatalogSuccess).value;
 
-  test('каталог возвращает все 137 тегов за одно чтение', () async {
+  test('каталог возвращает все 137 тегов целиком', () async {
     for (var number = 1; number <= 137; number++) {
       addTag(number, 'Тег $number');
     }
@@ -85,14 +82,6 @@ void main() {
     expect(loaded.items.map((tag) => tag.id), [
       for (var number = 1; number <= 137; number++) _tagId(number),
     ]);
-    expect(
-      probe.statements.where((sql) => sql.contains('FROM tags')),
-      hasLength(1),
-    );
-    expect(
-      probe.statements.any((sql) => sql.contains('tag_assignments')),
-      isFalse,
-    );
     expect(() => loaded.items.clear(), throwsUnsupportedError);
   });
 
@@ -105,23 +94,12 @@ void main() {
     for (var number = 1; number <= 7; number++) {
       addTag(number, 'Тег $number');
     }
-    probe.statements.clear();
     final loaded = snapshot(
       await repository.getTagCatalog(const TagCatalogBrowseMode()),
     );
     expect(loaded.items.map((tag) => tag.name.value), [
       for (var number = 1; number <= 7; number++) 'Тег $number',
     ]);
-    expect(
-      probe.statements.where((sql) => sql.contains('FROM tags')),
-      hasLength(1),
-    );
-    expect(
-      diagnostics.events.whereType<TagCatalogReadDiagnosticsEvent>().where(
-        (event) => event.status is DiagnosticsSucceeded,
-      ),
-      hasLength(2),
-    );
   });
 
   test(

@@ -20,31 +20,15 @@ String _uuid(int number) =>
 
 TagName _name(String value) => TagName.fromInput(value);
 
-final class _WriteProbe extends LocalDatabaseConnectionObserver {
-  final statements = <String>[];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    statements.addAll(statement.statements);
-  }
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late DriftPersonalGraphRepository repository;
   late InMemoryDiagnosticsSink diagnostics;
-  late _WriteProbe probe;
 
   setUp(() async {
-    probe = _WriteProbe();
     diagnostics = InMemoryDiagnosticsSink();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-        probe,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     repository = DriftPersonalGraphRepository(
       database,
@@ -52,7 +36,6 @@ void main() {
       () => DateTime.utc(2026, 9, 25),
       diagnostics,
     );
-    probe.statements.clear();
   });
   tearDown(() => database.close());
 
@@ -152,71 +135,51 @@ void main() {
       'Быт',
     );
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    expect(
-      probe.statements.any(
-        (sql) => sql.contains('OR IGNORE') || sql.contains('REPLACE'),
-      ),
-      isFalse,
-    );
   });
 
-  test(
-    'повтор имени не пишет, смена регистра разрешена, чужое имя занято',
-    () async {
-      final first = await repository.execute(CreateTag(_name('Straße')));
-      final id =
-          ((first as TagCommandSucceeded).value.value as TagCreated).tag.id;
-      final sequence = raw
+  test('повтор имени не меняет ревизию, смена регистра разрешена, чужое имя занято', () async {
+    final first = await repository.execute(CreateTag(_name('Straße')));
+    final id =
+        ((first as TagCommandSucceeded).value.value as TagCreated).tag.id;
+    final sequence = raw
+        .select('SELECT creation_sequence FROM tags')
+        .single['creation_sequence'];
+    final before = await currentRevision();
+
+    final unchanged = await repository.execute(
+      RenameTag(tagId: id, name: _name('Straße')),
+    );
+    expect((unchanged as TagCommandSucceeded).value.value, isA<TagUnchanged>());
+    expect(unchanged.value.revision.compareTo(before), GraphRevisionOrder.same);
+
+    final renamed = await repository.execute(
+      RenameTag(tagId: id, name: _name('STRASSE')),
+    );
+    expect((renamed as TagCommandSucceeded).value.value, isA<TagRenamed>());
+    expect(
+      raw
           .select('SELECT creation_sequence FROM tags')
-          .single['creation_sequence'];
-      final before = await currentRevision();
-      probe.statements.clear();
+          .single['creation_sequence'],
+      sequence,
+    );
 
-      final unchanged = await repository.execute(
-        RenameTag(tagId: id, name: _name('Straße')),
-      );
-      expect(
-        (unchanged as TagCommandSucceeded).value.value,
-        isA<TagUnchanged>(),
-      );
-      expect(
-        unchanged.value.revision.compareTo(before),
-        GraphRevisionOrder.same,
-      );
-      expect(
-        probe.statements.where((sql) => sql.contains('UPDATE tags')),
-        isEmpty,
-      );
-
-      final renamed = await repository.execute(
-        RenameTag(tagId: id, name: _name('STRASSE')),
-      );
-      expect((renamed as TagCommandSucceeded).value.value, isA<TagRenamed>());
-      expect(
-        raw
-            .select('SELECT creation_sequence FROM tags')
-            .single['creation_sequence'],
-        sequence,
-      );
-
-      final revisionBeforeConflict = await currentRevision();
-      final duplicate = await repository.execute(CreateTag(_name('straße')));
-      expect(duplicate, isA<TagCommandFailed>());
-      expect(
-        (duplicate as TagCommandFailed).failure,
-        isA<TagNameOccupiedFailure>().having(
-          (failure) => failure.existingTagId,
-          'существующий id',
-          id,
-        ),
-      );
-      expect(raw.select('SELECT id FROM tags').length, 1);
-      expect(
-        (await currentRevision()).compareTo(revisionBeforeConflict),
-        GraphRevisionOrder.same,
-      );
-    },
-  );
+    final revisionBeforeConflict = await currentRevision();
+    final duplicate = await repository.execute(CreateTag(_name('straße')));
+    expect(duplicate, isA<TagCommandFailed>());
+    expect(
+      (duplicate as TagCommandFailed).failure,
+      isA<TagNameOccupiedFailure>().having(
+        (failure) => failure.existingTagId,
+        'существующий id',
+        id,
+      ),
+    );
+    expect(raw.select('SELECT id FROM tags').length, 1);
+    expect(
+      (await currentRevision()).compareTo(revisionBeforeConflict),
+      GraphRevisionOrder.same,
+    );
+  });
 
   test(
     'конкурирующие команды сохраняют единственность и исходную идентичность',

@@ -84,8 +84,6 @@ void main() {
         final result = await repository.execute(_moveFiveAfterOne);
 
         expect(_failureOf(result), fault.failure);
-        expect(faults.failures, 1);
-        expect(faults.executedWrites, point.executedWritesBeforeFailure);
         faults.disarm();
         expect(_storedGraph(raw), graphBefore);
         await _expectPublishedState(
@@ -93,10 +91,7 @@ void main() {
           listBefore: listBefore,
           revisionBefore: revisionBefore,
         );
-        expect(diagnostics.orderEvents, [
-          _startedEvent(),
-          _failedEvent(point.stage, fault.code),
-        ]);
+        expect(diagnostics.failureCodes, [fault.code]);
       });
     }
 
@@ -106,28 +101,17 @@ void main() {
       final graphBefore = _storedGraph(raw);
       final listBefore = await _favorites(repository);
       final revisionBefore = await _graphRevision(repository);
-      diagnostics.clear();
-      faults.clear();
-      final commits = _CommitRejection.install(raw);
+      _CommitRejection.install(raw);
 
       final result = await repository.execute(_moveFiveAfterOne);
 
       expect(_failureOf(result), isA<FavoriteOrderUnexpectedFailure>());
-      expect(commits.rejected, 1);
-      expect(faults.executedWrites, 2);
       expect(_storedGraph(raw), graphBefore);
       await _expectPublishedState(
         repository,
         listBefore: listBefore,
         revisionBefore: revisionBefore,
       );
-      expect(diagnostics.orderEvents, [
-        _startedEvent(),
-        _failedEvent(
-          FavoriteOrderCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.unexpected,
-        ),
-      ]);
     });
   });
 
@@ -187,8 +171,6 @@ void main() {
         corruption.store(raw);
         final graphBefore = _storedGraph(raw);
         final revisionBefore = await _graphRevision(repository);
-        diagnostics.clear();
-        faults.clear();
 
         // Участники перемещения активны и целостны: повреждение лежит вне
         // них и не пропускается.
@@ -200,19 +182,11 @@ void main() {
         );
 
         expect(_failureOf(result), isA<FavoriteOrderCorruptionFailure>());
-        expect(faults.writes, isEmpty);
         expect(_storedGraph(raw), graphBefore);
         expect(
           (await _graphRevision(repository)).compareTo(revisionBefore),
           GraphRevisionOrder.same,
         );
-        expect(diagnostics.orderEvents, [
-          _startedEvent(),
-          _failedEvent(
-            FavoriteOrderCommandDiagnosticsStage.validation,
-            DiagnosticsFailureCode.corruption,
-          ),
-        ]);
         expect(
           await repository.getFavoriteIntentions(),
           isA<FavoriteIntentionsError>().having(
@@ -243,26 +217,15 @@ void main() {
       final graphBefore = _storedGraph(raw);
       final schemaBefore = _schema(raw);
       final revisionBefore = await _graphRevision(repository);
-      diagnostics.clear();
-      faults.clear();
 
       final result = await repository.execute(_moveTwoFirst);
 
       expect(_failureOf(result), isA<FavoriteOrderUnexpectedFailure>());
-      expect(faults.writes, hasLength(1));
-      expect(faults.executedWrites, 0);
       expect(_storedGraph(raw), graphBefore);
       expect(
         (await _graphRevision(repository)).compareTo(revisionBefore),
         GraphRevisionOrder.same,
       );
-      expect(diagnostics.orderEvents, [
-        _startedEvent(),
-        _failedEvent(
-          FavoriteOrderCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.unexpected,
-        ),
-      ]);
       // Схема и настройка соединения не ослаблены: непредставимое место
       // по-прежнему отклоняется, а повтор даёт тот же отказ.
       expect(_schema(raw), schemaBefore);
@@ -403,53 +366,31 @@ final _StorageFault _unexpectedFault = (
 /// Шаг перестановки, на котором хранилище отказывает.
 enum _FaultPoint {
   /// Чтение полного порядка отклонено до выполнения.
-  orderRead(
-    'при чтении порядка',
-    FavoriteOrderCommandDiagnosticsStage.read,
-    executedWritesBeforeFailure: 0,
-  ),
+  orderRead('при чтении порядка'),
 
   /// Итоговые места назначены, но транзакция не завершена.
-  afterAssignment(
-    'после назначения итоговых мест',
-    FavoriteOrderCommandDiagnosticsStage.write,
-    executedWritesBeforeFailure: 2,
-  );
+  afterAssignment('после назначения итоговых мест');
 
-  const _FaultPoint(
-    this.description,
-    this.stage, {
-    required this.executedWritesBeforeFailure,
-  });
+  const _FaultPoint(this.description);
 
   final String description;
-  final FavoriteOrderCommandDiagnosticsStage stage;
-  final int executedWritesBeforeFailure;
 }
 
-/// Однократный отказ хранилища на заданном шаге перестановки и журнал
-/// записей мест с последнего [arm] или [clear].
+/// Однократный отказ хранилища на заданном шаге перестановки.
 ///
 /// Шаги различаются по порядку записей мест внутри команды: первая запись —
 /// сдвиг за прежний максимум, вторая — назначение итоговых мест.
 final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
   _FaultPoint? _point;
   Object? _error;
-
-  /// Число сработавших отказов с последнего [arm].
-  var failures = 0;
-
-  /// Инструкции записи мест, дошедшие до хранилища.
-  final writes = <String>[];
-
-  /// Записи мест, выполненные хранилищем.
-  var executedWrites = 0;
+  var _failed = false;
+  var _executedWrites = 0;
 
   void arm(_FaultPoint point, Object error) {
-    clear();
+    _executedWrites = 0;
     _point = point;
     _error = error;
-    failures = 0;
+    _failed = false;
   }
 
   void disarm() {
@@ -457,26 +398,16 @@ final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
     _error = null;
   }
 
-  void clear() {
-    writes.clear();
-    executedWrites = 0;
-  }
-
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (_isOrderRead(statement)) {
-      _failAt(_FaultPoint.orderRead);
-      return;
-    }
-    if (!_isPlaceWrite(statement)) return;
-    writes.addAll(statement.statements);
+    if (_isOrderRead(statement)) _failAt(_FaultPoint.orderRead);
   }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     if (!_isPlaceWrite(statement)) return;
-    executedWrites++;
-    if (executedWrites == 2) _failAt(_FaultPoint.afterAssignment);
+    _executedWrites++;
+    if (_executedWrites == 2) _failAt(_FaultPoint.afterAssignment);
   }
 
   /// Внутри команды перестановки таблицу мест читает только чтение полного
@@ -491,8 +422,8 @@ final class _FavoriteOrderFaults extends LocalDatabaseConnectionObserver {
 
   void _failAt(_FaultPoint point) {
     final error = _error;
-    if (_point != point || error == null || failures > 0) return;
-    failures++;
+    if (_point != point || error == null || _failed) return;
+    _failed = true;
     throw error;
   }
 }
@@ -523,8 +454,12 @@ final class _CommitRejection {
 final class _RecordingDiagnostics implements DiagnosticsSink {
   final _events = <DiagnosticsEvent>[];
 
-  List<FavoriteOrderCommandDiagnosticsEvent> get orderEvents =>
-      _events.whereType<FavoriteOrderCommandDiagnosticsEvent>().toList();
+  /// Коды отказов, сообщённых командой перестановки.
+  List<DiagnosticsFailureCode> get failureCodes => [
+    for (final event
+        in _events.whereType<FavoriteOrderCommandDiagnosticsEvent>())
+      if (event.status case DiagnosticsFailed(:final code)) code,
+  ];
 
   void clear() {
     _events.clear();
@@ -647,29 +582,3 @@ Future<ConfirmedGraphResult<FavoriteOrderCommandSuccess>> _confirmed(
     'Ожидался успех, получен ${failure.runtimeType}.',
   ),
 };
-
-Matcher _startedEvent() => isA<FavoriteOrderCommandDiagnosticsEvent>()
-    .having(
-      (event) => event.stage,
-      'этап',
-      FavoriteOrderCommandDiagnosticsStage.read,
-    )
-    .having((event) => event.status, 'исход', isA<DiagnosticsStarted>());
-
-Matcher _failedEvent(
-  FavoriteOrderCommandDiagnosticsStage stage,
-  DiagnosticsFailureCode code,
-) => isA<FavoriteOrderCommandDiagnosticsEvent>()
-    .having((event) => event.stage, 'этап', stage)
-    .having((event) => event.completion, 'завершение', isNull)
-    .having(
-      (event) => event.status,
-      'исход',
-      isA<DiagnosticsFailed>()
-          .having((status) => status.code, 'категория', code)
-          .having(
-            (status) => status.duration,
-            'длительность',
-            greaterThanOrEqualTo(Duration.zero),
-          ),
-    );

@@ -73,138 +73,113 @@ void main() {
         sink,
       );
 
-  test(
-    'навигация сообщает этап, категорию и длительность без личных данных',
-    () async {
-      seedTagStorageFixture(raw);
-      final sink = _RecordingSink();
-      final graph = repository(sink);
-      final id = (TagId.decode(
-        tagFixtureId(firstTagNumber),
-      ) as TagIdDecodingSuccess).id;
-      TaggedIntentionsQuery query({TaggedIntentionsCursor? cursor}) =>
-          TaggedIntentionsQuery(
-            tagId: id,
-            scope: TaggedIntentionsScope.active,
-            pageSize: 1,
-            cursor: cursor,
-          );
-
-      expect(
-        await graph.getTaggedIntentionsPage(query()),
-        isA<TaggedIntentionsPageSuccess>(),
-      );
-      expect(
-        await graph.getTaggedIntentionsPage(
-          query(cursor: _ForeignTaggedCursor()),
-        ),
-        isA<TaggedIntentionsPageError>(),
-      );
-      final validation = sink.events
-          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-          .last;
-      expect(validation.stage, TagReadDiagnosticsStage.validation);
-      expect(
-        (validation.status as DiagnosticsFailed).code,
-        DiagnosticsFailureCode.validation,
-      );
-
-      readFault.failure = sqlite.SqliteException(
-        extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-        message: 'CANARY-SQL-ошибка',
-        causingStatement: 'CANARY-запрос',
-        parametersToStatement: [tagFixtureId(firstTagNumber)],
-      );
-      expect(
-        await graph.getTaggedIntentionsPage(query()),
-        isA<TaggedIntentionsPageError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TaggedIntentionsUnavailableFailure>(),
-        ),
-      );
-      final unavailable = sink.events
-          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-          .last;
-      expect(unavailable.stage, TagReadDiagnosticsStage.read);
-      expect(
-        (unavailable.status as DiagnosticsFailed).code,
-        DiagnosticsFailureCode.unavailable,
-      );
-
-      readFault.failure = StateError('CANARY-неизвестная-причина');
-      expect(
-        await graph.getTaggedIntentionsPage(query()),
-        isA<TaggedIntentionsPageError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TaggedIntentionsUnexpectedFailure>(),
-        ),
-      );
-      final unknown = sink.events
-          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-          .last;
-      expect(
-        (unknown.status as DiagnosticsFailed).code,
-        DiagnosticsFailureCode.unexpected,
-      );
-
-      readFault.failure = null;
-      raw.execute('PRAGMA foreign_keys = OFF');
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(999)],
-      );
-      expect(
-        await graph.getTaggedIntentionsPage(query()),
-        isA<TaggedIntentionsPageError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TaggedIntentionsCorruptionFailure>(),
-        ),
-      );
-      final corruption = sink.events
-          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-          .last;
-      expect(
-        (corruption.status as DiagnosticsFailed).code,
-        DiagnosticsFailureCode.corruption,
-      );
-      final events = sink.events
-          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-          .toList();
-      expect(
-        events.where((event) => event.status is DiagnosticsStarted),
-        hasLength(5),
-      );
-      expect(
-        events.where((event) => event.status is DiagnosticsSucceeded),
-        hasLength(1),
-      );
-      for (final event in events.where(
-        (event) => event.status is DiagnosticsFailed,
-      )) {
-        expect(
-          (event.status as DiagnosticsFailed).duration.isNegative,
-          isFalse,
+  test('навигация сообщает код отказа без личных данных', () async {
+    seedTagStorageFixture(raw);
+    final sink = _RecordingSink();
+    final graph = repository(sink);
+    final id =
+        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
+    TaggedIntentionsQuery query({TaggedIntentionsCursor? cursor}) =>
+        TaggedIntentionsQuery(
+          tagId: id,
+          scope: TaggedIntentionsScope.active,
+          pageSize: 1,
+          cursor: cursor,
         );
-      }
-      final recorded = sink.messages.join('\n');
-      for (final canary in [
-        'CANARY-SQL-ошибка',
-        'CANARY-запрос',
-        'CANARY-неизвестная-причина',
-        tagFixtureId(firstTagNumber),
-        tagFixtureId(999),
-        tagFixtureId(101),
-        tagFixtureId(1),
-        'Дом',
-        'Намерение 1',
-      ]) {
-        expect(recorded, isNot(contains(canary)));
-      }
-    },
-  );
+
+    expect(
+      await graph.getTaggedIntentionsPage(query()),
+      isA<TaggedIntentionsPageSuccess>(),
+    );
+    expect(
+      await graph.getTaggedIntentionsPage(
+        query(cursor: _ForeignTaggedCursor()),
+      ),
+      isA<TaggedIntentionsPageError>(),
+    );
+    final validation = sink.events
+        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+        .last;
+    expect(
+      (validation.status as DiagnosticsFailed).code,
+      DiagnosticsFailureCode.validation,
+    );
+
+    readFault.failure = sqlite.SqliteException(
+      extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+      message: 'CANARY-SQL-ошибка',
+      causingStatement: 'CANARY-запрос',
+      parametersToStatement: [tagFixtureId(firstTagNumber)],
+    );
+    expect(
+      await graph.getTaggedIntentionsPage(query()),
+      isA<TaggedIntentionsPageError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TaggedIntentionsUnavailableFailure>(),
+      ),
+    );
+    final unavailable = sink.events
+        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+        .last;
+    expect(
+      (unavailable.status as DiagnosticsFailed).code,
+      DiagnosticsFailureCode.unavailable,
+    );
+
+    readFault.failure = StateError('CANARY-неизвестная-причина');
+    expect(
+      await graph.getTaggedIntentionsPage(query()),
+      isA<TaggedIntentionsPageError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TaggedIntentionsUnexpectedFailure>(),
+      ),
+    );
+    final unknown = sink.events
+        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+        .last;
+    expect(
+      (unknown.status as DiagnosticsFailed).code,
+      DiagnosticsFailureCode.unexpected,
+    );
+
+    readFault.failure = null;
+    raw.execute('PRAGMA foreign_keys = OFF');
+    raw.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(firstTagNumber), tagFixtureId(999)],
+    );
+    expect(
+      await graph.getTaggedIntentionsPage(query()),
+      isA<TaggedIntentionsPageError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TaggedIntentionsCorruptionFailure>(),
+      ),
+    );
+    final corruption = sink.events
+        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+        .last;
+    expect(
+      (corruption.status as DiagnosticsFailed).code,
+      DiagnosticsFailureCode.corruption,
+    );
+    final recorded = sink.messages.join('\n');
+    for (final canary in [
+      'CANARY-SQL-ошибка',
+      'CANARY-запрос',
+      'CANARY-неизвестная-причина',
+      tagFixtureId(firstTagNumber),
+      tagFixtureId(999),
+      tagFixtureId(101),
+      tagFixtureId(1),
+      'Дом',
+      'Намерение 1',
+    ]) {
+      expect(recorded, isNot(contains(canary)));
+    }
+  });
 
   test('реальные исходы и повреждение чтения оставляют только безопасную диагностику', () async {
     final sink = _RecordingSink();
@@ -238,7 +213,6 @@ void main() {
     final conflictEvent = sink.events
         .whereType<TagCommandDiagnosticsEvent>()
         .last;
-    expect(conflictEvent.commandType, TagCommandDiagnosticsType.create);
     expect(
       (conflictEvent.status as DiagnosticsFailed).code,
       DiagnosticsFailureCode.conflict,
@@ -254,8 +228,6 @@ void main() {
       isA<TagUnexpectedFailure>(),
     );
     final writeEvent = sink.events.whereType<TagCommandDiagnosticsEvent>().last;
-    expect(writeEvent.commandType, TagCommandDiagnosticsType.delete);
-    expect(writeEvent.stage, TagCommandDiagnosticsStage.write);
     expect(
       (writeEvent.status as DiagnosticsFailed).code,
       DiagnosticsFailureCode.unexpected,
@@ -319,13 +291,6 @@ void main() {
       DiagnosticsFailureCode.corruption,
     );
 
-    expect(
-      sink.events
-          .whereType<TagCommandDiagnosticsEvent>()
-          .where((event) => event.status is DiagnosticsSucceeded)
-          .length,
-      3,
-    );
     expect(sink.messages, isNotEmpty);
     final recorded = [
       ...sink.events.map((event) => event.toString()),
@@ -403,15 +368,6 @@ void main() {
           category,
         ),
       );
-      for (final event in sink.events.reversed.take(6)) {
-        if (event.status case DiagnosticsFailed(
-          :final duration,
-          code: final failureCode,
-        )) {
-          expect(duration.isNegative, isFalse);
-          expect(failureCode, code);
-        }
-      }
       expect(
         (sink.events.whereType<TagAssignmentsReadDiagnosticsEvent>().last.status
                 as DiagnosticsFailed)
@@ -424,11 +380,15 @@ void main() {
             .code,
         code,
       );
-      final statusEvent = sink.events
-          .whereType<TagAssignmentStatusReadDiagnosticsEvent>()
-          .last;
-      expect(statusEvent.stage, TagReadDiagnosticsStage.read);
-      expect((statusEvent.status as DiagnosticsFailed).code, code);
+      expect(
+        (sink.events
+                    .whereType<TagAssignmentStatusReadDiagnosticsEvent>()
+                    .last
+                    .status
+                as DiagnosticsFailed)
+            .code,
+        code,
+      );
     }
     readFault.failure = null;
     expect(

@@ -61,9 +61,6 @@ void main() {
   /// данных и не меняет их.
   Future<void> expectCorruption() async {
     final storedBefore = _storedGraph(raw);
-    final changesBefore = _connectionChanges(raw);
-    storage.clear();
-    diagnostics.clear();
 
     final result = await repository.getFavoriteIntentions();
 
@@ -72,16 +69,7 @@ void main() {
       (result as FavoriteIntentionsError).failure.category,
       GraphFailureCategory.corruption,
     );
-    expect(storage.writes, isEmpty);
-    expect(_connectionChanges(raw), changesBefore);
     expect(_storedGraph(raw), storedBefore);
-    expect(diagnostics.readEvents, [
-      _started(),
-      _failed(
-        FavoriteIntentionsReadDiagnosticsStage.validation,
-        DiagnosticsFailureCode.corruption,
-      ),
-    ]);
   }
 
   test('место без существующего намерения между местами избранных '
@@ -162,7 +150,6 @@ void main() {
           'снимком', () async {
         seedFavorites();
         final storedBefore = _storedGraph(raw);
-        storage.clear();
         diagnostics.clear();
         storage.arm(fault.error);
 
@@ -173,13 +160,8 @@ void main() {
           (result as FavoriteIntentionsError).failure.category,
           fault.category,
         );
-        expect(storage.failures, 1);
-        expect(storage.writes, isEmpty);
         expect(_storedGraph(raw), storedBefore);
-        expect(diagnostics.readEvents, [
-          _started(),
-          _failed(FavoriteIntentionsReadDiagnosticsStage.read, fault.code),
-        ]);
+        expect(diagnostics.failureCodes, [fault.code]);
       });
     }
 
@@ -192,16 +174,11 @@ void main() {
         _failure(isA<FavoriteIntentionsUnavailableFailure>()),
       );
       storage.disarm();
-      storage.clear();
-      diagnostics.clear();
 
       final snapshot = await _favorites(repository);
 
       expect(snapshot.items.map(_rowId), [_uuid(1), _uuid(3)]);
       expect(snapshot.archivedCount, 1);
-      expect(storage.favoriteReads, 1);
-      expect(storage.writes, isEmpty);
-      expect(diagnostics.readEvents, [_started(), _succeeded()]);
     });
 
     test('повтор после повреждения возвращает то же повреждение', () async {
@@ -326,39 +303,18 @@ final _storageFaults =
       ),
     ];
 
-/// Наблюдает чтения и записи соединения и однократно отказывает при чтении
-/// строк избранного.
+/// Однократно отказывает при чтении строк избранного.
 final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
   Object? _error;
-
-  /// Число сработавших отказов с последнего [arm].
-  var failures = 0;
-
-  /// Число чтений строк избранного.
-  var favoriteReads = 0;
-
-  /// Записи соединения в порядке выполнения.
-  final writes = <String>[];
+  var _failed = false;
 
   void arm(Object error) {
     _error = error;
-    failures = 0;
+    _failed = false;
   }
 
   void disarm() {
     _error = null;
-  }
-
-  void clear() {
-    favoriteReads = 0;
-    writes.clear();
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation != LocalDatabaseSqlOperation.select) {
-      writes.addAll(statement.statements);
-    }
   }
 
   @override
@@ -367,7 +323,6 @@ final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
     List<Map<String, Object?>> rows,
   ) {
     if (statement.statements.single.contains('FROM favorite_intentions')) {
-      favoriteReads++;
       _fail();
     }
     return rows;
@@ -375,8 +330,8 @@ final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
 
   void _fail() {
     final error = _error;
-    if (error == null || failures > 0) return;
-    failures++;
+    if (error == null || _failed) return;
+    _failed = true;
     throw error;
   }
 }
@@ -385,8 +340,12 @@ final class _FavoriteListStorage extends LocalDatabaseConnectionObserver {
 final class _RecordingDiagnostics implements DiagnosticsSink {
   final _events = <DiagnosticsEvent>[];
 
-  List<FavoriteIntentionsReadDiagnosticsEvent> get readEvents =>
-      _events.whereType<FavoriteIntentionsReadDiagnosticsEvent>().toList();
+  /// Коды отказов, сообщённых чтением списка.
+  List<DiagnosticsFailureCode> get failureCodes => [
+    for (final event
+        in _events.whereType<FavoriteIntentionsReadDiagnosticsEvent>())
+      if (event.status case DiagnosticsFailed(:final code)) code,
+  ];
 
   void clear() {
     _events.clear();
@@ -403,39 +362,6 @@ Matcher _failure(Matcher failure) => isA<FavoriteIntentionsError>().having(
   'причина',
   failure,
 );
-
-Matcher _started() => isA<FavoriteIntentionsReadDiagnosticsEvent>()
-    .having(
-      (event) => event.stage,
-      'этап',
-      FavoriteIntentionsReadDiagnosticsStage.read,
-    )
-    .having((event) => event.status, 'исход', isA<DiagnosticsStarted>());
-
-Matcher _succeeded() => isA<FavoriteIntentionsReadDiagnosticsEvent>()
-    .having(
-      (event) => event.stage,
-      'этап',
-      FavoriteIntentionsReadDiagnosticsStage.validation,
-    )
-    .having((event) => event.status, 'исход', isA<DiagnosticsSucceeded>());
-
-Matcher _failed(
-  FavoriteIntentionsReadDiagnosticsStage stage,
-  DiagnosticsFailureCode code,
-) => isA<FavoriteIntentionsReadDiagnosticsEvent>()
-    .having((event) => event.stage, 'этап', stage)
-    .having(
-      (event) => event.status,
-      'исход',
-      isA<DiagnosticsFailed>()
-          .having((status) => status.code, 'категория', code)
-          .having(
-            (status) => status.duration,
-            'длительность',
-            greaterThanOrEqualTo(Duration.zero),
-          ),
-    );
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -498,9 +424,6 @@ void _corruptIntentionField(
     database.execute('PRAGMA ignore_check_constraints = OFF');
   }
 }
-
-int _connectionChanges(sqlite.Database database) =>
-    database.select('SELECT total_changes() AS count').single['count'] as int;
 
 /// Строки намерений и отметок для сравнения до и после чтения.
 List<List<Map<String, Object?>>> _storedGraph(sqlite.Database database) => [

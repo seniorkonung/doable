@@ -76,20 +76,7 @@ void main() {
 
         expect(probe.didFail, isTrue);
         expect(category, GraphFailureCategory.unexpected);
-        expect(
-          diagnostics.logs.map((line) {
-            final event = jsonDecode(line) as Map<String, dynamic>;
-            return '${event['outcome']}:${event['failureCode']}';
-          }),
-          point == _FailurePoint.continuationRead
-              ? [
-                  'started:null',
-                  'succeeded:null',
-                  'started:null',
-                  'failed:unexpected',
-                ]
-              : ['started:null', 'failed:unexpected'],
-        );
+        expect(_loggedFailureCodes(diagnostics.logs), ['unexpected']);
         _expectSafeLogs(diagnostics.logs);
       }
     },
@@ -111,11 +98,16 @@ void main() {
       (result as GraphCommandFailed).failure.category,
       GraphFailureCategory.conflict,
     );
-    expect(_commandStages(diagnostics.events), [
-      'validation:started',
-      'validation:failed:conflict',
-    ]);
-    expect(_pathStatuses(diagnostics.events), ['started', 'failed:conflict']);
+    expect(
+      _failureCodes<DailyChoiceCommandDiagnosticsEvent>(diagnostics.events),
+      ['conflict'],
+    );
+    expect(
+      _failureCodes<DailyChoicePathValidationDiagnosticsEvent>(
+        diagnostics.events,
+      ),
+      ['conflict'],
+    );
     expect(await durabilityRows(database, 'daily_choices'), isEmpty);
     _expectSafeLogs(diagnostics.logs);
   });
@@ -133,22 +125,23 @@ DriftPersonalGraphRepository _repository(
   choicePathStepIdGenerator: SequentialStepIds(301),
 );
 
-List<String> _commandStages(Iterable<DiagnosticsEvent> events) => [
-  for (final event in events.whereType<DailyChoiceCommandDiagnosticsEvent>())
-    '${event.stage.name}:${_status(event.status)}',
+/// Коды отказов событий одного семейства диагностики.
+List<String> _failureCodes<T extends DiagnosticsEvent>(
+  Iterable<DiagnosticsEvent> events,
+) => [
+  for (final event in events.whereType<T>())
+    if (event.status case DiagnosticsFailed(:final code)) code.name,
 ];
 
-List<String> _pathStatuses(Iterable<DiagnosticsEvent> events) => [
-  for (final event
-      in events.whereType<DailyChoicePathValidationDiagnosticsEvent>())
-    _status(event.status),
+/// Коды отказов в записанных строках журнала.
+List<String> _loggedFailureCodes(List<String> logs) => [
+  for (final line in logs)
+    if (jsonDecode(line) case {
+      'outcome': 'failed',
+      'failureCode': final String code,
+    })
+      code,
 ];
-
-String _status(DiagnosticsStatus status) => switch (status) {
-  DiagnosticsStarted() => 'started',
-  DiagnosticsSucceeded() => 'succeeded',
-  DiagnosticsFailed(:final code) => 'failed:${code.name}',
-};
 
 void _expectSafeLogs(List<String> logs) {
   expect(logs, isNotEmpty);

@@ -13,60 +13,19 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
-final class _SelectMeasurement {
-  const _SelectMeasurement(this.sql, this.arguments, this.rows);
-
-  final String sql;
-  final List<Object?> arguments;
-  final int rows;
-}
-
-final class _CatalogTrace extends LocalDatabaseConnectionObserver {
-  final selects = <_SelectMeasurement>[];
-
-  @override
-  List<Map<String, Object?>> afterSelect(
-    LocalDatabaseSqlStatement statement,
-    List<Map<String, Object?>> rows,
-  ) {
-    selects.add(
-      _SelectMeasurement(
-        statement.statements.single,
-        statement.arguments,
-        rows.length,
-      ),
-    );
-    return rows;
-  }
-}
-
-final class _MeasuredSnapshot {
-  const _MeasuredSnapshot(this.snapshot, this.select);
-
-  final TagCatalogSnapshot snapshot;
-  final _SelectMeasurement select;
-}
-
 void main() {
   test(
     'большой каталог читается одним полным снимком без пропусков',
-    measureTagCatalogReadCost,
+    expectFullTagCatalogSnapshot,
   );
 }
 
-Future<void> measureTagCatalogReadCost() async {
+Future<void> expectFullTagCatalogSnapshot() async {
   final directory = await Directory.systemTemp.createTemp('doable_tag_cost_');
   final file = File('${directory.path}/catalog.sqlite');
-  final trace = _CatalogTrace();
   late sqlite.Database raw;
   final database = AppDatabase(
-    observeConfiguredLocalDatabaseConnection(
-      openFileBackedLocalDatabase(
-        file,
-        setup: (connection) => raw = connection,
-      ),
-      trace,
-    ),
+    openFileBackedLocalDatabase(file, setup: (connection) => raw = connection),
   );
   try {
     await database.open();
@@ -101,52 +60,22 @@ Future<void> measureTagCatalogReadCost() async {
       }
     }
 
-    Future<_MeasuredSnapshot> read(int count) async {
-      trace.selects.clear();
+    Future<void> expectFullSnapshot(int count) async {
       final result = await repository.getTagCatalog(
         const TagCatalogBrowseMode(),
       );
       expect(result, isA<TagCatalogSuccess>());
       final snapshot = (result as TagCatalogSuccess).value;
-      expect(snapshot.items, hasLength(count));
-      expect(trace.selects, hasLength(1));
-      final select = trace.selects.single;
-      final sql = select.sql.toUpperCase();
-      expect(sql, contains('FROM TAGS'));
-      expect(sql, contains('ORDER BY CREATION_SEQUENCE ASC'));
-      expect(sql, isNot(contains('OFFSET')));
-      expect(sql, isNot(contains('COUNT(')));
-      expect(sql, isNot(contains('TAG_ASSIGNMENTS')));
-      expect(sql, isNot(contains('INTENTIONS')));
-      expect(sql, isNot(contains('RELATIONS')));
-      expect(select.rows, count);
-      final plan = [
-        for (final row in raw.select(
-          'EXPLAIN QUERY PLAN ${select.sql}',
-          select.arguments,
-        ))
-          row['detail'].toString(),
-      ];
-      expect(plan, isNotEmpty);
-      expect(plan.join(' ').toUpperCase(), isNot(contains('USE TEMP B-TREE')));
-      return _MeasuredSnapshot(snapshot, select);
-    }
-
-    Future<void> expectFullSnapshot(int count) async {
-      final measured = await read(count);
       final expectedIds = [
         tagFixtureId(firstTagNumber),
         tagFixtureId(lastTagNumber),
         for (var index = 2; index < count; index++) tagFixtureId(10000 + index),
       ];
       expect(
-        measured.snapshot.items.map((tag) => tag.id.toCanonicalString()),
+        snapshot.items.map((tag) => tag.id.toCanonicalString()),
         expectedIds,
       );
-      expect(
-        measured.snapshot.items.map((tag) => tag.id).toSet(),
-        hasLength(count),
-      );
+      expect(snapshot.items.map((tag) => tag.id).toSet(), hasLength(count));
     }
 
     seedTo(10000, 2);

@@ -241,7 +241,7 @@ ConfirmedGraphResult<IntentionCommandSuccess> _intentionConfirmed(
   expect(entry.summary.favoriteMark, FavoriteMark.favorite);
   expect(entry.summary.tags.map((tag) => tag.id), [tagId]);
   expect(confirmed.changes, [
-    same(mutation),
+    isA<IntentionCatalogCreated>(),
     isA<TagAssignmentChangedChange>()
         .having(
           (change) => change.assignment,

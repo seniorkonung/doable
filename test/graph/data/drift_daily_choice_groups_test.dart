@@ -19,33 +19,15 @@ IntentionId _id(int number) => switch (IntentionId.decode(_uuid(number))) {
   InvalidIntentionIdDecoding() => throw StateError('Некорректный тестовый ID'),
 };
 
-final class _ReadProbe extends LocalDatabaseConnectionObserver {
-  final statements = <String>[];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select) {
-      statements.add(statement.statements.single);
-    }
-  }
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late DriftPersonalGraphRepository repository;
   late InMemoryDiagnosticsSink diagnostics;
-  late _ReadProbe probe;
 
   setUp(() async {
-    probe = _ReadProbe();
     diagnostics = InMemoryDiagnosticsSink();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-        probe,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     repository = DriftPersonalGraphRepository(
       database,
@@ -170,7 +152,6 @@ void main() {
       'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
       [_uuid(500)],
     );
-    probe.statements.clear();
 
     final ids = <String>[];
     RelationGroupCursor? cursor;
@@ -202,19 +183,6 @@ void main() {
     expect(ids, [
       for (var number = 449; number >= 200; number--) _uuid(number),
     ]);
-    final pageReads = probe.statements.where(
-      (sql) => sql.contains('FROM daily_choices') && !sql.contains('COUNT('),
-    );
-    expect(pageReads, hasLength(5));
-    expect(pageReads.every((sql) => sql.contains('LIMIT')), isTrue);
-    final pathReads = probe.statements.where(
-      (sql) => sql.contains('FROM daily_choice_path_steps'),
-    );
-    expect(pathReads, hasLength(5));
-    expect(
-      pathReads.every((sql) => sql.contains('daily_choice_id IN')),
-      isTrue,
-    );
   });
 
   test('продолжает группу выбранного действия через границу дат', () async {

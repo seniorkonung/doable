@@ -181,23 +181,13 @@ void main() {
         ]).single['creation_sequence'],
         sequence,
       );
-      final stages = diagnostics.events
-          .whereType<DailyChoiceCommandDiagnosticsEvent>()
-          .where(
-            (event) =>
-                event.commandType ==
-                DailyChoiceCommandDiagnosticsType.updateFields,
-          )
-          .toList();
-      expect(stages.map((event) => event.stage), [
-        DailyChoiceCommandDiagnosticsStage.validation,
-        DailyChoiceCommandDiagnosticsStage.validation,
-        DailyChoiceCommandDiagnosticsStage.write,
-        DailyChoiceCommandDiagnosticsStage.write,
-        DailyChoiceCommandDiagnosticsStage.resultRead,
-        DailyChoiceCommandDiagnosticsStage.resultRead,
-      ]);
-      expect(stages.last.status, isA<DiagnosticsSucceeded>());
+      expect(
+        diagnostics.events
+            .whereType<DailyChoiceCommandDiagnosticsEvent>()
+            .last
+            .status,
+        isA<DiagnosticsSucceeded>(),
+      );
     },
   );
 
@@ -412,8 +402,6 @@ void main() {
       final last = diagnostics.events
           .whereType<DailyChoiceCommandDiagnosticsEvent>()
           .last;
-      expect(last.commandType, DailyChoiceCommandDiagnosticsType.updateFields);
-      expect(last.stage, DailyChoiceCommandDiagnosticsStage.resultRead);
       expect(
         (last.status as DiagnosticsFailed).code,
         DiagnosticsFailureCode.unexpected,

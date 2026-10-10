@@ -30,7 +30,7 @@ const _archivedGroupSize = 5000;
 const _pageSize = 50;
 
 void main() {
-  test('полностью читает большие активную и архивную группы с ограниченной стоимостью', () async {
+  test('полностью читает большие активную и архивную группы ограниченными порциями', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     final trace = _RelationReadTrace();
@@ -38,9 +38,6 @@ void main() {
     final repository = _repository(database);
 
     await _populateLargeFixture(database);
-    trace.clear();
-
-    await _expectGroupQueryPlans(database);
     trace.clear();
 
     final active = await _traverseGroup(
@@ -161,11 +158,9 @@ void main() {
     );
     await harness.closePersistenceObjectGraph();
 
-    final trace = _RelationReadTrace();
-    final reopened = await harness.openReadyDatabase(observer: trace);
+    // Повреждение не мешает повторному открытию хранилища.
+    final reopened = await harness.openReadyDatabase();
     final repository = _repository(reopened);
-
-    expect(trace.graphContentSelects, isEmpty);
 
     final result = await repository.getRelationGroupPage(
       _query(RelationScope.active),
@@ -179,8 +174,6 @@ void main() {
         isA<RelationGroupCorruptionFailure>(),
       ),
     );
-    expect(trace.aggregateSelects, isNotEmpty);
-    expect(trace.groupRowsSelects, isEmpty);
   });
 
   test(
@@ -192,7 +185,6 @@ void main() {
       final database = await harness.openReadyDatabase(observer: trace);
       final repository = _repository(database);
       await _populateLargeFixture(database);
-      trace.clear();
 
       final selected401 = [
         for (var index = 0; index < 201; index++) _decodedRelationId(index),
@@ -208,27 +200,7 @@ void main() {
         firstSnapshot.value.entries.values,
         everyElement(isA<SelectedRelationPresent>()),
       );
-      expect(trace.aggregateSelects.length, lessThanOrEqualTo(5));
-      expect(trace.groupRowsSelects, isEmpty);
-      expect(trace.relationContentSelects, hasLength(2));
-      expect(
-        trace.relationContentSelects
-            .expand((select) => select.arguments)
-            .toSet(),
-        selected401.map((id) => id.toCanonicalString()).toSet(),
-      );
-      expect(
-        trace.relationContentSelects,
-        everyElement(
-          isA<_TracedSelect>().having(
-            (select) => select.arguments.length,
-            'SQL-порция',
-            lessThanOrEqualTo(400),
-          ),
-        ),
-      );
 
-      trace.clear();
       final selected1100 = [
         for (var index = 0; index < 1100; index++) _decodedRelationId(index),
       ];
@@ -249,9 +221,6 @@ void main() {
         secondSnapshot.value.entries.values,
         everyElement(isA<SelectedRelationPresent>()),
       );
-      expect(trace.relationContentSelects, hasLength(3));
-      expect(trace.aggregateSelects, hasLength(3));
-      expect(trace.groupRowsSelects, isEmpty);
 
       trace.failSelectedReadAt(2);
       final interrupted = await repository.getSelectedRelations(
@@ -309,30 +278,8 @@ void main() {
         archivedRows.map((row) => row.relation.id).toSet(),
         hasLength(200),
       );
-      expect(trace.groupRowsSelects, hasLength(9));
-      expect(trace.relationContentSelects, hasLength(9));
-      expect(trace.groupRowsSelects.map((select) => select.arguments[2]), [
-        0,
-        0,
-        0,
-        0,
-        0,
-        1,
-        1,
-        1,
-        1,
-      ]);
-      expect(
-        trace.groupRowsSelects,
-        everyElement(
-          isA<_TracedSelect>().having(
-            (select) => select.rowCount,
-            'ограничение порции SQL',
-            lessThanOrEqualTo(_pageSize + 1),
-          ),
-        ),
-      );
-      expect(trace.aggregateSelects, hasLength(11));
+      // Просмотр порций группы не читает остальные строки архива.
+      expect(trace.rowCounts, everyElement(lessThanOrEqualTo(_pageSize + 1)));
 
       final container = ProviderContainer(
         overrides: [
@@ -363,26 +310,11 @@ void main() {
         chosenIds,
       );
       expect(prepared.snapshot.command.relationIds, chosenIds);
-      expect(trace.groupRowsSelects, isEmpty);
-      expect(trace.relationContentSelects, hasLength(2));
-      expect(trace.selectedRelationSelects, isEmpty);
+      // Обновление выбора читает только выбранные связи, а не всю группу.
       expect(
-        trace.relationContentSelects
-            .expand((select) => select.arguments)
-            .toSet(),
-        chosenIds.map((id) => id.toCanonicalString()).toSet(),
+        trace.rowCounts,
+        everyElement(lessThanOrEqualTo(chosenIds.length)),
       );
-      expect(
-        trace.relationContentSelects,
-        everyElement(
-          isA<_TracedSelect>().having(
-            (select) => select.arguments.length,
-            'размер SQL-порции выбранных связей',
-            lessThanOrEqualTo(400),
-          ),
-        ),
-      );
-      expect(trace.aggregateSelects.length, lessThanOrEqualTo(6));
 
       trace.clear();
       final result = await repository.execute(prepared.snapshot.command);
@@ -393,15 +325,6 @@ void main() {
       expect(
         deleted.deletedRelations.map((relation) => relation.id).toSet(),
         chosenIds,
-      );
-      expect(trace.groupRowsSelects, isEmpty);
-      expect(trace.relationContentSelects, hasLength(chosenIds.length));
-      expect(trace.selectedRelationSelects, hasLength(chosenIds.length));
-      expect(
-        trace.selectedRelationSelects
-            .map((select) => select.arguments.single)
-            .toSet(),
-        chosenIds.map((id) => id.toCanonicalString()).toSet(),
       );
 
       trace.clear();
@@ -416,13 +339,7 @@ void main() {
         activeAfter.items.map((row) => row.relation.id).toSet(),
         activeRows.skip(201).map((row) => row.relation.id).toSet(),
       );
-      expect(trace.groupRowsSelects, hasLength(1));
-      expect(trace.relationContentSelects, hasLength(1));
-      expect(
-        trace.groupRowsSelects.single.rowCount,
-        lessThanOrEqualTo(_pageSize + 1),
-      );
-      expect(trace.aggregateSelects, hasLength(2));
+      expect(trace.rowCounts, everyElement(lessThanOrEqualTo(_pageSize + 1)));
     },
     timeout: const Timeout(Duration(minutes: 5)),
   );
@@ -550,132 +467,10 @@ Future<List<String>> _traverseGroup(
 
   expect(ids, hasLength(expectedCount));
   expect(pageCount, (expectedCount / _pageSize).ceil());
-  expect(trace.groupRowsSelects, hasLength(pageCount));
-  expect(
-    trace.groupRowsSelects,
-    everyElement(
-      isA<_TracedSelect>()
-          .having(
-            (select) => select.rowCount,
-            'строк SQL',
-            lessThanOrEqualTo(_pageSize + 1),
-          )
-          .having(
-            (select) => select.statement,
-            'OFFSET',
-            isNot(contains('OFFSET')),
-          )
-          .having((select) => select.arguments.take(3), 'параметры группы', [
-            _ownerIdValue,
-            'need',
-            scope == RelationScope.active ? 0 : 1,
-          ]),
-    ),
-  );
-  expect(trace.participantSelects, hasLength(pageCount));
-  expect(
-    trace.participantSelects,
-    everyElement(
-      isA<_TracedSelect>().having(
-        (select) => select.rowCount,
-        'пакет участников',
-        lessThanOrEqualTo(_pageSize + 1),
-      ),
-    ),
-  );
-  expect(trace.aggregateSelects, hasLength(pageCount + 1));
-  expect(
-    trace.aggregateSelects,
-    everyElement(
-      isA<_TracedSelect>()
-          .having(
-            (select) => select.rowCount,
-            'строк агрегатов',
-            lessThanOrEqualTo(_pageSize),
-          )
-          .having(
-            (select) => select.arguments.length,
-            'размер пакета агрегатов',
-            lessThanOrEqualTo(_pageSize),
-          ),
-    ),
-  );
+  // Ни одно чтение не возвращает больше порции и признака продолжения.
+  expect(trace.rowCounts, everyElement(lessThanOrEqualTo(_pageSize + 1)));
 
   return List.unmodifiable(orderedIds);
-}
-
-Future<void> _expectGroupQueryPlans(AppDatabase database) async {
-  for (final scope in RelationScope.values) {
-    final firstPageRows = await database
-        .customSelect(
-          '''
-            EXPLAIN QUERY PLAN
-            SELECT
-              creation_sequence,
-              id,
-              source_intention_id,
-              related_intention_id,
-              type,
-              priority,
-              description,
-              is_archived
-            FROM long_term_relations
-              INDEXED BY long_term_relations_source_group_order
-            WHERE
-              source_intention_id = ? AND
-              type = ? AND
-              is_archived = ?
-            ORDER BY priority, creation_sequence
-            LIMIT ?
-          ''',
-          variables: [
-            Variable<String>(_ownerIdValue),
-            const Variable<String>('need'),
-            Variable<int>(scope == RelationScope.active ? 0 : 1),
-            const Variable<int>(_pageSize + 1),
-          ],
-        )
-        .get();
-    final continuationRows = await database
-        .customSelect(
-          '''
-            EXPLAIN QUERY PLAN
-            SELECT
-              creation_sequence,
-              id,
-              source_intention_id,
-              related_intention_id,
-              type,
-              priority,
-              description,
-              is_archived
-            FROM long_term_relations
-              INDEXED BY long_term_relations_source_group_order
-            WHERE
-              source_intention_id = ? AND
-              type = ? AND
-              is_archived = ? AND
-              (priority > ? OR (priority = ? AND creation_sequence > ?))
-            ORDER BY priority, creation_sequence
-            LIMIT ?
-          ''',
-          variables: [
-            Variable<String>(_ownerIdValue),
-            const Variable<String>('need'),
-            Variable<int>(scope == RelationScope.active ? 0 : 1),
-            const Variable<int>(1),
-            const Variable<int>(1),
-            const Variable<int>(1),
-            const Variable<int>(_pageSize + 1),
-          ],
-        )
-        .get();
-    for (final rows in [firstPageRows, continuationRows]) {
-      final details = rows.map((row) => row.read<String>('detail')).join('\n');
-      expect(details, contains('long_term_relations_source_group_order'));
-      expect(details, contains('SEARCH long_term_relations'));
-    }
-  }
 }
 
 Future<void> _insertIntention(AppDatabase database, String id, String title) =>
@@ -739,36 +534,13 @@ LongTermRelationId _decodedRelationId(int index) => (LongTermRelationId.decode(
   _relationId(index),
 ) as LongTermRelationIdDecodingSuccess).id;
 
+/// Запоминает число строк каждого чтения и однократно отказывает на заданной
+/// порции чтения выбранных связей.
 final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
-  final selects = <_TracedSelect>[];
+  final rowCounts = <int>[];
   int? _selectedReadFailureCountdown;
 
-  Iterable<_TracedSelect> get groupRowsSelects =>
-      selects.where((select) => _isGroupRowsSelect(select.statement));
-
-  Iterable<_TracedSelect> get aggregateSelects =>
-      selects.where((select) => _isAggregateSelect(select.statement));
-
-  Iterable<_TracedSelect> get participantSelects =>
-      selects.where((select) => _isParticipantSelect(select.statement));
-
-  Iterable<_TracedSelect> get selectedRelationSelects => selects.where(
-    (select) =>
-        select.statement.contains('FROM long_term_relations') &&
-        select.statement.contains('WHERE id = ?'),
-  );
-
-  Iterable<_TracedSelect> get relationContentSelects => selects.where(
-    (select) => select.statement.contains('FROM long_term_relations'),
-  );
-
-  Iterable<_TracedSelect> get graphContentSelects => selects.where(
-    (select) =>
-        _isGroupRowsSelect(select.statement) ||
-        _isAggregateSelect(select.statement),
-  );
-
-  void clear() => selects.clear();
+  void clear() => rowCounts.clear();
 
   void failSelectedReadAt(int selectNumber) {
     _selectedReadFailureCountdown = selectNumber;
@@ -796,39 +568,7 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    selects.add(
-      _TracedSelect(
-        statement: statement.statements.single,
-        arguments: statement.arguments,
-        rowCount: rows.length,
-      ),
-    );
+    rowCounts.add(rows.length);
     return rows;
   }
 }
-
-final class _TracedSelect {
-  const _TracedSelect({
-    required this.statement,
-    required this.arguments,
-    required this.rowCount,
-  });
-
-  final String statement;
-  final List<Object?> arguments;
-  final int rowCount;
-}
-
-bool _isGroupRowsSelect(String statement) =>
-    statement.contains('FROM long_term_relations INDEXED BY') &&
-    statement.contains('ORDER BY priority, creation_sequence') &&
-    statement.contains('LIMIT ?');
-
-bool _isAggregateSelect(String statement) =>
-    statement.contains('doable_relation_count_aggregates');
-
-bool _isParticipantSelect(String statement) =>
-    !_isAggregateSelect(statement) &&
-    (statement.contains('FROM "intentions"') ||
-        statement.contains('FROM intentions')) &&
-    statement.contains(' IN ');

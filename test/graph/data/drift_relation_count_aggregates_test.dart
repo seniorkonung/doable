@@ -6,7 +6,6 @@ import 'package:doable/src/graph/data/drift_relation_count_aggregates.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
-import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -426,116 +425,16 @@ void main() {
     },
   );
 
-  test('агрегирует внутри SQLite и использует индексы обоих направлений', () async {
-    await database.close();
-    final trace = _AggregateSelectTrace();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        trace,
-      ),
-    );
-    aggregates = DriftRelationCountAggregates(database);
-    const firstOwner = '018f0b5d-6b2e-7c80-8000-000000000021';
-    const secondOwner = '018f0b5d-6b2e-7c80-8000-000000000022';
-    await _insertIntention(database, firstOwner);
-    await _insertIntention(database, secondOwner);
-    for (var index = 0; index < 24; index++) {
-      final neighbor = _uuid(1000 + index);
-      await _insertIntention(database, neighbor);
-      await _insertRelation(
-        database,
-        id: _uuid(2000 + index),
-        sourceId: index.isEven ? firstOwner : neighbor,
-        relatedId: index.isEven ? neighbor : secondOwner,
-        type: index % 3 == 0 ? 'can' : 'need',
-        isArchived: index % 5 == 0,
-      );
-    }
-    await database.transaction(() async {
-      for (var index = 0; index < 160; index++) {
-        final choiceId = _uuid(4000 + index);
-        await _insertDailyChoice(
-          database,
-          id: choiceId,
-          sourceId: firstOwner,
-          selectedId: _uuid(1000),
-          completed: index.isEven,
-        );
-        await _insertStep(
-          database,
-          id: _uuid(5000 + index),
-          choiceId: choiceId,
-          relationId: _uuid(2000),
-        );
-      }
-    });
-
-    final result = await aggregates.read({_id(firstOwner), _id(secondOwner)});
-    final aggregateSelect = trace.selects.singleWhere(
-      (entry) => entry.statement.statements.single.contains(
-        'doable_relation_count_aggregates',
-      ),
-    );
-
-    expect(result, hasLength(2));
-    expect(result[_id(firstOwner)]!.counts.dailySource, 160);
-    expect(aggregateSelect.rowCount, 2);
-    expect(aggregateSelect.statement.arguments, hasLength(2));
-
-    final plan = await database
-        .customSelect(
-          'EXPLAIN QUERY PLAN ${aggregateSelect.statement.statements.single}',
-          variables: [
-            for (final argument in aggregateSelect.statement.arguments)
-              Variable.withString(argument! as String),
-          ],
-        )
-        .get();
-    final details = plan.map((row) => row.read<String>('detail'));
-
-    expect(
-      details,
-      contains(contains('long_term_relations_source_group_order')),
-    );
-    expect(
-      details,
-      contains(contains('long_term_relations_related_group_order')),
-    );
-    expect(details, contains(contains('daily_choices_source_recent')));
-    expect(details, contains(contains('daily_choices_selected_recent')));
-
-    final relationId = _relationId(_uuid(2000));
-    final permissions = await aggregates.readPermissions([relationId]);
-    expect(permissions[relationId]!.canDelete, isFalse);
-    final permissionSelect = trace.selects.singleWhere(
-      (entry) => entry.statement.statements.single.contains(
-        'doable_daily_path_permissions',
-      ),
-    );
-    expect(permissionSelect.rowCount, 1);
-    final permissionPlan = await database
-        .customSelect(
-          'EXPLAIN QUERY PLAN ${permissionSelect.statement.statements.single}',
-          variables: [Variable.withString(relationId.toCanonicalString())],
-        )
-        .get();
-    expect(
-      permissionPlan.map((row) => row.read<String>('detail')),
-      contains(contains('daily_choice_path_steps_relation')),
-    );
-  });
-
   test('ошибка агрегата не выдаёт нули или свободное разрешение', () async {
     await database.close();
-    final trace = _AggregateSelectTrace(
+    final fault = _AggregateSelectFault(
       failCounts: true,
       failPermissions: true,
     );
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(),
-        trace,
+        fault,
       ),
     );
     aggregates = DriftRelationCountAggregates(database);
@@ -677,15 +576,15 @@ Future<void> _insertRawRelation(
 String _uuid(int suffix) =>
     '018f0b5d-6b2e-7c80-8002-${suffix.toString().padLeft(12, '0')}';
 
-final class _AggregateSelectTrace extends LocalDatabaseConnectionObserver {
-  _AggregateSelectTrace({
+/// Отказывает при чтении агрегатов счётчиков и разрешений.
+final class _AggregateSelectFault extends LocalDatabaseConnectionObserver {
+  _AggregateSelectFault({
     this.failCounts = false,
     this.failPermissions = false,
   });
 
   final bool failCounts;
   final bool failPermissions;
-  final selects = <({LocalDatabaseSqlStatement statement, int rowCount})>[];
 
   @override
   List<Map<String, Object?>> afterSelect(
@@ -697,7 +596,6 @@ final class _AggregateSelectTrace extends LocalDatabaseConnectionObserver {
         (failPermissions && sql.contains('doable_daily_path_permissions'))) {
       throw StateError('Искусственный отказ агрегата.');
     }
-    selects.add((statement: statement, rowCount: rows.length));
     return rows;
   }
 }

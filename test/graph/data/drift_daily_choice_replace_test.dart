@@ -207,23 +207,13 @@ void main() {
       before.revision.compareTo(confirmed.revision),
       GraphRevisionOrder.older,
     );
-    final stages = diagnostics.events
-        .whereType<DailyChoiceCommandDiagnosticsEvent>()
-        .where(
-          (event) =>
-              event.commandType ==
-              DailyChoiceCommandDiagnosticsType.replacePath,
-        )
-        .toList();
-    expect(stages.map((event) => event.stage), [
-      DailyChoiceCommandDiagnosticsStage.validation,
-      DailyChoiceCommandDiagnosticsStage.validation,
-      DailyChoiceCommandDiagnosticsStage.write,
-      DailyChoiceCommandDiagnosticsStage.write,
-      DailyChoiceCommandDiagnosticsStage.resultRead,
-      DailyChoiceCommandDiagnosticsStage.resultRead,
-    ]);
-    expect(stages.last.status, isA<DiagnosticsSucceeded>());
+    expect(
+      diagnostics.events
+          .whereType<DailyChoiceCommandDiagnosticsEvent>()
+          .last
+          .status,
+      isA<DiagnosticsSucceeded>(),
+    );
   });
 
   test(

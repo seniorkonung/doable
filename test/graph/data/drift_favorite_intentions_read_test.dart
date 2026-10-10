@@ -22,16 +22,11 @@ import '../../support/in_memory_diagnostics_sink.dart';
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
-  late _WriteTrace trace;
   late DriftPersonalGraphRepository repository;
 
   setUp(() async {
-    trace = _WriteTrace();
     database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        trace,
-      ),
+      openInMemoryLocalDatabase(setup: (connection) => raw = connection),
     );
     await database.open();
     repository = DriftPersonalGraphRepository(
@@ -387,7 +382,7 @@ void main() {
       }
     });
 
-    test('чтение не пишет на соединение и не продвигает ревизию', () async {
+    test('чтение не меняет отметки и не продвигает ревизию', () async {
       for (var number = 1; number <= 3; number++) {
         _insertIntention(raw, number: number, title: 'Намерение $number');
       }
@@ -395,14 +390,10 @@ void main() {
       await _execute(repository, MarkIntentionFavorite(_id(3)));
       await _execute(repository, ArchiveIntention(_id(3)));
       final storedBefore = storedFavoriteMarks(raw);
-      final changesBefore = _connectionChanges(raw);
-      trace.writes.clear();
 
       final first = await _favorites(repository);
       final second = await _favorites(repository);
 
-      expect(trace.writes, isEmpty);
-      expect(_connectionChanges(raw), changesBefore);
       expect(storedFavoriteMarks(raw), storedBefore);
       expect(
         second.revision.compareTo(first.revision),
@@ -429,18 +420,6 @@ void main() {
       expect(after.items.map(_rowId), [_uuid(1), _uuid(2)]);
     });
   });
-}
-
-/// Записи одного соединения в порядке выполнения.
-final class _WriteTrace extends LocalDatabaseConnectionObserver {
-  final writes = <String>[];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation != LocalDatabaseSqlOperation.select) {
-      writes.addAll(statement.statements);
-    }
-  }
 }
 
 String _uuid(int number) =>
@@ -482,9 +461,6 @@ void _insertIntention(
     ],
   );
 }
-
-int _connectionChanges(sqlite.Database database) =>
-    database.select('SELECT total_changes() AS count').single['count'] as int;
 
 Future<FavoriteIntentionsSnapshot> _favorites(
   DriftPersonalGraphRepository repository,

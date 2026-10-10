@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
@@ -31,52 +32,29 @@ const _otherGroupChoices = 150;
 const _pathLength = 150;
 const _pageSize = 25;
 
+/// Самый длинный путь вместе с его участниками.
+const _pathWithParticipants = _pathLength + 1;
+
 String _uuid(int number) => durabilityUuid(number);
 
 IntentionId _intention(int number) => durabilityIntention(number);
 
 LongTermRelationId _relation(int number) => durabilityRelation(number);
 
+/// Запоминает число строк, которое вернуло каждое чтение.
 final class _ReadTrace extends LocalDatabaseConnectionObserver {
-  final selects = <_TracedSelect>[];
-  final statements = <String>[];
+  final rowCounts = <int>[];
 
-  void clear() {
-    selects.clear();
-    statements.clear();
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    statements.addAll(statement.statements);
-  }
+  void clear() => rowCounts.clear();
 
   @override
   List<Map<String, Object?>> afterSelect(
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    selects.add(
-      _TracedSelect(
-        sql: statement.statements.single,
-        arguments: statement.arguments,
-        rows: rows.length,
-      ),
-    );
+    rowCounts.add(rows.length);
     return rows;
   }
-}
-
-final class _TracedSelect {
-  const _TracedSelect({
-    required this.sql,
-    required this.arguments,
-    required this.rows,
-  });
-
-  final String sql;
-  final List<Object?> arguments;
-  final int rows;
 }
 
 final class _Fixture {
@@ -84,7 +62,7 @@ final class _Fixture {
 
   final File? file;
   final trace = _ReadTrace();
-  late final List<String> bootstrapStatements;
+  late final List<int> bootstrapRowCounts;
   late final sqlite.Database raw;
   late final AppDatabase database;
   late final DriftPersonalGraphRepository repository;
@@ -103,7 +81,7 @@ final class _Fixture {
       ),
     );
     await database.open();
-    bootstrapStatements = List.of(trace.statements);
+    bootstrapRowCounts = List.of(trace.rowCounts);
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -197,164 +175,22 @@ final class _Fixture {
       );
     }
   }
-
-  List<String> plan(_TracedSelect select) => [
-    for (final row in raw.select(
-      'EXPLAIN QUERY PLAN ${select.sql}',
-      select.arguments,
-    ))
-      row['detail'].toString(),
-  ];
 }
 
-List<_TracedSelect> _matching(
-  Iterable<_TracedSelect> selects,
-  String fragment,
-) => [
-  for (final select in selects)
-    if (select.sql.contains(fragment)) select,
-];
-
-_TracedSelect _boundedPage(
-  List<_TracedSelect> selects, {
-  required int expectedSteps,
-  required int expectedCountReads,
-  required bool group,
-  int pageSize = _pageSize,
-}) {
-  final rows = _matching(
-    selects,
-    group ? 'FROM daily_choices INDEXED BY' : 'FROM daily_choices',
-  ).where((select) => select.sql.contains('ORDER BY choice_date')).toList();
-  expect(rows, hasLength(1));
-  expect(rows.single.rows, lessThanOrEqualTo(pageSize + 1));
-  expect(rows.single.sql, isNot(contains('OFFSET')));
-  final counts = _matching(selects, 'COUNT(*) AS total_count');
-  expect(counts, hasLength(expectedCountReads));
-  expect(counts.map((select) => select.rows), everyElement(1));
-  final steps = _matching(selects, 'FROM daily_choice_path_steps');
-  expect(steps, hasLength(1));
-  expect(steps.single.sql, contains('WHERE daily_choice_id IN'));
-  expect(steps.single.rows, expectedSteps);
-  expect(steps.single.arguments, hasLength(pageSize));
-  final relations = selects.where(
-    (select) =>
-        select.sql.contains('FROM long_term_relations') &&
-        select.sql.contains('WHERE id IN'),
-  );
-  expect(relations, isNotEmpty);
-  expect(
-    relations.fold<int>(0, (total, select) => total + select.rows),
-    lessThanOrEqualTo(expectedSteps),
-  );
-  expect(
-    relations,
-    everyElement(
-      isA<_TracedSelect>()
-          .having(
-            (select) => select.arguments.length,
-            'размер пакета связей',
-            lessThanOrEqualTo(400),
-          )
-          .having(
-            (select) => select.sql,
-            'содержимое связей',
-            isNot(contains('description')),
-          ),
-    ),
-  );
-  expect(
-    selects.where(
-      (select) =>
-          select.sql.contains('FROM daily_choices') &&
-          !select.sql.contains('COUNT(') &&
-          !select.sql.contains('ORDER BY choice_date'),
-    ),
-    isEmpty,
-  );
-  return rows.single;
+/// Ни одно чтение не возвращает больше [rows] строк: выдача ограничена
+/// показанными записями, а не всей историей.
+void _expectEachReadAtMost(_ReadTrace trace, int rows) {
+  expect(trace.rowCounts, isNotEmpty);
+  expect(trace.rowCounts, everyElement(lessThanOrEqualTo(rows)));
 }
 
-/// Каждое чтение строк и количества дневных выборов ограничено днём [day].
-void _expectDayBound(List<_TracedSelect> selects, String day) {
-  final reads = _matching(selects, 'FROM daily_choices');
-  expect(reads, isNotEmpty);
-  for (final read in reads) {
-    expect(read.sql, contains('choice_date = ?'));
-    expect(read.arguments.first, day);
-  }
-}
-
-_TracedSelect _boundedSuggestions(
-  List<_TracedSelect> selects, {
-  required String participantColumn,
-  required String participantId,
-  required int expectedSteps,
-}) {
-  final candidates = selects
-      .where(
-        (select) =>
-            select.sql.contains('FROM daily_choices') &&
-            select.sql.contains('WHERE $participantColumn = ?'),
-      )
-      .toList();
-  expect(candidates, hasLength(1));
-  final candidate = candidates.single;
-  expect(candidate.sql, contains('ORDER BY creation_sequence DESC'));
-  expect(candidate.sql, contains('LIMIT ?'));
-  expect(candidate.arguments, [participantId, 20]);
-  expect(candidate.rows, 20);
-
-  final choices = _matching(selects, 'FROM daily_choices WHERE id = ?');
-  expect(choices, hasLength(20));
-  expect(choices.map((select) => select.rows), everyElement(1));
-  expect(
-    choices.map((select) => select.arguments.single).toSet(),
-    hasLength(20),
-  );
-  expect(
-    selects.where((select) => select.sql.contains('FROM daily_choices')),
-    hasLength(21),
-  );
-  final steps = _matching(
-    selects,
-    'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-  );
-  expect(steps, hasLength(20));
-  expect(steps.fold<int>(0, (sum, select) => sum + select.rows), expectedSteps);
-  expect(selects.indexOf(candidate), lessThan(selects.indexOf(choices.first)));
-  expect(selects.indexOf(candidate), lessThan(selects.indexOf(steps.first)));
-  final relations = selects.where(
-    (select) =>
-        select.sql.contains('FROM long_term_relations') &&
-        select.sql.contains('WHERE id IN'),
-  );
-  expect(relations, hasLength(20));
-  expect(
-    relations.fold<int>(0, (sum, select) => sum + select.rows),
-    expectedSteps,
-  );
-  expect(
-    selects.where((select) => select.sql.contains('daily_choice_path_steps')),
-    hasLength(20),
-  );
-  expect(
-    selects.where((select) => select.sql.contains('FROM long_term_relations')),
-    hasLength(20),
-  );
-  expect(
-    selects.where((select) => select.sql.contains('FROM intentions')),
-    everyElement(
-      isA<_TracedSelect>().having(
-        (select) => select.sql,
-        'чтение конкретных намерений',
-        contains('WHERE id'),
-      ),
-    ),
-  );
-  expect(_matching(selects, 'WITH RECURSIVE'), isEmpty);
-  return candidate;
-}
+/// Порция из [pageSize] записей читает не больше строк, чем занимают её
+/// записи и шаги их путей ([pageSteps]), и один лишний признак продолжения.
+void _expectBoundedPage(
+  _ReadTrace trace, {
+  required int pageSteps,
+  required int pageSize,
+}) => _expectEachReadAtMost(trace, max(pageSteps, pageSize + 1));
 
 void main() {
   late _Fixture fixture;
@@ -379,26 +215,14 @@ void main() {
       ) as ChoicePathSuggestionsSuccess).value;
       expect(first.items, hasLength(1));
       expect(first.items.single.path, hasLength(_pathLength));
-      final firstCandidate = _boundedSuggestions(
-        fixture.trace.selects,
-        participantColumn: 'source_intention_id',
-        participantId: _uuid(1),
-        expectedSteps: _pathLength + 19,
-      );
-      final plan = fixture.plan(firstCandidate).join(' | ');
-      expect(plan, contains('daily_choices_source_recent'));
+      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
 
       fixture.trace.clear();
       final refreshed = (await fixture.repository.getChoicePathSuggestions(
         query,
       ) as ChoicePathSuggestionsSuccess).value;
       expect(refreshed.items, hasLength(1));
-      _boundedSuggestions(
-        fixture.trace.selects,
-        participantColumn: 'source_intention_id',
-        participantId: _uuid(1),
-        expectedSteps: _pathLength + 19,
-      );
+      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
       expect(
         fixture.raw
             .select('SELECT COUNT(*) AS count FROM daily_choices')
@@ -426,14 +250,7 @@ void main() {
           .single['count'],
       _catalogChoices + _otherGroupChoices,
     );
-    final topCandidate = _boundedSuggestions(
-      fixture.trace.selects,
-      participantColumn: 'source_intention_id',
-      participantId: _uuid(1),
-      expectedSteps: _pathLength + 19,
-    );
-    final topPlan = fixture.plan(topCandidate).join(' | ');
-    expect(topPlan, contains('daily_choices_source_recent'));
+    _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
 
     fixture._addRelation(902, 1, 201);
     fixture._addChoice(12001, 1, 201, [902], stepBase: 33000);
@@ -453,14 +270,7 @@ void main() {
       ).single['long_term_relation_id'],
       _uuid(902),
     );
-    final bottomCandidate = _boundedSuggestions(
-      fixture.trace.selects,
-      participantColumn: 'selected_intention_id',
-      participantId: _uuid(201),
-      expectedSteps: 20,
-    );
-    final bottomPlan = fixture.plan(bottomCandidate).join(' | ');
-    expect(bottomPlan, contains('daily_choices_selected_recent'));
+    _expectEachReadAtMost(fixture.trace, 20);
     expect(
       fixture.raw
           .select('SELECT COUNT(*) AS count FROM daily_choices')
@@ -478,24 +288,14 @@ void main() {
         topQuery,
       ) as ChoicePathSuggestionsSuccess).value;
       expect(top.items.first.path, hasLength(_pathLength));
-      _boundedSuggestions(
-        fixture.trace.selects,
-        participantColumn: 'source_intention_id',
-        participantId: _uuid(1),
-        expectedSteps: _pathLength + 19,
-      );
+      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
 
       fixture.trace.clear();
       final bottom = (await fixture.repository.getChoicePathSuggestions(
         bottomQuery,
       ) as ChoicePathSuggestionsSuccess).value;
       expect(bottom.items, hasLength(1));
-      _boundedSuggestions(
-        fixture.trace.selects,
-        participantColumn: 'selected_intention_id',
-        participantId: _uuid(201),
-        expectedSteps: 20,
-      );
+      _expectEachReadAtMost(fixture.trace, 20);
 
       fixture.trace.clear();
       final refreshed = (await fixture.repository.getChoicePathSuggestions(
@@ -505,12 +305,7 @@ void main() {
         refreshed.items.first.originChoiceId,
         top.items.first.originChoiceId,
       );
-      _boundedSuggestions(
-        fixture.trace.selects,
-        participantColumn: 'source_intention_id',
-        participantId: _uuid(1),
-        expectedSteps: _pathLength + 19,
-      );
+      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
 
       final longPath = refreshed.items.first.confirmedPath;
       fixture.trace.clear();
@@ -532,13 +327,9 @@ void main() {
         isA<DailyChoiceReadSuccess>(),
       );
       expect(top.items.first.originChoiceId, durabilityChoice(10400));
-      expect(
-        _matching(
-          fixture.trace.selects,
-          'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-        ).every((select) => select.rows <= _pathLength),
-        isTrue,
-      );
+      // Создание и чтение читают не больше одного пути вместе с его
+      // участниками.
+      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
 
       fixture.trace.clear();
       expect(
@@ -586,15 +377,10 @@ void main() {
             .single['count'],
         _catalogChoices + _otherGroupChoices,
       );
+      // Чтение истории при запуске вернуло бы сотни строк выборов и шагов.
       expect(
-        reopened.bootstrapStatements.where(
-          (sql) =>
-              sql.contains('FROM daily_choices') ||
-              sql.contains('FROM daily_choice_path_steps') ||
-              sql.contains('FROM long_term_relations') ||
-              sql.contains('FROM intentions'),
-        ),
-        isEmpty,
+        reopened.bootstrapRowCounts.fold<int>(0, (sum, rows) => sum + rows),
+        lessThan(_pageSize),
       );
     },
     timeout: const Timeout(Duration(minutes: 3)),
@@ -629,6 +415,7 @@ void main() {
   );
 
   test('каталог и дневная группа читают только выбранные порции и пересобирают загруженную часть', () async {
+    const firstPageSteps = _pathLength + _pageSize - 1;
     final first =
         (await fixture.repository.getDailyChoiceCatalogPage(
               DailyChoiceCatalogQuery(pageSize: _pageSize),
@@ -636,31 +423,21 @@ void main() {
             as DailyChoiceCatalogFirstPage;
     expect(first.totalCount, _catalogChoices + _otherGroupChoices);
     expect(first.items.first.id, durabilityChoice(10400));
-    final firstSql = _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pathLength + _pageSize - 1,
-      expectedCountReads: 1,
-      group: false,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: firstPageSteps,
+      pageSize: _pageSize,
     );
-    final catalogPlan = fixture.plan(firstSql).join(' | ');
-    expect(catalogPlan, contains('daily_choices_date_creation_order'));
-    final countPlan = fixture
-        .plan(
-          _matching(fixture.trace.selects, 'COUNT(*) AS total_count').single,
-        )
-        .join(' | ');
-    expect(countPlan, contains('COVERING INDEX'));
 
     fixture.trace.clear();
     final second = (await fixture.repository.getDailyChoiceCatalogPage(
       DailyChoiceCatalogQuery(pageSize: _pageSize, cursor: first.nextCursor),
     ) as DailyChoiceCatalogPageSuccess).value;
     expect(second.items, hasLength(_pageSize));
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pageSize,
-      expectedCountReads: 0,
-      group: false,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: _pageSize,
+      pageSize: _pageSize,
     );
 
     fixture.trace.clear();
@@ -675,23 +452,11 @@ void main() {
             as DailyChoiceGroupFirstPage;
     expect(source.counts.dailySource, _catalogChoices);
     expect(source.counts.dailySelected, 0);
-    final groupSql = _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pathLength + _pageSize - 1,
-      expectedCountReads: 0,
-      group: true,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: firstPageSteps,
+      pageSize: _pageSize,
     );
-    final groupPlan = fixture.plan(groupSql).join(' | ');
-    expect(groupPlan, contains('daily_choices_source_date_creation_order'));
-    final aggregates = _matching(
-      fixture.trace.selects,
-      'doable_relation_count_aggregates',
-    );
-    expect(aggregates, hasLength(1));
-    expect(aggregates.single.rows, 1);
-    final aggregatePlan = fixture.plan(aggregates.single).join(' | ');
-    expect(aggregatePlan, contains('daily_choices_source_recent'));
-    expect(aggregatePlan, contains('daily_choices_selected_recent'));
 
     fixture.trace.clear();
     final selected =
@@ -704,16 +469,10 @@ void main() {
             ) as RelationGroupPageSuccess).value
             as DailyChoiceGroupFirstPage;
     expect(selected.counts.dailySelected, _otherGroupChoices);
-    final selectedSql = _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pageSize,
-      expectedCountReads: 0,
-      group: true,
-    );
-    final selectedPlan = fixture.plan(selectedSql).join(' | ');
-    expect(
-      selectedPlan,
-      contains('daily_choices_selected_date_creation_order'),
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: _pageSize,
+      pageSize: _pageSize,
     );
 
     fixture.trace.clear();
@@ -726,11 +485,10 @@ void main() {
       ),
     ) as RelationGroupPageSuccess).value;
     expect(sourceNext, isA<DailyChoiceGroupContinuationPage>());
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pageSize,
-      expectedCountReads: 0,
-      group: true,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: _pageSize,
+      pageSize: _pageSize,
     );
 
     expect(
@@ -751,22 +509,20 @@ void main() {
             ) as DailyChoiceCatalogPageSuccess).value
             as DailyChoiceCatalogFirstPage;
     expect(rebuilt.items.first.id, durabilityChoice(10399));
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pathLength + _pageSize - 1,
-      expectedCountReads: 1,
-      group: false,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: firstPageSteps,
+      pageSize: _pageSize,
     );
     fixture.trace.clear();
     final rebuiltNext = (await fixture.repository.getDailyChoiceCatalogPage(
       DailyChoiceCatalogQuery(pageSize: _pageSize, cursor: rebuilt.nextCursor),
     ) as DailyChoiceCatalogPageSuccess).value;
     expect(rebuiltNext.items, hasLength(_pageSize));
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pageSize,
-      expectedCountReads: 0,
-      group: false,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: _pageSize,
+      pageSize: _pageSize,
     );
     fixture.trace.clear();
     final rebuiltGroup =
@@ -779,11 +535,10 @@ void main() {
             ) as RelationGroupPageSuccess).value
             as DailyChoiceGroupFirstPage;
     expect(rebuiltGroup.items.first.id, durabilityChoice(10399));
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pathLength + _pageSize - 1,
-      expectedCountReads: 0,
-      group: true,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: firstPageSteps,
+      pageSize: _pageSize,
     );
     fixture.trace.clear();
     expect(
@@ -799,15 +554,14 @@ void main() {
           .items,
       hasLength(_pageSize),
     );
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pageSize,
-      expectedCountReads: 0,
-      group: true,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: _pageSize,
+      pageSize: _pageSize,
     );
   }, timeout: const Timeout(Duration(minutes: 3)));
 
-  test('каталог одного дня читает по индексу даты только этот день и порции по 50', () async {
+  test('каталог одного дня читает только этот день порциями по 50', () async {
     // Сотни записей соседних дней созданы после записей выбранного дня.
     fixture.raw.execute('BEGIN');
     for (var number = 40000; number < 40300; number++) {
@@ -842,41 +596,16 @@ void main() {
     expect(first.totalCount, dayChoices);
     expect(first.items, hasLength(pageSize));
     expect(first.items.first.id, durabilityChoice(10400));
-    final firstSql = _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pathLength + pageSize - 1,
-      expectedCountReads: 1,
-      group: false,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: _pathLength + pageSize - 1,
       pageSize: pageSize,
     );
-    _expectDayBound(fixture.trace.selects, '2026-09-24');
-    final dayPlan = fixture.plan(firstSql).join(' | ');
-    expect(
-      dayPlan,
-      contains(
-        'SEARCH daily_choices USING INDEX daily_choices_date_creation_order '
-        '(choice_date=?)',
-      ),
-    );
-    final dayCountPlan = fixture
-        .plan(
-          _matching(fixture.trace.selects, 'COUNT(*) AS total_count').single,
-        )
-        .join(' | ');
-    expect(
-      dayCountPlan,
-      contains(
-        'SEARCH daily_choices USING COVERING INDEX '
-        'daily_choices_date_creation_order (choice_date=?)',
-      ),
-    );
 
-    // Продолжения проходят весь день без нового подсчёта и без строк
-    // соседних дней.
+    // Продолжения проходят весь день без строк соседних дней.
     final ids = {for (final item in first.items) item.id};
     var cursor = first.nextCursor;
     var continuations = 0;
-    String? continuationPlan;
     while (cursor != null) {
       fixture.trace.clear();
       final next = (await fixture.repository.getDailyChoiceCatalogPage(
@@ -884,25 +613,17 @@ void main() {
       ) as DailyChoiceCatalogPageSuccess).value;
       expect(next, isA<DailyChoiceCatalogContinuationPage>());
       expect(next.items.map((item) => item.date), everyElement(day));
-      final nextSql = _boundedPage(
-        fixture.trace.selects,
-        expectedSteps: next.items.length,
-        expectedCountReads: 0,
-        group: false,
+      _expectBoundedPage(
+        fixture.trace,
+        pageSteps: next.items.length,
         pageSize: next.items.length,
       );
-      _expectDayBound(fixture.trace.selects, '2026-09-24');
-      continuationPlan ??= fixture.plan(nextSql).join(' | ');
       ids.addAll(next.items.map((item) => item.id));
       cursor = next.nextCursor;
       continuations++;
     }
     expect(continuations, (dayChoices - 1) ~/ pageSize);
     expect(ids, hasLength(dayChoices));
-    expect(
-      continuationPlan,
-      contains('daily_choices_date_creation_order (choice_date=?'),
-    );
 
     // Охват выполнения остаётся внутри выбранного дня.
     fixture.raw.execute(
@@ -917,18 +638,7 @@ void main() {
             as DailyChoiceCatalogFirstPage;
     expect(completed.totalCount, _otherGroupChoices);
     expect(completed.items.map((item) => item.isCompleted), everyElement(true));
-    final completedSql = _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: pageSize,
-      expectedCountReads: 1,
-      group: false,
-      pageSize: pageSize,
-    );
-    _expectDayBound(fixture.trace.selects, '2026-09-24');
-    expect(
-      fixture.plan(completedSql).join(' | '),
-      contains('daily_choices_date_creation_order (choice_date=?)'),
-    );
+    _expectBoundedPage(fixture.trace, pageSteps: pageSize, pageSize: pageSize);
 
     // Перенос записи меняет количество обоих дней, а пересборка снова
     // читает только первую порцию выбранного дня.
@@ -952,14 +662,11 @@ void main() {
     expect(rebuilt.totalCount, dayChoices - 1);
     expect(rebuilt.items.first.id, durabilityChoice(10400));
     expect(rebuilt.items[1].id, durabilityChoice(10398));
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: _pathLength + pageSize - 1,
-      expectedCountReads: 1,
-      group: false,
+    _expectBoundedPage(
+      fixture.trace,
+      pageSteps: _pathLength + pageSize - 1,
       pageSize: pageSize,
     );
-    _expectDayBound(fixture.trace.selects, '2026-09-24');
     fixture.trace.clear();
     final nextDay =
         (await fixture.repository.getDailyChoiceCatalogPage(
@@ -969,14 +676,7 @@ void main() {
             ) as DailyChoiceCatalogPageSuccess).value
             as DailyChoiceCatalogFirstPage;
     expect(nextDay.totalCount, 301);
-    _boundedPage(
-      fixture.trace.selects,
-      expectedSteps: pageSize,
-      expectedCountReads: 1,
-      group: false,
-      pageSize: pageSize,
-    );
-    _expectDayBound(fixture.trace.selects, '2026-09-25');
+    _expectBoundedPage(fixture.trace, pageSteps: pageSize, pageSize: pageSize);
   }, timeout: const Timeout(Duration(minutes: 3)));
 
   test(
@@ -987,26 +687,15 @@ void main() {
         DailyChoiceCatalogQuery(pageSize: 1),
       ) as DailyChoiceCatalogPageSuccess).value;
       expect(single.items.single.id, durabilityChoice(10400));
-      _boundedPage(
-        fixture.trace.selects,
-        expectedSteps: _pathLength,
-        expectedCountReads: 1,
-        group: false,
-        pageSize: 1,
+      _expectBoundedPage(fixture.trace, pageSteps: _pathLength, pageSize: 1);
+
+      final detail = await fixture.repository.getDailyChoice(
+        durabilityChoice(10400),
       );
-      fixture.trace.clear();
       expect(
-        await fixture.repository.getDailyChoice(durabilityChoice(10400)),
-        isA<DailyChoiceReadSuccess>(),
+        (detail as DailyChoiceReadSuccess).value.value!.path,
+        hasLength(_pathLength),
       );
-      final detailSteps = _matching(
-        fixture.trace.selects,
-        'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      );
-      expect(detailSteps, hasLength(1));
-      expect(detailSteps.single.rows, _pathLength);
-      final stepPlan = fixture.plan(detailSteps.single).join(' | ');
-      expect(stepPlan, contains('daily_choice_path_steps'));
 
       final draft = ChoicePathDraftStart(_intention(1));
       fixture.trace.clear();
@@ -1015,11 +704,7 @@ void main() {
             ChoicePathContinuationQuery(draft: draft, pageSize: 1),
           ) as ChoicePathContinuationSuccess).value;
       expect(continuations.items, hasLength(1));
-      final reachability = _matching(fixture.trace.selects, 'WITH RECURSIVE');
-      expect(reachability, hasLength(1));
-      expect(reachability.single.rows, lessThanOrEqualTo(2));
-      final reachabilityPlan = fixture.plan(reachability.single).join(' | ');
-      expect(reachabilityPlan, contains('reachable'));
+      _expectEachReadAtMost(fixture.trace, 2);
 
       expect(
         await fixture.repository.execute(

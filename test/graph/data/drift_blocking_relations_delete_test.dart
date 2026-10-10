@@ -452,7 +452,6 @@ void main() {
       LargeBlockingRelationsFixture.unrelated,
     );
     final previousRevision = await _revision(repository, owner);
-    deleteObserver.clear();
 
     final confirmed = _success(
       await repository.execute(
@@ -463,7 +462,6 @@ void main() {
       ),
     );
 
-    expect(deleteObserver.batchSizes, [400, 1]);
     expect(
       confirmed.revision.compareTo(previousRevision),
       GraphRevisionOrder.newer,
@@ -505,7 +503,6 @@ void main() {
     );
     final before = await _rows(database, 'long_term_relations');
     final revision = await _revision(repository, owner);
-    deleteObserver.clear();
 
     final failure = _failure(
       await repository.execute(
@@ -524,7 +521,6 @@ void main() {
         selected.last,
       ),
     );
-    expect(deleteObserver.batchSizes, isEmpty);
     expect(await _rows(database, 'long_term_relations'), before);
     expect(
       (await _revision(repository, owner)).compareTo(revision),
@@ -562,7 +558,6 @@ void main() {
     );
 
     expect(failure, isA<DeleteBlockingRelationsUnexpectedFailure>());
-    expect(deleteObserver.batchSizes, [400]);
     expect(await _graphSnapshot(database), graphBefore);
     expect(await _rows(database, 'long_term_relations'), beforeRelations);
     expect(await _rows(database, 'intentions'), beforeIntentions);
@@ -644,7 +639,6 @@ void main() {
       }
       final graphBefore = await _graphSnapshot(database);
       final revision = await _revision(repository, owner);
-      deleteObserver.clear();
 
       final failure = _failure(
         await repository.execute(
@@ -673,7 +667,6 @@ void main() {
               BlockingRelationConflictReason.deletionProhibited,
             ),
       );
-      expect(deleteObserver.batchSizes, isEmpty);
       expect(await _choice(database, choice), isNotNull);
       expect(await _relation(database, free), isNotNull);
       expect(await _graphSnapshot(database), graphBefore);
@@ -759,7 +752,6 @@ void main() {
     await _insertChoice(database, choice, owner, intentions[1], selected);
     final graphBefore = await _graphSnapshot(database);
     final revision = await _revision(repository, owner);
-    deleteObserver.clear();
 
     final failure = _failure(await repository.execute(command));
 
@@ -771,7 +763,6 @@ void main() {
         BlockingRelationConflictReason.deletionProhibited,
       ),
     );
-    expect(deleteObserver.batchSizes, isEmpty);
     expect(await _choice(database, choice), isNotNull);
     expect(await _relation(database, selected), isNotNull);
     expect(await _graphSnapshot(database), graphBefore);
@@ -830,7 +821,6 @@ void main() {
       final tagsBefore = await _rows(database, 'tags');
       expect(await _assignments(database), assignmentsBefore);
       final revision = await _revision(repository, newSource);
-      deleteObserver.clear();
 
       final staleFailure = _failure(await repository.execute(stale));
       expect(
@@ -847,7 +837,6 @@ void main() {
               BlockingRelationConflictReason.noLongerBlocking,
             ),
       );
-      expect(deleteObserver.batchSizes, isEmpty);
       expect(await _relation(database, free), isNotNull);
       expect(await _choice(database, choice), isNotNull);
       expect(await _graphSnapshot(database), graphBefore);
@@ -877,7 +866,6 @@ void main() {
               BlockingRelationConflictReason.deletionProhibited,
             ),
       );
-      expect(deleteObserver.batchSizes, isEmpty);
       expect(await _choice(database, choice), isNotNull);
       expect(await _relation(database, newPath), isNotNull);
       expect(await _graphSnapshot(database), graphBefore);

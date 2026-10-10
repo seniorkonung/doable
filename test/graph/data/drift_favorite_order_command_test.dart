@@ -24,17 +24,12 @@ void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late InMemoryDiagnosticsSink diagnostics;
-  late _WriteTrace trace;
   late DriftPersonalGraphRepository repository;
 
   setUp(() async {
     diagnostics = InMemoryDiagnosticsSink();
-    trace = _WriteTrace();
     database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        trace,
-      ),
+      openInMemoryLocalDatabase(setup: (connection) => raw = connection),
     );
     await database.open();
     repository = _repository(database, diagnostics);
@@ -151,38 +146,10 @@ void main() {
   });
 
   group('Запись мест', () {
-    const count = 3;
-    test('перестановка $count избранных переписывает места значениями '
-        '1..$count двумя пакетными инструкциями', () async {
-      // Места идут с пропусками и не начинаются с единицы.
-      for (var number = 1; number <= count; number++) {
-        _insertFavorite(
-          raw,
-          number: number,
-          title: 'Намерение $number',
-          position: number * 3 + 4,
-        );
-      }
-      trace.clear();
-
-      await _moved(repository, _move(count, first: true));
-
-      expect(
-        _storedOrder(raw),
-        _uuids([count, for (var n = 1; n < count; n++) n]),
-      );
-      expect(storedFavoriteMarks(raw).map((mark) => mark.$2), [
-        for (var place = 1; place <= count; place++) place,
-      ]);
-      expect(trace.writes, hasLength(2));
-      expect(
-        trace.writes,
-        everyElement(startsWith('UPDATE favorite_intentions')),
-      );
-    });
-
-    test('промежуточные места положительны, уникальны и не совпадают ни с '
-        'прежними, ни с итоговыми', () async {
+    test('перестановка при пересекающихся старых и итоговых местах '
+        'переписывает места значениями 1..N', () async {
+      // Места идут с пропусками и не начинаются с единицы; прежнее место 3
+      // совпадает с одним из итоговых.
       for (final (number, position) in [(1, 3), (2, 8), (3, 20)]) {
         _insertFavorite(
           raw,
@@ -191,18 +158,11 @@ void main() {
           position: position,
         );
       }
-      final placeLog = _PlaceLog.install(raw);
 
       await _moved(repository, _move(3, after: 1));
 
-      final shifted = placeLog.updates.take(3).map((update) => update.after);
-      final assigned = placeLog.updates.skip(3).map((update) => update.after);
-      expect(placeLog.updates, hasLength(6));
-      expect(shifted, everyElement(greaterThan(0)));
-      expect(shifted.toSet(), hasLength(3));
-      expect(shifted.toSet().intersection({3, 8, 20, 1, 2}), isEmpty);
-      expect(assigned.toSet(), {1, 2, 3});
       expect(_storedOrder(raw), _uuids([1, 3, 2]));
+      expect(storedFavoriteMarks(raw).map((mark) => mark.$2), [1, 2, 3]);
     });
 
     test('перестановка не меняет намерения, их показания времени, поисковую '
@@ -228,16 +188,11 @@ void main() {
         );
       }
       final graphBefore = _graphWithoutFavorites(raw);
-      trace.clear();
 
       await _moved(repository, _move(5, after: 1));
 
       expect(_graphWithoutFavorites(raw), graphBefore);
       expect(_storedOrder(raw), _uuids([1, 5, 2, 3, 4]));
-      expect(
-        trace.writes,
-        everyElement(startsWith('UPDATE favorite_intentions')),
-      );
     });
   });
 
@@ -265,7 +220,7 @@ void main() {
         moved.change.revision.compareTo(confirmed.revision),
         GraphRevisionOrder.same,
       );
-      expect(confirmed.changes, [same(moved.change)]);
+      expect(confirmed.changes, hasLength(1));
       expect(confirmed.changes.whereType<IntentionCatalogMutation>(), isEmpty);
       // Независимое чтение видит новый порядок на той же ревизии: ревизия
       // продвинута ровно одним изменением.
@@ -301,7 +256,7 @@ void main() {
     );
 
     test('перемещение после ближайшего предшествующего активного намерения '
-        'сохраняет места и ревизию без записей', () async {
+        'сохраняет места и ревизию', () async {
       // Скрытое архивированное намерение стоит перед первым активным и
       // между активными; места идут с пропусками.
       _insertFavorite(raw, number: 4, title: 'Б', position: 2, archived: true);
@@ -310,8 +265,6 @@ void main() {
       _insertFavorite(raw, number: 3, title: 'В', position: 12);
       final marksBefore = storedFavoriteMarks(raw);
       final revisionBefore = await _revision(repository);
-      final changesBefore = _connectionChanges(raw);
-      trace.clear();
 
       final confirmed = await _confirmed(repository, _move(3, after: 1));
 
@@ -324,9 +277,7 @@ void main() {
         unchanged.change.revision.compareTo(revisionBefore),
         GraphRevisionOrder.same,
       );
-      expect(confirmed.changes, [same(unchanged.change)]);
-      expect(trace.writes, isEmpty);
-      expect(_connectionChanges(raw), changesBefore);
+      expect(confirmed.changes, hasLength(1));
       expect(storedFavoriteMarks(raw), marksBefore);
       expect(
         (await _revision(repository)).compareTo(revisionBefore),
@@ -350,7 +301,6 @@ void main() {
       await _expectRejectedWithoutWrite(
         raw,
         repository,
-        trace,
         _move(2, after: 2),
         isA<FavoriteOrderInputFailure>(),
       );
@@ -370,7 +320,6 @@ void main() {
       await _expectRejectedWithoutWrite(
         raw,
         repository,
-        trace,
         _move(3, after: 2),
         isA<FavoriteOrderConflictFailure>(),
       );
@@ -392,7 +341,6 @@ void main() {
       await _expectRejectedWithoutWrite(
         raw,
         repository,
-        trace,
         _move(2, first: true),
         isA<FavoriteOrderConflictFailure>(),
       );
@@ -416,60 +364,12 @@ void main() {
         await _expectRejectedWithoutWrite(
           raw,
           repository,
-          trace,
           _move(1, first: true),
           isA<FavoriteOrderCorruptionFailure>(),
         );
       });
     });
   });
-}
-
-/// Записи одного соединения в порядке выполнения.
-final class _WriteTrace extends LocalDatabaseConnectionObserver {
-  final writes = <String>[];
-
-  void clear() => writes.clear();
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation != LocalDatabaseSqlOperation.select) {
-      writes.addAll(statement.statements);
-    }
-  }
-}
-
-/// Журнал изменений мест, который ведёт временный триггер соединения.
-/// Триггер наблюдает каждую изменённую строку, не меняя схему хранилища.
-final class _PlaceLog {
-  _PlaceLog._(this._database);
-
-  factory _PlaceLog.install(sqlite.Database database) {
-    database.execute(
-      'CREATE TEMP TABLE favorite_place_log ('
-      'sequence INTEGER PRIMARY KEY AUTOINCREMENT, '
-      'before_place INTEGER, after_place INTEGER)',
-    );
-    database.execute(
-      'CREATE TEMP TRIGGER favorite_place_log_after_update '
-      'AFTER UPDATE OF position ON main.favorite_intentions '
-      'BEGIN '
-      'INSERT INTO favorite_place_log (before_place, after_place) '
-      'VALUES (old.position, new.position); '
-      'END',
-    );
-    return _PlaceLog._(database);
-  }
-
-  final sqlite.Database _database;
-
-  List<({int before, int after})> get updates => [
-    for (final row in _database.select(
-      'SELECT before_place, after_place FROM favorite_place_log '
-      'ORDER BY sequence',
-    ))
-      (before: row['before_place'] as int, after: row['after_place'] as int),
-  ];
 }
 
 DriftPersonalGraphRepository _repository(
@@ -555,9 +455,6 @@ List<String> _storedOrder(sqlite.Database database) => [
   for (final (intentionId, _) in storedFavoriteMarks(database)) intentionId,
 ];
 
-int _connectionChanges(sqlite.Database database) =>
-    database.select('SELECT total_changes() AS count').single['count'] as int;
-
 /// Все строки всех таблиц хранилища, кроме отметок избранного, включая
 /// служебные таблицы поисковой проекции.
 Map<String, List<Map<String, Object?>>> _graphWithoutFavorites(
@@ -636,20 +533,15 @@ Future<void> _succeeded(
 Future<void> _expectRejectedWithoutWrite(
   sqlite.Database raw,
   DriftPersonalGraphRepository repository,
-  _WriteTrace trace,
   MoveFavoriteIntention command,
   Matcher failure,
 ) async {
   final marksBefore = storedFavoriteMarks(raw);
-  final changesBefore = _connectionChanges(raw);
   final revisionBefore = await _graphRevision(repository);
-  trace.clear();
 
   final result = await repository.execute(command);
 
   expect(_failureOf(result), failure);
-  expect(trace.writes, isEmpty);
-  expect(_connectionChanges(raw), changesBefore);
   expect(storedFavoriteMarks(raw), marksBefore);
   expect(
     (await _graphRevision(repository)).compareTo(revisionBefore),

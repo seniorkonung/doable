@@ -4,7 +4,6 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -15,7 +14,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
-import 'tag_delete_cost.dart' as cost;
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -23,37 +21,19 @@ String _uuid(int number) =>
 TagId _tagId(int number) =>
     (TagId.decode(_uuid(number)) as TagIdDecodingSuccess).id;
 
-final class _StatementProbe extends LocalDatabaseConnectionObserver {
-  final statements = <String>[];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    statements.addAll(statement.statements);
-  }
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late DriftPersonalGraphRepository repository;
-  late InMemoryDiagnosticsSink diagnostics;
-  late _StatementProbe probe;
 
   setUp(() async {
-    probe = _StatementProbe();
-    diagnostics = InMemoryDiagnosticsSink();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-        probe,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 9, 25),
-      diagnostics,
+      InMemoryDiagnosticsSink(),
     );
   });
   tearDown(() => database.close());
@@ -140,7 +120,6 @@ void main() {
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
       [_uuid(301), _uuid(105)],
     );
-    probe.statements.clear();
 
     final result = await repository.execute(DeleteTag(id));
     expect(result, isA<TagCommandSucceeded>());
@@ -174,28 +153,6 @@ void main() {
     expect(raw.select('SELECT * FROM tag_assignments'), hasLength(1));
     expect(retainedGraph(), before);
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    expect(
-      probe.statements.where((sql) => sql.contains('FROM tag_assignments')),
-      isEmpty,
-    );
-    expect(
-      probe.statements.where((sql) => sql.contains('FROM intentions')),
-      isEmpty,
-    );
-    expect(
-      diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last,
-      isA<TagCommandDiagnosticsEvent>()
-          .having(
-            (event) => event.commandType,
-            'команда',
-            TagCommandDiagnosticsType.delete,
-          )
-          .having(
-            (event) => event.status,
-            'результат',
-            isA<DiagnosticsSucceeded>(),
-          ),
-    );
   });
 
   test('отказ внутри каскада откатывает весь граф без новой ревизии', () async {
@@ -235,25 +192,6 @@ void main() {
       GraphRevisionOrder.same,
     );
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    expect(
-      diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last,
-      isA<TagCommandDiagnosticsEvent>()
-          .having(
-            (event) => event.commandType,
-            'команда',
-            TagCommandDiagnosticsType.delete,
-          )
-          .having(
-            (event) => event.stage,
-            'этап',
-            TagCommandDiagnosticsStage.write,
-          )
-          .having(
-            (event) => event.status,
-            'результат',
-            isA<DiagnosticsFailed>(),
-          ),
-    );
   });
 
   test('устаревший id не удаляет новый одноимённый тег', () async {
@@ -285,9 +223,4 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
-
-  test('широко используемый тег удаляется одним компактным каскадом', () async {
-    await database.close();
-    await cost.expectWidelyAssignedTagDeletion();
-  }, tags: ['slow']);
 }

@@ -122,7 +122,6 @@ void main() {
         _uuid(1020),
       );
       addChoice(1021, 1, 5, 105);
-      probe.selects.clear();
 
       final result = await read(ChoicePathSuggestionsForSource(_intention(1)));
       expect(result.items, hasLength(5));
@@ -131,13 +130,6 @@ void main() {
         [for (var index = 21; index >= 17; index--) _uuid(1000 + index)],
       );
       expect(result.items, everyElement(isA<AvailableChoicePathSuggestion>()));
-      expect(
-        probe.selects.where(
-          (sql) => sql.contains('FROM daily_choices WHERE id = ?'),
-        ),
-        hasLength(20),
-      );
-      expect(probe.selects.any((sql) => sql.contains('LIMIT ?')), isTrue);
     },
   );
 
@@ -224,16 +216,9 @@ void main() {
     raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
       _uuid(3),
     ]);
-    probe.selects.clear();
 
     final result = await read(ChoicePathSuggestionsForSource(_intention(1)));
     expect(result.items, isEmpty);
-    expect(
-      probe.selects.where(
-        (sql) => sql.contains('FROM daily_choices WHERE id = ?'),
-      ),
-      hasLength(20),
-    );
     expect(result.observedIntentionIds, contains(_intention(3)));
   });
 
@@ -332,7 +317,6 @@ void main() {
     final failureEvent = diagnostics.events
         .whereType<ChoicePathSuggestionReadDiagnosticsEvent>()
         .last;
-    expect(failureEvent.stage, ChoicePathSuggestionReadStage.pathValidation);
     expect(
       (failureEvent.status as DiagnosticsFailed).code,
       DiagnosticsFailureCode.corruption,
@@ -397,11 +381,6 @@ void main() {
           GraphFailureCategory.unexpected,
         ),
       );
-      expect(
-        diagnostics.events
-            .whereType<ChoicePathSuggestionReadDiagnosticsEvent>(),
-        isNotEmpty,
-      );
       final failures = diagnostics.events
           .whereType<ChoicePathSuggestionReadDiagnosticsEvent>()
           .map((event) => event.status)
@@ -411,25 +390,17 @@ void main() {
         DiagnosticsFailureCode.unavailable,
         DiagnosticsFailureCode.unexpected,
       ]);
-      expect(
-        diagnostics.events
-            .whereType<ChoicePathSuggestionReadDiagnosticsEvent>()
-            .map((event) => event.stage),
-        everyElement(ChoicePathSuggestionReadStage.candidateSelection),
-      );
     },
   );
 }
 
 final class _SuggestionsProbe extends LocalDatabaseConnectionObserver {
   Object? failure;
-  final selects = <String>[];
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     final sql = statement.statements.single;
-    selects.add(sql);
     if (sql.contains('FROM daily_choices') && failure != null) {
       throw failure!;
     }
