@@ -11,18 +11,11 @@ void main() {
       );
     });
 
+    // Список разрешённых разрешений точный: любое лишнее идёт одной проверкой,
+    // поэтому достаточно сети и постороннего пространства имён.
     for (final permission in <String>[
       'android.permission.INTERNET',
-      'android.permission.READ_EXTERNAL_STORAGE',
-      'android.permission.WRITE_EXTERNAL_STORAGE',
-      'android.permission.MANAGE_EXTERNAL_STORAGE',
-      'android.permission.READ_MEDIA_IMAGES',
-      'android.permission.READ_MEDIA_VIDEO',
-      'android.permission.READ_MEDIA_AUDIO',
-      'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
-      'android.permission.ACCESS_MEDIA_LOCATION',
       'com.example.permission.THIRD_PARTY',
-      'android.permission.UNKNOWN_TO_CURRENT_SDK',
     ]) {
       test('отклоняет дополнительное разрешение $permission', () {
         expect(

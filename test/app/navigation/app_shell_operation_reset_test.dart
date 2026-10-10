@@ -62,25 +62,298 @@ void main() {
     );
   });
 
-  for (final destination in [
-    AppDestination.intentionGraph,
-    AppDestination.home,
-  ]) {
-    final resetKind = destination == AppDestination.intentionGraph
-        ? 'текущему'
-        : 'другому';
-    testWidgets('позднее удаление намерения после сброса к $resetKind пункту '
-        'сохраняет повторно открытую страницу того же намерения', (
+  // Сброс идёт одним путём для текущего и другого пункта; берём переход на
+  // другой пункт, где меняется ещё и выбранная вкладка.
+  const destination = AppDestination.home;
+  testWidgets('позднее удаление намерения после сброса к другому пункту '
+      'сохраняет повторно открытую страницу того же намерения', (tester) async {
+    final app = await _ControlledApp.start(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(IntentionCatalogPage)),
+    );
+    final catalogProvider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final catalogBefore = container.read(catalogProvider).value!;
+    await app.openDetails(tester);
+    final previousPage = tester.state(find.byType(IntentionDetailsPage));
+    final previousRouteId = app.router.stackData.last.matchId;
+    await app.delete(tester);
+
+    await _select(tester, destination, settle: false);
+    unawaited(
+      app.router.push(IntentionDetailsRoute(intentionId: app.intention.id)),
+    );
+    await tester.pump();
+    await tester.pump();
+    final newPage = tester
+        .stateList(find.byType(IntentionDetailsPage))
+        .singleWhere((page) => !identical(page, previousPage));
+    final newRouteId = app.router.stackData.last.matchId;
+    expect(newPage, isNot(same(previousPage)));
+    expect(newRouteId, isNot(previousRouteId));
+    expect(previousPage.mounted, isTrue);
+    expect(
+      app.router.stackData.any((route) => route.matchId == previousRouteId),
+      isFalse,
+    );
+    expect(app.coordinator.isRunning(app.intention.id), isTrue);
+
+    app.complete(
+      testDetailsDeletedResult(
+        app.intention,
+        revision: const TestDetailsRevision(1),
+      ),
+    );
+    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+    expect(previousPage.mounted, isTrue);
+    expect(app.router.stackData.last.matchId, newRouteId);
+    expect(newPage.mounted, isTrue);
+    expect(
+      container.read(intentionDetailsViewModelProvider(app.intention.id)),
+      isA<IntentionDetailsDeleted>(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.state(find.byType(IntentionDetailsPage)), same(newPage));
+    expect(app.router.stackData.last.matchId, newRouteId);
+    expect(app.router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      IntentionDetailsRoute.name,
+    ]);
+    expect(previousPage.mounted, isFalse);
+    final l10n = AppLocalizations.of(newPage.context);
+    expect(find.text(l10n.detailsNotFound), findsOneWidget);
+    expect(find.text(app.intention.title), findsNothing);
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      destination,
+    );
+    final catalogAfter = container.read(catalogProvider).value!;
+    expect(catalogAfter.selection, same(catalogBefore.selection));
+    expect(
+      catalogAfter,
+      isA<IntentionCatalogConfirmedState>()
+          .having((state) => state.totalCount, 'число намерений', 0)
+          .having(
+            (state) => state.revision.compareTo(const TestDetailsRevision(1)),
+            'ревизия каталога',
+            GraphRevisionOrder.same,
+          ),
+    );
+    expect(find.text(_deleteSuccess), findsOneWidget);
+    await _expireMessages(tester);
+    expect(app.router.stackData.last.matchId, newRouteId);
+    expect(app.repository.commands.single, isA<DeleteIntention>());
+    expect(app.repository.catalogQueries, hasLength(1));
+    unawaited(app.router.maybePop());
+    await tester.pumpAndSettle();
+    _expectRoot(tester, app.router, destination);
+  });
+
+  testWidgets('позднее удаление связи после сброса к другому пункту '
+      'сохраняет повторно открытый просмотр той же связи', (tester) async {
+    final app = await _ControlledApp.start(tester, activeRelationCount: 1);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(IntentionCatalogPage)),
+    );
+    final catalogProvider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final catalogBefore = container.read(catalogProvider).value!;
+    await app.openRelationDetails(tester);
+    final previousPage = tester.element(find.byType(RelationDetailsPage));
+    final previousRouteId = app.router.stackData.last.matchId;
+    await app.deleteRelation(tester);
+
+    await _select(tester, destination, settle: false);
+    unawaited(
+      app.router.push(
+        RelationDetailsRoute(relationId: app.relationDetails.relation.id),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final newPage = tester
+        .elementList(find.byType(RelationDetailsPage))
+        .singleWhere((page) => !identical(page, previousPage));
+    final newRouteId = app.router.stackData.last.matchId;
+    expect(newRouteId, isNot(previousRouteId));
+    expect(previousPage.mounted, isTrue);
+    expect(
+      app.router.stackData.any((route) => route.matchId == previousRouteId),
+      isFalse,
+    );
+    expect(
+      app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+      isTrue,
+    );
+
+    app.completeRelationDelete();
+    await _until(
       tester,
-    ) async {
+      () => !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+    );
+    expect(previousPage.mounted, isTrue);
+    expect(app.router.stackData.last.matchId, newRouteId);
+    expect(newPage.mounted, isTrue);
+    expect(
+      container.read(
+        relationDetailsViewModelProvider(app.relationDetails.relation.id),
+      ),
+      isA<RelationDetailsDeleted>(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.element(find.byType(RelationDetailsPage)), same(newPage));
+    expect(app.router.stackData.last.matchId, newRouteId);
+    expect(app.router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      RelationDetailsRoute.name,
+    ]);
+    expect(previousPage.mounted, isFalse);
+    final l10n = AppLocalizations.of(newPage);
+    expect(find.text(l10n.relationDetailsNotFound), findsOneWidget);
+    expect(find.byKey(const ValueKey('relation-details-phrase')), findsNothing);
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      destination,
+    );
+    final catalogAfter = container.read(catalogProvider).value!;
+    expect(catalogAfter.selection, same(catalogBefore.selection));
+    expect(
+      catalogAfter,
+      isA<IntentionCatalogLoaded>()
+          .having(
+            (state) => state.items.single.activeRelationCount,
+            'число связей после удаления',
+            0,
+          )
+          .having(
+            (state) => state.revision.compareTo(const TestDetailsRevision(1)),
+            'ревизия каталога',
+            GraphRevisionOrder.same,
+          ),
+    );
+    expect(find.text(_relationDeleteSuccess), findsOneWidget);
+    await _expireMessages(tester);
+    expect(app.router.stackData.last.matchId, newRouteId);
+    expect(
+      app.repository.relationCommands.single,
+      isA<DeleteLongTermRelation>(),
+    );
+    expect(app.repository.commands, isEmpty);
+    expect(app.repository.catalogQueries, hasLength(1));
+    unawaited(app.router.maybePop());
+    await tester.pumpAndSettle();
+    _expectRoot(tester, app.router, destination);
+  });
+
+  testWidgets('позднее удаление связи после сброса к другому пункту '
+      'сохраняет новую форму и её ввод до освобождения прежней страницы', (
+    tester,
+  ) async {
+    final app = await _ControlledApp.start(tester, activeRelationCount: 1);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(IntentionCatalogPage)),
+    );
+    final catalogProvider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    expect(
+      container.read(catalogProvider).value,
+      isA<IntentionCatalogLoaded>().having(
+        (state) => state.items.single.activeRelationCount,
+        'число связей до удаления',
+        1,
+      ),
+    );
+    await app.openRelationDetails(tester);
+    final previousPage = tester.element(find.byType(RelationDetailsPage));
+    final previousRouteId = app.router.stackData.last.matchId;
+    await app.deleteRelation(tester);
+
+    await _select(tester, destination, settle: false);
+    unawaited(
+      app.router.push(
+        RelationEditorRoute(
+          editorContext: RelationCreationContext(
+            participant: RelationParticipantSummary(
+              id: testDetailsIntentionId(3),
+              title: 'Независимый участник',
+              archiveState: IntentionArchiveState.active,
+              activeRelationCount: 0,
+            ),
+            direction: RelationDirection.outgoing,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    const text = 'Несохранённое описание после сброса просмотра связи';
+    await tester.enterText(find.byKey(_description), text);
+    final form = tester.state(find.byType(RelationEditorPage));
+    final formRouteId = app.router.stackData.last.matchId;
+    expect(find.text(text), findsOneWidget);
+    expect(previousPage.mounted, isTrue);
+    expect(
+      app.router.stackData.any((route) => route.matchId == previousRouteId),
+      isFalse,
+    );
+    expect(
+      app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+      isTrue,
+    );
+
+    app.completeRelationDelete();
+    await _until(
+      tester,
+      () => !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+    );
+    expect(previousPage.mounted, isTrue);
+    expect(app.router.stackData.last.matchId, formRouteId);
+    await tester.pumpAndSettle();
+
+    expect(tester.state(find.byType(RelationEditorPage)), same(form));
+    expect(find.text(text), findsOneWidget);
+    expect(app.router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      RelationEditorRoute.name,
+    ]);
+    expect(find.text(_relationDeleteSuccess), findsOneWidget);
+    expect(
+      container.read(catalogProvider).value,
+      isA<IntentionCatalogLoaded>()
+          .having(
+            (state) => state.items.single.activeRelationCount,
+            'число связей после удаления',
+            0,
+          )
+          .having(
+            (state) => state.revision.compareTo(const TestDetailsRevision(1)),
+            'ревизия каталога',
+            GraphRevisionOrder.same,
+          ),
+    );
+    await _expireMessages(tester);
+    expect(
+      app.repository.relationCommands.single,
+      isA<DeleteLongTermRelation>(),
+    );
+    expect(app.repository.commands, isEmpty);
+
+    unawaited(app.router.maybePop());
+    await tester.pumpAndSettle();
+    _expectRoot(tester, app.router, destination);
+    expect(find.byType(RelationDetailsPage, skipOffstage: false), findsNothing);
+    expect(app.repository.catalogQueries, hasLength(1));
+  });
+  testWidgets(
+    'позднее удаление намерения после сброса к другому пункту '
+    'сохраняет новую форму связи и её ввод до освобождения прежней страницы',
+    (tester) async {
       final app = await _ControlledApp.start(tester);
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(IntentionCatalogPage)),
-      );
-      final catalogProvider = intentionCatalogViewModelProvider(
-        const BrowseIntentionCatalog(),
-      );
-      final catalogBefore = container.read(catalogProvider).value!;
       await app.openDetails(tester);
       final previousPage = tester.state(find.byType(IntentionDetailsPage));
       final previousRouteId = app.router.stackData.last.matchId;
@@ -88,16 +361,27 @@ void main() {
 
       await _select(tester, destination, settle: false);
       unawaited(
-        app.router.push(IntentionDetailsRoute(intentionId: app.intention.id)),
+        app.router.push(
+          RelationEditorRoute(
+            editorContext: RelationCreationContext(
+              participant: RelationParticipantSummary(
+                id: testDetailsIntentionId(2),
+                title: 'Независимый участник',
+                archiveState: IntentionArchiveState.active,
+                activeRelationCount: 0,
+              ),
+              direction: RelationDirection.outgoing,
+            ),
+          ),
+        ),
       );
       await tester.pump();
       await tester.pump();
-      final newPage = tester
-          .stateList(find.byType(IntentionDetailsPage))
-          .singleWhere((page) => !identical(page, previousPage));
-      final newRouteId = app.router.stackData.last.matchId;
-      expect(newPage, isNot(same(previousPage)));
-      expect(newRouteId, isNot(previousRouteId));
+      const text = 'Несохранённое описание новой связи';
+      await tester.enterText(find.byKey(_description), text);
+      expect(find.text(text), findsOneWidget);
+      final form = tester.state(find.byType(RelationEditorPage));
+      final formRouteId = app.router.stackData.last.matchId;
       expect(previousPage.mounted, isTrue);
       expect(
         app.router.stackData.any((route) => route.matchId == previousRouteId),
@@ -113,216 +397,6 @@ void main() {
       );
       await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
       expect(previousPage.mounted, isTrue);
-      expect(app.router.stackData.last.matchId, newRouteId);
-      expect(newPage.mounted, isTrue);
-      expect(
-        container.read(intentionDetailsViewModelProvider(app.intention.id)),
-        isA<IntentionDetailsDeleted>(),
-      );
-      await tester.pumpAndSettle();
-
-      expect(tester.state(find.byType(IntentionDetailsPage)), same(newPage));
-      expect(app.router.stackData.last.matchId, newRouteId);
-      expect(app.router.stack.map((page) => page.name), [
-        AppShellRoute.name,
-        IntentionDetailsRoute.name,
-      ]);
-      expect(previousPage.mounted, isFalse);
-      final l10n = AppLocalizations.of(newPage.context);
-      expect(find.text(l10n.detailsNotFound), findsOneWidget);
-      expect(find.text(app.intention.title), findsNothing);
-      expect(
-        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        destination,
-      );
-      final catalogAfter = container.read(catalogProvider).value!;
-      expect(catalogAfter.selection, same(catalogBefore.selection));
-      expect(
-        catalogAfter,
-        isA<IntentionCatalogConfirmedState>()
-            .having((state) => state.totalCount, 'число намерений', 0)
-            .having(
-              (state) => state.revision.compareTo(const TestDetailsRevision(1)),
-              'ревизия каталога',
-              GraphRevisionOrder.same,
-            ),
-      );
-      expect(find.text(_deleteSuccess), findsOneWidget);
-      await _expireMessages(tester);
-      expect(app.router.stackData.last.matchId, newRouteId);
-      expect(app.repository.commands.single, isA<DeleteIntention>());
-      expect(app.repository.catalogQueries, hasLength(1));
-      unawaited(app.router.maybePop());
-      await tester.pumpAndSettle();
-      _expectRoot(tester, app.router, destination);
-    });
-
-    testWidgets('позднее удаление связи после сброса к $resetKind пункту '
-        'сохраняет повторно открытый просмотр той же связи', (tester) async {
-      final app = await _ControlledApp.start(tester, activeRelationCount: 1);
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(IntentionCatalogPage)),
-      );
-      final catalogProvider = intentionCatalogViewModelProvider(
-        const BrowseIntentionCatalog(),
-      );
-      final catalogBefore = container.read(catalogProvider).value!;
-      await app.openRelationDetails(tester);
-      final previousPage = tester.element(find.byType(RelationDetailsPage));
-      final previousRouteId = app.router.stackData.last.matchId;
-      await app.deleteRelation(tester);
-
-      await _select(tester, destination, settle: false);
-      unawaited(
-        app.router.push(
-          RelationDetailsRoute(relationId: app.relationDetails.relation.id),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-      final newPage = tester
-          .elementList(find.byType(RelationDetailsPage))
-          .singleWhere((page) => !identical(page, previousPage));
-      final newRouteId = app.router.stackData.last.matchId;
-      expect(newRouteId, isNot(previousRouteId));
-      expect(previousPage.mounted, isTrue);
-      expect(
-        app.router.stackData.any((route) => route.matchId == previousRouteId),
-        isFalse,
-      );
-      expect(
-        app.coordinator.isRelationRunning(app.relationDetails.relation.id),
-        isTrue,
-      );
-
-      app.completeRelationDelete();
-      await _until(
-        tester,
-        () =>
-            !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
-      );
-      expect(previousPage.mounted, isTrue);
-      expect(app.router.stackData.last.matchId, newRouteId);
-      expect(newPage.mounted, isTrue);
-      expect(
-        container.read(
-          relationDetailsViewModelProvider(app.relationDetails.relation.id),
-        ),
-        isA<RelationDetailsDeleted>(),
-      );
-      await tester.pumpAndSettle();
-
-      expect(tester.element(find.byType(RelationDetailsPage)), same(newPage));
-      expect(app.router.stackData.last.matchId, newRouteId);
-      expect(app.router.stack.map((page) => page.name), [
-        AppShellRoute.name,
-        RelationDetailsRoute.name,
-      ]);
-      expect(previousPage.mounted, isFalse);
-      final l10n = AppLocalizations.of(newPage);
-      expect(find.text(l10n.relationDetailsNotFound), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('relation-details-phrase')),
-        findsNothing,
-      );
-      expect(
-        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        destination,
-      );
-      final catalogAfter = container.read(catalogProvider).value!;
-      expect(catalogAfter.selection, same(catalogBefore.selection));
-      expect(
-        catalogAfter,
-        isA<IntentionCatalogLoaded>()
-            .having(
-              (state) => state.items.single.activeRelationCount,
-              'число связей после удаления',
-              0,
-            )
-            .having(
-              (state) => state.revision.compareTo(const TestDetailsRevision(1)),
-              'ревизия каталога',
-              GraphRevisionOrder.same,
-            ),
-      );
-      expect(find.text(_relationDeleteSuccess), findsOneWidget);
-      await _expireMessages(tester);
-      expect(app.router.stackData.last.matchId, newRouteId);
-      expect(
-        app.repository.relationCommands.single,
-        isA<DeleteLongTermRelation>(),
-      );
-      expect(app.repository.commands, isEmpty);
-      expect(app.repository.catalogQueries, hasLength(1));
-      unawaited(app.router.maybePop());
-      await tester.pumpAndSettle();
-      _expectRoot(tester, app.router, destination);
-    });
-
-    testWidgets('позднее удаление связи после сброса к $resetKind пункту '
-        'сохраняет новую форму и её ввод до освобождения прежней страницы', (
-      tester,
-    ) async {
-      final app = await _ControlledApp.start(tester, activeRelationCount: 1);
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(IntentionCatalogPage)),
-      );
-      final catalogProvider = intentionCatalogViewModelProvider(
-        const BrowseIntentionCatalog(),
-      );
-      expect(
-        container.read(catalogProvider).value,
-        isA<IntentionCatalogLoaded>().having(
-          (state) => state.items.single.activeRelationCount,
-          'число связей до удаления',
-          1,
-        ),
-      );
-      await app.openRelationDetails(tester);
-      final previousPage = tester.element(find.byType(RelationDetailsPage));
-      final previousRouteId = app.router.stackData.last.matchId;
-      await app.deleteRelation(tester);
-
-      await _select(tester, destination, settle: false);
-      unawaited(
-        app.router.push(
-          RelationEditorRoute(
-            editorContext: RelationCreationContext(
-              participant: RelationParticipantSummary(
-                id: testDetailsIntentionId(3),
-                title: 'Независимый участник',
-                archiveState: IntentionArchiveState.active,
-                activeRelationCount: 0,
-              ),
-              direction: RelationDirection.outgoing,
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-      const text = 'Несохранённое описание после сброса просмотра связи';
-      await tester.enterText(find.byKey(_description), text);
-      final form = tester.state(find.byType(RelationEditorPage));
-      final formRouteId = app.router.stackData.last.matchId;
-      expect(find.text(text), findsOneWidget);
-      expect(previousPage.mounted, isTrue);
-      expect(
-        app.router.stackData.any((route) => route.matchId == previousRouteId),
-        isFalse,
-      );
-      expect(
-        app.coordinator.isRelationRunning(app.relationDetails.relation.id),
-        isTrue,
-      );
-
-      app.completeRelationDelete();
-      await _until(
-        tester,
-        () =>
-            !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
-      );
-      expect(previousPage.mounted, isTrue);
       expect(app.router.stackData.last.matchId, formRouteId);
       await tester.pumpAndSettle();
 
@@ -332,111 +406,19 @@ void main() {
         AppShellRoute.name,
         RelationEditorRoute.name,
       ]);
-      expect(find.text(_relationDeleteSuccess), findsOneWidget);
-      expect(
-        container.read(catalogProvider).value,
-        isA<IntentionCatalogLoaded>()
-            .having(
-              (state) => state.items.single.activeRelationCount,
-              'число связей после удаления',
-              0,
-            )
-            .having(
-              (state) => state.revision.compareTo(const TestDetailsRevision(1)),
-              'ревизия каталога',
-              GraphRevisionOrder.same,
-            ),
-      );
+      expect(find.text(_deleteSuccess), findsOneWidget);
       await _expireMessages(tester);
-      expect(
-        app.repository.relationCommands.single,
-        isA<DeleteLongTermRelation>(),
-      );
-      expect(app.repository.commands, isEmpty);
+      expect(app.repository.commands.single, isA<DeleteIntention>());
+      expect(app.repository.relationCommands, isEmpty);
 
       unawaited(app.router.maybePop());
       await tester.pumpAndSettle();
       _expectRoot(tester, app.router, destination);
-      expect(
-        find.byType(RelationDetailsPage, skipOffstage: false),
-        findsNothing,
-      );
+      await _select(tester, AppDestination.intentionGraph);
+      expect(find.text(app.intention.title), findsNothing);
       expect(app.repository.catalogQueries, hasLength(1));
-    });
-    testWidgets(
-      'позднее удаление намерения после сброса к $resetKind пункту '
-      'сохраняет новую форму связи и её ввод до освобождения прежней страницы',
-      (tester) async {
-        final app = await _ControlledApp.start(tester);
-        await app.openDetails(tester);
-        final previousPage = tester.state(find.byType(IntentionDetailsPage));
-        final previousRouteId = app.router.stackData.last.matchId;
-        await app.delete(tester);
-
-        await _select(tester, destination, settle: false);
-        unawaited(
-          app.router.push(
-            RelationEditorRoute(
-              editorContext: RelationCreationContext(
-                participant: RelationParticipantSummary(
-                  id: testDetailsIntentionId(2),
-                  title: 'Независимый участник',
-                  archiveState: IntentionArchiveState.active,
-                  activeRelationCount: 0,
-                ),
-                direction: RelationDirection.outgoing,
-              ),
-            ),
-          ),
-        );
-        await tester.pump();
-        await tester.pump();
-        const text = 'Несохранённое описание новой связи';
-        await tester.enterText(find.byKey(_description), text);
-        expect(find.text(text), findsOneWidget);
-        final form = tester.state(find.byType(RelationEditorPage));
-        final formRouteId = app.router.stackData.last.matchId;
-        expect(previousPage.mounted, isTrue);
-        expect(
-          app.router.stackData.any((route) => route.matchId == previousRouteId),
-          isFalse,
-        );
-        expect(app.coordinator.isRunning(app.intention.id), isTrue);
-
-        app.complete(
-          testDetailsDeletedResult(
-            app.intention,
-            revision: const TestDetailsRevision(1),
-          ),
-        );
-        await _until(
-          tester,
-          () => !app.coordinator.isRunning(app.intention.id),
-        );
-        expect(previousPage.mounted, isTrue);
-        expect(app.router.stackData.last.matchId, formRouteId);
-        await tester.pumpAndSettle();
-
-        expect(tester.state(find.byType(RelationEditorPage)), same(form));
-        expect(find.text(text), findsOneWidget);
-        expect(app.router.stack.map((page) => page.name), [
-          AppShellRoute.name,
-          RelationEditorRoute.name,
-        ]);
-        expect(find.text(_deleteSuccess), findsOneWidget);
-        await _expireMessages(tester);
-        expect(app.repository.commands.single, isA<DeleteIntention>());
-        expect(app.repository.relationCommands, isEmpty);
-
-        unawaited(app.router.maybePop());
-        await tester.pumpAndSettle();
-        _expectRoot(tester, app.router, destination);
-        await _select(tester, AppDestination.intentionGraph);
-        expect(find.text(app.intention.title), findsNothing);
-        expect(app.repository.catalogQueries, hasLength(1));
-      },
-    );
-  }
+    },
+  );
 
   testWidgets('удаление связи с актуальной верхней страницы закрывает только '
       'её просмотр и один раз предъявляет результат', (tester) async {

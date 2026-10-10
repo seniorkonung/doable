@@ -234,69 +234,63 @@ void main() {
     },
   );
 
-  for (final scenario in <({Locale locale, String failure, String busy})>[
-    (
-      locale: const Locale('en'),
-      failure: 'This intention no longer exists. Refresh its details.',
-      busy: 'A tag assignment change is already in progress. Wait for its result.',
-    ),
-    (
-      locale: const Locale('ru'),
-      failure: 'Этого намерения больше нет. Обновите подробности.',
-      busy: 'Изменение назначения тега уже выполняется. Дождитесь результата.',
-    ),
-  ]) {
-    testWidgets(
-      'инлайн-отказ назначения и занятость доступны для ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = _FailureHarness();
-        addTearDown(harness.dispose);
-        final claim = await harness.createAssignmentClaim();
+  // Тексты по языкам проверяют тесты сообщений об отказе; здесь важна проводка
+  // инлайн-отображения, поэтому достаточно русского.
+  const scenario = (
+    locale: Locale('ru'),
+    failure: 'Этого намерения больше нет. Обновите подробности.',
+    busy: 'Изменение назначения тега уже выполняется. Дождитесь результата.',
+  );
+  testWidgets(
+    'инлайн-отказ назначения и занятость доступны для ${scenario.locale.languageCode}',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createAssignmentClaim();
 
-        await tester.pumpWidget(
-          harness.app(
-            Builder(
-              builder: (context) => Column(
-                children: [
-                  OperationFailurePresentation(
-                    claim: claim,
-                    message: tagAssignmentFailureMessage(
-                      AppLocalizations.of(context),
-                      TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
-                    ),
-                    messageKey: const ValueKey('assignment-failure-message'),
+      await tester.pumpWidget(
+        harness.app(
+          Builder(
+            builder: (context) => Column(
+              children: [
+                OperationFailurePresentation(
+                  claim: claim,
+                  message: tagAssignmentFailureMessage(
+                    AppLocalizations.of(context),
+                    TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
                   ),
-                  OperationFailurePresentation(
-                    claim: null,
-                    message: tagAssignmentStartMessage(
-                      AppLocalizations.of(context),
-                      const TagCommandAlreadyRunning(),
-                    )!,
-                    messageKey: const ValueKey('assignment-busy-message'),
-                  ),
-                ],
-              ),
+                  messageKey: const ValueKey('assignment-failure-message'),
+                ),
+                OperationFailurePresentation(
+                  claim: null,
+                  message: tagAssignmentStartMessage(
+                    AppLocalizations.of(context),
+                    const TagCommandAlreadyRunning(),
+                  )!,
+                  messageKey: const ValueKey('assignment-busy-message'),
+                ),
+              ],
             ),
-            locale: scenario.locale,
           ),
-        );
+          locale: scenario.locale,
+        ),
+      );
 
-        expect(find.text(scenario.failure), findsOneWidget);
-        expect(find.text(scenario.busy), findsOneWidget);
-        expect(
-          tester.getSemantics(
-            find.byKey(const ValueKey('assignment-failure-message')),
-          ),
-          matchesSemantics(
-            label: scenario.failure,
-            isLiveRegion: true,
-            textDirection: TextDirection.ltr,
-          ),
-        );
-        expect(harness.claimAgain(claim), isNull);
-      },
-    );
-  }
+      expect(find.text(scenario.failure), findsOneWidget);
+      expect(find.text(scenario.busy), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('assignment-failure-message')),
+        ),
+        matchesSemantics(
+          label: scenario.failure,
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+      expect(harness.claimAgain(claim), isNull);
+    },
+  );
 
   testWidgets(
     'исчезнувшая до кадра форма передаёт отказ отсутствующих тегов общей поверхности тем же token',

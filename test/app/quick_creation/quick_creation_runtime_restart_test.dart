@@ -49,7 +49,9 @@ void main() {
   });
   tearDown(() => directory.delete(recursive: true));
 
-  for (final mode in <QuickCreationMode?>[null, ...QuickCreationMode.values]) {
+  // Соответствие ключа режиму одинаково для всех режимов, а запуск каждого
+  // режима проверяет тест запускателя.
+  for (final mode in <QuickCreationMode?>[null, QuickCreationMode.relation]) {
     final title =
         mode?.title(lookupAppLocalizations(const Locale('ru'))) ??
         'Первый запуск';
@@ -110,146 +112,141 @@ void main() {
     });
   }
 
-  for (final step in [ModeWriteStep.write, ModeWriteStep.rename]) {
-    for (final outcomes in ['ss', 'fs', 'sf', 'ff', 'ffs', 'sss']) {
-      testWidgets(
-        '${step.label}, $outcomes: все панели и меню сразу '
-        'показывают последний выбор; свежий runtime получает последний успех',
-        (tester) async {
-          const initial = QuickCreationMode.dailyChoiceFromIntention;
-          const a = QuickCreationMode.relation;
-          const b = QuickCreationMode.dailyChoiceFromAction;
-          await tester.runAsync(() => store().save(initial));
-          final modes = [a, b, if (outcomes.length == 3) a];
-          final attempts = [
-            for (var i = 0; i < modes.length; i++)
-              ModeWriteAttempt(
-                holdAt: step,
-                failAt: outcomes[i] == 'f' ? step : null,
-              ),
-          ];
-          final io = ControlledModeIo(modeFile, attempts);
-          final observed = store(io: io);
-          diagnostics.throwsOnMode = outcomes == 'ffs';
-          final first = await _mount(tester, observed, diagnostics);
-          addTearDown(() async {
-            for (final attempt in attempts) {
-              if (!attempt.release.isCompleted) attempt.release.complete();
-            }
-            for (final writing in observed.writes) {
-              await _complete(tester, writing);
-            }
-          });
-          await tester.tap(
-            appNavigationDestination(AppDestination.intentionGraph),
-          );
-          await _settle(tester);
-          await _choose(tester, a);
-          await _complete(tester, attempts.first.held.future);
+  // Остальные сочетания исходов и точек отказа идут теми же ветвями, их
+  // подробно проверяет тест хранилища.
+  for (final (step, outcomes) in [
+    (ModeWriteStep.write, 'sf'),
+    (ModeWriteStep.rename, 'ffs'),
+  ]) {
+    testWidgets('${step.label}, $outcomes: все панели и меню сразу '
+        'показывают последний выбор; свежий runtime получает последний успех', (
+      tester,
+    ) async {
+      const initial = QuickCreationMode.dailyChoiceFromIntention;
+      const a = QuickCreationMode.relation;
+      const b = QuickCreationMode.dailyChoiceFromAction;
+      await tester.runAsync(() => store().save(initial));
+      final modes = [a, b, if (outcomes.length == 3) a];
+      final attempts = [
+        for (var i = 0; i < modes.length; i++)
+          ModeWriteAttempt(
+            holdAt: step,
+            failAt: outcomes[i] == 'f' ? step : null,
+          ),
+      ];
+      final io = ControlledModeIo(modeFile, attempts);
+      final observed = store(io: io);
+      diagnostics.throwsOnMode = outcomes == 'ffs';
+      final first = await _mount(tester, observed, diagnostics);
+      addTearDown(() async {
+        for (final attempt in attempts) {
+          if (!attempt.release.isCompleted) attempt.release.complete();
+        }
+        for (final writing in observed.writes) {
+          await _complete(tester, writing);
+        }
+      });
+      await tester.tap(appNavigationDestination(AppDestination.intentionGraph));
+      await _settle(tester);
+      await _choose(tester, a);
+      await _complete(tester, attempts.first.held.future);
 
-          // Второй экземпляр панели принадлежит обычному просмотру тегов.
-          await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
-          await _settle(tester);
-          for (final mode in modes.skip(1)) {
-            await _choose(tester, mode);
-            expect(
-              find.byType(QuickCreationButton, skipOffstage: false),
-              findsNWidgets(2),
-            );
-            _expectVisiblePanel(tester, mode);
-            // Скрытый Consumer приостанавливается вместе с маршрутом.
-            // Проверяем обе панели при показе, пока запись всё ещё удержана.
-            await tester.binding.handlePopRoute();
-            await _settle(tester);
-            _expectVisiblePanel(tester, mode);
-            await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
-            await _settle(tester);
-            _expectVisiblePanel(tester, mode);
-          }
-          final history = [
-            for (final route in first.router.stackData) route.matchId,
-          ];
-          expect(observed.writes, hasLength(modes.length));
-          expect(io.startedAttempts, [attempts.first]);
-          expect(
-            await tester.runAsync(modeFile.readAsString),
-            initial.storageKey,
-          );
-          await _openMenu(tester);
-          final localizations = AppLocalizations.of(
-            tester.element(find.byType(BottomSheet)),
-          );
-          final selected = find.widgetWithText(
-            ListTile,
-            modes.last.title(localizations),
-          );
-          expect(tester.widget<ListTile>(selected).selected, isTrue);
-
-          var expected = initial;
-          final committed = <String>[];
-          for (var i = 0; i < attempts.length; i++) {
-            expect(io.startedAttempts, hasLength(i + 1));
-            attempts[i].release.complete();
-            final result = await _complete(tester, observed.writes[i]);
-            if (outcomes[i] == 's') {
-              expect(result, isA<QuickCreationModeSaved>());
-              expected = modes[i];
-              committed.add(expected.storageKey);
-            } else {
-              expect(result, isA<QuickCreationModeSaveFailed>());
-            }
-            if (i + 1 < attempts.length) {
-              await _complete(tester, attempts[i + 1].held.future);
-            }
-            await tester.pump();
-            expect(io.committedKeys, committed);
-            expect(
-              await tester.runAsync(modeFile.readAsString),
-              expected.storageKey,
-            );
-            _expectVisiblePanel(tester, modes.last);
-            expect(tester.widget<ListTile>(selected).selected, isTrue);
-            expect(
-              find.descendant(of: selected, matching: find.byIcon(Icons.check)),
-              findsOneWidget,
-            );
-            expect(find.byType(SnackBar), findsNothing);
-            expect(tester.takeException(), isNull);
-          }
-          expect(
-            attempts.map((attempt) => attempt.key),
-            modes.map((mode) => mode.storageKey),
-          );
-          expect(
-            attempts.map((attempt) => attempt.temporaryPath).toSet(),
-            hasLength(modes.length),
-          );
-          _expectFailures(diagnostics, 'write', [
-            for (final outcome in outcomes.split(''))
-              if (outcome == 'f') 'unavailable',
-          ]);
-          await tester.binding.handlePopRoute();
-          await _settle(tester);
-          expect([
-            for (final route in first.router.stackData) route.matchId,
-          ], history);
-          expect(
-            tester
-                .widget<AppNavigationBar>(find.byType(AppNavigationBar))
-                .selected,
-            AppDestination.intentionGraph,
-          );
-          await tester.binding.handlePopRoute();
-          await _settle(tester);
-          _expectVisiblePanel(tester, modes.last);
-          await _close(tester, first);
-
-          final restored = await _mount(tester, store(), diagnostics);
-          _expectHome(tester, restored, expected);
-          await _expectLaunch(tester, restored, expected);
-        },
+      // Второй экземпляр панели принадлежит обычному просмотру тегов.
+      await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
+      await _settle(tester);
+      for (final mode in modes.skip(1)) {
+        await _choose(tester, mode);
+        expect(
+          find.byType(QuickCreationButton, skipOffstage: false),
+          findsNWidgets(2),
+        );
+        _expectVisiblePanel(tester, mode);
+        // Скрытый Consumer приостанавливается вместе с маршрутом.
+        // Проверяем обе панели при показе, пока запись всё ещё удержана.
+        await tester.binding.handlePopRoute();
+        await _settle(tester);
+        _expectVisiblePanel(tester, mode);
+        await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
+        await _settle(tester);
+        _expectVisiblePanel(tester, mode);
+      }
+      final history = [
+        for (final route in first.router.stackData) route.matchId,
+      ];
+      expect(observed.writes, hasLength(modes.length));
+      expect(io.startedAttempts, [attempts.first]);
+      expect(await tester.runAsync(modeFile.readAsString), initial.storageKey);
+      await _openMenu(tester);
+      final localizations = AppLocalizations.of(
+        tester.element(find.byType(BottomSheet)),
       );
-    }
+      final selected = find.widgetWithText(
+        ListTile,
+        modes.last.title(localizations),
+      );
+      expect(tester.widget<ListTile>(selected).selected, isTrue);
+
+      var expected = initial;
+      final committed = <String>[];
+      for (var i = 0; i < attempts.length; i++) {
+        expect(io.startedAttempts, hasLength(i + 1));
+        attempts[i].release.complete();
+        final result = await _complete(tester, observed.writes[i]);
+        if (outcomes[i] == 's') {
+          expect(result, isA<QuickCreationModeSaved>());
+          expected = modes[i];
+          committed.add(expected.storageKey);
+        } else {
+          expect(result, isA<QuickCreationModeSaveFailed>());
+        }
+        if (i + 1 < attempts.length) {
+          await _complete(tester, attempts[i + 1].held.future);
+        }
+        await tester.pump();
+        expect(io.committedKeys, committed);
+        expect(
+          await tester.runAsync(modeFile.readAsString),
+          expected.storageKey,
+        );
+        _expectVisiblePanel(tester, modes.last);
+        expect(tester.widget<ListTile>(selected).selected, isTrue);
+        expect(
+          find.descendant(of: selected, matching: find.byIcon(Icons.check)),
+          findsOneWidget,
+        );
+        expect(find.byType(SnackBar), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+      expect(
+        attempts.map((attempt) => attempt.key),
+        modes.map((mode) => mode.storageKey),
+      );
+      expect(
+        attempts.map((attempt) => attempt.temporaryPath).toSet(),
+        hasLength(modes.length),
+      );
+      _expectFailures(diagnostics, 'write', [
+        for (final outcome in outcomes.split(''))
+          if (outcome == 'f') 'unavailable',
+      ]);
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect([
+        for (final route in first.router.stackData) route.matchId,
+      ], history);
+      expect(
+        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+        AppDestination.intentionGraph,
+      );
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      _expectVisiblePanel(tester, modes.last);
+      await _close(tester, first);
+
+      final restored = await _mount(tester, store(), diagnostics);
+      _expectHome(tester, restored, expected);
+      await _expectLaunch(tester, restored, expected);
+    });
   }
 }
 

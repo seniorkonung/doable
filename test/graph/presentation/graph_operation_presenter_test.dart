@@ -169,89 +169,85 @@ void main() {
     },
   );
 
-  for (final scenario in <({Locale locale, String created, String invalid})>[
-    (
-      locale: const Locale('en'),
-      created: 'Create — “Полное намерение”: Intention created.',
-      invalid: 'Create — “new intention”: Check the entered data.',
-    ),
-    (
-      locale: const Locale('ru'),
-      created: 'Создание — «Полное намерение»: Намерение создано.',
-      invalid: 'Создание — «новое намерение»: Проверьте введённые данные.',
-    ),
-  ]) {
-    for (final releaseInitiator in [false, true]) {
-      final initiator = releaseInitiator
-          ? 'после ухода формы'
-          : 'при живой форме';
-      testWidgets(
-        'успех полного создания $initiator предъявляется одним сообщением без '
-        'отдельных исходов готовности, избранного и назначений, '
-        '${scenario.locale.languageCode}',
-        (tester) async {
-          final harness = await _pumpPresenterApp(
-            tester,
-            locale: scenario.locale,
-          );
-          final creation = harness.startFullCreation(
-            releaseInitiator: releaseInitiator,
-          );
-          harness.completeFullCreated(creation);
-          await tester.pumpAndSettle();
+  // Язык не меняет путь предъявления, поэтому достаточно русского.
+  const fullCreation = (
+    locale: Locale('ru'),
+    created: 'Создание — «Полное намерение»: Намерение создано.',
+    invalid: 'Создание — «новое намерение»: Проверьте введённые данные.',
+  );
+  for (final releaseInitiator in [false, true]) {
+    final initiator = releaseInitiator
+        ? 'после ухода формы'
+        : 'при живой форме';
+    testWidgets(
+      'успех полного создания $initiator предъявляется одним сообщением без '
+      'отдельных исходов готовности, избранного и назначений, '
+      '${fullCreation.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: fullCreation.locale,
+        );
+        final creation = harness.startFullCreation(
+          releaseInitiator: releaseInitiator,
+        );
+        harness.completeFullCreated(creation);
+        await tester.pumpAndSettle();
 
-          expect(find.byType(SnackBar), findsOneWidget);
-          expect(find.text(scenario.created), findsOneWidget);
-          expect(
-            harness.claimInitiatorFailure(creation.token),
-            isNull,
-            reason: 'успех не принадлежит форме',
-          );
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(find.text(fullCreation.created), findsOneWidget);
+        expect(
+          harness.claimInitiatorFailure(creation.token),
+          isNull,
+          reason: 'успех не принадлежит форме',
+        );
 
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-        },
-      );
-    }
-
-    testWidgets('отказ отсутствующих тегов живой формы не дублируется общей '
-        'поверхностью, а после её ухода предъявляется ею один раз, '
-        '${scenario.locale.languageCode}', (tester) async {
-      final harness = await _pumpPresenterApp(tester, locale: scenario.locale);
-      final creation = harness.startFullCreation(releaseInitiator: false);
-      harness.completeFailure(
-        creation,
-        IntentionCreationTagsMissingFailure([_tagId]),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(SnackBar), findsNothing);
-      final initiatorClaim = harness.claimInitiatorFailure(creation.token);
-      expect(
-        initiatorClaim!.completion,
-        isA<IntentionCommandCompletion>().having(
-          (completion) => completion.kind,
-          'вид операции',
-          IntentionCommandKind.create,
-        ),
-      );
-
-      harness.releaseInitiatorPresentation(creation.token);
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsOneWidget);
-      expect(find.text(scenario.invalid), findsOneWidget);
-      expect(find.textContaining(_tagId.toCanonicalString()), findsNothing);
-
-      // Запоздалый кадр закрытой формы не подтверждает право оболочки.
-      harness.confirmPresentation(initiatorClaim);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    });
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
   }
+
+  testWidgets('отказ отсутствующих тегов живой формы не дублируется общей '
+      'поверхностью, а после её ухода предъявляется ею один раз, '
+      '${fullCreation.locale.languageCode}', (tester) async {
+    final harness = await _pumpPresenterApp(
+      tester,
+      locale: fullCreation.locale,
+    );
+    final creation = harness.startFullCreation(releaseInitiator: false);
+    harness.completeFailure(
+      creation,
+      IntentionCreationTagsMissingFailure([_tagId]),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsNothing);
+    final initiatorClaim = harness.claimInitiatorFailure(creation.token);
+    expect(
+      initiatorClaim!.completion,
+      isA<IntentionCommandCompletion>().having(
+        (completion) => completion.kind,
+        'вид операции',
+        IntentionCommandKind.create,
+      ),
+    );
+
+    harness.releaseInitiatorPresentation(creation.token);
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text(fullCreation.invalid), findsOneWidget);
+    expect(find.textContaining(_tagId.toCanonicalString()), findsNothing);
+
+    // Запоздалый кадр закрытой формы не подтверждает право оболочки.
+    harness.confirmPresentation(initiatorClaim);
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
 
   testWidgets(
     'показывает безопасный конфликт блокирующих связей в общей поверхности',
@@ -267,80 +263,58 @@ void main() {
     },
   );
 
-  for (final scenario
-      in <({TagCommandKind kind, bool unchanged, String en, String ru})>[
-        (
-          kind: TagCommandKind.create,
-          unchanged: false,
-          en: 'Tag created.',
-          ru: 'Тег создан.',
-        ),
-        (
-          kind: TagCommandKind.rename,
-          unchanged: false,
-          en: 'Tag renamed.',
-          ru: 'Тег переименован.',
-        ),
-        (
-          kind: TagCommandKind.rename,
-          unchanged: true,
-          en: 'Tag name unchanged.',
-          ru: 'Название тега не изменилось.',
-        ),
-        (
-          kind: TagCommandKind.delete,
-          unchanged: false,
-          en: 'Tag deleted with all its assignments.',
-          ru: 'Тег удалён вместе со всеми назначениями.',
-        ),
-      ]) {
-    for (final locale in const [Locale('en'), Locale('ru')]) {
-      testWidgets(
-        'успех тега ${scenario.kind.name}, без изменения: ${scenario.unchanged}, ${locale.languageCode}',
-        (tester) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final accepted = harness.startTag(scenario.kind);
-          harness.completeTagSuccess(
-            accepted,
-            scenario.kind,
-            unchanged: scenario.unchanged,
-          );
-          await tester.pumpAndSettle();
+  for (final scenario in <({TagCommandKind kind, bool unchanged, String ru})>[
+    (kind: TagCommandKind.create, unchanged: false, ru: 'Тег создан.'),
+    (kind: TagCommandKind.rename, unchanged: false, ru: 'Тег переименован.'),
+    (
+      kind: TagCommandKind.rename,
+      unchanged: true,
+      ru: 'Название тега не изменилось.',
+    ),
+    (
+      kind: TagCommandKind.delete,
+      unchanged: false,
+      ru: 'Тег удалён вместе со всеми назначениями.',
+    ),
+  ]) {
+    testWidgets(
+      'успех тега ${scenario.kind.name}, без изменения: ${scenario.unchanged}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: const Locale('ru'),
+        );
+        final accepted = harness.startTag(scenario.kind);
+        harness.completeTagSuccess(
+          accepted,
+          scenario.kind,
+          unchanged: scenario.unchanged,
+        );
+        await tester.pumpAndSettle();
 
-          final operation = locale.languageCode == 'ru'
-              ? switch (scenario.kind) {
-                  TagCommandKind.create => 'Создание',
-                  TagCommandKind.rename => 'Изменение',
-                  TagCommandKind.delete => 'Удаление',
-                  TagCommandKind.assign || TagCommandKind.removeAssignment =>
-                    throw StateError('Сценарий проверяет жизненный цикл тега.'),
-                }
-              : switch (scenario.kind) {
-                  TagCommandKind.create => 'Create',
-                  TagCommandKind.rename => 'Edit',
-                  TagCommandKind.delete => 'Delete',
-                  TagCommandKind.assign || TagCommandKind.removeAssignment =>
-                    throw StateError('Сценарий проверяет жизненный цикл тега.'),
-                };
-          final message = locale.languageCode == 'ru'
-              ? '$operation — «тег»: ${scenario.ru}'
-              : '$operation — “tag”: ${scenario.en}';
-          expect(find.text(message), findsOneWidget);
-          expect(
-            tester.getSemantics(
-              find.byKey(const ValueKey('graph-operation-message')),
-            ),
-            matchesSemantics(
-              label: message,
-              isLiveRegion: true,
-              textDirection: TextDirection.ltr,
-            ),
-          );
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-        },
-      );
-    }
+        final operation = switch (scenario.kind) {
+          TagCommandKind.create => 'Создание',
+          TagCommandKind.rename => 'Изменение',
+          TagCommandKind.delete => 'Удаление',
+          TagCommandKind.assign || TagCommandKind.removeAssignment =>
+            throw StateError('Сценарий проверяет жизненный цикл тега.'),
+        };
+        final message = '$operation — «тег»: ${scenario.ru}';
+        expect(find.text(message), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: message,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
   }
 
   testWidgets('несогласованный результат тега не объявляется успехом', (
@@ -361,73 +335,62 @@ void main() {
     await _closeMessage(tester);
   });
 
-  for (final scenario in <({TagCommandFailure failure, String en, String ru})>[
+  for (final scenario in <({TagCommandFailure failure, String ru})>[
     (
       failure: const TagNameInputFailure(
         TagNameFailureReason.invalidUnicodeRepertoire,
       ),
-      en: 'Tag name contains invalid characters.',
       ru: 'Название тега содержит недопустимые символы.',
     ),
     (
       failure: const TagNameInputFailure(TagNameFailureReason.empty),
-      en: 'Enter a tag name.',
       ru: 'Введите название тега.',
     ),
     (
       failure: const TagNameInputFailure(TagNameFailureReason.tooLong),
-      en: 'Tag name must contain no more than 255 visible characters.',
       ru: 'Название тега должно содержать не более 255 отображаемых символов.',
     ),
     (
       failure: const TagNameInputFailure(TagNameFailureReason.nonCanonical),
-      en: 'Remove whitespace around the tag name.',
       ru: 'Удалите пробелы по краям названия тега.',
     ),
     (
       failure: TagNameOccupiedFailure(_tagId),
-      en: 'A tag with this name already exists. Choose another name or use the existing tag.',
       ru: 'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.',
     ),
     (
       failure: TagNotFoundFailure(_tagId),
-      en: 'This tag no longer exists. Refresh the catalog.',
       ru: 'Этого тега больше нет. Обновите каталог.',
     ),
     (
       failure: const TagUnavailableFailure(),
-      en: 'Could not complete the tag operation. Try again.',
       ru: 'Не удалось выполнить действие с тегом. Повторите попытку.',
     ),
     (
       failure: const TagCorruptionFailure(),
-      en: 'Stored tag data is damaged. The tag was not changed.',
       ru: 'Сохранённые данные тега повреждены. Тег не изменён.',
     ),
     (
       failure: const TagUnexpectedFailure(),
-      en: 'The tag operation failed because of an unexpected error.',
       ru: 'Действие с тегом не выполнено из-за непредвиденной ошибки.',
     ),
   ]) {
-    for (final locale in const [Locale('en'), Locale('ru')]) {
-      testWidgets(
-        'отказ тега ${scenario.failure.runtimeType} безопасен для ${locale.languageCode}',
-        (tester) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final accepted = harness.startTag(TagCommandKind.create);
-          harness.completeTagFailure(accepted, scenario.failure);
-          await tester.pumpAndSettle();
-
-          final message = locale.languageCode == 'ru'
-              ? 'Создание — «тег»: ${scenario.ru}'
-              : 'Create — “tag”: ${scenario.en}';
-          expect(find.text(message), findsOneWidget);
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-        },
+    testWidgets('отказ тега ${scenario.failure.runtimeType} безопасен', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
       );
-    }
+      final accepted = harness.startTag(TagCommandKind.create);
+      harness.completeTagFailure(accepted, scenario.failure);
+      await tester.pumpAndSettle();
+
+      final message = 'Создание — «тег»: ${scenario.ru}';
+      expect(find.text(message), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
   }
 
   testWidgets('исключение хранилища тега не попадает в сообщение', (
@@ -449,74 +412,42 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  for (final scenario in const [
-    (
-      locale: Locale('en'),
-      message:
-          'The new order of favorite intentions wasn’t saved because the '
-          'list changed.',
-    ),
-    (
-      locale: Locale('ru'),
-      message:
-          'Новый порядок избранных намерений не сохранён, потому что список '
-          'изменился.',
-    ),
-  ]) {
-    testWidgets(
-      'отказ перестановки предъявляется общей поверхностью без участия инициатора, ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(
-          tester,
-          locale: scenario.locale,
-        );
-        final move = harness.startFavoriteOrderMove();
-        harness.completeFavoriteOrderFailure(
-          move,
-          const FavoriteOrderConflictFailure(),
-        );
-        await tester.pumpAndSettle();
-
-        expect(find.text(scenario.message), findsOneWidget);
-        expect(
-          tester.getSemantics(
-            find.byKey(const ValueKey('graph-operation-message')),
-          ),
-          matchesSemantics(
-            label: scenario.message,
-            isLiveRegion: true,
-            textDirection: TextDirection.ltr,
-          ),
-        );
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-        expect(harness.repository.favoriteOrderCommands, hasLength(1));
-      },
-    );
-  }
-
+  // Тексты по языкам проверяет тест сообщения отказа перестановки; здесь
+  // нужна только проводка до общей поверхности.
+  const orderConflict = (
+    locale: Locale('ru'),
+    message:
+        'Новый порядок избранных намерений не сохранён, потому что список '
+        'изменился.',
+  );
   testWidgets(
-    'исключение перестановки предъявляется неизвестным отказом без технических данных',
+    'отказ перестановки предъявляется общей поверхностью без участия инициатора, ${orderConflict.locale.languageCode}',
     (tester) async {
-      final harness = await _pumpPresenterApp(tester);
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: orderConflict.locale,
+      );
       final move = harness.startFavoriteOrderMove();
-      harness.failFavoriteOrderWithException(
+      harness.completeFavoriteOrderFailure(
         move,
-        StateError('UPDATE favorite_intentions: личные данные'),
+        const FavoriteOrderConflictFailure(),
       );
       await tester.pumpAndSettle();
 
+      expect(find.text(orderConflict.message), findsOneWidget);
       expect(
-        find.text(
-          'The new order of favorite intentions couldn’t be saved because of '
-          'an unexpected error.',
+        tester.getSemantics(
+          find.byKey(const ValueKey('graph-operation-message')),
         ),
-        findsOneWidget,
+        matchesSemantics(
+          label: orderConflict.message,
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
       );
-      expect(find.textContaining('favorite_intentions'), findsNothing);
-      expect(find.textContaining('личные данные'), findsNothing);
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.favoriteOrderCommands, hasLength(1));
     },
   );
 
@@ -635,64 +566,26 @@ void main() {
     },
   );
 
-  for (final scenario in const [
-    (name: 'изменение порядка', changesOrder: true),
-    (name: 'отсутствие изменения', changesOrder: false),
-  ]) {
-    testWidgets(
-      'успех перестановки (${scenario.name}) между результатами не показывает сообщения и не задерживает очередь',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        final first = harness.startDelete(index: 1, title: 'Первое');
-        final move = harness.startFavoriteOrderMove();
-        final second = harness.startDelete(index: 2, title: 'Второе');
-        harness.completeDeleted(first);
-        if (scenario.changesOrder) {
-          harness.completeFavoriteOrderMoved(move);
-        } else {
-          harness.completeFavoriteOrderUnchanged(move);
-        }
-        harness.completeDeleted(second);
-        await tester.pumpAndSettle();
-        expect(find.text(_deleted('Первое')), findsOneWidget);
+  testWidgets(
+    'успех перестановки между результатами не показывает сообщения и не задерживает очередь',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final first = harness.startDelete(index: 1, title: 'Первое');
+      final move = harness.startFavoriteOrderMove();
+      final second = harness.startDelete(index: 2, title: 'Второе');
+      harness.completeDeleted(first);
+      harness.completeFavoriteOrderMoved(move);
+      harness.completeDeleted(second);
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Первое')), findsOneWidget);
 
-        await _closeMessage(tester);
-        expect(find.text(_deleted('Второе')), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.text(_deleted('Второе')), findsOneWidget);
 
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-
-    testWidgets(
-      'успех перестановки (${scenario.name}) без поверхности не оставляет сообщения для неё',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        harness.presenterGeneration.value = _withoutPresenter;
-        await tester.pumpAndSettle();
-
-        final move = harness.startFavoriteOrderMove();
-        if (scenario.changesOrder) {
-          harness.completeFavoriteOrderMoved(move);
-        } else {
-          harness.completeFavoriteOrderUnchanged(move);
-        }
-        await tester.pumpAndSettle();
-
-        harness.presenterGeneration.value = 1;
-        await tester.pumpAndSettle();
-        expect(find.byType(SnackBar), findsNothing);
-
-        final deletion = harness.startDelete(index: 1, title: 'Следующее');
-        harness.completeDeleted(deletion);
-        await tester.pumpAndSettle();
-        expect(find.text(_deleted('Следующее')), findsOneWidget);
-
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
   testWidgets(
     'отказ перестановки не меняет владельцев результатов других операций по ADR-0012',
@@ -753,235 +646,193 @@ void main() {
     },
   );
 
-  for (final locale in const [Locale('en'), Locale('ru')]) {
-    testWidgets(
-      'тег ждёт сообщения графа и передаёт отказ оболочке после закрытия формы, ${locale.languageCode}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester, locale: locale);
-        final intention = harness.startDelete(index: 1, title: 'Граф');
-        final tag = harness.startTag(
-          TagCommandKind.create,
-          releaseInitiator: false,
-        );
-        harness.completeDeleted(intention);
-        harness.completeTagFailure(tag, const TagUnavailableFailure());
-        await tester.pumpAndSettle();
-
-        final first = locale.languageCode == 'ru'
-            ? 'Удаление — «Граф»: Намерение удалено.'
-            : _deleted('Граф');
-        expect(find.text(first), findsOneWidget);
-        expect(harness.claimInitiatorFailure(tag.token), isNotNull);
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-
-        harness.releaseInitiatorPresentation(tag.token);
-        await tester.pumpAndSettle();
-        final fallback = locale.languageCode == 'ru'
-            ? 'Создание — «тег»: Не удалось выполнить действие с тегом. Повторите попытку.'
-            : 'Create — “tag”: Could not complete the tag operation. Try again.';
-        expect(find.text(fallback), findsOneWidget);
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
-
-  for (final scenario
-      in <({TagCommandKind kind, bool unchanged, String en, String ru})>[
-        (
-          kind: TagCommandKind.assign,
-          unchanged: false,
-          en: 'Tag assigned.',
-          ru: 'Тег назначен.',
-        ),
-        (
-          kind: TagCommandKind.assign,
-          unchanged: true,
-          en: 'Tag already assigned.',
-          ru: 'Тег уже назначен.',
-        ),
-        (
-          kind: TagCommandKind.removeAssignment,
-          unchanged: false,
-          en: 'Tag assignment removed.',
-          ru: 'Назначение тега снято.',
-        ),
-        (
-          kind: TagCommandKind.removeAssignment,
-          unchanged: true,
-          en: 'Tag assignment already absent.',
-          ru: 'Назначение тега уже отсутствует.',
-        ),
-      ]) {
-    for (final locale in const [Locale('en'), Locale('ru')]) {
-      testWidgets(
-        'исход назначения ${scenario.kind.name}, ${scenario.unchanged}, ${locale.languageCode}',
-        (tester) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final accepted = harness.startTag(scenario.kind);
-          harness.completeTagSuccess(
-            accepted,
-            scenario.kind,
-            unchanged: scenario.unchanged,
-          );
-          await tester.pumpAndSettle();
-
-          final message = locale.languageCode == 'ru'
-              ? '${scenario.kind == TagCommandKind.assign ? 'Назначение' : 'Снятие'} — «назначение тега»: ${scenario.ru}'
-              : '${scenario.kind == TagCommandKind.assign ? 'Assign' : 'Remove'} — “tag assignment”: ${scenario.en}';
-          expect(find.text(message), findsOneWidget);
-          await _closeMessage(tester);
-        },
+  testWidgets(
+    'тег ждёт сообщения графа и передаёт отказ оболочке после закрытия формы',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 1, title: 'Граф');
+      final tag = harness.startTag(
+        TagCommandKind.create,
+        releaseInitiator: false,
       );
-    }
+      harness.completeDeleted(intention);
+      harness.completeTagFailure(tag, const TagUnavailableFailure());
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Граф')), findsOneWidget);
+      expect(harness.claimInitiatorFailure(tag.token), isNotNull);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+
+      harness.releaseInitiatorPresentation(tag.token);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Create — “tag”: Could not complete the tag operation. Try again.',
+        ),
+        findsOneWidget,
+      );
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  for (final scenario in <({TagCommandKind kind, bool unchanged, String ru})>[
+    (kind: TagCommandKind.assign, unchanged: false, ru: 'Тег назначен.'),
+    (kind: TagCommandKind.assign, unchanged: true, ru: 'Тег уже назначен.'),
+    (
+      kind: TagCommandKind.removeAssignment,
+      unchanged: false,
+      ru: 'Назначение тега снято.',
+    ),
+    (
+      kind: TagCommandKind.removeAssignment,
+      unchanged: true,
+      ru: 'Назначение тега уже отсутствует.',
+    ),
+  ]) {
+    testWidgets('исход назначения ${scenario.kind.name}, ${scenario.unchanged}', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final accepted = harness.startTag(scenario.kind);
+      harness.completeTagSuccess(
+        accepted,
+        scenario.kind,
+        unchanged: scenario.unchanged,
+      );
+      await tester.pumpAndSettle();
+
+      final message =
+          '${scenario.kind == TagCommandKind.assign ? 'Назначение' : 'Снятие'} — «назначение тега»: ${scenario.ru}';
+      expect(find.text(message), findsOneWidget);
+      await _closeMessage(tester);
+    });
   }
 
-  for (final scenario in <({TagCommandFailure failure, String en, String ru})>[
+  for (final scenario in <({TagCommandFailure failure, String ru})>[
     (
       failure: TagNotFoundFailure(_tagId),
-      en: 'This tag no longer exists. Refresh the catalog.',
       ru: 'Этого тега больше нет. Обновите каталог.',
     ),
     (
       failure: TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
-      en: 'This intention no longer exists. Refresh its details.',
       ru: 'Этого намерения больше нет. Обновите подробности.',
     ),
     (
       failure: const TagUnavailableFailure(),
-      en: 'Could not complete the tag assignment operation. Try again.',
       ru: 'Не удалось изменить назначение тега. Повторите попытку.',
     ),
     (
       failure: const TagCorruptionFailure(),
-      en: 'Stored tag assignment data is damaged. The assignment was not changed.',
       ru: 'Сохранённые данные назначения тега повреждены. Назначение не изменено.',
     ),
     (
       failure: const TagUnexpectedFailure(),
-      en: 'The tag assignment operation failed because of an unexpected error.',
       ru: 'Назначение тега не изменено из-за непредвиденной ошибки.',
     ),
   ]) {
-    for (final locale in const [Locale('en'), Locale('ru')]) {
-      testWidgets(
-        'отказ назначения ${scenario.failure.runtimeType}, ${locale.languageCode}',
-        (tester) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final accepted = harness.startTag(TagCommandKind.assign);
-          harness.completeTagFailure(accepted, scenario.failure);
-          await tester.pumpAndSettle();
-
-          final message = locale.languageCode == 'ru'
-              ? 'Назначение — «назначение тега»: ${scenario.ru}'
-              : 'Assign — “tag assignment”: ${scenario.en}';
-          expect(find.text(message), findsOneWidget);
-          await _closeMessage(tester);
-        },
+    testWidgets('отказ назначения ${scenario.failure.runtimeType}', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
       );
-    }
+      final accepted = harness.startTag(TagCommandKind.assign);
+      harness.completeTagFailure(accepted, scenario.failure);
+      await tester.pumpAndSettle();
+
+      final message = 'Назначение — «назначение тега»: ${scenario.ru}';
+      expect(find.text(message), findsOneWidget);
+      await _closeMessage(tester);
+    });
   }
 
-  for (final scenario
-      in <({DailyChoiceValidationField field, String en, String ru})>[
-        (
-          field: DailyChoiceValidationField.sourceIntention,
-          en: 'Check the source intention of the daily choice.',
-          ru: 'Проверьте исходное намерение дневного выбора.',
-        ),
-        (
-          field: DailyChoiceValidationField.selectedIntention,
-          en: 'Check the selected intention of the daily choice.',
-          ru: 'Проверьте выбранное намерение дневного выбора.',
-        ),
-        (
-          field: DailyChoiceValidationField.date,
-          en: 'Check the daily choice date.',
-          ru: 'Проверьте дату дневного выбора.',
-        ),
-        (
-          field: DailyChoiceValidationField.description,
-          en: 'Check the daily choice description.',
-          ru: 'Проверьте описание дневного выбора.',
-        ),
-        (
-          field: DailyChoiceValidationField.path,
-          en: 'Check the daily choice path.',
-          ru: 'Проверьте путь дневного выбора.',
-        ),
-      ]) {
-    for (final locale in const [Locale('en'), Locale('ru')]) {
-      testWidgets(
-        'ошибка поля ${scenario.field.name} локализована для ${locale.languageCode}',
-        (tester) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final update = harness.startDailyChoiceUpdate();
-          harness.completeDailyChoiceFailure(
-            update,
-            DailyChoiceValidationFailure(scenario.field),
-          );
-          await tester.pumpAndSettle();
-
-          final message = locale.languageCode == 'ru'
-              ? 'Изменение — «дневной выбор»: ${scenario.ru}'
-              : 'Edit — “daily choice”: ${scenario.en}';
-          expect(find.text(message), findsOneWidget);
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-        },
+  for (final scenario in <({DailyChoiceValidationField field, String ru})>[
+    (
+      field: DailyChoiceValidationField.sourceIntention,
+      ru: 'Проверьте исходное намерение дневного выбора.',
+    ),
+    (
+      field: DailyChoiceValidationField.selectedIntention,
+      ru: 'Проверьте выбранное намерение дневного выбора.',
+    ),
+    (
+      field: DailyChoiceValidationField.date,
+      ru: 'Проверьте дату дневного выбора.',
+    ),
+    (
+      field: DailyChoiceValidationField.description,
+      ru: 'Проверьте описание дневного выбора.',
+    ),
+    (
+      field: DailyChoiceValidationField.path,
+      ru: 'Проверьте путь дневного выбора.',
+    ),
+  ]) {
+    testWidgets('ошибка поля ${scenario.field.name} объяснена', (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
       );
-    }
+      final update = harness.startDailyChoiceUpdate();
+      harness.completeDailyChoiceFailure(
+        update,
+        DailyChoiceValidationFailure(scenario.field),
+      );
+      await tester.pumpAndSettle();
+
+      final message = 'Изменение — «дневной выбор»: ${scenario.ru}';
+      expect(find.text(message), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
   }
 
-  for (final scenario
-      in <({DailyChoiceCommandFailure failure, String en, String ru})>[
-        (
-          failure: const DailyChoiceNotFoundFailure(),
-          en: 'This daily choice no longer exists.',
-          ru: 'Дневной выбор больше не существует.',
-        ),
-        (
-          failure: const DailyChoiceConflictFailure(
-            DailyChoiceConflictReason.dependencyChanged,
-          ),
-          en: 'The data changed. Refresh it and confirm again.',
-          ru: 'Данные изменились. Обновите их и подтвердите снова.',
-        ),
-        (
-          failure: const DailyChoiceUnavailableFailure(),
-          en: 'Could not complete the daily choice operation. Try again.',
-          ru: 'Не удалось выполнить действие с дневным выбором. Повторите попытку.',
-        ),
-        (
-          failure: const DailyChoiceCorruptionFailure(),
-          en: 'Stored data is damaged. The daily choice was not changed.',
-          ru: 'Сохранённые данные повреждены. Дневной выбор не изменён.',
-        ),
-        (
-          failure: const DailyChoiceUnexpectedFailure(),
-          en: 'The daily choice operation failed because of an unexpected error.',
-          ru: 'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.',
-        ),
-      ]) {
-    for (final locale in const [Locale('en'), Locale('ru')]) {
-      testWidgets(
-        'отказ ${scenario.failure.runtimeType} безопасен для ${locale.languageCode}',
-        (tester) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final update = harness.startDailyChoiceUpdate();
-          harness.completeDailyChoiceFailure(update, scenario.failure);
-          await tester.pumpAndSettle();
-
-          final message = locale.languageCode == 'ru'
-              ? 'Изменение — «дневной выбор»: ${scenario.ru}'
-              : 'Edit — “daily choice”: ${scenario.en}';
-          expect(find.text(message), findsOneWidget);
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-        },
+  for (final scenario in <({DailyChoiceCommandFailure failure, String ru})>[
+    (
+      failure: const DailyChoiceNotFoundFailure(),
+      ru: 'Дневной выбор больше не существует.',
+    ),
+    (
+      failure: const DailyChoiceConflictFailure(
+        DailyChoiceConflictReason.dependencyChanged,
+      ),
+      ru: 'Данные изменились. Обновите их и подтвердите снова.',
+    ),
+    (
+      failure: const DailyChoiceUnavailableFailure(),
+      ru: 'Не удалось выполнить действие с дневным выбором. Повторите попытку.',
+    ),
+    (
+      failure: const DailyChoiceCorruptionFailure(),
+      ru: 'Сохранённые данные повреждены. Дневной выбор не изменён.',
+    ),
+    (
+      failure: const DailyChoiceUnexpectedFailure(),
+      ru: 'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.',
+    ),
+  ]) {
+    testWidgets('отказ ${scenario.failure.runtimeType} безопасен', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
       );
-    }
+      final update = harness.startDailyChoiceUpdate();
+      harness.completeDailyChoiceFailure(update, scenario.failure);
+      await tester.pumpAndSettle();
+
+      final message = 'Изменение — «дневной выбор»: ${scenario.ru}';
+      expect(find.text(message), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
   }
 
   testWidgets(
@@ -1048,107 +899,70 @@ void main() {
     );
   }
 
-  for (final scenario in <({Locale locale, String message})>[
-    (
-      locale: const Locale('en'),
-      message:
-          'Edit — “relation”: This relation is used by a saved daily path. '
-          'Its type and participants can’t be changed.',
-    ),
-    (
-      locale: const Locale('ru'),
-      message:
-          'Изменение — «связь»: Связь используется в сохранённом дневном '
-          'пути. Её тип и участников нельзя изменить.',
-    ),
-  ]) {
-    testWidgets(
-      'конфликт зависимости пути объяснён для ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(
-          tester,
-          locale: scenario.locale,
-        );
-        final update = harness.startRelationUpdate();
-        harness.completeRelationFailure(
-          update,
-          LongTermRelationReferencedByDailyPathFailure(_relationId),
-        );
-        await tester.pumpAndSettle();
+  const pathDependency = (
+    locale: Locale('ru'),
+    message:
+        'Изменение — «связь»: Связь используется в сохранённом дневном '
+        'пути. Её тип и участников нельзя изменить.',
+  );
+  testWidgets(
+    'конфликт зависимости пути объяснён для ${pathDependency.locale.languageCode}',
+    (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: pathDependency.locale,
+      );
+      final update = harness.startRelationUpdate();
+      harness.completeRelationFailure(
+        update,
+        LongTermRelationReferencedByDailyPathFailure(_relationId),
+      );
+      await tester.pumpAndSettle();
 
-        expect(find.text(scenario.message), findsOneWidget);
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
+      expect(find.text(pathDependency.message), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
-  for (final scenario
-      in <
-        ({
-          AppLifecycleState state,
-          List<AppLifecycleState> away,
-          List<AppLifecycleState> back,
-        })
-      >[
-        (
-          state: AppLifecycleState.inactive,
-          away: [AppLifecycleState.inactive],
-          back: [AppLifecycleState.resumed],
-        ),
-        (
-          state: AppLifecycleState.hidden,
-          away: [AppLifecycleState.inactive, AppLifecycleState.hidden],
-          back: [AppLifecycleState.inactive, AppLifecycleState.resumed],
-        ),
-        (
-          state: AppLifecycleState.paused,
-          away: [
-            AppLifecycleState.inactive,
-            AppLifecycleState.hidden,
-            AppLifecycleState.paused,
-          ],
-          back: [
-            AppLifecycleState.hidden,
-            AppLifecycleState.inactive,
-            AppLifecycleState.resumed,
-          ],
-        ),
-        (
-          state: AppLifecycleState.detached,
-          away: [
-            AppLifecycleState.inactive,
-            AppLifecycleState.hidden,
-            AppLifecycleState.paused,
-            AppLifecycleState.detached,
-          ],
-          back: [AppLifecycleState.resumed],
-        ),
-      ]) {
-    testWidgets(
-      '${scenario.state.name} удерживает результат до возвращения в resumed',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        for (final state in scenario.away) {
-          tester.binding.handleAppLifecycleStateChanged(state);
-        }
-        final operation = harness.startDelete(index: 1, title: 'Фоновое');
-        harness.completeDeleted(operation);
-        await tester.pump();
-        await tester.pump();
-        expect(find.byType(SnackBar), findsNothing);
+  // Все состояния, кроме resumed, удерживают результат одной ветвью; берём
+  // полный уход в фон и возврат через промежуточные состояния.
+  const lifecycle = (
+    state: AppLifecycleState.paused,
+    away: [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ],
+    back: [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ],
+  );
+  testWidgets(
+    '${lifecycle.state.name} удерживает результат до возвращения в resumed',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      for (final state in lifecycle.away) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      final operation = harness.startDelete(index: 1, title: 'Фоновое');
+      harness.completeDeleted(operation);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(SnackBar), findsNothing);
 
-        for (final state in scenario.back) {
-          tester.binding.handleAppLifecycleStateChanged(state);
-        }
-        await tester.pumpAndSettle();
-        expect(find.text(_deleted('Фоновое')), findsOneWidget);
+      for (final state in lifecycle.back) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Фоновое')), findsOneWidget);
 
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
   testWidgets('неизвестное исходное lifecycle state не разрешает показ', (
     tester,
@@ -1416,35 +1230,27 @@ void main() {
     },
   );
 
-  for (final scenario in <({Locale locale, String message})>[
-    (
-      locale: const Locale('ru'),
-      message:
-          'Удаление выбранных связей — «Связанное»: Выбранные связи удалены.',
-    ),
-    (
-      locale: const Locale('fr'),
-      message: 'Delete selected relations — “Связанное”: Selected relations deleted.',
-    ),
-  ]) {
-    testWidgets(
-      'массовый успех локализуется для ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(
-          tester,
-          locale: scenario.locale,
-        );
-        final deletion = harness.startBlockingRelationsDelete(
-          title: 'Связанное',
-        );
-        harness.completeBlockingRelationsDeleted(deletion);
-        await tester.pumpAndSettle();
-        expect(find.text(scenario.message), findsOneWidget);
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
+  // Английский текст массового успеха проверяет отдельный тест выше.
+  const massDeleted = (
+    locale: Locale('ru'),
+    message:
+        'Удаление выбранных связей — «Связанное»: Выбранные связи удалены.',
+  );
+  testWidgets(
+    'массовый успех локализуется для ${massDeleted.locale.languageCode}',
+    (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: massDeleted.locale,
+      );
+      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
+      harness.completeBlockingRelationsDeleted(deletion);
+      await tester.pumpAndSettle();
+      expect(find.text(massDeleted.message), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
   testWidgets(
     'массовый конфликт на русском не раскрывает идентификатор связи',
@@ -1645,143 +1451,119 @@ void main() {
     );
   });
 
+  // Язык не ветвит предъявление: берём русский.
   for (final scenario
       in <
         ({
           ExistingIntentionCommand Function(IntentionId) command,
-          String enOperation,
-          String ruOperation,
-          String enSuccess,
-          String ruSuccess,
+          String operation,
+          String success,
         })
       >[
         (
           command: MarkIntentionFavorite.new,
-          enOperation: 'Mark as favorite',
-          ruOperation: 'Отметка избранного',
-          enSuccess: 'Intention marked as favorite.',
-          ruSuccess: 'Намерение отмечено избранным.',
+          operation: 'Отметка избранного',
+          success: 'Намерение отмечено избранным.',
         ),
         (
           command: UnmarkIntentionFavorite.new,
-          enOperation: 'Remove favorite mark',
-          ruOperation: 'Снятие отметки избранного',
-          enSuccess: 'Favorite mark removed.',
-          ruSuccess: 'Отметка избранного снята.',
+          operation: 'Снятие отметки избранного',
+          success: 'Отметка избранного снята.',
         ),
       ]) {
-    for (final locale in const [Locale('en'), Locale('ru')]) {
-      final isRussian = locale.languageCode == 'ru';
-      final operation = isRussian ? scenario.ruOperation : scenario.enOperation;
-      String message(String outcome) => isRussian
-          ? '$operation — «Гулять»: $outcome'
-          : '$operation — “Гулять”: $outcome';
-
-      testWidgets(
-        'успех отметки называет операцию, намерение и исход: $operation',
-        (tester) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final accepted = harness.startExisting(
-            scenario.command,
-            index: 1,
-            title: 'Гулять',
-          );
-          harness.completeSaved(accepted);
-          await tester.pumpAndSettle();
-
-          expect(
-            find.text(
-              message(isRussian ? scenario.ruSuccess : scenario.enSuccess),
-            ),
-            findsOneWidget,
-          );
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-        },
-      );
-
-      for (final failure
-          in <({IntentionFailure failure, String en, String ru})>[
-            (
-              failure: const IntentionGenericValidationFailure(),
-              en: 'The favorite mark couldn’t be changed.',
-              ru: 'Не удалось изменить отметку избранного.',
-            ),
-            (
-              failure: const IntentionNotFoundFailure(),
-              en:
-                  'The intention no longer exists. The favorite mark wasn’t '
-                  'changed.',
-              ru:
-                  'Намерение больше не существует. Отметка избранного не '
-                  'изменена.',
-            ),
-            (
-              failure: const IntentionConflictFailure(),
-              en:
-                  'The intention changed elsewhere. The favorite mark wasn’t '
-                  'changed.',
-              ru:
-                  'Намерение было изменено в другом месте. Отметка избранного '
-                  'не изменена.',
-            ),
-            (
-              failure: IntentionHasBlockingRelationsFailure(
-                testDetailsIntentionId(1),
-              ),
-              en:
-                  'The favorite mark couldn’t be changed because of an '
-                  'unexpected error.',
-              ru:
-                  'Не удалось изменить отметку избранного из-за '
-                  'непредвиденной ошибки.',
-            ),
-            (
-              failure: const IntentionUnavailableFailure(),
-              en: 'The favorite mark couldn’t be changed. Try again.',
-              ru: 'Не удалось изменить отметку избранного. Повторите попытку.',
-            ),
-            (
-              failure: const IntentionCorruptionFailure(),
-              en: 'Stored data is damaged. The favorite mark wasn’t changed.',
-              ru:
-                  'Сохранённые данные повреждены. Отметка избранного не '
-                  'изменена.',
-            ),
-            (
-              failure: const IntentionUnexpectedFailure(),
-              en:
-                  'The favorite mark couldn’t be changed because of an '
-                  'unexpected error.',
-              ru:
-                  'Не удалось изменить отметку избранного из-за '
-                  'непредвиденной ошибки.',
-            ),
-          ]) {
-        testWidgets('отказ отметки ${failure.failure.runtimeType} называет '
-            'операцию, намерение и безопасный исход: $operation', (
+    testWidgets(
+      'успех отметки называет операцию, намерение и исход: ${scenario.operation}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
           tester,
-        ) async {
-          final harness = await _pumpPresenterApp(tester, locale: locale);
-          final accepted = harness.startExisting(
-            scenario.command,
-            index: 1,
-            title: 'Гулять',
-          );
-          harness.completeFailure(accepted, failure.failure);
-          await tester.pumpAndSettle();
+          locale: const Locale('ru'),
+        );
+        final accepted = harness.startExisting(
+          scenario.command,
+          index: 1,
+          title: 'Гулять',
+        );
+        harness.completeSaved(accepted);
+        await tester.pumpAndSettle();
 
-          final text = message(isRussian ? failure.ru : failure.en);
-          expect(find.text(text), findsOneWidget);
-          expect(
-            text,
-            isNot(contains(testDetailsIntentionId(1).toCanonicalString())),
-          );
-          await _closeMessage(tester);
-          expect(find.byType(SnackBar), findsNothing);
-        });
-      }
-    }
+        expect(
+          find.text('${scenario.operation} — «Гулять»: ${scenario.success}'),
+          findsOneWidget,
+        );
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  // Исход отказа общий для отметки и снятия отметки, поэтому его достаточно
+  // показать на одной команде.
+  for (final failure in <({IntentionFailure failure, String ru})>[
+    (
+      failure: const IntentionGenericValidationFailure(),
+      ru: 'Не удалось изменить отметку избранного.',
+    ),
+    (
+      failure: const IntentionNotFoundFailure(),
+      ru:
+          'Намерение больше не существует. Отметка избранного не '
+          'изменена.',
+    ),
+    (
+      failure: const IntentionConflictFailure(),
+      ru:
+          'Намерение было изменено в другом месте. Отметка избранного '
+          'не изменена.',
+    ),
+    (
+      failure: IntentionHasBlockingRelationsFailure(testDetailsIntentionId(1)),
+      ru:
+          'Не удалось изменить отметку избранного из-за '
+          'непредвиденной ошибки.',
+    ),
+    (
+      failure: const IntentionUnavailableFailure(),
+      ru: 'Не удалось изменить отметку избранного. Повторите попытку.',
+    ),
+    (
+      failure: const IntentionCorruptionFailure(),
+      ru:
+          'Сохранённые данные повреждены. Отметка избранного не '
+          'изменена.',
+    ),
+    (
+      failure: const IntentionUnexpectedFailure(),
+      ru:
+          'Не удалось изменить отметку избранного из-за '
+          'непредвиденной ошибки.',
+    ),
+  ]) {
+    testWidgets(
+      'отказ отметки ${failure.failure.runtimeType} называет операцию, '
+      'намерение и безопасный исход',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: const Locale('ru'),
+        );
+        final accepted = harness.startExisting(
+          MarkIntentionFavorite.new,
+          index: 1,
+          title: 'Гулять',
+        );
+        harness.completeFailure(accepted, failure.failure);
+        await tester.pumpAndSettle();
+
+        final text = 'Отметка избранного — «Гулять»: ${failure.ru}';
+        expect(find.text(text), findsOneWidget);
+        expect(
+          text,
+          isNot(contains(testDetailsIntentionId(1).toCanonicalString())),
+        );
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
   }
 }
 

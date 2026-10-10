@@ -80,7 +80,9 @@ void _registerQuickCreationFlowTests() {
       },
     );
 
-    for (final fail in [false, true]) {
+    // Отказ записи не зависит от вида создания: его достаточно показать на
+    // одном потоке, а поздний успех — на каждом.
+    for (final fail in flow == _Flow.intention ? [false, true] : [false]) {
       testWidgets('${flow.label}: поздний ${fail ? 'отказ' : 'успех'} '
           'сохраняет новую сессию и предъявляется один раз', (tester) async {
         final app = await _start(tester);

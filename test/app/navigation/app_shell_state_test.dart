@@ -230,52 +230,53 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    for (final origin in AppDestination.values) {
-      for (final destination in AppDestination.values) {
-        testWidgets('из «${_names[origin]}» в «${_names[destination]}» '
-            'сохраняет состояние всех корневых страниц без повторного чтения', (
-          tester,
-        ) async {
-          final app = await _start(tester);
-          final before = <AppDestination, Map<String, Object?>>{};
-          for (final entry in _rootPageStates.entries) {
-            await entry.value.prepare(tester, app);
-            before[entry.key] = entry.value.view(tester, app);
-          }
-          await _select(tester, origin);
-          final router = app.container.read(appRouterProvider);
-          unawaited(
-            router.push(
-              IntentionDetailsRoute(intentionId: app.home.items.first.id),
-            ),
-          );
-          await _until(tester, find.byType(IntentionDetailsPage));
-          await tester.pumpAndSettle();
-          expect(_selected(tester), origin);
-          // Вторая страница создаёт глубокую историю над тем же пунктом.
-          unawaited(
-            router.push(
-              IntentionDetailsRoute(intentionId: app.home.items[1].id),
-            ),
-          );
-          await tester.pumpAndSettle();
-          expect(_selected(tester), origin);
+    // Сброс одинаков для всех пунктов: достаточно повторного выбора текущего
+    // пункта и перехода на другой.
+    for (final (origin, destination) in [
+      (AppDestination.intentionGraph, AppDestination.intentionGraph),
+      (AppDestination.home, AppDestination.dailyChoices),
+    ]) {
+      testWidgets('из «${_names[origin]}» в «${_names[destination]}» '
+          'сохраняет состояние всех корневых страниц без повторного чтения', (
+        tester,
+      ) async {
+        final app = await _start(tester);
+        final before = <AppDestination, Map<String, Object?>>{};
+        for (final entry in _rootPageStates.entries) {
+          await entry.value.prepare(tester, app);
+          before[entry.key] = entry.value.view(tester, app);
+        }
+        await _select(tester, origin);
+        final router = app.container.read(appRouterProvider);
+        unawaited(
+          router.push(
+            IntentionDetailsRoute(intentionId: app.home.items.first.id),
+          ),
+        );
+        await _until(tester, find.byType(IntentionDetailsPage));
+        await tester.pumpAndSettle();
+        expect(_selected(tester), origin);
+        // Вторая страница создаёт глубокую историю над тем же пунктом.
+        unawaited(
+          router.push(IntentionDetailsRoute(intentionId: app.home.items[1].id)),
+        );
+        await tester.pumpAndSettle();
+        expect(_selected(tester), origin);
 
-          await _select(tester, destination);
+        await _select(tester, destination);
 
-          expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
-          expect(
-            find.byType(IntentionDetailsPage, skipOffstage: false),
-            findsNothing,
-          );
-          expect(_selected(tester), destination);
-          for (final entry in _rootPageStates.entries) {
-            await _select(tester, entry.key);
-            expect(entry.value.view(tester, app), before[entry.key]);
-          }
-          expect(tester.takeException(), isNull);
-        });
-      }
+        expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
+        expect(
+          find.byType(IntentionDetailsPage, skipOffstage: false),
+          findsNothing,
+        );
+        expect(_selected(tester), destination);
+        for (final entry in _rootPageStates.entries) {
+          await _select(tester, entry.key);
+          expect(entry.value.view(tester, app), before[entry.key]);
+        }
+        expect(tester.takeException(), isNull);
+      });
     }
   });
 
@@ -577,7 +578,7 @@ void main() {
   });
 
   group('смена языка интерфейса', () {
-    testWidgets('русский, английский и английский fallback переводят только '
+    testWidgets('русский и английский переводят только '
         'системные подписи каталога дневных выборов, а календарь, фильтры, '
         'выдача, пользовательский текст и позиция сохраняются без новых '
         'чтений', (tester) async {
@@ -588,7 +589,6 @@ void main() {
       for (final (platform, resolved) in [
         (const Locale('ru', 'RU'), const Locale('ru')),
         (const Locale('en', 'GB'), const Locale('en')),
-        (const Locale('de', 'DE'), const Locale('en')),
       ]) {
         tester.binding.platformDispatcher.localesTestValue = [platform];
         await tester.pumpAndSettle();

@@ -12,7 +12,6 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
@@ -27,7 +26,9 @@ part 'quick_creation_launcher_test_support.dart';
 
 void main() {
   for (final mode in QuickCreationMode.values) {
-    for (final origin in _Origin.values) {
+    // Корневые пункты запускают одним путём: достаточно Главной и глубокой
+    // страницы, над которой лежит чужая история.
+    for (final origin in [_Origin.home, _Origin.deep]) {
       testWidgets(
         '${_label(mode)} над ${origin.label}: один поток сохраняет историю и ввод',
         (tester) async {

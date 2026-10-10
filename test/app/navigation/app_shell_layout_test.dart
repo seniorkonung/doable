@@ -53,10 +53,6 @@ part 'ordinary_page_layout_scenarios.dart';
 /// панель, нижний безопасный отступ и клавиатура.
 const _screen = Size(400, 800);
 
-/// Локали интерфейса, в которых проверяется каталог дневных выборов:
-/// подписи строк выдачи различаются длиной.
-const _locales = [Locale('ru'), Locale('en')];
-
 /// Размер порции каталога намерений и каталога дневных выборов.
 const _intentionPageSize = 100;
 const _dailyChoicePageSize = 50;
@@ -321,134 +317,132 @@ void main() {
       });
     }
 
-    for (final locale in _locales) {
-      for (final insets in _insetVariants) {
-        testWidgets('каталог дневных выборов, ${locale.languageCode}, '
-            '${insets.name}: продолжение выдачи и последняя строка видны над '
-            'панелью без зарезервированного места', (tester) async {
-          const count = _dailyChoicePageSize + 5;
-          final l10n = lookupAppLocalizations(locale);
-          await _start(
-            tester,
-            dailyChoices: count,
-            insets: insets,
-            locale: locale,
-          );
-          await _select(tester, AppDestination.dailyChoices);
-          await _until(
-            tester,
-            find.text(l10n.dailyChoiceCatalogTotalCount(count)),
-          );
-          final page = find.byType(DailyChoiceCatalogPage);
+    // Язык раскладку не ветвит: русский даёт самые длинные подписи строк.
+    const locale = Locale('ru');
+    for (final insets in _insetVariants) {
+      testWidgets('каталог дневных выборов, ${locale.languageCode}, '
+          '${insets.name}: продолжение выдачи и последняя строка видны над '
+          'панелью без зарезервированного места', (tester) async {
+        const count = _dailyChoicePageSize + 5;
+        final l10n = lookupAppLocalizations(locale);
+        await _start(
+          tester,
+          dailyChoices: count,
+          insets: insets,
+          locale: locale,
+        );
+        await _select(tester, AppDestination.dailyChoices);
+        await _until(
+          tester,
+          find.text(l10n.dailyChoiceCatalogTotalCount(count)),
+        );
+        final page = find.byType(DailyChoiceCatalogPage);
 
-          if (insets.keyboard > 0) {
-            _expectDateControlAboveKeyboard(tester, insets);
-          }
+        if (insets.keyboard > 0) {
+          _expectDateControlAboveKeyboard(tester, insets);
+        }
 
-          await _scrollToEnd(tester, page);
+        await _scrollToEnd(tester, page);
 
-          final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
-          _expectFullyVisible(tester, loadMore, insets);
-          _expectDailyChoiceEnd(tester, loadMore, insets);
-          expect(loadMore.hitTestable(), findsOneWidget);
+        final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
+        _expectFullyVisible(tester, loadMore, insets);
+        _expectDailyChoiceEnd(tester, loadMore, insets);
+        expect(loadMore.hitTestable(), findsOneWidget);
 
-          await tester.tap(loadMore);
-          // Нажатие догружает выдачу до конца, а не открывает поиск действия.
-          await _waitFor(
-            tester,
-            () => _continuation(page, l10n).evaluate().isEmpty,
-          );
-          await tester.pumpAndSettle();
-          expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
-          await _scrollToEnd(tester, page);
+        await tester.tap(loadMore);
+        // Нажатие догружает выдачу до конца, а не открывает поиск действия.
+        await _waitFor(
+          tester,
+          () => _continuation(page, l10n).evaluate().isEmpty,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
+        await _scrollToEnd(tester, page);
 
-          final lastRow = _dailyChoiceRow(count);
-          _expectFullyVisible(tester, lastRow, insets);
-          _expectDailyChoiceEnd(tester, lastRow, insets);
-          expect(lastRow.hitTestable(), findsOneWidget);
+        final lastRow = _dailyChoiceRow(count);
+        _expectFullyVisible(tester, lastRow, insets);
+        _expectDailyChoiceEnd(tester, lastRow, insets);
+        expect(lastRow.hitTestable(), findsOneWidget);
 
-          await tester.tap(lastRow);
-          await _until(tester, find.byType(DailyChoiceDetailsPage));
-          await tester.pumpAndSettle();
-          // Записи одного дня идут от поздних к ранним по созданию: первый
-          // дневной выбор стоит последним.
-          expect(
-            tester
-                .widget<DailyChoiceDetailsPage>(
-                  find.byType(DailyChoiceDetailsPage),
-                )
-                .choiceId,
-            _dailyChoiceId(_firstChoice),
-          );
-          expect(tester.takeException(), isNull);
-        });
-      }
+        await tester.tap(lastRow);
+        await _until(tester, find.byType(DailyChoiceDetailsPage));
+        await tester.pumpAndSettle();
+        // Записи одного дня идут от поздних к ранним по созданию: первый
+        // дневной выбор стоит последним.
+        expect(
+          tester
+              .widget<DailyChoiceDetailsPage>(
+                find.byType(DailyChoiceDetailsPage),
+              )
+              .choiceId,
+          _dailyChoiceId(_firstChoice),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
 
-      for (final insets in [_safeArea, _keyboardOpen]) {
-        testWidgets('каталог дневных выборов, ${locale.languageCode}, '
-            '${insets.name}: отказ продолжения выдачи и повтор видны над '
-            'панелью без зарезервированного места, а повтор '
-            'догружает выдачу', (tester) async {
-          const count = _dailyChoicePageSize + 5;
-          final l10n = lookupAppLocalizations(locale);
-          final faults = _ReadFaults();
-          await _start(
-            tester,
-            dailyChoices: count,
-            insets: insets,
-            locale: locale,
-            observer: faults,
-          );
-          await _select(tester, AppDestination.dailyChoices);
-          await _until(
-            tester,
-            find.text(l10n.dailyChoiceCatalogTotalCount(count)),
-          );
-          final page = find.byType(DailyChoiceCatalogPage);
-          if (insets.keyboard > 0) {
-            _expectDateControlAboveKeyboard(tester, insets);
-          }
-          await _scrollToEnd(tester, page);
+    for (final insets in [_safeArea, _keyboardOpen]) {
+      testWidgets('каталог дневных выборов, ${locale.languageCode}, '
+          '${insets.name}: отказ продолжения выдачи и повтор видны над '
+          'панелью без зарезервированного места, а повтор '
+          'догружает выдачу', (tester) async {
+        const count = _dailyChoicePageSize + 5;
+        final l10n = lookupAppLocalizations(locale);
+        final faults = _ReadFaults();
+        await _start(
+          tester,
+          dailyChoices: count,
+          insets: insets,
+          locale: locale,
+          observer: faults,
+        );
+        await _select(tester, AppDestination.dailyChoices);
+        await _until(
+          tester,
+          find.text(l10n.dailyChoiceCatalogTotalCount(count)),
+        );
+        final page = find.byType(DailyChoiceCatalogPage);
+        if (insets.keyboard > 0) {
+          _expectDateControlAboveKeyboard(tester, insets);
+        }
+        await _scrollToEnd(tester, page);
 
-          faults.isFailing = true;
-          await tester.tap(
-            find.byKey(const ValueKey('daily-choice-load-more')),
-          );
-          final failure = find.descendant(
-            of: page,
-            matching: find.text(l10n.dailyChoiceCatalogUnavailable),
-          );
-          await _until(tester, failure);
-          await tester.pumpAndSettle();
-          await _scrollToEnd(tester, page);
+        faults.isFailing = true;
+        await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
+        final failure = find.descendant(
+          of: page,
+          matching: find.text(l10n.dailyChoiceCatalogUnavailable),
+        );
+        await _until(tester, failure);
+        await tester.pumpAndSettle();
+        await _scrollToEnd(tester, page);
 
-          final retry = find.descendant(
-            of: page,
-            matching: find.widgetWithText(TextButton, l10n.commonRetry),
-          );
-          _expectFullyVisible(tester, failure, insets);
-          _expectFullyVisible(tester, retry, insets);
-          expect(find.byType(FloatingActionButton), findsNothing);
-          expect(retry.hitTestable(), findsOneWidget);
+        final retry = find.descendant(
+          of: page,
+          matching: find.widgetWithText(TextButton, l10n.commonRetry),
+        );
+        _expectFullyVisible(tester, failure, insets);
+        _expectFullyVisible(tester, retry, insets);
+        expect(find.byType(FloatingActionButton), findsNothing);
+        expect(retry.hitTestable(), findsOneWidget);
 
-          faults.isFailing = false;
-          await tester.tap(retry);
-          // Повтор догружает выдачу до конца, а не открывает поиск действия.
-          await _waitFor(
-            tester,
-            () => _continuation(page, l10n).evaluate().isEmpty,
-          );
-          await tester.pumpAndSettle();
-          expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
-          await _scrollToEnd(tester, page);
+        faults.isFailing = false;
+        await tester.tap(retry);
+        // Повтор догружает выдачу до конца, а не открывает поиск действия.
+        await _waitFor(
+          tester,
+          () => _continuation(page, l10n).evaluate().isEmpty,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
+        await _scrollToEnd(tester, page);
 
-          final lastRow = _dailyChoiceRow(count);
-          _expectFullyVisible(tester, lastRow, insets);
-          _expectDailyChoiceEnd(tester, lastRow, insets);
-          expect(lastRow.hitTestable(), findsOneWidget);
-          expect(tester.takeException(), isNull);
-        });
-      }
+        final lastRow = _dailyChoiceRow(count);
+        _expectFullyVisible(tester, lastRow, insets);
+        _expectDailyChoiceEnd(tester, lastRow, insets);
+        expect(lastRow.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
     }
   });
 

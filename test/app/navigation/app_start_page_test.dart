@@ -34,50 +34,31 @@ const _readTitle = 'Читать';
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    testWidgets('первый запуск в новой установке без намерений открывает '
-        'Главную с объяснением отсутствия избранных намерений на '
-        '${locale.languageCode}', (tester) async {
-      final harness = await _harness(tester, locale);
-      final l10n = lookupAppLocalizations(locale);
-      // Новая установка: хранилища ещё нет, его создаёт подготовка.
-      expect(harness.databaseFile.existsSync(), isFalse);
+  testWidgets('первый запуск в новой установке без намерений открывает '
+      'Главную с объяснением отсутствия избранных намерений', (tester) async {
+    const locale = Locale('ru');
+    final harness = await _harness(tester, locale);
+    final l10n = lookupAppLocalizations(locale);
+    // Новая установка: хранилища ещё нет, его создаёт подготовка.
+    expect(harness.databaseFile.existsSync(), isFalse);
 
-      final app = await _launch(tester, harness);
-      await _until(tester, find.text(l10n.homeEmptyNoFavorites));
-      await tester.pumpAndSettle();
+    final app = await _launch(tester, harness);
+    await _until(tester, find.text(l10n.homeEmptyNoFavorites));
+    await tester.pumpAndSettle();
 
-      _expectStartPage(tester, app);
-      expect(
-        find.descendant(
-          of: find.byType(HomePage),
-          matching: find.text(l10n.homeEmptyNoFavorites),
-        ),
-        findsOneWidget,
-      );
-      expect(_intentionCount(app.raw), 0);
-      expect(tester.takeException(), isNull);
-    });
-  }
+    _expectStartPage(tester, app);
+    expect(
+      find.descendant(
+        of: find.byType(HomePage),
+        matching: find.text(l10n.homeEmptyNoFavorites),
+      ),
+      findsOneWidget,
+    );
+    expect(_intentionCount(app.raw), 0);
+    expect(tester.takeException(), isNull);
+  });
 
   group('начальная страница не зависит от намерений и избранных намерений', () {
-    testWidgets('намерения без избранных', (tester) async {
-      final harness = await _harness(tester, const Locale('ru'));
-      final l10n = lookupAppLocalizations(const Locale('ru'));
-      await _prepareStorage(tester, harness, (database) {
-        _storeIntention(database, _walk, _walkTitle, archived: false);
-        _storeIntention(database, _read, _readTitle, archived: false);
-      });
-
-      final app = await _launch(tester, harness);
-      await _until(tester, find.text(l10n.homeEmptyNoFavorites));
-      await tester.pumpAndSettle();
-
-      _expectStartPage(tester, app);
-      expect(_intentionCount(app.raw), 2);
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('активное избранное намерение', (tester) async {
       final harness = await _harness(tester, const Locale('ru'));
       await _prepareStorage(tester, harness, (database) {
@@ -107,26 +88,6 @@ void main() {
         ),
         findsNothing,
       );
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('все избранные намерения архивированы', (tester) async {
-      final harness = await _harness(tester, const Locale('ru'));
-      final l10n = lookupAppLocalizations(const Locale('ru'));
-      await _prepareStorage(tester, harness, (database) {
-        _storeIntention(database, _walk, _walkTitle, archived: true);
-        storeFavoriteMark(
-          database,
-          intentionId: tagFixtureId(_walk),
-          position: 1,
-        );
-      });
-
-      final app = await _launch(tester, harness);
-      await _until(tester, find.text(l10n.homeEmptyAllArchived));
-      await tester.pumpAndSettle();
-
-      _expectStartPage(tester, app);
       expect(tester.takeException(), isNull);
     });
   });

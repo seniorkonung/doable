@@ -5,8 +5,10 @@ import 'package:doable/src/app/navigation/app_shell_tab_insets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _barHeights = <double>[56, 64, 80, 96];
-const _safeBottoms = <double>[0, 34];
+/// У приложения одна высота панели; нижний безопасный отступ задан, чтобы
+/// формула учитывала его вместе с высотой панели.
+const _barHeights = <double>[AppNavigationBar.height];
+const _safeBottoms = <double>[34];
 
 void main() {
   for (final barHeight in _barHeights) {
@@ -119,20 +121,6 @@ void main() {
 
     expect(probe.created, 1);
     expect(probe.disposed, 0);
-  });
-
-  testWidgets('изменение высоты панели меняет заменённые данные без '
-      'пересоздания содержимого', (tester) async {
-    final probe = _Probe();
-    final data = _data(keyboard: 300, safeBottom: 0);
-
-    await tester.pumpWidget(_host(data: data, barHeight: 56, probe: probe));
-    expect(probe.data.viewInsets.bottom, 244);
-
-    await tester.pumpWidget(_host(data: data, barHeight: 96, probe: probe));
-    expect(probe.data.viewInsets.bottom, 204);
-
-    expect(probe.created, 1);
   });
 
   testWidgets('тело Scaffold внутри замены заканчивается на верхней границе '

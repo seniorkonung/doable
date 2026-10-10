@@ -63,62 +63,63 @@ void main() {
     });
   }
 
-  for (final destination in AppDestination.values) {
-    testWidgets('выбор ${destination.name} удаляет типизированную и '
-        'безымянную историю без подтверждения', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final router = await _start(tester);
-      await _select(tester, AppDestination.dailyChoices);
-      final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
-      final shell = router.stack.single;
-      unawaited(router.push<void>(TagCatalogRoute()));
-      await tester.pumpAndSettle();
-      var popRequests = 0;
-      final taskResult = router.pushNativeRoute<String>(
-        MaterialPageRoute(
-          builder: (_) => PopScope<String>(
-            canPop: false,
-            onPopInvokedWithResult: (didPop, _) {
-              if (!didPop) popRequests += 1;
-            },
-            child: const Scaffold(body: Text('Незавершённая задача')),
-          ),
+  // Сброс истории не зависит от пункта; берём другой пункт, с которого
+  // «назад» ведёт на Главную.
+  const destination = AppDestination.intentionGraph;
+  testWidgets('выбор ${destination.name} удаляет типизированную и '
+      'безымянную историю без подтверждения', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final router = await _start(tester);
+    await _select(tester, AppDestination.dailyChoices);
+    final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
+    final shell = router.stack.single;
+    unawaited(router.push<void>(TagCatalogRoute()));
+    await tester.pumpAndSettle();
+    var popRequests = 0;
+    final taskResult = router.pushNativeRoute<String>(
+      MaterialPageRoute(
+        builder: (_) => PopScope<String>(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) popRequests += 1;
+          },
+          child: const Scaffold(body: Text('Незавершённая задача')),
         ),
-      );
-      await tester.pumpAndSettle();
-      unawaited(router.pushNativeRoute<void>(_ordinaryRoute()));
-      await tester.pumpAndSettle();
-      _expectSelected(tester, AppDestination.dailyChoices);
+      ),
+    );
+    await tester.pumpAndSettle();
+    unawaited(router.pushNativeRoute<void>(_ordinaryRoute()));
+    await tester.pumpAndSettle();
+    _expectSelected(tester, AppDestination.dailyChoices);
 
-      await _select(tester, destination);
+    await _select(tester, destination);
 
-      expect(await taskResult, isNull);
-      expect(popRequests, 0);
-      expect(router.stack, [shell]);
-      expect(router.innerRouterOf<TabsRouter>(AppShellRoute.name), same(tabs));
-      expect(router.hasPagelessTopRoute, isFalse);
-      expect(router.topRoute.name, destination.page.name);
-      _expectSelected(tester, destination);
-      expect(
-        find.byType(OrdinaryPageScaffold, skipOffstage: false),
-        findsNothing,
-      );
-      expect(
-        find.text('Незавершённая задача', skipOffstage: false),
-        findsNothing,
-      );
+    expect(await taskResult, isNull);
+    expect(popRequests, 0);
+    expect(router.stack, [shell]);
+    expect(router.innerRouterOf<TabsRouter>(AppShellRoute.name), same(tabs));
+    expect(router.hasPagelessTopRoute, isFalse);
+    expect(router.topRoute.name, destination.page.name);
+    _expectSelected(tester, destination);
+    expect(
+      find.byType(OrdinaryPageScaffold, skipOffstage: false),
+      findsNothing,
+    );
+    expect(
+      find.text('Незавершённая задача', skipOffstage: false),
+      findsNothing,
+    );
 
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
 
-      expect(router.stack, [shell]);
-      expect(router.hasPagelessTopRoute, isFalse);
-      expect(router.topRoute.name, HomeRoute.name);
-      expect(find.byType(HomePage), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    });
-  }
+    expect(router.stack, [shell]);
+    expect(router.hasPagelessTopRoute, isFalse);
+    expect(router.topRoute.name, HomeRoute.name);
+    expect(find.byType(HomePage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets('обычное «назад» закрывает только верхний каркас', (
     tester,

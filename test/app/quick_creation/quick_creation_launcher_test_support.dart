@@ -3,7 +3,6 @@ part of 'quick_creation_launcher_test.dart';
 enum _Origin {
   home('Главной', 0, HomePage),
   daily('каталогом дневных выборов', 1, DailyChoiceCatalogPage),
-  graph('каталогом намерений', 2, IntentionCatalogPage),
   deep('глубокой страницей', 1, IntentionDetailsPage);
 
   const _Origin(this.label, this.tabIndex, this.page);

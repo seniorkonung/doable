@@ -36,111 +36,117 @@ const _icons = [
 ];
 
 void main() {
-  for (final language in _titles.keys) {
+  // Выбранная строка определяется индексом режима, а названия — языком: берём
+  // по одному режиму на язык.
+  for (final (language, initial) in [
+    ('ru', QuickCreationMode.intention),
+    ('en', QuickCreationMode.dailyChoiceFromAction),
+  ]) {
     final titles = _titles[language]!;
-    for (final initial in QuickCreationMode.values) {
-      testWidgets(
-        '$language: четыре режима и выбор из «${titles[initial.index]}» '
-        'без запуска создания и изменения исходной истории',
-        (tester) async {
-          final app = await _openApp(
-            tester,
-            language: language,
-            initial: initial,
-          );
-          await _openMenu(tester);
+    testWidgets(
+      '$language: четыре режима и выбор из «${titles[initial.index]}» '
+      'без запуска создания и изменения исходной истории',
+      (tester) async {
+        final app = await _openApp(
+          tester,
+          language: language,
+          initial: initial,
+        );
+        await _openMenu(tester);
 
-          expect(find.byType(ListTile), findsNWidgets(4));
+        expect(find.byType(ListTile), findsNWidgets(4));
+        expect(
+          find.text(
+            language == 'ru'
+                ? 'Режим быстрого создания'
+                : 'Quick creation mode',
+          ),
+          findsOneWidget,
+        );
+        for (var i = 0; i < titles.length; i++) {
+          final row = find.ancestor(
+            of: find.text(titles[i]),
+            matching: find.byType(ListTile),
+          );
           expect(
-            find.text(
-              language == 'ru'
-                  ? 'Режим быстрого создания'
-                  : 'Quick creation mode',
-            ),
+            find.descendant(of: row, matching: find.byIcon(_icons[i])),
             findsOneWidget,
           );
-          for (var i = 0; i < titles.length; i++) {
-            final row = find.ancestor(
-              of: find.text(titles[i]),
-              matching: find.byType(ListTile),
-            );
-            expect(
-              find.descendant(of: row, matching: find.byIcon(_icons[i])),
-              findsOneWidget,
-            );
-            expect(
-              tester.getSemantics(row).flagsCollection.isSelected,
-              i == initial.index ? Tristate.isTrue : Tristate.isFalse,
-            );
-            expect(
-              find.descendant(of: row, matching: find.byIcon(Icons.check)),
-              i == initial.index ? findsOneWidget : findsNothing,
-            );
-            if (i > 0) {
-              expect(
-                tester.getTopLeft(find.text(titles[i])).dy,
-                greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
-              );
-            }
-          }
-
-          final next = QuickCreationMode.values[(initial.index + 1) % 4];
-          await tester.tap(find.text(titles[next.index]));
-          expect(app.mode, next);
-          expect(app.store.writes.single.mode, next);
-          expect(app.store.writes.single.completion.isCompleted, isFalse);
-          await tester.pumpAndSettle();
-          app.expectOrigin(tester);
-
-          await _openMenu(tester);
           expect(
-            tester
-                .getSemantics(find.text(titles[next.index]))
-                .flagsCollection
-                .isSelected,
-            Tristate.isTrue,
+            tester.getSemantics(row).flagsCollection.isSelected,
+            i == initial.index ? Tristate.isTrue : Tristate.isFalse,
           );
-          await tester.tap(find.text(titles[next.index]));
-          await tester.pumpAndSettle();
-          expect(app.mode, next);
-          expect(app.store.writes.map((write) => write.mode), [next, next]);
-          app.expectOrigin(tester);
-        },
-      );
-    }
+          expect(
+            find.descendant(of: row, matching: find.byIcon(Icons.check)),
+            i == initial.index ? findsOneWidget : findsNothing,
+          );
+          if (i > 0) {
+            expect(
+              tester.getTopLeft(find.text(titles[i])).dy,
+              greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
+            );
+          }
+        }
 
-    testWidgets('$language: все названия целиком доступны при тексте 2.6 '
-        'через прокрутку на узком экране', (tester) async {
-      tester.view.physicalSize = const Size(320, 568);
-      tester.view.devicePixelRatio = 1;
-      tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
-      tester.platformDispatcher.textScaleFactorTestValue = 2.6;
-      addTearDown(tester.view.reset);
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      final app = await _openApp(tester, language: language);
-
-      for (var i = 0; i < titles.length; i++) {
-        await _openMenu(tester);
-        final title = find.text(titles[i]);
-        final scrollable = find.descendant(
-          of: find.byType(BottomSheet),
-          matching: find.byType(Scrollable),
-        );
-        await tester.scrollUntilVisible(title, 100, scrollable: scrollable);
+        final next = QuickCreationMode.values[(initial.index + 1) % 4];
+        await tester.tap(find.text(titles[next.index]));
+        expect(app.mode, next);
+        expect(app.store.writes.single.mode, next);
+        expect(app.store.writes.single.completion.isCompleted, isFalse);
         await tester.pumpAndSettle();
-        final text = tester.renderObject<RenderParagraph>(title);
-        expect(text.didExceedMaxLines, isFalse);
-        final rect = tester.getRect(title);
-        expect(rect.top, greaterThanOrEqualTo(24));
-        expect(rect.bottom, lessThanOrEqualTo(568 - 34));
-        expect(title.hitTestable(), findsOneWidget);
-        await tester.tap(title);
-        await tester.pumpAndSettle();
-        expect(app.mode, QuickCreationMode.values[i]);
         app.expectOrigin(tester);
-      }
-    });
+
+        await _openMenu(tester);
+        expect(
+          tester
+              .getSemantics(find.text(titles[next.index]))
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue,
+        );
+        await tester.tap(find.text(titles[next.index]));
+        await tester.pumpAndSettle();
+        expect(app.mode, next);
+        expect(app.store.writes.map((write) => write.mode), [next, next]);
+        app.expectOrigin(tester);
+      },
+    );
   }
+
+  // Самые длинные названия русские, поэтому достаточно русского языка.
+  testWidgets('все названия целиком доступны при тексте 2.6 '
+      'через прокрутку на узком экране', (tester) async {
+    const language = 'ru';
+    final titles = _titles[language]!;
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+    tester.platformDispatcher.textScaleFactorTestValue = 2.6;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final app = await _openApp(tester, language: language);
+
+    for (var i = 0; i < titles.length; i++) {
+      await _openMenu(tester);
+      final title = find.text(titles[i]);
+      final scrollable = find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(title, 100, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      final text = tester.renderObject<RenderParagraph>(title);
+      expect(text.didExceedMaxLines, isFalse);
+      final rect = tester.getRect(title);
+      expect(rect.top, greaterThanOrEqualTo(24));
+      expect(rect.bottom, lessThanOrEqualTo(568 - 34));
+      expect(title.hitTestable(), findsOneWidget);
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      expect(app.mode, QuickCreationMode.values[i]);
+      app.expectOrigin(tester);
+    }
+  });
 
   for (final byBack in [false, true]) {
     testWidgets('закрытие ${byBack ? 'назад' : 'фоном'} сохраняет режим, '

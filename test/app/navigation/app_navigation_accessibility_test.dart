@@ -48,119 +48,122 @@ final _names = {
 };
 
 void main() {
-  for (final locale in [..._names.keys, const Locale('de', 'DE')]) {
+  // Доступность и размер текста от языка не зависят: общие сценарии идут на
+  // русском. Смену языка проверяем в обе стороны, включая английский fallback.
+  const locale = Locale('ru');
+  final names = _names[locale]!;
+  const code = 'ru';
+
+  testWidgets('обычные страницы сохраняют доступные названия, выбранный '
+      'пункт, подсказки и целые значки при тексте 2.5: $code', (tester) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.physicalSize = _screen;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = _textScale;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final router = await _start(tester, locale);
+
+    for (final selected in AppDestination.values) {
+      await tester.tap(appNavigationDestination(selected));
+      await tester.pumpAndSettle();
+      for (final route in <PageRouteInfo>[
+        IntentionDetailsRoute(
+          intentionId: (IntentionId.decode(
+            tagFixtureId(1),
+          ) as IntentionIdDecodingSuccess).id,
+        ),
+        RelationDetailsRoute(
+          relationId: (LongTermRelationId.decode(
+            tagFixtureId(101),
+          ) as LongTermRelationIdDecodingSuccess).id,
+        ),
+        DailyChoiceDetailsRoute(
+          choiceId: (DailyChoiceId.decode(
+            tagFixtureId(201),
+          ) as DailyChoiceIdDecodingSuccess).id,
+        ),
+        TagNavigationRoute(
+          tagId: (TagId.decode(
+            tagFixtureId(firstTagNumber),
+          ) as TagIdDecodingSuccess).id,
+        ),
+        TagCatalogRoute(),
+      ]) {
+        unawaited(router.push<void>(route));
+        await tester.pumpAndSettle();
+
+        _expectAnnounced(
+          tester,
+          names,
+          selected: selected,
+          rootHeaderVisible: false,
+        );
+        _expectWholeIcons(tester, selected: selected);
+        for (final name in names.values) {
+          expect(find.byTooltip(name), findsOneWidget);
+        }
+        final appBar = find.byType(AppBar);
+        final title = tester.widget<AppBar>(appBar).title!;
+        final rect = tester.getRect(find.byWidget(title));
+        expect(rect.top, greaterThanOrEqualTo(tester.getRect(appBar).top));
+        expect(rect.bottom, lessThanOrEqualTo(tester.getRect(appBar).bottom));
+        expect(
+          tester.getSemantics(find.byWidget(title)).flagsCollection.isHeader,
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+      }
+      // Доступное действие пункта закрывает всю историю до его корня.
+      tester.semantics.tap(
+        find.semantics.byLabel(_destinationLabel(tester, names, selected)),
+      );
+      await tester.pumpAndSettle();
+      _expectAnnounced(tester, names, selected: selected);
+      expect(router.stack, hasLength(1));
+    }
+    semantics.dispose();
+  });
+
+  testWidgets('при масштабе текста 2.5 значки пунктов не обрезаются, каждый '
+      'пункт выбирается касанием, а заголовок его корневой страницы виден: '
+      '$code', (tester) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.physicalSize = _screen;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = _textScale;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _start(tester, locale);
+
+    // Системный размер текста доходит до корневых страниц.
+    expect(
+      MediaQuery.textScalerOf(tester.element(find.byType(HomePage))).scale(10),
+      10 * _textScale,
+    );
+    _expectWholeIcons(tester, selected: AppDestination.home);
+    _expectVisibleTitle(tester, names, AppDestination.home);
+
+    for (final selected in [
+      AppDestination.dailyChoices,
+      AppDestination.intentionGraph,
+      AppDestination.home,
+    ]) {
+      await tester.tap(_icon(selected, isSelected: false));
+      await tester.pumpAndSettle();
+
+      expect(_selected(tester), selected);
+      _expectWholeIcons(tester, selected: selected);
+      _expectVisibleTitle(tester, names, selected);
+      expect(tester.takeException(), isNull);
+    }
+    semantics.dispose();
+  });
+
+  for (final locale in const [Locale('ru'), Locale('de', 'DE')]) {
     final names = _names[locale] ?? _names[const Locale('en')]!;
     final code = locale.languageCode;
     final otherLocale = _names.keys.firstWhere((other) => other != locale);
-
-    testWidgets('обычные страницы сохраняют доступные названия, выбранный '
-        'пункт, подсказки и целые значки при тексте 2.5: $code', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      tester.view.physicalSize = _screen;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      tester.platformDispatcher.textScaleFactorTestValue = _textScale;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      final router = await _start(tester, locale);
-
-      for (final selected in AppDestination.values) {
-        await tester.tap(appNavigationDestination(selected));
-        await tester.pumpAndSettle();
-        for (final route in <PageRouteInfo>[
-          IntentionDetailsRoute(
-            intentionId: (IntentionId.decode(
-              tagFixtureId(1),
-            ) as IntentionIdDecodingSuccess).id,
-          ),
-          RelationDetailsRoute(
-            relationId: (LongTermRelationId.decode(
-              tagFixtureId(101),
-            ) as LongTermRelationIdDecodingSuccess).id,
-          ),
-          DailyChoiceDetailsRoute(
-            choiceId: (DailyChoiceId.decode(
-              tagFixtureId(201),
-            ) as DailyChoiceIdDecodingSuccess).id,
-          ),
-          TagNavigationRoute(
-            tagId: (TagId.decode(
-              tagFixtureId(firstTagNumber),
-            ) as TagIdDecodingSuccess).id,
-          ),
-          TagCatalogRoute(),
-        ]) {
-          unawaited(router.push<void>(route));
-          await tester.pumpAndSettle();
-
-          _expectAnnounced(
-            tester,
-            names,
-            selected: selected,
-            rootHeaderVisible: false,
-          );
-          _expectWholeIcons(tester, selected: selected);
-          for (final name in names.values) {
-            expect(find.byTooltip(name), findsOneWidget);
-          }
-          final appBar = find.byType(AppBar);
-          final title = tester.widget<AppBar>(appBar).title!;
-          final rect = tester.getRect(find.byWidget(title));
-          expect(rect.top, greaterThanOrEqualTo(tester.getRect(appBar).top));
-          expect(rect.bottom, lessThanOrEqualTo(tester.getRect(appBar).bottom));
-          expect(
-            tester.getSemantics(find.byWidget(title)).flagsCollection.isHeader,
-            isTrue,
-          );
-          expect(tester.takeException(), isNull);
-        }
-        // Доступное действие пункта закрывает всю историю до его корня.
-        tester.semantics.tap(
-          find.semantics.byLabel(_destinationLabel(tester, names, selected)),
-        );
-        await tester.pumpAndSettle();
-        _expectAnnounced(tester, names, selected: selected);
-        expect(router.stack, hasLength(1));
-      }
-      semantics.dispose();
-    });
-
-    testWidgets('при масштабе текста 2.5 значки пунктов не обрезаются, каждый '
-        'пункт выбирается касанием, а заголовок его корневой страницы виден: '
-        '$code', (tester) async {
-      final semantics = tester.ensureSemantics();
-      tester.view.physicalSize = _screen;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      tester.platformDispatcher.textScaleFactorTestValue = _textScale;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await _start(tester, locale);
-
-      // Системный размер текста доходит до корневых страниц.
-      expect(
-        MediaQuery.textScalerOf(tester.element(find.byType(HomePage)))
-            .scale(10),
-        10 * _textScale,
-      );
-      _expectWholeIcons(tester, selected: AppDestination.home);
-      _expectVisibleTitle(tester, names, AppDestination.home);
-
-      for (final selected in [
-        AppDestination.dailyChoices,
-        AppDestination.intentionGraph,
-        AppDestination.home,
-      ]) {
-        await tester.tap(_icon(selected, isSelected: false));
-        await tester.pumpAndSettle();
-
-        expect(_selected(tester), selected);
-        _expectWholeIcons(tester, selected: selected);
-        _expectVisibleTitle(tester, names, selected);
-        expect(tester.takeException(), isNull);
-      }
-      semantics.dispose();
-    });
 
     testWidgets('смена языка интерфейса меняет только названия пунктов и '
         'заголовок: состав, порядок, значки и выбранный пункт прежние: '

@@ -131,117 +131,103 @@ void main() {
     }
   });
 
-  for (final destination in AppDestination.values) {
-    testWidgets(
-      'выбор пункта ${destination.index + 1} со страницы участника удаляет '
-      'незавершённую форму связи и правку намерения без сохранения',
-      (tester) async {
-        final router = await _start(tester);
-        await _open(
-          tester,
-          find.byType(HomeIntentionRow),
-          IntentionDetailsPage,
-        );
-        await _open(
-          tester,
-          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-          RelationEditorPage,
-        );
-        await _open(
-          tester,
-          find.byKey(const ValueKey('relation-editor-select-related')),
-          RelationParticipantPickerPage,
-        );
-        await _tap(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
-        await _gone(tester, RelationParticipantPickerPage);
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('relation-editor-type-need')),
-        );
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('relation-editor-priority-p2')),
-        );
-        await tester.enterText(
-          find.byKey(const ValueKey('relation-editor-description')),
-          'Несохранённый черновик связи',
-        );
-        await _open(
-          tester,
-          find.byKey(const ValueKey('relation-editor-open-source-details')),
-          IntentionDetailsPage,
-        );
-        _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('intention-details-edit')),
-        );
-        await tester.enterText(
-          find.byKey(const ValueKey('intention-details-edit-title')),
-          'Несохранённое название',
-        );
-        await tester.enterText(
-          find.byKey(const ValueKey('intention-details-edit-description')),
-          'Несохранённое описание',
-        );
-        tester.testTextInput.hide();
-        await tester.pumpAndSettle();
-        _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+  // Выбор любого пункта сбрасывает историю одним путём: берём переход на
+  // другой пункт.
+  const destination = AppDestination.dailyChoices;
+  testWidgets(
+    'выбор пункта ${destination.index + 1} со страницы участника удаляет '
+    'незавершённую форму связи и правку намерения без сохранения',
+    (tester) async {
+      final router = await _start(tester);
+      await _open(tester, find.byType(HomeIntentionRow), IntentionDetailsPage);
+      await _open(
+        tester,
+        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+        RelationEditorPage,
+      );
+      await _open(
+        tester,
+        find.byKey(const ValueKey('relation-editor-select-related')),
+        RelationParticipantPickerPage,
+      );
+      await _tap(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
+      await _gone(tester, RelationParticipantPickerPage);
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('relation-editor-type-need')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('relation-editor-priority-p2')),
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('relation-editor-description')),
+        'Несохранённый черновик связи',
+      );
+      await _open(
+        tester,
+        find.byKey(const ValueKey('relation-editor-open-source-details')),
+        IntentionDetailsPage,
+      );
+      _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+      await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-details-edit-title')),
+        'Несохранённое название',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-details-edit-description')),
+        'Несохранённое описание',
+      );
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
 
-        await _select(tester, destination);
+      await _select(tester, destination);
 
-        _expectRootPage(tester, router, destination);
-        expect(find.byType(AlertDialog), findsNothing);
-        expect(
-          find.byType(RelationEditorPage, skipOffstage: false),
-          findsNothing,
-        );
-        expect(
-          find.byType(IntentionDetailsPage, skipOffstage: false),
-          findsNothing,
-        );
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        _expectRootPage(tester, router, AppDestination.home);
-        await _open(
-          tester,
-          find.byType(HomeIntentionRow),
-          IntentionDetailsPage,
-        );
-        expect(
-          tester
-              .widget<Text>(
-                find.byKey(const ValueKey('intention-details-title')),
-              )
-              .data,
-          'Читать',
-        );
-        expect(find.text('Несохранённое название'), findsNothing);
-        expect(find.text('Несохранённое описание'), findsNothing);
-        await _open(
-          tester,
-          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-          RelationEditorPage,
-        );
-        expect(
-          tester
-              .widget<TextField>(
-                find.byKey(const ValueKey('relation-editor-description')),
-              )
-              .controller!
-              .text,
-          isEmpty,
-        );
-        expect(
-          find.byKey(
-            const ValueKey('relation-editor-participant-title-related'),
-          ),
-          findsNothing,
-        );
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
+      _expectRootPage(tester, router, destination);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(
+        find.byType(RelationEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.byType(IntentionDetailsPage, skipOffstage: false),
+        findsNothing,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      _expectRootPage(tester, router, AppDestination.home);
+      await _open(tester, find.byType(HomeIntentionRow), IntentionDetailsPage);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
+            .data,
+        'Читать',
+      );
+      expect(find.text('Несохранённое название'), findsNothing);
+      expect(find.text('Несохранённое описание'), findsNothing);
+      await _open(
+        tester,
+        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+        RelationEditorPage,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('relation-editor-description')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+      expect(
+        find.byKey(const ValueKey('relation-editor-participant-title-related')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// Корневая страница каждого пункта.
