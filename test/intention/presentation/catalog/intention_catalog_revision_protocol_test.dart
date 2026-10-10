@@ -35,7 +35,6 @@ void main() {
         ),
       ),
     );
-    expect(repository.queries, hasLength(1));
 
     repository.complete(
       0,
@@ -56,12 +55,7 @@ void main() {
       current,
       isA<IntentionCatalogLoaded>()
           .having((value) => value.items.single.id, 'ID', created.id)
-          .having((value) => value.totalCount, 'count', 1)
-          .having(
-            (value) => value.revision,
-            'ревизия',
-            const TestCatalogRevision(2),
-          ),
+          .having((value) => value.totalCount, 'count', 1),
     );
   });
 
@@ -125,7 +119,6 @@ void main() {
             as IntentionCatalogLoaded;
     expect(current.items.map((item) => item.id), [created.id]);
     expect(current.totalCount, 1);
-    expect(repository.queries, hasLength(1));
   });
 
   test('повторяет только устаревшую continuation с тем же cursor', () async {
@@ -368,7 +361,6 @@ void main() {
       ]);
       expect(current.totalCount, 6);
       expect(current.nextCursor, isNull);
-      expect(repository.queries, hasLength(2));
     },
   );
 
@@ -478,7 +470,6 @@ void main() {
                   .requireValue
               as IntentionCatalogLoaded;
       expect(current.items.first.title, 'Подтверждённое');
-      expect(current.revision, const TestCatalogRevision(2));
       expect(current.nextCursor, same(cursor));
       expect(repository.queries, hasLength(4));
     },

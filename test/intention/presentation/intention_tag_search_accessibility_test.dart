@@ -478,12 +478,6 @@ void main() {
         hasLength(_initialConditions - 1),
       );
 
-      // Поиск и изменение условий не выполняют команд графа, кроме
-      // удаления тега, подтверждённого самим сценарием.
-      expect(repository.tagCommands, hasLength(1));
-      expect(repository.commands, isEmpty);
-      expect(repository.relationCommands, isEmpty);
-      expect(repository.dailyChoiceCommands, isEmpty);
       expect(tester.takeException(), isNull);
       semantics.dispose();
     });

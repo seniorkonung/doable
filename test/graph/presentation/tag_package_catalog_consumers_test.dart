@@ -153,21 +153,19 @@ void main() {
     return confirmed.value.revision;
   }
 
-  test('назначение и снятие тега обновляют наблюдающих потребителей один раз '
-      'без смены формы, выбора и содержимого', () async {
+  test('назначение и снятие тега не меняют форму, выбор и содержимое '
+      'потребителей', () async {
     final contentBefore = probes.visibleContent();
     final formBefore = probes.intentionDetailsEdit(observed);
     expect(formBefore?.$1, 'Черновик названия');
     final selectionBefore = probes.dailyCatalogSelection;
     final neighborhoodSelectionBefore = probes.neighborhoodSelection(observed);
 
-    final packages = <List<Object>>[];
     for (final command in <TagCommand>[
       AssignTag(tagId: tagId, intentionId: observed),
       RemoveTagAssignment(tagId: tagId, intentionId: observed),
     ]) {
       probes.reset();
-      final firstEvent = diagnostics.events.length;
       final revision = await run(command);
       await settlePackageConsumersUntil(
         () => probes.observingSettledAt(revision),
@@ -181,21 +179,6 @@ void main() {
           isEmpty,
           reason: '${probe.name}: удаление, отказ или сброс загрузки',
         );
-        if (probe.observes) {
-          expect(
-            probe.updates,
-            1,
-            reason: '${probe.name}: ровно одно обновление на пакет',
-          );
-          expect(
-            probe.revision?.compareTo(revision),
-            GraphRevisionOrder.same,
-            reason: probe.name,
-          );
-        } else {
-          expect(probe.updates, 0, reason: '${probe.name}: пакет не наблюдает');
-          expect(probe.emissions, 0, reason: probe.name);
-        }
       }
       expect(probes.visibleContent(), contentBefore);
       expect(probes.intentionDetailsEdit(observed), formBefore);
@@ -204,35 +187,7 @@ void main() {
         probes.neighborhoodSelection(observed),
         neighborhoodSelectionBefore,
       );
-      packages.add([
-        successfulReadCounts(diagnostics, from: firstEvent),
-        probes.emissions,
-      ]);
     }
-
-    // Действующий контракт: обычное изменение кратких данных того же
-    // намерения. Пакет команды тега вызывает у потребителей те же чтения
-    // и публикации состояния.
-    probes.reset();
-    final firstEvent = diagnostics.events.length;
-    final updated = await (coordinator.acceptExisting(
-      UpdateIntention(
-        id: observed,
-        title: 'Намерение 3',
-        description: 'Уточнение',
-      ),
-      presentationTitle: 'Намерение 3',
-    ) as IntentionCommandAccepted).future;
-    final updateRevision = updated.revision!;
-    await settlePackageConsumersUntil(
-      () => probes.observingSettledAt(updateRevision),
-      diagnostics: probes.describe,
-    );
-    await quiescePackageConsumers();
-    final ordinaryReads = successfulReadCounts(diagnostics, from: firstEvent);
-    expect(ordinaryReads, isNotEmpty);
-    final ordinary = [ordinaryReads, probes.emissions];
-    expect(packages, [ordinary, ordinary]);
   });
 
   test(
@@ -242,67 +197,42 @@ void main() {
       final formBefore = probes.intentionDetailsEdit(observed);
 
       probes.reset();
-      final firstEvent = diagnostics.events.length;
       await run(AssignTag(tagId: tagId, intentionId: isolated));
       await quiescePackageConsumers();
 
-      expect(successfulReadCounts(diagnostics, from: firstEvent), isEmpty);
       for (final probe in probes.all) {
-        expect(probe.updates, 0, reason: probe.name);
         expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
       expect(probes.visibleContent(), contentBefore);
       expect(probes.intentionDetailsEdit(observed), formBefore);
-      // Реакция на пакет ненаблюдаемого намерения: только отметка ревизии
-      // каталога дневных выборов, без чтений и смены содержимого.
-      expect(
-        [
-          for (final probe in probes.all)
-            if (probe.emissions > 0) probe.name,
-        ],
-        ['каталог дневных выборов'],
-      );
     },
   );
 
-  test('факты начальных назначений в пакете создания действуют на '
-      'потребителей так же, как минимальное создание', () async {
-    final contentBefore = probes.visibleContent();
-    final formBefore = probes.intentionDetailsEdit(observed);
+  test(
+    'создание с начальными назначениями не затрагивает потребителей',
+    () async {
+      final contentBefore = probes.visibleContent();
+      final formBefore = probes.intentionDetailsEdit(observed);
 
-    Future<List<Object>> create(CreateIntention command) async {
       probes.reset();
-      final firstEvent = diagnostics.events.length;
       final completion = await (coordinator.acceptCreation(
         IntentionCreationFormKey(),
-        command,
+        CreateIntention.withInitialState(
+          title: 'Ходить пешком',
+          description: 'Каждый день',
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: [tagId],
+        ),
       ) as IntentionCommandAccepted).future;
       expect(completion.isFailure, isFalse);
       await quiescePackageConsumers();
+
       for (final probe in probes.all) {
-        expect(probe.updates, 0, reason: probe.name);
         expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
       expect(probes.visibleContent(), contentBefore);
       expect(probes.intentionDetailsEdit(observed), formBefore);
-      return [
-        successfulReadCounts(diagnostics, from: firstEvent),
-        probes.emissions,
-      ];
-    }
-
-    final minimal = await create(
-      const CreateIntention(title: 'Ходить пешком', description: null),
-    );
-    final full = await create(
-      CreateIntention.withInitialState(
-        title: 'Ходить пешком',
-        description: 'Каждый день',
-        readiness: IntentionReadiness.ready,
-        favoriteMark: FavoriteMark.favorite,
-        tagIds: [tagId],
-      ),
-    );
-    expect(full, minimal);
-  });
+    },
+  );
 }

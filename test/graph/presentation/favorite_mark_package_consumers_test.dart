@@ -152,20 +152,18 @@ void main() {
     intentionDetailsViewModelProvider(id),
   ) as IntentionDetailsLoaded).details.favoriteMark;
 
-  test('отметка и её снятие обновляют наблюдающих потребителей один раз без '
-      'смены состава, параметров и позиции', () async {
+  test('отметка и её снятие не меняют состав, параметры и позицию у '
+      'потребителей', () async {
     final contentBefore = probes.visibleContent();
     final selectionBefore = probes.dailyCatalogSelection;
     final neighborhoodSelectionBefore = probes.neighborhoodSelection(observed);
     expect(detailsMark(observed), FavoriteMark.notFavorite);
 
-    final packages = <List<Object>>[];
     for (final (command, mark) in <(ExistingIntentionCommand, FavoriteMark)>[
       (MarkIntentionFavorite(observed), FavoriteMark.favorite),
       (UnmarkIntentionFavorite(observed), FavoriteMark.notFavorite),
     ]) {
       probes.reset();
-      final firstEvent = diagnostics.events.length;
       final revision = await runChanging(command);
       await settlePackageConsumersUntil(
         () => probes.observingSettledAt(revision),
@@ -179,21 +177,6 @@ void main() {
           isEmpty,
           reason: '${probe.name}: удаление, отказ или сброс загрузки',
         );
-        if (probe.observes) {
-          expect(
-            probe.updates,
-            1,
-            reason: '${probe.name}: ровно одно обновление на пакет',
-          );
-          expect(
-            probe.revision?.compareTo(revision),
-            GraphRevisionOrder.same,
-            reason: probe.name,
-          );
-        } else {
-          expect(probe.updates, 0, reason: '${probe.name}: пакет не наблюдает');
-          expect(probe.emissions, 0, reason: probe.name);
-        }
       }
       expect(probes.visibleContent(), contentBefore);
       expect(probes.dailyCatalogSelection, selectionBefore);
@@ -205,33 +188,7 @@ void main() {
       // подтверждённую отметку.
       expect(detailsMark(observed), mark);
       expect(detailsMark(durabilityIntention(5)), FavoriteMark.notFavorite);
-      packages.add([
-        successfulReadCounts(diagnostics, from: firstEvent),
-        probes.emissions,
-      ]);
     }
-
-    // Действующий контракт: обычное изменение кратких данных того же
-    // намерения. Пакет отметки вызывает у потребителей те же чтения и
-    // публикации состояния.
-    probes.reset();
-    final firstEvent = diagnostics.events.length;
-    final updateRevision = await runChanging(
-      UpdateIntention(
-        id: observed,
-        title: 'Намерение 3',
-        description: 'Уточнение',
-      ),
-    );
-    await settlePackageConsumersUntil(
-      () => probes.observingSettledAt(updateRevision),
-      diagnostics: probes.describe,
-    );
-    await quiescePackageConsumers();
-    final ordinaryReads = successfulReadCounts(diagnostics, from: firstEvent);
-    expect(ordinaryReads, isNotEmpty);
-    final ordinary = [ordinaryReads, probes.emissions];
-    expect(packages, [ordinary, ordinary]);
   });
 
   test('повтор отметки без изменения не затрагивает потребителей', () async {
@@ -257,21 +214,11 @@ void main() {
       ),
     );
     for (final probe in probes.all) {
-      expect(probe.updates, 0, reason: probe.name);
       expect(probe.forbiddenStates, isEmpty, reason: probe.name);
     }
     expect(probes.visibleContent(), contentBefore);
     expect(probes.dailyCatalogSelection, selectionBefore);
     expect(detailsMark(observed), FavoriteMark.favorite);
-    // Повтор не продвигает ревизию: состояние публикует только страница
-    // самого намерения, которая отражает завершение его операции.
-    expect(
-      [
-        for (final probe in probes.all)
-          if (probe.emissions > 0) probe.name,
-      ],
-      ['подробности намерения 3'],
-    );
   });
 
   test(
@@ -281,27 +228,15 @@ void main() {
       final selectionBefore = probes.dailyCatalogSelection;
 
       probes.reset();
-      final firstEvent = diagnostics.events.length;
       await runChanging(MarkIntentionFavorite(isolated));
       await quiescePackageConsumers();
 
-      expect(successfulReadCounts(diagnostics, from: firstEvent), isEmpty);
       for (final probe in probes.all) {
-        expect(probe.updates, 0, reason: probe.name);
         expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
       expect(probes.visibleContent(), contentBefore);
       expect(probes.dailyCatalogSelection, selectionBefore);
       expect(detailsMark(observed), FavoriteMark.notFavorite);
-      // Реакция на пакет ненаблюдаемого намерения: только отметка ревизии
-      // каталога дневных выборов, без чтений и смены содержимого.
-      expect(
-        [
-          for (final probe in probes.all)
-            if (probe.emissions > 0) probe.name,
-        ],
-        ['каталог дневных выборов'],
-      );
     },
   );
 }

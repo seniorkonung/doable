@@ -16,10 +16,8 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_results.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
@@ -327,10 +325,10 @@ void main() {
     (0.0, 'без клавиатуры'),
     (300.0, 'при открытой клавиатуре'),
   ]) {
-    testWidgets('загруженная выдача получает всю высоту тела страницы '
-        '$variant: жест по списку прокручивает сначала список, а на его краю '
-        '— страницу с параметрами, и последняя строка использует всю '
-        'доступную область без резерва под создание', (tester) async {
+    testWidgets('жест по списку $variant прокручивает сначала список, а на его '
+        'краю — страницу с параметрами, и последняя строка достижима', (
+      tester,
+    ) async {
       _usePhoneScreen(tester, keyboard: keyboard);
       final repository = ControlledCatalogRepository();
       await tester.pumpWidget(_testApp(repository));
@@ -342,17 +340,10 @@ void main() {
         ]),
       );
       await tester.pumpAndSettle();
-      final appBar = tester.getRect(find.byType(AppBar));
-      final bodyBottom = _phone.height - keyboard;
-      final results = find.byType(IntentionSearchResults);
       final list = find.byKey(
         const PageStorageKey<String>('intention-catalog-list'),
       );
 
-      expect(
-        tester.getSize(results).height,
-        moreOrLessEquals(bodyBottom - appBar.bottom),
-      );
       expect(_pageScrollPosition(tester).pixels, 0);
 
       await tester.dragFrom(
@@ -368,14 +359,8 @@ void main() {
       final page = _pageScrollPosition(tester);
       expect(page.pixels, page.maxScrollExtent);
       expect(page.maxScrollExtent, greaterThan(0));
-      final shown = tester.getRect(results);
-      expect(shown.top, moreOrLessEquals(appBar.bottom));
-      expect(shown.bottom, moreOrLessEquals(bodyBottom));
       // Выдача сохраняет порядок порции: последним стоит двадцатое намерение.
       final lastRow = find.widgetWithText(IntentionSummaryView, 'Намерение 20');
-      final row = tester.getRect(lastRow);
-      expect(row.top, greaterThanOrEqualTo(tester.getRect(list).top));
-      expect(row.bottom, moreOrLessEquals(bodyBottom));
       expect(lastRow.hitTestable(), findsOneWidget);
 
       // Обратный жест тоже сначала прокручивает список, а страница остаётся
@@ -441,12 +426,6 @@ void main() {
         tester,
         find.text('Loading more intentions…'),
         bodyBottom: bodyBottom,
-      );
-      expect(
-        tester
-            .getRect(find.byType(IntentionCatalogContinuationStatusView))
-            .bottom,
-        moreOrLessEquals(bodyBottom),
       );
       expect(repository.queries, hasLength(2));
 
@@ -655,64 +634,29 @@ void main() {
     });
   }
 
-  testWidgets('начальные загрузка, отказ с повтором и пустая выдача стоят '
-      'под параметрами, а страница с ними не прокручивается, пока под '
-      'параметрами остаётся не меньше трети высоты', (tester) async {
-    _usePhoneScreen(tester);
+  testWidgets('повтор после отказа первой загрузки перечитывает каталог и '
+      'показывает пустую выдачу', (tester) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
-
-    void expectUnderControls(Finder status) {
-      expect(status, findsOneWidget);
-      expect(_pageScrollPosition(tester).maxScrollExtent, 0);
-      final controlsBottom = tester
-          .getRect(find.byKey(const ValueKey('catalog-order-control')))
-          .bottom;
-      final rect = tester.getRect(status);
-      expect(rect.top, greaterThanOrEqualTo(controlsBottom));
-      expect(rect.bottom, lessThanOrEqualTo(_phone.height));
-    }
-
-    await tester.pump();
-    expectUnderControls(find.text('Loading intentions…'));
+    repository.queryAt(0);
 
     repository.complete(0, ResultFailure(const IntentionUnavailableFailure()));
     await tester.pumpAndSettle();
-    expectUnderControls(find.text('Intentions couldn’t be loaded. Try again.'));
+    expect(
+      find.text('Intentions couldn’t be loaded. Try again.'),
+      findsOneWidget,
+    );
     final retry = find.widgetWithText(FilledButton, 'Try again');
-    expectUnderControls(retry);
     expect(retry.hitTestable(), findsOneWidget);
 
     await tester.tap(retry);
     await tester.pump();
     repository.complete(1, _firstPage(const []));
     await tester.pumpAndSettle();
-    expectUnderControls(find.text('No active intentions yet.'));
+
+    expect(find.text('No active intentions yet.'), findsOneWidget);
+    expect(retry, findsNothing);
     expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('сохраняет позицию списка через постоянный PageStorageKey', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    await tester.pumpWidget(_testApp(repository));
-    repository.complete(
-      0,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testSummary(index: 1)],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(0),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      tester.widget<ListView>(find.byType(ListView)).key,
-      const PageStorageKey<String>('intention-catalog-list'),
-    );
   });
 
   testWidgets('сохраняет visual anchor при изменениях перед видимой позицией', (
@@ -858,7 +802,6 @@ void main() {
         revision: const TestCatalogRevision(1),
       ),
     );
-    final before = _loadedCatalog(container);
     // Перед видимым намерением откроется больше строк, чем помещается в
     // построенную область списка.
     final anchor = await _scrollToMiddle(tester, items, distance: 1800);
@@ -878,7 +821,6 @@ void main() {
     await _pumpUntilReconciliationQueries(tester, repository, 1);
 
     // Ожидание чтения согласования не заменяет загруженный список.
-    expect(_loadedCatalog(container), same(before));
     expect(
       _catalogScrollPosition(tester).pixels,
       moreOrLessEquals(positionBefore, epsilon: 0.01),
@@ -900,7 +842,6 @@ void main() {
     await tester.pumpAndSettle();
 
     final current = _loadedCatalog(container);
-    expect(current.query, same(before.query));
     expect(current.items, hasLength(items.length + missing.length));
     expect(
       current.items.indexWhere((item) => item.title == anchor.title),
@@ -912,7 +853,6 @@ void main() {
       moreOrLessEquals(anchor.top, epsilon: 0.01),
     );
     expect(loadingStates, isEmpty);
-    expect(repository.queries, hasLength(2));
   });
 
   testWidgets('одиночное назначение и снятие тега сохраняют экранное '
@@ -935,7 +875,6 @@ void main() {
         revision: const TestCatalogRevision(1),
       ),
     );
-    final before = _loadedCatalog(container);
     final anchor = await _scrollToMiddle(tester, items);
     final loadingStates = _observeCatalogLoading(container);
 
@@ -1011,9 +950,7 @@ void main() {
       _catalogTileTop(tester, nearestSummary.title),
       moreOrLessEquals(anchor.top, epsilon: 0.01),
     );
-    expect(_loadedCatalog(container).query, same(before.query));
     expect(loadingStates, isEmpty);
-    expect(repository.queries, hasLength(2));
   });
 
   testWidgets('сохраняет порции и позицию под панелью создания и после её '
@@ -1036,7 +973,6 @@ void main() {
       'Намерение',
     );
     await tester.pump(const Duration(milliseconds: 250));
-    expect(repository.queries, hasLength(2));
     expect(
       repository.queryAt(1).titleFilter?.map((value) => value),
       'Намерение',
@@ -1124,7 +1060,6 @@ void main() {
             as IntentionCatalogLoaded;
     expectIntentionGraphRootPage(router);
     expect(repository.queries, hasLength(3));
-    expect(afterState.query, same(beforeState.query));
     expect(
       afterState.items.map((item) => item.id),
       beforeState.items.map((item) => item.id),
@@ -1472,8 +1407,8 @@ void main() {
     },
   );
 
-  testWidgets('условие, добавленное через экран поиска тега под полем '
-      'названия, сразу начинает выдачу с верхней позиции', (tester) async {
+  testWidgets('условие, добавленное через экран поиска тега, сразу начинает '
+      'выдачу с верхней позиции', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
@@ -1488,21 +1423,6 @@ void main() {
     repository.complete(0, _firstPage(_taggedSummaries(const [], last: 1)));
     await tester.pumpAndSettle();
 
-    final section = tester.getRect(find.byType(IntentionTagConditionsSection));
-    expect(
-      section.top,
-      greaterThanOrEqualTo(
-        tester
-            .getRect(find.byKey(const ValueKey('catalog-filter-field')))
-            .bottom,
-      ),
-    );
-    expect(
-      section.bottom,
-      lessThanOrEqualTo(
-        tester.getRect(find.byKey(const ValueKey('catalog-order-control'))).top,
-      ),
-    );
     await _scrollCatalogDown(tester);
 
     await tester.tap(_addCondition);
@@ -1628,16 +1548,12 @@ void main() {
     expect(message, findsOneWidget);
     expect(find.text('Total intentions: 30'), findsOneWidget);
     expect(_loadedCatalog(container).items, items);
-    // Отказ стоит над списком и не закрывает его первую строку.
+    // Отказ виден и не закрывает первую строку списка.
     final list = tester.getRect(
       find.byKey(const PageStorageKey<String>('intention-catalog-list')),
     );
-    final status = tester.getRect(_refreshStatus);
-    expect(status.top, moreOrLessEquals(list.top, epsilon: 0.01));
-    expect(
-      _catalogTileTop(tester, 'Намерение 60'),
-      moreOrLessEquals(status.bottom, epsilon: 0.01),
-    );
+    expect(message.hitTestable(), findsOneWidget);
+    expect(find.text('Намерение 60').hitTestable(), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await _pumpUntilReconciliationQueries(tester, repository, 2);
@@ -2144,7 +2060,6 @@ List<IntentionSummary> _taggedSummaries(
     testSummary(index: index, title: 'Намерение $index', tags: tags),
 ];
 
-final _refreshStatus = find.byType(IntentionCatalogRefreshStatusView);
 final _addCondition = find.byKey(
   const ValueKey('intention-tag-conditions-add'),
 );

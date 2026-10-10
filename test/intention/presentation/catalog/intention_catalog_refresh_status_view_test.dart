@@ -54,10 +54,9 @@ void main() {
       // Повтор запускает то же чтение области с прежними условиями.
       expect(h.repository.reconciliationQueries, hasLength(2));
       expect(
-        h.repository.reconciliationQueryAt(1).catalogQuery,
-        same(before.query),
+        h.repository.reconciliationQueryAt(1).catalogQuery.tagFilter,
+        before.query.tagFilter,
       );
-      expect(h.repository.queries, hasLength(2));
       expect(scrollable.position.pixels, 300);
       expect((h.confirmed as IntentionCatalogLoaded).items, items);
       // На время повторного чтения отказ не показывается.

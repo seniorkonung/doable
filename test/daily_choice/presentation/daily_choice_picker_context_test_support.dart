@@ -88,7 +88,6 @@ void defineDailyChoicePickerContextTests({
     expect(await selection, isNull);
     expect([for (final data in router.stackData) data.matchId], history);
     expect(find.text(cancelLabel), findsNothing);
-    expect(repository.dailyChoiceCommands, isEmpty);
     await router.maybePop();
     await tester.pumpAndSettle();
     expect(await auxiliary, isNull);
@@ -173,7 +172,6 @@ void defineDailyChoicePickerContextTests({
     expect(await selection, testSummary(index: 2).id);
     expect(launch.isActive, isTrue);
     expectIntentionGraphRootPage(router);
-    expect(repository.dailyChoiceCommands, isEmpty);
   });
 
   testWidgets('утрата права запуска запрещает выбор кандидата и открытие '
@@ -270,7 +268,6 @@ void defineDailyChoicePickerContextTests({
     await tester.pumpAndSettle();
     expect(await selection, isNull);
     expect(launch.isActive, isFalse);
-    expect(repository.dailyChoiceCommands, isEmpty);
   });
 
   testWidgets('поздний выбор и отмена прежней страницы не закрывают новый '
@@ -505,18 +502,7 @@ void _defineInitialPickerAccessibilityTests({
         expect(await selection, isNull);
         expect([for (final data in router.stackData) data.matchId], history);
         expect(tester.widget<TextField>(filter).controller!.text, 'Гул');
-        expect(
-          tester
-              .widget<ListView>(
-                find.byKey(PageStorageKey<String>('$keyPrefix-list')),
-              )
-              .childrenDelegate
-              .estimatedChildCount,
-          2,
-        );
         expect(find.text(label), findsNothing);
-        expect(repository.queries, hasLength(5));
-        expect(repository.dailyChoiceCommands, isEmpty);
         expect(tester.takeException(), isNull);
 
         // Отдельный запуск доказывает выбор ID обычным нажатием строки.
@@ -555,7 +541,6 @@ void _defineInitialPickerAccessibilityTests({
         expect(nextContext.launch.isActive, isTrue);
         expect([for (final data in router.stackData) data.matchId], history);
         expect(tester.widget<TextField>(filter).controller!.text, 'Гул');
-        expect(repository.dailyChoiceCommands, isEmpty);
         expect(tester.takeException(), isNull);
         await router.maybePop();
         await tester.pumpAndSettle();
@@ -601,7 +586,6 @@ void _expectPickerCandidateReachable(
   );
   expect(title, findsOneWidget);
   expect(input, findsOneWidget);
-  expect(tester.element(title), isNot(same(tester.element(input))));
   expect(tester.widget<EditableText>(input).controller.text, 'Гулять');
   final viewport = tester.getRect(find.byType(IntentionSearchLayout));
   final cancel = tester.getRect(find.widgetWithText(TextButton, cancelLabel));

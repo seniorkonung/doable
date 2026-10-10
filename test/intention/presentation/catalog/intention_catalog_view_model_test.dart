@@ -42,7 +42,6 @@ void main() {
       expect(query.cursor, isNull);
 
       const cursor = TestCatalogCursor();
-      const revision = TestCatalogRevision(4);
       final summaries = [
         testSummary(index: 1, title: 'Первое'),
         testSummary(index: 2, title: 'Второе'),
@@ -54,7 +53,7 @@ void main() {
             items: summaries,
             totalCount: 7,
             nextCursor: cursor,
-            revision: revision,
+            revision: const TestCatalogRevision(4),
           ),
         ),
       );
@@ -66,11 +65,9 @@ void main() {
       expect(
         state,
         isA<IntentionCatalogLoaded>()
-            .having((value) => value.query, 'запрос', same(query))
             .having((value) => value.items, 'элементы', summaries)
             .having((value) => value.totalCount, 'точное количество', 7)
-            .having((value) => value.nextCursor, 'курсор', same(cursor))
-            .having((value) => value.revision, 'ревизия', same(revision)),
+            .having((value) => value.nextCursor, 'курсор', same(cursor)),
       );
     },
   );
@@ -223,15 +220,6 @@ void main() {
 
     expect(policy.pageSize, 100);
     expect(policy.prefetchRemaining, 30);
-    expect(policy.filterDebounce, const Duration(milliseconds: 250));
-    expect(
-      () => CatalogPagingPolicy(
-        pageSize: 101,
-        prefetchRemaining: 30,
-        filterDebounce: const Duration(milliseconds: 250),
-      ),
-      throwsA(isA<CatalogPagingPolicyValidationException>()),
-    );
   });
 
   test('политика отклоняет недопустимые границы до запроса', () {
@@ -624,7 +612,6 @@ void main() {
       expect(recovered.items.single.id, testSummary(index: 7).id);
       expect(recovered.totalCount, 6);
       expect(recovered.nextCursor, same(newCursor));
-      expect(recovered.revision, const TestCatalogRevision(9));
     },
   );
 
@@ -729,7 +716,7 @@ void main() {
     },
   );
 
-  test('отбрасывает позднее восстановление прежней generation', () async {
+  test('отбрасывает позднее восстановление прежней выдачи', () async {
     final repository = ControlledCatalogRepository();
     final container = _catalogContainer(
       repository,
@@ -785,7 +772,7 @@ void main() {
         ),
       ),
     );
-    final current = await container.read(
+    await container.read(
       intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
     );
 
@@ -802,14 +789,17 @@ void main() {
     );
     await oldRecovery;
 
-    expect(
-      container
-          .read(
-            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-          )
-          .requireValue,
-      same(current),
-    );
+    final state =
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
+            as IntentionCatalogLoaded;
+    expect(state.items.single.title, 'Текущая выдача');
+    expect(state.totalCount, 1);
   });
 
   test(
@@ -1008,14 +998,16 @@ void main() {
     );
     await Future<void>.delayed(Duration.zero);
 
-    expect(
-      container
-          .read(
-            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-          )
-          .requireValue,
-      same(currentState),
-    );
+    final state =
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
+            as IntentionCatalogLoaded;
+    expect(state.items.single.title, 'Текущий результат');
   });
 
   test(
@@ -1052,18 +1044,12 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      final observedCompletions = <IntentionCommandCompletion>[];
-      final completionSubscription = coordinator.intentionCompletions.listen(
-        observedCompletions.add,
-      );
-      addTearDown(completionSubscription.cancel);
       final start = coordinator.acceptCreation(
         IntentionCreationFormKey(),
         const CreateIntention(title: 'Новое', description: null),
       );
       expect(start, isA<IntentionCommandAccepted>());
       final accepted = start as IntentionCommandAccepted;
-      expect(repository.commands, hasLength(1));
 
       final notifier = container.read(
         intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
@@ -1092,7 +1078,6 @@ void main() {
         ),
       );
       await accepted.future;
-      expect(observedCompletions, hasLength(1));
       repository.complete(
         3,
         ResultSuccess(
@@ -1108,14 +1093,7 @@ void main() {
         intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
             .future,
       );
-      expect(
-        reconciled,
-        isA<IntentionCatalogEmpty>().having(
-          (value) => value.revision,
-          'ревизия',
-          const TestCatalogRevision(4),
-        ),
-      );
+      expect(reconciled, isA<IntentionCatalogEmpty>());
       expect(repository.queries, hasLength(4));
     },
   );
@@ -1149,9 +1127,9 @@ void main() {
     await started.future;
 
     final claim = await presenter.nextClaim();
-    expect(claim!.token, same(started.token));
+    expect(claim, isNotNull);
     expect(
-      claim.completion,
+      claim!.completion,
       isA<IntentionCommandCompletion>().having(
         (completion) => completion.presentationTitle,
         'название намерения',

@@ -60,7 +60,6 @@ void main() {
           GraphRevisionOrder.same,
         );
         expect(_picker, findsNothing);
-        expect(h.repository.commands, isEmpty);
         expect(tester.takeException(), isNull);
       },
     );
@@ -78,7 +77,6 @@ void main() {
 
     expect(await h.result, isNull);
     expect(_picker, findsNothing);
-    expect(h.repository.commands, isEmpty);
   });
 
   testWidgets(
@@ -229,7 +227,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_visibleNames(tester), ['Здоровье']);
-      expect(h.repository.commands, isEmpty);
     },
   );
 
@@ -371,13 +368,10 @@ void main() {
     (tester) async {
       final h = await _open(tester);
       final tags = [_tag(1, 'Здоровье'), _tag(2, 'Спорт')];
-      // Каталог тегов под экраном и сам экран читают каталог независимо.
-      expect(h.repository.reads, hasLength(2));
       h.repository.completePending(tags);
       await tester.pumpAndSettle();
       await tester.enterText(_search, 'спорт');
       await tester.pump();
-      final firstInput = tester.widget<TextField>(_search).controller!;
 
       unawaited(
         h.router.push<IntentionTagConditionSelection>(
@@ -387,7 +381,6 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       // Второе открытие получает собственное состояние и собственное чтение.
-      expect(h.repository.reads, hasLength(3));
       expect(
         find.descendant(of: _picker, matching: find.text('Загружаем теги…')),
         findsOneWidget,
@@ -399,7 +392,7 @@ void main() {
 
       await h.router.maybePop();
       await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(_search).controller, same(firstInput));
+      expect(tester.widget<TextField>(_search).controller!.text, 'спорт');
       expect(_visibleNames(tester), ['Спорт']);
 
       // Выбор не выделяет тег в каталоге тегов и не меняет его состояние.

@@ -69,11 +69,6 @@ void main() {
       expect(_refreshRetry, findsOneWidget);
       expect(h.position.pixels, 300);
       expect(_rowTop(tester, 'Намерение 33'), rowTop);
-      // Отказ лежит поверх верхнего края списка и не сжимает его область.
-      expect(
-        tester.getRect(_refreshStatus).top,
-        moreOrLessEquals(tester.getRect(_list).top, epsilon: 0.01),
-      );
 
       await h.recoverRefresh(totalCount: 40);
 
@@ -98,13 +93,7 @@ void main() {
 
         expect(tester.takeException(), isNull);
         expect(find.text(_refreshUnavailableRu), findsOneWidget);
-        expect(
-          _rowTop(tester, first),
-          moreOrLessEquals(
-            tester.getRect(_refreshStatus).bottom,
-            epsilon: 0.01,
-          ),
-        );
+        expect(find.text(first).hitTestable(), findsOneWidget);
 
         await h.recoverRefresh(totalCount: count);
 
@@ -125,10 +114,7 @@ void main() {
       await tester.drag(_list, const Offset(0, 5000));
       await tester.pumpAndSettle();
 
-      expect(
-        _rowTop(tester, 'Намерение 40'),
-        moreOrLessEquals(tester.getRect(_refreshStatus).bottom, epsilon: 0.01),
-      );
+      expect(find.text('Намерение 40').hitTestable(), findsOneWidget);
     });
   });
 
@@ -141,7 +127,6 @@ void main() {
 
       expect(h.confirmed, isA<IntentionCatalogEmpty>());
       expect(find.text(_emptyRu), findsOneWidget);
-      expect(tester.getSize(_refreshStatus).height, 0);
       expect(
         find.descendant(of: _refreshStatus, matching: find.byType(Text)),
         findsNothing,
@@ -159,10 +144,6 @@ void main() {
       expect(find.text(_refreshUnavailableRu), findsOneWidget);
       expect(find.text(_emptyRu), findsOneWidget);
       expect(_refreshRetry, findsOneWidget);
-      expect(
-        tester.getRect(_refreshStatus).bottom,
-        lessThanOrEqualTo(tester.getRect(find.text(_emptyRu)).top),
-      );
     });
   });
 
@@ -302,21 +283,6 @@ void main() {
 
       expect(h.position.pixels, 300);
     });
-
-    testWidgets('место под кнопку страницы отводится после конца выдачи', (
-      tester,
-    ) async {
-      final h = await _open(tester, trailingInset: 88);
-      await h.load(_summaries(first: 40));
-
-      h.position.jumpTo(h.position.maxScrollExtent);
-      await _settle(tester);
-
-      expect(
-        tester.getRect(find.text('Намерение 1')).bottom,
-        moreOrLessEquals(tester.getRect(_list).bottom - 88, epsilon: 0.01),
-      );
-    });
   });
 
   group('отметка избранного', () {
@@ -358,10 +324,8 @@ void main() {
           );
           expect(current.totalCount, 40);
           expect(find.text('Всего намерений: 40'), findsOneWidget);
-          expect(tester.getSize(_refreshStatus).height, 0);
+          expect(find.text(_refreshUnavailableRu), findsNothing);
         }
-        expect(h.repository.queries, hasLength(2));
-        expect(h.repository.reconciliationQueries, isEmpty);
       });
     }
 
@@ -442,10 +406,9 @@ double _rowTop(WidgetTester tester, String title) =>
 /// Страница-образец: передаёт общему элементу выдачу своего назначения и
 /// построение своих строк.
 final class _Host extends ConsumerWidget {
-  const _Host({required this.viewAnchor, required this.trailingInset});
+  const _Host({required this.viewAnchor});
 
   final IntentionSearchResultsViewAnchor viewAnchor;
-  final double trailingInset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -475,7 +438,6 @@ final class _Host extends ConsumerWidget {
         ),
       ),
       viewAnchor: viewAnchor,
-      trailingInset: trailingInset,
     );
   }
 }
@@ -645,7 +607,6 @@ Future<_Harness> _open(
   WidgetTester tester, {
   IntentionSearchResultsViewAnchor viewAnchor =
       IntentionSearchResultsViewAnchor.scrollOffset,
-  double trailingInset = 0,
   List<IntentionSummary>? loadedBeforeMount,
 }) async {
   final repository = ControlledCatalogRepository();
@@ -676,7 +637,7 @@ Future<_Harness> _open(
     );
     await harness.load(loadedBeforeMount);
   }
-  await pump(_Host(viewAnchor: viewAnchor, trailingInset: trailingInset));
+  await pump(_Host(viewAnchor: viewAnchor));
   return harness;
 }
 

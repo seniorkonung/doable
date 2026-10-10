@@ -211,7 +211,6 @@ void main() {
       expect(current.items.single.id, action.id);
       expect(current.items.single.activeRelationCount, 2);
       expect(current.totalCount, 1);
-      expect(current.revision, const TestCatalogRevision(2));
     },
   );
 

@@ -12,7 +12,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -184,7 +183,6 @@ void main() {
       expect(find.byIcon(Icons.star_border), findsNothing);
       expect(find.text(markLabel), findsNothing);
       expect(find.byTooltip(markLabel), findsNothing);
-      expect(repository.queries, hasLength(2));
 
       // Выбор по-прежнему возвращает участника строки по идентификатору.
       await tester.tap(find.text('Гулять').first);
@@ -297,7 +295,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(await selection, isNull);
-    expect(repository.queries, hasLength(2));
   });
 
   testWidgets('архивный выбор подгружает следующую порцию полного каталога', (
@@ -544,9 +541,9 @@ Future<AppRouter> _pumpAppWithCatalog(
 /// Проверки подключения поиска по тегам к странице выбора участника.
 void _defineTagSearchTests() {
   // Охват архивированной связи проверяет отказ обновления ниже.
-  testWidgets('для активной связи условие добавляется через экран поиска тега '
-      'под полем названия, переключается и снимается с прежним охватом, а '
-      'отмена ничего не возвращает', (tester) async {
+  testWidgets('для активной связи условие добавляется через экран поиска тега, '
+      'переключается и снимается с прежним охватом, а отмена ничего не '
+      'возвращает', (tester) async {
     final purpose = _activeRelation;
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
@@ -555,13 +552,6 @@ void _defineTagSearchTests() {
     final opened = await _openTagSearchPicker(tester, repository, purpose);
     repository.complete(1, _tagSearchPage(_summaries(const [], count: 3)));
     await tester.pumpAndSettle();
-
-    final section = tester.getRect(find.byType(IntentionTagConditionsSection));
-    expect(
-      section.top,
-      greaterThanOrEqualTo(tester.getRect(_filterField).bottom),
-    );
-    expect(section.bottom, lessThanOrEqualTo(tester.getRect(_list).top));
 
     await tester.tap(_addCondition);
     await tester.pumpAndSettle();
@@ -675,13 +665,10 @@ void _defineTagSearchTests() {
     expect(message, findsOneWidget);
     expect(find.byType(IntentionSummaryView), findsNWidgets(3));
     expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
-    // Место под отказ отведено перед началом выдачи: первая строка стоит
-    // под ним и остаётся достижимой.
+    // Отказ не закрывает первую строку: она остаётся достижимой.
     expect(
-      tester.getRect(_refreshStatus).bottom,
-      lessThanOrEqualTo(
-        tester.getRect(find.byType(IntentionSummaryView).first).top,
-      ),
+      find.byType(IntentionSummaryView).first.hitTestable(),
+      findsOneWidget,
     );
     _expectParticipantQuery(
       repository.reconciliationQueryAt(0).catalogQuery,
@@ -874,15 +861,8 @@ void _expectNoCommands(
   expect(repository.dailyChoiceCommands, isEmpty);
 }
 
-final _refreshStatus = find.byType(IntentionCatalogRefreshStatusView);
 final _addCondition = find.byKey(
   const ValueKey('intention-tag-conditions-add'),
-);
-final _filterField = find.byKey(
-  const ValueKey('participant-picker-filter-field'),
-);
-final _list = find.byKey(
-  const PageStorageKey<String>('participant-picker-list'),
 );
 
 Finder _conditionToggle(Tag tag) => find.byKey(

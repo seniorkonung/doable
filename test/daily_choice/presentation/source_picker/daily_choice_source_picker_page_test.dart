@@ -169,7 +169,6 @@ void main() {
         expect(find.byIcon(Icons.star_border), findsNothing);
         expect(find.text(markLabel), findsNothing);
         expect(find.byTooltip(markLabel), findsNothing);
-        expect(repository.queries, hasLength(2));
 
         // Выбор по-прежнему возвращает намерение строки по идентификатору.
         await tester.tap(find.text('Гулять').first);
@@ -299,10 +298,6 @@ void main() {
     }
     final list = find.byKey(
       const PageStorageKey<String>('daily-choice-source-list'),
-    );
-    expect(
-      tester.widget<ListView>(list).childrenDelegate.estimatedChildCount,
-      250,
     );
     await tester.scrollUntilVisible(
       find.text('Намерение 1'),

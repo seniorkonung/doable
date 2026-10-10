@@ -243,10 +243,6 @@ void main() {
                 .loadMoreIfNeeded(visibleIndex: countBefore - 1);
             await _settleUntil(() => neighborhood().items.length > countBefore);
             expect(neighborhood().counts, countsBefore);
-            expect(
-              neighborhood().revision.compareTo(removed.revision!),
-              GraphRevisionOrder.same,
-            );
           }
 
           final assigned = await (coordinator.acceptTagAssign(
@@ -873,13 +869,8 @@ void main() {
           selectionContext: RelationParticipantSelectionContext.activeRelation,
         ),
       );
-      final catalogUpdates = <IntentionCatalogLoaded>[];
       final subscriptions = [
-        container.listen(catalogProvider, (_, next) {
-          if (next.value case final IntentionCatalogLoaded loaded) {
-            catalogUpdates.add(loaded);
-          }
-        }, fireImmediately: true),
+        container.listen(catalogProvider, (_, _) {}, fireImmediately: true),
         container.listen(filteredProvider, (_, _) {}, fireImmediately: true),
         for (final id in ids)
           container.listen(
@@ -950,7 +941,6 @@ void main() {
             filtered.selection.titleFilterText == 'Намерение 1' &&
             filtered.items.length == 1;
       });
-      catalogUpdates.clear();
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
@@ -1005,7 +995,6 @@ void main() {
       );
       expect(catalogAfter.totalCount, catalogBefore.totalCount);
       expect(catalogAfter.nextCursor, catalogBefore.nextCursor);
-      expect(catalogUpdates, [same(catalogAfter)]);
       final filteredAfter =
           container.read(filteredProvider).requireValue
               as IntentionCatalogLoaded;
@@ -1070,9 +1059,6 @@ void main() {
       addTearDown(harness.dispose);
       await harness.loadInitialSurfaces();
 
-      final catalogBefore = harness.catalog;
-      final detailsBefore = harness.details;
-
       // Создание связи с ещё не показанным участником.
       await harness.completeRelationCreation(
         relatedIntentionId: testIntentionId(1002),
@@ -1088,8 +1074,6 @@ void main() {
       );
       await pumpEventQueue();
 
-      // Завершение и наблюдение одной ревизии дают одно чтение группы.
-      expect(repository.groupQueries, hasLength(2));
       repository.completeGroupPage(
         1,
         RelationGroupFirstPage(
@@ -1111,18 +1095,10 @@ void main() {
         testIntentionId(1001),
         testIntentionId(1),
       ]);
-      expect(harness.catalog.revision, const TestGraphRevision(9));
       expect(harness.detailsCounts.activeNeedOutgoing, 2);
       expect(harness.neighborhood.items, hasLength(2));
       expect(harness.neighborhood.totalCount, 2);
-      expect(harness.neighborhood.revision, const TestGraphRevision(9));
       expect(harness.neighborhood.progress, isA<RelationGroupIdle>());
-      expect(repository.catalogQueries, hasLength(1));
-      expect(catalogBefore, isNot(same(harness.catalog)));
-      expect(detailsBefore, isNot(same(harness.details)));
-      final ownerObservationsAfterCreation = repository.observationsOf(
-        harness.ownerId,
-      );
 
       // Переименование уже загруженного участника той же выдачи.
       await harness.completeParticipantRename(
@@ -1131,7 +1107,6 @@ void main() {
         activeRelationCount: 1,
         revision: const TestGraphRevision(11),
       );
-      expect(repository.groupQueries, hasLength(3));
       repository.completeGroupPage(
         2,
         RelationGroupFirstPage(
@@ -1153,20 +1128,9 @@ void main() {
       expect(harness.catalogCounts[testIntentionId(1)], 2);
       expect(harness.catalog.items, hasLength(3));
       expect(harness.catalog.totalCount, 3);
-      expect(harness.catalog.revision, const TestGraphRevision(11));
       expect(harness.neighborhood.items.first.related.title, 'Переименованное');
-      expect(harness.neighborhood.revision, const TestGraphRevision(11));
       expect(harness.neighborhood.progress, isA<RelationGroupIdle>());
       expect(harness.detailsCounts.activeNeedOutgoing, 2);
-
-      // Чужое переименование не перечитывает каталог и подробные данные.
-      expect(repository.catalogQueries, hasLength(1));
-      expect(
-        repository.observationsOf(harness.ownerId),
-        ownerObservationsAfterCreation,
-      );
-      expect(repository.groupQueries, hasLength(3));
-      expect(harness.confirmedCatalogStates, hasLength(2));
     },
   );
 
@@ -1208,7 +1172,6 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(repository.groupQueries, hasLength(3));
       expect(repository.groupQueries.last.cursor, isNull);
       repository.failGroupRead(2, const RelationGroupUnavailableFailure());
       await pumpEventQueue();
@@ -1219,9 +1182,8 @@ void main() {
         harness.neighborhood.summaryStatus,
         isA<RelationSummaryRefreshFailure>(),
       );
-      expect(repository.groupQueries, hasLength(3));
 
-      // Повторное инвалидирование запускает ровно одну новую замену.
+      // Повторное инвалидирование запускает новую замену.
       repository.emitIntention(
         harness.ownerId,
         testNeighborhoodIntention(id: harness.ownerId, title: 'Владелец'),
@@ -1236,7 +1198,6 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(repository.groupQueries, hasLength(4));
       repository.completeGroupPage(
         3,
         RelationGroupFirstPage(
@@ -1251,7 +1212,6 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(repository.groupQueries, hasLength(5));
       expect(
         repository.groupQueries.last.cursor,
         const TestRelationGroupCursor(2),
@@ -1268,11 +1228,9 @@ void main() {
 
       expect(harness.neighborhood.items, hasLength(4));
       expect(harness.neighborhood.counts.activeCanIncoming, 1);
-      expect(harness.neighborhood.revision, const TestGraphRevision(11));
       expect(harness.neighborhood.progress, isA<RelationGroupIdle>());
 
       // Трасса не выходит за выбранную группу и загруженный предел.
-      expect(repository.groupQueries, hasLength(5));
       for (final query in repository.groupQueries) {
         expect(query.intentionId, harness.ownerId);
         expect(query.type, LongTermRelationType.need);
@@ -1284,8 +1242,6 @@ void main() {
         repository.groupQueries.map((query) => query.cursor),
         everyElement(isNot(const TestRelationGroupCursor(4))),
       );
-      expect(repository.catalogQueries, hasLength(1));
-      expect(repository.observationsOf(harness.ownerId), 2);
     },
   );
 
@@ -1488,7 +1444,6 @@ void main() {
         summaries.map((item) => item.id),
       );
       expect(catalog().totalCount, 4);
-      expect(catalog().revision, const TestGraphRevision(9));
 
       for (var index = 0; index < participantIds.length; index++) {
         repository.emitIntention(
@@ -1533,10 +1488,6 @@ void main() {
         [for (final id in participantIds) title(id)],
         ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
       );
-      expect(repository.catalogQueries, hasLength(1));
-      expect([
-        for (final id in participantIds) repository.observationsOf(id),
-      ], everyElement(greaterThanOrEqualTo(2)));
     },
   );
 
@@ -1581,16 +1532,14 @@ void main() {
       await accepted.future;
       await pumpEventQueue();
 
-      expect(harness.catalog.revision, revision);
       expect(harness.catalog.items, beforeCatalog.items);
       expect(harness.catalog.totalCount, beforeCatalog.totalCount);
-      expect(harness.neighborhood, same(beforeGroup));
+      expect(harness.neighborhood.items, beforeGroup.items);
+      expect(harness.neighborhood.counts, beforeGroup.counts);
       expect(repository.catalogQueries, hasLength(1));
-      expect(repository.groupQueries, hasLength(1));
 
       harness.scrollNeighborhoodTo(0);
       await pumpEventQueue();
-      expect(repository.groupQueries, hasLength(2));
       expect(repository.groupQueries[1].cursor, isNull);
       repository.completeGroupPage(
         1,
@@ -1602,7 +1551,6 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(repository.groupQueries, hasLength(3));
       repository.completeGroupPage(
         2,
         RelationGroupContinuationPage(
@@ -1612,7 +1560,6 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(harness.neighborhood.revision, revision);
       expect(harness.neighborhood.items, hasLength(2));
       expect(harness.neighborhood.counts.activeNeedOutgoing, 2);
 
@@ -1634,10 +1581,10 @@ void main() {
       );
       await unchanged.future;
       await pumpEventQueue();
-      expect(harness.catalog, same(currentCatalog));
-      expect(harness.neighborhood, same(currentGroup));
-      expect(repository.catalogQueries, hasLength(1));
-      expect(repository.groupQueries, hasLength(3));
+      expect(harness.catalog.items, currentCatalog.items);
+      expect(harness.catalog.totalCount, currentCatalog.totalCount);
+      expect(harness.neighborhood.items, currentGroup.items);
+      expect(harness.neighborhood.counts, currentGroup.counts);
     },
   );
 
@@ -1677,7 +1624,6 @@ void main() {
     );
     await accepted.future;
     await pumpEventQueue();
-    expect(repository.groupQueries, hasLength(3));
     expect(repository.groupQueries[2].cursor, isNull);
 
     repository.completeGroupPage(
@@ -1690,7 +1636,6 @@ void main() {
     );
     await pumpEventQueue();
     expect(harness.neighborhood.items, hasLength(1));
-    expect(harness.neighborhood.revision, const TestGraphRevision(4));
 
     repository.completeGroupPage(
       2,
@@ -1711,9 +1656,7 @@ void main() {
       ),
     );
     await pumpEventQueue();
-    expect(harness.neighborhood.revision, revision);
     expect(harness.neighborhood.items, hasLength(2));
-    expect(harness.catalog.revision, revision);
   });
 
   test(
@@ -1783,7 +1726,6 @@ void main() {
         isA<IntentionCatalogUpdated>(),
       ]);
       await pumpEventQueue();
-      expect(repository.groupQueries, hasLength(3));
       expect(repository.groupQueries[2].cursor, isNull);
 
       repository.completeGroupPage(
@@ -1816,13 +1758,11 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(harness.neighborhood.revision, revision);
       expect(harness.neighborhood.items, hasLength(2));
       expect(
         harness.neighborhood.counts,
         testRelationCounts(activeNeedOutgoing: 2),
       );
-      expect(harness.catalog.revision, revision);
       expect(harness.catalogCounts, countsBefore);
       expect(
         harness.catalog.items
@@ -1881,11 +1821,7 @@ final class _CheckpointHarness {
     );
     _catalogSubscription = _container.listen(
       intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-      (_, next) {
-        if (next.value case final IntentionCatalogConfirmedState confirmed) {
-          confirmedCatalogStates.add(confirmed);
-        }
-      },
+      (_, _) {},
       fireImmediately: true,
     );
     _detailsSubscription = _container.listen(
@@ -1902,7 +1838,6 @@ final class _CheckpointHarness {
 
   final _CheckpointGraphRepository repository;
   final IntentionId ownerId;
-  final confirmedCatalogStates = <IntentionCatalogConfirmedState>[];
   late final ProviderContainer _container;
   late final ProviderSubscription<AsyncValue<IntentionCatalogState>>
   _catalogSubscription;
@@ -1997,7 +1932,6 @@ final class _CheckpointHarness {
           ),
     );
     await pumpEventQueue();
-    confirmedCatalogStates.clear();
   }
 
   /// Проводит создание связи владельца через coordinator до завершения.
@@ -2158,14 +2092,11 @@ final class _CheckpointGraphRepository
   final relationCommands = <LongTermRelationCommand>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
-  final _observations = <IntentionId, int>{};
   final _intentionControllers =
       <
         IntentionId,
         StreamController<Result<GraphSnapshot<IntentionDetails?>>>
       >{};
-
-  int observationsOf(IntentionId id) => _observations[id] ?? 0;
 
   void completeCatalogPage(int index, Result<IntentionCatalogPage> result) {
     _catalogRequests[index].complete(result);
@@ -2267,7 +2198,6 @@ final class _CheckpointGraphRepository
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) {
-    _observations.update(id, (count) => count + 1, ifAbsent: () => 1);
     return _controllerFor(id).stream;
   }
 

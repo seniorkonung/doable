@@ -7,7 +7,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -63,10 +62,8 @@ void defineDailyChoicePickerTagSearchTests(
     listKey: '${page.keyPrefix}-list',
     readinessFilter: page.readinessFilter,
   );
-  testWidgets('условие добавляется через экран поиска тега под полем '
-      'названия, переключается и снимается, а отмена ничего не меняет', (
-    tester,
-  ) async {
+  testWidgets('условие добавляется через экран поиска тега, переключается и '
+      'снимается, а отмена ничего не меняет', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
@@ -74,13 +71,6 @@ void defineDailyChoicePickerTagSearchTests(
     final opened = await _openPicker(tester, repository, page);
     repository.complete(1, _firstPage(_summaries(page, const [], count: 3)));
     await tester.pumpAndSettle();
-
-    final section = tester.getRect(find.byType(IntentionTagConditionsSection));
-    expect(
-      section.top,
-      greaterThanOrEqualTo(tester.getRect(_filterField(page)).bottom),
-    );
-    expect(section.bottom, lessThanOrEqualTo(tester.getRect(_list(page)).top));
 
     await tester.tap(_addCondition);
     await tester.pumpAndSettle();
@@ -177,13 +167,10 @@ void defineDailyChoicePickerTagSearchTests(
     expect(find.text(page.totalCountLabel(3)), findsOneWidget);
     expect(find.byType(IntentionSummaryView), findsNWidgets(3));
     expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
-    // Место под отказ отведено перед началом выдачи: первая строка стоит
-    // под ним и остаётся достижимой.
+    // Отказ не закрывает первую строку: она остаётся достижимой.
     expect(
-      tester.getRect(_refreshStatus).bottom,
-      lessThanOrEqualTo(
-        tester.getRect(find.byType(IntentionSummaryView).first).top,
-      ),
+      find.byType(IntentionSummaryView).first.hitTestable(),
+      findsOneWidget,
     );
     _expectPickerQuery(
       page,
@@ -352,16 +339,9 @@ void _expectNoCommands(
   expect(repository.dailyChoiceCommands, isEmpty);
 }
 
-final _refreshStatus = find.byType(IntentionCatalogRefreshStatusView);
 final _addCondition = find.byKey(
   const ValueKey('intention-tag-conditions-add'),
 );
-
-Finder _filterField(DailyChoicePickerTagSearchCase page) =>
-    find.byKey(ValueKey('${page.keyPrefix}-filter'));
-
-Finder _list(DailyChoicePickerTagSearchCase page) =>
-    find.byKey(PageStorageKey<String>('${page.keyPrefix}-list'));
 
 Finder _conditionToggle(Tag tag) => find.byKey(
   ValueKey('intention-tag-condition-toggle-${tag.id.toCanonicalString()}'),

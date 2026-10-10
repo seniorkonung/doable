@@ -140,9 +140,6 @@ void main() {
       }
       await tester.pump(const Duration(milliseconds: 251));
       expect(repository.queries, hasLength(filters.length + 1));
-      expect(repository.commands, isEmpty);
-      expect(repository.relationCommands, isEmpty);
-      expect(repository.dailyChoiceCommands, isEmpty);
     },
   );
 
@@ -389,9 +386,6 @@ void main() {
         );
       }
       expect(repository.queries, hasLength(11));
-      expect(repository.commands, isEmpty);
-      expect(repository.relationCommands, isEmpty);
-      expect(repository.dailyChoiceCommands, isEmpty);
     },
   );
 

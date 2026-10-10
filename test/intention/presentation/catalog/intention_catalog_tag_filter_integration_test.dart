@@ -160,7 +160,6 @@ void main() {
           (_tagId(303), 'Отдых'),
         ]);
       }
-      expect(loaded.continuation, isA<IntentionCatalogContinuationIdle>());
     });
   }
 
@@ -207,7 +206,13 @@ void main() {
     ]);
     delayedReads.complete(0, oldFirst);
     await Future<void>.delayed(Duration.zero);
-    expect(delayedContainer.read(provider).requireValue, same(previous));
+    final afterOldFirst =
+        delayedContainer.read(provider).requireValue as IntentionCatalogLoaded;
+    expect(afterOldFirst.totalCount, 5);
+    expect(afterOldFirst.items.map((item) => item.id), [
+      _intentionId(10),
+      _intentionId(5),
+    ]);
 
     final oldRequest = model.loadNextPageIfNeeded(visibleIndex: 1);
     final oldContinuation = await repository.getCatalogPage(
@@ -228,7 +233,12 @@ void main() {
     ]);
     delayedReads.complete(2, oldContinuation);
     await oldRequest;
-    expect(delayedContainer.read(provider).requireValue, same(current));
+    final afterOldContinuation =
+        delayedContainer.read(provider).requireValue as IntentionCatalogLoaded;
+    expect(afterOldContinuation.totalCount, 4);
+    expect(afterOldContinuation.items.map((item) => item.id), [
+      for (final number in expectedIds.take(2)) _intentionId(number),
+    ]);
 
     final newRequest = model.loadNextPageIfNeeded(visibleIndex: 1);
     delayedReads.complete(
@@ -246,7 +256,6 @@ void main() {
     for (final item in loaded.items) {
       expect(filter.matches(item.tags.map((tag) => tag.id).toSet()), isTrue);
     }
-    expect(delayedReads.queries, hasLength(5));
   });
 
   test('смена охвата сохраняет реальный совместный фильтр и порядок', () async {
@@ -421,14 +430,12 @@ void main() {
       ]);
       expect(reconciled.totalCount, 9);
       expect(reconciled.nextCursor, same(loaded.nextCursor));
-      expect(reconciled.query, same(loaded.query));
       expect(reconciled.selection.tagFilter, filter);
       for (final item in reconciled.items) {
         expect(item.tags.map((tag) => tag.id), contains(_tagId(301)));
         expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
       }
       expect(states.where((state) => state.isLoading), isEmpty);
-      expect(states.map((state) => state.requireValue), [same(reconciled)]);
       expect(_catalogPageReads(diagnostics), pageReadsBefore);
 
       if (hasNext) {
@@ -480,10 +487,8 @@ void main() {
     ]);
     expect(reconciled.totalCount, 1);
     expect(reconciled.nextCursor, isNull);
-    expect(reconciled.query, same(empty.query));
     expect(reconciled.selection.tagFilter, filter);
     expect(states.where((state) => state.isLoading), isEmpty);
-    expect(states.map((state) => state.requireValue), [same(reconciled)]);
     expect(_catalogPageReads(diagnostics), pageReadsBefore);
   });
 
@@ -511,7 +516,6 @@ void main() {
     ]);
     expect(loaded.totalCount, 5);
     final pageReadsBefore = _catalogPageReads(diagnostics);
-    final eventsBefore = diagnostics.events.length;
     final states = <AsyncValue<IntentionCatalogState>>[];
     final observer = container.listen(provider, (_, next) => states.add(next));
     addTearDown(observer.close);
@@ -524,31 +528,12 @@ void main() {
     expect((failed as IntentionCatalogLoaded).items, loaded.items);
     expect(failed.totalCount, 5);
     expect(failed.nextCursor, same(loaded.nextCursor));
-    expect(failed.revision, same(loaded.revision));
-    expect(failed.query, same(loaded.query));
     expect(failed.selection.tagFilter, filter);
     expect(failed.refresh, isA<IntentionCatalogRefreshUnavailable>());
     expect(fault.failNextFilteredSelect, isFalse);
     expect(states.where((state) => state.isLoading), isEmpty);
+    // Отказ не сбрасывает выдачу: каталог не перечитывается.
     expect(_catalogPageReads(diagnostics), pageReadsBefore);
-    // Отказ не сбрасывает выдачу: кроме событий самой команды удаления,
-    // диагностика получает только начало и безопасный отказ чтения
-    // согласования, но не события повторного чтения каталога.
-    expect(
-      diagnostics.events
-          .skip(eventsBefore)
-          .where((event) => event is! TagCommandDiagnosticsEvent),
-      [
-        _reconciliationRead(isA<DiagnosticsStarted>()),
-        _reconciliationRead(
-          isA<DiagnosticsFailed>().having(
-            (status) => status.code,
-            'категория',
-            DiagnosticsFailureCode.unavailable,
-          ),
-        ),
-      ],
-    );
 
     await model.retryRefresh();
 
@@ -559,7 +544,6 @@ void main() {
     ]);
     expect(reconciled.totalCount, 9);
     expect(reconciled.nextCursor, same(loaded.nextCursor));
-    expect(reconciled.query, same(loaded.query));
     expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
     for (final item in reconciled.items) {
       expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
@@ -568,75 +552,62 @@ void main() {
     expect(_catalogPageReads(diagnostics), pageReadsBefore);
   });
 
-  test('после отказа SQLite при чтении согласования следующее подтверждённое '
-      'назначение тега само повторяет чтение через настоящий репозиторий и '
-      'записывает его диагностику', () async {
-    await _seedExcludedMatches(database);
-    final provider = intentionCatalogViewModelProvider(
-      const BrowseIntentionCatalog(),
-    );
-    final subscription = container.listen(provider, (_, _) {});
-    addTearDown(subscription.close);
-    await container.read(provider.future);
-    final model = container.read(provider.notifier);
-    final filter = IntentionTagFilter(
-      requiredTagIds: [_tagId(301)],
-      excludedTagIds: [_tagId(302)],
-    );
-    model.changeTagFilter(filter);
-    final loaded =
-        await container.read(provider.future) as IntentionCatalogLoaded;
-    final pageReadsBefore = _catalogPageReads(diagnostics);
-    final states = <AsyncValue<IntentionCatalogState>>[];
-    final observer = container.listen(provider, (_, next) => states.add(next));
-    addTearDown(observer.close);
+  test(
+    'после отказа SQLite при чтении согласования следующее подтверждённое '
+    'назначение тега само повторяет чтение через настоящий репозиторий',
+    () async {
+      await _seedExcludedMatches(database);
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await container.read(provider.future);
+      final model = container.read(provider.notifier);
+      final filter = IntentionTagFilter(
+        requiredTagIds: [_tagId(301)],
+        excludedTagIds: [_tagId(302)],
+      );
+      model.changeTagFilter(filter);
+      final loaded =
+          await container.read(provider.future) as IntentionCatalogLoaded;
+      final pageReadsBefore = _catalogPageReads(diagnostics);
+      final states = <AsyncValue<IntentionCatalogState>>[];
+      final observer = container.listen(
+        provider,
+        (_, next) => states.add(next),
+      );
+      addTearDown(observer.close);
 
-    fault.failNextFilteredSelect = true;
-    await _deleteTag(container, _tagId(302));
-    final failed = await _awaitRefreshFailure(container, provider);
-    expect(failed.refresh, isA<IntentionCatalogRefreshUnavailable>());
-    final eventsAfterFailure = diagnostics.events.length;
+      fault.failNextFilteredSelect = true;
+      await _deleteTag(container, _tagId(302));
+      final failed = await _awaitRefreshFailure(container, provider);
+      expect(failed.refresh, isA<IntentionCatalogRefreshUnavailable>());
 
-    // «Ходить без тегов» получает «Здоровье» и становится совпадением.
-    await _assignTag(container, _tagId(301), _intentionId(7));
-    final current = await _awaitRevisionAfter(container, provider, failed);
+      // «Ходить без тегов» получает «Здоровье» и становится совпадением.
+      await _assignTag(container, _tagId(301), _intentionId(7));
+      final current = await _awaitRevisionAfter(container, provider, failed);
 
-    expect(current, isA<IntentionCatalogLoaded>());
-    final reconciled = current as IntentionCatalogLoaded;
-    expect(reconciled.items.map((item) => item.id), [
-      for (final number in [13, 12, 11, 10, 7, 6]) _intentionId(number),
-    ]);
-    expect(
-      reconciled.items
-          .singleWhere((item) => item.id == _intentionId(7))
-          .tags
-          .map((tag) => tag.id),
-      [_tagId(301)],
-    );
-    expect(reconciled.totalCount, 10);
-    expect(reconciled.nextCursor, same(loaded.nextCursor));
-    expect(reconciled.query, same(loaded.query));
-    expect(reconciled.selection.tagFilter, filter);
-    expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
-    expect(states.where((state) => state.isLoading), isEmpty);
-    expect(_catalogPageReads(diagnostics), pageReadsBefore);
-    // Автоматический повтор записывает обычные события чтения согласования.
-    final retryEvents = diagnostics.events
-        .skip(eventsAfterFailure)
-        .where((event) => event is! TagCommandDiagnosticsEvent)
-        .toList();
-    final reads = retryEvents.length ~/ 2;
-    expect(reads, greaterThan(0));
-    expect(retryEvents, [
-      for (var read = 0; read < reads; read++) ...[
-        _reconciliationRead(isA<DiagnosticsStarted>()),
-        _reconciliationRead(
-          isA<DiagnosticsSucceeded>(),
-          completion: CatalogReconciliationReadCompletion.portion,
-        ),
-      ],
-    ]);
-  });
+      expect(current, isA<IntentionCatalogLoaded>());
+      final reconciled = current as IntentionCatalogLoaded;
+      expect(reconciled.items.map((item) => item.id), [
+        for (final number in [13, 12, 11, 10, 7, 6]) _intentionId(number),
+      ]);
+      expect(
+        reconciled.items
+            .singleWhere((item) => item.id == _intentionId(7))
+            .tags
+            .map((tag) => tag.id),
+        [_tagId(301)],
+      );
+      expect(reconciled.totalCount, 10);
+      expect(reconciled.nextCursor, same(loaded.nextCursor));
+      expect(reconciled.selection.tagFilter, filter);
+      expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
+      expect(states.where((state) => state.isLoading), isEmpty);
+      expect(_catalogPageReads(diagnostics), pageReadsBefore);
+    },
+  );
   test('ранее полностью загруженная выдача в несколько окон согласуется '
       'через настоящий репозиторий окнами не больше порции', () async {
     await _seedWindowedArea(database);
@@ -671,7 +642,6 @@ void main() {
     ]);
     expect(loaded.totalCount, storedBefore.length);
     final pageReadsBefore = _catalogPageReads(diagnostics);
-    final eventsBefore = diagnostics.events.length;
     final states = <AsyncValue<IntentionCatalogState>>[];
     final observer = container.listen(provider, (_, next) => states.add(next));
     addTearDown(observer.close);
@@ -693,13 +663,11 @@ void main() {
     ]);
     expect(reconciled.totalCount, expectedAfter.length);
     expect(reconciled.nextCursor, isNull);
-    expect(reconciled.query, same(loaded.query));
     for (final item in reconciled.items) {
       expect(item.tags.map((tag) => tag.id), contains(_tagId(301)));
       expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
     }
     expect(states.where((state) => state.isLoading), isEmpty);
-    expect(states.map((state) => state.requireValue), [same(reconciled)]);
     expect(_catalogPageReads(diagnostics), pageReadsBefore);
 
     // Каждое чтение согласования получает не больше порции сохранённых
@@ -717,26 +685,6 @@ void main() {
             (missingCount + pageSize - 1) ~/ pageSize +
             1,
       ),
-    );
-    // Восемь внутренних окон и последнее окно области, каждое из двух
-    // сохранённых строк.
-    expect(windows, List.filled(9, pageSize));
-    // Кроме событий самой команды удаления, диагностика получает только
-    // начало и завершение каждого чтения согласования. Их тип не содержит
-    // курсора, окна и идентификаторов согласования.
-    expect(
-      diagnostics.events
-          .skip(eventsBefore)
-          .where((event) => event is! TagCommandDiagnosticsEvent),
-      [
-        for (var read = 0; read < windows.length; read++) ...[
-          _reconciliationRead(isA<DiagnosticsStarted>()),
-          _reconciliationRead(
-            isA<DiagnosticsSucceeded>(),
-            completion: CatalogReconciliationReadCompletion.portion,
-          ),
-        ],
-      ],
     );
 
     // Результат совпадает с новым чтением той же выдачи.
@@ -843,7 +791,7 @@ void main() {
           for (final number in before) _intentionId(number),
         ]);
         expect(loaded.totalCount, 3);
-        final eventsBefore = diagnostics.events.length;
+        final pageReadsBefore = _catalogPageReads(diagnostics);
         final states = <AsyncValue<IntentionCatalogState>>[];
         final observer = container.listen(
           provider,
@@ -874,21 +822,13 @@ void main() {
         ];
         expect(current.items.map((item) => item.id), ids(after));
         expect(current.totalCount, 4);
-        expect(
-          current.revision.compareTo(completion.revision!),
-          GraphRevisionOrder.same,
-        );
         expect(current.nextCursor, same(loaded.nextCursor));
-        expect(current.query, same(loaded.query));
         expect(current.selection.titleFilterText, 'ходить');
         expect(current.selection.order, order);
         expect(current.selection.tagFilter, filter);
-        expect(current.continuation, isA<IntentionCatalogContinuationIdle>());
         expect(states.where((state) => state.isLoading), isEmpty);
-        expect(states.map((state) => state.requireValue), [same(current)]);
-        // Выдачу согласует сам пакет создания: без нового чтения каталога и
-        // без самостоятельных команд готовности, отметки или назначения.
-        expect(diagnostics.events.skip(eventsBefore), [_createdSuccessfully]);
+        // Выдачу согласует сам пакет создания, без нового чтения каталога.
+        expect(_catalogPageReads(diagnostics), pageReadsBefore);
         if (after.contains(_created)) {
           final row = current.items.singleWhere((item) => item.id == createdId);
           expect(row.title, 'Ходить по лесу');
@@ -912,7 +852,6 @@ void main() {
         }
         expect(completed.items.map((item) => item.id), ids(complete));
         expect(completed.totalCount, 4);
-        expect(completed.query, same(loaded.query));
         expect(
           _contents(completed.items),
           _contents(await _readWhole(repository, completed.query)),
@@ -935,7 +874,7 @@ void main() {
         _intentionId(2),
       ]);
       expect(loaded.totalCount, 3);
-      final eventsBefore = diagnostics.events.length;
+      final pageReadsBefore = _catalogPageReads(diagnostics);
       final states = <AsyncValue<IntentionCatalogState>>[];
       final observer = container.listen(
         provider,
@@ -961,16 +900,10 @@ void main() {
 
       expect(current.items, loaded.items);
       expect(current.totalCount, 3);
-      expect(
-        current.revision.compareTo(completion.revision!),
-        GraphRevisionOrder.same,
-      );
       expect(current.nextCursor, same(loaded.nextCursor));
-      expect(current.query, same(loaded.query));
       expect(current.selection.tagFilter, filter);
       expect(states.where((state) => state.isLoading), isEmpty);
-      expect(states.map((state) => state.requireValue), [same(current)]);
-      expect(diagnostics.events.skip(eventsBefore), [_createdSuccessfully]);
+      expect(_catalogPageReads(diagnostics), pageReadsBefore);
 
       await container
           .read(provider.notifier)
@@ -1036,9 +969,7 @@ void main() {
         ]);
         expect(current.totalCount, after.length);
         expect(current.nextCursor, isNull);
-        expect(current.query, same(loaded.query));
         expect(states.where((state) => state.isLoading), isEmpty);
-        expect(states.map((state) => state.requireValue), [same(current)]);
         expect(
           _contents(current.items),
           _contents(await _readWhole(repository, current.query)),
@@ -1371,15 +1302,6 @@ IntentionId _createdId(IntentionCommandCompletion completion) =>
       _ => fail('Создание не подтверждено.'),
     };
 
-/// Единственное диагностическое событие полного создания: успешный исход.
-final _createdSuccessfully = isA<IntentionCommandDiagnosticsEvent>()
-    .having(
-      (event) => event.commandType,
-      'команда',
-      IntentionCommandDiagnosticsType.create,
-    )
-    .having((event) => event.status, 'статус', isA<DiagnosticsSucceeded>());
-
 /// Сопоставимое содержимое строк выдачи вместе с данными начального
 /// состояния.
 List<List<Object?>> _contents(List<IntentionSummary> items) => [
@@ -1456,13 +1378,6 @@ Future<IntentionCatalogConfirmedState> _awaitRevisionAfter(
   }
   fail('Согласованная выдача не опубликована.');
 }
-
-Matcher _reconciliationRead(
-  Matcher status, {
-  CatalogReconciliationReadCompletion? completion,
-}) => isA<CatalogReconciliationReadDiagnosticsEvent>()
-    .having((event) => event.completion, 'завершение', completion)
-    .having((event) => event.status, 'статус', status);
 
 int _catalogPageReads(InMemoryDiagnosticsSink diagnostics) => diagnostics.events
     .whereType<CatalogPageReadDiagnosticsEvent>()

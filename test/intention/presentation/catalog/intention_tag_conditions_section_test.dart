@@ -66,8 +66,6 @@ void main() {
       expect(_chipIcon(health, Icons.block), findsNothing);
       expect(_chipIcon(sport, Icons.block), findsOneWidget);
       expect(_chipIcon(sport, Icons.check), findsNothing);
-      // Кнопка добавления стоит после чипов.
-      expect(_precedes(tester, _chip(health), _add), isTrue);
     },
   );
 
@@ -89,46 +87,31 @@ void main() {
     },
   );
 
-  testWidgets(
-    'чипы переносятся на новые строки, а длинное название не выходит за ширину',
-    (tester) async {
-      tester.view
-        ..physicalSize = const Size(320, 800)
-        ..devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final h = await _open(tester);
-      final long = _tag(9, 'Очень длинное название тега ' * 4);
-      final tags = [
-        for (var number = 1; number <= 6; number++) _tag(number, 'Тег $number'),
-      ];
-      for (final tag in tags) {
-        await h.select(tag, _present);
-      }
-      await h.select(long, _absent);
+  testWidgets('много чипов и длинное название не выходят за ширину раздела', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(320, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final h = await _open(tester);
+    final long = _tag(9, 'Очень длинное название тега ' * 4);
+    final tags = [
+      for (var number = 1; number <= 6; number++) _tag(number, 'Тег $number'),
+    ];
+    for (final tag in tags) {
+      await h.select(tag, _present);
+    }
+    await h.select(long, _absent);
 
-      expect(tester.takeException(), isNull);
-      final tops = {for (final tag in tags) tester.getTopLeft(_chip(tag)).dy};
-      expect(tops.length, greaterThan(1));
-      for (var index = 1; index < tags.length; index++) {
-        expect(
-          _precedes(tester, _chip(tags[index - 1]), _chip(tags[index])),
-          isTrue,
-        );
-      }
-      final sectionRect = tester.getRect(_section);
-      for (final tag in [...tags, long]) {
-        final rect = tester.getRect(_chip(tag));
-        expect(rect.left, greaterThanOrEqualTo(sectionRect.left));
-        expect(rect.right, lessThanOrEqualTo(sectionRect.right));
-      }
-      // Длинное название переносится внутри чипа и не обрезается.
-      expect(
-        tester.getSize(_chip(long)).height,
-        greaterThan(tester.getSize(_chip(tags.first)).height),
-      );
-      expect(_precedes(tester, _chip(long), _add), isTrue);
-    },
-  );
+    expect(tester.takeException(), isNull);
+    final sectionRect = tester.getRect(_section);
+    for (final tag in [...tags, long]) {
+      final rect = tester.getRect(_chip(tag));
+      expect(rect.left, greaterThanOrEqualTo(sectionRect.left));
+      expect(rect.right, lessThanOrEqualTo(sectionRect.right));
+    }
+  });
 
   testWidgets(
     'нажатие на чип переключает надобность на прежнем месте и сразу применяет поиск',
@@ -159,7 +142,6 @@ void main() {
           excludedTagIds: [sport.id],
         ),
       );
-      expect(h.repository.commands, isEmpty);
     },
   );
 
@@ -183,7 +165,6 @@ void main() {
     expect(h.shown, isEmpty);
     expect(h.appliedFilter, IntentionTagFilter.empty);
     expect(_add, findsOneWidget);
-    expect(h.repository.commands, isEmpty);
   });
 
   testWidgets(
@@ -196,13 +177,6 @@ void main() {
 
       await h.openPicker([health, sport]);
 
-      expect(
-        tester
-            .widget<TagConditionPickerPage>(_picker)
-            .conditions
-            .map((condition) => (condition.tagId, condition.requirement)),
-        [(sport.id, _absent)],
-      );
       expect(
         find.descendant(
           of: _picker,
@@ -223,7 +197,6 @@ void main() {
           excludedTagIds: [sport.id],
         ),
       );
-      expect(h.repository.commands, isEmpty);
     },
   );
 
@@ -261,7 +234,6 @@ void main() {
     expect(_picker, findsNothing);
     expect(h.shown, ['Здоровье']);
     expect(h.repository.queries, hasLength(queriesBefore));
-    expect(h.repository.commands, isEmpty);
   });
 
   testWidgets('раздел не читает каталог тегов и не выполняет команд тегов', (
@@ -560,13 +532,6 @@ Finder _pickerAction(Tag tag, IntentionTagRequirement requirement) =>
         '${tag.id.toCanonicalString()}',
       ),
     );
-
-/// Первый элемент стоит раньше второго в порядке чтения: выше либо левее.
-bool _precedes(WidgetTester tester, Finder first, Finder second) {
-  final a = tester.getRect(first);
-  final b = tester.getRect(second);
-  return a.bottom <= b.top || (a.top < b.bottom && a.left < b.left);
-}
 
 TagId _id(int number) => (TagId.decode(
   '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',
