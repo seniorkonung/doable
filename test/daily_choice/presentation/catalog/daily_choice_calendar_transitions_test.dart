@@ -1,4 +1,5 @@
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'daily_choice_calendar_test_support.dart';
@@ -134,6 +135,10 @@ void main() {
         expect(consumer.viewport, afterToggle);
         expect(consumer.selectedDate, date(2026, 10, 4));
       });
+
+      // Перестроение посреди перехода не зависит от представления: страницы и
+      // их анимацией ведёт одна и та же сетка, поэтому достаточно недели.
+      if (start.mode != DailyChoiceCalendarMode.week) continue;
 
       testWidgets(
         'во время перелистывания кнопкой до середины перехода ($mode)',

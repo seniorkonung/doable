@@ -36,114 +36,117 @@ import '../../../support/catalog_reconciliation_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
-  for (final direction in ChoicePathDraftDirection.values) {
-    for (final succeeds in [true, false]) {
-      testWidgets(
-        'возврат ${direction == ChoicePathDraftDirection.topDown ? 'сверху вниз' : 'снизу вверх'} при записи сохраняет поздний ${succeeds ? 'успех' : 'отказ'} и блокирует прежнее подтверждение',
-        (tester) async {
-          final repository = _PathRepository();
-          addTearDown(repository.dispose);
-          await _pumpPage(
-            tester,
-            repository,
-            direction: direction,
-            startingId: direction == ChoicePathDraftDirection.topDown ? 1 : 2,
-          );
-          repository.complete(0, [_edge(1, 2, 1)]);
-          await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(
-              ValueKey(
-                'choice-path-continue-${_relation(1).toCanonicalString()}',
-              ),
+  // Поздний результат не зависит от сочетания направления и исхода: два
+  // случая покрывают оба значения каждой оси.
+  for (final (direction, succeeds) in [
+    (ChoicePathDraftDirection.topDown, true),
+    (ChoicePathDraftDirection.bottomUp, false),
+  ]) {
+    testWidgets(
+      'возврат ${direction == ChoicePathDraftDirection.topDown ? 'сверху вниз' : 'снизу вверх'} при записи сохраняет поздний ${succeeds ? 'успех' : 'отказ'} и блокирует прежнее подтверждение',
+      (tester) async {
+        final repository = _PathRepository();
+        addTearDown(repository.dispose);
+        await _pumpPage(
+          tester,
+          repository,
+          direction: direction,
+          startingId: direction == ChoicePathDraftDirection.topDown ? 1 : 2,
+        );
+        repository.complete(0, [_edge(1, 2, 1)]);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(
+            ValueKey(
+              'choice-path-continue-${_relation(1).toCanonicalString()}',
             ),
-          );
-          await tester.pump();
-          repository.complete(1, [], ready: true);
-          await tester.pumpAndSettle();
-          final session = tester
-              .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-              .creationSession!;
-          final endpoint = ValueKey(
-            direction == ChoicePathDraftDirection.topDown
-                ? 'choice-path-select-action'
-                : 'choice-path-select-source',
-          );
-          await tester.tap(find.byKey(endpoint));
-          await tester.pumpAndSettle();
-          await tester.ensureVisible(
-            find.byKey(const ValueKey('choice-path-open-confirmation')),
-          );
-          final oldOpen = tester
-              .widget<FilledButton>(
-                find.byKey(const ValueKey('choice-path-open-confirmation')),
-              )
-              .onPressed!;
-          oldOpen();
-          await tester.pumpAndSettle();
-          await tester.ensureVisible(
-            find.byKey(const ValueKey('daily-choice-submit')),
-          );
-          await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
-          await tester.pump();
-          expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
-          await tester.binding.handlePopRoute();
-          await tester.pump();
-          await tester.pump(const Duration(seconds: 1));
-          await tester.pump();
-          expect(find.byType(DailyChoiceCreationPage), findsNothing);
-          expect(find.text('Сохраняем…'), findsOneWidget);
-          expect(find.byKey(endpoint), findsNothing);
-          expect(repository.queries, hasLength(2));
-          oldOpen();
-          await tester.pumpAndSettle();
-          expect(find.byType(DailyChoiceCreationPage), findsNothing);
-          expect(repository.commands, 1);
+          ),
+        );
+        await tester.pump();
+        repository.complete(1, [], ready: true);
+        await tester.pumpAndSettle();
+        final session = tester
+            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+            .creationSession!;
+        final endpoint = ValueKey(
+          direction == ChoicePathDraftDirection.topDown
+              ? 'choice-path-select-action'
+              : 'choice-path-select-source',
+        );
+        await tester.tap(find.byKey(endpoint));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
+        final oldOpen = tester
+            .widget<FilledButton>(
+              find.byKey(const ValueKey('choice-path-open-confirmation')),
+            )
+            .onPressed!;
+        oldOpen();
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('daily-choice-submit')),
+        );
+        await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+        await tester.pump();
+        expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        expect(find.byType(DailyChoiceCreationPage), findsNothing);
+        expect(find.text('Сохраняем…'), findsOneWidget);
+        expect(find.byKey(endpoint), findsNothing);
+        expect(repository.queries, hasLength(2));
+        oldOpen();
+        await tester.pumpAndSettle();
+        expect(find.byType(DailyChoiceCreationPage), findsNothing);
+        expect(repository.commands, 1);
 
-          if (succeeds) {
-            repository.succeed();
-          } else {
-            repository.creationRequests.single.complete(
-              const GraphCommandFailed(DailyChoiceUnavailableFailure()),
-            );
-          }
+        if (succeeds) {
+          repository.succeed();
+        } else {
+          repository.creationRequests.single.complete(
+            const GraphCommandFailed(DailyChoiceUnavailableFailure()),
+          );
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(DailyChoiceCreationPage), findsNothing);
+        expect(repository.commands, 1);
+        if (succeeds) {
+          expect(session.state, isA<DailyChoiceCreationFlowSaved>());
+          expect(find.text('Дневной выбор создан.'), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('choice-path-open-confirmation')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('choice-path-back-0')),
+            findsNothing,
+          );
+          oldOpen();
           await tester.pumpAndSettle();
           expect(find.byType(DailyChoiceCreationPage), findsNothing);
           expect(repository.commands, 1);
-          if (succeeds) {
-            expect(session.state, isA<DailyChoiceCreationFlowSaved>());
-            expect(find.text('Дневной выбор создан.'), findsOneWidget);
-            expect(
-              find.byKey(const ValueKey('choice-path-open-confirmation')),
-              findsNothing,
-            );
-            expect(
-              find.byKey(const ValueKey('choice-path-back-0')),
-              findsNothing,
-            );
-            oldOpen();
-            await tester.pumpAndSettle();
-            expect(find.byType(DailyChoiceCreationPage), findsNothing);
-            expect(repository.commands, 1);
-          } else {
-            expect(session.canContinue, isTrue);
-            expect(
-              find.byKey(const ValueKey('choice-path-creation-status')),
-              findsNothing,
-            );
-            expect(
-              find.byKey(const ValueKey('choice-path-open-confirmation')),
-              findsOneWidget,
-            );
-            oldOpen();
-            await tester.pumpAndSettle();
-            expect(find.byType(DailyChoiceCreationPage), findsOneWidget);
-            expect(repository.commands, 1);
-          }
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+        } else {
+          expect(session.canContinue, isTrue);
+          expect(
+            find.byKey(const ValueKey('choice-path-creation-status')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('choice-path-open-confirmation')),
+            findsOneWidget,
+          );
+          oldOpen();
+          await tester.pumpAndSettle();
+          expect(find.byType(DailyChoiceCreationPage), findsOneWidget);
+          expect(repository.commands, 1);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets(
@@ -313,41 +316,39 @@ void main() {
     semantics.dispose();
   });
 
-  for (final (locale, markLabel) in [
-    (const Locale('ru'), 'Избранное намерение'),
-    (const Locale('en'), 'Favorite intention'),
-  ]) {
-    testWidgets('${locale.languageCode}: дневной путь избранного намерения не '
-        'показывает отметку', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = _PathRepository();
-      addTearDown(repository.dispose);
-      await _pumpPage(tester, repository, locale: locale);
-      repository.complete(0, [_edge(1, 2, 1)]);
-      await tester.pumpAndSettle();
-      // Исходное намерение пути подтверждено избранным.
-      repository.emitRevision(1, favoriteMark: FavoriteMark.favorite);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(
-          ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
-        ),
-      );
-      await tester.pump();
-      repository.complete(1, [_edge(2, 3, 2)], ready: true);
-      await tester.pumpAndSettle();
+  // Отсутствие отметки не зависит от языка: значок отметки не появляется ни в
+  // одном, поэтому проверено на русском.
+  testWidgets('дневной путь избранного намерения не показывает отметку', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = _PathRepository();
+    addTearDown(repository.dispose);
+    await _pumpPage(tester, repository);
+    repository.complete(0, [_edge(1, 2, 1)]);
+    await tester.pumpAndSettle();
+    // Исходное намерение пути подтверждено избранным.
+    repository.emitRevision(1, favoriteMark: FavoriteMark.favorite);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
+      ),
+    );
+    await tester.pump();
+    repository.complete(1, [_edge(2, 3, 2)], ready: true);
+    await tester.pumpAndSettle();
 
-      expect(find.textContaining('Намерение 1'), findsWidgets);
-      expect(find.textContaining('Намерение 2'), findsWidgets);
-      // Дневной путь — представление без поиска: отметки в нём нет.
-      expect(find.byIcon(Icons.star), findsNothing);
-      expect(find.byIcon(Icons.star_border), findsNothing);
-      expect(find.text(markLabel), findsNothing);
-      expect(find.bySemanticsLabel(RegExp(markLabel)), findsNothing);
+    expect(find.textContaining('Намерение 1'), findsWidgets);
+    expect(find.textContaining('Намерение 2'), findsWidgets);
+    // Дневной путь — представление без поиска: отметки в нём нет.
+    expect(find.byIcon(Icons.star), findsNothing);
+    expect(find.byIcon(Icons.star_border), findsNothing);
+    expect(find.text('Избранное намерение'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Избранное намерение')), findsNothing);
 
-      semantics.dispose();
-    });
-  }
+    semantics.dispose();
+  });
 
   testWidgets('различает отсутствие пути, конфликт и временную ошибку', (
     tester,

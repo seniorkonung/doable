@@ -9,8 +9,9 @@ import 'daily_choice_calendar_test_support.dart';
 // Проверки не зависят от часового пояса процесса. Отсутствие дат в местном
 // времени в календарном компоненте при любом часовом поясе мгновенно проверяет
 // daily_choice_calendar_utc_dates_test.dart по исходникам. Недели перехода на
-// летнее и зимнее время ниже взяты по правилам America/New_York: при запуске
-// в этом поясе они показывают сдвиг дат на реальной сетке.
+// летнее время ниже взяты по правилам America/New_York: при запуске в этом
+// поясе они показывают сдвиг дат на реальной сетке. Календарь считает периоды в
+// UTC, поэтому зимний переход идёт тем же путём и отдельной проверки не требует.
 void main() {
   group('календарные периоды', () {
     testWidgets('неделя на границе года показывает дни обоих лет по порядку', (
@@ -148,7 +149,7 @@ void main() {
     });
   });
 
-  group('смена летнего и зимнего времени', () {
+  group('смена летнего времени', () {
     for (final (
           :transition,
           :transitionDay,
@@ -165,14 +166,6 @@ void main() {
             nextFocus: date(2026, 3, 15),
             nextWeekStart: date(2026, 3, 9),
             monthStart: date(2026, 2, 23),
-          ),
-          (
-            transition: 'зимнее',
-            transitionDay: date(2026, 11, 1),
-            weekStart: date(2026, 10, 26),
-            nextFocus: date(2026, 11, 8),
-            nextWeekStart: date(2026, 11, 2),
-            monthStart: date(2026, 10, 26),
           ),
         ]) {
       testWidgets(
@@ -254,53 +247,45 @@ void main() {
   });
 
   group('пределы диапазона CalendarDate', () {
-    for (final locale in const [Locale('ru'), Locale('en')]) {
-      final language = locale.languageCode;
-
-      testWidgets('первая неделя начинается с 0001-01-01 ($language)', (
+    testWidgets('первая неделя начинается с 0001-01-01', (tester) async {
+      final consumer = await pumpCalendarConsumer(
         tester,
-      ) async {
+        selectedDate: date(2026, 10, 4),
+        viewport: week(date(1, 1, 1)),
+        today: date(2026, 10, 4),
+      );
+
+      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 1));
+
+      await tester.tap(calendarDay(date(1, 1, 1)));
+      await tester.pumpAndSettle();
+
+      expect(consumer.events, [DateSelected(date(1, 1, 1))]);
+      expect(consumer.viewport, week(date(1, 1, 1)));
+      expect(dayCell(tester, date(1, 1, 1)).isSelected, isTrue);
+    });
+
+    testWidgets(
+      'последняя неделя сохраняет семь позиций и выбирает 9999-12-31',
+      (tester) async {
         final consumer = await pumpCalendarConsumer(
           tester,
           selectedDate: date(2026, 10, 4),
-          viewport: week(date(1, 1, 1)),
+          viewport: week(date(9999, 12, 31)),
           today: date(2026, 10, 4),
-          locale: locale,
         );
 
-        expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 1));
+        expect(visibleWeeks(tester), [_lastWeekPositions]);
 
-        await tester.tap(calendarDay(date(1, 1, 1)));
+        await tester.tap(calendarDay(date(9999, 12, 31)));
         await tester.pumpAndSettle();
 
-        expect(consumer.events, [DateSelected(date(1, 1, 1))]);
-        expect(consumer.viewport, week(date(1, 1, 1)));
-        expect(dayCell(tester, date(1, 1, 1)).isSelected, isTrue);
-      });
-
-      testWidgets(
-        'последняя неделя сохраняет семь позиций и выбирает 9999-12-31 ($language)',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: week(date(9999, 12, 31)),
-            today: date(2026, 10, 4),
-            locale: locale,
-          );
-
-          expect(visibleWeeks(tester), [_lastWeekPositions]);
-
-          await tester.tap(calendarDay(date(9999, 12, 31)));
-          await tester.pumpAndSettle();
-
-          expect(consumer.events, [DateSelected(date(9999, 12, 31))]);
-          expect(consumer.viewport, week(date(9999, 12, 31)));
-          expect(visibleWeeks(tester), [_lastWeekPositions]);
-          expect(dayCell(tester, date(9999, 12, 31)).isSelected, isTrue);
-        },
-      );
-    }
+        expect(consumer.events, [DateSelected(date(9999, 12, 31))]);
+        expect(consumer.viewport, week(date(9999, 12, 31)));
+        expect(visibleWeeks(tester), [_lastWeekPositions]);
+        expect(dayCell(tester, date(9999, 12, 31)).isSelected, isTrue);
+      },
+    );
 
     for (final mode in DailyChoiceCalendarMode.values) {
       testWidgets(

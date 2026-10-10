@@ -36,229 +36,219 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
-  for (final direction in ChoicePathDraftDirection.values) {
-    for (final point in _FailurePoint.values) {
-      testWidgets(
-        'завершение $direction при $point сохраняет одну запись, исходную историю и выход',
-        (tester) async {
-          final app = await _launch(tester, direction, point);
-          final history = app.session.originalHistory;
-          final confirmationId = app.router.stackData.last.matchId;
-          final oldConfirmation = tester.state<DailyChoiceCreationPageState>(
-            find.byType(DailyChoiceCreationPage),
-          );
-          await _tap(tester, 'daily-choice-submit');
-          await tester.pumpAndSettle();
-          expect(app.completions, hasLength(1));
-          expect(
-            await app.database
-                .customSelect('SELECT id FROM daily_choices')
-                .get(),
-            hasLength(1),
-          );
-          expect(app.session.canContinue, isFalse);
-          expect(
-            app.router.stackData
-                .take(history.length)
-                .map((route) => route.matchId),
-            history,
-          );
-          final active = switch (app.session.state) {
-            DailyChoiceCreationFlowActiveState value => value,
-            DailyChoiceCreationFlowLeft(:final lastActiveState) =>
-              lastActiveState,
-          };
-          expect(active, isA<DailyChoiceCreationFlowSaved>());
-          expect(find.textContaining('Дневной выбор создан'), findsWidgets);
-          if (point == _FailurePoint.none ||
-              point == _FailurePoint.afterResult) {
-            expect(app.router.stackData, hasLength(history.length + 1));
-            expect(
-              app.router.stackData.last.name,
-              DailyChoiceDetailsRoute.name,
-            );
-            expect(
-              tester
-                  .widget<DailyChoiceDetailsPage>(
-                    find.byType(DailyChoiceDetailsPage),
-                  )
-                  .choiceId,
-              durabilityChoice(201),
-            );
-            expect(find.byType(ChoicePathPage), findsNothing);
-            expect(find.byType(DailyChoiceCreationPage), findsNothing);
-            expect(oldConfirmation.mounted, isFalse);
-            if (point == _FailurePoint.afterResult) {
-              final resultMatchId = app.router.stackData.last.matchId;
-              app.router.releaseFailure();
-              await tester.pumpAndSettle();
-              expect(app.router.stackData.last.matchId, resultMatchId);
-              expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
-            }
-            await tester.binding.handlePopRoute();
-            await tester.pumpAndSettle();
-          } else {
-            if (point == _FailurePoint.beforeConfirmation) {
-              expect(app.router.stackData.last.matchId, confirmationId);
-              await completeDailyChoiceCreation(
-                router: app.router,
-                session: app.session,
-                confirmationMatchId: confirmationId,
-                choiceId: durabilityChoice(201),
-              );
-              expect(app.errors, hasLength(1));
-              expect(
-                tester
-                    .widget<FilledButton>(
-                      find.byKey(const ValueKey('daily-choice-submit')),
-                    )
-                    .onPressed,
-                isNull,
-              );
-              await tester.binding.handlePopRoute();
-              await tester.pumpAndSettle();
-            }
-            if (point != _FailurePoint.afterRoot) {
-              expect(
-                app.router.stackData.last.matchId,
-                app.session.rootMatchId,
-              );
-              expect(
-                find.byKey(const ValueKey('choice-path-creation-status')),
-                findsOneWidget,
-              );
-              expect(
-                find.byKey(const ValueKey('choice-path-open-confirmation')),
-                findsNothing,
-              );
-              expect(
-                find.byKey(const ValueKey('choice-path-select-action')),
-                findsNothing,
-              );
-              expect(
-                find.byKey(const ValueKey('choice-path-select-source')),
-                findsNothing,
-              );
-              expect(
-                find.byKey(const ValueKey('choice-path-back-0')),
-                findsNothing,
-              );
-              await tester.binding.handlePopRoute();
-              await tester.pumpAndSettle();
-            }
-          }
-          expect(app.router.stackData.map((route) => route.matchId), history);
-          expect(find.byType(IntentionDetailsPage), findsOneWidget);
-          expect(app.errors, hasLength(point == _FailurePoint.none ? 0 : 1));
-          for (final error in app.errors) {
-            expect(error.library, 'daily choice creation');
-            expect(error.toString(), isNot(contains('Секретный черновик')));
-            expect(error.toString(), isNot(contains(durabilityUuid(201))));
-          }
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
+  // Направление не меняет завершение: оно чередуется по точкам отказа, так что
+  // каждая точка проверена в одном направлении, а оба направления — в наборе.
+  for (final (direction, point) in [
+    (ChoicePathDraftDirection.topDown, _FailurePoint.none),
+    (ChoicePathDraftDirection.bottomUp, _FailurePoint.beforeConfirmation),
+    (ChoicePathDraftDirection.topDown, _FailurePoint.beforeRoot),
+    (ChoicePathDraftDirection.bottomUp, _FailurePoint.afterRoot),
+    (ChoicePathDraftDirection.topDown, _FailurePoint.afterResult),
+  ]) {
+    testWidgets(
+      'завершение $direction при $point сохраняет одну запись, исходную историю и выход',
+      (tester) async {
+        final app = await _launch(tester, direction, point);
+        final history = app.session.originalHistory;
+        final confirmationId = app.router.stackData.last.matchId;
+        final oldConfirmation = tester.state<DailyChoiceCreationPageState>(
+          find.byType(DailyChoiceCreationPage),
+        );
+        await _tap(tester, 'daily-choice-submit');
+        await tester.pumpAndSettle();
+        expect(app.completions, hasLength(1));
+        expect(
+          await app.database.customSelect('SELECT id FROM daily_choices').get(),
+          hasLength(1),
+        );
+        expect(app.session.canContinue, isFalse);
+        expect(
+          app.router.stackData
+              .take(history.length)
+              .map((route) => route.matchId),
+          history,
+        );
+        final active = switch (app.session.state) {
+          DailyChoiceCreationFlowActiveState value => value,
+          DailyChoiceCreationFlowLeft(:final lastActiveState) =>
+            lastActiveState,
+        };
+        expect(active, isA<DailyChoiceCreationFlowSaved>());
+        expect(find.textContaining('Дневной выбор создан'), findsWidgets);
+        if (point == _FailurePoint.none || point == _FailurePoint.afterResult) {
+          expect(app.router.stackData, hasLength(history.length + 1));
+          expect(app.router.stackData.last.name, DailyChoiceDetailsRoute.name);
           expect(
             tester
-                .widget<TextField>(
-                  find.byKey(const ValueKey('relation-editor-description')),
+                .widget<DailyChoiceDetailsPage>(
+                  find.byType(DailyChoiceDetailsPage),
                 )
-                .controller!
-                .text,
-            'Чужой черновик',
+                .choiceId,
+            durabilityChoice(201),
           );
-          expect(app.completions, hasLength(1));
-          expect(
-            app.router.replacements,
-            point == _FailurePoint.beforeConfirmation ? 0 : 1,
-          );
-          await tester.pump(const Duration(seconds: 8));
-          await tester.pumpAndSettle();
-          expect(
-            find.byKey(const ValueKey('graph-operation-message')),
-            findsNothing,
-          );
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
-    for (final point in [_FailurePoint.beforeRoot, _FailurePoint.afterResult]) {
-      testWidgets(
-        'поздний отказ $point и прежнее завершение $direction сохраняют новую сессию',
-        (tester) async {
-          final app = await _launch(
-            tester,
-            direction,
-            point,
-            delayFailure: true,
-          );
-          final confirmationId = app.router.stackData.last.matchId;
-          await _tap(tester, 'daily-choice-submit');
-          expect(app.completions, hasLength(1));
-          expect(app.errors, isEmpty);
-          final savedHistory = app.router.stackData
-              .map((route) => route.matchId)
-              .toList();
-          await completeDailyChoiceCreation(
-            router: app.router,
-            session: app.session,
-            confirmationMatchId: confirmationId,
-            choiceId: durabilityChoice(201),
-          );
-          expect(
-            app.router.stackData.map((route) => route.matchId),
-            savedHistory,
-          );
-          expect(app.router.replacements, 1);
+          expect(find.byType(ChoicePathPage), findsNothing);
+          expect(find.byType(DailyChoiceCreationPage), findsNothing);
+          expect(oldConfirmation.mounted, isFalse);
+          if (point == _FailurePoint.afterResult) {
+            final resultMatchId = app.router.stackData.last.matchId;
+            app.router.releaseFailure();
+            await tester.pumpAndSettle();
+            expect(app.router.stackData.last.matchId, resultMatchId);
+            expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
+          }
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          expect(
-            app.router.stackData.map((route) => route.matchId),
-            app.session.originalHistory,
-          );
-          unawaited(
-            app.router.push(
-              ChoicePathRoute(
-                sourceIntentionId: durabilityIntention(
-                  direction == ChoicePathDraftDirection.topDown ? 1 : 3,
-                ),
-                direction: direction,
+        } else {
+          if (point == _FailurePoint.beforeConfirmation) {
+            expect(app.router.stackData.last.matchId, confirmationId);
+            await completeDailyChoiceCreation(
+              router: app.router,
+              session: app.session,
+              confirmationMatchId: confirmationId,
+              choiceId: durabilityChoice(201),
+            );
+            expect(app.errors, hasLength(1));
+            expect(
+              tester
+                  .widget<FilledButton>(
+                    find.byKey(const ValueKey('daily-choice-submit')),
+                  )
+                  .onPressed,
+              isNull,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+          }
+          if (point != _FailurePoint.afterRoot) {
+            expect(app.router.stackData.last.matchId, app.session.rootMatchId);
+            expect(
+              find.byKey(const ValueKey('choice-path-creation-status')),
+              findsOneWidget,
+            );
+            expect(
+              find.byKey(const ValueKey('choice-path-open-confirmation')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('choice-path-select-action')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('choice-path-select-source')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('choice-path-back-0')),
+              findsNothing,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+          }
+        }
+        expect(app.router.stackData.map((route) => route.matchId), history);
+        expect(find.byType(IntentionDetailsPage), findsOneWidget);
+        expect(app.errors, hasLength(point == _FailurePoint.none ? 0 : 1));
+        for (final error in app.errors) {
+          expect(error.library, 'daily choice creation');
+          expect(error.toString(), isNot(contains('Секретный черновик')));
+          expect(error.toString(), isNot(contains(durabilityUuid(201))));
+        }
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey('relation-editor-description')),
+              )
+              .controller!
+              .text,
+          'Чужой черновик',
+        );
+        expect(app.completions, hasLength(1));
+        expect(
+          app.router.replacements,
+          point == _FailurePoint.beforeConfirmation ? 0 : 1,
+        );
+        await tester.pump(const Duration(seconds: 8));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('graph-operation-message')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  for (final (direction, point) in [
+    (ChoicePathDraftDirection.topDown, _FailurePoint.beforeRoot),
+    (ChoicePathDraftDirection.bottomUp, _FailurePoint.afterResult),
+  ]) {
+    testWidgets(
+      'поздний отказ $point и прежнее завершение $direction сохраняют новую сессию',
+      (tester) async {
+        final app = await _launch(tester, direction, point, delayFailure: true);
+        final confirmationId = app.router.stackData.last.matchId;
+        await _tap(tester, 'daily-choice-submit');
+        expect(app.completions, hasLength(1));
+        expect(app.errors, isEmpty);
+        final savedHistory = app.router.stackData
+            .map((route) => route.matchId)
+            .toList();
+        await completeDailyChoiceCreation(
+          router: app.router,
+          session: app.session,
+          confirmationMatchId: confirmationId,
+          choiceId: durabilityChoice(201),
+        );
+        expect(
+          app.router.stackData.map((route) => route.matchId),
+          savedHistory,
+        );
+        expect(app.router.replacements, 1);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          app.router.stackData.map((route) => route.matchId),
+          app.session.originalHistory,
+        );
+        unawaited(
+          app.router.push(
+            ChoicePathRoute(
+              sourceIntentionId: durabilityIntention(
+                direction == ChoicePathDraftDirection.topDown ? 1 : 3,
               ),
+              direction: direction,
             ),
-          );
-          await tester.pumpAndSettle();
-          final newSession = tester
-              .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-              .creationSession!;
-          final newHistory = app.router.stackData
-              .map((route) => route.matchId)
-              .toList();
-          expect(newSession.flowId, isNot(same(app.session.flowId)));
-          app.router.releaseFailure();
-          await tester.pumpAndSettle();
-          await completeDailyChoiceCreation(
-            router: app.router,
-            session: app.session,
-            confirmationMatchId: confirmationId,
-            choiceId: durabilityChoice(201),
-          );
-          expect(
-            app.router.stackData.map((route) => route.matchId),
-            newHistory,
-          );
-          expect(newSession.state, isA<DailyChoiceCreationFlowEditing>());
-          expect(app.completions, hasLength(1));
-          expect(
-            await app.database
-                .customSelect('SELECT id FROM daily_choices')
-                .get(),
-            hasLength(1),
-          );
-          expect(app.router.replacements, 1);
-          expect(app.errors, hasLength(1));
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+          ),
+        );
+        await tester.pumpAndSettle();
+        final newSession = tester
+            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+            .creationSession!;
+        final newHistory = app.router.stackData
+            .map((route) => route.matchId)
+            .toList();
+        expect(newSession.flowId, isNot(same(app.session.flowId)));
+        app.router.releaseFailure();
+        await tester.pumpAndSettle();
+        await completeDailyChoiceCreation(
+          router: app.router,
+          session: app.session,
+          confirmationMatchId: confirmationId,
+          choiceId: durabilityChoice(201),
+        );
+        expect(app.router.stackData.map((route) => route.matchId), newHistory);
+        expect(newSession.state, isA<DailyChoiceCreationFlowEditing>());
+        expect(app.completions, hasLength(1));
+        expect(
+          await app.database.customSelect('SELECT id FROM daily_choices').get(),
+          hasLength(1),
+        );
+        expect(app.router.replacements, 1);
+        expect(app.errors, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 }
 

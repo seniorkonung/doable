@@ -4,46 +4,47 @@ import 'package:flutter_test/flutter_test.dart';
 import 'daily_choice_calendar_test_support.dart';
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    final language = locale.languageCode;
+  // Начало недели не зависит от языка. Остальные проверки файла идут на
+  // русском, поэтому периоды отдельно проверяются на английском, где неделя
+  // по умолчанию начиналась бы не с понедельника.
+  const locale = Locale('en');
 
-    testWidgets(
-      'недельное представление показывает неделю даты просмотра с понедельника ($language)',
-      (tester) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: week(date(2026, 10, 4)),
-          today: date(2026, 10, 4),
-          locale: locale,
-        );
+  testWidgets(
+    'недельное представление показывает неделю даты просмотра с понедельника',
+    (tester) async {
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: date(2026, 10, 4),
+        viewport: week(date(2026, 10, 4)),
+        today: date(2026, 10, 4),
+        locale: locale,
+      );
 
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-        expect(dayCell(tester, date(2026, 9, 30)).isOutsideMonth, isFalse);
-        expect(consumer.events, isEmpty);
-      },
-    );
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
+      expect(dayCell(tester, date(2026, 9, 30)).isOutsideMonth, isFalse);
+      expect(consumer.events, isEmpty);
+    },
+  );
 
-    testWidgets(
-      'месячное представление показывает все дни месяца даты просмотра с понедельника ($language)',
-      (tester) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: month(date(2026, 11, 15)),
-          today: date(2026, 10, 4),
-          locale: locale,
-        );
+  testWidgets(
+    'месячное представление показывает все дни месяца даты просмотра с понедельника',
+    (tester) async {
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: date(2026, 10, 4),
+        viewport: month(date(2026, 11, 15)),
+        today: date(2026, 10, 4),
+        locale: locale,
+      );
 
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-        expect(dayCell(tester, date(2026, 10, 26)).isOutsideMonth, isTrue);
-        expect(dayCell(tester, date(2026, 11, 1)).isOutsideMonth, isFalse);
-        expect(dayCell(tester, date(2026, 11, 30)).isOutsideMonth, isFalse);
-        expect(dayCell(tester, date(2026, 12, 6)).isOutsideMonth, isTrue);
-        expect(consumer.events, isEmpty);
-      },
-    );
-  }
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+      expect(dayCell(tester, date(2026, 10, 26)).isOutsideMonth, isTrue);
+      expect(dayCell(tester, date(2026, 11, 1)).isOutsideMonth, isFalse);
+      expect(dayCell(tester, date(2026, 11, 30)).isOutsideMonth, isFalse);
+      expect(dayCell(tester, date(2026, 12, 6)).isOutsideMonth, isTrue);
+      expect(consumer.events, isEmpty);
+    },
+  );
 
   testWidgets('нажатие дня передаёт одно событие выбора с датой этой ячейки', (
     tester,

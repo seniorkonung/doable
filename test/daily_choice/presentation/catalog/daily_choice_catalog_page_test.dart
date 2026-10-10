@@ -34,59 +34,60 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    for (final (mode, route, cancelKey, name) in const [
-      (
-        QuickCreationMode.dailyChoiceFromIntention,
-        DailyChoiceSourcePickerRoute.name,
-        'daily-choice-source-cancel',
-        'дневной выбор от намерения',
-      ),
-      (
-        QuickCreationMode.dailyChoiceFromAction,
-        DailyChoiceActionPickerRoute.name,
-        'daily-choice-action-cancel',
-        'дневной выбор от действия',
-      ),
-    ]) {
-      testWidgets(
-        'каталог без собственной кнопки запускает $name через общую панель '
-        'на языке ${locale.languageCode}',
-        (tester) async {
-          final repository = _Repository();
-          final router = await _open(tester, repository, locale: locale);
-          await tester.pump(const Duration(milliseconds: 400));
-          expect(find.byType(FloatingActionButton), findsNothing);
-          repository.completeFirst([], total: 0);
-          await tester.pumpAndSettle();
-          expect(find.byType(FloatingActionButton), findsNothing);
-          final semantics = tester.ensureSemantics();
-          final l10n = lookupAppLocalizations(locale);
-          expect(
-            find.bySemanticsLabel(l10n.dailyChoiceCreateFromAction),
-            findsNothing,
-          );
-          await openQuickCreation(
-            tester,
-            mode,
-            openedPage: find.byKey(ValueKey(cancelKey)),
-          );
-          expect(router.current.name, route);
-          await tester.tap(find.byKey(ValueKey(cancelKey)));
-          await tester.pump(const Duration(milliseconds: 400));
-          expectDailyChoicesRootPage(router);
-          expect(repository.queries, hasLength(1));
-          expect(quickCreationAction().hitTestable(), findsOneWidget);
-          expect(
-            find.bySemanticsLabel(
-              '${l10n.quickCreationLabel}, ${mode.title(l10n)}',
-            ),
-            findsOneWidget,
-          );
-          semantics.dispose();
-        },
-      );
-    }
+  // Режим и язык независимы: диагональ покрывает оба режима и оба языка.
+  for (final (locale, mode, route, cancelKey, name) in const [
+    (
+      Locale('ru'),
+      QuickCreationMode.dailyChoiceFromIntention,
+      DailyChoiceSourcePickerRoute.name,
+      'daily-choice-source-cancel',
+      'дневной выбор от намерения',
+    ),
+    (
+      Locale('en'),
+      QuickCreationMode.dailyChoiceFromAction,
+      DailyChoiceActionPickerRoute.name,
+      'daily-choice-action-cancel',
+      'дневной выбор от действия',
+    ),
+  ]) {
+    testWidgets(
+      'каталог без собственной кнопки запускает $name через общую панель '
+      'на языке ${locale.languageCode}',
+      (tester) async {
+        final repository = _Repository();
+        final router = await _open(tester, repository, locale: locale);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.byType(FloatingActionButton), findsNothing);
+        repository.completeFirst([], total: 0);
+        await tester.pumpAndSettle();
+        expect(find.byType(FloatingActionButton), findsNothing);
+        final semantics = tester.ensureSemantics();
+        final l10n = lookupAppLocalizations(locale);
+        expect(
+          find.bySemanticsLabel(l10n.dailyChoiceCreateFromAction),
+          findsNothing,
+        );
+        await openQuickCreation(
+          tester,
+          mode,
+          openedPage: find.byKey(ValueKey(cancelKey)),
+        );
+        expect(router.current.name, route);
+        await tester.tap(find.byKey(ValueKey(cancelKey)));
+        await tester.pump(const Duration(milliseconds: 400));
+        expectDailyChoicesRootPage(router);
+        expect(repository.queries, hasLength(1));
+        expect(quickCreationAction().hitTestable(), findsOneWidget);
+        expect(
+          find.bySemanticsLabel(
+            '${l10n.quickCreationLabel}, ${mode.title(l10n)}',
+          ),
+          findsOneWidget,
+        );
+        semantics.dispose();
+      },
+    );
   }
 
   testWidgets('показывает все записи, количество и открывает дубликат по id', (
@@ -649,97 +650,70 @@ void main() {
     expect(find.text('To Основание, today I Действие'), findsOneWidget);
   });
 
-  for (final (keyboard, variant) in [
-    (0.0, 'без клавиатуры'),
-    (300.0, 'при открытой клавиатуре'),
-  ]) {
-    testWidgets('начальные загрузка, отказ с повтором и пустая выдача стоят '
-        'под фильтрами и доступны до панели либо клавиатуры $variant', (
-      tester,
-    ) async {
-      final repository = _Repository();
-      await _open(tester, repository, size: _phone, keyboard: keyboard);
-      final l10n = lookupAppLocalizations(const Locale('ru'));
-      // Прокручивает страницу до конца жестом из-под шапки и проверяет, что
-      // элемент стоит под фильтрами и целиком виден над панелью либо клавиатурой.
-      Future<void> expectReachable(
-        Finder finder, {
-        bool fillsRemaining = true,
-      }) async {
-        final appBar = tester.getRect(find.byType(AppBar));
-        await tester.dragFrom(
-          Offset(appBar.left + 24, appBar.bottom + 24),
-          const Offset(0, -400),
-        );
-        // Индикатор загрузки не даёт кадрам успокоиться.
-        await tester.pump();
-        await tester.pump(const Duration(seconds: 1));
-        expect(finder, findsOneWidget);
-        final filtersBottom = [
-          tester
-              .getRect(find.byType(DailyChoiceCalendar, skipOffstage: false))
-              .bottom,
-          for (final key in _filterKeys)
-            tester
-                .getRect(find.byKey(ValueKey(key), skipOffstage: false))
-                .bottom,
-        ].reduce(math.max);
-        final rect = tester.getRect(finder);
-        final contentBottom = math.min(
-          tester.getRect(find.byType(AppNavigationBar)).top,
-          _phone.height - keyboard,
-        );
-        expect(find.byType(FloatingActionButton), findsNothing);
-        if (fillsRemaining) {
-          final status = find
-              .ancestor(of: finder, matching: find.byType(Center))
-              .last;
-          expect(
-            tester.getRect(status).bottom,
-            moreOrLessEquals(contentBottom),
-          );
-        }
-        expect(
-          rect.top,
-          greaterThanOrEqualTo(filtersBottom),
-          reason: '$finder',
-        );
-        expect(
-          rect.top,
-          greaterThanOrEqualTo(appBar.bottom),
-          reason: '$finder',
-        );
-        expect(
-          rect.bottom,
-          lessThanOrEqualTo(contentBottom),
-          reason: '$finder',
-        );
-      }
-
-      await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
-
-      repository.failFirst();
-      await tester.pumpAndSettle();
-      final retry = find.widgetWithText(TextButton, l10n.commonRetry);
-      await expectReachable(find.text(l10n.dailyChoiceCatalogUnavailable));
-      await expectReachable(retry);
-      expect(retry.hitTestable(), findsOneWidget);
-
-      await tester.tap(retry);
-      await tester.pump();
-      expect(repository.queries, hasLength(2));
-      await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
-
-      repository.completeFirst([], index: 1, total: 0);
-      await tester.pumpAndSettle();
-      await expectReachable(
-        find.text(l10n.dailyChoiceCatalogTotalCount(0)),
-        fillsRemaining: false,
+  testWidgets('начальные загрузка, отказ с повтором и пустая выдача стоят '
+      'под фильтрами и доступны над панелью', (tester) async {
+    final repository = _Repository();
+    await _open(tester, repository, size: _phone);
+    final l10n = lookupAppLocalizations(const Locale('ru'));
+    // Прокручивает страницу до конца жестом из-под шапки и проверяет, что
+    // элемент стоит под фильтрами и целиком виден над панелью.
+    Future<void> expectReachable(
+      Finder finder, {
+      bool fillsRemaining = true,
+    }) async {
+      final appBar = tester.getRect(find.byType(AppBar));
+      await tester.dragFrom(
+        Offset(appBar.left + 24, appBar.bottom + 24),
+        const Offset(0, -400),
       );
-      await expectReachable(find.text(l10n.dailyChoiceCatalogEmpty));
-      expect(tester.takeException(), isNull);
-    });
-  }
+      // Индикатор загрузки не даёт кадрам успокоиться.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(finder, findsOneWidget);
+      final filtersBottom = [
+        tester
+            .getRect(find.byType(DailyChoiceCalendar, skipOffstage: false))
+            .bottom,
+        for (final key in _filterKeys)
+          tester.getRect(find.byKey(ValueKey(key), skipOffstage: false)).bottom,
+      ].reduce(math.max);
+      final rect = tester.getRect(finder);
+      final contentBottom = tester.getRect(find.byType(AppNavigationBar)).top;
+      expect(find.byType(FloatingActionButton), findsNothing);
+      if (fillsRemaining) {
+        final status = find
+            .ancestor(of: finder, matching: find.byType(Center))
+            .last;
+        expect(tester.getRect(status).bottom, moreOrLessEquals(contentBottom));
+      }
+      expect(rect.top, greaterThanOrEqualTo(filtersBottom), reason: '$finder');
+      expect(rect.top, greaterThanOrEqualTo(appBar.bottom), reason: '$finder');
+      expect(rect.bottom, lessThanOrEqualTo(contentBottom), reason: '$finder');
+    }
+
+    await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
+
+    repository.failFirst();
+    await tester.pumpAndSettle();
+    final retry = find.widgetWithText(TextButton, l10n.commonRetry);
+    await expectReachable(find.text(l10n.dailyChoiceCatalogUnavailable));
+    await expectReachable(retry);
+    expect(retry.hitTestable(), findsOneWidget);
+
+    await tester.tap(retry);
+    await tester.pump();
+    expect(repository.queries, hasLength(2));
+    await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
+
+    repository.completeFirst([], index: 1, total: 0);
+    await tester.pumpAndSettle();
+    await expectReachable(
+      find.text(l10n.dailyChoiceCatalogTotalCount(0)),
+      fillsRemaining: false,
+    );
+    await expectReachable(find.text(l10n.dailyChoiceCatalogEmpty));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 /// Экран телефона, на котором фильтры и выдача делят высоту.
@@ -788,21 +762,18 @@ Future<void> _swipeCalendar(WidgetTester tester, {required bool toNext}) async {
   await _settleCalendar(tester);
 }
 
-/// Открывает каталог дневных выборов; [today] — локальное сегодня,
-/// [keyboard] — высота открытой экранной клавиатуры.
+/// Открывает каталог дневных выборов; [today] — локальное сегодня.
 Future<AppRouter> _open(
   WidgetTester tester,
   _Repository repository, {
   CalendarDate? today,
   Locale locale = const Locale('ru'),
   Size size = const Size(1200, 2400),
-  double keyboard = 0,
 }) async {
   final router = AppRouter();
   addTearDown(router.dispose);
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
-  tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(

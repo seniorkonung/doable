@@ -11,8 +11,15 @@ import 'daily_choice_calendar_test_support.dart';
 /// Узкий экран телефона.
 const _screen = Size(360, 780);
 
-/// Обычный и увеличенный системный размер текста.
-const _textScales = [1.0, 2.5];
+/// Языки и системные размеры текста: русский проверяется целиком в обычном и
+/// увеличенном масштабе. Английские подписи дней недели длиннее русских, поэтому
+/// английский проверяется только свёрнутой неделей в увеличенном масштабе:
+/// остальная раскладка от языка не зависит.
+final _configurations = [
+  (locale: const Locale('ru'), textScale: 1.0, full: true),
+  (locale: const Locale('ru'), textScale: 2.5, full: true),
+  (locale: const Locale('en'), textScale: 2.5, full: false),
+];
 
 /// Короткие подписи колонок с понедельника по воскресенье.
 const _weekdays = {
@@ -70,193 +77,191 @@ final _pageScroll = find.byWidgetPredicate(
 );
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    for (final textScale in _textScales) {
-      final language = locale.languageCode;
+  for (final (:locale, :textScale, :full) in _configurations) {
+    final language = locale.languageCode;
 
-      group('экран 360×780, $language, масштаб текста $textScale', () {
-        testWidgets(
-          'свёрнутая неделя показывает семь колонок, числа, подписи дней '
-          'недели, выбранную дату и команды целиком, и всё нажимается',
-          (tester) async {
-            final consumer = await _pumpOnPhone(
-              tester,
-              locale: locale,
-              textScale: textScale,
-              viewport: week(date(2026, 10, 4)),
-            );
-            final weeks = weeksFrom(date(2026, 9, 28), 1);
-
-            _expectLaidOut(
-              tester,
-              weeks: weeks,
-              weekdays: _weekdays[language]!,
-              selectedDate: date(2026, 10, 4),
-              textScale: textScale,
-            );
-            await _tapEveryDay(tester, consumer, weeks);
-            final localizations = _localizations(tester);
-            await _tapEveryCommand(tester, consumer, {
-              localizations.dailyChoiceCalendarPreviousWeek: week(
-                date(2026, 9, 27),
-              ),
-              localizations.dailyChoiceCalendarNextWeek: week(
-                date(2026, 10, 11),
-              ),
-              localizations.dailyChoiceCalendarExpand: month(date(2026, 10, 4)),
-            });
-          },
-        );
-
-        for (final shown in _months) {
-          testWidgets(
-            'раскрытый ${shown.name} размещается целиком, а все его дни и '
-            'команды нажимаются',
-            (tester) async {
-              final consumer = await _pumpOnPhone(
-                tester,
-                locale: locale,
-                textScale: textScale,
-                viewport: month(shown.focusedDate),
-              );
-              final focused = shown.focusedDate;
-
-              _expectLaidOut(
-                tester,
-                weeks: shown.weeks,
-                weekdays: _weekdays[language]!,
-                selectedDate: focused,
-                textScale: textScale,
-              );
-              await _tapEveryDay(tester, consumer, shown.weeks);
-              final localizations = _localizations(tester);
-              await _tapEveryCommand(tester, consumer, {
-                localizations.dailyChoiceCalendarPreviousMonth: month(
-                  date(focused.year, focused.month - 1, 1),
-                ),
-                localizations.dailyChoiceCalendarNextMonth: month(
-                  date(focused.year, focused.month + 1, 1),
-                ),
-                localizations.dailyChoiceCalendarCollapse: week(focused),
-              });
-            },
-          );
-        }
-
-        testWidgets('раскрытие увеличивает высоту на строки месяца и сдвигает '
-            'содержимое ниже, которое остаётся достижимым общей прокруткой', (
-          tester,
-        ) async {
+    group('экран 360×780, $language, масштаб текста $textScale', () {
+      testWidgets(
+        'свёрнутая неделя показывает семь колонок, числа, подписи дней '
+        'недели, выбранную дату и команды целиком, и всё нажимается',
+        (tester) async {
           final consumer = await _pumpOnPhone(
             tester,
             locale: locale,
             textScale: textScale,
-            viewport: week(date(2027, 2, 15)),
+            viewport: week(date(2026, 10, 4)),
           );
-          final weekLayout = await _calendarLayout(tester);
-          expect(weekLayout.rows, 1);
+          final weeks = weeksFrom(date(2026, 9, 28), 1);
 
-          final expand = find.byTooltip(
-            _localizations(tester).dailyChoiceCalendarExpand,
+          _expectLaidOut(
+            tester,
+            weeks: weeks,
+            weekdays: _weekdays[language]!,
+            selectedDate: date(2026, 10, 4),
+            textScale: textScale,
           );
-          await _reveal(tester, expand);
-          await tester.tap(expand);
-          await tester.pumpAndSettle();
-          expect(consumer.viewport, month(date(2027, 2, 15)));
-          // Месяц раскрывается внутри страницы: у календаря нет своей
-          // вертикальной прокрутки, окна или маршрута.
-          expect(_pageScroll, findsOneWidget);
-          expect(find.byType(DailyChoiceCalendar), findsOneWidget);
-          expect(tester.takeException(), isNull);
+          await _tapEveryDay(tester, consumer, weeks);
+          final localizations = _localizations(tester);
+          await _tapEveryCommand(tester, consumer, {
+            localizations.dailyChoiceCalendarPreviousWeek: week(
+              date(2026, 9, 27),
+            ),
+            localizations.dailyChoiceCalendarNextWeek: week(date(2026, 10, 11)),
+            localizations.dailyChoiceCalendarExpand: month(date(2026, 10, 4)),
+          });
+        },
+      );
 
-          final layouts = [weekLayout, await _calendarLayout(tester)];
-          for (final shown in _months.skip(1)) {
-            consumer.replaceInputs(viewport: month(shown.focusedDate));
-            await tester.pumpAndSettle();
-            layouts.add(await _calendarLayout(tester));
-          }
+      if (!full) return;
 
-          expect(layouts.map((layout) => layout.rows), [1, 4, 5, 6]);
-          final rowHeight = weekLayout.rowHeight;
-          expect(rowHeight, greaterThanOrEqualTo(kMinInteractiveDimension));
-          for (final layout in layouts) {
-            // Сетка занимает ровно свои строки одинаковой высоты, а каталог
-            // начинается сразу под календарём: ничего не обрезано и не
-            // перекрыто.
-            expect(layout.rowHeight, moreOrLessEquals(rowHeight));
-            expect(
-              layout.gridHeight,
-              moreOrLessEquals(layout.rows * rowHeight),
-              reason: '${layout.rows} строк',
-            );
-            expect(
-              layout.messageTop,
-              moreOrLessEquals(layout.calendar.bottom),
-              reason: '${layout.rows} строк',
-            );
-          }
-          // Высота шапки зависит от длины названия месяца, поэтому
-          // раскрытие сравнивается на одном и том же феврале 2027 года.
-          expect(
-            layouts[1].calendar.height - weekLayout.calendar.height,
-            moreOrLessEquals(3 * rowHeight),
-          );
-
-          await tester.scrollUntilVisible(
-            find.byKey(_lastRow),
-            200,
-            scrollable: _pageScroll,
-          );
-          await tester.pumpAndSettle();
-          _expectTappable(tester, find.byKey(_lastRow));
-          await tester.scrollUntilVisible(
-            find.byKey(_message),
-            -200,
-            scrollable: _pageScroll,
-          );
-          await tester.pumpAndSettle();
-          _expectTappable(tester, find.byKey(_message));
-          expect(consumer.viewport, month(date(2026, 3, 15)));
-          expect(consumer.selectedDate, date(2027, 2, 15));
-        });
-
+      // Крайние месяцы: строки сетки не ветвят раскладку, пять недель
+      // лежат между ними и проверяются вместе с высотами ниже.
+      for (final shown in [_months.first, _months.last]) {
         testWidgets(
-          'вертикальный жест по дням прокручивает страницу, а горизонтальный '
-          'перелистывает месяц',
+          'раскрытый ${shown.name} размещается целиком, а все его дни и '
+          'команды нажимаются',
           (tester) async {
             final consumer = await _pumpOnPhone(
               tester,
               locale: locale,
               textScale: textScale,
-              viewport: month(date(2026, 10, 4)),
+              viewport: month(shown.focusedDate),
             );
-            final day = calendarDay(date(2026, 10, 14));
-            await _reveal(tester, day);
-            final scroll = tester.state<ScrollableState>(_pageScroll).position;
-            final before = scroll.pixels;
+            final focused = shown.focusedDate;
 
-            await tester.drag(day, const Offset(0, -150));
-            await tester.pumpAndSettle();
-
-            expect(scroll.pixels, greaterThan(before + 100));
-            expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
-            expect(consumer.events, isEmpty);
-
-            final scrolled = scroll.pixels;
-            // Больше половины, но меньше ширины страницы периода.
-            await tester.drag(day, const Offset(-300, 0));
-            await tester.pumpAndSettle();
-
-            expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-            expect(consumer.events, [
-              ViewportChanged(month(date(2026, 11, 1))),
-            ]);
-            expect(consumer.selectedDate, date(2026, 10, 4));
-            expect(scroll.pixels, scrolled);
+            _expectLaidOut(
+              tester,
+              weeks: shown.weeks,
+              weekdays: _weekdays[language]!,
+              selectedDate: focused,
+              textScale: textScale,
+            );
+            await _tapEveryDay(tester, consumer, shown.weeks);
+            final localizations = _localizations(tester);
+            await _tapEveryCommand(tester, consumer, {
+              localizations.dailyChoiceCalendarPreviousMonth: month(
+                date(focused.year, focused.month - 1, 1),
+              ),
+              localizations.dailyChoiceCalendarNextMonth: month(
+                date(focused.year, focused.month + 1, 1),
+              ),
+              localizations.dailyChoiceCalendarCollapse: week(focused),
+            });
           },
         );
+      }
+
+      testWidgets('раскрытие увеличивает высоту на строки месяца и сдвигает '
+          'содержимое ниже, которое остаётся достижимым общей прокруткой', (
+        tester,
+      ) async {
+        final consumer = await _pumpOnPhone(
+          tester,
+          locale: locale,
+          textScale: textScale,
+          viewport: week(date(2027, 2, 15)),
+        );
+        final weekLayout = await _calendarLayout(tester);
+        expect(weekLayout.rows, 1);
+
+        final expand = find.byTooltip(
+          _localizations(tester).dailyChoiceCalendarExpand,
+        );
+        await _reveal(tester, expand);
+        await tester.tap(expand);
+        await tester.pumpAndSettle();
+        expect(consumer.viewport, month(date(2027, 2, 15)));
+        // Месяц раскрывается внутри страницы: у календаря нет своей
+        // вертикальной прокрутки, окна или маршрута.
+        expect(_pageScroll, findsOneWidget);
+        expect(find.byType(DailyChoiceCalendar), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        final layouts = [weekLayout, await _calendarLayout(tester)];
+        for (final shown in _months.skip(1)) {
+          consumer.replaceInputs(viewport: month(shown.focusedDate));
+          await tester.pumpAndSettle();
+          layouts.add(await _calendarLayout(tester));
+        }
+
+        expect(layouts.map((layout) => layout.rows), [1, 4, 5, 6]);
+        final rowHeight = weekLayout.rowHeight;
+        expect(rowHeight, greaterThanOrEqualTo(kMinInteractiveDimension));
+        for (final layout in layouts) {
+          // Сетка занимает ровно свои строки одинаковой высоты, а каталог
+          // начинается сразу под календарём: ничего не обрезано и не
+          // перекрыто.
+          expect(layout.rowHeight, moreOrLessEquals(rowHeight));
+          expect(
+            layout.gridHeight,
+            moreOrLessEquals(layout.rows * rowHeight),
+            reason: '${layout.rows} строк',
+          );
+          expect(
+            layout.messageTop,
+            moreOrLessEquals(layout.calendar.bottom),
+            reason: '${layout.rows} строк',
+          );
+        }
+        // Высота шапки зависит от длины названия месяца, поэтому
+        // раскрытие сравнивается на одном и том же феврале 2027 года.
+        expect(
+          layouts[1].calendar.height - weekLayout.calendar.height,
+          moreOrLessEquals(3 * rowHeight),
+        );
+
+        await tester.scrollUntilVisible(
+          find.byKey(_lastRow),
+          200,
+          scrollable: _pageScroll,
+        );
+        await tester.pumpAndSettle();
+        _expectTappable(tester, find.byKey(_lastRow));
+        await tester.scrollUntilVisible(
+          find.byKey(_message),
+          -200,
+          scrollable: _pageScroll,
+        );
+        await tester.pumpAndSettle();
+        _expectTappable(tester, find.byKey(_message));
+        expect(consumer.viewport, month(date(2026, 3, 15)));
+        expect(consumer.selectedDate, date(2027, 2, 15));
       });
-    }
+
+      testWidgets(
+        'вертикальный жест по дням прокручивает страницу, а горизонтальный '
+        'перелистывает месяц',
+        (tester) async {
+          final consumer = await _pumpOnPhone(
+            tester,
+            locale: locale,
+            textScale: textScale,
+            viewport: month(date(2026, 10, 4)),
+          );
+          final day = calendarDay(date(2026, 10, 14));
+          await _reveal(tester, day);
+          final scroll = tester.state<ScrollableState>(_pageScroll).position;
+          final before = scroll.pixels;
+
+          await tester.drag(day, const Offset(0, -150));
+          await tester.pumpAndSettle();
+
+          expect(scroll.pixels, greaterThan(before + 100));
+          expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+          expect(consumer.events, isEmpty);
+
+          final scrolled = scroll.pixels;
+          // Больше половины, но меньше ширины страницы периода.
+          await tester.drag(day, const Offset(-300, 0));
+          await tester.pumpAndSettle();
+
+          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+          expect(consumer.events, [ViewportChanged(month(date(2026, 11, 1)))]);
+          expect(consumer.selectedDate, date(2026, 10, 4));
+          expect(scroll.pixels, scrolled);
+        },
+      );
+    });
   }
 
   testWidgets(

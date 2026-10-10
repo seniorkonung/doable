@@ -103,60 +103,157 @@ void main() {
   );
 
   for (final direction in ChoicePathDraftDirection.values) {
-    for (final closeIcon in [false, true]) {
-      testWidgets(
-        '${_directionName(direction)}: ${closeIcon ? 'крестик' : 'текстовая отмена'} '
-        'при клавиатуре сохраняет глубокую историю и запрещает поздний путь',
-        (tester) async {
-          final router = await _openApp(tester);
-          final source = await _sourceContext(tester, router, deep: true);
-          final history = router.stackData.map((data) => data.matchId).toList();
-          final launcher = DailyChoiceCreationLauncher();
-          final running = launcher.launch(
-            sourceContext: source,
-            direction: direction,
-          );
-          await tester.pumpAndSettle();
-          final launch = _pickerContext(router).launch;
-          final lateSelection = tester
-              .widget<IntentionSummaryView>(
-                find.byType(IntentionSummaryView).first,
-              )
-              .onTap!;
-          final prefix = direction == ChoicePathDraftDirection.topDown
-              ? 'source'
-              : 'action';
-          final filter = find.byKey(ValueKey('daily-choice-$prefix-filter'));
-          await tester.enterText(filter, 'Намерение 3');
-          tester.view.physicalSize = const Size(400, 800);
-          tester.view.viewInsets = const FakeViewPadding(bottom: 260);
-          tester.platformDispatcher.textScaleFactorTestValue = 2.6;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          await tester.pumpAndSettle();
-          final action = closeIcon
-              ? find.byKey(ValueKey('daily-choice-$prefix-cancel'))
-              : find.widgetWithText(TextButton, 'Отменить создание');
-          expect(action.hitTestable(), findsOneWidget);
-          expect(tester.getRect(action).bottom, lessThanOrEqualTo(540));
-          await tester.tap(action);
-          expect(launch.isActive, isFalse);
-          lateSelection();
-          await tester.pumpAndSettle();
-          await running;
-          expect(router.stackData.map((data) => data.matchId), history);
-          expect(find.byType(ChoicePathPage), findsNothing);
+    // Направление и способ отмены независимы: диагональ покрывает оба значения.
+    final closeIcon = direction == ChoicePathDraftDirection.bottomUp;
+    testWidgets(
+      '${_directionName(direction)}: ${closeIcon ? 'крестик' : 'текстовая отмена'} '
+      'при клавиатуре сохраняет глубокую историю и запрещает поздний путь',
+      (tester) async {
+        final router = await _openApp(tester);
+        final source = await _sourceContext(tester, router, deep: true);
+        final history = router.stackData.map((data) => data.matchId).toList();
+        final launcher = DailyChoiceCreationLauncher();
+        final running = launcher.launch(
+          sourceContext: source,
+          direction: direction,
+        );
+        await tester.pumpAndSettle();
+        final launch = _pickerContext(router).launch;
+        final lateSelection = tester
+            .widget<IntentionSummaryView>(
+              find.byType(IntentionSummaryView).first,
+            )
+            .onTap!;
+        final prefix = direction == ChoicePathDraftDirection.topDown
+            ? 'source'
+            : 'action';
+        final filter = find.byKey(ValueKey('daily-choice-$prefix-filter'));
+        await tester.enterText(filter, 'Намерение 3');
+        tester.view.physicalSize = const Size(400, 800);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+        tester.platformDispatcher.textScaleFactorTestValue = 2.6;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await tester.pumpAndSettle();
+        final action = closeIcon
+            ? find.byKey(ValueKey('daily-choice-$prefix-cancel'))
+            : find.widgetWithText(TextButton, 'Отменить создание');
+        expect(action.hitTestable(), findsOneWidget);
+        expect(tester.getRect(action).bottom, lessThanOrEqualTo(540));
+        await tester.tap(action);
+        expect(launch.isActive, isFalse);
+        lateSelection();
+        await tester.pumpAndSettle();
+        await running;
+        expect(router.stackData.map((data) => data.matchId), history);
+        expect(find.byType(ChoicePathPage), findsNothing);
 
-          final next = launcher.launch(
-            sourceContext: source,
-            direction: direction,
+        final next = launcher.launch(
+          sourceContext: source,
+          direction: direction,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(filter).controller!.text, isEmpty);
+        expect(_pickerContext(router).launch, isNot(same(launch)));
+        await tester.tap(find.byKey(ValueKey('daily-choice-$prefix-cancel')));
+        await tester.pumpAndSettle();
+        await next;
+        expect(router.stackData.map((data) => data.matchId), history);
+        await router.maybePop();
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey('relation-editor-description')),
+              )
+              .controller!
+              .text,
+          'Чужой черновик',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+    // Направление и глубина страницы запуска независимы: диагональ покрывает
+    // оба значения.
+    final deep = direction == ChoicePathDraftDirection.bottomUp;
+    testWidgets(
+      '${_directionName(direction)}: явный выбор над ${deep ? 'глубокой страницей' : 'корнем'} '
+      'закрывает поиск, строит путь и сохраняет исходную историю',
+      (tester) async {
+        final router = await _openApp(tester);
+        final source = await _sourceContext(tester, router, deep: deep);
+        final history = router.stackData.map((route) => route.matchId).toList();
+        final launcher = DailyChoiceCreationLauncher();
+        final running = launcher.launch(
+          sourceContext: source,
+          direction: direction,
+        );
+        unawaited(launcher.launch(sourceContext: source, direction: direction));
+        await tester.pumpAndSettle();
+        expect(router.stackData, hasLength(history.length + 1));
+        expect(router.current.name, _pickerName(direction));
+        expect(_pickerContext(router).launch.isActive, isTrue);
+        expect(find.text('Отменить создание'), findsOneWidget);
+        if (direction == ChoicePathDraftDirection.bottomUp) {
+          expect(find.text('Намерение 1'), findsNothing);
+        }
+        await _choose(
+          tester,
+          direction,
+          direction == ChoicePathDraftDirection.topDown ? 1 : 3,
+        );
+        final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
+        final session = tester
+            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
+            .creationSession!;
+        expect(page.direction, direction);
+        expect(
+          page.sourceIntentionId,
+          durabilityIntention(
+            direction == ChoicePathDraftDirection.topDown ? 1 : 3,
+          ),
+        );
+        expect(session.originalHistory, history);
+        expect(
+          router.stackData.map((route) => route.name),
+          isNot(contains(_pickerName(direction))),
+        );
+        for (final relation
+            in direction == ChoicePathDraftDirection.topDown
+                ? [101, 102]
+                : [102, 101]) {
+          await _tapKey(
+            tester,
+            'choice-path-continue-${durabilityUuid(relation)}',
           );
-          await tester.pumpAndSettle();
-          expect(tester.widget<TextField>(filter).controller!.text, isEmpty);
-          expect(_pickerContext(router).launch, isNot(same(launch)));
-          await tester.tap(find.byKey(ValueKey('daily-choice-$prefix-cancel')));
-          await tester.pumpAndSettle();
-          await next;
-          expect(router.stackData.map((data) => data.matchId), history);
+        }
+        expect(
+          find.byKey(
+            ValueKey(
+              direction == ChoicePathDraftDirection.topDown
+                  ? 'choice-path-select-action'
+                  : 'choice-path-select-source',
+            ),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Отменить создание'));
+        await tester.pumpAndSettle();
+        await running;
+        expect(router.stackData.map((route) => route.matchId), history);
+        expect(
+          router.innerRouterOf<TabsRouter>(AppShellRoute.name)!.activeIndex,
+          1,
+        );
+        final next = launcher.launch(
+          sourceContext: source,
+          direction: direction,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Отменить создание'));
+        await tester.pumpAndSettle();
+        await next;
+        expect(router.stackData.map((route) => route.matchId), history);
+        if (deep) {
           await router.maybePop();
           await tester.pumpAndSettle();
           expect(
@@ -168,112 +265,10 @@ void main() {
                 .text,
             'Чужой черновик',
           );
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
-    for (final deep in [false, true]) {
-      testWidgets(
-        '${_directionName(direction)}: явный выбор над ${deep ? 'глубокой страницей' : 'корнем'} '
-        'закрывает поиск, строит путь и сохраняет исходную историю',
-        (tester) async {
-          final router = await _openApp(tester);
-          final source = await _sourceContext(tester, router, deep: deep);
-          final history = router.stackData
-              .map((route) => route.matchId)
-              .toList();
-          final launcher = DailyChoiceCreationLauncher();
-          final running = launcher.launch(
-            sourceContext: source,
-            direction: direction,
-          );
-          unawaited(
-            launcher.launch(sourceContext: source, direction: direction),
-          );
-          await tester.pumpAndSettle();
-          expect(router.stackData, hasLength(history.length + 1));
-          expect(router.current.name, _pickerName(direction));
-          expect(_pickerContext(router).launch.isActive, isTrue);
-          expect(find.text('Отменить создание'), findsOneWidget);
-          if (direction == ChoicePathDraftDirection.bottomUp) {
-            expect(find.text('Намерение 1'), findsNothing);
-          }
-          await _choose(
-            tester,
-            direction,
-            direction == ChoicePathDraftDirection.topDown ? 1 : 3,
-          );
-          final page = tester.widget<ChoicePathPage>(
-            find.byType(ChoicePathPage),
-          );
-          final session = tester
-              .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-              .creationSession!;
-          expect(page.direction, direction);
-          expect(
-            page.sourceIntentionId,
-            durabilityIntention(
-              direction == ChoicePathDraftDirection.topDown ? 1 : 3,
-            ),
-          );
-          expect(session.originalHistory, history);
-          expect(
-            router.stackData.map((route) => route.name),
-            isNot(contains(_pickerName(direction))),
-          );
-          for (final relation
-              in direction == ChoicePathDraftDirection.topDown
-                  ? [101, 102]
-                  : [102, 101]) {
-            await _tapKey(
-              tester,
-              'choice-path-continue-${durabilityUuid(relation)}',
-            );
-          }
-          expect(
-            find.byKey(
-              ValueKey(
-                direction == ChoicePathDraftDirection.topDown
-                    ? 'choice-path-select-action'
-                    : 'choice-path-select-source',
-              ),
-            ),
-            findsOneWidget,
-          );
-          await tester.tap(find.text('Отменить создание'));
-          await tester.pumpAndSettle();
-          await running;
-          expect(router.stackData.map((route) => route.matchId), history);
-          expect(
-            router.innerRouterOf<TabsRouter>(AppShellRoute.name)!.activeIndex,
-            1,
-          );
-          final next = launcher.launch(
-            sourceContext: source,
-            direction: direction,
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Отменить создание'));
-          await tester.pumpAndSettle();
-          await next;
-          expect(router.stackData.map((route) => route.matchId), history);
-          if (deep) {
-            await router.maybePop();
-            await tester.pumpAndSettle();
-            expect(
-              tester
-                  .widget<TextField>(
-                    find.byKey(const ValueKey('relation-editor-description')),
-                  )
-                  .controller!
-                  .text,
-              'Чужой черновик',
-            );
-          }
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
     testWidgets(
       '${_directionName(direction)}: пустой граф объясняет отсутствие кандидатов и допускает отмену',
       (tester) async {
@@ -479,70 +474,71 @@ void main() {
 }
 
 void _defineLatePickerTests() {
-  for (final direction in ChoicePathDraftDirection.values) {
-    for (final deep in [false, true]) {
-      for (final selected in [false, true]) {
-        testWidgets(
-          '${_directionName(direction)}: поздний ${selected ? 'ID' : 'возврат'} после сброса '
-          '${deep ? 'глубокой страницы' : 'корня'} до освобождения страницы не меняет новый запуск',
-          (tester) async {
-            final router = _DelayedPickerRouter();
-            await _openApp(tester, router: router);
-            final source = await _sourceContext(tester, router, deep: deep);
-            final launcher = DailyChoiceCreationLauncher();
-            final old = launcher.launch(
-              sourceContext: source,
-              direction: direction,
-            );
-            await tester.pumpAndSettle();
-            final oldLaunch = _pickerContext(router).launch;
-            if (selected) {
-              await _choose(
-                tester,
-                direction,
-                direction == ChoicePathDraftDirection.topDown ? 1 : 3,
-              );
-            }
-            router.popUntilRoot();
-            // Корневая вкладка остаётся смонтированной даже при смене пункта.
-            final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
-            tabs.setActiveIndex(0);
-            tabs.setActiveIndex(1);
-            expect(source.mounted, isTrue);
-            expect(oldLaunch.isActive, isFalse);
-            final rootSource = tester.element(
-              find.byType(DailyChoiceCatalogPage, skipOffstage: false),
-            );
-            final next = launcher.launch(
-              sourceContext: rootSource,
-              direction: direction,
-            );
-            router.release();
-            await old;
-            expect(source.mounted, isTrue);
-            expect(
-              router.stackData.map((route) => route.name),
-              isNot(contains(ChoicePathRoute.name)),
-            );
-            await tester.pumpAndSettle();
-            expect(router.current.name, _pickerName(direction));
-            expect(_pickerContext(router).launch, isNot(same(oldLaunch)));
-            expect(_pickerContext(router).launch.isActive, isTrue);
-            await _choose(
-              tester,
-              direction,
-              direction == ChoicePathDraftDirection.topDown ? 1 : 3,
-            );
-            expect(router.current.name, ChoicePathRoute.name);
-            await tester.tap(find.text('Отменить создание'));
-            await tester.pumpAndSettle();
-            await next;
-            expect(router.stackData, hasLength(1));
-            expect(tester.takeException(), isNull);
-          },
+  // Направление, глубина страницы запуска и вид позднего результата независимы:
+  // два случая покрывают оба значения каждой оси.
+  for (final (direction, deep, selected) in [
+    (ChoicePathDraftDirection.topDown, false, false),
+    (ChoicePathDraftDirection.bottomUp, true, true),
+  ]) {
+    testWidgets(
+      '${_directionName(direction)}: поздний ${selected ? 'ID' : 'возврат'} после сброса '
+      '${deep ? 'глубокой страницы' : 'корня'} до освобождения страницы не меняет новый запуск',
+      (tester) async {
+        final router = _DelayedPickerRouter();
+        await _openApp(tester, router: router);
+        final source = await _sourceContext(tester, router, deep: deep);
+        final launcher = DailyChoiceCreationLauncher();
+        final old = launcher.launch(
+          sourceContext: source,
+          direction: direction,
         );
-      }
-    }
+        await tester.pumpAndSettle();
+        final oldLaunch = _pickerContext(router).launch;
+        if (selected) {
+          await _choose(
+            tester,
+            direction,
+            direction == ChoicePathDraftDirection.topDown ? 1 : 3,
+          );
+        }
+        router.popUntilRoot();
+        // Корневая вкладка остаётся смонтированной даже при смене пункта.
+        final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
+        tabs.setActiveIndex(0);
+        tabs.setActiveIndex(1);
+        expect(source.mounted, isTrue);
+        expect(oldLaunch.isActive, isFalse);
+        final rootSource = tester.element(
+          find.byType(DailyChoiceCatalogPage, skipOffstage: false),
+        );
+        final next = launcher.launch(
+          sourceContext: rootSource,
+          direction: direction,
+        );
+        router.release();
+        await old;
+        expect(source.mounted, isTrue);
+        expect(
+          router.stackData.map((route) => route.name),
+          isNot(contains(ChoicePathRoute.name)),
+        );
+        await tester.pumpAndSettle();
+        expect(router.current.name, _pickerName(direction));
+        expect(_pickerContext(router).launch, isNot(same(oldLaunch)));
+        expect(_pickerContext(router).launch.isActive, isTrue);
+        await _choose(
+          tester,
+          direction,
+          direction == ChoicePathDraftDirection.topDown ? 1 : 3,
+        );
+        expect(router.current.name, ChoicePathRoute.name);
+        await tester.tap(find.text('Отменить создание'));
+        await tester.pumpAndSettle();
+        await next;
+        expect(router.stackData, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 }
 

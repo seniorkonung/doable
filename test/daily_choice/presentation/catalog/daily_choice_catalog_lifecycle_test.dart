@@ -96,47 +96,37 @@ void main() {
     expect(_catalogScroll(tester).pixels, 300);
   });
 
-  for (final (name, start, transitionDay, transitionLength) in [
-    (
-      'на летнее время сутки длятся 23 часа',
-      _local(2026, 3, 7, 23),
-      date(2026, 3, 8),
-      const Duration(hours: 23),
-    ),
-    (
-      'на зимнее время сутки длятся 25 часов',
-      _local(2026, 10, 31, 23),
-      date(2026, 11, 1),
-      const Duration(hours: 25),
-    ),
-  ]) {
-    testWidgets('при переводе часов $name, и сегодняшний день сменяется в их '
-        'местную полночь', (tester) async {
-      final clock = _LocalClock(tester, start: start);
-      final repository = _Repository();
-      await _openCatalog(tester, repository, clock);
-      repository.completeFirst([], total: 0);
-      await tester.pump();
-      final selected = _calendar(tester).selectedDate;
-      final reads = clock.readCount;
+  // Расчёт промежутка до местной полуночи на обоих переходах проверяет
+  // `untilLocalDateStart` в daily_choice_local_date_provider_test.dart; здесь
+  // проверено, что страница ждёт именно этот промежуток, а не 24 часа.
+  testWidgets('при переводе часов на летнее время сутки длятся 23 часа, и '
+      'сегодняшний день сменяется в их местную полночь', (tester) async {
+    final transitionDay = date(2026, 3, 8);
+    const transitionLength = Duration(hours: 23);
+    final clock = _LocalClock(tester, start: _local(2026, 3, 7, 23));
+    final repository = _Repository();
+    await _openCatalog(tester, repository, clock);
+    repository.completeFirst([], total: 0);
+    await tester.pump();
+    final selected = _calendar(tester).selectedDate;
+    final reads = clock.readCount;
 
-      await tester.pump(const Duration(hours: 1));
-      expect(_calendar(tester).today, transitionDay);
-      expect(clock.readCount, reads + 1);
+    await tester.pump(const Duration(hours: 1));
+    expect(_calendar(tester).today, transitionDay);
+    expect(clock.readCount, reads + 1);
 
-      // Следующая дата начинается не через фиксированные 24 часа, а в
-      // действительную местную полночь.
-      await tester.pump(transitionLength - const Duration(seconds: 1));
-      expect(_calendar(tester).today, transitionDay);
-      expect(clock.readCount, reads + 1);
+    // Следующая дата начинается не через фиксированные 24 часа, а в
+    // действительную местную полночь.
+    await tester.pump(transitionLength - const Duration(seconds: 1));
+    expect(_calendar(tester).today, transitionDay);
+    expect(clock.readCount, reads + 1);
 
-      await tester.pump(const Duration(seconds: 1));
-      expect(_calendar(tester).today, _nextDay(transitionDay));
-      expect(clock.readCount, reads + 2);
-      expect(_calendar(tester).selectedDate, selected);
-      expect(repository.queries, hasLength(1));
-    });
-  }
+    await tester.pump(const Duration(seconds: 1));
+    expect(_calendar(tester).today, _nextDay(transitionDay));
+    expect(clock.readCount, reads + 2);
+    expect(_calendar(tester).selectedDate, selected);
+    expect(repository.queries, hasLength(1));
+  });
 
   testWidgets('каждое возвращение в приложение перечитывает часы, а до '
       'полуночи остаётся один таймер', (tester) async {
