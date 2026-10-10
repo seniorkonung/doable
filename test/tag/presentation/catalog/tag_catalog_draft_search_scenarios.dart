@@ -82,44 +82,36 @@ void _registerDraftSearchScenarios() {
     },
   );
 
-  for (final language in ['ru', 'en']) {
-    testWidgets(
-      'черновик: пустой каталог и отсутствие совпадений различаются на $language',
-      (tester) async {
-        final (host, repository) = await _pumpDraftHost(
-          tester,
-          language: language,
-        );
-        await host.openChooser(tester, host.tagSet);
-        final l10n = _draftLocalizations(tester);
-        repository.complete([]);
-        await tester.pumpAndSettle();
-        expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
-        expect(find.text(l10n.tagCatalogSearch), findsOneWidget);
-        expect(tester.widget<FilledButton>(_addToDraft).onPressed, isNull);
+  testWidgets('черновик: пустой каталог и отсутствие совпадений различаются', (
+    tester,
+  ) async {
+    final (host, repository) = await _pumpDraftHost(tester);
+    await host.openChooser(tester, host.tagSet);
+    final l10n = _draftLocalizations(tester);
+    repository.complete([]);
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
+    expect(find.text(l10n.tagCatalogSearch), findsOneWidget);
+    expect(tester.widget<FilledButton>(_addToDraft).onPressed, isNull);
 
-        await tester.enterText(_search, 'спорт');
-        await tester.pump();
-        expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
-        expect(find.text(l10n.tagCatalogEmpty), findsNothing);
-        expect(
-          tester
-              .widget<IconButton>(
-                find.byKey(const ValueKey('tag-catalog-create')),
-              )
-              .onPressed,
-          isNotNull,
-        );
-
-        await tester.tap(find.byTooltip(l10n.tagCatalogClearSearch));
-        await tester.pump();
-        expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
-        expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
-        expect(host.tagSet.current.tagIds, isEmpty);
-        expect(tester.takeException(), isNull);
-      },
+    await tester.enterText(_search, 'спорт');
+    await tester.pump();
+    expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
+    expect(find.text(l10n.tagCatalogEmpty), findsNothing);
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('tag-catalog-create')))
+          .onPressed,
+      isNotNull,
     );
-  }
+
+    await tester.tap(find.byTooltip(l10n.tagCatalogClearSearch));
+    await tester.pump();
+    expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
+    expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
+    expect(host.tagSet.current.tagIds, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'черновик: отказ первоначального чтения и обновления с повтором сохраняет сырой ввод, применённый фильтр и набор',

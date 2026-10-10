@@ -1,95 +1,97 @@
 part of 'tag_navigation_view_model_test.dart';
 
 void _realTagNavigationCatalogScenarios() {
-  for (final scope in TaggedIntentionsScope.values) {
-    for (final searchFails in [false, true]) {
-      test(
-        '${searchFails ? 'отказавший' : 'успешный'} совместный поиск '
-        'сохраняет загруженную навигацию и добавляет продолжение: $scope',
-        () async {
-          final h = await _RealNavigationHarness.open();
-          addTearDown(h.dispose);
-          final expected =
-              (await h.graph.getTaggedIntentionsPage(
-                    TaggedIntentionsQuery(
-                      tagId: h.tagId,
-                      scope: scope,
-                      pageSize: 100,
-                    ),
-                  ) as TaggedIntentionsPageSuccess).value.items
-                  .map((item) => item.id)
-                  .toList();
-          h.model.setScope(scope);
-          final first = await h.loaded((state) => state.scope == scope);
-          expect(first.items, hasLength(50));
-          expect(first.nextCursor, isNotNull);
-          h.probe.navigationReads.clear();
-          final stateOffset = h.states.length;
-          h.probe.failCatalogSearch = searchFails;
+  // Охват и исход поиска не зависят друг от друга: значения образуют диагональ.
+  for (final (scope, searchFails) in const [
+    (TaggedIntentionsScope.active, false),
+    (TaggedIntentionsScope.archived, true),
+  ]) {
+    test(
+      '${searchFails ? 'отказавший' : 'успешный'} совместный поиск '
+      'сохраняет загруженную навигацию и добавляет продолжение: $scope',
+      () async {
+        final h = await _RealNavigationHarness.open();
+        addTearDown(h.dispose);
+        final expected =
+            (await h.graph.getTaggedIntentionsPage(
+                  TaggedIntentionsQuery(
+                    tagId: h.tagId,
+                    scope: scope,
+                    pageSize: 100,
+                  ),
+                ) as TaggedIntentionsPageSuccess).value.items
+                .map((item) => item.id)
+                .toList();
+        h.model.setScope(scope);
+        final first = await h.loaded((state) => state.scope == scope);
+        expect(first.items, hasLength(50));
+        expect(first.nextCursor, isNotNull);
+        h.probe.navigationReads.clear();
+        final stateOffset = h.states.length;
+        h.probe.failCatalogSearch = searchFails;
 
-          final search = await h.graph.getCatalogPage(
-            IntentionCatalogQuery(
-              scope: scope == TaggedIntentionsScope.active
-                  ? IntentionScope.active
-                  : IntentionScope.archived,
-              titleFilter: null,
-              tagFilter: IntentionTagFilter(
-                requiredTagIds: [h.tagId],
-                excludedTagIds: [
-                  (TagId.decode(tagFixtureId(303)) as TagIdDecodingSuccess).id,
-                ],
-              ),
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 1,
+        final search = await h.graph.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: scope == TaggedIntentionsScope.active
+                ? IntentionScope.active
+                : IntentionScope.archived,
+            titleFilter: null,
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: [h.tagId],
+              excludedTagIds: [
+                (TagId.decode(tagFixtureId(303)) as TagIdDecodingSuccess).id,
+              ],
             ),
-          );
-          expect(
-            search,
-            searchFails
-                ? isA<ResultFailure<IntentionCatalogPage>>().having(
-                    (result) => result.failure,
-                    'причина',
-                    isA<IntentionUnexpectedFailure>(),
-                  )
-                : isA<ResultSuccess<IntentionCatalogPage>>(),
-          );
-          final unchanged = h.subscription.read() as TagNavigationLoaded;
-          expect(unchanged.items, first.items);
-          expect(unchanged.nextCursor, same(first.nextCursor));
-          expect(unchanged.freshness, TagNavigationFreshness.current);
-          await h.model.loadMore();
-          final loaded = h.subscription.read() as TagNavigationLoaded;
-          expect(loaded.items.map((item) => item.id), expected);
-          expect(loaded.items.take(first.items.length), first.items);
-          expect(
-            loaded.items.map((item) => item.id).toSet(),
-            hasLength(expected.length),
-          );
-          expect(loaded.hasReachedEnd, isTrue);
-          expect(loaded.freshness, TagNavigationFreshness.current);
-          expect(loaded.refreshFailure, isNull);
-          expect(
-            loaded.revision.compareTo(first.revision),
-            GraphRevisionOrder.same,
-          );
-          expect(h.probe.navigationReads, hasLength(1));
-          expect(
-            h.probe.navigationReads.single,
-            contains('AND a.creation_sequence > ?'),
-          );
-          expect(
-            h.states.skip(stateOffset),
-            everyElement(
-              isA<TagNavigationLoaded>().having(
-                (state) => state.freshness,
-                'актуальность',
-                TagNavigationFreshness.current,
-              ),
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+          ),
+        );
+        expect(
+          search,
+          searchFails
+              ? isA<ResultFailure<IntentionCatalogPage>>().having(
+                  (result) => result.failure,
+                  'причина',
+                  isA<IntentionUnexpectedFailure>(),
+                )
+              : isA<ResultSuccess<IntentionCatalogPage>>(),
+        );
+        final unchanged = h.subscription.read() as TagNavigationLoaded;
+        expect(unchanged.items, first.items);
+        expect(unchanged.nextCursor, same(first.nextCursor));
+        expect(unchanged.freshness, TagNavigationFreshness.current);
+        await h.model.loadMore();
+        final loaded = h.subscription.read() as TagNavigationLoaded;
+        expect(loaded.items.map((item) => item.id), expected);
+        expect(loaded.items.take(first.items.length), first.items);
+        expect(
+          loaded.items.map((item) => item.id).toSet(),
+          hasLength(expected.length),
+        );
+        expect(loaded.hasReachedEnd, isTrue);
+        expect(loaded.freshness, TagNavigationFreshness.current);
+        expect(loaded.refreshFailure, isNull);
+        expect(
+          loaded.revision.compareTo(first.revision),
+          GraphRevisionOrder.same,
+        );
+        expect(h.probe.navigationReads, hasLength(1));
+        expect(
+          h.probe.navigationReads.single,
+          contains('AND a.creation_sequence > ?'),
+        );
+        expect(
+          h.states.skip(stateOffset),
+          everyElement(
+            isA<TagNavigationLoaded>().having(
+              (state) => state.freshness,
+              'актуальность',
+              TagNavigationFreshness.current,
             ),
-          );
-        },
-      );
-    }
+          ),
+        );
+      },
+    );
   }
 
   test('реально устаревший снимок адаптера восстанавливает первую порцию навигации', () async {

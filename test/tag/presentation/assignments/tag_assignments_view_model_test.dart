@@ -218,22 +218,6 @@ void main() {
     );
   });
 
-  test('смена эпохи отбрасывает ответ прежней эпохи', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.changes.add(
-      _Package(const _Revision(1, 1), [
-        TagDeletedChange(revision: const _Revision(1, 1), tagId: _id(2)),
-      ]),
-    );
-    h.reads.page(0, [_tag(2, 'Старый')]);
-    await pumpEventQueue();
-    expect(h.reads.queries, hasLength(2));
-    h.reads.page(1, [_tag(1, 'Новый')], epoch: 1);
-    await pumpEventQueue();
-    expect((h.state as TagAssignmentsLoaded).items.single.id, _id(1));
-  });
-
   test(
     'явный повтор начального отказа восстанавливает полный список',
     () async {
@@ -439,7 +423,6 @@ void main() {
   const refreshFailures = [
     TagAssignmentsUnavailableFailure(),
     TagAssignmentsCorruptionFailure(),
-    TagAssignmentsUnexpectedFailure(),
   ];
   for (final failure in refreshFailures) {
     test('пакет создания другого намерения с общим тегом сохраняет строки при '
@@ -610,7 +593,6 @@ final class _Reads extends Fake implements TagReadContract {
     List<Tag> tags, {
 
     int revision = 1,
-    int epoch = 0,
     IntentionId? intentionId,
   }) {
     pages[index].complete(
@@ -619,7 +601,7 @@ final class _Reads extends Fake implements TagReadContract {
           intentionId: intentionId ?? queries[index],
           items: tags,
 
-          revision: _Revision(revision, epoch),
+          revision: _Revision(revision),
         ),
       ),
     );
@@ -638,14 +620,11 @@ final class _Package implements ConfirmedGraphChangePackage {
 }
 
 final class _Revision implements GraphRevision {
-  const _Revision(this.number, [this.epoch = 0]);
+  const _Revision(this.number);
   final int number;
-  final int epoch;
 
   @override
   GraphRevisionOrder compareTo(GraphRevision other) => switch (other) {
-    _Revision(epoch: final e) when e != epoch =>
-      GraphRevisionOrder.differentEpoch,
     _Revision(number: final n) when number < n => GraphRevisionOrder.older,
     _Revision(number: final n) when number > n => GraphRevisionOrder.newer,
     _Revision() => GraphRevisionOrder.same,

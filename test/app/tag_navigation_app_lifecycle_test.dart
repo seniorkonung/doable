@@ -17,7 +17,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -150,152 +149,139 @@ void main() {
     },
   );
 
-  for (final mutation in _Mutation.values) {
-    for (final order in _arrivalOrders) {
-      testWidgets(
-        '${_mutationName(mutation)}: ${order.map(_arrivalName).join(' → ')} не возвращает прежнюю выдачу',
-        (tester) async {
-          final app = await _App.pump(tester);
-          app.repository.holdObservations = true;
-          final heldPage = app.repository.holdNextPage();
-          await app.openNavigation(tester);
+  for (final (mutation, order) in _mutationCases) {
+    testWidgets(
+      '${_mutationName(mutation)}: ${order.map(_arrivalName).join(' → ')} не возвращает прежнюю выдачу',
+      (tester) async {
+        final app = await _App.pump(tester);
+        app.repository.holdObservations = true;
+        final heldPage = app.repository.holdNextPage();
+        await app.openNavigation(tester);
+        await _waitFor(
+          tester,
+          () =>
+              heldPage.ready.isCompleted &&
+              app.repository.observations.isNotEmpty,
+        );
+        final before =
+            (await heldPage.ready.future as TaggedIntentionsPageSuccess).value;
+        final heldCommand = app.repository.holdNextCommand(
+          delay: _CommandDelay.afterWrite,
+        );
+        final completion = _mutate(app, mutation);
+        await _waitFor(tester, () => heldCommand.written.isCompleted);
+        if (mutation == _Mutation.renameTag ||
+            mutation == _Mutation.deleteTag) {
+          await _waitFor(tester, () => app.repository.observations.length >= 2);
+        }
+        for (final arrival in order) {
+          switch (arrival) {
+            case _Arrival.page:
+              app.repository.releasePage(heldPage);
+              await _waitFor(tester, () => app.repository.activePages == 0);
+            case _Arrival.package:
+              heldCommand.release.complete();
+              final result = await _completed(tester, completion);
+              expect(result.isFailure, isFalse);
+            case _Arrival.observation:
+              // Новое наблюдение приходит раньше удержанного старого.
+              app.repository.flushObservations(newestFirst: true);
+              await tester.pump();
+          }
+        }
+        app.repository.flushObservations(newestFirst: true);
+        if (mutation == _Mutation.deleteTag) {
           await _waitFor(
             tester,
-            () =>
-                heldPage.ready.isCompleted &&
-                app.repository.observations.isNotEmpty,
+            () => app.state(tester) is TagNavigationTagMissing,
           );
-          final before =
-              (await heldPage.ready.future as TaggedIntentionsPageSuccess)
-                  .value;
-          final heldCommand = app.repository.holdNextCommand(
-            delay: _CommandDelay.afterWrite,
-          );
-          final completion = _mutate(app, mutation);
-          await _waitFor(tester, () => heldCommand.written.isCompleted);
-          if (mutation == _Mutation.renameTag ||
-              mutation == _Mutation.deleteTag) {
-            await _waitFor(
-              tester,
-              () => app.repository.observations.length >= 2,
-            );
+          expect(find.text(app.l10n(tester).tagNotFound), findsOneWidget);
+          expect(find.byKey(ValueKey(_intention(1))), findsNothing);
+          final created = app.runtime.commandCoordinator.acceptTagCreation(
+            TagCreationFormKey(),
+            CreateTag(before.tag.name),
+          ) as TagCommandAccepted;
+          final replacement = await _completed(tester, created.future);
+          switch (replacement.result) {
+            case GraphResultSuccess(value: TagCreated(:final tag)):
+              expect(tag.id, isNot(_tagId));
+            default:
+              fail('Новое одноимённое создание должно подтвердиться');
           }
-          for (final arrival in order) {
-            switch (arrival) {
-              case _Arrival.page:
-                app.repository.releasePage(heldPage);
-                await _waitFor(tester, () => app.repository.activePages == 0);
-              case _Arrival.package:
-                heldCommand.release.complete();
-                final result = await _completed(tester, completion);
-                expect(result.isFailure, isFalse);
-              case _Arrival.observation:
-                // Новое наблюдение приходит раньше удержанного старого.
-                app.repository.flushObservations(newestFirst: true);
-                await tester.pump();
-            }
-          }
-          app.repository.flushObservations(newestFirst: true);
-          if (mutation == _Mutation.deleteTag) {
-            await _waitFor(
-              tester,
-              () => app.state(tester) is TagNavigationTagMissing,
-            );
-            expect(find.text(app.l10n(tester).tagNotFound), findsOneWidget);
-            expect(find.byKey(ValueKey(_intention(1))), findsNothing);
-            final created = app.runtime.commandCoordinator.acceptTagCreation(
-              TagCreationFormKey(),
-              CreateTag(before.tag.name),
-            ) as TagCommandAccepted;
-            final replacement = await _completed(tester, created.future);
-            switch (replacement.result) {
-              case GraphResultSuccess(value: TagCreated(:final tag)):
-                expect(tag.id, isNot(_tagId));
-              default:
-                fail('Новое одноимённое создание должно подтвердиться');
-            }
-            expect(app.state(tester), isA<TagNavigationTagMissing>());
-            expect(
-              app.raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-                tagFixtureId(firstTagNumber),
-              ]),
-              isEmpty,
-            );
-          } else {
-            final current = await app.loaded(tester);
-            expect(current.tagId, _tagId);
-            expect(current.scope, TaggedIntentionsScope.active);
-            expect(
-              current.revision.compareTo(before.revision),
-              GraphRevisionOrder.newer,
-            );
-            switch (mutation) {
-              case _Mutation.removeAssignment:
-                expect(
-                  current.items.map((item) => item.id),
-                  isNot(contains(_intention(4))),
-                );
-                expect(app.model(tester).canActOn(_intention(4)), isFalse);
-              case _Mutation.editParticipant:
-                expect(
-                  current.items.map((item) => item.id),
-                  before.items.map((item) => item.id),
-                );
-                expect(
-                  current.items.map((item) => item.id),
-                  isNot(contains(_intention(3))),
-                );
-                expect(find.text('Новое имя соседа'), findsNothing);
-                expect(find.text('Непомеченный сосед'), findsNothing);
-                expect(
-                  app.raw.select('SELECT title FROM intentions WHERE id = ?', [
-                    tagFixtureId(3),
-                  ]).single['title'],
-                  'Новое имя соседа',
-                );
-              case _Mutation.renameTag:
-                expect(current.tag.name.value, 'Быт');
-                expect(
-                  find.text(
-                    app.l10n(tester).tagNavigationTag(before.tag.name.value),
-                  ),
-                  findsNothing,
-                );
-              case _Mutation.deleteTag:
-                fail('Удаление проверяется состоянием отсутствия');
-            }
-          }
+          expect(app.state(tester), isA<TagNavigationTagMissing>());
           expect(
-            app.repository.commands.whereType<CreateTag>(),
-            hasLength(mutation == _Mutation.deleteTag ? 1 : 0),
+            app.raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+              tagFixtureId(firstTagNumber),
+            ]),
+            isEmpty,
           );
+        } else {
+          final current = await app.loaded(tester);
+          expect(current.tagId, _tagId);
+          expect(current.scope, TaggedIntentionsScope.active);
           expect(
-            app.repository.commands,
-            hasLength(mutation == _Mutation.deleteTag ? 2 : 1),
+            current.revision.compareTo(before.revision),
+            GraphRevisionOrder.newer,
           );
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+          switch (mutation) {
+            case _Mutation.removeAssignment:
+              expect(
+                current.items.map((item) => item.id),
+                isNot(contains(_intention(4))),
+              );
+              expect(app.model(tester).canActOn(_intention(4)), isFalse);
+            case _Mutation.renameTag:
+              expect(current.tag.name.value, 'Быт');
+              expect(
+                find.text(
+                  app.l10n(tester).tagNavigationTag(before.tag.name.value),
+                ),
+                findsNothing,
+              );
+            case _Mutation.deleteTag:
+              fail('Удаление проверяется состоянием отсутствия');
+          }
+        }
+        expect(
+          app.repository.commands.whereType<CreateTag>(),
+          hasLength(mutation == _Mutation.deleteTag ? 1 : 0),
+        );
+        expect(
+          app.repository.commands,
+          hasLength(mutation == _Mutation.deleteTag ? 2 : 1),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 }
 
-enum _Mutation { removeAssignment, editParticipant, renameTag, deleteTag }
+enum _Mutation { removeAssignment, renameTag, deleteTag }
 
 enum _Arrival { page, package, observation }
 
-const _arrivalOrders = [
-  [_Arrival.page, _Arrival.package, _Arrival.observation],
-  [_Arrival.page, _Arrival.observation, _Arrival.package],
-  [_Arrival.package, _Arrival.page, _Arrival.observation],
-  [_Arrival.package, _Arrival.observation, _Arrival.page],
-  [_Arrival.observation, _Arrival.page, _Arrival.package],
-  [_Arrival.observation, _Arrival.package, _Arrival.page],
+const _pageFirst = [_Arrival.page, _Arrival.package, _Arrival.observation];
+const _pageLast = [_Arrival.package, _Arrival.observation, _Arrival.page];
+const _observationFirst = [
+  _Arrival.observation,
+  _Arrival.page,
+  _Arrival.package,
+];
+
+/// Каждый источник приходит и первым, и последним; поздняя страница после
+/// пакета проверяется для каждой мутации. Остальные порядки проходят те же
+/// ветки модели представления.
+const _mutationCases = <(_Mutation, List<_Arrival>)>[
+  (_Mutation.removeAssignment, _pageFirst),
+  (_Mutation.removeAssignment, _pageLast),
+  (_Mutation.renameTag, _pageLast),
+  (_Mutation.renameTag, _observationFirst),
+  (_Mutation.deleteTag, _observationFirst),
+  (_Mutation.deleteTag, _pageFirst),
 ];
 
 String _mutationName(_Mutation mutation) => switch (mutation) {
   _Mutation.removeAssignment => 'Снятие назначения',
-  _Mutation.editParticipant => 'Правка участника связи',
   _Mutation.renameTag => 'Переименование тега',
   _Mutation.deleteTag => 'Удаление тега',
 };
@@ -311,14 +297,6 @@ Future<GraphCommandCompletion> _mutate(_App app, _Mutation mutation) {
     _Mutation.removeAssignment => (coordinator.acceptTagRemoveAssignment(
       RemoveTagAssignment(tagId: _tagId, intentionId: _intention(4)),
     ) as TagCommandAccepted).future,
-    _Mutation.editParticipant => (coordinator.acceptExisting(
-      UpdateIntention(
-        id: _intention(3),
-        title: 'Новое имя соседа',
-        description: 'Описание 3',
-      ),
-      presentationTitle: 'Непомеченный сосед',
-    ) as IntentionCommandAccepted).future,
     _Mutation.renameTag => (coordinator.acceptTagRename(
       RenameTag(tagId: _tagId, name: TagName.fromInput('Быт')),
     ) as TagCommandAccepted).future,

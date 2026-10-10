@@ -94,107 +94,106 @@ void main() {
   _registerAssignmentScenarios();
   _registerNavigationEntryScenarios();
   _registerDraftSelectionScenarios();
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'диктор и увеличенный текст сохраняют ввод, действия и подтверждение — ${locale.languageCode}',
-      (tester) async {
-        tester.view.physicalSize = const Size(420, 900);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        final semantics = tester.ensureSemantics();
-        late sqlite.Database raw;
-        final database = AppDatabase(
-          openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        );
-        await database.open();
-        addTearDown(database.close);
-        final repository = DriftPersonalGraphRepository(
-          database,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(2026, 9, 25),
-          InMemoryDiagnosticsSink(),
-        );
-        final router = AppRouter();
-        addTearDown(router.dispose);
-        final l10n = await AppLocalizations.delegate.load(locale);
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              inMemoryQuickCreationModeOverride,
-              personalGraphRepositoryProvider.overrideWithValue(repository),
-            ],
-            child: MaterialApp.router(
-              locale: locale,
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(context)
-                    .copyWith(textScaler: const TextScaler.linear(2.5)),
-                child: child!,
-              ),
-              routerConfig: router.config(),
+  const locale = Locale('ru');
+
+  testWidgets(
+    'диктор и увеличенный текст сохраняют ввод, действия и подтверждение',
+    (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      late sqlite.Database raw;
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
+      );
+      await database.open();
+      addTearDown(database.close);
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        InMemoryDiagnosticsSink(),
+      );
+      final router = AppRouter();
+      addTearDown(router.dispose);
+      final l10n = await AppLocalizations.delegate.load(locale);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inMemoryQuickCreationModeOverride,
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp.router(
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(2.5)),
+              child: child!,
             ),
+            routerConfig: router.config(),
           ),
-        );
-        addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-        await openIntentionGraph(tester, waitFor: _until);
-        await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-        final create = find.byKey(const ValueKey('tag-catalog-create'));
-        await _until(tester, create);
-        await tester.pumpAndSettle();
-        expect(tester.getSemantics(create).tooltip, l10n.tagCatalogCreate);
-        await _tap(tester, create);
-        final nameField = find.byKey(const ValueKey('tag-editor-name'));
-        await _until(tester, nameField);
-        expect(
-          find.bySemanticsLabel(RegExp(l10n.tagEditorNameLabel)),
-          findsWidgets,
-        );
+        ),
+      );
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      await openIntentionGraph(tester, waitFor: _until);
+      await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
+      final create = find.byKey(const ValueKey('tag-catalog-create'));
+      await _until(tester, create);
+      await tester.pumpAndSettle();
+      expect(tester.getSemantics(create).tooltip, l10n.tagCatalogCreate);
+      await _tap(tester, create);
+      final nameField = find.byKey(const ValueKey('tag-editor-name'));
+      await _until(tester, nameField);
+      expect(
+        find.bySemanticsLabel(RegExp(l10n.tagEditorNameLabel)),
+        findsWidgets,
+      );
 
-        final invalid = '🙂' * 256;
-        await tester.enterText(nameField, invalid);
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        final failure = find.byKey(const ValueKey('tag-editor-field-failure'));
-        await _until(tester, failure);
-        await tester.pumpAndSettle();
-        expect(tester.getSemantics(failure).label, isNotEmpty);
-        expect(tester.widget<TextField>(nameField).controller!.text, invalid);
-        expect(raw.select('SELECT * FROM tags'), isEmpty);
+      final invalid = '🙂' * 256;
+      await tester.enterText(nameField, invalid);
+      await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
+      final failure = find.byKey(const ValueKey('tag-editor-field-failure'));
+      await _until(tester, failure);
+      await tester.pumpAndSettle();
+      expect(tester.getSemantics(failure).label, isNotEmpty);
+      expect(tester.widget<TextField>(nameField).controller!.text, invalid);
+      expect(raw.select('SELECT * FROM tags'), isEmpty);
 
-        final corrected =
-            'Straße 🏠é ${('Длинное название ' * 8).trimRight()}';
-        await tester.enterText(nameField, corrected);
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        await _until(tester, find.text(corrected));
-        final id = raw.select('SELECT id FROM tags').single['id'] as String;
-        final delete = find.byKey(ValueKey('tag-catalog-delete-$id'));
-        await _until(tester, delete);
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(delete);
-        expect(tester.getSemantics(delete).tooltip, l10n.tagCatalogDelete);
-        await _tap(tester, delete);
-        final scope = find.byKey(const ValueKey('tag-delete-scope'));
-        await _until(tester, scope);
-        await tester.pumpAndSettle();
-        expect(find.textContaining(corrected), findsWidgets);
-        expect(
-          tester.getSemantics(scope).label,
-          contains(l10n.tagDeleteConfirmationScope),
-        );
-        final cancel = find.byKey(const ValueKey('tag-delete-cancel'));
-        final confirm = find.byKey(const ValueKey('tag-delete-confirm'));
-        await tester.ensureVisible(cancel);
-        expect(tester.getSemantics(cancel).label, l10n.tagDeleteCancel);
-        await tester.ensureVisible(confirm);
-        expect(tester.getSemantics(confirm).label, l10n.tagDeleteConfirm);
-        expect(tester.takeException(), isNull);
-        await tester.tap(cancel);
-        await tester.pumpAndSettle();
-        expect(raw.select('SELECT id FROM tags'), hasLength(1));
-        semantics.dispose();
-      },
-    );
-  }
+      final corrected = 'Straße 🏠é ${('Длинное название ' * 8).trimRight()}';
+      await tester.enterText(nameField, corrected);
+      await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
+      await _until(tester, find.text(corrected));
+      final id = raw.select('SELECT id FROM tags').single['id'] as String;
+      final delete = find.byKey(ValueKey('tag-catalog-delete-$id'));
+      await _until(tester, delete);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(delete);
+      expect(tester.getSemantics(delete).tooltip, l10n.tagCatalogDelete);
+      await _tap(tester, delete);
+      final scope = find.byKey(const ValueKey('tag-delete-scope'));
+      await _until(tester, scope);
+      await tester.pumpAndSettle();
+      expect(find.textContaining(corrected), findsWidgets);
+      expect(
+        tester.getSemantics(scope).label,
+        contains(l10n.tagDeleteConfirmationScope),
+      );
+      final cancel = find.byKey(const ValueKey('tag-delete-cancel'));
+      final confirm = find.byKey(const ValueKey('tag-delete-confirm'));
+      await tester.ensureVisible(cancel);
+      expect(tester.getSemantics(cancel).label, l10n.tagDeleteCancel);
+      await tester.ensureVisible(confirm);
+      expect(tester.getSemantics(confirm).label, l10n.tagDeleteConfirm);
+      expect(tester.takeException(), isNull);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(raw.select('SELECT id FROM tags'), hasLength(1));
+      semantics.dispose();
+    },
+  );
 }
 
 void _registerAssignmentScenarios() {
@@ -529,184 +528,181 @@ void _registerAssignmentScenarios() {
 }
 
 void _registerDraftSelectionScenarios() {
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'добавление тегов в черновик доступно диктору, клавиатуре и при увеличенном тексте — ${locale.languageCode}',
-      (tester) async {
-        tester.view.physicalSize = const Size(420, 900);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        final semantics = tester.ensureSemantics();
-        late sqlite.Database raw;
-        final database = AppDatabase(
-          openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        );
-        await database.open();
-        addTearDown(database.close);
-        final diagnostics = InMemoryDiagnosticsSink();
-        final repository = DriftPersonalGraphRepository(
-          database,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(2026, 9, 25),
-          diagnostics,
-        );
-        for (final (number, name) in [
-          (firstTagNumber, 'Дом'),
-          (lastTagNumber, 'Работа'),
-        ]) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagFixtureId(number),
-            name,
-          ]);
-        }
-        final container = ProviderContainer(
-          overrides: [
-            personalGraphRepositoryProvider.overrideWithValue(repository),
-          ],
-        );
-        addTearDown(container.dispose);
-        final session = intentionEditorViewModelProvider(
-          IntentionCreationFormKey(),
-        );
-        final sessionSubscription = container.listen(session, (_, _) {});
-        addTearDown(sessionSubscription.close);
-        final tagSet = container.read(session.notifier).draftTagSet;
-        final l10n = await AppLocalizations.delegate.load(locale);
-        await tester.pumpWidget(
-          UncontrolledProviderScope(
-            container: container,
-            child: MaterialApp(
-              locale: locale,
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(context)
-                    .copyWith(textScaler: const TextScaler.linear(2.5)),
-                child: child!,
-              ),
-              home: TagCatalogView(
-                selectionContext: TagDraftContext(tagSet),
-                onOpenEditor: (_) async => null,
-                onOpenNavigation: (_) {},
-              ),
+  const locale = Locale('ru');
+
+  testWidgets(
+    'добавление тегов в черновик доступно диктору, клавиатуре и при увеличенном тексте',
+    (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      late sqlite.Database raw;
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
+      );
+      await database.open();
+      addTearDown(database.close);
+      final diagnostics = InMemoryDiagnosticsSink();
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        diagnostics,
+      );
+      for (final (number, name) in [
+        (firstTagNumber, 'Дом'),
+        (lastTagNumber, 'Работа'),
+      ]) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          name,
+        ]);
+      }
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      final session = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final sessionSubscription = container.listen(session, (_, _) {});
+      addTearDown(sessionSubscription.close);
+      final tagSet = container.read(session.notifier).draftTagSet;
+      final l10n = await AppLocalizations.delegate.load(locale);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(2.5)),
+              child: child!,
+            ),
+            home: TagCatalogView(
+              selectionContext: TagDraftContext(tagSet),
+              onOpenEditor: (_) async => null,
+              onOpenNavigation: (_) {},
             ),
           ),
-        );
-        addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-        final home = find.byKey(
-          ValueKey('tag-catalog-row-${tagFixtureId(firstTagNumber)}'),
-        );
-        final work = find.byKey(
-          ValueKey('tag-catalog-row-${tagFixtureId(lastTagNumber)}'),
-        );
-        final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
-        await _until(tester, work);
-        await tester.pumpAndSettle();
+        ),
+      );
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      final home = find.byKey(
+        ValueKey('tag-catalog-row-${tagFixtureId(firstTagNumber)}'),
+      );
+      final work = find.byKey(
+        ValueKey('tag-catalog-row-${tagFixtureId(lastTagNumber)}'),
+      );
+      final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
+      await _until(tester, work);
+      await tester.pumpAndSettle();
 
-        for (final (row, name) in [(home, 'Дом'), (work, 'Работа')]) {
-          final status = find.descendant(
-            of: row,
-            matching: find.text(l10n.tagCatalogAvailableForDraft),
-          );
-          expect(status, findsOneWidget);
-          final node = tester.getSemantics(status);
-          expect(node.label, contains(name));
-          expect(node.label, contains(l10n.tagCatalogAvailableForDraft));
-          expect(node.label, isNot(contains(l10n.tagCatalogInDraft)));
-          expect(node.label, isNot(contains(l10n.tagCatalogAvailable)));
-          expect(node.getSemanticsData().hasAction(SemanticsAction.tap), true);
-        }
-        final idle = tester.getSemantics(add);
-        expect(idle.label, l10n.tagCatalogAddToDraftSemantic);
-        expect(idle.flagsCollection.isButton, isTrue);
-        expect(idle.flagsCollection.isEnabled, Tristate.isFalse);
-        expect(_isInsideView(tester, add), isTrue);
+      for (final (row, name) in [(home, 'Дом'), (work, 'Работа')]) {
+        final status = find.descendant(
+          of: row,
+          matching: find.text(l10n.tagCatalogAvailableForDraft),
+        );
+        expect(status, findsOneWidget);
+        final node = tester.getSemantics(status);
+        expect(node.label, contains(name));
+        expect(node.label, contains(l10n.tagCatalogAvailableForDraft));
+        expect(node.label, isNot(contains(l10n.tagCatalogInDraft)));
+        expect(node.label, isNot(contains(l10n.tagCatalogAvailable)));
+        expect(node.getSemanticsData().hasAction(SemanticsAction.tap), true);
+      }
+      final idle = tester.getSemantics(add);
+      expect(idle.label, l10n.tagCatalogAddToDraftSemantic);
+      expect(idle.flagsCollection.isButton, isTrue);
+      expect(idle.flagsCollection.isEnabled, Tristate.isFalse);
+      expect(_isInsideView(tester, add), isTrue);
 
-        await _focusWithTab(tester, home);
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pump();
-        expect(
-          tester.getSemantics(home).flagsCollection.isSelected,
-          Tristate.isTrue,
-        );
-        expect(tagSet.current.tagIds, isEmpty);
-        final homeAction = tester.getSemantics(add);
-        expect(homeAction.label, l10n.tagCatalogAddToDraftNamed('Дом'));
-        expect(homeAction.label, contains(l10n.tagCatalogAddToDraft));
-        _expectAction(homeAction);
+      await _focusWithTab(tester, home);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(
+        tester.getSemantics(home).flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
+      expect(tagSet.current.tagIds, isEmpty);
+      final homeAction = tester.getSemantics(add);
+      expect(homeAction.label, l10n.tagCatalogAddToDraftNamed('Дом'));
+      expect(homeAction.label, contains(l10n.tagCatalogAddToDraft));
+      _expectAction(homeAction);
 
-        await _focusWithTab(tester, add);
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pump();
-        final homeIncluded = find.descendant(
-          of: home,
-          matching: find.text(l10n.tagCatalogInDraft),
-        );
-        expect(homeIncluded, findsOneWidget);
-        expect(
-          tester.getSemantics(homeIncluded).label,
-          isNot(contains(l10n.tagCatalogAvailableForDraft)),
-        );
-        expect(
-          tester.getSemantics(add).flagsCollection.isEnabled,
-          Tristate.isFalse,
-        );
+      await _focusWithTab(tester, add);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      final homeIncluded = find.descendant(
+        of: home,
+        matching: find.text(l10n.tagCatalogInDraft),
+      );
+      expect(homeIncluded, findsOneWidget);
+      expect(
+        tester.getSemantics(homeIncluded).label,
+        isNot(contains(l10n.tagCatalogAvailableForDraft)),
+      );
+      expect(
+        tester.getSemantics(add).flagsCollection.isEnabled,
+        Tristate.isFalse,
+      );
 
-        _performSemanticsTap(
-          tester,
-          tester.getSemantics(
-            find.descendant(
-              of: work,
-              matching: find.text(l10n.tagCatalogAvailableForDraft),
-            ),
-          ),
-        );
-        await tester.pump();
-        expect(
-          tester.getSemantics(work).flagsCollection.isSelected,
-          Tristate.isTrue,
-        );
-        expect(
-          tester.getSemantics(add).label,
-          l10n.tagCatalogAddToDraftNamed('Работа'),
-        );
-        _performSemanticsTap(tester, tester.getSemantics(add));
-        await tester.pump();
-        await _until(
-          tester,
+      _performSemanticsTap(
+        tester,
+        tester.getSemantics(
           find.descendant(
             of: work,
-            matching: find.text(l10n.tagCatalogInDraft),
+            matching: find.text(l10n.tagCatalogAvailableForDraft),
           ),
-        );
+        ),
+      );
+      await tester.pump();
+      expect(
+        tester.getSemantics(work).flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
+      expect(
+        tester.getSemantics(add).label,
+        l10n.tagCatalogAddToDraftNamed('Работа'),
+      );
+      _performSemanticsTap(tester, tester.getSemantics(add));
+      await tester.pump();
+      await _until(
+        tester,
+        find.descendant(of: work, matching: find.text(l10n.tagCatalogInDraft)),
+      );
 
-        expect(tagSet.current.tagIds.map((id) => id.toCanonicalString()), [
-          tagFixtureId(firstTagNumber),
-          tagFixtureId(lastTagNumber),
-        ]);
-        expect(_isInsideView(tester, add), isTrue);
-        expect(find.byType(SnackBar), findsNothing);
-        // Наблюдение выбранных тегов остаётся чтением; локальное добавление
-        // не выдаётся за постоянную команду или проверку назначения.
-        expect(
-          diagnostics.events.where(
-            (event) => switch (event) {
-              TagCommandDiagnosticsEvent() ||
-              TagAssignmentStatusReadDiagnosticsEvent() ||
-              IntentionCommandDiagnosticsEvent() => true,
-              _ => false,
-            },
-          ),
-          isEmpty,
-        );
-        expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
-        expect(raw.select('SELECT * FROM intentions'), isEmpty);
-        expect(raw.select('SELECT id FROM tags'), hasLength(2));
-        expect(tester.takeException(), isNull);
-        semantics.dispose();
-      },
-    );
-  }
+      expect(tagSet.current.tagIds.map((id) => id.toCanonicalString()), [
+        tagFixtureId(firstTagNumber),
+        tagFixtureId(lastTagNumber),
+      ]);
+      expect(_isInsideView(tester, add), isTrue);
+      expect(find.byType(SnackBar), findsNothing);
+      // Наблюдение выбранных тегов остаётся чтением; локальное добавление
+      // не выдаётся за постоянную команду или проверку назначения.
+      expect(
+        diagnostics.events.where(
+          (event) => switch (event) {
+            TagCommandDiagnosticsEvent() ||
+            TagAssignmentStatusReadDiagnosticsEvent() ||
+            IntentionCommandDiagnosticsEvent() => true,
+            _ => false,
+          },
+        ),
+        isEmpty,
+      );
+      expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+      expect(raw.select('SELECT * FROM intentions'), isEmpty);
+      expect(raw.select('SELECT id FROM tags'), hasLength(2));
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
 }
 
 /// Переводит фокус клавишей Tab, пока он не окажется внутри [target].

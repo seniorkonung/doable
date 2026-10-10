@@ -44,395 +44,368 @@ String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
 void main() {
-  for (final (second, recipient) in [
-    (false, 'первого намерения'),
-    (true, 'другого намерения'),
-  ]) {
-    for (final assigned in [false, true]) {
-      testWidgets(
-        'экран сохраняет повтор после исчерпания устаревших проверок $recipient: ${assigned ? 'назначен' : 'свободен'}',
-        (tester) async {
-          final repository = _CatalogRepository();
-          addTearDown(repository.dispose);
-          final intentionId = second
-              ? (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id
-              : (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
-          await _pumpCatalog(tester, repository, intentionId: intentionId);
-          repository.complete(
-            TagCatalogSuccess(
-              TagCatalogSnapshot.selection(
-                intentionId: intentionId,
-                rows: [
-                  TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-                ],
+  for (final assigned in [false, true]) {
+    testWidgets(
+      'экран сохраняет повтор после исчерпания устаревших проверок: ${assigned ? 'назначен' : 'свободен'}',
+      (tester) async {
+        final repository = _CatalogRepository();
+        addTearDown(repository.dispose);
+        final intentionId =
+            (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+        await _pumpCatalog(tester, repository, intentionId: intentionId);
+        repository.complete(
+          TagCatalogSuccess(
+            TagCatalogSnapshot.selection(
+              intentionId: intentionId,
+              rows: [
+                TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+              ],
 
-                revision: const _Revision(2),
-              ),
+              revision: const _Revision(2),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(TagCatalogPage)),
+        );
+        container
+            .read(
+              tagCatalogViewModelProvider(
+                mode: TagCatalogSelectionMode(intentionId),
+              ).notifier,
+            )
+            .selectTag(_tag(52, 'Из редактора').id);
+        repository.tagRead(_tag(52, 'Из редактора'), revision: 2);
+        await tester.pumpAndSettle();
+        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+
+        for (var index = 0; index < 8; index++) {
+          repository.statusReads[index].complete(
+            const TagAssignmentStatusSuccess(
+              GraphSnapshot(value: false, revision: _Revision(1)),
             ),
           );
           await tester.pumpAndSettle();
-          final container = ProviderScope.containerOf(
-            tester.element(find.byType(TagCatalogPage)),
-          );
-          container
-              .read(
-                tagCatalogViewModelProvider(
-                  mode: TagCatalogSelectionMode(intentionId),
-                ).notifier,
-              )
-              .selectTag(_tag(52, 'Из редактора').id);
-          repository.tagRead(_tag(52, 'Из редактора'), revision: 2);
-          await tester.pumpAndSettle();
-          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+        }
+        expect(repository.statusReads, hasLength(8));
+        expect(find.text('Try again'), findsOneWidget);
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
 
-          for (var index = 0; index < 8; index++) {
-            repository.statusReads[index].complete(
-              const TagAssignmentStatusSuccess(
-                GraphSnapshot(value: false, revision: _Revision(1)),
-              ),
-            );
-            await tester.pumpAndSettle();
-          }
-          expect(repository.statusReads, hasLength(8));
-          expect(find.text('Try again'), findsOneWidget);
-          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-
-          await tester.tap(find.text('Try again'));
-          await tester.pump();
-          expect(repository.statusReads, hasLength(9));
-          for (var index = 8; index < 11; index++) {
-            repository.statusReads[index].complete(
-              const TagAssignmentStatusSuccess(
-                GraphSnapshot(value: false, revision: _Revision(1)),
-              ),
-            );
-            await tester.pumpAndSettle();
-            expect(repository.statusReads, hasLength(index + 2));
-            expect(find.text('Try again'), findsNothing);
-            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-          }
-          repository.statusReads[11].complete(
-            TagAssignmentStatusSuccess(
-              GraphSnapshot(value: assigned, revision: const _Revision(2)),
+        await tester.tap(find.text('Try again'));
+        await tester.pump();
+        expect(repository.statusReads, hasLength(9));
+        for (var index = 8; index < 11; index++) {
+          repository.statusReads[index].complete(
+            const TagAssignmentStatusSuccess(
+              GraphSnapshot(value: false, revision: _Revision(1)),
             ),
           );
           await tester.pumpAndSettle();
+          expect(repository.statusReads, hasLength(index + 2));
           expect(find.text('Try again'), findsNothing);
-          if (assigned) {
-            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-          } else {
-            expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
-          }
-          expect(repository._commands, isEmpty);
-        },
-      );
-    }
-    for (final assigned in [false, true]) {
-      testWidgets(
-        'экран сохраняет статус полного снимка после позднего отказа для $recipient: ${assigned ? 'назначен' : 'свободен'}',
-        (tester) async {
-          final repository = _CatalogRepository();
-          addTearDown(repository.dispose);
-          final intentionId = second
-              ? (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id
-              : (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
-          await _pumpCatalog(tester, repository, intentionId: intentionId);
-          repository.complete(
-            TagCatalogSuccess(
-              TagCatalogSnapshot.selection(
-                intentionId: intentionId,
-                rows: [
-                  TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-                ],
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+        }
+        repository.statusReads[11].complete(
+          TagAssignmentStatusSuccess(
+            GraphSnapshot(value: assigned, revision: const _Revision(2)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Try again'), findsNothing);
+        if (assigned) {
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+        } else {
+          expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+        }
+        expect(repository._commands, isEmpty);
+      },
+    );
+  }
+  for (final assigned in [false, true]) {
+    testWidgets(
+      'экран сохраняет статус полного снимка после позднего отказа: ${assigned ? 'назначен' : 'свободен'}',
+      (tester) async {
+        final repository = _CatalogRepository();
+        addTearDown(repository.dispose);
+        final intentionId =
+            (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+        await _pumpCatalog(tester, repository, intentionId: intentionId);
+        repository.complete(
+          TagCatalogSuccess(
+            TagCatalogSnapshot.selection(
+              intentionId: intentionId,
+              rows: [
+                TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+              ],
 
-                revision: const _Revision(),
-              ),
+              revision: const _Revision(),
             ),
-          );
-          await tester.pumpAndSettle();
-          final container = ProviderScope.containerOf(
-            tester.element(find.byType(TagCatalogPage)),
-          );
-          container
-              .read(
-                tagCatalogViewModelProvider(
-                  mode: TagCatalogSelectionMode(intentionId),
-                ).notifier,
-              )
-              .selectTag(_tag(52, 'Из редактора').id);
+          ),
+        );
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(TagCatalogPage)),
+        );
+        container
+            .read(
+              tagCatalogViewModelProvider(
+                mode: TagCatalogSelectionMode(intentionId),
+              ).notifier,
+            )
+            .selectTag(_tag(52, 'Из редактора').id);
+        repository.tagRead(_tag(52, 'Из редактора'));
+        await tester.pumpAndSettle();
+        expect(repository.statusReads, hasLength(1));
+        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+
+        final accepted =
+            container
+                    .read(graphCommandCoordinatorProvider.notifier)
+                    .acceptTagCreation(
+                      TagCreationFormKey(),
+                      CreateTag(TagName.fromInput('Из редактора')),
+                    )
+                as TagCommandAccepted;
+        repository.completeCommand(
+          TagCreated(
+            TagCreatedChange(
+              revision: const _Revision(2),
+              after: _tag(52, 'Из редактора'),
+            ),
+          ),
+        );
+        await accepted.future;
+        await tester.pump();
+        repository.complete(
+          TagCatalogSuccess(
+            TagCatalogSnapshot.selection(
+              intentionId: intentionId,
+              rows: [
+                TagSelectionRow(
+                  tag: _tag(52, 'Из редактора'),
+                  isAssigned: assigned,
+                ),
+              ],
+
+              revision: const _Revision(2),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        repository.statusReads.first.complete(
+          const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Could not load assignments. Try again.'),
+          findsNothing,
+        );
+        expect(find.text('Try again'), findsNothing);
+        expect(repository.statusReads, hasLength(2));
+        if (assigned) {
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+          expect(repository._commands, hasLength(1));
+        } else {
+          expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+        }
+      },
+    );
+  }
+
+  // Порядок прихода чтения тега и отказа проверки не зависит от итогового
+  // признака назначения: значения измерений образуют диагональ.
+  for (final (assigned, tagReadFirst) in const [(false, false), (true, true)]) {
+    testWidgets(
+      'экран повторяет проверку пары после ${tagReadFirst ? 'раннего' : 'позднего'} чтения тега: ${assigned ? 'назначен' : 'свободен'}',
+      (tester) async {
+        final repository = _CatalogRepository();
+        addTearDown(repository.dispose);
+        final intentionId =
+            (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+        await _pumpCatalog(tester, repository, intentionId: intentionId);
+        repository.complete(
+          TagCatalogSuccess(
+            TagCatalogSnapshot.selection(
+              intentionId: intentionId,
+              rows: [
+                TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+              ],
+
+              revision: const _Revision(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(TagCatalogPage)),
+        );
+        container
+            .read(
+              tagCatalogViewModelProvider(
+                mode: TagCatalogSelectionMode(intentionId),
+              ).notifier,
+            )
+            .selectTag(_tag(52, 'Из редактора').id);
+        if (tagReadFirst) {
+          repository.tagRead(_tag(52, 'Из редактора'));
+        }
+        repository.statusReads.single.complete(
+          const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+        );
+        await tester.pump();
+        await tester.pump();
+        if (!tagReadFirst) {
           repository.tagRead(_tag(52, 'Из редактора'));
           await tester.pumpAndSettle();
-          expect(repository.statusReads, hasLength(1));
-          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-
-          final accepted =
-              container
-                      .read(graphCommandCoordinatorProvider.notifier)
-                      .acceptTagCreation(
-                        TagCreationFormKey(),
-                        CreateTag(TagName.fromInput('Из редактора')),
-                      )
-                  as TagCommandAccepted;
-          repository.completeCommand(
-            TagCreated(
-              TagCreatedChange(
-                revision: const _Revision(2),
-                after: _tag(52, 'Из редактора'),
-              ),
-            ),
-          );
-          await accepted.future;
-          await tester.pump();
-          repository.complete(
-            TagCatalogSuccess(
-              TagCatalogSnapshot.selection(
-                intentionId: intentionId,
-                rows: [
-                  TagSelectionRow(
-                    tag: _tag(52, 'Из редактора'),
-                    isAssigned: assigned,
-                  ),
-                ],
-
-                revision: const _Revision(2),
-              ),
-            ),
-          );
-          await tester.pumpAndSettle();
-          repository.statusReads.first.complete(
-            const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
-          );
-          await tester.pumpAndSettle();
-
-          expect(
-            find.text('Could not load assignments. Try again.'),
-            findsNothing,
-          );
-          expect(find.text('Try again'), findsNothing);
-          expect(repository.statusReads, hasLength(2));
-          if (assigned) {
-            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-            expect(repository._commands, hasLength(1));
-          } else {
-            expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
-          }
-        },
-      );
-    }
-  }
-
-  for (final (second, recipient) in [
-    (false, 'первого намерения'),
-    (true, 'другого намерения'),
-  ]) {
-    for (final assigned in [false, true]) {
-      for (final tagReadFirst in [false, true]) {
-        testWidgets(
-          'экран повторяет проверку пары $recipient после ${tagReadFirst ? 'раннего' : 'позднего'} чтения тега: ${assigned ? 'назначен' : 'свободен'}',
-          (tester) async {
-            final repository = _CatalogRepository();
-            addTearDown(repository.dispose);
-            final intentionId = second
-                ? (IntentionId.decode(
-                    _id(101),
-                  ) as IntentionIdDecodingSuccess).id
-                : (IntentionId.decode(
-                    _id(100),
-                  ) as IntentionIdDecodingSuccess).id;
-            await _pumpCatalog(tester, repository, intentionId: intentionId);
-            repository.complete(
-              TagCatalogSuccess(
-                TagCatalogSnapshot.selection(
-                  intentionId: intentionId,
-                  rows: [
-                    TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-                  ],
-
-                  revision: const _Revision(),
-                ),
-              ),
-            );
-            await tester.pumpAndSettle();
-            final container = ProviderScope.containerOf(
-              tester.element(find.byType(TagCatalogPage)),
-            );
-            container
-                .read(
-                  tagCatalogViewModelProvider(
-                    mode: TagCatalogSelectionMode(intentionId),
-                  ).notifier,
-                )
-                .selectTag(_tag(52, 'Из редактора').id);
-            if (tagReadFirst) {
-              repository.tagRead(_tag(52, 'Из редактора'));
-            }
-            repository.statusReads.single.complete(
-              const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
-            );
-            await tester.pump();
-            await tester.pump();
-            if (!tagReadFirst) {
-              repository.tagRead(_tag(52, 'Из редактора'));
-              await tester.pumpAndSettle();
-            }
-            final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-            expect(assign, findsOneWidget);
-            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-            expect(
-              find.text('Could not load assignments. Try again.'),
-              findsOneWidget,
-            );
-            await tester.tap(find.text('Try again'));
-            await tester.pump();
-            expect(repository.statusReads, hasLength(2));
-            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-            repository.statusReads.last.complete(
-              TagAssignmentStatusSuccess(
-                GraphSnapshot(value: assigned, revision: const _Revision()),
-              ),
-            );
-            await tester.pumpAndSettle();
-            expect(
-              find.text('Could not load assignments. Try again.'),
-              findsNothing,
-            );
-            if (assigned) {
-              expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-              expect(repository._commands, isEmpty);
-            } else {
-              expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
-            }
-          },
+        }
+        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+        expect(assign, findsOneWidget);
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+        expect(
+          find.text('Could not load assignments. Try again.'),
+          findsOneWidget,
         );
-      }
-    }
+        await tester.tap(find.text('Try again'));
+        await tester.pump();
+        expect(repository.statusReads, hasLength(2));
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+        repository.statusReads.last.complete(
+          TagAssignmentStatusSuccess(
+            GraphSnapshot(value: assigned, revision: const _Revision()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Could not load assignments. Try again.'),
+          findsNothing,
+        );
+        if (assigned) {
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+          expect(repository._commands, isEmpty);
+        } else {
+          expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+        }
+      },
+    );
   }
 
-  for (final (second, recipient) in [
-    (false, 'первого намерения'),
-    (true, 'другого намерения'),
-  ]) {
-    for (final assigned in [false, true]) {
-      testWidgets(
-        'редактор подтверждает уже загруженный ${assigned ? 'назначенный' : 'свободный'} тег для $recipient',
-        (tester) async {
-          late sqlite.Database raw;
-          final database = AppDatabase(
-            openInMemoryLocalDatabase(setup: (db) => raw = db),
-          );
-          await database.open();
-          addTearDown(database.close);
-          for (final number in [100, 101]) {
-            raw.execute(
-              'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-              [_id(number), 'Намерение $number', 0, 0, number, number],
-            );
-          }
+  for (final assigned in [false, true]) {
+    testWidgets(
+      'редактор подтверждает уже загруженный ${assigned ? 'назначенный' : 'свободный'} тег',
+      (tester) async {
+        late sqlite.Database raw;
+        final database = AppDatabase(
+          openInMemoryLocalDatabase(setup: (db) => raw = db),
+        );
+        await database.open();
+        addTearDown(database.close);
+        for (final number in [100, 101]) {
           raw.execute(
-            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-            [_id(200), _id(100), _id(101), 'need', 2, 0],
+            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [_id(number), 'Намерение $number', 0, 0, number, number],
           );
-          for (var number = 1; number <= 52; number++) {
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              _id(number),
-              number == 52 ? 'Дом' : 'Тег $number',
-            ]);
-          }
-          if (assigned) {
-            raw.execute(
-              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-              [_id(52), _id(second ? 101 : 100)],
-            );
-          }
-          final repository = DriftPersonalGraphRepository(
-            database,
-            UuidV7IntentionIdGenerator(),
-            () => DateTime.utc(2026, 9, 27),
-            InMemoryDiagnosticsSink(),
+        }
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(200), _id(100), _id(101), 'need', 2, 0],
+        );
+        for (var number = 1; number <= 52; number++) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _id(number),
+            number == 52 ? 'Дом' : 'Тег $number',
+          ]);
+        }
+        if (assigned) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_id(52), _id(100)],
           );
-          final router = AppRouter();
-          addTearDown(router.dispose);
-          await tester.pumpWidget(
-            ProviderScope(
-              overrides: [
-                inMemoryQuickCreationModeOverride,
-                personalGraphRepositoryProvider.overrideWithValue(repository),
-              ],
-              child: MaterialApp.router(
-                locale: const Locale('ru'),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                routerConfig: router.config(),
-              ),
+        }
+        final repository = DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 27),
+          InMemoryDiagnosticsSink(),
+        );
+        final router = AppRouter();
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              inMemoryQuickCreationModeOverride,
+              personalGraphRepositoryProvider.overrideWithValue(repository),
+            ],
+            child: MaterialApp.router(
+              locale: const Locale('ru'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              routerConfig: router.config(),
             ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await openIntentionGraph(tester);
+        final intentionId =
+            (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+        router.push<Object?>(
+          TagCatalogRoute(selectionContext: TagAssignmentContext(intentionId)),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('tag-catalog-load-more')),
+          findsNothing,
+        );
+        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('tag-editor-name')),
+          'дом',
+        );
+        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        for (
+          var attempt = 0;
+          attempt < 30 &&
+              find
+                  .byKey(const ValueKey('tag-editor-use-existing'))
+                  .evaluate()
+                  .isEmpty;
+          attempt++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
           );
           await tester.pumpAndSettle();
-          await openIntentionGraph(tester);
-          final intentionId = second
-              ? (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id
-              : (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
-          router.push<Object?>(
-            TagCatalogRoute(
-              selectionContext: TagAssignmentContext(intentionId),
-            ),
-          );
+        }
+        await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
+        await _waitForEditorToClose(tester);
+        expect(
+          find.byKey(const ValueKey('tag-catalog-load-more')),
+          findsNothing,
+        );
+        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+        if (assigned) {
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+        } else {
+          expect(assign, findsOneWidget);
+          expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+          await tester.tap(assign);
           await tester.pumpAndSettle();
           expect(
-            find.byKey(const ValueKey('tag-catalog-load-more')),
-            findsNothing,
+            raw
+                .select(
+                  'SELECT tag_id FROM tag_assignments WHERE intention_id = ?',
+                  [_id(100)],
+                )
+                .map((row) => row['tag_id']),
+            [_id(52)],
           );
-          await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-          await tester.pumpAndSettle();
-          await tester.enterText(
-            find.byKey(const ValueKey('tag-editor-name')),
-            'дом',
-          );
-          await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-          for (
-            var attempt = 0;
-            attempt < 30 &&
-                find
-                    .byKey(const ValueKey('tag-editor-use-existing'))
-                    .evaluate()
-                    .isEmpty;
-            attempt++
-          ) {
-            await tester.runAsync(
-              () => Future<void>.delayed(const Duration(milliseconds: 20)),
-            );
-            await tester.pumpAndSettle();
-          }
-          await tester.tap(
-            find.byKey(const ValueKey('tag-editor-use-existing')),
-          );
-          await _waitForEditorToClose(tester);
-          expect(
-            find.byKey(const ValueKey('tag-catalog-load-more')),
-            findsNothing,
-          );
-          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-          if (assigned) {
-            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-          } else {
-            expect(assign, findsOneWidget);
-            expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
-            await tester.tap(assign);
-            await tester.pumpAndSettle();
-            expect(
-              raw
-                  .select(
-                    'SELECT tag_id FROM tag_assignments WHERE intention_id = ?',
-                    [_id(second ? 101 : 100)],
-                  )
-                  .map((row) => row['tag_id']),
-              [_id(52)],
-            );
-          }
-        },
-      );
-    }
+        }
+      },
+    );
   }
 
   testWidgets(

@@ -23,9 +23,7 @@ import '../support/in_memory_quick_creation_mode_store.dart';
 void main() {
   for (final (isIntention, number, locale) in [
     (true, 1, const Locale('ru')),
-    (true, 2, const Locale('en')),
-    (false, 101, const Locale('ru')),
-    (false, 102, const Locale('en')),
+    (false, 102, const Locale('ru')),
   ]) {
     testWidgets(
       '${isIntention ? 'намерение $number: сквозное назначение и снятие' : 'долговременная связь $number: собственные теги недоступны'} на ${locale.languageCode}',

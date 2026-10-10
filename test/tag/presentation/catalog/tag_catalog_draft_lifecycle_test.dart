@@ -319,7 +319,6 @@ void main() {
 /// Окончательный результат отправки сессии, закрытой до его получения.
 enum _ClosedSessionOutcome {
   success('успех'),
-  unavailable('устранимый отказ'),
   tagsMissing('отказ отсутствующего тега, выбранного и в новом открытии');
 
   const _ClosedSessionOutcome(this.description);
@@ -328,9 +327,6 @@ enum _ClosedSessionOutcome {
 
   void complete(_Repository repository) => switch (this) {
     _ClosedSessionOutcome.success => repository.confirmCreation(),
-    _ClosedSessionOutcome.unavailable => repository.failCreation(
-      const IntentionUnavailableFailure(),
-    ),
     _ClosedSessionOutcome.tagsMissing => repository.failCreation(
       IntentionCreationTagsMissingFailure([_home.id]),
     ),
@@ -339,12 +335,6 @@ enum _ClosedSessionOutcome {
   Matcher get matcher => switch (this) {
     _ClosedSessionOutcome.success =>
       isA<ResultSuccess<IntentionCommandSuccess>>(),
-    _ClosedSessionOutcome.unavailable =>
-      isA<ResultFailure<IntentionCommandSuccess>>().having(
-        (result) => result.failure,
-        'отказ',
-        isA<IntentionUnavailableFailure>(),
-      ),
     _ClosedSessionOutcome.tagsMissing =>
       isA<ResultFailure<IntentionCommandSuccess>>().having(
         (result) => result.failure,

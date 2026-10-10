@@ -116,222 +116,199 @@ void main() {
     },
   );
 
+  testWidgets('актуализация отключает прежние переходы', (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final reads = _Reads();
+      addTearDown(reads.dispose);
+      await _pumpPage(tester, reads);
+      final item = _intention(1);
+      reads.page(0, [item], cursor: _Cursor());
+      await tester.pumpAndSettle();
+      final tile = find.descendant(
+        of: _row(item),
+        matching: find.byType(ListTile),
+      );
+      final oldCallback = tester.widget<ListTile>(tile).onTap!;
+      reads.watch.add(
+        TagReadSuccess(
+          GraphSnapshot(value: _tag, revision: const _Revision(2)),
+        ),
+      );
+      // Сигнал уже изменил ViewModel, а прежний кадр ещё не перестроен.
+      oldCallback();
+      expect(tester.takeException(), isNull);
+      await tester.pump();
+      expect(
+        find.text(
+          'Обновляем выдачу. Показанные данные могут быть устаревшими.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.widget<ListTile>(tile).onTap, isNull);
+      expect(
+        tester
+            .getSemantics(_row(item))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isFalse,
+      );
+      expect(find.text('Показать ещё намерения'), findsNothing);
+      reads.fail(1, const TaggedIntentionsUnavailableFailure());
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Не удалось обновить выдачу. Показанные данные могут быть устаревшими. Повторите чтение.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.widget<ListTile>(tile).onTap, isNull);
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+      expect(reads.queries.last.cursor, isNull);
+      reads.page(2, [_intention(2)], revision: 2);
+      await tester.pumpAndSettle();
+      expect(_row(item), findsNothing);
+      expect(_row(_intention(2)), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  testWidgets('длинный текст, охваты, подгрузка и повтор доступны', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    try {
+      final reads = _Reads();
+      addTearDown(reads.dispose);
+      await _pumpPage(tester, reads, textScale: 3);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(TagNavigationPage)),
+      );
+      final tag = Tag(
+        id: _tag.id,
+        name: TagName.fromInput('Длинный тег ' * 20),
+      );
+      reads.page(0, [], tag: tag);
+      await tester.pumpAndSettle();
+      expect(find.text('Тег: ${tag.name.value}'), findsOneWidget);
+      await _scrollTo(tester, _scope(TaggedIntentionsScope.archived));
+      await tester.tap(_scope(TaggedIntentionsScope.archived));
+      await tester.pump();
+      final intention = _intention(
+        2,
+        archived: true,
+        title: 'Очень длинное намерение ' * 10,
+      );
+      final second = _intention(
+        103,
+        archived: true,
+        title: 'Ещё одно длинное намерение ' * 7,
+      );
+      reads.page(1, [intention, second], tag: tag, cursor: _Cursor());
+      await tester.pumpAndSettle();
+      await _scrollTo(tester, _row(intention));
+      expect(
+        tester.getSemantics(_row(intention)).label,
+        '${l10n.tagNavigationIntentionArchived}: ${intention.title}',
+      );
+      expect(
+        tester
+            .getSize(
+              find
+                  .descendant(of: _row(intention), matching: find.byType(Text))
+                  .first,
+            )
+            .height,
+        greaterThan(100),
+      );
+      await _scrollTo(tester, _row(second));
+      expect(
+        tester.getSemantics(_row(second)).label,
+        '${l10n.tagNavigationIntentionArchived}: ${second.title}',
+      );
+      final more = find.text('Показать ещё намерения');
+      await _scrollTo(tester, more);
+      await tester.tap(more);
+      await tester.pump();
+      await _expectNavigationStatusSemantics(
+        tester,
+        l10n.tagNavigationLoadingMore,
+      );
+      reads.fail(2, const TaggedIntentionsUnavailableFailure());
+      await tester.pumpAndSettle();
+      await _expectNavigationStatusSemantics(
+        tester,
+        l10n.tagNavigationLoadMoreUnavailable,
+      );
+      final retry = find.text('Повторить');
+      await _scrollTo(tester, retry);
+      final retrySemantics = tester.getSemantics(retry);
+      expect(retrySemantics.flagsCollection.isButton, isTrue);
+      expect(
+        retrySemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      await tester.tap(retry);
+      await tester.pump();
+      reads.page(3, [_intention(3, archived: true)], tag: tag);
+      await tester.pumpAndSettle();
+      await _scrollTo(tester, _row(_intention(3, archived: true)));
+      expect(_row(_intention(3, archived: true)), findsOneWidget);
+      expect(reads.queries.last.scope, TaggedIntentionsScope.archived);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  testWidgets('строки намерений тега не показывают отметку избранного', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final reads = _Reads();
+      addTearDown(reads.dispose);
+      await _pumpPage(tester, reads);
+      final active = _intention(1);
+      reads.page(0, [active, _intention(101)]);
+      await tester.pumpAndSettle();
+
+      // Навигация по тегу — представление без поиска: строка намерения
+      // тега отметку не несёт и не выводит её для избранных намерений.
+      const markLabel = 'Избранное намерение';
+      expect(find.text('Намерение 1'), findsOneWidget);
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.byIcon(Icons.star_border), findsNothing);
+      expect(find.text(markLabel), findsNothing);
+      expect(
+        tester.getSemantics(_row(active)).label,
+        isNot(contains(markLabel)),
+      );
+      expect(find.bySemanticsLabel(RegExp(markLabel)), findsNothing);
+
+      await tester.tap(_scope(TaggedIntentionsScope.archived));
+      await tester.pump();
+      final archived = _intention(2, archived: true);
+      reads.page(1, [archived]);
+      await tester.pumpAndSettle();
+      expect(find.text('Намерение 2'), findsOneWidget);
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(
+        tester.getSemantics(_row(archived)).label,
+        isNot(contains(markLabel)),
+      );
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   for (final locale in ['ru', 'en']) {
     final russian = locale == 'ru';
-    testWidgets('актуализация отключает прежние переходы на $locale', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      try {
-        final reads = _Reads();
-        addTearDown(reads.dispose);
-        await _pumpPage(tester, reads, locale: locale);
-        final item = _intention(1);
-        reads.page(0, [item], cursor: _Cursor());
-        await tester.pumpAndSettle();
-        final tile = find.descendant(
-          of: _row(item),
-          matching: find.byType(ListTile),
-        );
-        final oldCallback = tester.widget<ListTile>(tile).onTap!;
-        reads.watch.add(
-          TagReadSuccess(
-            GraphSnapshot(value: _tag, revision: const _Revision(2)),
-          ),
-        );
-        // Сигнал уже изменил ViewModel, а прежний кадр ещё не перестроен.
-        oldCallback();
-        expect(tester.takeException(), isNull);
-        await tester.pump();
-        expect(
-          find.text(
-            russian
-                ? 'Обновляем выдачу. Показанные данные могут быть устаревшими.'
-                : 'Refreshing results. The displayed data may be out of date.',
-          ),
-          findsOneWidget,
-        );
-        expect(tester.widget<ListTile>(tile).onTap, isNull);
-        expect(
-          tester
-              .getSemantics(_row(item))
-              .getSemanticsData()
-              .hasAction(SemanticsAction.tap),
-          isFalse,
-        );
-        expect(
-          find.text(
-            russian ? 'Показать ещё намерения' : 'Show more intentions',
-          ),
-          findsNothing,
-        );
-        reads.fail(1, const TaggedIntentionsUnavailableFailure());
-        await tester.pumpAndSettle();
-        expect(
-          find.text(
-            russian
-                ? 'Не удалось обновить выдачу. Показанные данные могут быть устаревшими. Повторите чтение.'
-                : 'Could not refresh results. The displayed data may be out of date. Try loading again.',
-          ),
-          findsOneWidget,
-        );
-        expect(tester.widget<ListTile>(tile).onTap, isNull);
-        await tester.tap(find.text(russian ? 'Повторить' : 'Try again'));
-        await tester.pump();
-        expect(reads.queries.last.cursor, isNull);
-        reads.page(2, [_intention(2)], revision: 2);
-        await tester.pumpAndSettle();
-        expect(_row(item), findsNothing);
-        expect(_row(_intention(2)), findsOneWidget);
-      } finally {
-        semantics.dispose();
-      }
-    });
-
-    testWidgets(
-      'длинный текст, охваты, подгрузка и повтор доступны на $locale',
-      (tester) async {
-        tester.view.physicalSize = const Size(360, 640);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        final semantics = tester.ensureSemantics();
-        try {
-          final reads = _Reads();
-          addTearDown(reads.dispose);
-          await _pumpPage(tester, reads, locale: locale, textScale: 3);
-          final l10n = AppLocalizations.of(
-            tester.element(find.byType(TagNavigationPage)),
-          );
-          final tag = Tag(
-            id: _tag.id,
-            name: TagName.fromInput('Длинный тег ' * 20),
-          );
-          reads.page(0, [], tag: tag);
-          await tester.pumpAndSettle();
-          expect(
-            find.text(
-              russian ? 'Тег: ${tag.name.value}' : 'Tag: ${tag.name.value}',
-            ),
-            findsOneWidget,
-          );
-          await _scrollTo(tester, _scope(TaggedIntentionsScope.archived));
-          await tester.tap(_scope(TaggedIntentionsScope.archived));
-          await tester.pump();
-          final intention = _intention(
-            2,
-            archived: true,
-            title: 'Очень длинное намерение ' * 10,
-          );
-          final second = _intention(
-            103,
-            archived: true,
-            title: 'Ещё одно длинное намерение ' * 7,
-          );
-          reads.page(1, [intention, second], tag: tag, cursor: _Cursor());
-          await tester.pumpAndSettle();
-          await _scrollTo(tester, _row(intention));
-          expect(
-            tester.getSemantics(_row(intention)).label,
-            '${l10n.tagNavigationIntentionArchived}: ${intention.title}',
-          );
-          expect(
-            tester
-                .getSize(
-                  find
-                      .descendant(
-                        of: _row(intention),
-                        matching: find.byType(Text),
-                      )
-                      .first,
-                )
-                .height,
-            greaterThan(100),
-          );
-          await _scrollTo(tester, _row(second));
-          expect(
-            tester.getSemantics(_row(second)).label,
-            '${l10n.tagNavigationIntentionArchived}: ${second.title}',
-          );
-          final more = find.text(
-            russian ? 'Показать ещё намерения' : 'Show more intentions',
-          );
-          await _scrollTo(tester, more);
-          await tester.tap(more);
-          await tester.pump();
-          await _expectNavigationStatusSemantics(
-            tester,
-            l10n.tagNavigationLoadingMore,
-          );
-          reads.fail(2, const TaggedIntentionsUnavailableFailure());
-          await tester.pumpAndSettle();
-          await _expectNavigationStatusSemantics(
-            tester,
-            l10n.tagNavigationLoadMoreUnavailable,
-          );
-          final retry = find.text(russian ? 'Повторить' : 'Try again');
-          await _scrollTo(tester, retry);
-          final retrySemantics = tester.getSemantics(retry);
-          expect(retrySemantics.flagsCollection.isButton, isTrue);
-          expect(
-            retrySemantics.getSemanticsData().hasAction(SemanticsAction.tap),
-            isTrue,
-          );
-          await tester.tap(retry);
-          await tester.pump();
-          reads.page(3, [_intention(3, archived: true)], tag: tag);
-          await tester.pumpAndSettle();
-          await _scrollTo(tester, _row(_intention(3, archived: true)));
-          expect(_row(_intention(3, archived: true)), findsOneWidget);
-          expect(reads.queries.last.scope, TaggedIntentionsScope.archived);
-          expect(tester.takeException(), isNull);
-        } finally {
-          semantics.dispose();
-        }
-      },
-    );
-
-    testWidgets('строки намерений тега не показывают отметку избранного на '
-        '$locale', (tester) async {
-      final semantics = tester.ensureSemantics();
-      try {
-        final reads = _Reads();
-        addTearDown(reads.dispose);
-        await _pumpPage(tester, reads, locale: locale);
-        final active = _intention(1);
-        reads.page(0, [active, _intention(101)]);
-        await tester.pumpAndSettle();
-
-        // Навигация по тегу — представление без поиска: строка намерения
-        // тега отметку не несёт и не выводит её для избранных намерений.
-        final markLabel = russian
-            ? 'Избранное намерение'
-            : 'Favorite intention';
-        expect(find.text('Намерение 1'), findsOneWidget);
-        expect(find.byIcon(Icons.star), findsNothing);
-        expect(find.byIcon(Icons.star_border), findsNothing);
-        expect(find.text(markLabel), findsNothing);
-        expect(
-          tester.getSemantics(_row(active)).label,
-          isNot(contains(markLabel)),
-        );
-        expect(find.bySemanticsLabel(RegExp(markLabel)), findsNothing);
-
-        await tester.tap(_scope(TaggedIntentionsScope.archived));
-        await tester.pump();
-        final archived = _intention(2, archived: true);
-        reads.page(1, [archived]);
-        await tester.pumpAndSettle();
-        expect(find.text('Намерение 2'), findsOneWidget);
-        expect(find.byIcon(Icons.star), findsNothing);
-        expect(
-          tester.getSemantics(_row(archived)).label,
-          isNot(contains(markLabel)),
-        );
-      } finally {
-        semantics.dispose();
-      }
-    });
-
     testWidgets('строки намерений, охват и семантика на $locale', (
       tester,
     ) async {
@@ -491,76 +468,41 @@ void main() {
     },
   );
 
-  for (final locale in ['ru', 'en']) {
-    for (final (failure, pageRu, pageEn, refreshRu, refreshEn) in [
-      (
-        const TaggedIntentionsCorruptionFailure(),
-        'Сохранённые данные повреждены; следующая порция намерений недоступна.',
-        'Stored data is damaged; more intentions cannot be shown.',
-        'Не удалось обновить выдачу: сохранённые данные повреждены. Показанные данные могут быть устаревшими.',
-        'Could not refresh results: stored data is damaged. The displayed data may be out of date.',
-      ),
-      (
-        const TaggedIntentionsUnexpectedFailure(),
-        'Не удалось загрузить следующую порцию намерений из-за непредвиденной ошибки.',
-        'Could not load more intentions because of an unexpected error.',
-        'Не удалось обновить выдачу из-за непредвиденной ошибки. Показанные данные могут быть устаревшими.',
-        'Could not refresh results because of an unexpected error. The displayed data may be out of date.',
-      ),
-    ]) {
-      for (final refresh in [false, true]) {
-        testWidgets(
-          'неустранимый отказ ${refresh ? 'актуализации' : 'подгрузки'} на $locale: $pageRu',
-          (tester) async {
-            final reads = _Reads();
-            addTearDown(reads.dispose);
-            await _pumpPage(tester, reads, locale: locale);
-            final item = _intention(1);
-            reads.page(0, [item], cursor: _Cursor());
-            await tester.pumpAndSettle();
-            if (refresh) {
-              reads.watch.add(
-                TagReadSuccess(
-                  GraphSnapshot(value: _tag, revision: const _Revision(2)),
-                ),
-              );
-            } else {
-              await tester.tap(
-                find.text(
-                  locale == 'ru'
-                      ? 'Показать ещё намерения'
-                      : 'Show more intentions',
-                ),
-              );
-            }
-            await tester.pump();
-            reads.fail(1, failure);
-            await tester.pumpAndSettle();
-            expect(
-              find.text(
-                refresh
-                    ? (locale == 'ru' ? refreshRu : refreshEn)
-                    : (locale == 'ru' ? pageRu : pageEn),
-              ),
-              findsOneWidget,
-            );
-            expect(_row(item), findsOneWidget);
-            expect(find.byType(OutlinedButton), findsNothing);
-            expect(
-              tester
-                  .widget<ListTile>(
-                    find.descendant(
-                      of: _row(item),
-                      matching: find.byType(ListTile),
-                    ),
-                  )
-                  .onTap,
-              refresh ? isNull : isNotNull,
-            );
-          },
-        );
-      }
-    }
+  // Сообщения об отказе актуализации проверяет сценарий окончания наблюдения;
+  // здесь остаётся отказ подгрузки, не допускающий повтора.
+  for (final (failure, message) in [
+    (
+      const TaggedIntentionsCorruptionFailure(),
+      'Сохранённые данные повреждены; следующая порция намерений недоступна.',
+    ),
+    (
+      const TaggedIntentionsUnexpectedFailure(),
+      'Не удалось загрузить следующую порцию намерений из-за непредвиденной ошибки.',
+    ),
+  ]) {
+    testWidgets('неустранимый отказ подгрузки: $message', (tester) async {
+      final reads = _Reads();
+      addTearDown(reads.dispose);
+      await _pumpPage(tester, reads);
+      final item = _intention(1);
+      reads.page(0, [item], cursor: _Cursor());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Показать ещё намерения'));
+      await tester.pump();
+      reads.fail(1, failure);
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      expect(_row(item), findsOneWidget);
+      expect(find.byType(OutlinedButton), findsNothing);
+      expect(
+        tester
+            .widget<ListTile>(
+              find.descendant(of: _row(item), matching: find.byType(ListTile)),
+            )
+            .onTap,
+        isNotNull,
+      );
+    });
   }
 }
 

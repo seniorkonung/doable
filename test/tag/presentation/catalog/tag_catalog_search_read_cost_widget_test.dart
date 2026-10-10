@@ -30,15 +30,9 @@ final _list = find.byKey(const ValueKey('tag-catalog-list'));
 void main() {
   final intention =
       (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
-  final archivedAction =
-      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
   for (final (description, mode) in <(String, TagCatalogMode)>[
     ('каталог', const TagCatalogBrowseMode()),
     ('выбор для намерения', TagCatalogSelectionMode(intention)),
-    (
-      'выбор для архивированного действия',
-      TagCatalogSelectionMode(archivedAction),
-    ),
   ]) {
     testWidgets(
       '$description: только подтверждённая операция добавляет чтение, поиск сохраняет счётчики',

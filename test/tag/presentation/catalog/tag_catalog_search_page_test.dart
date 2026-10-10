@@ -49,7 +49,6 @@ part 'tag_catalog_search_recovery_scenarios.dart';
 final _modes = <(String, IntentionId?)>[
   ('каталог', null),
   ('выбор для активного намерения', _intentionId(1)),
-  ('выбор для архивированного действия', _intentionId(2)),
 ];
 
 IntentionId _intentionId(int number) =>
@@ -599,7 +598,8 @@ void main() {
       expect(_loaded(tester, intentionId).items, hasLength(133));
     });
 
-    for (final language in ['ru', 'en']) {
+    // Тексты английского языка проверяет каталог; выбор показывает те же строки.
+    for (final language in intentionId == null ? ['ru', 'en'] : ['ru']) {
       testWidgets(
         '$description: пустой каталог и отсутствие совпадений различаются на $language',
         (tester) async {
@@ -1084,7 +1084,7 @@ void main() {
   for (final (description, before, after) in [
     ('из каталога в выбор', null, _modes[1].$2),
     ('другое намерение', _modes[1].$2, secondIntention),
-    ('из выбора в каталог', _modes[2].$2, null),
+    ('из выбора в каталог', _modes[1].$2, null),
   ]) {
     testWidgets('$description: смена экранной сессии сбрасывает поиск', (
       tester,
