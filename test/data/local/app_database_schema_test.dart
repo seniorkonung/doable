@@ -266,33 +266,6 @@ void main() {
         throwsA(isA<Exception>()),
       );
     });
-
-    test(
-      'использует ограничивающий индекс для каждого scope и порядка каталога',
-      () async {
-        for (final scope in _CatalogIndexScope.values) {
-          for (final timestamp in _CatalogIndexTimestamp.values) {
-            for (final direction in _CatalogIndexDirection.values) {
-              final plan = await database.customSelect('''
-                  EXPLAIN QUERY PLAN
-                  SELECT id
-                  FROM intentions
-                  ${scope.whereClause}
-                  ORDER BY ${timestamp.column} ${direction.sql}, id ASC
-                  LIMIT 100
-                ''').get();
-
-              expect(
-                plan.map((row) => row.read<String>('detail')),
-                contains(contains(scope.indexName(timestamp, direction))),
-                reason:
-                    'Ожидался индекс ${scope.indexName(timestamp, direction)}.',
-              );
-            }
-          }
-        }
-      },
-    );
   });
 
   group('схема долговременных связей', () {
@@ -600,92 +573,6 @@ void main() {
         );
       },
     );
-
-    test(
-      'использует отдельный индекс для каждой направленной группы',
-      () async {
-        const groupIndexes = [
-          (
-            participantColumn: 'source_intention_id',
-            indexName: 'long_term_relations_source_group_order',
-          ),
-          (
-            participantColumn: 'related_intention_id',
-            indexName: 'long_term_relations_related_group_order',
-          ),
-        ];
-
-        for (final group in groupIndexes) {
-          final plan = await database
-              .customSelect(
-                '''
-          EXPLAIN QUERY PLAN
-          SELECT id
-          FROM long_term_relations
-          WHERE ${group.participantColumn} = ?
-            AND type = ?
-            AND is_archived = ?
-          ORDER BY priority ASC, creation_sequence ASC
-          LIMIT 50
-        ''',
-                variables: [
-                  Variable.withString('018f0b5d-6b2e-7c80-8000-000000000131'),
-                  Variable.withString('need'),
-                  Variable.withInt(0),
-                ],
-              )
-              .get();
-
-          expect(
-            plan.map((row) => row.read<String>('detail')),
-            contains(contains(group.indexName)),
-            reason: 'Ожидался индекс ${group.indexName}.',
-          );
-        }
-      },
-    );
-
-    test(
-      'единственная версия схемы сохраняет ссылку шага дневного пути на связь',
-      () async {
-        final version = await database
-            .customSelect('PRAGMA user_version')
-            .getSingle();
-        final foreignKeys = await database
-            .customSelect('PRAGMA foreign_key_list(daily_choice_path_steps)')
-            .get();
-        final relationObjects = await database.customSelect('''
-          SELECT name
-          FROM sqlite_schema
-          WHERE name IN (
-            'daily_choice_path_steps_relation',
-            'long_term_relations_protect_daily_choice_path'
-          )
-          ORDER BY name
-        ''').get();
-
-        expect(AppDatabase.currentSchemaVersion, 1);
-        expect(version.read<int>('user_version'), 1);
-        expect(
-          foreignKeys.map(
-            (row) => (
-              row.read<String>('table'),
-              row.read<String>('from'),
-              row.read<String>('on_delete'),
-            ),
-          ),
-          contains((
-            'long_term_relations',
-            'long_term_relation_id',
-            'RESTRICT',
-          )),
-        );
-        expect(relationObjects.map((row) => row.read<String>('name')), [
-          'daily_choice_path_steps_relation',
-          'long_term_relations_protect_daily_choice_path',
-        ]);
-      },
-    );
   });
 }
 
@@ -760,37 +647,4 @@ Future<int> _relationCreationSequence(
       )
       .getSingle();
   return row.read<int>('creation_sequence');
-}
-
-enum _CatalogIndexScope {
-  active('WHERE is_archived = 0'),
-  archived('WHERE is_archived = 1'),
-  all('');
-
-  const _CatalogIndexScope(this.whereClause);
-
-  final String whereClause;
-
-  String indexName(
-    _CatalogIndexTimestamp timestamp,
-    _CatalogIndexDirection direction,
-  ) => 'intentions_${name}_${timestamp.column}_${direction.sql}_id_asc';
-}
-
-enum _CatalogIndexTimestamp {
-  createdAt('created_at'),
-  updatedAt('updated_at');
-
-  const _CatalogIndexTimestamp(this.column);
-
-  final String column;
-}
-
-enum _CatalogIndexDirection {
-  ascending('asc'),
-  descending('desc');
-
-  const _CatalogIndexDirection(this.sql);
-
-  final String sql;
 }

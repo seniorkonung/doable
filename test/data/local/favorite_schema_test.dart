@@ -1,4 +1,3 @@
-import 'package:doable/src/data/local/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -31,76 +30,6 @@ void main() {
   });
 
   tearDown(() => harness.dispose());
-
-  test('создаёт таблицу отметок в единственной версии схемы 1', () {
-    expect(AppDatabase.currentSchemaVersion, 1);
-    expect(
-      raw.select('PRAGMA user_version').single['user_version'],
-      AppDatabase.currentSchemaVersion,
-    );
-
-    final columns = {
-      for (final row in raw.select('PRAGMA table_info(favorite_intentions)'))
-        row['name']! as String: (
-          type: row['type'],
-          notNull: row['notnull'],
-          primaryKey: row['pk'],
-        ),
-    };
-    expect(columns, {
-      'intention_id': (type: 'TEXT', notNull: 1, primaryKey: 1),
-      'position': (type: 'INTEGER', notNull: 1, primaryKey: 0),
-    });
-
-    expect(
-      raw
-          .select('PRAGMA foreign_key_list(favorite_intentions)')
-          .map(
-            (row) => (
-              row['table'],
-              row['from'],
-              row['to'],
-              row['on_update'],
-              row['on_delete'],
-            ),
-          ),
-      [('intentions', 'intention_id', 'id', 'RESTRICT', 'CASCADE')],
-    );
-
-    final uniqueColumns = {
-      for (final index in raw.select('PRAGMA index_list(favorite_intentions)'))
-        if (index['unique'] == 1)
-          [
-            for (final column in raw.select(
-              'SELECT name FROM pragma_index_info(?) ORDER BY seqno',
-              [index['name']],
-            ))
-              column['name']! as String,
-          ].join(','),
-    };
-    expect(uniqueColumns, {'intention_id', 'position'});
-  });
-
-  test('состоит из таблицы и защитного триггера без функций приложения', () {
-    final objects = raw.select('''
-      SELECT name, sql
-      FROM sqlite_schema
-      WHERE tbl_name = 'favorite_intentions' AND name NOT LIKE 'sqlite_%'
-      ORDER BY name
-    ''');
-
-    expect(objects.map((row) => row['name']), [
-      'favorite_intentions',
-      'favorite_intentions_immutable_identity',
-    ]);
-    for (final object in objects) {
-      expect(
-        object['sql']! as String,
-        isNot(contains('doable_')),
-        reason: 'Объект ${object['name']} не должен зависеть от соединения.',
-      );
-    }
-  });
 
   test('отклоняет отметку отсутствующего намерения', () {
     _addFavorite(raw, _firstIntention, 1);

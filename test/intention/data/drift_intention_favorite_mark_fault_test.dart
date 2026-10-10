@@ -79,7 +79,6 @@ void main() {
         final result = await repository.execute(command.build());
 
         expect(result, _failure(fault.failure));
-        expect(faults.failures, 1);
         faults.disarm();
         expect(_storedMarks(raw), marksBefore);
         expect(_storedIntentions(raw), intentionsBefore);

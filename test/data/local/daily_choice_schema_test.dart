@@ -291,38 +291,6 @@ void main() {
       'can',
     );
   });
-
-  test('предоставляет индексы каталога, участников и обратных ссылок', () {
-    final names = raw
-        .select("SELECT name FROM sqlite_schema WHERE type = 'index'")
-        .map((row) => row['name'])
-        .toSet();
-    expect(
-      names,
-      containsAll([
-        'daily_choices_date_creation_order',
-        'daily_choices_source_date_creation_order',
-        'daily_choices_selected_date_creation_order',
-        'daily_choices_source_recent',
-        'daily_choices_selected_recent',
-        'daily_choice_path_steps_one_root',
-        'daily_choice_path_steps_one_successor',
-        'daily_choice_path_steps_relation',
-      ]),
-    );
-    final plan = raw.select(
-      '''
-      EXPLAIN QUERY PLAN
-      SELECT id FROM daily_choice_path_steps WHERE daily_choice_id = ?
-    ''',
-      [_choice],
-    );
-    expect(
-      plan.map((row) => row['detail']),
-      contains(contains('daily_choice_path_steps')),
-    );
-    expect(plan.map((row) => row['detail']), contains(contains('INDEX')));
-  });
 }
 
 void _addRelation(

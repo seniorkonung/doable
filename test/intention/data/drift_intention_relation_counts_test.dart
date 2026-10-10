@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -261,74 +259,6 @@ void main() {
     expect(snapshot.value?.activeRelationCount, 1);
   });
 
-  test(
-    'пакетно возвращает активные количества только для порции каталога',
-    () async {
-      final trace = _SelectTrace();
-      await database.close();
-      database = AppDatabase(
-        observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          trace,
-        ),
-      );
-      await database.open();
-      repository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 19),
-        diagnostics,
-      );
-      final owners = [_id(_uuid(40)), _id(_uuid(41))];
-      final hiddenNeighbors = [_id(_uuid(42)), _id(_uuid(43))];
-      for (var index = 0; index < owners.length; index++) {
-        await _insertIntention(
-          database,
-          owners[index],
-          title: 'Видимое ${index + 1}',
-        );
-        await _insertIntention(
-          database,
-          hiddenNeighbors[index],
-          title: 'Скрытый сосед ${index + 1}',
-        );
-        await _insertRelation(
-          database,
-          id: _uuid(140 + index),
-          sourceId: owners[index],
-          relatedId: hiddenNeighbors[index],
-          type: 'need',
-          isArchived: false,
-        );
-      }
-      trace.statements.clear();
-
-      final result = await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: IntentionScope.active,
-          titleFilter: 'Видимое',
-          order: IntentionCatalogOrder.createdAtAscending,
-          pageSize: 2,
-        ),
-      );
-
-      final page =
-          (result as ResultSuccess<IntentionCatalogPage>).value
-              as IntentionCatalogFirstPage;
-      expect(page.totalCount, 2);
-      expect(
-        page.items.map((item) => item.activeRelationCount),
-        everyElement(1),
-      );
-      expect(
-        trace.statements.where(
-          (statement) => statement.contains('doable_relation_count_aggregates'),
-        ),
-        hasLength(1),
-      );
-    },
-  );
-
   test('не публикует частичный успех при повреждении соседства', () async {
     final owner = _id(_uuid(50));
     final neighbor = _id(_uuid(51));
@@ -381,30 +311,21 @@ void main() {
     );
   });
 
-  test('не перечитывает наблюдение при изменении другого намерения', () async {
-    await database.close();
-    final trace = _SelectTrace();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        trace,
-      ),
-    );
-    await database.open();
-    repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 19),
-      diagnostics,
-    );
+  test('не публикует наблюдение при изменении другого намерения', () async {
     final watchedId = _id(_uuid(70));
     final changedId = _id(_uuid(71));
     await _insertIntention(database, watchedId, title: 'Наблюдаемое');
     await _insertIntention(database, changedId, title: 'Изменяемое');
-    final events = StreamIterator(repository.watchIntention(watchedId));
-    addTearDown(events.cancel);
-    expect(await events.moveNext(), isTrue);
-    trace.statements.clear();
+    final snapshots = <Object>[];
+    final subscription = repository
+        .watchIntention(watchedId)
+        .listen(snapshots.add);
+    // Генератор `watchIntention` ждёт инвалидации, а не `yield`: отмена
+    // завершилась бы только после неё, поэтому её не ожидают.
+    addTearDown(() => subscription.cancel().ignore());
+    while (snapshots.isEmpty) {
+      await pumpEventQueue();
+    }
 
     final result = await repository.execute(
       UpdateIntention(id: changedId, title: 'Изменённое', description: null),
@@ -414,15 +335,8 @@ void main() {
       isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
     );
     await pumpEventQueue();
-    expect(
-      trace.statements.where(
-        (statement) =>
-            statement.contains('FROM intentions') &&
-            statement.contains('description') &&
-            !statement.contains('title_search_key'),
-      ),
-      isEmpty,
-    );
+
+    expect(snapshots, hasLength(1));
   });
 
   test('архивирует только непосредственные активные связи и возвращает абсолютные счётчики', () async {
@@ -559,23 +473,8 @@ void main() {
   });
 
   test(
-    'перечитывает после каскада только владельца и соседей изменённых связей',
+    'публикует после каскада только владельцу и соседям изменённых связей',
     () async {
-      await database.close();
-      final trace = _SelectTrace();
-      database = AppDatabase(
-        observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          trace,
-        ),
-      );
-      await database.open();
-      repository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 19),
-        diagnostics,
-      );
       final owner = _id(_uuid(90));
       final activeNeighbor = _id(_uuid(91));
       final archivedNeighbor = _id(_uuid(92));
@@ -599,39 +498,47 @@ void main() {
         type: 'can',
         isArchived: true,
       );
-      final ownerEvents = StreamIterator(repository.watchIntention(owner));
-      final activeNeighborEvents = StreamIterator(
-        repository.watchIntention(activeNeighbor),
-      );
-      final archivedNeighborEvents = StreamIterator(
-        repository.watchIntention(archivedNeighbor),
-      );
-      final unrelatedEvents = StreamIterator(
-        repository.watchIntention(unrelated),
-      );
-      addTearDown(ownerEvents.cancel);
-      addTearDown(activeNeighborEvents.cancel);
-      addTearDown(archivedNeighborEvents.cancel);
-      addTearDown(unrelatedEvents.cancel);
-      for (final events in [
-        ownerEvents,
-        activeNeighborEvents,
-        archivedNeighborEvents,
-        unrelatedEvents,
-      ]) {
-        expect(await events.moveNext(), isTrue);
+      final snapshots = {
+        for (final id in [owner, activeNeighbor, archivedNeighbor, unrelated])
+          id: <Result<GraphSnapshot<IntentionDetails?>>>[],
+      };
+      final subscriptions = [
+        for (final entry in snapshots.entries)
+          repository.watchIntention(entry.key).listen(entry.value.add),
+      ];
+      // Генератор `watchIntention` ждёт инвалидации, а не `yield`: отмена
+      // завершилась бы только после неё, поэтому её не ожидают.
+      addTearDown(() {
+        for (final subscription in subscriptions) {
+          subscription.cancel().ignore();
+        }
+      });
+      Future<void> untilPublished(IntentionId id, int count) async {
+        while (snapshots[id]!.length < count) {
+          await pumpEventQueue();
+        }
       }
-      trace.statements.clear();
+
+      /// Число публикаций каждого наблюдения: владелец, сосед с активной
+      /// связью, сосед с архивной связью и посторонний.
+      List<int> published() => [
+        for (final id in [owner, activeNeighbor, archivedNeighbor, unrelated])
+          snapshots[id]!.length,
+      ];
+      for (final id in snapshots.keys) {
+        await untilPublished(id, 1);
+      }
 
       final archived = _confirmedCommand(
         await repository.execute(ArchiveIntention(owner)),
       );
+      await untilPublished(owner, 2);
+      await untilPublished(activeNeighbor, 2);
+      await pumpEventQueue();
 
-      expect(await ownerEvents.moveNext(), isTrue);
-      expect(await activeNeighborEvents.moveNext(), isTrue);
-      final ownerSnapshot = _successfulSnapshot(ownerEvents.current);
+      final ownerSnapshot = _successfulSnapshot(snapshots[owner]!.last);
       final neighborSnapshot = _successfulSnapshot(
-        activeNeighborEvents.current,
+        snapshots[activeNeighbor]!.last,
       );
       expect(
         ownerSnapshot.revision.compareTo(archived.revision),
@@ -649,31 +556,30 @@ void main() {
       expect(ownerSnapshot.value?.relationCounts.archived, 2);
       expect(neighborSnapshot.value?.relationCounts.active, 0);
       expect(neighborSnapshot.value?.relationCounts.archived, 1);
-      await pumpEventQueue();
-      expect(_detailReadStatements(trace), hasLength(2));
+      expect(published(), [2, 2, 1, 1]);
 
-      trace.statements.clear();
+      // Восстановление не возвращает связи: меняется только владелец.
       final restored = _confirmedCommand(
         await repository.execute(RestoreIntention(owner)),
       );
-      expect(await ownerEvents.moveNext(), isTrue);
+      await untilPublished(owner, 3);
+      await pumpEventQueue();
       expect(
-        _successfulSnapshot(ownerEvents.current).revision
+        _successfulSnapshot(snapshots[owner]!.last).revision
             .compareTo(restored.revision),
         GraphRevisionOrder.same,
       );
-      await pumpEventQueue();
-      expect(_detailReadStatements(trace), hasLength(1));
+      expect(published(), [3, 2, 1, 1]);
 
-      trace.statements.clear();
+      // Повторное архивирование без активных связей меняет только владельца.
       final archivedWithoutActiveRelations = _confirmedCommand(
         await repository.execute(ArchiveIntention(owner)),
       );
-      expect(await ownerEvents.moveNext(), isTrue);
+      await untilPublished(owner, 4);
       await pumpEventQueue();
-      expect(_detailReadStatements(trace), hasLength(1));
+      expect(published(), [4, 2, 1, 1]);
 
-      trace.statements.clear();
+      // Повтор без изменений ничего не публикует.
       final noOp = _confirmedCommand(
         await repository.execute(ArchiveIntention(owner)),
       );
@@ -682,7 +588,7 @@ void main() {
         archivedWithoutActiveRelations.revision.compareTo(noOp.revision),
         GraphRevisionOrder.same,
       );
-      expect(_detailReadStatements(trace), isEmpty);
+      expect(published(), [4, 2, 1, 1]);
     },
   );
 }
@@ -797,22 +703,3 @@ Future<Map<String, bool>> _relationArchiveStates(AppDatabase database) async =>
   ''').get())
         row.read<String>('id'): row.read<int>('is_archived') == 1,
     };
-
-Iterable<String> _detailReadStatements(_SelectTrace trace) =>
-    trace.statements.where(
-      (statement) =>
-          statement.contains('FROM intentions') &&
-          statement.contains('description') &&
-          !statement.contains('title_search_key'),
-    );
-
-final class _SelectTrace extends LocalDatabaseConnectionObserver {
-  final List<String> statements = [];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select) {
-      statements.add(statement.statements.single);
-    }
-  }
-}

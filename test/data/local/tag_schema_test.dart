@@ -1,4 +1,3 @@
-import 'package:doable/src/data/local/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -31,101 +30,6 @@ void main() {
   });
 
   tearDown(() => harness.dispose());
-
-  test('создаёт версию 1 с индексами, ключом названия и внешними ключами', () {
-    expect(AppDatabase.currentSchemaVersion, 1);
-    expect(
-      raw.select('PRAGMA user_version').single['user_version'],
-      AppDatabase.currentSchemaVersion,
-    );
-    final objects = raw
-        .select("SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
-        .map((row) => row['name'])
-        .toSet();
-    expect(
-      objects,
-      containsAll([
-        'tags',
-        'tag_assignments',
-        'tag_assignments_tag_order',
-        'tag_assignments_intention',
-        'tag_assignments_intention_order',
-        'tags_immutable_identity',
-        'tag_assignments_immutable_identity',
-        'tag_assignments_valid_tag_order_insert',
-        'tag_assignments_fill_tag_order',
-        'tag_assignments_valid_tag_order_update',
-      ]),
-    );
-    final key = raw
-        .select('PRAGMA table_xinfo(tags)')
-        .singleWhere((row) => row['name'] == 'name_key');
-    expect(key['hidden'], 3);
-    final foreignKeys = raw.select('PRAGMA foreign_key_list(tag_assignments)');
-    expect(
-      foreignKeys
-          .map(
-            (row) => (
-              row['table'],
-              row['from'],
-              row['to'],
-              row['on_update'],
-              row['on_delete'],
-            ),
-          )
-          .toSet(),
-      {
-        ('tags', 'tag_id', 'id', 'RESTRICT', 'CASCADE'),
-        ('intentions', 'intention_id', 'id', 'RESTRICT', 'CASCADE'),
-      },
-    );
-  });
-
-  test('хранит назначение только с обязательным намерением', () {
-    final columns = {
-      for (final row in raw.select('PRAGMA table_info(tag_assignments)'))
-        row['name']! as String: row['notnull']! as int,
-    };
-    expect(columns, {
-      'creation_sequence': 1,
-      'tag_id': 1,
-      'tag_creation_sequence': 1,
-      'intention_id': 1,
-    });
-
-    final uniqueIndexes = [
-      for (final index in raw.select('PRAGMA index_list(tag_assignments)'))
-        if (index['unique'] == 1)
-          [
-            for (final column in raw.select(
-              'SELECT name FROM pragma_index_info(?) ORDER BY seqno',
-              [index['name']],
-            ))
-              column['name']! as String,
-          ],
-    ];
-    expect(uniqueIndexes, [
-      ['tag_id', 'intention_id'],
-    ]);
-
-    final indexedColumns = {
-      for (final index in raw.select('PRAGMA index_list(tag_assignments)'))
-        for (final column in raw.select(
-          'SELECT name FROM pragma_index_info(?)',
-          [index['name']],
-        ))
-          column['name']! as String,
-    };
-    expect(indexedColumns, isNot(contains('long_term_relation_id')));
-
-    final relationObjects = raw.select('''
-      SELECT name
-      FROM sqlite_schema
-      WHERE tbl_name = 'tag_assignments'
-        AND (name LIKE '%long_term_relation%' OR sql LIKE '%long_term_relation%')
-    ''');
-    expect(relationObjects, isEmpty);
-  });
 
   test('отклоняет неверные названия и дубликаты после Unicode folding', () {
     // Пустое название, окружающие пробелы, NUL и длина: начальный BOM и

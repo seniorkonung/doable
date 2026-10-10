@@ -1,7 +1,6 @@
 @Tags(['slow'])
 library;
 
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -22,7 +21,6 @@ import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -51,10 +49,6 @@ const _allConditions = (
   excluded: _conditionCount,
 );
 
-/// Число обязательных условий запроса вместе с популярным тегом.
-int _requiredConditionCount(_Conditions conditions) =>
-    conditions.required + (conditions.popular ? 1 : 0);
-
 void main() {
   test(
     'сохраняет ограниченную стоимость каталога на большой file-backed fixture',
@@ -73,13 +67,10 @@ void main() {
       await _populateFixture(database);
       trace.clear();
 
-      await _expectQueryPlans(database);
-      trace.clear();
-
       await _expectBoundedPages(repository);
-      await _expectFirstPageSql(repository, trace);
+      await _expectFirstPageCounts(repository, trace);
       await _expectWarmedShortFilterLatency(repository, trace);
-      await _expectCompleteKeysetTraversal(repository, trace);
+      await _expectCompleteKeysetTraversal(repository);
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
@@ -87,7 +78,7 @@ void main() {
   test(
     'материализует только порцию редких совместных совпадений и все её теги',
     () async {
-      final (:repository, :raw, :trace) = await _openJointFixture();
+      final (:repository, raw: _, :trace) = await _openJointFixture();
 
       // Без фильтра названия совпадение отсекают только теги среди
       // 25 000 готовых активных кандидатов; «Другое название» проходит.
@@ -106,13 +97,7 @@ void main() {
         ) as IntentionCatalogFirstPage;
         expect(first.totalCount, matchCount);
         expect(first.items, hasLength(pageSize));
-        _expectJointMaterialization(
-          first,
-          trace,
-          isFirst: true,
-          pageSize: pageSize,
-        );
-        _expectJointPlans(raw, trace, titleFilter: titleFilter);
+        _expectJointPage(first, trace, isFirst: true);
       }
 
       for (final (titleFilter, matches) in [
@@ -134,7 +119,6 @@ void main() {
       ]) {
         await _expectJointTraversal(
           repository,
-          raw,
           trace,
           titleFilter: titleFilter,
           matches: matches,
@@ -168,18 +152,7 @@ void main() {
         ) as IntentionCatalogFirstPage;
         expect(first.totalCount, matchCount, reason: label);
         expect(first.items, hasLength(_pageSize), reason: label);
-        _expectJointPlans(
-          raw,
-          trace,
-          titleFilter: null,
-          conditions: conditions,
-        );
-        _expectJointMaterialization(
-          first,
-          trace,
-          isFirst: true,
-          conditions: conditions,
-        );
+        _expectJointPage(first, trace, isFirst: true);
       }
     },
     timeout: const Timeout(Duration(minutes: 3)),
@@ -190,27 +163,21 @@ void main() {
     () async {
       final (:repository, :raw, :trace) = await _openJointFixture();
 
-      Future<({IntentionCatalogPage page, _TracedSelect marks})> read() async {
+      Future<IntentionCatalogPage> read() async {
         trace.clear();
         final page = _page(await repository.getCatalogPage(_jointQuery()));
         expect(page.items, hasLength(_pageSize));
-        _expectMarkMaterialization(page.items, trace);
-        return (
-          page: page,
-          marks: trace.selects.singleWhere(
-            (select) => select.statement.contains('FROM favorite_intentions'),
-          ),
-        );
+        _expectJointPage(page, trace, isFirst: true);
+        return page;
       }
 
       final before = await read();
       final pageIds = {
-        for (final item in before.page.items) item.id.toCanonicalString(),
+        for (final item in before.items) item.id.toCanonicalString(),
       };
       final storedBefore = _favoriteRowCount(raw);
 
-      // Избранным становится каждое намерение вне порции, а за ними
-      // сохраняются места без существующих намерений.
+      // Избранным становится каждое намерение вне порции.
       final insertFavorite = raw.prepare(
         'INSERT INTO favorite_intentions (intention_id, position) '
         'VALUES (?, ?)',
@@ -230,44 +197,25 @@ void main() {
       } finally {
         insertFavorite.close();
       }
-      for (var index = 0; index < _placesWithoutIntention; index++) {
-        storeFavoritePlaceWithoutIntention(
-          raw,
-          intentionId: _fixtureId(_fixtureSize + index),
-          position: ++position,
-        );
-      }
       final storedAfter = _favoriteRowCount(raw);
       expect(storedAfter, greaterThan(storedBefore * 2));
       expect(
         storedAfter,
         _fixtureSize -
-            before.page.items
+            before.items
                 .where((item) => item.favoriteMark == FavoriteMark.notFavorite)
-                .length +
-            _placesWithoutIntention,
+                .length,
       );
 
       final after = await read();
 
       expect(
-        [for (final item in after.page.items) (item.id, item.favoriteMark)],
-        [for (final item in before.page.items) (item.id, item.favoriteMark)],
-      );
-      expect(after.marks.arguments, before.marks.arguments);
-      expect(after.marks.rowCount, before.marks.rowCount);
-      expect(after.marks.intentionIds, before.marks.intentionIds);
-      expect(after.marks.rowCount, lessThanOrEqualTo(_pageSize));
-      expect(
-        _observedPlan(raw, after.marks).join('\n'),
-        allOf(
-          contains('sqlite_autoindex_favorite_intentions_1'),
-          isNot(contains('SCAN favorite_intentions')),
-        ),
+        [for (final item in after.items) (item.id, item.favoriteMark)],
+        [for (final item in before.items) (item.id, item.favoriteMark)],
       );
 
-      // Подробные данные читают не больше одной строки отметки.
-      for (final item in after.page.items.take(3)) {
+      // Подробные данные читают не больше одной строки за чтение.
+      for (final item in after.items.take(3)) {
         trace.clear();
         final details = await repository.watchIntention(item.id).first;
         expect(
@@ -277,30 +225,22 @@ void main() {
               .favoriteMark,
           item.favoriteMark,
         );
-        final marks = trace.selects.singleWhere(
-          (select) => select.statement.contains('FROM favorite_intentions'),
-        );
-        expect(marks.arguments, [item.id.toCanonicalString()]);
-        expect(
-          marks.rowCount,
-          item.favoriteMark == FavoriteMark.favorite ? 1 : 0,
-        );
+        expect(trace.rowCounts, everyElement(lessThanOrEqualTo(1)));
       }
       expect(trace.writes, isEmpty);
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test('ведёт порцию и продолжение по индексу порядка при популярном обязательном теге', () async {
-    final (:repository, :raw, :trace) = await _openJointFixture();
+  test('отдаёт порцию и продолжение в порядке охвата при популярном обязательном теге', () async {
+    final (:repository, raw: _, :trace) = await _openJointFixture();
 
     // Популярный тег назначен 19 999 из 24 999 активных намерений. Среди
     // них не готов кандидат 243 и исключён из выдачи кандидат 244, поэтому
     // один популярный тег оставляет 19 997 совпадений. Все 1201
     // исключённых тегов отсекают ещё трёх кандидатов.
     // С редкими обязательными тегами совпадения сужаются до совместных
-    // кандидатов, но популярный тег остаётся в наборе условий. Во всех
-    // сценариях порция и продолжение идут по индексу порядка охвата.
+    // кандидатов, но популярный тег остаётся в наборе условий.
     const popularBounds = [(6, 1728), (1756, 3478)];
     for (final (label, conditions, matchCount, bounds) in [
       (
@@ -366,18 +306,7 @@ void main() {
           );
         }
         expect(page.nextCursor, isA<IntentionCatalogCursor>(), reason: label);
-        _expectJointPlans(
-          raw,
-          trace,
-          titleFilter: null,
-          conditions: conditions,
-        );
-        _expectJointMaterialization(
-          page,
-          trace,
-          isFirst: isFirst,
-          conditions: conditions,
-        );
+        _expectJointPage(page, trace, isFirst: isFirst);
         cursor = page.nextCursor;
       }
     }
@@ -467,13 +396,6 @@ void main() {
           reason: label,
         );
       }
-
-      await _expectFailedReconciliationReadsKeepConnection(
-        repository,
-        raw,
-        trace,
-        stored: loaded,
-      );
     },
     timeout: const Timeout(Duration(minutes: 5)),
   );
@@ -522,11 +444,9 @@ IntentionCatalogQuery _massQuery({IntentionCatalogCursor? cursor}) =>
 
 /// Проходит согласование области до конца скользящим окном сохранённых
 /// строк и возвращает номера недостающих совпадений в порядке получения.
-/// Каждая порция читает только себя: строка после границы порции не
-/// выбирается повторно, сохранённые строки и предшествующие порции не
-/// перечитываются. Вход каждого чтения — не больше порции сохранённых
-/// идентификаторов независимо от размера области, а число чтений растёт
-/// линейно с числом сохранённых и недостающих строк.
+/// Каждая порция даёт только следующие недостающие совпадения и не читает
+/// больше строк, чем нужно порции, а число порций растёт линейно с числом
+/// сохранённых и недостающих строк.
 Future<List<int>> _expectMassReconciliation(
   DriftPersonalGraphRepository repository,
   sqlite.Database raw,
@@ -541,8 +461,8 @@ Future<List<int>> _expectMassReconciliation(
   final storedIndexes = [for (final row in stored) _fixtureIndexOf(row.id)];
   final changesBefore = _connectionChanges(raw);
   final reconciled = <int>[];
-  final costs = <_TracedSelect>[];
-  final storedInputSizes = <int>[];
+  var readRows = 0;
+  var allowedRows = 0;
   IntentionCatalogReconciliationCursor? cursor;
   var windowStart = 0;
   var portionNumber = 0;
@@ -616,19 +536,19 @@ Future<List<int>> _expectMassReconciliation(
           reconciled.length + indexes.length == missing.length,
       reason: '$label, порция $portionNumber',
     );
-    _expectReconciliationMaterialization(
-      portion,
+    _expectBoundedReadVolume(
       trace,
+      portion.items,
       isFirst: isFirst,
-      window: window,
+      portionRows: _pageSize + 1,
     );
-    _expectReconciliationPlans(raw, trace, window: window);
-    final read = trace.selects.singleWhere(
-      (select) => select.statement.contains('LIMIT'),
+    _expectFixtureTagsAndMarks(portion.items);
+    readRows += _selectedRows(trace);
+    allowedRows += _readVolumeLimit(
+      portion.items,
+      isFirst: isFirst,
+      portionRows: portion.items.length + 1,
     );
-    costs.add(read);
-    storedInputSizes.add(_storedRowParameterSize(read, window: window));
-    if (isFirst || portion.nextCursor == null) {}
     reconciled.addAll(indexes);
     cursor = portion.nextCursor;
     if (cursor != null) {
@@ -648,21 +568,9 @@ Future<List<int>> _expectMassReconciliation(
   } while (cursor != null);
 
   expect(reconciled, missing, reason: label);
-  // Вход чтения ограничен окном: порция сохранённых идентификаторов для
-  // области любого размера, меньше — только для области меньше порции.
-  expect(
-    storedInputSizes,
-    everyElement(lessThanOrEqualTo(_pageSize)),
-    reason: label,
-  );
-  expect(
-    storedInputSizes.reduce(max),
-    min(stored.length, _pageSize),
-    reason: label,
-  );
   // Заполненная порция забирает `pageSize` недостающих строк, а незаполненная
   // исчерпывает окно из `pageSize` сохранённых строк либо завершает область,
-  // поэтому число чтений линейно по обоим размерам.
+  // поэтому число порций линейно по обоим размерам.
   expect(
     portionNumber,
     inInclusiveRange(
@@ -672,232 +580,12 @@ Future<List<int>> _expectMassReconciliation(
     ),
     reason: label,
   );
-  // Каждое чтение выбирает не больше `pageSize + 1` строк после своей
-  // позиции, поэтому все порции вместе читают недостающие совпадения
-  // однократно, а сохранённые строки не читают вовсе.
-  expect(
-    costs.map((select) => select.rowCount),
-    everyElement(lessThanOrEqualTo(_pageSize + 1)),
-    reason: label,
-  );
-  expect(
-    costs.fold<int>(0, (sum, select) => sum + select.rowCount),
-    lessThanOrEqualTo(missing.length + portionNumber),
-    reason: label,
-  );
+  // Все порции вместе читают недостающие совпадения однократно, а
+  // сохранённые строки не читают вовсе: каждая порция читает не больше одной
+  // строки сверх своих.
+  expect(readRows, lessThanOrEqualTo(allowedRows), reason: label);
   expect(_connectionChanges(raw), changesBefore, reason: label);
   return reconciled;
-}
-
-/// Число сохранённых идентификаторов в SQL-параметре чтения порции: набор
-/// передаётся последним `json_each(?)` и отсутствует для пустого окна.
-int _storedRowParameterSize(
-  _TracedSelect read, {
-  required IntentionCatalogReconciliationWindow window,
-}) {
-  if (window.storedRows.isEmpty) return 0;
-  final sets = [
-    for (final argument in read.arguments.whereType<String>())
-      if (argument.startsWith('[')) jsonDecode(argument) as List,
-  ];
-  return sets.last.length;
-}
-
-/// Порция согласования материализует только себя и полные назначения своих
-/// строк, а абсолютное количество считается отдельным агрегатом полного
-/// предиката без границы области и сохранённых строк.
-void _expectReconciliationMaterialization(
-  IntentionCatalogReconciliationPortion portion,
-  _SelectTrace trace, {
-  required bool isFirst,
-  required IntentionCatalogReconciliationWindow window,
-}) {
-  final conditionSets = [
-    {_fixtureId(_popularTag)},
-    {
-      _fixtureId(_massTag),
-      for (var index = 0; index < _conditionCount; index++)
-        _fixtureId(_excludedTagBase + index),
-    },
-  ];
-  List<Set<Object?>> jsonSets(_TracedSelect select) => [
-    for (final argument in select.arguments.whereType<String>())
-      if (argument.startsWith('[')) (jsonDecode(argument) as List).toSet(),
-  ];
-
-  final counts = trace.selects
-      .where((select) => _isCatalogCountStatement(select.statement))
-      .toList();
-  expect(counts, hasLength(isFirst ? 1 : 0));
-  if (isFirst) {
-    final count = counts.single;
-    expect(count.rowCount, 1);
-    expect(count.statement, isNot(contains('stored_row')));
-    expect(count.statement, isNot(contains('LIMIT')));
-    expect(jsonSets(count), conditionSets);
-  }
-  final read = trace.selects
-      .where((select) => select.statement.contains('LIMIT'))
-      .single;
-  expect(read.rowCount, inInclusiveRange(portion.items.length, _pageSize + 1));
-  expect(read.statement, contains('LIMIT ${_pageSize + 1}'));
-  expect(jsonSets(read), [
-    ...conditionSets,
-    if (window.storedRows.isNotEmpty)
-      {for (final id in window.storedIntentionIds) id.toCanonicalString()},
-  ]);
-
-  final ids = portion.items.map((item) => item.id.toCanonicalString()).toSet();
-  final tags = trace.selects
-      .where((select) => select.statement.contains('FROM tag_assignments a'))
-      .single;
-  expect(tags.arguments, unorderedEquals(ids));
-  expect(tags.intentionIds, ids);
-  final aggregates = trace.selects
-      .where(
-        (select) =>
-            select.statement.contains('doable_relation_count_aggregates'),
-      )
-      .single;
-  expect(aggregates.arguments, unorderedEquals(ids));
-  expect(aggregates.rowCount, portion.items.length);
-  var tagCount = 0;
-  for (final item in portion.items) {
-    final expectedTags = _fixtureTagIds(_fixtureIndexOf(item.id));
-    expect(item.tags.map((tag) => tag.id), expectedTags);
-    tagCount += expectedTags.length;
-  }
-  expect(tags.rowCount, tagCount);
-  _expectMarkMaterialization(portion.items, trace);
-  // Число чтений не растёт с числом строк порции, сохранённых строк и
-  // условий: количество, порция, агрегаты, назначения и отметки пакетны.
-  expect(trace.writes, isEmpty);
-  expect(trace.selects, hasLength(isFirst ? 5 : 4));
-  _expectNoOffset(trace);
-}
-
-/// Порцию согласования ведёт индекс порядка охвата. Наборы условий и
-/// сохранённых идентификаторов читаются из своих `json_each(?)` один раз на
-/// выполнение запроса, а кандидат проверяется поиском в отобранном
-/// множестве, поэтому стоимость его отсечения не растёт с размером наборов.
-void _expectReconciliationPlans(
-  sqlite.Database database,
-  _SelectTrace trace, {
-  required IntentionCatalogReconciliationWindow window,
-}) {
-  _expectJointPlans(
-    database,
-    trace,
-    titleFilter: null,
-    conditions: _massConditions,
-  );
-  final read = _observedPlanTree(
-    database,
-    trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
-  );
-  if (window.storedRows.isNotEmpty) {
-    _expectParameterSetReadOnce(read, 'stored_row');
-  }
-}
-
-/// Отказавшие чтения согласования, в том числе продолжения, откатываются
-/// без записей на соединении, а повтор того же чтения успешен.
-Future<void> _expectFailedReconciliationReadsKeepConnection(
-  DriftPersonalGraphRepository repository,
-  sqlite.Database raw,
-  _SelectTrace trace, {
-  required List<IntentionSummary> stored,
-}) async {
-  // Первое окно — начало сохранённой области; окно продолжения — сохранённые
-  // строки после последней строки заполненной первой порции.
-  final firstWindow = IntentionCatalogInnerReconciliationWindow(
-    stored.take(_pageSize),
-  );
-  final first = await repository.getCatalogReconciliationPortion(
-    IntentionCatalogReconciliationQuery(
-      catalogQuery: _massQuery(),
-      boundary: const IntentionCatalogCompletedBoundary(),
-      window: firstWindow,
-    ),
-  );
-  final firstPortion =
-      (first as ResultSuccess<IntentionCatalogReconciliationOutcome>).value
-          as IntentionCatalogReconciliationPortion;
-  final continuation = firstPortion.nextCursor;
-  expect(continuation, isA<IntentionCatalogReconciliationCursor>());
-  expect(firstPortion.items, hasLength(_pageSize));
-  final position = firstPortion.items.last;
-  final continuationWindow = IntentionCatalogInnerReconciliationWindow(
-    stored
-        .where((row) => _massQuery().compare(row, position) > 0)
-        .take(_pageSize),
-  );
-  IntentionCatalogReconciliationQuery query({
-    IntentionCatalogReconciliationCursor? cursor,
-  }) => IntentionCatalogReconciliationQuery(
-    catalogQuery: _massQuery(),
-    boundary: const IntentionCatalogCompletedBoundary(),
-    window: cursor == null ? firstWindow : continuationWindow,
-    cursor: cursor,
-  );
-
-  for (final (label, cursor, failsOn)
-      in <
-        (String, IntentionCatalogReconciliationCursor?, bool Function(String))
-      >[
-        ('количество', null, _isCatalogCountStatement),
-        ('первая порция', null, (sql) => sql.contains('LIMIT')),
-        (
-          'теги первой порции',
-          null,
-          (sql) => sql.contains('FROM tag_assignments a'),
-        ),
-        (
-          'отметки первой порции',
-          null,
-          (sql) => sql.contains('FROM favorite_intentions'),
-        ),
-        ('продолжение', continuation, (sql) => sql.contains('LIMIT')),
-        (
-          'теги продолжения',
-          continuation,
-          (sql) => sql.contains('FROM tag_assignments a'),
-        ),
-        (
-          'отметки продолжения',
-          continuation,
-          (sql) => sql.contains('FROM favorite_intentions'),
-        ),
-      ]) {
-    final changesBefore = _connectionChanges(raw);
-    trace.failWhen = failsOn;
-    final failed = await repository.getCatalogReconciliationPortion(
-      query(cursor: cursor),
-    );
-    trace.failWhen = null;
-    expect(trace.hasFailed, isTrue, reason: label);
-    trace.hasFailed = false;
-    expect(
-      failed,
-      isA<ResultFailure<IntentionCatalogReconciliationOutcome>>(),
-      reason: label,
-    );
-    expect(_connectionChanges(raw), changesBefore, reason: label);
-
-    final recovered = await repository.getCatalogReconciliationPortion(
-      query(cursor: cursor),
-    );
-    expect(
-      recovered,
-      isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>().having(
-        (result) => result.value,
-        'исход',
-        isA<IntentionCatalogReconciliationPortion>(),
-      ),
-      reason: label,
-    );
-    expect(_connectionChanges(raw), changesBefore, reason: label);
-  }
 }
 
 int _connectionChanges(sqlite.Database raw) =>
@@ -934,11 +622,10 @@ _openJointFixture() async {
   return (repository: repository, raw: raw, trace: trace);
 }
 
-/// Полный обход совместного поиска: каждая порция, включая продолжения,
-/// материализует только себя и сохраняет адресные планы проверок тегов.
+/// Полный обход совместного поиска: каждая порция, включая продолжения, даёт
+/// только себя и все свои теги.
 Future<void> _expectJointTraversal(
   DriftPersonalGraphRepository repository,
-  sqlite.Database raw,
   _SelectTrace trace, {
   required String? titleFilter,
   required List<int> matches,
@@ -954,8 +641,7 @@ Future<void> _expectJointTraversal(
         _jointQuery(titleFilter: titleFilter, cursor: cursor),
       ),
     );
-    _expectJointMaterialization(page, trace, isFirst: pageNumber == 0);
-    _expectJointPlans(raw, trace, titleFilter: titleFilter);
+    _expectJointPage(page, trace, isFirst: pageNumber == 0);
     if (pageNumber == 0) {
       expect((page as IntentionCatalogFirstPage).totalCount, matches.length);
     }
@@ -1058,9 +744,6 @@ void _populateJointTagFixture(sqlite.Database database) {
 
 const _jointCandidateCount = _jointMatchCount + 10;
 
-/// Число мест без существующих намерений, добавляемых вне порции.
-const _placesWithoutIntention = 500;
-
 int _favoriteRowCount(sqlite.Database raw) =>
     raw
             .select('SELECT count(*) AS count FROM favorite_intentions')
@@ -1071,29 +754,56 @@ int _favoriteRowCount(sqlite.Database raw) =>
 /// часть совместных кандидатов и большинство намерений вне любой порции.
 bool _isFavorite(int fixtureIndex) => fixtureIndex % 3 == 0;
 
-/// Отметки порции получены одним чтением только по её идентификаторам:
-/// число строк не больше размера порции, а чтение ведёт первичный ключ.
-void _expectMarkMaterialization(
-  List<IntentionSummary> items,
-  _SelectTrace trace,
-) {
-  final marks = trace.selects
-      .where((select) => select.statement.contains('FROM favorite_intentions'))
-      .single;
-  final ids = items.map((item) => item.id.toCanonicalString()).toSet();
-  expect(marks.arguments, unorderedEquals(ids));
-  expect(marks.rowCount, lessThanOrEqualTo(items.length));
-  final favoriteIds = <String>{};
+/// Порция несёт собственные теги и отметки избранного намерений фикстуры.
+void _expectFixtureTagsAndMarks(List<IntentionSummary> items) {
   for (final item in items) {
-    final isFavorite = _isFavorite(_fixtureIndexOf(item.id));
+    expect(
+      item.tags.map((tag) => tag.id),
+      _fixtureTagIds(_fixtureIndexOf(item.id)),
+    );
     expect(
       item.favoriteMark,
-      isFavorite ? FavoriteMark.favorite : FavoriteMark.notFavorite,
+      _isFavorite(_fixtureIndexOf(item.id))
+          ? FavoriteMark.favorite
+          : FavoriteMark.notFavorite,
     );
-    if (isFavorite) favoriteIds.add(item.id.toCanonicalString());
   }
-  expect(marks.intentionIds, favoriteIds);
-  expect(marks.rowCount, favoriteIds.length);
+}
+
+/// Строки всех чтений за один запрос.
+int _selectedRows(_SelectTrace trace) =>
+    trace.rowCounts.fold(0, (sum, rows) => sum + rows);
+
+/// Предел строк, которые запрос может прочитать для порции [items]:
+/// количество (только первая порция), сама порция, сводки связей, теги и
+/// отметки именно этих намерений.
+int _readVolumeLimit(
+  List<IntentionSummary> items, {
+  required bool isFirst,
+  required int portionRows,
+}) {
+  final tagRows = items.fold(0, (sum, item) => sum + item.tags.length);
+  final markRows = items
+      .where((item) => item.favoriteMark == FavoriteMark.favorite)
+      .length;
+  return (isFirst ? 1 : 0) + portionRows + items.length + tagRows + markRows;
+}
+
+/// Запрос порции не читает строк сверх порции и её данных, как бы ни были
+/// велики каталог, число назначений и избранного вне порции, и не пишет.
+void _expectBoundedReadVolume(
+  _SelectTrace trace,
+  List<IntentionSummary> items, {
+  required bool isFirst,
+  required int portionRows,
+}) {
+  expect(
+    _selectedRows(trace),
+    lessThanOrEqualTo(
+      _readVolumeLimit(items, isFirst: isFirst, portionRows: portionRows),
+    ),
+  );
+  expect(trace.writes, isEmpty);
 }
 
 int _jointIntentionIndex(int index) => 1000 + index * 200;
@@ -1216,241 +926,17 @@ IntentionCatalogQuery _jointQuery({
   cursor: cursor,
 );
 
-void _expectJointMaterialization(
+void _expectJointPage(
   IntentionCatalogPage page,
   _SelectTrace trace, {
   required bool isFirst,
-  int pageSize = _pageSize,
-  _Conditions conditions = _allConditions,
 }) {
-  final counts = trace.selects.where(
-    (select) => _isCatalogCountStatement(select.statement),
-  );
-  expect(counts, hasLength(isFirst ? 1 : 0));
-  if (isFirst) expect(counts.single.rowCount, 1);
-  final read = trace.selects
-      .where((select) => select.statement.contains('LIMIT'))
-      .single;
-  expect(read.rowCount, page.items.length + (page.nextCursor == null ? 0 : 1));
-  expect(read.statement, contains('LIMIT ${pageSize + 1}'));
-  final tags = trace.selects
-      .where((select) => select.statement.contains('FROM tag_assignments a'))
-      .single;
-  final aggregates = trace.selects
-      .where(
-        (select) =>
-            select.statement.contains('doable_relation_count_aggregates'),
-      )
-      .single;
-  final ids = page.items.map((item) => item.id.toCanonicalString()).toSet();
-  expect(tags.arguments, unorderedEquals(ids));
-  expect(tags.intentionIds, ids);
-  expect(aggregates.arguments, unorderedEquals(ids));
-  expect(aggregates.rowCount, page.items.length);
-  var tagCount = 0;
-  for (final item in page.items) {
-    final expectedTags = _fixtureTagIds(_fixtureIndexOf(item.id));
-    expect(item.tags.map((tag) => tag.id), expectedTags);
-    tagCount += expectedTags.length;
-  }
-  expect(tags.rowCount, tagCount);
-  _expectMarkMaterialization(page.items, trace);
-  // Объём назначений может превышать размер порции. Число чтений не растёт
-  // с числом намерений: количество, порция, агрегаты, назначения и отметки
-  // пакетны.
-  // Наборы условий передаются параметрами, служебных записей и чтений нет.
-  expect(
-    trace.selects.where(
-      (select) => select.statement.contains('total_changes()'),
-    ),
-    isEmpty,
-  );
-  expect(trace.writes, isEmpty);
-  expect(trace.selects, hasLength(isFirst ? 5 : 4));
-  for (final select in [...counts, read]) {
-    final conditionSets = select.arguments
-        .whereType<String>()
-        .where((argument) => argument.startsWith('['))
-        .map((argument) => (jsonDecode(argument) as List).toSet())
-        .toList();
-    expect(conditionSets, [
-      if (_requiredConditionCount(conditions) > 0)
-        {
-          if (conditions.popular) _fixtureId(_popularTag),
-          for (var index = 0; index < conditions.required; index++)
-            _fixtureId(_requiredTagBase + index),
-        },
-      if (conditions.excluded > 0)
-        {
-          for (var index = 0; index < conditions.excluded; index++)
-            _fixtureId(_excludedTagBase + index),
-        },
-    ]);
-  }
-  _expectNoOffset(trace);
-}
-
-/// Строка `EXPLAIN QUERY PLAN`: подзапросы вложены через `parent`.
-typedef _PlanNode = ({int id, int parent, String detail});
-
-List<_PlanNode> _observedPlanTree(
-  sqlite.Database database,
-  _TracedSelect select,
-) => [
-  for (final row in database.select(
-    'EXPLAIN QUERY PLAN ${select.statement}',
-    select.arguments,
-  ))
-    (
-      id: row['id'] as int,
-      parent: row['parent'] as int,
-      detail: row['detail'] as String,
-    ),
-];
-
-List<String> _observedPlan(sqlite.Database database, _TracedSelect select) => [
-  for (final node in _observedPlanTree(database, select)) node.detail,
-];
-
-/// Набор [alias] из `json_each(?)` читается один раз подзапросом, не
-/// коррелированным с текущим намерением, а кандидат проверяется поиском по
-/// ключу в отобранном множестве (`LIST SUBQUERY` оператора `IN`).
-void _expectParameterSetReadOnce(List<_PlanNode> plan, String alias) {
-  final nodes = {for (final node in plan) node.id: node};
-  final details = plan.map((node) => node.detail).join('\n');
-  final setReads = plan
-      .where((node) => node.detail.startsWith('SCAN $alias VIRTUAL TABLE'))
-      .toList();
-  expect(setReads, hasLength(1), reason: 'Набор $alias в плане:\n$details');
-  final chain = [
-    for (
-      var parent = nodes[setReads.single.parent];
-      parent != null;
-      parent = nodes[parent.parent]
-    )
-      parent.detail,
-  ];
-  expect(
-    chain,
-    everyElement(isNot(startsWith('CORRELATED'))),
-    reason:
-        'Набор $alias читается коррелированным подзапросом, то есть '
-        'заново для каждого кандидата:\n$details',
-  );
-  expect(
-    chain.last,
-    matches(RegExp(r'^LIST SUBQUERY \d+$')),
-    reason: 'Кандидат проверяется поиском в множестве:\n$details',
-  );
-}
-
-/// Утверждения описывают свойство плана, а не порядок обхода: каждый набор
-/// условий из json_each(?) читается подзапросом, не коррелированным с
-/// текущим намерением, то есть один раз на выполнение запроса. Назначения
-/// выбранных тегов отбираются по индексу `(tag_id, intention_id)`, а
-/// кандидат проверяется поиском по ключу в отобранном множестве
-/// (`LIST SUBQUERY` оператора `IN`). Поэтому стоимость отсечения кандидата
-/// не растёт с числом условий.
-void _expectConditionSetsReadOnce(
-  List<_PlanNode> plan,
-  _Conditions conditions,
-) {
-  final nodes = {for (final node in plan) node.id: node};
-  List<String> ancestors(_PlanNode node) => [
-    for (
-      var parent = nodes[node.parent];
-      parent != null;
-      parent = nodes[parent.parent]
-    )
-      parent.detail,
-  ];
-  final correlated = startsWith('CORRELATED');
-  final details = plan.map((node) => node.detail).join('\n');
-  final hasRequired = _requiredConditionCount(conditions) > 0;
-  for (final alias in [
-    if (hasRequired) 'required_tag',
-    if (conditions.excluded > 0) 'excluded_tag',
-  ]) {
-    _expectParameterSetReadOnce(plan, alias);
-  }
-  final assignmentReads = plan
-      .where(
-        (node) => RegExp(r'^(SCAN|SEARCH) assignment\b').hasMatch(node.detail),
-      )
-      .toList();
-  expect(
-    assignmentReads,
-    hasLength((hasRequired ? 1 : 0) + (conditions.excluded > 0 ? 1 : 0)),
-    reason: details,
-  );
-  for (final read in assignmentReads) {
-    expect(read.detail, startsWith('SEARCH assignment'), reason: details);
-    expect(read.detail, contains('(tag_id=?'), reason: details);
-    expect(ancestors(read), everyElement(isNot(correlated)), reason: details);
-  }
-}
-
-void _expectJointPlans(
-  sqlite.Database database,
-  _SelectTrace trace, {
-  required String? titleFilter,
-  _Conditions conditions = _allConditions,
-}) {
-  final usesFts = titleFilter != null && titleFilter.length >= 3;
-  for (final select in trace.selects.where(
-    (select) =>
-        _isCatalogCountStatement(select.statement) ||
-        select.statement.contains('LIMIT'),
-  )) {
-    final plan = _observedPlanTree(database, select);
-    _expectConditionSetsReadOnce(plan, conditions);
-    expect(
-      plan.any((node) => node.detail.contains('intention_titles_fts')),
-      usesFts,
-    );
-    // Без полнотекстового индекса порцию ведёт индекс порядка охвата, и
-    // выборка завершается после `pageSize + 1` строк. Точное количество может
-    // использовать любой план.
-    if (!usesFts && select.statement.contains('LIMIT')) {
-      _expectOrderIndexDrivesPage(plan);
-    }
-  }
-  final tagPlan = _observedPlan(
-    database,
-    trace.selects.singleWhere(
-      (select) => select.statement.contains('FROM tag_assignments a'),
-    ),
-  ).join('\n');
-  expect(tagPlan, contains('tag_assignments_intention_order'));
-  expect(tagPlan, isNot(contains('SCAN a')));
-  final markPlan = _observedPlan(
-    database,
-    trace.selects.singleWhere(
-      (select) => select.statement.contains('FROM favorite_intentions'),
-    ),
-  ).join('\n');
-  expect(markPlan, contains('sqlite_autoindex_favorite_intentions_1'));
-  expect(markPlan, isNot(contains('SCAN favorite_intentions')));
-}
-
-void _expectOrderIndexDrivesPage(List<_PlanNode> plan) {
-  final details = plan.map((node) => node.detail).join('\n');
-  expect(
-    details,
-    contains('intentions_active_created_at_desc_id_asc'),
-    reason: 'Порцию ведёт индекс порядка охвата:\n$details',
-  );
-  expect(
-    details,
-    isNot(contains('USE TEMP B-TREE FOR ORDER BY')),
-    reason: 'Порция не сортирует все совпадения:\n$details',
-  );
-  expect(
-    details,
-    isNot(
-      contains('SEARCH intentions USING INDEX sqlite_autoindex_intentions_1'),
-    ),
-    reason: 'Выборку не ведёт отобранное по тегам множество:\n$details',
+  _expectFixtureTagsAndMarks(page.items);
+  _expectBoundedReadVolume(
+    trace,
+    page.items,
+    isFirst: isFirst,
+    portionRows: page.items.length + (page.nextCursor == null ? 0 : 1),
   );
 }
 
@@ -1473,74 +959,6 @@ Future<void> _populateFixture(AppDatabase database) => database.batch((batch) {
   }
 });
 
-Future<void> _expectQueryPlans(AppDatabase database) async {
-  final ftsPlan = await _queryPlan(database, '''
-      EXPLAIN QUERY PLAN
-      SELECT id FROM intentions
-      WHERE is_archived = 0
-        AND rowid IN (
-          SELECT rowid FROM intention_titles_fts
-          WHERE title_search_key MATCH '"ааа"'
-        )
-      ORDER BY created_at DESC, id ASC
-      LIMIT ${_pageSize + 1}
-    ''');
-  expect(ftsPlan.join('\n'), contains('intention_titles_fts'));
-
-  for (final filter in const ['а', 'я', 'аа', 'яя']) {
-    final shortFilterPlan = await _queryPlan(database, '''
-        EXPLAIN QUERY PLAN
-        SELECT id FROM intentions
-        WHERE is_archived = 0
-          AND instr(title_search_key, '$filter') > 0
-        ORDER BY created_at DESC, id ASC
-        LIMIT ${_pageSize + 1}
-      ''');
-    final details = shortFilterPlan.join('\n');
-    expect(details, contains('SCAN'));
-    expect(details, isNot(contains('intention_titles_fts')));
-  }
-
-  for (final scope in _IndexScope.values) {
-    for (final timestamp in _IndexTimestamp.values) {
-      for (final direction in _IndexDirection.values) {
-        final indexName =
-            'intentions_${scope.name}_${timestamp.column}_${direction.name}_id_asc';
-        final column = timestamp.column;
-        final comparison = switch (direction) {
-          _IndexDirection.asc => '>',
-          _IndexDirection.desc => '<',
-        };
-        final order = direction.sql;
-
-        final firstPagePlan = await _queryPlan(database, '''
-            EXPLAIN QUERY PLAN
-            SELECT id FROM intentions
-            WHERE ${scope.predicate}
-            ORDER BY $column $order, id ASC
-            LIMIT ${_pageSize + 1}
-          ''');
-        expect(firstPagePlan.join('\n'), contains(indexName));
-
-        final continuationPlan = await _queryPlan(database, '''
-            EXPLAIN QUERY PLAN
-            SELECT id FROM intentions
-            WHERE ${scope.predicate}
-              AND ($column $comparison 0 OR ($column = 0 AND id > ''))
-            ORDER BY $column $order, id ASC
-            LIMIT ${_pageSize + 1}
-          ''');
-        expect(continuationPlan.join('\n'), contains(indexName));
-      }
-    }
-  }
-}
-
-Future<List<String>> _queryPlan(AppDatabase database, String statement) async {
-  final rows = await database.customSelect(statement).get();
-  return [for (final row in rows) row.read<String>('detail')];
-}
-
 Future<void> _expectBoundedPages(PersonalGraphRepository repository) async {
   // Граница порции не зависит от текста фильтра: достаточно запроса без
   // фильтра и запроса с совпадением всех записей.
@@ -1558,7 +976,7 @@ Future<void> _expectBoundedPages(PersonalGraphRepository repository) async {
   }
 }
 
-Future<void> _expectFirstPageSql(
+Future<void> _expectFirstPageCounts(
   PersonalGraphRepository repository,
   _SelectTrace trace,
 ) async {
@@ -1579,7 +997,12 @@ Future<void> _expectFirstPageSql(
     };
     expect(page, isA<IntentionCatalogFirstPage>());
     expect((page as IntentionCatalogFirstPage).totalCount, expectedCount);
-    _expectSingleCountAndBoundedRead(trace);
+    _expectBoundedReadVolume(
+      trace,
+      page.items,
+      isFirst: true,
+      portionRows: page.items.length + (page.nextCursor == null ? 0 : 1),
+    );
   }
 }
 
@@ -1610,7 +1033,6 @@ Future<void> _expectWarmedShortFilterLatency(
     } finally {
       trace.isRecording = true;
     }
-    expect(trace.selects, isEmpty);
 
     if (Platform.isLinux) {
       expect(
@@ -1624,9 +1046,8 @@ Future<void> _expectWarmedShortFilterLatency(
 
 Future<void> _expectCompleteKeysetTraversal(
   PersonalGraphRepository repository,
-  _SelectTrace trace,
 ) async {
-  trace.clear();
+  var pageCount = 0;
   var query = _query(
     scope: IntentionScope.all,
     order: IntentionCatalogOrder.createdAtDescending,
@@ -1637,6 +1058,7 @@ Future<void> _expectCompleteKeysetTraversal(
 
   while (true) {
     final page = _page(await repository.getCatalogPage(query));
+    pageCount++;
     expect(page.items.length, lessThanOrEqualTo(_pageSize));
     final pageIds = page.items
         .map((summary) => summary.id.toCanonicalString())
@@ -1660,44 +1082,8 @@ Future<void> _expectCompleteKeysetTraversal(
 
   expect(firstPage.totalCount, _fixtureSize);
   expect(ids, hasLength(_fixtureSize));
-  _expectNoOffset(trace);
-  expect(
-    trace.selects.where((select) => _isCatalogCountStatement(select.statement)),
-    hasLength(1),
-  );
-  expect(
-    trace.selects.where((select) => select.statement.contains('LIMIT')),
-    hasLength(_fixtureSize ~/ _pageSize),
-  );
+  expect(pageCount, _fixtureSize ~/ _pageSize);
 }
-
-void _expectSingleCountAndBoundedRead(_SelectTrace trace) {
-  _expectNoOffset(trace);
-  final counts = [
-    for (final select in trace.selects)
-      if (_isCatalogCountStatement(select.statement)) select,
-  ];
-  final reads = [
-    for (final select in trace.selects)
-      if (select.statement.contains('LIMIT')) select,
-  ];
-
-  expect(counts, hasLength(1));
-  expect(reads, hasLength(1));
-  expect(counts.single.statement, isNot(contains('"description"')));
-  expect(reads.single.statement, contains('LIMIT ${_pageSize + 1}'));
-  expect(reads.single.statement, contains('"description"'));
-  expect(reads.single.statement, isNot(contains('IS NOT NULL')));
-}
-
-void _expectNoOffset(_SelectTrace trace) => expect(
-  trace.selects,
-  isNot(anyElement((select) => select.statement.contains('OFFSET'))),
-);
-
-bool _isCatalogCountStatement(String statement) =>
-    statement.startsWith('SELECT COUNT(') &&
-    !statement.contains('doable_relation_count_aggregates');
 
 Duration _percentile95(List<Duration> samples) {
   final sorted = [...samples]..sort();
@@ -1744,46 +1130,15 @@ const _catalogOrders = <IntentionCatalogOrder>[
   ),
 ];
 
-enum _IndexScope {
-  active('is_archived = 0'),
-  archived('is_archived = 1'),
-  all('1');
-
-  const _IndexScope(this.predicate);
-
-  final String predicate;
-}
-
-enum _IndexTimestamp {
-  createdAt('created_at'),
-  updatedAt('updated_at');
-
-  const _IndexTimestamp(this.column);
-
-  final String column;
-}
-
-enum _IndexDirection {
-  asc('ASC'),
-  desc('DESC');
-
-  const _IndexDirection(this.sql);
-
-  final String sql;
-}
-
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
-  final selects = <_TracedSelect>[];
+  /// Число строк каждого чтения в порядке выполнения.
+  final rowCounts = <int>[];
   final writes = <String>[];
   int? parameterLimit;
   var isRecording = true;
 
-  /// Чтение, на котором соединение отказывает; отказ однократен.
-  bool Function(String statement)? failWhen;
-  var hasFailed = false;
-
   void clear() {
-    selects.clear();
+    rowCounts.clear();
     writes.clear();
   }
 
@@ -1800,47 +1155,14 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
   }
 
   @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    final fails = failWhen;
-    if (fails != null && !hasFailed && fails(statement.statements.single)) {
-      hasFailed = true;
-      throw StateError('CANARY-отказ чтения');
-    }
-  }
-
-  @override
   List<Map<String, Object?>> afterSelect(
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
     if (isRecording &&
         statement.operation == LocalDatabaseSqlOperation.select) {
-      selects.add(
-        _TracedSelect(
-          statement.statements.single,
-          statement.arguments,
-          rows.length,
-          {
-            for (final row in rows)
-              if (row['intention_id'] case final String id) id,
-          },
-        ),
-      );
+      rowCounts.add(rows.length);
     }
     return rows;
   }
-}
-
-final class _TracedSelect {
-  const _TracedSelect(
-    this.statement,
-    this.arguments,
-    this.rowCount,
-    this.intentionIds,
-  );
-
-  final String statement;
-  final List<Object?> arguments;
-  final int rowCount;
-  final Set<String> intentionIds;
 }

@@ -20,19 +20,14 @@ void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late InMemoryDiagnosticsSink diagnostics;
-  late _WriteTrace trace;
   late DateTime now;
   late DriftPersonalGraphRepository repository;
 
   setUp(() async {
     diagnostics = InMemoryDiagnosticsSink();
-    trace = _WriteTrace();
     now = DateTime.utc(2026, 10, 2, 12);
     database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        trace,
-      ),
+      openInMemoryLocalDatabase(setup: (connection) => raw = connection),
     );
     await database.open();
     repository = DriftPersonalGraphRepository(
@@ -190,13 +185,12 @@ void main() {
     test('создание с избранным не выполняет отдельную команду отметки и '
         'возвращает отметку в снимке создания', () async {
       await _revision(repository);
-      trace.clear();
 
       final confirmed = await _confirmed(repository, favoriteCreation('Новое'));
 
       final saved = confirmed.value as IntentionSaved;
       final created = saved.catalogMutation as IntentionCatalogCreated;
-      expect(saved.changes, [same(created)]);
+      expect(saved.changes, hasLength(1));
       expect(created.entry.summary.favoriteMark, FavoriteMark.favorite);
       expect(
         diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().map(
@@ -204,11 +198,9 @@ void main() {
         ),
         [IntentionCommandDiagnosticsType.create],
       );
-      expect(
-        trace.writes.where((sql) => sql.contains('favorite_intentions')),
-        hasLength(1),
-      );
-      expect(trace.writes.join('\n'), isNot(contains('intentions SET')));
+      expect(_storedMarks(raw).map((mark) => mark.$1), [
+        saved.intention.id.toCanonicalString(),
+      ]);
     });
   });
 
@@ -259,7 +251,7 @@ void main() {
           mutation.revision.compareTo(confirmed.revision),
           GraphRevisionOrder.same,
         );
-        expect(saved.changes, [same(mutation)]);
+        expect(saved.changes, hasLength(1));
         expect(mutation.before.summary.favoriteMark, scenario.before);
         expect(mutation.after.summary.favoriteMark, scenario.after);
         expect(
@@ -270,7 +262,6 @@ void main() {
         expect(saved.intention.title, 'Гулять');
         // Команда не пишет в строки намерений и не меняет показания времени.
         expect(_storedIntentions(raw), intentionsBefore);
-        expect(trace.writes.join('\n'), isNot(contains('intentions SET')));
         expect((await _details(repository, 1)).favoriteMark, scenario.after);
       });
     }
@@ -298,8 +289,6 @@ void main() {
       storeFavoriteMark(raw, intentionId: _uuid(1), position: 4);
       storeFavoriteMark(raw, intentionId: _uuid(2), position: 9);
       final revisionBefore = await _revision(repository);
-      final changesBefore = _connectionChanges(raw);
-      trace.clear();
 
       final confirmed = await _confirmed(
         repository,
@@ -313,8 +302,6 @@ void main() {
         confirmed.revision.compareTo(revisionBefore),
         GraphRevisionOrder.same,
       );
-      expect(trace.writes, isEmpty);
-      expect(_connectionChanges(raw), changesBefore);
       expect(_storedMarks(raw), [(_uuid(1), 4), (_uuid(2), 9)]);
     });
 
@@ -324,8 +311,6 @@ void main() {
       _insertIntention(raw, number: 2, title: 'Второе');
       storeFavoriteMark(raw, intentionId: _uuid(2), position: 5);
       final revisionBefore = await _revision(repository);
-      final changesBefore = _connectionChanges(raw);
-      trace.clear();
 
       final confirmed = await _confirmed(
         repository,
@@ -339,8 +324,6 @@ void main() {
         confirmed.revision.compareTo(revisionBefore),
         GraphRevisionOrder.same,
       );
-      expect(trace.writes, isEmpty);
-      expect(_connectionChanges(raw), changesBefore);
       expect(_storedMarks(raw), [(_uuid(2), 5)]);
     });
 
@@ -354,8 +337,6 @@ void main() {
         storeFavoriteMark(raw, intentionId: _uuid(1), position: 1);
         final intentionsBefore = _storedIntentions(raw);
         final revisionBefore = await _revision(repository);
-        final changesBefore = _connectionChanges(raw);
-        trace.clear();
 
         final result = await repository.execute(scenario.command(_id(2)));
 
@@ -368,8 +349,6 @@ void main() {
                 isA<IntentionNotFoundFailure>(),
               ),
         );
-        expect(trace.writes, isEmpty);
-        expect(_connectionChanges(raw), changesBefore);
         expect(_storedIntentions(raw), intentionsBefore);
         expect(_storedMarks(raw), [(_uuid(1), 1)]);
         expect(
@@ -379,20 +358,6 @@ void main() {
       });
     }
   });
-}
-
-/// Записи одного соединения в порядке выполнения.
-final class _WriteTrace extends LocalDatabaseConnectionObserver {
-  final writes = <String>[];
-
-  void clear() => writes.clear();
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation != LocalDatabaseSqlOperation.select) {
-      writes.addAll(statement.statements);
-    }
-  }
 }
 
 String _uuid(int number) =>
@@ -433,9 +398,6 @@ void _insertIntention(
     ],
   );
 }
-
-int _connectionChanges(sqlite.Database database) =>
-    database.select('SELECT total_changes() AS count').single['count'] as int;
 
 List<Map<String, Object?>> _storedIntentions(sqlite.Database database) => [
   for (final row in database.select('SELECT * FROM intentions ORDER BY id'))

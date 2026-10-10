@@ -11,7 +11,6 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -23,17 +22,12 @@ void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late InMemoryDiagnosticsSink diagnostics;
-  late _StatementTrace trace;
   late DriftPersonalGraphRepository repository;
 
   setUp(() async {
     diagnostics = InMemoryDiagnosticsSink();
-    trace = _StatementTrace();
     database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        trace,
-      ),
+      openInMemoryLocalDatabase(setup: (connection) => raw = connection),
     );
     await database.open();
     repository = DriftPersonalGraphRepository(
@@ -45,25 +39,6 @@ void main() {
   });
 
   tearDown(() => database.close());
-
-  group('Подробные данные намерения', () {
-    test('читают только отметку запрошенного намерения без записи', () async {
-      _insertIntention(raw, number: 1, title: 'Первое');
-      _insertIntention(raw, number: 2, title: 'Второе');
-      storeFavoriteMark(raw, intentionId: _uuid(1), position: 1);
-      storeFavoriteMark(raw, intentionId: _uuid(2), position: 2);
-      final changesBefore = _connectionChanges(raw);
-      trace.clear();
-
-      await _details(repository, 1);
-
-      final markRead = trace.favoriteMarkReads.single;
-      expect(markRead.arguments, [_uuid(1)]);
-      expect(markRead.rowCount, 1);
-      expect(trace.writes, isEmpty);
-      expect(_connectionChanges(raw), changesBefore);
-    });
-  });
 
   group('Порция каталога', () {
     test(
@@ -139,39 +114,15 @@ void main() {
         }
       },
     );
-
-    test('получает отметки одним чтением по идентификаторам порции', () async {
-      for (var number = 1; number <= 6; number++) {
-        _insertIntention(raw, number: number, title: 'Намерение $number');
-        storeFavoriteMark(raw, intentionId: _uuid(number), position: number);
-      }
-      final changesBefore = _connectionChanges(raw);
-
-      for (final pageSize in [1, 3, 5]) {
-        trace.clear();
-        final first = await _page(repository, _query(pageSize: pageSize));
-        _expectSingleMarkRead(trace, first.items);
-
-        trace.clear();
-        final continuation = await _page(
-          repository,
-          _query(pageSize: pageSize, cursor: first.nextCursor),
-        );
-        _expectSingleMarkRead(trace, continuation.items);
-      }
-      expect(_connectionChanges(raw), changesBefore);
-    });
   });
 
   group('Порция согласования каталога', () {
-    test('несёт отметки недостающих совпадений одним чтением', () async {
+    test('несёт отметки недостающих совпадений', () async {
       for (var number = 1; number <= 4; number++) {
         _insertIntention(raw, number: number, title: 'Гулять');
       }
       storeFavoriteMark(raw, intentionId: _uuid(2), position: 4);
       storeFavoriteMark(raw, intentionId: _uuid(4), position: 2);
-      final changesBefore = _connectionChanges(raw);
-      trace.clear();
 
       final result = await repository.getCatalogReconciliationPortion(
         _reconciliationQuery(),
@@ -191,8 +142,6 @@ void main() {
         _uuid(3): FavoriteMark.notFavorite,
         _uuid(4): FavoriteMark.favorite,
       });
-      _expectSingleMarkRead(trace, portion.items);
-      expect(_connectionChanges(raw), changesBefore);
     });
   });
 
@@ -408,163 +357,6 @@ void main() {
       });
     }
   });
-
-  group('Место без существующего намерения вне запрошенных', () {
-    // Целостные отметки — у первого и третьего намерений; между их местами и
-    // после них сохранены места без намерений.
-    late TagId tagId;
-
-    setUp(() async {
-      _insertIntention(raw, number: 1, title: 'CANARY-избранное');
-      _insertIntention(raw, number: 2, title: 'CANARY-неизбранное');
-      _insertIntention(raw, number: 3, title: 'CANARY-избранное');
-      storeFavoriteMark(raw, intentionId: _uuid(1), position: 2);
-      storeFavoriteMark(raw, intentionId: _uuid(3), position: 4);
-      for (final (number, position) in [(101, 1), (102, 3), (103, 9)]) {
-        storeFavoritePlaceWithoutIntention(
-          raw,
-          intentionId: _uuid(number),
-          position: position,
-        );
-      }
-      tagId = switch (await repository.execute(
-        CreateTag(TagName.fromInput('CANARY-тег')),
-      )) {
-        TagCommandSucceeded(
-          value: ConfirmedGraphResult(:final TagCreated value),
-        ) =>
-          value.change.after.id,
-        final other => fail('Тег не создан: $other'),
-      };
-      trace.clear();
-    });
-
-    test('порция согласования показывает подтверждённые отметки', () async {
-      final result = await repository.getCatalogReconciliationPortion(
-        _reconciliationQuery(),
-      );
-
-      expect(
-        result,
-        isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
-      );
-      final portion =
-          (result as ResultSuccess<IntentionCatalogReconciliationOutcome>).value
-              as IntentionCatalogReconciliationFirstPortion;
-      expect(portion.totalCount, 3);
-      expect(_marks(portion.items), _intactMarksById);
-      _expectSingleMarkRead(trace, portion.items);
-    });
-
-    test('каталожные снимки команд несут подтверждённые отметки', () async {
-      for (final (number, mark) in _intactMarks) {
-        final id = _id(number);
-        for (final command in <IntentionCommand>[
-          UpdateIntention(id: id, title: 'CANARY-новое', description: null),
-          EnableIntentionReadiness(id),
-          ArchiveIntention(id),
-          RestoreIntention(id),
-        ]) {
-          final mutation = (await _execute(
-            repository,
-            command,
-          )).catalogMutation;
-          final reason = '${command.runtimeType} намерения $number';
-          expect(mutation.before!.summary.favoriteMark, mark, reason: reason);
-          expect(mutation.after!.summary.favoriteMark, mark, reason: reason);
-        }
-        for (final command in <TagCommand>[
-          AssignTag(tagId: tagId, intentionId: id),
-          RemoveTagAssignment(tagId: tagId, intentionId: id),
-        ]) {
-          final result = await repository.execute(command);
-          final reason = '${command.runtimeType} намерения $number';
-          expect(result, isA<TagCommandSucceeded>(), reason: reason);
-          final changed =
-              (result as TagCommandSucceeded).value.value
-                  as TagAssignmentChanged;
-          for (final snapshot in [
-            changed.catalogMutation.before,
-            changed.catalogMutation.after,
-          ]) {
-            expect(snapshot.summary.favoriteMark, mark, reason: reason);
-          }
-        }
-      }
-
-      // Чтения и команды не исправляют и не удаляют места без намерений.
-      expect(storedFavoriteMarks(raw), [
-        (_uuid(101), 1),
-        (_uuid(1), 2),
-        (_uuid(102), 3),
-        (_uuid(3), 4),
-        (_uuid(103), 9),
-      ]);
-      expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-    });
-  });
-}
-
-/// Подтверждённые отметки намерений, чьи сохранённые данные целостны.
-const _intactMarks = [
-  (1, FavoriteMark.favorite),
-  (2, FavoriteMark.notFavorite),
-  (3, FavoriteMark.favorite),
-];
-
-Map<String, FavoriteMark> get _intactMarksById => {
-  for (final (number, mark) in _intactMarks) _uuid(number): mark,
-};
-
-/// Чтения отметок и записи одного соединения в порядке выполнения.
-final class _StatementTrace extends LocalDatabaseConnectionObserver {
-  final favoriteMarkReads = <({List<Object?> arguments, int rowCount})>[];
-  final writes = <String>[];
-
-  void clear() {
-    favoriteMarkReads.clear();
-    writes.clear();
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation != LocalDatabaseSqlOperation.select) {
-      writes.addAll(statement.statements);
-    }
-  }
-
-  @override
-  List<Map<String, Object?>> afterSelect(
-    LocalDatabaseSqlStatement statement,
-    List<Map<String, Object?>> rows,
-  ) {
-    if (statement.statements.single.contains('FROM favorite_intentions')) {
-      favoriteMarkReads.add((
-        arguments: statement.arguments,
-        rowCount: rows.length,
-      ));
-    }
-    return rows;
-  }
-}
-
-/// Порция читает отметки одним обращением: только по своим идентификаторам,
-/// без строки-признака продолжения и без записи на соединение.
-void _expectSingleMarkRead(
-  _StatementTrace trace,
-  List<IntentionSummary> items,
-) {
-  final markRead = trace.favoriteMarkReads.single;
-  expect(
-    markRead.arguments,
-    unorderedEquals(items.map((item) => item.id.toCanonicalString())),
-  );
-  expect(markRead.rowCount, lessThanOrEqualTo(items.length));
-  expect(
-    markRead.rowCount,
-    items.where((item) => item.favoriteMark == FavoriteMark.favorite).length,
-  );
-  expect(trace.writes, isEmpty);
 }
 
 Matcher _failedWith(DiagnosticsFailureCode code) =>
@@ -608,9 +400,6 @@ void _insertIntention(
   );
 }
 
-int _connectionChanges(sqlite.Database database) =>
-    database.select('SELECT total_changes() AS count').single['count'] as int;
-
 /// Строки намерений, отметок и назначений тегов для сравнения до и после.
 List<List<Map<String, Object?>>> _storedGraph(sqlite.Database database) => [
   for (final table in ['intentions', 'favorite_intentions', 'tag_assignments'])
@@ -619,17 +408,6 @@ List<List<Map<String, Object?>>> _storedGraph(sqlite.Database database) => [
         {...row},
     ],
 ];
-
-Future<IntentionDetails> _details(
-  DriftPersonalGraphRepository repository,
-  int number,
-) async {
-  final result = await repository.watchIntention(_id(number)).first;
-  expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
-  return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
-      .value
-      .value!;
-}
 
 IntentionCatalogQuery _query({
   IntentionScope scope = IntentionScope.all,

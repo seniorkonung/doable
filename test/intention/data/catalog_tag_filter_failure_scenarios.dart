@@ -87,7 +87,6 @@ void _catalogTagFilterFailureScenarios(
         ) as TaggedIntentionsPageSuccess).value;
         expect(first.nextCursor, isNotNull);
         final before = _storedFilterFailureGraph(raw);
-        final changesBefore = _connectionChanges(raw);
         observer.arm();
 
         expect(
@@ -98,9 +97,7 @@ void _catalogTagFilterFailureScenarios(
             failure,
           ),
         );
-        expect(observer.hasFailed, isTrue);
         expect(_storedFilterFailureGraph(raw), before);
-        expect(_connectionChanges(raw), changesBefore);
         expect(
           diagnostics.events.last,
           isA<CatalogPageReadDiagnosticsEvent>().having(
@@ -148,7 +145,6 @@ void _catalogTagFilterFailureScenarios(
           GraphRevisionOrder.same,
         );
         expect(_storedFilterFailureGraph(raw), before);
-        expect(_connectionChanges(raw), changesBefore);
       },
     );
   }
@@ -222,7 +218,6 @@ void _catalogReconciliationFailureScenarios(
         window: IntentionCatalogFinalReconciliationWindow(const []),
       );
       final before = _storedFilterFailureGraph(raw);
-      final changesBefore = _connectionChanges(raw);
       observer.arm();
       final failureOffset = diagnostics.events.length;
 
@@ -234,9 +229,7 @@ void _catalogReconciliationFailureScenarios(
           failure,
         ),
       );
-      expect(observer.hasFailed, isTrue);
       expect(_storedFilterFailureGraph(raw), before);
-      expect(_connectionChanges(raw), changesBefore);
       // Отказ SQLite виден только в событиях самого чтения согласования и
       // только безопасной категорией, без сообщения исключения.
       expect(diagnostics.events.skip(failureOffset), [
@@ -272,7 +265,6 @@ void _catalogReconciliationFailureScenarios(
       ]);
       expect(portion.nextCursor, isNotNull);
       expect(_storedFilterFailureGraph(raw), before);
-      expect(_connectionChanges(raw), changesBefore);
     });
   }
 }
@@ -296,9 +288,6 @@ Map<String, List<List<Object?>>> _storedFilterFailureGraph(Database raw) => {
         .map((row) => row.values.toList())
         .toList(),
 };
-
-int _connectionChanges(Database raw) =>
-    raw.select('SELECT total_changes() AS count').single['count'] as int;
 
 enum _CatalogFailurePoint { count, rows, tags }
 

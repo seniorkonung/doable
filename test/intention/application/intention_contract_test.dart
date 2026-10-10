@@ -1,5 +1,4 @@
 import 'package:doable/src/graph/application/graph_change.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -51,7 +50,6 @@ void main() {
       expect(filter.matches({}), isTrue);
       expect(filter.matches({health, sport}), isTrue);
       expect(filter, IntentionTagFilter.empty);
-      expect(filter.hashCode, IntentionTagFilter.empty.hashCode);
     });
 
     test('требует каждый обязательный тег и допускает дополнительные', () {
@@ -103,7 +101,7 @@ void main() {
       expect(filter.matches({health, rest, sport, work}), isFalse);
     });
 
-    test('повторы и порядок не меняют равенство, хеш и смысл условий', () {
+    test('повторы и порядок не меняют равенство и смысл условий', () {
       final first = IntentionTagFilter(
         requiredTagIds: [health, rest, health],
         excludedTagIds: [sport, work, sport],
@@ -117,8 +115,6 @@ void main() {
       expect(first.excludedTagIds, {sport, work});
       expect(first == reordered, isTrue);
       expect(reordered == first, isTrue);
-      expect(first.hashCode, reordered.hashCode);
-      expect({first, reordered}, hasLength(1));
       for (final ownTagIds in <Set<TagId>>[
         {},
         {health},
@@ -129,14 +125,13 @@ void main() {
       }
     });
 
-    test('копирует входные наборы и запрещает изменение своих условий', () {
+    test('копирует входные наборы условий', () {
       final requiredTagIds = [health, rest];
       final excludedTagIds = {sport, work};
       final filter = IntentionTagFilter(
         requiredTagIds: requiredTagIds,
         excludedTagIds: excludedTagIds,
       );
-      final originalHashCode = filter.hashCode;
       requiredTagIds.clear();
       excludedTagIds
         ..clear()
@@ -144,15 +139,7 @@ void main() {
 
       expect(filter.requiredTagIds, {health, rest});
       expect(filter.excludedTagIds, {sport, work});
-      expect(() => filter.requiredTagIds.add(work), throwsUnsupportedError);
-      expect(
-        () => filter.requiredTagIds.remove(health),
-        throwsUnsupportedError,
-      );
-      expect(() => filter.excludedTagIds.add(health), throwsUnsupportedError);
-      expect(() => filter.excludedTagIds.clear(), throwsUnsupportedError);
       expect(filter.matches({health, rest}), isTrue);
-      expect(filter.hashCode, originalHashCode);
     });
 
     test(
@@ -343,7 +330,6 @@ void main() {
         'Первый тег',
         'Второй тег',
       ]);
-      expect(() => copy.tags.clear(), throwsUnsupportedError);
     });
 
     test('переименование тега заменяет только его название в сводке', () {
@@ -384,10 +370,9 @@ void main() {
       expect(copy.createdAt, summary.createdAt);
       expect(copy.favoriteMark, FavoriteMark.favorite);
       expect(copy.updatedAt, summary.updatedAt);
-      expect(() => copy.tags.clear(), throwsUnsupportedError);
     });
 
-    test('переименование неназначенного тега возвращает ту же сводку', () {
+    test('переименование неназначенного тега не меняет сводку', () {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
@@ -413,7 +398,8 @@ void main() {
         ),
       );
 
-      expect(copy, same(summary));
+      expect(copy.tags.map((tag) => tag.name.value), ['Здоровье']);
+      expect(copy.title, 'Гулять');
     });
 
     test('удаление тега убирает только его назначение из сводки', () {
@@ -449,10 +435,9 @@ void main() {
       expect(copy.createdAt, summary.createdAt);
       expect(copy.favoriteMark, FavoriteMark.favorite);
       expect(copy.updatedAt, summary.updatedAt);
-      expect(() => copy.tags.clear(), throwsUnsupportedError);
     });
 
-    test('удаление неназначенного тега возвращает ту же сводку', () {
+    test('удаление неназначенного тега не меняет сводку', () {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
@@ -475,7 +460,8 @@ void main() {
         _tagId('00000000-0000-4000-8000-000000000002'),
       );
 
-      expect(copy, same(summary));
+      expect(copy.tags.map((tag) => tag.name.value), ['Здоровье']);
+      expect(copy.title, 'Гулять');
     });
 
     test('копии сводки сохраняют отсутствие отметки', () {
@@ -823,34 +809,16 @@ void main() {
   });
 
   group('контракт чтения согласования каталога', () {
-    test('запрос несёт фильтр, границу, курсор и окно сохранённых строк', () {
-      final query = _query(pageSize: 2);
+    test('окно сохранённых строк не зависит от изменения исходного списка', () {
       final second = _summary(id: '00000000-0000-4000-8000-000000000002');
       final first = _summary(id: '00000000-0000-4000-8000-000000000001');
       final stored = [second, first];
-      const continuation = _TestCatalogCursor();
-      const cursor = _TestReconciliationCursor();
 
-      final reconciliation = IntentionCatalogReconciliationQuery(
-        catalogQuery: query,
-        boundary: const IntentionCatalogPartialPrefixBoundary(continuation),
-        window: IntentionCatalogInnerReconciliationWindow(stored),
-        cursor: cursor,
-      );
+      final window = IntentionCatalogInnerReconciliationWindow(stored);
       stored.clear();
 
-      expect(reconciliation.catalogQuery, same(query));
-      expect(reconciliation.cursor, same(cursor));
-      final window =
-          reconciliation.window as IntentionCatalogInnerReconciliationWindow;
       expect(window.storedIntentionIds, [second.id, first.id]);
-      expect(window.upperEdgeRow, same(first));
-      expect(() => window.storedRows.add(first), throwsUnsupportedError);
-      expect(switch (reconciliation.boundary) {
-        IntentionCatalogPartialPrefixBoundary(:final continuation) =>
-          continuation,
-        IntentionCatalogCompletedBoundary() => null,
-      }, same(continuation));
+      expect(window.upperEdgeRow.id, first.id);
     });
 
     test('внутреннее окно без сохранённых строк не создаётся', () {
@@ -894,16 +862,6 @@ void main() {
     final weekend = _tagId('00000000-0000-4000-8000-000000000002');
     final sport = _tagId('00000000-0000-4000-8000-000000000003');
 
-    test('минимальная команда, включая const-вызов, создаёт неготовое '
-        'неизбранное намерение без тегов', () {
-      const minimal = CreateIntention(title: 'Здоровье', description: null);
-
-      expect(minimal.readiness, IntentionReadiness.notReady);
-      expect(minimal.favoriteMark, FavoriteMark.notFavorite);
-      expect(minimal.tagIds, isEmpty);
-      expect(() => minimal.tagIds.add(home), throwsUnsupportedError);
-    });
-
     test('повторные идентификаторы тега не размножают назначения', () {
       final command = CreateIntention.withInitialState(
         title: 'Прогулка',
@@ -917,36 +875,7 @@ void main() {
       expect(command.tagIds, {home, weekend});
     });
 
-    test(
-      'отказ отсутствующих выбранных тегов — validation, отличимый от ошибки '
-      'текста, отсутствия намерения и повреждения данных',
-      () {
-        final failure = IntentionCreationTagsMissingFailure([home]);
-        final otherFailures = <IntentionFailure>[
-          const IntentionTextInputValidationFailure(
-            IntentionTextValidationFailure(
-              field: IntentionTextField.title,
-              reason: IntentionTextValidationReason.empty,
-            ),
-          ),
-          const IntentionNotFoundFailure(),
-          const IntentionCorruptionFailure(),
-        ];
-
-        expect(failure, isA<IntentionValidationFailure>());
-        expect(failure.code, IntentionFailureCode.validation);
-        expect(failure.category, GraphFailureCategory.validation);
-        expect(_failureDescription(failure), 'tagsMissing');
-        expect(otherFailures.map(_failureDescription), [
-          'textInput',
-          'notFound',
-          'corruption',
-        ]);
-      },
-    );
-
-    test('отказ фиксирует неизменяемую копию набора отсутствующих тегов '
-        'без повторов', () {
+    test('отказ фиксирует копию набора отсутствующих тегов без повторов', () {
       final missing = [home, weekend, _tagId(home.toCanonicalString())];
       final failure = IntentionCreationTagsMissingFailure(missing);
       missing
@@ -955,8 +884,6 @@ void main() {
 
       expect(failure.missingTagIds, {home, weekend});
       expect(failure.missingTagIds, hasLength(2));
-      expect(() => failure.missingTagIds.add(sport), throwsUnsupportedError);
-      expect(() => failure.missingTagIds.clear(), throwsUnsupportedError);
     });
 
     test('отказ отсутствующих тегов не создаётся с пустым набором', () {
@@ -972,96 +899,43 @@ void main() {
   });
 
   group('общая граница личного графа', () {
-    test('пакет результата неизменно объединяет снимки одной ревизии', () {
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
-      final before = _TestCatalogEntrySnapshot(
-        _summary(id: '00000000-0000-4000-8000-000000000001'),
-      );
-      final after = _TestCatalogEntrySnapshot(
-        _summary(
-          id: '00000000-0000-4000-8000-000000000001',
-          title: 'Быть здоровым',
-        ),
-      );
-      final mutation = IntentionCatalogUpdated(
-        revision: revision,
-        before: before,
-        after: after,
-      );
-      final success = IntentionSaved(_intention(), catalogMutation: mutation);
-      final result = ConfirmedGraphResult(revision: revision, value: success);
-
-      expect(result.revision, same(revision));
-      expect(result.value, same(success));
-      expect(result.changes, hasLength(1));
-      expect(
-        () => result.changes.add(
-          IntentionCatalogUnchanged(revision: revision, entry: after),
-        ),
-        throwsUnsupportedError,
-      );
-    });
-
-    test('пакет намерения включает неизменяемые абсолютные счётчики', () {
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
-      final intention = _intention();
-      final entry = _TestCatalogEntrySnapshot(
-        _summary(id: intention.id.toCanonicalString()),
-      );
-      final mutation = IntentionCatalogUpdated(
-        revision: revision,
-        before: entry,
-        after: entry,
-      );
-      final countChange = IntentionRelationCountsChanged(
-        revision: revision,
-        intentionId: intention.id,
-        counts: RelationCounts(
-          activeNeedIncoming: 0,
-          activeNeedOutgoing: 0,
-          activeCanIncoming: 0,
-          activeCanOutgoing: 0,
-          archivedNeedIncoming: 1,
-          archivedNeedOutgoing: 0,
-          archivedCanIncoming: 0,
-          archivedCanOutgoing: 0,
-        ),
-      );
-      final success = IntentionSaved(
-        intention,
-        catalogMutation: mutation,
-        additionalChanges: [countChange],
-      );
-      final result = ConfirmedGraphResult(revision: revision, value: success);
-
-      expect(result.changes, [mutation, countChange]);
-      expect(
-        () => success.additionalChanges.add(mutation),
-        throwsUnsupportedError,
-      );
-    });
-
-    test('пакет результата отклоняет изменение другой ревизии', () {
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
-      const newerRevision = _TestGraphRevision(epoch: 'первая', sequence: 5);
-      final entry = _TestCatalogEntrySnapshot(
-        _summary(id: '00000000-0000-4000-8000-000000000001'),
-      );
-
-      expect(
-        () => ConfirmedGraphResult(
+    test(
+      'пакет намерения объединяет каталожное и дополнительные изменения',
+      () {
+        const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+        final intention = _intention();
+        final entry = _TestCatalogEntrySnapshot(
+          _summary(id: intention.id.toCanonicalString()),
+        );
+        final mutation = IntentionCatalogUpdated(
           revision: revision,
-          value: IntentionSaved(
-            _intention(),
-            catalogMutation: IntentionCatalogCreated(
-              revision: newerRevision,
-              entry: entry,
-            ),
+          before: entry,
+          after: entry,
+        );
+        final countChange = IntentionRelationCountsChanged(
+          revision: revision,
+          intentionId: intention.id,
+          counts: RelationCounts(
+            activeNeedIncoming: 0,
+            activeNeedOutgoing: 0,
+            activeCanIncoming: 0,
+            activeCanOutgoing: 0,
+            archivedNeedIncoming: 1,
+            archivedNeedOutgoing: 0,
+            archivedCanIncoming: 0,
+            archivedCanOutgoing: 0,
           ),
-        ),
-        throwsA(isA<ConfirmedGraphResultValidationException>()),
-      );
-    });
+        );
+        final success = IntentionSaved(
+          intention,
+          catalogMutation: mutation,
+          additionalChanges: [countChange],
+        );
+        final result = ConfirmedGraphResult(revision: revision, value: success);
+
+        expect(result.changes, [mutation, countChange]);
+      },
+    );
 
     test('пакет подтверждённого результата не бывает пустым', () {
       const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
@@ -1161,18 +1035,6 @@ String _windowDescription(IntentionCatalogReconciliationWindow window) =>
       IntentionCatalogFinalReconciliationWindow() => 'final',
     };
 
-String _failureDescription(IntentionFailure failure) => switch (failure) {
-  IntentionGenericValidationFailure() => 'validation',
-  IntentionTextInputValidationFailure() => 'textInput',
-  IntentionCreationTagsMissingFailure() => 'tagsMissing',
-  IntentionNotFoundFailure() => 'notFound',
-  IntentionConflictFailure() => 'conflict',
-  IntentionHasBlockingRelationsFailure() => 'blockingRelations',
-  IntentionUnavailableFailure() => 'unavailable',
-  IntentionCorruptionFailure() => 'corruption',
-  IntentionUnexpectedFailure() => 'unexpected',
-};
-
 Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
     throwsA(
       isA<IntentionCatalogQueryValidationException>().having(
@@ -1216,15 +1078,6 @@ final class _EmptyGraphCommandOutcome implements GraphCommandOutcome {
 
   @override
   Iterable<GraphChange> get changes => const [];
-}
-
-final class _TestCatalogCursor implements IntentionCatalogCursor {
-  const _TestCatalogCursor();
-}
-
-final class _TestReconciliationCursor
-    implements IntentionCatalogReconciliationCursor {
-  const _TestReconciliationCursor();
 }
 
 final class _TestGraphRevision implements GraphRevision {

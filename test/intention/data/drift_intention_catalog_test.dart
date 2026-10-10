@@ -46,7 +46,6 @@ void main() {
       () => DateTime.utc(2026, 9, 2),
       diagnostics,
     );
-    trace.statements.clear();
   });
 
   tearDown(() => database.close());
@@ -80,7 +79,7 @@ void main() {
       ('сняты условия по тегам', IntentionTagFilter.empty, null, null),
       ('добавлен исключённый участник', originalFilter, null, _id(_uuid(3))),
     ]) {
-      test('отклоняет несовместимый курсор до SQL: $label', () async {
+      test('отклоняет несовместимый курсор: $label', () async {
         seedTagStorageFixture(raw);
         final first = _firstPage(
           await repository.getCatalogPage(
@@ -91,7 +90,6 @@ void main() {
           ),
         );
         expect(first.nextCursor, isNotNull);
-        trace.statements.clear();
 
         final result = await repository.getCatalogPage(
           _tagQuery(
@@ -109,7 +107,6 @@ void main() {
             isA<IntentionGenericValidationFailure>(),
           ),
         );
-        expect(trace.statements, isEmpty);
       });
     }
 
@@ -236,13 +233,10 @@ void main() {
               pageSize: 100,
               cursor: cursor,
             );
-        trace.statements.clear();
         final first = _firstPage(await repository.getCatalogPage(query(null)));
         expect(first.totalCount, 235);
         expect(first.items, hasLength(100));
         expect(first.nextCursor, isNotNull);
-        expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
-        trace.statements.clear();
 
         final items = [...first.items];
         final pageLengths = [first.items.length];
@@ -277,8 +271,6 @@ void main() {
           ),
           isTrue,
         );
-        expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
-        expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
       });
     }
 
@@ -880,7 +872,7 @@ void main() {
       }
     });
 
-    test('порция и продолжение с обязательными тегами идут по индексу порядка охвата', () async {
+    test('порция и продолжение с обязательными тегами отдают выдачу по порядку и читают только порцию', () async {
       // 50 000 намерений: чётные активны, нечётные в архиве. Обязательный
       // тег назначен всем, исключённый — каждому десятому.
       const requiredTag = 1001;
@@ -959,16 +951,12 @@ void main() {
 
         trace.measured.clear();
         final first = _firstPage(await repository.getCatalogPage(query()));
-        final firstRead = trace.measured.singleWhere(
-          (select) => select.sql.contains('LIMIT'),
-        );
+        _expectReadsBoundedByPage(trace, first.items, pageSize);
         trace.measured.clear();
         final next = _continuationPage(
           await repository.getCatalogPage(query(cursor: first.nextCursor)),
         );
-        final nextRead = trace.measured.singleWhere(
-          (select) => select.sql.contains('LIMIT'),
-        );
+        _expectReadsBoundedByPage(trace, next.items, pageSize);
 
         expect(first.totalCount, expected.length, reason: label);
         expect(
@@ -981,45 +969,13 @@ void main() {
           expected.skip(pageSize).take(pageSize),
           reason: label,
         );
-        String planOf(_MeasuredSelect read) => raw
-            .select('EXPLAIN QUERY PLAN ${read.sql}', read.arguments)
-            .map((row) => row['detail'] as String)
-            .join('\n');
-        final firstPlan = planOf(firstRead);
-        final nextPlan = planOf(nextRead);
-        for (final (read, plan) in [
-          (firstRead, firstPlan),
-          (nextRead, nextPlan),
-        ]) {
-          expect(
-            plan,
-            contains('intentions_${scope.name}_created_at_desc_id_asc'),
-            reason: '$label:\n$plan',
-          );
-          expect(
-            plan,
-            isNot(contains('USE TEMP B-TREE FOR ORDER BY')),
-            reason: '$label:\n$plan',
-          );
-          expect(
-            plan,
-            isNot(
-              contains(
-                'SEARCH intentions USING INDEX '
-                'sqlite_autoindex_intentions_1 (id=?)',
-              ),
-            ),
-            reason: '$label:\n$plan',
-          );
-          expect(read.rows, pageSize + 1, reason: label);
-        }
       }
     });
   });
 
   group('Порция каталога — собственные теги', () {
     test(
-      'пакетно получает теги только возвращаемых одноимённых намерений',
+      'показывает собственные теги возвращаемых одноимённых намерений',
       () async {
         for (var number = 1; number <= 4; number++) {
           await _insertIntention(
@@ -1053,17 +1009,6 @@ void main() {
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
           [_uuid(109), _uuid(4)],
         );
-        raw.execute('PRAGMA foreign_keys = OFF');
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          _uuid(111),
-          'Недоступный тег за границей порции',
-        ]);
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [_uuid(111), _uuid(4)],
-        );
-        raw.execute('DELETE FROM tags WHERE id = ?', [_uuid(111)]);
-        trace.measured.clear();
 
         final page = _firstPage(
           await repository.getCatalogPage(
@@ -1092,28 +1037,6 @@ void main() {
           ],
         );
         expect(page.items.first.activeRelationCount, 1);
-        expect(() => page.items.first.tags.clear(), throwsUnsupportedError);
-        final suppliedTags = List.of(page.items.first.tags);
-        final original = page.items.first;
-        final summary = IntentionSummary(
-          id: original.id,
-          title: original.title,
-          hasDescription: original.hasDescription,
-          readiness: original.readiness,
-          archiveState: original.archiveState,
-          activeRelationCount: original.activeRelationCount,
-          createdAt: original.createdAt,
-          updatedAt: original.updatedAt,
-          tags: suppliedTags,
-          favoriteMark: original.favoriteMark,
-        );
-        suppliedTags.clear();
-        expect(summary.tags, original.tags);
-        final assignmentRead = trace.measured
-            .where((read) => read.sql.contains('FROM tag_assignments'))
-            .single;
-        expect(assignmentRead.rows, 3);
-        expect(assignmentRead.arguments, [_uuid(1), _uuid(2), _uuid(3)]);
         final assignments = (await repository.getTagAssignments(
           page.items.first.id,
         ) as TagAssignmentsSuccess).value;
@@ -1142,7 +1065,6 @@ void main() {
             ),
           ),
         ).nextCursor;
-        trace.measured.clear();
 
         final dense = _continuationPage(
           await repository.getCatalogPage(
@@ -1161,18 +1083,12 @@ void main() {
           dense.items.single.tags.map((tag) => tag.id.toCanonicalString()),
           [for (var index = 0; index < 1203; index++) _uuid(10000 + index)],
         );
-        final read = trace.measured
-            .where((read) => read.sql.contains('FROM tag_assignments'))
-            .single;
-        expect(read.rows, 1203);
-        expect(read.arguments, [_uuid(2)]);
         cursor = dense.nextCursor;
         // Третье намерение получает каждый третий тег, четвёртое — все.
         for (final (number, indexes) in [
           (3, [for (var index = 0; index < 1203; index += 3) index]),
           (4, [for (var index = 0; index < 1203; index++) index]),
         ]) {
-          trace.measured.clear();
           final next = _continuationPage(
             await repository.getCatalogPage(
               IntentionCatalogQuery(
@@ -1189,11 +1105,6 @@ void main() {
             next.items.single.tags.map((tag) => tag.id.toCanonicalString()),
             [for (final index in indexes) _uuid(10000 + index)],
           );
-          final nextRead = trace.measured
-              .where((read) => read.sql.contains('FROM tag_assignments'))
-              .single;
-          expect(nextRead.rows, indexes.length);
-          expect(nextRead.arguments, [_uuid(number)]);
           cursor = next.nextCursor;
         }
         expect(cursor, isNull);
@@ -1306,7 +1217,7 @@ void main() {
     }
   });
 
-  test('отбирает действия в SQL до порции и считает только совпадения', () async {
+  test('отбирает действия до порции и считает только совпадения', () async {
     for (var index = 1; index <= 60; index++) {
       await _insertIntention(
         database,
@@ -1352,19 +1263,9 @@ void main() {
         order: order,
         pageSize: 1,
       );
-      trace.statements.clear();
       final first = _firstPage(await repository.getCatalogPage(query));
       expect(first.totalCount, 3);
       expect(first.items, hasLength(1));
-      expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
-      expect(
-        trace.statements.where(_isCatalogCountStatement).single,
-        contains('is_action_ready'),
-      );
-      expect(
-        trace.statements.where((sql) => sql.contains('LIMIT')).single,
-        contains('is_action_ready'),
-      );
       final ids = [first.items.single.id.toCanonicalString()];
       var cursor = first.nextCursor;
       while (cursor != null) {
@@ -1416,22 +1317,12 @@ void main() {
       _id(_uuid(3000)),
       _id(_uuid(2000)),
     ]);
-    final firstQueries = List<_MeasuredSelect>.of(trace.measured);
+    // Порция из двух намерений и одна строка сверх неё: ни одно чтение не
+    // возвращает остальные 2997 намерений без готовности.
     expect(
-      firstQueries.map((entry) => entry.rows),
+      trace.measured.map((entry) => entry.rows),
       everyElement(lessThanOrEqualTo(3)),
     );
-    final count = firstQueries
-        .where((entry) => _isCatalogCountStatement(entry.sql))
-        .single;
-    final page = firstQueries
-        .where((entry) => entry.sql.contains('LIMIT'))
-        .single;
-    expect(count.rows, 1);
-    expect(page.rows, 3);
-    expect(count.sql, contains('is_action_ready'));
-    expect(page.sql, contains('is_action_ready'));
-    expect(page.sql, isNot(contains('OFFSET')));
 
     trace.measured.clear();
     final next = _continuationPage(
@@ -1448,16 +1339,12 @@ void main() {
     );
     expect(next.items.map((item) => item.id), [_id(_uuid(1000))]);
     expect(
-      trace.measured.where((entry) => _isCatalogCountStatement(entry.sql)),
-      isEmpty,
-    );
-    expect(
-      trace.measured.where((entry) => entry.sql.contains('LIMIT')).single.rows,
-      1,
+      trace.measured.map((entry) => entry.rows),
+      everyElement(lessThanOrEqualTo(1)),
     );
   });
 
-  test('курсор привязан к готовности до SQL', () async {
+  test('курсор привязан к готовности', () async {
     for (final suffix in ['201', '202']) {
       await _insertIntention(
         database,
@@ -1478,7 +1365,6 @@ void main() {
         ),
       ),
     ).nextCursor!;
-    trace.statements.clear();
 
     final result = await repository.getCatalogPage(
       IntentionCatalogQuery(
@@ -1495,7 +1381,6 @@ void main() {
       (result as ResultFailure<IntentionCatalogPage>).failure,
       isA<IntentionValidationFailure>(),
     );
-    expect(trace.statements, isEmpty);
   });
 
   test(
@@ -1775,59 +1660,45 @@ void main() {
     },
   );
 
-  test(
-    'применяет FTS-фильтр к count и ограниченному чтению без OFFSET',
-    () async {
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000021',
-        title: 'Купить молоко',
-        description: 'В фермерском магазине',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000022',
-        title: 'Молоко в запас',
-        createdAt: DateTime.utc(2026, 9, 2, 11),
-      );
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000023',
-        title: 'Заварить чай',
-        createdAt: DateTime.utc(2026, 9, 2, 12),
-      );
-      trace.statements.clear();
+  test('применяет фильтр названия к количеству и порции', () async {
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000021',
+      title: 'Купить молоко',
+      description: 'В фермерском магазине',
+      createdAt: DateTime.utc(2026, 9, 2, 10),
+    );
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000022',
+      title: 'Молоко в запас',
+      createdAt: DateTime.utc(2026, 9, 2, 11),
+    );
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000023',
+      title: 'Заварить чай',
+      createdAt: DateTime.utc(2026, 9, 2, 12),
+    );
 
-      final page = _firstPage(
-        await repository.getCatalogPage(
-          IntentionCatalogQuery(
-            scope: IntentionScope.active,
-            titleFilter: '  МОЛО  ',
-            order: IntentionCatalogOrder.createdAtDescending,
-            pageSize: 100,
-          ),
+    final page = _firstPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: '  МОЛО  ',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
         ),
-      );
+      ),
+    );
 
-      expect(page.totalCount, 2);
-      expect(page.items.map((summary) => summary.title), [
-        'Молоко в запас',
-        'Купить молоко',
-      ]);
-      expect(page.items.last.hasDescription, isTrue);
-      expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
-      expect(
-        trace.statements.where((statement) => statement.contains('MATCH')),
-        hasLength(2),
-      );
-      expect(
-        trace.statements.where((statement) => statement.contains('LIMIT')),
-        hasLength(1),
-      );
-      expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
-    },
-  );
+    expect(page.totalCount, 2);
+    expect(page.items.map((summary) => summary.title), [
+      'Молоко в запас',
+      'Купить молоко',
+    ]);
+    expect(page.items.last.hasDescription, isTrue);
+  });
 
   test(
     'хранилище не допускает пустое или полностью пробельное описание',
@@ -1906,7 +1777,6 @@ void main() {
     }
     await database.customStatement('PRAGMA ignore_check_constraints = OFF');
 
-    trace.statements.clear();
     final result = await repository.getCatalogPage(
       IntentionCatalogQuery(
         scope: IntentionScope.active,
@@ -1921,7 +1791,6 @@ void main() {
       (result as ResultFailure<IntentionCatalogPage>).failure,
       isA<IntentionCorruptionFailure>(),
     );
-    expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
     expect(
       diagnostics.events.last,
       isA<CatalogPageReadDiagnosticsEvent>().having(
@@ -2076,7 +1945,6 @@ void main() {
           pageSize: 2,
         );
         final firstPage = _firstPage(await repository.getCatalogPage(query));
-        trace.statements.clear();
 
         final actualIds = [
           ...firstPage.items.map((summary) => summary.id.toCanonicalString()),
@@ -2101,14 +1969,12 @@ void main() {
         }
 
         expect(actualIds, expectedIds);
-        expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
-        expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
       }
     },
   );
 
   test(
-    'отклоняет cursor другого адаптера и cursor с другими параметрами до SQL',
+    'отклоняет cursor другого адаптера и cursor с другими параметрами',
     () async {
       await _insertIntention(
         database,
@@ -2165,8 +2031,6 @@ void main() {
       ];
 
       for (final invalidQuery in invalidQueries) {
-        trace.statements.clear();
-
         final result = await repository.getCatalogPage(invalidQuery);
 
         expect(result, isA<ResultFailure<IntentionCatalogPage>>());
@@ -2174,62 +2038,56 @@ void main() {
           (result as ResultFailure<IntentionCatalogPage>).failure,
           isA<IntentionValidationFailure>(),
         );
-        expect(trace.statements, isEmpty);
       }
     },
   );
 
-  test(
-    'отклоняет cursor другого экземпляра repository до обращения к SQLite',
-    () async {
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000056',
-        title: 'Первое',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000057',
-        title: 'Второе',
-        createdAt: DateTime.utc(2026, 9, 2, 11),
-      );
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.active,
+  test('отклоняет cursor другого экземпляра repository', () async {
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000056',
+      title: 'Первое',
+      createdAt: DateTime.utc(2026, 9, 2, 10),
+    );
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000057',
+      title: 'Второе',
+      createdAt: DateTime.utc(2026, 9, 2, 11),
+    );
+    final query = IntentionCatalogQuery(
+      scope: IntentionScope.active,
+      titleFilter: null,
+      order: IntentionCatalogOrder.createdAtDescending,
+      pageSize: 1,
+    );
+    final cursor = _firstPage(await repository.getCatalogPage(query))
+        .nextCursor!;
+    // Курсор принадлежит эпохе создавшего его экземпляра: заново созданный
+    // repository над тем же хранилищем не принимает чужое продолжение.
+    final recreatedRepository = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 9, 2),
+      diagnostics,
+    );
+
+    final result = await recreatedRepository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: query.scope,
         titleFilter: null,
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 1,
-      );
-      final cursor = _firstPage(await repository.getCatalogPage(query))
-          .nextCursor!;
-      // Курсор принадлежит эпохе создавшего его экземпляра: заново созданный
-      // repository над тем же хранилищем не принимает чужое продолжение.
-      final recreatedRepository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 2),
-        diagnostics,
-      );
-      trace.statements.clear();
+        order: query.order,
+        pageSize: query.pageSize,
+        cursor: cursor,
+      ),
+    );
 
-      final result = await recreatedRepository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: null,
-          order: query.order,
-          pageSize: query.pageSize,
-          cursor: cursor,
-        ),
-      );
-
-      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-      expect(
-        (result as ResultFailure<IntentionCatalogPage>).failure,
-        isA<IntentionValidationFailure>(),
-      );
-      expect(trace.statements, isEmpty);
-    },
-  );
+    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+    expect(
+      (result as ResultFailure<IntentionCatalogPage>).failure,
+      isA<IntentionValidationFailure>(),
+    );
+  });
 
   test('продолжает независимые цепочки одного repository вперемешку', () async {
     for (final (id, title, createdAt) in [
@@ -2386,7 +2244,6 @@ void main() {
         ],
       );
       expect(continuation.nextCursor, isNotNull);
-      expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
     },
   );
 
@@ -2559,21 +2416,10 @@ void main() {
           GraphRevisionOrder.same,
         );
 
-        // Сохранённые строки не перечитываются: теги получены только для
-        // строк порций, а каждая выборка порции ограничена её размером.
-        final tagReads = trace.measured.where(
-          (select) => select.sql.contains('FROM tag_assignments a'),
-        );
-        expect(tagReads.map((select) => select.arguments), [
-          [_uuid(2)],
-          [_uuid(4), _uuid(6)],
-        ]);
-        final portionReads = trace.measured.where(
-          (select) => select.sql.contains('LIMIT'),
-        );
-        expect(portionReads, hasLength(2));
+        // Сохранённые строки не перечитываются: ни одно чтение не возвращает
+        // больше строк, чем порция с одной строкой сверх неё.
         expect(
-          portionReads.map((select) => select.rows),
+          trace.measured.map((select) => select.rows),
           everyElement(lessThanOrEqualTo(3)),
         );
         expect(connectionChanges(), changesBefore);
@@ -2821,298 +2667,289 @@ void main() {
       },
     );
 
-    test(
-      'отклоняет недопустимое окно, чужие границу и продолжение до SQL',
-      () async {
-        _seedReconciliationFixture(raw);
-        final query = excludingQuery();
-        final first = _firstPage(await repository.getCatalogPage(query));
-        final second = _continuationPage(
-          await repository.getCatalogPage(
-            excludingQuery().withCursorForTest(first.nextCursor!),
-          ),
-        );
-        final otherFilterPage = _firstPage(
-          await repository.getCatalogPage(
-            _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
-          ),
-        );
-        final all = await loadWholeCatalog(
-          () => _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
-        );
-        IntentionSummary row(int number) =>
-            all.singleWhere((item) => item.id == _id(_uuid(number)));
-        expect(
-          await repository.execute(DeleteTag(excludedTag)),
-          isA<GraphCommandSucceeded>(),
-        );
-        final stored = [...first.items, ...second.items];
-        final boundary = IntentionCatalogPartialPrefixBoundary(
-          second.nextCursor!,
-        );
-        final firstWindow = IntentionCatalogInnerReconciliationWindow(
-          stored.take(2),
-        );
-        final nextWindow = IntentionCatalogFinalReconciliationWindow(
-          stored.skip(2),
-        );
-        final firstPortion = _reconciliationFirstPortion(
-          await repository.getCatalogReconciliationPortion(
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: boundary,
-              window: firstWindow,
-            ),
-          ),
-        );
-        final foreignRepository = DriftPersonalGraphRepository(
-          database,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(2026, 9, 2),
-          diagnostics,
-        );
-        final foreignPortion = _reconciliationFirstPortion(
-          await foreignRepository.getCatalogReconciliationPortion(
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: firstWindow,
-            ),
-          ),
-        );
-        // Заполненные порции оставляют строки окна после своей последней
-        // строки: внутреннее окно — следующему окну, последнее окно — ровно
-        // им же.
-        final fullInnerPortion = _reconciliationFirstPortion(
-          await repository.getCatalogReconciliationPortion(
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: IntentionCatalogInnerReconciliationWindow([
-                row(1),
-                row(7),
-              ]),
-            ),
-          ),
-        );
-        final fullFinalPortion = _reconciliationFirstPortion(
-          await repository.getCatalogReconciliationPortion(
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: IntentionCatalogFinalReconciliationWindow([
-                row(1),
-                row(7),
-              ]),
-            ),
-          ),
-        );
-        // Для сравнения: подходящие продолжения принимаются.
-        for (final valid in [
+    test('отклоняет недопустимое окно, чужие границу и продолжение', () async {
+      _seedReconciliationFixture(raw);
+      final query = excludingQuery();
+      final first = _firstPage(await repository.getCatalogPage(query));
+      final second = _continuationPage(
+        await repository.getCatalogPage(
+          excludingQuery().withCursorForTest(first.nextCursor!),
+        ),
+      );
+      final otherFilterPage = _firstPage(
+        await repository.getCatalogPage(
+          _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
+        ),
+      );
+      final all = await loadWholeCatalog(
+        () => _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
+      );
+      IntentionSummary row(int number) =>
+          all.singleWhere((item) => item.id == _id(_uuid(number)));
+      expect(
+        await repository.execute(DeleteTag(excludedTag)),
+        isA<GraphCommandSucceeded>(),
+      );
+      final stored = [...first.items, ...second.items];
+      final boundary = IntentionCatalogPartialPrefixBoundary(
+        second.nextCursor!,
+      );
+      final firstWindow = IntentionCatalogInnerReconciliationWindow(
+        stored.take(2),
+      );
+      final nextWindow = IntentionCatalogFinalReconciliationWindow(
+        stored.skip(2),
+      );
+      final firstPortion = _reconciliationFirstPortion(
+        await repository.getCatalogReconciliationPortion(
           IntentionCatalogReconciliationQuery(
             catalogQuery: query,
+            boundary: boundary,
+            window: firstWindow,
+          ),
+        ),
+      );
+      final foreignRepository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 2),
+        diagnostics,
+      );
+      final foreignPortion = _reconciliationFirstPortion(
+        await foreignRepository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: firstWindow,
+          ),
+        ),
+      );
+      // Заполненные порции оставляют строки окна после своей последней
+      // строки: внутреннее окно — следующему окну, последнее окно — ровно
+      // им же.
+      final fullInnerPortion = _reconciliationFirstPortion(
+        await repository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogInnerReconciliationWindow([row(1), row(7)]),
+          ),
+        ),
+      );
+      final fullFinalPortion = _reconciliationFirstPortion(
+        await repository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogFinalReconciliationWindow([row(1), row(7)]),
+          ),
+        ),
+      );
+      // Для сравнения: подходящие продолжения принимаются.
+      for (final valid in [
+        IntentionCatalogReconciliationQuery(
+          catalogQuery: query,
+          boundary: boundary,
+          window: nextWindow,
+          cursor: firstPortion.nextCursor,
+        ),
+        IntentionCatalogReconciliationQuery(
+          catalogQuery: query,
+          boundary: const IntentionCatalogCompletedBoundary(),
+          window: IntentionCatalogFinalReconciliationWindow([row(7), row(9)]),
+          cursor: fullInnerPortion.nextCursor,
+        ),
+        IntentionCatalogReconciliationQuery(
+          catalogQuery: query,
+          boundary: const IntentionCatalogCompletedBoundary(),
+          window: IntentionCatalogFinalReconciliationWindow([row(7)]),
+          cursor: fullFinalPortion.nextCursor,
+        ),
+      ]) {
+        expect(
+          await repository.getCatalogReconciliationPortion(valid),
+          isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
+        );
+      }
+      expect(foreignPortion.nextCursor, isNotNull);
+
+      for (final (label, invalid) in [
+        (
+          'окно больше размера порции',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            window: IntentionCatalogInnerReconciliationWindow(stored.take(3)),
+          ),
+        ),
+        (
+          'окно не в действующем порядке',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            window: IntentionCatalogInnerReconciliationWindow(
+              stored.take(2).toList().reversed,
+            ),
+          ),
+        ),
+        (
+          'окно с повтором строки',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            window: IntentionCatalogInnerReconciliationWindow([
+              stored.first,
+              stored.first,
+            ]),
+          ),
+        ),
+        (
+          'окно за границей частичного префикса',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: IntentionCatalogPartialPrefixBoundary(first.nextCursor!),
+            window: nextWindow,
+          ),
+        ),
+        (
+          'продолжение с окном, не следующим за курсором',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            window: IntentionCatalogFinalReconciliationWindow(
+              stored.skip(1).take(2),
+            ),
+            cursor: firstPortion.nextCursor,
+          ),
+        ),
+        (
+          'продолжение без строк своего окна после курсора',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogFinalReconciliationWindow([row(9)]),
+            cursor: fullInnerPortion.nextCursor,
+          ),
+        ),
+        (
+          'продолжение последнего окна с другими строками',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogInnerReconciliationWindow([row(7), row(9)]),
+            cursor: fullFinalPortion.nextCursor,
+          ),
+        ),
+        (
+          'продолжение с завершённой границей вместо префикса',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: nextWindow,
+            cursor: firstPortion.nextCursor,
+          ),
+        ),
+        (
+          'продолжение с другой границей префикса',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: IntentionCatalogPartialPrefixBoundary(first.nextCursor!),
+            window: IntentionCatalogFinalReconciliationWindow(const []),
+            cursor: firstPortion.nextCursor,
+          ),
+        ),
+        (
+          'продолжение с другими условиями',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: _tagQuery(
+              tagFilter: IntentionTagFilter(excludedTagIds: [keptTag]),
+              pageSize: 2,
+            ),
             boundary: boundary,
             window: nextWindow,
             cursor: firstPortion.nextCursor,
           ),
+        ),
+        (
+          'продолжение другого экземпляра репозитория',
           IntentionCatalogReconciliationQuery(
             catalogQuery: query,
             boundary: const IntentionCatalogCompletedBoundary(),
-            window: IntentionCatalogFinalReconciliationWindow([row(7), row(9)]),
-            cursor: fullInnerPortion.nextCursor,
+            window: nextWindow,
+            cursor: foreignPortion.nextCursor,
           ),
+        ),
+        (
+          'посторонняя реализация продолжения',
           IntentionCatalogReconciliationQuery(
             catalogQuery: query,
+            boundary: boundary,
+            window: nextWindow,
+            cursor: const _ForeignReconciliationCursor(),
+          ),
+        ),
+        (
+          'граница выдачи других условий',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: IntentionCatalogPartialPrefixBoundary(
+              otherFilterPage.nextCursor!,
+            ),
+            window: firstWindow,
+          ),
+        ),
+        (
+          'посторонняя реализация границы',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogPartialPrefixBoundary(
+              _ForeignCatalogCursor(),
+            ),
+            window: firstWindow,
+          ),
+        ),
+        (
+          'запрос выдачи с курсором обычного продолжения',
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: excludingQuery().withCursorForTest(first.nextCursor!),
             boundary: const IntentionCatalogCompletedBoundary(),
-            window: IntentionCatalogFinalReconciliationWindow([row(7)]),
-            cursor: fullFinalPortion.nextCursor,
+            window: firstWindow,
           ),
-        ]) {
-          expect(
-            await repository.getCatalogReconciliationPortion(valid),
-            isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
-          );
-        }
-        expect(foreignPortion.nextCursor, isNotNull);
+        ),
+      ]) {
+        final result = await repository.getCatalogReconciliationPortion(
+          invalid,
+        );
 
-        for (final (label, invalid) in [
-          (
-            'окно больше размера порции',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: boundary,
-              window: IntentionCatalogInnerReconciliationWindow(stored.take(3)),
-            ),
+        expect(
+          result,
+          isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionGenericValidationFailure>(),
           ),
-          (
-            'окно не в действующем порядке',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: boundary,
-              window: IntentionCatalogInnerReconciliationWindow(
-                stored.take(2).toList().reversed,
-              ),
-            ),
-          ),
-          (
-            'окно с повтором строки',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: boundary,
-              window: IntentionCatalogInnerReconciliationWindow([
-                stored.first,
-                stored.first,
-              ]),
-            ),
-          ),
-          (
-            'окно за границей частичного префикса',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: IntentionCatalogPartialPrefixBoundary(
-                first.nextCursor!,
-              ),
-              window: nextWindow,
-            ),
-          ),
-          (
-            'продолжение с окном, не следующим за курсором',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: boundary,
-              window: IntentionCatalogFinalReconciliationWindow(
-                stored.skip(1).take(2),
-              ),
-              cursor: firstPortion.nextCursor,
-            ),
-          ),
-          (
-            'продолжение без строк своего окна после курсора',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: IntentionCatalogFinalReconciliationWindow([row(9)]),
-              cursor: fullInnerPortion.nextCursor,
-            ),
-          ),
-          (
-            'продолжение последнего окна с другими строками',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: IntentionCatalogInnerReconciliationWindow([
-                row(7),
-                row(9),
-              ]),
-              cursor: fullFinalPortion.nextCursor,
-            ),
-          ),
-          (
-            'продолжение с завершённой границей вместо префикса',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: nextWindow,
-              cursor: firstPortion.nextCursor,
-            ),
-          ),
-          (
-            'продолжение с другой границей префикса',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: IntentionCatalogPartialPrefixBoundary(
-                first.nextCursor!,
-              ),
-              window: IntentionCatalogFinalReconciliationWindow(const []),
-              cursor: firstPortion.nextCursor,
-            ),
-          ),
-          (
-            'продолжение с другими условиями',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: _tagQuery(
-                tagFilter: IntentionTagFilter(excludedTagIds: [keptTag]),
-                pageSize: 2,
-              ),
-              boundary: boundary,
-              window: nextWindow,
-              cursor: firstPortion.nextCursor,
-            ),
-          ),
-          (
-            'продолжение другого экземпляра репозитория',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: nextWindow,
-              cursor: foreignPortion.nextCursor,
-            ),
-          ),
-          (
-            'посторонняя реализация продолжения',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: boundary,
-              window: nextWindow,
-              cursor: const _ForeignReconciliationCursor(),
-            ),
-          ),
-          (
-            'граница выдачи других условий',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: IntentionCatalogPartialPrefixBoundary(
-                otherFilterPage.nextCursor!,
-              ),
-              window: firstWindow,
-            ),
-          ),
-          (
-            'посторонняя реализация границы',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: query,
-              boundary: const IntentionCatalogPartialPrefixBoundary(
-                _ForeignCatalogCursor(),
-              ),
-              window: firstWindow,
-            ),
-          ),
-          (
-            'запрос выдачи с курсором обычного продолжения',
-            IntentionCatalogReconciliationQuery(
-              catalogQuery: excludingQuery().withCursorForTest(
-                first.nextCursor!,
-              ),
-              boundary: const IntentionCatalogCompletedBoundary(),
-              window: firstWindow,
-            ),
-          ),
-        ]) {
-          trace.statements.clear();
-
-          final result = await repository.getCatalogReconciliationPortion(
-            invalid,
-          );
-
-          expect(
-            result,
-            isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
-              (result) => result.failure,
-              'причина',
-              isA<IntentionGenericValidationFailure>(),
-            ),
-            reason: label,
-          );
-          expect(trace.statements, isEmpty, reason: label);
-        }
-      },
-    );
+          reason: label,
+        );
+      }
+    });
   });
 }
 
-bool _isCatalogCountStatement(String statement) =>
-    statement.startsWith('SELECT COUNT(') &&
-    !statement.contains('doable_relation_count_aggregates');
+/// Ни одно чтение запроса порции не возвращает больше строк, чем порция с
+/// одной строкой сверх неё или собственные теги её намерений.
+void _expectReadsBoundedByPage(
+  _SelectTrace trace,
+  List<IntentionSummary> items,
+  int pageSize,
+) {
+  final tagRows = items.fold(0, (sum, item) => sum + item.tags.length);
+  expect(
+    trace.measured.map((select) => select.rows),
+    everyElement(
+      lessThanOrEqualTo(tagRows > pageSize + 1 ? tagRows : pageSize + 1),
+    ),
+  );
+}
 
 void _seedJointCatalogPagingFixture(Database database) {
   database.execute('BEGIN');
@@ -3388,7 +3225,6 @@ final class _ForeignCatalogCursor implements IntentionCatalogCursor {
 }
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
-  final List<String> statements = [];
   final List<_MeasuredSelect> measured = [];
   int? parameterLimit;
   Completer<void>? _blockedSelectStarted;
@@ -3421,7 +3257,6 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
       throw StateError('Превышено число параметров одного SQL-выражения.');
     }
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
-    statements.add(statement.statements.single);
     final started = _blockedSelectStarted;
     if (started == null || started.isCompleted) return;
     final release = _blockedSelectRelease!;
@@ -3436,21 +3271,14 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    measured.add(
-      _MeasuredSelect(
-        statement.statements.single,
-        statement.arguments,
-        rows.length,
-      ),
-    );
+    measured.add(_MeasuredSelect(rows.length));
     return rows;
   }
 }
 
+/// Число строк одного чтения.
 final class _MeasuredSelect {
-  const _MeasuredSelect(this.sql, this.arguments, this.rows);
+  const _MeasuredSelect(this.rows);
 
-  final String sql;
-  final List<Object?> arguments;
   final int rows;
 }

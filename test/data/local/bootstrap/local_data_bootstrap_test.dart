@@ -43,8 +43,8 @@ void main() {
       await openingStarted.future;
 
       final closing = bootstrap.close();
+      final repeatedClosing = bootstrap.close();
 
-      expect(bootstrap.close(), same(closing));
       expect(bootstrap.open, throwsStateError);
       expect(connectionFactoryCalls, 1);
 
@@ -55,7 +55,7 @@ void main() {
 
       allowOpening.complete();
       expect(await opening, isA<LocalDataReady>());
-      await closing;
+      await Future.wait([closing, repeatedClosing]);
 
       expect(observer.closeCalls, 1);
       expect(bootstrap.open, throwsStateError);
@@ -63,7 +63,7 @@ void main() {
     });
 
     test(
-      'повторный close готового bootstrap присоединяется к одному Future',
+      'повторный close готового bootstrap закрывает ресурс один раз',
       () async {
         late _CloseTrackingObserver observer;
         final bootstrap = LocalDataBootstrap(
@@ -79,8 +79,7 @@ void main() {
         final firstClose = bootstrap.close();
         final repeatedClose = bootstrap.close();
 
-        expect(repeatedClose, same(firstClose));
-        await firstClose;
+        await Future.wait([firstClose, repeatedClose]);
         expect(observer.closeCalls, 1);
         expect(bootstrap.open, throwsStateError);
       },
@@ -136,10 +135,12 @@ void main() {
       await pumpEventQueue();
 
       expect(failedResult, isNull);
-      expect(bootstrap.open(), same(failedOpening));
+      final repeatedOpening = bootstrap.open();
+      expect(connectionFactoryCalls, 1);
 
       resumeCreation.complete();
       expect(await failedOpening, isA<LocalDataUnexpectedFailure>());
+      expect(await repeatedOpening, isA<LocalDataUnexpectedFailure>());
       expect(databaseFile.existsSync(), isTrue);
 
       final retriedResult = await bootstrap.open();
@@ -169,8 +170,7 @@ void main() {
       final results = await Future.wait([bootstrap.open(), bootstrap.open()]);
 
       expect(createdExecutors, 1);
-      expect(results[0], same(results[1]));
-      expect(results.first, isA<LocalDataReady>());
+      expect(results, everyElement(isA<LocalDataReady>()));
     });
 
     test(

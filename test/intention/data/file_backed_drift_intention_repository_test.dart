@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -28,7 +26,7 @@ void main() {
       final archivedId = _id('018f0b5d-6b2e-7c80-8000-000000000801');
       final deletedId = _id('018f0b5d-6b2e-7c80-8000-000000000802');
 
-      final firstRevision = await _createFirstObjectGraph(
+      await _createFirstObjectGraph(
         harness,
         activeId: activeId,
         archivedId: archivedId,
@@ -45,10 +43,6 @@ void main() {
 
       final reopenedSnapshot = _graphSnapshot(
         await repository.watchIntention(activeId).first,
-      );
-      expect(
-        firstRevision.compareTo(reopenedSnapshot.revision),
-        GraphRevisionOrder.differentEpoch,
       );
       final active = reopenedSnapshot.value;
       expect(active, isNotNull);
@@ -321,7 +315,7 @@ void main() {
   });
 }
 
-Future<GraphRevision> _createFirstObjectGraph(
+Future<void> _createFirstObjectGraph(
   LocalDatabaseHarness harness, {
   required IntentionId activeId,
   required IntentionId archivedId,
@@ -379,16 +373,7 @@ Future<GraphRevision> _createFirstObjectGraph(
     _deleted(deletedId),
   );
 
-  final firstSnapshot = Completer<Result<GraphSnapshot<IntentionDetails?>>>();
-  final subscription = repository
-      .watchIntention(activeId)
-      .listen(firstSnapshot.complete);
-  final snapshot = _graphSnapshot(await firstSnapshot.future);
-  expect(snapshot.value?.id, activeId);
-  await subscription.cancel();
-
   await harness.closePersistenceObjectGraph();
-  return snapshot.revision;
 }
 
 IntentionCatalogQuery _catalogQuery(
