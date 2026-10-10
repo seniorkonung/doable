@@ -97,16 +97,11 @@ artifacts:
 
       3. Paste under `## MODIFIED Requirements` and edit to reflect new behavior
 
-      4. Apply the criteria you use to admit a new scenario to every copied
-      scenario, and delete the scenarios that fail them. Name each deleted scenario in the proposal's What Changes, so that the
-      tasks also delete tests that exist only for it.
-
-      5. Ensure header text matches exactly (whitespace-insensitive)
+      4. Ensure header text matches exactly (whitespace-insensitive)
 
 
       Common pitfall: Using MODIFIED with partial content loses detail at
-      archive time. Deleting a scenario in step 4 is deliberate and is not this
-      pitfall.
+      archive time.
 
       If adding new concerns without changing existing behavior, use ADDED
       instead.
