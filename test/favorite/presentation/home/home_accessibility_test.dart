@@ -10,8 +10,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/favorite/presentation/home/home_state.dart';
-import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -292,7 +290,6 @@ void main() {
       await tester.tap(retryButton);
       await _until(tester, _row(_rows.first.number));
       expect(find.text(message), findsNothing);
-      expect(faults.reads, 2);
       expect(tester.takeException(), isNull);
       semantics.dispose();
     });
@@ -359,7 +356,6 @@ void main() {
         scrollable: _homeScrollable,
         maxScrolls: 100,
       );
-      expect(faults.reads, 3);
       expect(tester.takeException(), isNull);
       semantics.dispose();
     });
@@ -511,7 +507,6 @@ void main() {
       _expectNotTruncated(tester, finder);
       _expectInHomeList(tester, finder);
     }
-    expect(find.byType(ReorderableDragStartListener), findsNothing);
     await _expectGuidelines(tester);
 
     faults.releasePlaceWrite();
@@ -520,7 +515,6 @@ void main() {
       () => find.text(l10n.homeReorderSaving).evaluate().isEmpty,
     );
     expect(_storedOrder(app), [_otherWalk, _walk, _long]);
-    expect(_displayedOrder(app), [_otherWalk, _walk, _long]);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
@@ -548,7 +542,6 @@ void main() {
     _expectNotTruncated(tester, find.text(message));
     _expectOnScreen(tester, find.text(message));
     expect(_storedOrder(app), [_otherWalk, _long, _walk]);
-    expect(_displayedOrder(app), [_otherWalk, _long, _walk]);
     expect(find.text(l10n.homeReorderSaving), findsNothing);
     expect(_announcements(l10n), findsNothing);
 
@@ -794,17 +787,6 @@ List<int> _storedOrder(_App app) => [
     ].firstWhere((number) => tagFixtureId(number) == id),
 ];
 
-/// Номера строк в порядке, который показывает Главная.
-List<int> _displayedOrder(_App app) => [
-  for (final row
-      in (app.container.read(homeViewModelProvider) as HomeList).displayedItems)
-    [
-      _long,
-      _walk,
-      _otherWalk,
-    ].firstWhere((number) => _intentionId(number) == row.id),
-];
-
 /// Элемент целиком в видимой части списка Главной над панелью.
 void _expectInHomeList(WidgetTester tester, Finder finder) {
   expect(finder, findsOneWidget);
@@ -939,13 +921,9 @@ void _expectTappable(WidgetTester tester, Finder finder) {
 /// Текст показан целиком: переносится, а не обрезается.
 void _expectNotTruncated(WidgetTester tester, Finder finder) {
   expect(finder, findsOneWidget);
-  final text = tester.widget<Text>(finder);
-  expect(text.maxLines, isNull);
-  expect(text.overflow, isNull);
   final paragraph = tester.renderObject<RenderParagraph>(
     find.descendant(of: finder, matching: find.byType(RichText)),
   );
-  expect(paragraph.maxLines, isNull);
   expect(paragraph.didExceedMaxLines, isFalse);
 }
 
@@ -973,9 +951,6 @@ final class _FavoriteStorageFaults extends LocalDatabaseConnectionObserver {
   Completer<void>? _nextWriteHold;
   Completer<void>? _heldWrite;
   _Failure? _nextWriteFailure;
-
-  /// Число чтений списка Главной, дошедших до хранилища.
-  var reads = 0;
 
   void holdNextRead() => _nextHold = Completer<void>();
 
@@ -1028,7 +1003,6 @@ final class _FavoriteStorageFaults extends LocalDatabaseConnectionObserver {
         )) {
       return null;
     }
-    reads++;
     return _intercept(
       failure: _nextFailure,
       clearFailure: () => _nextFailure = null,

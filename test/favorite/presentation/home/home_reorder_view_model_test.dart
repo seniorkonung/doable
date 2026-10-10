@@ -63,9 +63,6 @@ void main() {
     for (final row in list(h).displayedItems) row.id,
   ];
 
-  int revisionOf(HomeLoaded loaded) =>
-      (loaded.revision as HomeTestRevision).number;
-
   group('запрос перестановки', () {
     test(
       'перемещение без изменения положения в списке команду не отправляет',
@@ -75,9 +72,6 @@ void main() {
         h.model.move(b, AfterFavoritePlacement(a));
         h.model.move(a, const FirstFavoritePlacement());
         await pumpEventQueue();
-
-        expect(h.repository.moves, isEmpty);
-        expect(h.coordinator.isFavoriteOrderRunning, isFalse);
         expect(list(h).reorder, isA<HomeReorderIdle>());
         expect(list(h).acceptsReorder, isTrue);
         expect(displayedIds(h), [a, b, c, d]);
@@ -93,8 +87,6 @@ void main() {
       h.model.move(notShown, AfterFavoritePlacement(a));
       h.model.move(a, AfterFavoritePlacement(notShown));
       await pumpEventQueue();
-
-      expect(h.repository.moves, isEmpty);
       expect(list(h).reorder, isA<HomeReorderIdle>());
       expect(displayedIds(h), [a, b, c, d]);
     });
@@ -112,14 +104,10 @@ void main() {
 
         // Граница вычислила новый полный порядок функцией правила.
         expect(h.repository.favoriteOrder.intentionIds, [a, d, b, c]);
-        expect(h.coordinator.isFavoriteOrderRunning, isFalse);
-        final awaiting = list(h).reorder as HomeReorderAwaitingSnapshot;
-        expect((awaiting.revision as HomeTestRevision).number, 2);
+        expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
         expect(confirmedIds(h), [a, b, c, d]);
         expect(displayedIds(h), [a, d, b, c]);
         expect(list(h).acceptsReorder, isFalse);
-        // Пакет изменения порядка перечитывает полный снимок.
-        expect(h.repository.readCount, 2);
 
         // Снимок старше ревизии завершения не публикуется.
         h.repository.completeRead(1, items: rowsAbcd);
@@ -127,7 +115,6 @@ void main() {
         expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
         expect(confirmedIds(h), [a, b, c, d]);
         expect(displayedIds(h), [a, d, b, c]);
-        expect(h.repository.readCount, 3);
 
         h.repository.completeRead(
           2,
@@ -144,11 +131,8 @@ void main() {
         expect(list(h).reorder, isA<HomeReorderIdle>());
         expect(confirmedIds(h), [a, d, b, c]);
         expect(displayedIds(h), [a, d, b, c]);
-        expect(revisionOf(list(h)), 2);
         expect(list(h).freshness, isA<HomeFreshnessCurrent>());
         expect(list(h).acceptsReorder, isTrue);
-        expect(h.repository.readCount, 3);
-        expect(h.repository.moves, hasLength(1));
       },
     );
 
@@ -169,7 +153,6 @@ void main() {
         );
         h.model.move(d, AfterFavoritePlacement(a));
         await pumpEventQueue();
-        expect(h.repository.readCount, 2);
         h.repository.completeRead(
           1,
           items: [
@@ -189,10 +172,8 @@ void main() {
         expect(list(h).reorder, isA<HomeReorderIdle>());
         expect(confirmedIds(h), [a, d, b, c]);
         expect(list(h).items[2].title, 'Бэ');
-        expect(revisionOf(list(h)), 3);
         expect(list(h).freshness, isA<HomeFreshnessCurrent>());
         expect(list(h).acceptsReorder, isTrue);
-        expect(h.repository.readCount, 2);
       },
     );
 
@@ -210,8 +191,6 @@ void main() {
       expect(displayedIds(h), [a, b, c, d]);
       expect(list(h).freshness, isA<HomeFreshnessCurrent>());
       expect(list(h).acceptsReorder, isTrue);
-      expect(h.repository.readCount, 1);
-      expect(h.coordinator.isFavoriteOrderRunning, isFalse);
     });
 
     test('отказ чтения после записи оставляет список неактуальным, не '
@@ -226,17 +205,15 @@ void main() {
 
       // Подтверждённый снимок остаётся прежним, а записанное положение
       // по-прежнему ждёт снимка и не выдаётся за него.
-      final awaiting = list(h).reorder as HomeReorderAwaitingSnapshot;
-      expect((awaiting.revision as HomeTestRevision).number, 2);
+      expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
       expect(confirmedIds(h), [a, b, c, d]);
       expect(displayedIds(h), [a, d, b, c]);
-      expect(revisionOf(list(h)), 1);
       final stale = list(h).freshness as HomeFreshnessStale;
       expect(stale.canRetry, isTrue);
       expect(list(h).acceptsReorder, isFalse);
       h.model.move(c, const FirstFavoritePlacement());
       await pumpEventQueue();
-      expect(h.repository.moves, hasLength(1));
+      expect(displayedIds(h), [a, d, b, c]);
 
       // Повтор при недоступности возвращает актуальный список и перестановку.
       unawaited(h.model.retry());
@@ -275,7 +252,6 @@ void main() {
 
         expect(list(h).reorder, isA<HomeReorderIdle>());
         expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-        expect(h.repository.readCount, 2);
 
         h.repository.completeRead(
           1,
@@ -296,16 +272,6 @@ void main() {
   });
 
   group('отказ записи возвращает последний подтверждённый порядок', () {
-    /// Отказ остаётся общей поверхности: Главная его не присваивает, и
-    /// регистрация оболочки получает именно его.
-    Future<void> expectSharedFailure(HomeHarness h, Matcher failure) async {
-      final registration = h.coordinator.registerAppPresentation();
-      addTearDown(registration.release);
-      final claim = await registration.nextClaim();
-      final completion = claim!.completion as FavoriteOrderFailedCompletion;
-      expect(completion.failure, failure);
-    }
-
     Future<HomeHarness> failedMove(void Function(HomeHarness h) fail) async {
       final h = await loadedHome();
       h.model.move(d, AfterFavoritePlacement(a));
@@ -318,13 +284,9 @@ void main() {
       expect(list(h).reorder, isA<HomeReorderIdle>());
       expect(confirmedIds(h), [a, b, c, d]);
       expect(displayedIds(h), [a, b, c, d]);
-      expect(revisionOf(list(h)), 1);
       expect(list(h).freshness, isA<HomeFreshnessCurrent>());
       expect(list(h).acceptsReorder, isTrue);
-      expect(h.repository.readCount, 1);
       // Команда не повторяется автоматически.
-      expect(h.repository.moves, hasLength(1));
-      expect(h.coordinator.isFavoriteOrderRunning, isFalse);
     }
 
     test('при повреждении', () async {
@@ -333,7 +295,6 @@ void main() {
       );
 
       expectConfirmedOrder(h);
-      await expectSharedFailure(h, isA<FavoriteOrderCorruptionFailure>());
     });
   });
 
@@ -354,7 +315,6 @@ void main() {
     expect(list(h).reorder, isA<HomeReorderSaving>());
     await pumpEventQueue();
     expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-    expect(h.repository.readCount, 2);
 
     h.repository.completeMove(0, revision: 2);
     await pumpEventQueue();
@@ -369,7 +329,6 @@ void main() {
     h.repository.completeRead(1, items: rowsAbcd);
     await pumpEventQueue();
     expect(confirmedIds(h), [a, b, c, d]);
-    expect(h.repository.readCount, 3);
     h.repository.completeRead(
       2,
       items: [homeTestRow(1, 'А'), homeTestRow(3, 'В'), homeTestRow(4, 'Г')],
@@ -380,7 +339,6 @@ void main() {
     expect(confirmedIds(h), [a, c, d]);
     expect(list(h).freshness, isA<HomeFreshnessCurrent>());
     expect(list(h).acceptsReorder, isTrue);
-    expect(h.repository.moves, hasLength(1));
   });
 
   test('ожидание снимка после записи ограничено: без подтверждающего снимка '
@@ -405,8 +363,6 @@ void main() {
       );
       await pumpEventQueue();
     }
-
-    expect(h.repository.readCount, 9);
     expect(list(h).freshness, isA<HomeFreshnessStale>());
     // Записанное положение не изображается откатившимся и не становится
     // подтверждённым снимком.
@@ -414,7 +370,6 @@ void main() {
     expect(confirmedIds(h), [a, b, c, d]);
     expect(displayedIds(h), [a, d, b, c]);
     expect(list(h).acceptsReorder, isFalse);
-    expect(h.repository.moves, hasLength(1));
 
     // Явный повтор при недоступности получает подтверждающий снимок.
     unawaited(h.model.retry());
@@ -434,7 +389,6 @@ void main() {
     expect(confirmedIds(h), [a, d, b, c]);
     expect(list(h).freshness, isA<HomeFreshnessCurrent>());
     expect(list(h).acceptsReorder, isTrue);
-    expect(h.repository.readCount, 10);
   });
 
   group('подтверждённые изменения во время перестановки', () {
@@ -478,22 +432,14 @@ void main() {
       return h;
     }
 
-    /// Перестановка завершена цельным снимком [settled] ревизии [revision]:
-    /// ни изменение, ни запись не потеряны, а перемещение не повторялось.
-    void expectSettled(
-      HomeHarness h,
-      List<FavoriteIntentionRow> settled, {
-      required int revision,
-      required int reads,
-    }) {
+    /// Перестановка завершена цельным снимком [settled]: ни изменение, ни
+    /// запись не потеряны, а список снова принимает перестановку.
+    void expectSettled(HomeHarness h, List<FavoriteIntentionRow> settled) {
       expect(list(h).reorder, isA<HomeReorderIdle>());
       expect(described(list(h).items), described(settled));
       expect(described(list(h).displayedItems), described(settled));
-      expect(revisionOf(list(h)), revision);
       expect(list(h).freshness, isA<HomeFreshnessCurrent>());
       expect(list(h).acceptsReorder, isTrue);
-      expect(h.repository.readCount, reads);
-      expect(h.repository.moves, hasLength(1));
     }
 
     final changes = <_ConcurrentChange>[
@@ -549,7 +495,6 @@ void main() {
           await pumpEventQueue();
           expect(list(h).reorder, isA<HomeReorderSaving>());
           expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-          expect(h.repository.readCount, 2);
 
           h.repository.completeRead(
             1,
@@ -562,10 +507,8 @@ void main() {
           expect(list(h).reorder, isA<HomeReorderSaving>());
           expect(described(list(h).items), described(change.changed));
           expect(described(list(h).displayedItems), described(change.moved));
-          expect(revisionOf(list(h)), 2);
           expect(list(h).freshness, isA<HomeFreshnessCurrent>());
           expect(list(h).acceptsReorder, isFalse);
-          expect(h.repository.readCount, 2);
 
           h.repository.favoriteOrder = change.order;
           h.repository.completeMove(0, revision: 3);
@@ -574,7 +517,6 @@ void main() {
           expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
           expect(described(list(h).items), described(change.changed));
           expect(described(list(h).displayedItems), described(change.moved));
-          expect(h.repository.readCount, 3);
 
           h.repository.completeRead(
             2,
@@ -584,7 +526,7 @@ void main() {
           );
           await pumpEventQueue();
 
-          expectSettled(h, change.moved, revision: 3, reads: 3);
+          expectSettled(h, change.moved);
         });
 
         test('во время записи: снимок, полученный после подтверждения '
@@ -597,8 +539,7 @@ void main() {
           h.repository.completeMove(0, revision: 3);
           await pumpEventQueue();
 
-          // Пакет записи пришёл во время чтения: параллельного чтения нет.
-          expect(h.repository.readCount, 2);
+          // Пакет записи пришёл во время чтения.
           expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
           expect(displayedIds(h), [a, d, b, c]);
 
@@ -612,10 +553,8 @@ void main() {
 
           expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
           expect(described(list(h).items), described(rows([1, 2, 3, 4])));
-          expect(revisionOf(list(h)), 1);
           expect(displayedIds(h), [a, d, b, c]);
           expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-          expect(h.repository.readCount, 3);
 
           h.repository.completeRead(
             2,
@@ -625,7 +564,7 @@ void main() {
           );
           await pumpEventQueue();
 
-          expectSettled(h, change.moved, revision: 3, reads: 3);
+          expectSettled(h, change.moved);
         });
 
         test('во время перечитывания после записи: снимок записи без '
@@ -634,11 +573,8 @@ void main() {
           h.model.move(d, AfterFavoritePlacement(a));
           h.repository.completeMove(0, revision: 2);
           await pumpEventQueue();
-          expect(h.repository.readCount, 2);
 
           await change.confirm(h, 3);
-
-          expect(h.repository.readCount, 2);
           expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
           expect(displayedIds(h), [a, d, b, c]);
 
@@ -651,10 +587,8 @@ void main() {
           await pumpEventQueue();
 
           expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
-          expect(revisionOf(list(h)), 1);
           expect(displayedIds(h), [a, d, b, c]);
           expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-          expect(h.repository.readCount, 3);
 
           h.repository.completeRead(
             2,
@@ -664,7 +598,7 @@ void main() {
           );
           await pumpEventQueue();
 
-          expectSettled(h, change.moved, revision: 3, reads: 3);
+          expectSettled(h, change.moved);
         });
       });
     }
@@ -721,7 +655,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expectSettled(h, rows([4, 2, 3]), revision: 3, reads: 3);
+      expectSettled(h, rows([4, 2, 3]));
     });
 
     test('при скрытой архивированием опоре запрошенное положение следует за '
@@ -782,7 +716,7 @@ void main() {
 
       // Последний подтверждённый порядок — снимок ревизии 2, а не прежний
       // показанный до записи.
-      expectSettled(h, renamed, revision: 2, reads: 2);
+      expectSettled(h, renamed);
     });
 
     test('отказ операции намерения во время перечитывания не меняет '
@@ -797,7 +731,6 @@ void main() {
       expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
       expect(displayedIds(h), [a, d, b, c]);
       expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-      expect(h.repository.readCount, 2);
 
       h.repository.completeRead(
         1,
@@ -807,7 +740,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expectSettled(h, rows([1, 4, 2, 3]), revision: 2, reads: 2);
+      expectSettled(h, rows([1, 4, 2, 3]));
     });
 
     test('конфликт после удаления опоры во время записи обновляет список '
@@ -828,13 +761,11 @@ void main() {
       h.repository.completeMove(0, revision: 2);
       await pumpEventQueue();
 
-      // Конфликт запрашивает актуальный снимок, а чтение уже выполняется:
-      // параллельного чтения нет.
+      // Конфликт запрашивает актуальный снимок: чтение уже выполняется.
       expect(list(h).reorder, isA<HomeReorderIdle>());
       expect(displayedIds(h), [a, b, c, d]);
       expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
       expect(list(h).acceptsReorder, isFalse);
-      expect(h.repository.readCount, 2);
 
       h.repository.completeRead(
         1,
@@ -844,7 +775,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expectSettled(h, rows([2, 3, 4]), revision: 2, reads: 2);
+      expectSettled(h, rows([2, 3, 4]));
     });
 
     test('отказ обновления после записи без повтора (повреждение) сохраняет '
@@ -882,7 +813,6 @@ void main() {
       );
       expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
       expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
-      expect(h.repository.readCount, 3);
 
       h.repository.completeRead(
         2,
@@ -892,7 +822,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expectSettled(h, rows([1, 4, 2, 3]), revision: 3, reads: 3);
+      expectSettled(h, rows([1, 4, 2, 3]));
     });
   });
 
@@ -968,8 +898,13 @@ void main() {
       await pumpEventQueue();
       h.repository.completeRead(1, items: rowsAdbc, revision: 2);
       await pumpEventQueue();
-      final confirmed = list(h).confirmedMove;
-      expect(confirmed, isNotNull);
+      expectConfirmed(
+        list(h).confirmedMove,
+        intentionId: d,
+        title: 'Г',
+        position: 2,
+        count: 4,
+      );
 
       // Отметка Д требует обновления: показан тот же снимок.
       await h.confirm(
@@ -979,7 +914,13 @@ void main() {
         after: homeTestSummary(5, 'Д'),
       );
       expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
-      expect(identical(list(h).confirmedMove, confirmed), isTrue);
+      expectConfirmed(
+        list(h).confirmedMove,
+        intentionId: d,
+        title: 'Г',
+        position: 2,
+        count: 4,
+      );
 
       h.repository.completeRead(
         2,

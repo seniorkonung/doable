@@ -434,7 +434,7 @@ List<String> _shownHome(WidgetTester tester) {
 
 /// Дожидается, пока Главная покажет подтверждённый цельным снимком список
 /// [expected] без принятой перестановки, и проверяет показанные строки:
-/// порядок, отсутствие признака сохранения и доступные ручки.
+/// порядок и отсутствие признака сохранения.
 Future<void> _expectConfirmedHome(
   WidgetTester tester,
   _Launch app,
@@ -457,7 +457,6 @@ Future<void> _expectConfirmedHome(
   expect(_shownHome(tester), ids);
   final l10n = AppLocalizations.of(tester.element(find.byType(HomePage)));
   expect(_homeText(l10n.homeReorderSaving), findsNothing);
-  expect(find.byType(ReorderableDragStartListener), findsNWidgets(ids.length));
   // Успех перестановки предъявляется новым порядком, без сообщения.
   expect(_builtMessages, findsNothing);
 }

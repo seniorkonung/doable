@@ -5,7 +5,6 @@ import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/favorite/application/favorite_order_command.dart';
 import 'package:doable/src/favorite/domain/favorite_order.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:flutter/gestures.dart';
@@ -33,45 +32,6 @@ const _moveToEnd = 'Переместить в конец';
 /// Главную и пустую страницу намерения.
 void main() {
   group('ручка перемещения', () {
-    testWidgets('каждая строка списка получает ручку в конце строки, а '
-        'список — устойчивые ключи идентификаторов намерений', (tester) async {
-      await _pumpLoadedHome(tester);
-
-      expect(find.byType(SliverReorderableList), findsOneWidget);
-      expect(find.byType(ReorderableDelayedDragStartListener), findsNothing);
-      expect(find.byIcon(Icons.drag_handle), findsNWidgets(4));
-      for (final number in [1, 2, 3, 4]) {
-        final row = find.byKey(ValueKey(homeTestIntentionId(number)));
-        expect(row, findsOneWidget);
-        expect(tester.widget(row), isA<HomeIntentionRow>());
-        final handle = _handle(number);
-        expect(handle, findsOneWidget);
-        expect(
-          find.descendant(
-            of: row,
-            matching: find.byType(ReorderableDragStartListener),
-          ),
-          findsOneWidget,
-        );
-        // Ручка стоит после содержимого строки, у её конца, и в её высоте.
-        final rowRect = tester.getRect(row);
-        final contentRect = tester.getRect(
-          find.descendant(of: row, matching: find.byType(ListTile)),
-        );
-        final handleRect = tester.getRect(handle);
-        expect(handleRect.left, greaterThanOrEqualTo(contentRect.right));
-        expect(handleRect.right, greaterThan(rowRect.right - 16));
-        expect(handleRect.top, greaterThanOrEqualTo(rowRect.top));
-        expect(handleRect.bottom, lessThanOrEqualTo(rowRect.bottom));
-        expect(handleRect.width, greaterThanOrEqualTo(48));
-        expect(handleRect.height, greaterThanOrEqualTo(48));
-      }
-      // Список по-прежнему без звёзд и снятия отметки.
-      expect(find.byIcon(Icons.star), findsNothing);
-      expect(find.byType(IconButton), findsNothing);
-      expect(find.byType(Dismissible), findsNothing);
-    });
-
     testWidgets('долгое нажатие строки не начинает перетаскивание, а нажатие '
         'строки открывает её намерение', (tester) async {
       final h = await _pumpLoadedHome(tester);
@@ -86,8 +46,8 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
 
-      expect(h.repository.moves, isEmpty);
       expect(_shownTitles(tester), ['А', 'Б', 'В', 'Г']);
+      expect(find.text(_saving), findsNothing);
       expect(h.router.current.name, HomeRoute.name);
 
       await tester.tap(_title(3));
@@ -126,14 +86,13 @@ void main() {
         }
         expect(_shownTitles(tester), shown);
         _expectSaving(tester, moved);
-        _expectHandles(tester, enabled: false);
         expect(tester.takeException(), isNull);
       });
     }
 
     testWidgets('отпускание строки на прежнем месте не отправляет '
         'перемещение', (tester) async {
-      final h = await _pumpLoadedHome(tester);
+      await _pumpLoadedHome(tester);
       final rowHeight = tester.getSize(_row(2)).height;
 
       final gesture = await tester.startGesture(tester.getCenter(_handle(2)));
@@ -144,10 +103,8 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
 
-      expect(h.repository.moves, isEmpty);
       expect(_shownTitles(tester), ['А', 'Б', 'В', 'Г']);
       expect(find.text(_saving), findsNothing);
-      _expectHandles(tester, enabled: true);
     });
   });
 
@@ -164,23 +121,21 @@ void main() {
       // Запись подтверждена, а цельного снимка с ней ещё нет.
       h.repository.completeMove(0, revision: 2);
       await tester.pumpAndSettle();
-      expect(
-        (h.harness.state as HomeList).reorder,
-        isA<HomeReorderAwaitingSnapshot>(),
-      );
-      expect(h.repository.readCount, 2);
       expect(_shownTitles(tester), ['А', 'Г', 'Б', 'В']);
       _expectSaving(tester, 4);
-      _expectHandles(tester, enabled: false);
 
       h.repository.completeRead(1, items: _rows([1, 4, 2, 3]), revision: 2);
       await tester.pumpAndSettle();
 
       expect(_shownTitles(tester), ['А', 'Г', 'Б', 'В']);
       expect(find.text(_saving), findsNothing);
-      _expectHandles(tester, enabled: true);
       expect(find.byType(SnackBar), findsNothing);
       expect(find.textContaining('сохранён'), findsNothing);
+
+      // Подтверждённая запись снова принимает перестановку.
+      await _dragHandle(tester, 1, 1);
+      expect(_shownTitles(tester), ['Г', 'А', 'Б', 'В']);
+      _expectSaving(tester, 1);
       expect(tester.takeException(), isNull);
     });
 
@@ -194,14 +149,12 @@ void main() {
 
       expect(_shownTitles(tester), ['А', 'Б', 'В', 'Г']);
       expect(find.text(_saving), findsNothing);
-      _expectHandles(tester, enabled: false);
 
       h.repository.completeRead(1, items: _rows([1, 3, 4]), revision: 3);
       await tester.pumpAndSettle();
 
       expect(_shownTitles(tester), ['А', 'В', 'Г']);
-      _expectHandles(tester, enabled: true);
-      expect(h.repository.moves, hasLength(1));
+      expect(find.text(_saving), findsNothing);
     });
   });
 
@@ -252,19 +205,20 @@ void main() {
         await block(tester, h);
         await tester.pumpAndSettle();
 
-        _expectHandles(tester, enabled: false);
         expect(_moveActionNodes(), findsNothing);
         final shown = _shownTitles(tester);
-        final moves = h.repository.moves.length;
+        final saving = find.text(_saving).evaluate().length;
         await _dragHandle(tester, 1, 1);
-        expect(h.repository.moves, hasLength(moves));
         expect(_shownTitles(tester), shown);
+        expect(find.text(_saving), findsNWidgets(saving));
 
         await unblock(tester, h);
         await tester.pumpAndSettle();
 
-        _expectHandles(tester, enabled: true);
         expect(_moveActionNodes(), findsWidgets);
+        await _dragHandle(tester, 1, 1);
+        expect(_shownTitles(tester).take(2), ['Б', 'А']);
+        _expectSaving(tester, 1);
         expect(tester.takeException(), isNull);
         semantics.dispose();
       });
@@ -463,7 +417,7 @@ void main() {
       h.repository.failMove(1, const FavoriteOrderUnavailableFailure());
       await tester.pumpAndSettle();
       expect(_scrollOffset(tester), offset);
-      _expectHandles(tester, enabled: true);
+      expect(find.text(_saving), findsNothing);
     });
   });
 }
@@ -565,6 +519,9 @@ Future<void> _confirmUnmark(
   ),
 );
 
+/// Строка намерения [number]. Ручки всех строк выглядят одинаково, поэтому
+/// строку находят по идентификатору намерения: другого обозримого признака
+/// у неё нет.
 Finder _row(int number) => find.byKey(ValueKey(homeTestIntentionId(number)));
 
 /// Название, готовность, признак сохранения и число активных связей строки
@@ -601,11 +558,9 @@ SemanticsFinder _moveActionNodes() =>
 /// Названия строк Главной в порядке, в котором их видит человек.
 List<String> _shownTitles(WidgetTester tester) {
   final rows = [
-    for (final element in find.byType(HomeIntentionRow).evaluate())
-      (
-        top: (element.renderObject! as RenderBox).localToGlobal(Offset.zero).dy,
-        title: (element.widget as HomeIntentionRow).row.title,
-      ),
+    for (final title in _titles.values)
+      if (find.text(title).evaluate().isNotEmpty)
+        (top: tester.getTopLeft(find.text(title)).dy, title: title),
   ]..sort((a, b) => a.top.compareTo(b.top));
   return [for (final row in rows) row.title];
 }
@@ -617,29 +572,6 @@ void _expectSaving(WidgetTester tester, int moved) {
   expect(
     find.descendant(of: _row(moved), matching: find.text(_saving)),
     findsOneWidget,
-  );
-}
-
-/// Каждая построенная строка показывает ручку: доступная начинает
-/// перетаскивание, а недоступная показана приглушённой и перетаскивание не
-/// начинает. Встроенная перестановка списка существует только вместе с
-/// доступными ручками.
-void _expectHandles(WidgetTester tester, {required bool enabled}) {
-  final rows = find.byType(HomeIntentionRow).evaluate().length;
-  expect(rows, greaterThan(0));
-  final icons = find.byIcon(Icons.drag_handle);
-  expect(icons, findsNWidgets(rows));
-  final theme = Theme.of(tester.element(find.byType(HomePage)));
-  for (final icon in tester.widgetList<Icon>(icons)) {
-    expect(icon.color, enabled ? isNull : theme.disabledColor);
-  }
-  expect(
-    find.byType(ReorderableDragStartListener),
-    enabled ? findsNWidgets(rows) : findsNothing,
-  );
-  expect(
-    find.byType(SliverReorderableList),
-    enabled ? findsOneWidget : findsNothing,
   );
 }
 

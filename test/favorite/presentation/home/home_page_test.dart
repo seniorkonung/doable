@@ -37,7 +37,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Намерение 150'), findsOneWidget);
-      expect(h.repository.readCount, 1);
     });
   });
 

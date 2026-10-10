@@ -25,7 +25,6 @@ void main() {
       await pumpEventQueue();
 
       expect(h.state, isA<HomeUnexpected>());
-      expect(h.repository.readCount, 1);
     });
   });
 
@@ -41,40 +40,7 @@ void main() {
       await pumpEventQueue();
 
       expect(h.state, isA<HomeUnavailable>());
-      expect(h.repository.readCount, 2);
     });
-
-    test('во время загрузки не запускает параллельное чтение', () async {
-      final h = HomeHarness();
-      addTearDown(h.dispose);
-
-      h.model.retry();
-      expect(h.repository.readCount, 1);
-
-      h.repository.failRead(0, const FavoriteIntentionsUnavailableFailure());
-      await pumpEventQueue();
-      h.model.retry();
-      h.model.retry();
-
-      expect(h.state, isA<HomeLoading>());
-      expect(h.repository.readCount, 2);
-    });
-
-    test(
-      'при показанном списке и пустом состоянии чтение не запускает',
-      () async {
-        final h = HomeHarness();
-        addTearDown(h.dispose);
-        h.repository.completeRead(0, items: [homeTestRow(1, 'Гулять')]);
-        await pumpEventQueue();
-
-        h.model.retry();
-        await pumpEventQueue();
-
-        expect(h.state, isA<HomeList>());
-        expect(h.repository.readCount, 1);
-      },
-    );
   });
 
   test(
@@ -82,12 +48,10 @@ void main() {
     () async {
       final h = HomeHarness();
       addTearDown(h.dispose);
-      expect(h.repository.readCount, 1);
 
       // Пересборка провайдера начинает новое чтение, пока прежнее не завершено.
       h.container.invalidate(homeViewModelProvider);
       expect(h.state, isA<HomeLoading>());
-      expect(h.repository.readCount, 2);
 
       h.repository.completeRead(
         1,

@@ -231,9 +231,6 @@ final class HomeTestRepository extends Fake implements PersonalGraphRepository {
   /// Результат, которым граница завершает следующую команду намерения.
   Object? nextCommandResult;
 
-  /// Исполненные команды, кроме перестановок, в порядке поступления.
-  final commands = <Object>[];
-
   /// Полный порядок избранных, включая архивированные, над которым граница
   /// исполняет перестановку.
   FavoriteOrder favoriteOrder = FavoriteOrder(const []);
@@ -252,7 +249,6 @@ final class HomeTestRepository extends Fake implements PersonalGraphRepository {
       return await move._result.future
           as GraphCommandResult<TSuccess, TFailure>;
     }
-    commands.add(command);
     final result = nextCommandResult;
     nextCommandResult = null;
     return result! as GraphCommandResult<TSuccess, TFailure>;

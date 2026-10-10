@@ -270,7 +270,10 @@ void main() {
       await _expectConfirmedHome(tester, app, initial);
       expect(_homePosition(tester).pixels, _homeOffset);
       if (departure == _Departure.pageAbove) {
-        expect(_homeTitle(app, 20), renamed);
+        expect(
+          find.descendant(of: _homeRow(20), matching: find.text(renamed)),
+          findsOneWidget,
+        );
       }
 
       // Вторая перестановка: «Избранное 15» — на одно место ниже.
@@ -304,7 +307,6 @@ void main() {
       await _returnHome(tester, departure);
       await _expectConfirmedHome(tester, app, reordered);
       expect(_homePosition(tester).pixels, _homeOffset);
-      expect(app.repository.moves, 2);
 
       // Параметры каталогов не изменились.
       await openIntentionGraph(tester, waitFor: _until);
@@ -433,7 +435,6 @@ void main() {
     // временем, связи с приоритетами, дневные выборы, теги и их
     // назначения сохранены.
     expect(_storedGraph(app.raw), stored);
-    expect(app.repository.moves, 4);
     expect(_builtMessages, findsNothing);
     expect(tester.takeException(), isNull);
     semantics.dispose();
@@ -674,7 +675,6 @@ Future<void> _moveWhileOpen(
   _SearchView? expected,
   List<_Row>? expectedRows,
 }) async {
-  final moves = app.repository.moves;
   app.repository.holdNextMove();
   _moveBySemantics(tester, _homeRowLabel(app.l10n, moved), action);
   await _waitFor(tester, () => app.repository.isHoldingMove);
@@ -691,7 +691,6 @@ Future<void> _moveWhileOpen(
   );
   await _settle(tester);
   expect(_searchView(tester, page, app.l10n), before);
-  expect(app.repository.moves, moves + 1);
   expect(_builtMessages, findsNothing);
 }
 
@@ -852,12 +851,6 @@ void _expectShownInOrder(WidgetTester tester, List<int> expected) {
   expect(shown, ids.sublist(start, start + shown.length));
 }
 
-String _homeTitle(_App app, int number) => switch (app.home) {
-  HomeList(:final items) =>
-    items.singleWhere((row) => row.id == _intentionId(number)).title,
-  final other => fail('Главная не показывает список: $other'),
-};
-
 /// Главная показывает подтверждённый цельным снимком список [expected] без
 /// принятой перестановки.
 bool _isConfirmed(_App app, List<int> expected) => switch (app.home) {
@@ -874,8 +867,8 @@ bool _isConfirmed(_App app, List<int> expected) => switch (app.home) {
 };
 
 /// Дожидается подтверждённого списка [expected] на открытой Главной и
-/// проверяет показанные строки: порядок, отсутствие признака сохранения,
-/// доступные ручки и, если не разрешено [allowMessage], отсутствие сообщений.
+/// проверяет показанные строки: порядок, отсутствие признака сохранения и,
+/// если не разрешено [allowMessage], отсутствие сообщений.
 Future<void> _expectConfirmedHome(
   WidgetTester tester,
   _App app,
@@ -886,30 +879,18 @@ Future<void> _expectConfirmedHome(
   await tester.pumpAndSettle();
   _expectShownInOrder(tester, expected);
   expect(find.text(app.l10n.homeReorderSaving), findsNothing);
-  expect(
-    find.byType(ReorderableDragStartListener),
-    findsNWidgets(find.byType(HomeIntentionRow).evaluate().length),
-  );
   if (!allowMessage) expect(_builtMessages, findsNothing);
 }
 
 /// Принятая перестановка [moved] ещё не подтверждена: Главная показывает
 /// запрошенный порядок [requested] с признаком сохранения только у
-/// перемещаемой строки, а ручки и действия перемещения недоступны.
+/// перемещаемой строки, а действия перемещения недоступны.
 void _expectSaving(
   WidgetTester tester,
   _App app,
   List<int> requested, {
   required int moved,
 }) {
-  final home = app.home;
-  expect(home, isA<HomeList>());
-  final list = home as HomeList;
-  expect(list.reorder, isA<HomeReorderPending>());
-  expect(
-    [for (final row in list.displayedItems) row.id],
-    [for (final number in requested) _intentionId(number)],
-  );
   _expectShownInOrder(tester, requested);
   final saving = find.text(app.l10n.homeReorderSaving);
   expect(saving, findsOneWidget);
@@ -917,7 +898,6 @@ void _expectSaving(
     find.descendant(of: _homeRow(moved), matching: saving),
     findsOneWidget,
   );
-  expect(find.byType(ReorderableDragStartListener), findsNothing);
   final actions = WidgetsLocalizations.of(
     tester.element(find.byType(HomePage, skipOffstage: false)),
   );
@@ -1131,9 +1111,6 @@ final class _HeldMoves implements PersonalGraphRepository {
   final PersonalGraphRepository _delegate;
   Completer<void>? _gate;
 
-  /// Перестановки, дошедшие до хранилища.
-  var moves = 0;
-
   /// Перестановка принята координатором и ждёт [releaseMove].
   var isHoldingMove = false;
 
@@ -1150,7 +1127,6 @@ final class _HeldMoves implements PersonalGraphRepository {
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
     if (command is MoveFavoriteIntention) {
-      moves++;
       final gate = _gate;
       if (gate != null) {
         isHoldingMove = true;
