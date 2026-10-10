@@ -4,8 +4,6 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
@@ -17,53 +15,46 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
 const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
 void main() {
-  testWidgets(
-    'не монтирует начальный route до ready и передаёт runtime container',
-    (tester) async {
-      _useEnglishLocale(tester);
-      final openingStarted = Completer<void>();
-      final allowOpening = Completer<void>();
-      final runtime = AppRuntime(
-        quickCreationModeStore: InMemoryQuickCreationModeStore(),
-        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          _ControlledOpenObserver(openingStarted, allowOpening),
-        ),
-        diagnosticsSink: InMemoryDiagnosticsSink(),
-      );
-      addTearDown(() async {
-        if (!allowOpening.isCompleted) allowOpening.complete();
-        await runtime.shutdown();
-      });
+  testWidgets('не показывает корневые страницы до готовности хранилища', (
+    tester,
+  ) async {
+    _useEnglishLocale(tester);
+    final openingStarted = Completer<void>();
+    final allowOpening = Completer<void>();
+    final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
+      connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        _ControlledOpenObserver(openingStarted, allowOpening),
+      ),
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
+    addTearDown(() async {
+      if (!allowOpening.isCompleted) allowOpening.complete();
+      await runtime.shutdown();
+    });
 
-      await tester.pumpWidget(MainApp(runtime: runtime));
-      await openingStarted.future;
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await openingStarted.future;
 
-      expect(find.text('Preparing local data…'), findsOneWidget);
-      _expectNoRootPages();
+    expect(find.text('Preparing local data…'), findsOneWidget);
+    _expectNoRootPages();
 
-      allowOpening.complete();
-      await tester.pumpAndSettle();
+    allowOpening.complete();
+    await tester.pumpAndSettle();
 
-      final ready = await runtime.bootstrap() as AppRuntimeReady;
-      _expectHome(tester, ready);
-      final featureContext = tester.element(find.byType(HomePage));
-      expect(
-        ProviderScope.containerOf(featureContext, listen: false),
-        same(ready.container),
-      );
-    },
-  );
+    _expectHome(tester);
+  });
 
   testWidgets('retryable bootstrap сохраняет явный retry до успеха, а '
       'повторная подготовка показана без панели', (tester) async {
@@ -119,8 +110,7 @@ void main() {
     allowRetry.complete();
     await tester.pumpAndSettle();
 
-    expect(attempts, 2);
-    _expectHome(tester, await runtime.bootstrap() as AppRuntimeReady);
+    _expectHome(tester);
   });
 
   testWidgets('corruption имеет terminal-состояние без retry', (tester) async {
@@ -250,17 +240,23 @@ void _expectNoRootPages() {
 
 /// После готовности хранилища открыта Главная с видимой панелью и выбранным
 /// пунктом «Главная» без страниц поверх оболочки.
-void _expectHome(WidgetTester tester, AppRuntimeReady ready) {
-  final router = ready.container.read(appRouterProvider);
+void _expectHome(WidgetTester tester) {
   expect(find.byType(HomePage), findsOneWidget);
   expect(find.byType(AppNavigationBar), findsOneWidget);
-  expect(
-    tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-    AppDestination.home,
-  );
-  expect(router.current.name, AppShellRoute.name);
-  expect(router.topRoute.name, HomeRoute.name);
-  expect(router.canPop(), isFalse);
+  for (final destination in AppDestination.values) {
+    expect(
+      find.descendant(
+        of: appNavigationDestination(destination),
+        matching: find.byIcon(
+          destination == AppDestination.home
+              ? destination.selectedIcon
+              : destination.icon,
+        ),
+      ),
+      findsOneWidget,
+      reason: destination.name,
+    );
+  }
 }
 
 void _useEnglishLocale(WidgetTester tester) {

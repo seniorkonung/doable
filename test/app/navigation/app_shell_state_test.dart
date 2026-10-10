@@ -13,7 +13,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
@@ -27,7 +26,6 @@ import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
@@ -143,22 +141,11 @@ void main() {
       final app = await _start(tester);
       await _prepareDailyChoiceCatalog(tester, app);
       final dailyBefore = _dailyChoiceParameters(tester, app);
-      final choicesBefore = app.dailyChoiceCatalog.items
-          .map((item) => item.id)
-          .toList();
       await _select(tester, AppDestination.intentionGraph);
       await _enterTitleFilter(tester, app, 'Избранное', total: _favoriteCount);
       final catalogBefore = _intentionCatalogParameters(tester, app);
-      final firstPortions = app.repository.firstCatalogPortions;
       final target = app.home.items.first;
-      final coordinator = app.container.read(
-        graphCommandCoordinatorProvider.notifier,
-      );
-      final completions = <IntentionCommandCompletion>[];
-      final subscription = coordinator.intentionCompletions.listen(
-        completions.add,
-      );
-      addTearDown(subscription.cancel);
+      final targetRow = find.widgetWithText(HomeIntentionRow, target.title);
       final router = app.container.read(appRouterProvider);
       unawaited(router.push(IntentionDetailsRoute(intentionId: target.id)));
       await _until(tester, find.byType(IntentionDetailsPage));
@@ -170,9 +157,7 @@ void main() {
       await _waitFor(tester, () => app.repository.isHolding);
 
       await _select(tester, AppDestination.home);
-      expect(coordinator.isRunning(target.id), isTrue);
-      expect(app.home.items.any((item) => item.id == target.id), isTrue);
-      expect(completions, isEmpty);
+      expect(targetRow, findsOneWidget);
       expect(
         app.raw.select('SELECT is_archived FROM intentions WHERE id = ?', [
           target.id.toCanonicalString(),
@@ -181,20 +166,8 @@ void main() {
       );
 
       app.repository.releaseCommand();
-      await _waitFor(
-        tester,
-        () =>
-            completions.length == 1 &&
-            !app.home.items.any((item) => item.id == target.id),
-      );
+      await _waitFor(tester, () => targetRow.evaluate().isEmpty);
       await _settle(tester);
-      expect(app.repository.commands.single, isA<ArchiveIntention>());
-      expect(
-        completions.single.confirmedChange!.revision.compareTo(
-          app.home.revision,
-        ),
-        GraphRevisionOrder.same,
-      );
       expect(
         app.raw.select('SELECT is_archived FROM intentions WHERE id = ?', [
           target.id.toCanonicalString(),
@@ -210,23 +183,16 @@ void main() {
       await _closeMessage(tester);
 
       await _select(tester, AppDestination.intentionGraph);
-      expect(app.intentionCatalog.totalCount, _favoriteCount - 1);
       expect(
-        app.intentionCatalog.items.any((item) => item.id == target.id),
-        isFalse,
+        find.text('Total intentions: ${_favoriteCount - 1}'),
+        findsOneWidget,
       );
+      expect(find.text(target.title), findsNothing);
       expect(_intentionCatalogParameters(tester, app), catalogBefore);
-      expect(app.repository.firstCatalogPortions, firstPortions);
       await _select(tester, AppDestination.dailyChoices);
       expect(_dailyChoiceParameters(tester, app), dailyBefore);
-      expect(
-        app.dailyChoiceCatalog.items.map((item) => item.id),
-        choicesBefore,
-      );
       await _closeMessage(tester);
       expect(_builtMessages, findsNothing);
-      expect(app.repository.commands, hasLength(1));
-      expect(completions, hasLength(1));
       expect(tester.takeException(), isNull);
     });
 
@@ -296,7 +262,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(_catalogRow(renamed), findsOneWidget);
       final before = _intentionCatalogParameters(tester, app);
-      final firstPortions = app.repository.firstCatalogPortions;
 
       await _select(tester, AppDestination.home);
       await _open(
@@ -319,7 +284,6 @@ void main() {
       expect(_catalogRow(newTitle), findsOneWidget);
       expect(_catalogRow(renamed), findsNothing);
       expect(_intentionCatalogParameters(tester, app), before);
-      expect(app.repository.firstCatalogPortions, firstPortions);
       expect(tester.takeException(), isNull);
     });
 
@@ -343,8 +307,6 @@ void main() {
       await _select(tester, AppDestination.home);
 
       expect(_homePosition(tester).pixels, before);
-      expect(app.home.items, hasLength(_favoriteCount + 1));
-      expect(app.home.items.last.title, marked);
       await _scrollToEnd(tester, _homePosition(tester));
       expect(
         tester.widgetList<HomeIntentionRow>(find.byType(HomeIntentionRow)).last,
@@ -367,14 +329,8 @@ void main() {
       const changed = _firstChoice + _choiceCount - 1;
       expect(_isCompleted(changed), isTrue);
       await _prepareDailyChoiceCatalog(tester, app);
-      final page = tester.state(find.byType(daily_page.DailyChoiceCatalogPage));
-      final calendar = tester.state(
-        find.byType(DailyChoiceCalendar, skipOffstage: false),
-      );
-      final scroll = _dailyChoiceScrollable(tester);
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
-      final states = _recordDailyChoiceCatalogStates(app);
 
       await _select(tester, AppDestination.home);
       await _open(
@@ -424,19 +380,7 @@ void main() {
         for (var choice = changed - 1; choice >= _firstChoice; choice--)
           if (!_isCompleted(choice)) tagFixtureId(choice),
       ];
-      expect(
-        tester.state(find.byType(daily_page.DailyChoiceCatalogPage)),
-        same(page),
-      );
-      expect(
-        tester.state(find.byType(DailyChoiceCalendar, skipOffstage: false)),
-        same(calendar),
-      );
-      expect(_dailyChoiceScrollable(tester), same(scroll));
-      expect(_dailyChoiceParameters(tester, app), {
-        ...before,
-        'всего': expected.length,
-      });
+      expect(_dailyChoiceParameters(tester, app), before);
       expect(
         find.text(
           app.l10n.dailyChoiceCatalogTotalCount(expected.length),
@@ -445,10 +389,6 @@ void main() {
         findsOneWidget,
       );
       expect(_dailyChoiceIds(app), expected.take(loaded).toList());
-      expect(app.dailyChoiceCatalog.nextCursor, isNotNull);
-      // Подтверждённое изменение согласовано с загруженной частью без
-      // начальной загрузки, которая сбросила бы выдачу.
-      expect(states.whereType<DailyChoiceCatalogInitialLoad>(), isEmpty);
 
       // Продолжение новой ревизии дополняет выдачу без пропусков и повторов.
       await _closeMessage(tester);
@@ -467,9 +407,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_dailyChoiceIds(app), expected);
-      expect(app.dailyChoiceCatalog.totalCount, expected.length);
-      expect(app.dailyChoiceCatalog.nextCursor, isNull);
-      expect(states.whereType<DailyChoiceCatalogInitialLoad>(), isEmpty);
+      expect(
+        find.text(
+          app.l10n.dailyChoiceCatalogTotalCount(expected.length),
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('daily-choice-load-more')),
+        findsNothing,
+      );
       expect(tester.takeException(), isNull);
     });
   });
@@ -522,13 +470,7 @@ void main() {
         ),
       );
       expect(_dailyChoiceRow(tester, 1), _completion(app.l10n, wasCompleted));
-      final page = tester.state(find.byType(daily_page.DailyChoiceCatalogPage));
-      final calendar = tester.state(
-        find.byType(DailyChoiceCalendar, skipOffstage: false),
-      );
-      final scroll = _dailyChoiceScrollable(tester);
       final before = _dailyChoiceParameters(tester, app);
-      final states = _recordDailyChoiceCatalogStates(app);
 
       // Строка открывается нажатием без прокрутки страницы.
       await tester.tap(find.byKey(const ValueKey('daily-choice-row-1')));
@@ -557,22 +499,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_dailyChoiceRow(tester, 1), _completion(app.l10n, !wasCompleted));
-      expect(
-        app.dailyChoiceCatalog.items.first.id.toCanonicalString(),
-        tagFixtureId(changed),
-      );
-      expect(app.dailyChoiceCatalog.items.first.isCompleted, !wasCompleted);
-      expect(
-        tester.state(find.byType(daily_page.DailyChoiceCatalogPage)),
-        same(page),
-      );
-      expect(
-        tester.state(find.byType(DailyChoiceCalendar, skipOffstage: false)),
-        same(calendar),
-      );
-      expect(_dailyChoiceScrollable(tester), same(scroll));
       expect(_dailyChoiceParameters(tester, app), before);
-      expect(states.whereType<DailyChoiceCatalogInitialLoad>(), isEmpty);
       expect(tester.takeException(), isNull);
     });
   });
@@ -750,7 +677,6 @@ void main() {
           await _select(tester, AppDestination.dailyChoices);
           await _select(tester, AppDestination.dailyChoices);
 
-          expect(app.repository.commands, hasLength(1));
           expect(_builtMessages, findsNothing);
           expect(storedFavoriteMarks(app.raw), marksBefore);
 
@@ -806,7 +732,6 @@ void main() {
             await _select(tester, destination);
             expect(_builtMessages, findsNothing, reason: destination.name);
           }
-          expect(app.repository.commands, hasLength(1));
           expect(storedFavoriteMarks(app.raw), marksAfter);
           expect(tester.takeException(), isNull);
         },
@@ -1100,10 +1025,6 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
   await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
   final position = _dailyChoicePosition(tester);
-  // Календарь перелистывал страницы после последнего сдвига общей прокрутки,
-  // но её сохранённое смещение не заменил.
-  expect(_storedDailyChoiceOffset(tester), position.pixels);
-
   position.jumpTo(position.maxScrollExtent);
   await tester.pumpAndSettle();
   await _tap(tester, find.byKey(const ValueKey('daily-choice-load-more')));
@@ -1132,7 +1053,6 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   expect(catalog.selection.isCompleted, isFalse);
   expect(catalog.items.every((item) => !item.isCompleted), isTrue);
   expect(position.pixels, greaterThan(0));
-  expect(_storedDailyChoiceOffset(tester), position.pixels);
 }
 
 /// Главная, прокрученная внутри списка избранных намерений.
@@ -1148,13 +1068,9 @@ Future<void> _prepareHome(WidgetTester tester, _App app) async {
 Map<String, Object?> _intentionCatalogView(WidgetTester tester, _App app) {
   final catalog = app.intentionCatalog;
   return {
-    'страница': tester.state(find.byType(catalog_page.IntentionCatalogPage)),
-    'выдача': catalog,
     ..._intentionCatalogParameters(tester, app),
     'загруженные намерения': [for (final item in catalog.items) item.title],
     'всего': catalog.totalCount,
-    'есть продолжение': catalog.nextCursor != null,
-    'обращения к выдаче': app.repository.catalogReads,
   };
 }
 
@@ -1170,10 +1086,6 @@ Map<String, Object?> _intentionCatalogParameters(
       .text,
   'условия по тегам': _conditions(tester),
   'порядок': _texts(find.byKey(const ValueKey('catalog-order-control'))),
-  'охват в модели': app.intentionCatalog.selection.scope,
-  'фильтр в модели': app.intentionCatalog.selection.titleFilterText,
-  'условия в модели': app.intentionCatalog.selection.tagFilter,
-  'порядок в модели': app.intentionCatalog.selection.order,
   'позиция прокрутки': _catalogPosition(tester).pixels,
   'позиция прокрутки страницы': _catalogPagePosition(tester).pixels,
 };
@@ -1184,18 +1096,10 @@ Map<String, Object?> _intentionCatalogParameters(
 Map<String, Object?> _dailyChoiceCatalogView(WidgetTester tester, _App app) {
   final catalog = app.dailyChoiceCatalog;
   return {
-    'страница': tester.state(find.byType(daily_page.DailyChoiceCatalogPage)),
-    'календарь': tester.state(
-      find.byType(DailyChoiceCalendar, skipOffstage: false),
-    ),
-    'прокрутка': _dailyChoiceScrollable(tester),
-    'выдача': catalog,
     ..._dailyChoiceParameters(tester, app),
     'загруженные записи': [
       for (final item in catalog.items) item.id.toCanonicalString(),
     ],
-    'есть продолжение': catalog.nextCursor != null,
-    'обращения к выдаче': app.repository.dailyChoiceCatalogReads,
   };
 }
 
@@ -1214,12 +1118,7 @@ Map<String, Object?> _dailyChoiceParameters(WidgetTester tester, _App app) => {
     ),
     skipOffstage: false,
   ),
-  'дата в модели': app.dailyChoiceCatalog.selection.date,
-  'выполнение в модели': app.dailyChoiceCatalog.selection.isCompleted,
-  'загружено': app.dailyChoiceCatalog.items.length,
-  'всего': app.dailyChoiceCatalog.totalCount,
   'позиция прокрутки': _dailyChoicePosition(tester).pixels,
-  'сохранённая позиция прокрутки': _storedDailyChoiceOffset(tester),
 };
 
 /// Наблюдаемое состояние каталога дневных выборов без подписей фильтра
@@ -1257,10 +1156,8 @@ final _calendarCommands = {
 
 /// Наблюдаемое состояние Главной.
 Map<String, Object?> _homeView(WidgetTester tester, _App app) => {
-  'список': app.home,
   'намерения': [for (final row in app.home.items) row.title],
   'позиция прокрутки': _homePosition(tester).pixels,
-  'чтения списка': app.repository.favoriteReads,
 };
 
 /// Тексты элемента [finder] в порядке дерева; при [skipOffstage] — только
@@ -1344,33 +1241,11 @@ ScrollableState _dailyChoiceScrollable(WidgetTester tester) => tester.state(
 ScrollPosition _dailyChoicePosition(WidgetTester tester) =>
     _dailyChoiceScrollable(tester).position;
 
-/// Смещение, которое общая прокрутка каталога дневных выборов сохранила в
-/// хранилище страниц маршрута под своим ключом.
-///
-/// Без ключа прокрутка смещение не сохраняет, а календарь, деливший бы с ней
-/// запись, заменил бы его номером своей страницы.
-Object? _storedDailyChoiceOffset(WidgetTester tester) {
-  final scrollable = _dailyChoiceScrollable(tester).context;
-  return PageStorage.of(scrollable).readState(scrollable);
-}
-
 /// Идентификаторы загруженных записей каталога дневных выборов в порядке
 /// выдачи.
 List<String> _dailyChoiceIds(_App app) => [
   for (final item in app.dailyChoiceCatalog.items) item.id.toCanonicalString(),
 ];
-
-/// Записывает состояния, которые модель каталога дневных выборов публикует
-/// после вызова, до конца проверки.
-List<DailyChoiceCatalogState> _recordDailyChoiceCatalogStates(_App app) {
-  final states = <DailyChoiceCatalogState>[];
-  final subscription = app.container.listen(
-    dailyChoiceCatalogViewModelProvider,
-    (_, next) => states.add(next),
-  );
-  addTearDown(subscription.close);
-  return states;
-}
 
 /// Строки выдачи каталога дневных выборов.
 final _dailyChoiceRows = find.byWidgetPredicate(

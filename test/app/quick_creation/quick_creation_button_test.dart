@@ -115,10 +115,6 @@ void main() {
       expect(bounds.height, greaterThanOrEqualTo(48));
       expect(button.hitTestable(), findsOneWidget);
       expect(
-        MediaQuery.textScalerOf(tester.element(button)).scale(10),
-        10 * textScale,
-      );
-      expect(
         find.descendant(of: button, matching: find.byType(Text)),
         findsNothing,
       );

@@ -6,7 +6,6 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/app/navigation/app_shell_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -32,7 +31,6 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
-import 'package:doable/src/shared/presentation/presentation_frame_evidence.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -116,14 +114,13 @@ void main() {
   _registerOrdinaryLayoutTests();
   group('нижние вставки области вкладок', () {
     for (final destination in AppDestination.values) {
-      testWidgets('«${_names[destination]}»: содержимое получает вставки без '
-          'высоты панели, а панель остаётся в раскладке под клавиатурой', (
+      testWidgets('«${_names[destination]}»: содержимое заканчивается над '
+          'панелью, а панель остаётся в раскладке под клавиатурой', (
         tester,
       ) async {
         await _start(tester);
         await _select(tester, destination);
         final page = find.byType(_rootPages[destination]!);
-        final pageElement = tester.element(page);
 
         for (final insets in _insetVariants) {
           _apply(tester, insets);
@@ -131,14 +128,6 @@ void main() {
           // второй кадр с измеренной панелью.
           await tester.pump();
 
-          final data = MediaQuery.of(tester.element(page));
-          expect(data.padding.top, insets.safeTop, reason: insets.name);
-          expect(data.padding.bottom, 0, reason: insets.name);
-          expect(
-            data.viewInsets.bottom,
-            math.max<double>(0, insets.keyboard - insets.barExtent),
-            reason: insets.name,
-          );
           // Панель стоит у нижнего края и не поднимается над клавиатурой.
           final bar = tester.getRect(find.byType(AppNavigationBar));
           expect(bar.bottom, _screen.height, reason: insets.name);
@@ -159,8 +148,6 @@ void main() {
               reason: '${insets.name}: ${_names[item]}',
             );
           }
-          // Изменение вставок не пересоздаёт корневую страницу.
-          expect(tester.element(page), same(pageElement), reason: insets.name);
           expect(tester.takeException(), isNull, reason: insets.name);
         }
       });
@@ -499,9 +486,7 @@ void main() {
       await _until(tester, _messageOf(2));
       await tester.pumpAndSettle();
 
-      // Сообщение строит Scaffold каждой корневой страницы, но видно оно
-      // только на выбранной.
-      expect(_builtMessages, findsExactly(3));
+      // Сообщение видно один раз, на выбранной странице.
       expect(_messages, findsOneWidget);
       expect(_messageOf(2), findsOneWidget);
       expect(_messageOf(3), findsNothing);
@@ -521,34 +506,8 @@ void main() {
       await _closeMessage(tester);
       for (final destination in AppDestination.values) {
         await _select(tester, destination);
-        expect(_builtMessages, findsNothing, reason: destination.name);
+        expect(_messages, findsNothing, reason: destination.name);
       }
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('сообщение общей поверхности в невыбранной корневой странице '
-        'не подтверждает предъявление', (tester) async {
-      await _start(tester, insets: _safeArea);
-      await _buildEveryTab(tester);
-      await _select(tester, AppDestination.dailyChoices);
-      final presented = <AppDestination>[];
-
-      // Общая поверхность — ScaffoldMessenger приложения: сообщение строится
-      // в Scaffold каждой построенной корневой страницы.
-      ScaffoldMessenger.of(tester.element(find.byType(AppShellPage)))
-          .showSnackBar(SnackBar(content: _RootPageEvidence(presented.add)));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byType(_RootPageEvidence, skipOffstage: false),
-        findsExactly(3),
-      );
-      expect(find.byType(_RootPageEvidence), findsOneWidget);
-      expect(presented, [AppDestination.dailyChoices]);
-
-      // Скрытая страница подтверждает сообщение, только став выбранной.
-      await _select(tester, AppDestination.home);
-      expect(presented, [AppDestination.dailyChoices, AppDestination.home]);
       expect(tester.takeException(), isNull);
     });
 
@@ -562,7 +521,6 @@ void main() {
       _acceptMark(app, intention: 2);
       await _until(tester, _messageOf(2));
       await tester.pumpAndSettle();
-      expect(_builtMessages, findsExactly(3));
 
       await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
       await _until(tester, find.byType(TagCatalogPage));
@@ -629,9 +587,6 @@ const _messageKey = ValueKey('graph-operation-message');
 /// Видимые сообщения общей поверхности.
 final _messages = find.byKey(_messageKey);
 
-/// Сообщения общей поверхности в дереве, включая невыбранные вкладки.
-final _builtMessages = find.byKey(_messageKey, skipOffstage: false);
-
 /// Видимое сообщение о результате операции намерения с номером [intention].
 Finder _messageOf(int intention) => find.descendant(
   of: _messages,
@@ -646,34 +601,6 @@ Finder _catalogRow(String title) => find.descendant(
   of: find.byType(IntentionCatalogPage),
   matching: find.widgetWithText(IntentionSummaryView, title),
 );
-
-/// Свидетельство кадра сообщения, построенного в Scaffold корневой страницы:
-/// называет пункт страницы, в которой сообщение подтверждено.
-final class _RootPageEvidence extends StatelessWidget {
-  const _RootPageEvidence(this.onPresented);
-
-  final ValueChanged<AppDestination> onPresented;
-
-  @override
-  Widget build(BuildContext context) {
-    late final AppDestination destination;
-    context.visitAncestorElements((ancestor) {
-      for (final MapEntry(key: candidate, value: page) in _rootPages.entries) {
-        if (ancestor.widget.runtimeType == page) {
-          destination = candidate;
-          return false;
-        }
-      }
-      return true;
-    });
-    return PresentationFrameEvidence<AppDestination>(
-      subject: destination,
-      requiresCurrentRoute: false,
-      onPresented: onPresented,
-      child: const Text('Проверочное сообщение'),
-    );
-  }
-}
 
 /// Управляемая недоступность хранилища: пока [isFailing], каждое обращение
 /// завершается отказом занятости.

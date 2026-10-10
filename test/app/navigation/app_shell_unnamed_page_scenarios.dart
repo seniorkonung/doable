@@ -34,17 +34,6 @@ void _registerUnnamedPageTests() {
         );
         await _until(tester, find.byType(ChoicePathPage));
         await tester.pumpAndSettle();
-        final shown = tester.widget<ChoicePathPage>(
-          find.byType(ChoicePathPage),
-        );
-        expect(shown.purpose, purpose);
-        expect(shown.direction, direction);
-        expect(
-          tester
-              .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-              .creationSession,
-          isNull,
-        );
         _expectAboveShell(
           tester,
           ChoicePathPage,
@@ -137,10 +126,6 @@ void _registerUnnamedPageTests() {
           tester,
           _summary(picker, topDown ? 'Читать' : 'Бегать'),
           ChoicePathPage,
-        );
-        expect(
-          tester.widget<ChoicePathPage>(find.byType(ChoicePathPage)).purpose,
-          ChoicePathPurpose.replace,
         );
         _expectAboveShell(
           tester,

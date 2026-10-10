@@ -3,9 +3,6 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/app/routing/app_router.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
@@ -46,7 +43,7 @@ void main() {
     await _until(tester, find.text(l10n.homeEmptyNoFavorites));
     await tester.pumpAndSettle();
 
-    _expectStartPage(tester, app);
+    _expectStartPage(tester);
     expect(
       find.descendant(
         of: find.byType(HomePage),
@@ -71,7 +68,7 @@ void main() {
         );
       });
 
-      final app = await _launch(tester, harness);
+      await _launch(tester, harness);
       final row = find.descendant(
         of: find.byType(HomePage),
         matching: find.text(_walkTitle),
@@ -79,7 +76,7 @@ void main() {
       await _until(tester, row);
       await tester.pumpAndSettle();
 
-      _expectStartPage(tester, app);
+      _expectStartPage(tester);
       expect(row, findsOneWidget);
       expect(
         find.descendant(
@@ -130,18 +127,17 @@ void main() {
       await _until(tester, find.byKey(_favoriteControl));
       await tester.pumpAndSettle();
       expect(find.byType(IntentionDetailsPage), findsOneWidget);
-      expect(first.router.topRoute.name, IntentionDetailsRoute.name);
       expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(_selected(tester), AppDestination.intentionGraph);
 
       // Полное завершение и новый запуск на том же хранилище.
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.runAsync(first.runtime.shutdown);
-      final second = await _launch(tester, harness);
+      await _launch(tester, harness);
       await _until(tester, homeRow);
       await tester.pumpAndSettle();
 
-      _expectStartPage(tester, second);
+      _expectStartPage(tester);
       // Список Главной прочитан из того же хранилища.
       expect(homeRow, findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -151,11 +147,10 @@ void main() {
 
 /// Запуск приложения на файловом хранилище [LocalDatabaseHarness].
 final class _App {
-  _App(this.runtime, this.raw, this.router);
+  _App(this.runtime, this.raw);
 
   final AppRuntime runtime;
   final sqlite.Database raw;
-  final AppRouter router;
 }
 
 Future<LocalDatabaseHarness> _harness(
@@ -204,20 +199,16 @@ Future<_App> _launch(WidgetTester tester, LocalDatabaseHarness harness) async {
     await tester.pumpWidget(MainApp(runtime: runtime));
     return runtime.bootstrap();
   });
-  final router = (ready! as AppRuntimeReady).container.read(appRouterProvider);
-  return _App(runtime, raw, router);
+  expect(ready, isA<AppRuntimeReady>());
+  return _App(runtime, raw);
 }
 
 /// Открыта Главная с видимой панелью и выбранным пунктом «Главная»: страниц
 /// поверх оболочки нет, а каталоги в этом запуске ещё не построены.
-void _expectStartPage(WidgetTester tester, _App app) {
+void _expectStartPage(WidgetTester tester) {
   expect(find.byType(HomePage), findsOneWidget);
   expect(find.byType(AppNavigationBar), findsOneWidget);
   expect(_selected(tester), AppDestination.home);
-  expect(app.router.current.name, AppShellRoute.name);
-  expect(app.router.topRoute.name, HomeRoute.name);
-  expect(app.router.stack, hasLength(1));
-  expect(app.router.canPop(), isFalse);
   for (final page in [
     IntentionDetailsPage,
     IntentionCatalogPage,

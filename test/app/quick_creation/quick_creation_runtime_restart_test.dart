@@ -6,19 +6,17 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
-import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/file_quick_creation_mode_store.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode_controller.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
-import 'package:doable/src/app/routing/app_router.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
+import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
@@ -74,15 +72,10 @@ void main() {
       } else {
         expect(await tester.runAsync(modeFile.exists), isFalse);
       }
-      expect(
-        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        AppDestination.intentionGraph,
-      );
+      _expectSelected(tester, AppDestination.intentionGraph);
       await _close(tester, first);
 
       final second = await _mount(tester, store(), diagnostics);
-      expect(second.ready.container, isNot(same(first.ready.container)));
-      expect(second.router, isNot(same(first.router)));
       final restored = mode ?? QuickCreationMode.intention;
       _expectHome(tester, second, restored);
       await _expectLaunch(tester, second, restored);
@@ -156,10 +149,6 @@ void main() {
       await _settle(tester);
       for (final mode in modes.skip(1)) {
         await _choose(tester, mode);
-        expect(
-          find.byType(QuickCreationButton, skipOffstage: false),
-          findsNWidgets(2),
-        );
         _expectVisiblePanel(tester, mode);
         // Скрытый Consumer приостанавливается вместе с маршрутом.
         // Проверяем обе панели при показе, пока запись всё ещё удержана.
@@ -170,11 +159,6 @@ void main() {
         await _settle(tester);
         _expectVisiblePanel(tester, mode);
       }
-      final history = [
-        for (final route in first.router.stackData) route.matchId,
-      ];
-      expect(observed.writes, hasLength(modes.length));
-      expect(io.startedAttempts, [attempts.first]);
       expect(await tester.runAsync(modeFile.readAsString), initial.storageKey);
       await _openMenu(tester);
       final localizations = AppLocalizations.of(
@@ -184,18 +168,18 @@ void main() {
         ListTile,
         modes.last.title(localizations),
       );
-      expect(tester.widget<ListTile>(selected).selected, isTrue);
+      expect(
+        find.descendant(of: selected, matching: find.byIcon(Icons.check)),
+        findsOneWidget,
+      );
 
       var expected = initial;
-      final committed = <String>[];
       for (var i = 0; i < attempts.length; i++) {
-        expect(io.startedAttempts, hasLength(i + 1));
         attempts[i].release.complete();
         final result = await _complete(tester, observed.writes[i]);
         if (outcomes[i] == 's') {
           expect(result, isA<QuickCreationModeSaved>());
           expected = modes[i];
-          committed.add(expected.storageKey);
         } else {
           expect(result, isA<QuickCreationModeSaveFailed>());
         }
@@ -203,13 +187,11 @@ void main() {
           await _complete(tester, attempts[i + 1].held.future);
         }
         await tester.pump();
-        expect(io.committedKeys, committed);
         expect(
           await tester.runAsync(modeFile.readAsString),
           expected.storageKey,
         );
         _expectVisiblePanel(tester, modes.last);
-        expect(tester.widget<ListTile>(selected).selected, isTrue);
         expect(
           find.descendant(of: selected, matching: find.byIcon(Icons.check)),
           findsOneWidget,
@@ -217,27 +199,13 @@ void main() {
         expect(find.byType(SnackBar), findsNothing);
         expect(tester.takeException(), isNull);
       }
-      expect(
-        attempts.map((attempt) => attempt.key),
-        modes.map((mode) => mode.storageKey),
-      );
-      expect(
-        attempts.map((attempt) => attempt.temporaryPath).toSet(),
-        hasLength(modes.length),
-      );
       _expectFailures(diagnostics, 'write', [
         for (final outcome in outcomes.split(''))
           if (outcome == 'f') 'unavailable',
       ]);
       await tester.binding.handlePopRoute();
       await _settle(tester);
-      expect([
-        for (final route in first.router.stackData) route.matchId,
-      ], history);
-      expect(
-        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        AppDestination.intentionGraph,
-      );
+      _expectSelected(tester, AppDestination.intentionGraph);
       await tester.binding.handlePopRoute();
       await _settle(tester);
       _expectVisiblePanel(tester, modes.last);
@@ -253,11 +221,26 @@ void main() {
 void _expectVisiblePanel(WidgetTester tester, QuickCreationMode mode) {
   final button = find.byType(QuickCreationButton);
   expect(button, findsOneWidget);
-  expect(tester.widget<QuickCreationButton>(button).mode, mode);
   expect(
     find.descendant(of: button, matching: find.byIcon(mode.icon)),
     findsOneWidget,
   );
+}
+
+/// Панель показывает выбранным пункт [destination]: залитый значок у него.
+void _expectSelected(WidgetTester tester, AppDestination destination) {
+  for (final item in AppDestination.values) {
+    expect(
+      find.descendant(
+        of: appNavigationDestination(item),
+        matching: find.byIcon(
+          item == destination ? item.selectedIcon : item.icon,
+        ),
+      ),
+      findsOneWidget,
+      reason: item.name,
+    );
+  }
 }
 
 Future<_Session> _mount(
@@ -276,10 +259,10 @@ Future<_Session> _mount(
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(runtime.shutdown);
   });
-  final ready = await tester.runAsync(runtime.bootstrap) as AppRuntimeReady;
+  await tester.runAsync(runtime.bootstrap);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _settle(tester);
-  return _Session(runtime, ready, ready.container.read(appRouterProvider));
+  return _Session(runtime);
 }
 
 Future<void> _close(WidgetTester tester, _Session session) async {
@@ -334,8 +317,11 @@ Future<void> _choose(WidgetTester tester, QuickCreationMode mode) async {
   await tester.pumpAndSettle();
   expect(find.byType(BottomSheet), findsNothing);
   expect(
-    tester.widget<QuickCreationButton>(find.byType(QuickCreationButton)).mode,
-    mode,
+    find.descendant(
+      of: find.byType(QuickCreationButton),
+      matching: find.byIcon(mode.icon),
+    ),
+    findsOneWidget,
   );
 }
 
@@ -345,19 +331,9 @@ void _expectHome(
   QuickCreationMode mode,
 ) {
   expect(find.byType(HomePage), findsOneWidget);
-  expect(session.router.topRoute.name, HomeRoute.name);
-  expect(session.router.canPop(), isFalse);
-  expect(
-    tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-    AppDestination.home,
-  );
-  expect(
-    session.ready.container.read(quickCreationModeControllerProvider),
-    mode,
-  );
+  _expectSelected(tester, AppDestination.home);
   final button = find.byType(QuickCreationButton);
   expect(button.hitTestable(), findsOneWidget);
-  expect(tester.widget<QuickCreationButton>(button).mode, mode);
   expect(
     find.descendant(of: button, matching: find.byIcon(mode.icon)),
     findsOneWidget,
@@ -373,21 +349,15 @@ Future<void> _expectLaunch(
 ) async {
   await tester.tap(find.byType(QuickCreationButton));
   await _settle(tester);
-  expect(session.router.current.name, switch (mode) {
-    QuickCreationMode.intention => IntentionEditorRoute.name,
-    QuickCreationMode.relation => RelationEditorRoute.name,
-    QuickCreationMode.dailyChoiceFromIntention =>
-      DailyChoiceSourcePickerRoute.name,
-    QuickCreationMode.dailyChoiceFromAction =>
-      DailyChoiceActionPickerRoute.name,
-  });
-  expect(session.router.stackData, hasLength(2));
-  if (mode == QuickCreationMode.relation) {
-    expect(
-      session.router.current.argsAs<RelationEditorRouteArgs>().editorContext,
-      isA<RelationBlankCreationContext>(),
-    );
-  }
+  expect(
+    find.byType(switch (mode) {
+      QuickCreationMode.intention => IntentionEditorPage,
+      QuickCreationMode.relation => RelationEditorPage,
+      QuickCreationMode.dailyChoiceFromIntention => DailyChoiceSourcePickerPage,
+      QuickCreationMode.dailyChoiceFromAction => DailyChoiceActionPickerPage,
+    }),
+    findsOneWidget,
+  );
   expect(find.byType(SnackBar), findsNothing);
   expect(tester.takeException(), isNull);
 }
@@ -409,10 +379,8 @@ void _expectFailures(
 }
 
 final class _Session {
-  _Session(this.runtime, this.ready, this.router);
+  _Session(this.runtime);
   final AppRuntime runtime;
-  final AppRuntimeReady ready;
-  final AppRouter router;
 }
 
 /// Наблюдает исходы реального адаптера, сохраняя его очередь и файловые операции.

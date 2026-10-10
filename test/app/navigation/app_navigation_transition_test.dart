@@ -7,14 +7,15 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/ordinary_page_scaffold.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/shared/presentation/presentation_frame_evidence.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -98,27 +99,17 @@ void main() {
   }
 
   testWidgets('скрытая обычная страница не участвует в обходе фокуса и '
-      'семантики и не подтверждает кадр сообщения до возврата', (tester) async {
+      'семантики', (tester) async {
     final semantics = tester.ensureSemantics();
-    final subject = ValueNotifier<String?>(null);
-    addTearDown(subject.dispose);
-    final presented = <String>[];
     final router = await _start(tester);
     unawaited(
       router.pushNativeRoute<void>(
         MaterialPageRoute(
           builder: (_) => OrdinaryPageScaffold(
             appBar: AppBar(title: const Text('Скрытая страница')),
-            body: ValueListenableBuilder<String?>(
-              valueListenable: subject,
-              builder: (_, value, _) => PresentationFrameEvidence<String>(
-                subject: value,
-                onPresented: presented.add,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text('Скрытое сообщение'),
-                ),
-              ),
+            body: TextButton(
+              onPressed: () {},
+              child: const Text('Скрытое сообщение'),
             ),
           ),
         ),
@@ -128,9 +119,6 @@ void main() {
     unawaited(router.pushNativeRoute<void>(_ordinary('Верхняя страница')));
     await tester.pumpAndSettle();
 
-    subject.value = 'Сообщение';
-    await tester.pumpAndSettle();
-    expect(presented, isEmpty);
     final traversal = tester.semantics
         .simulatedAccessibilityTraversal()
         .toList();
@@ -148,11 +136,9 @@ void main() {
       final focused = FocusManager.instance.primaryFocus!.context!;
       expect(ModalRoute.of(focused)?.isCurrent, isTrue);
     }
-    expect(presented, isEmpty);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(presented, ['Сообщение']);
     expect(find.text('Скрытое сообщение').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
     semantics.dispose();
@@ -182,10 +168,21 @@ Future<void> _expectStationaryFrames(
     await tester.pump(const Duration(milliseconds: 16));
     expect(_bar, findsOneWidget, reason: 'кадр $frame');
     expect(tester.getRect(_bar), rect, reason: 'кадр $frame');
-    expect(tester.widget<AppNavigationBar>(_bar).selected, AppDestination.home);
     expect(
-      tester.widget<QuickCreationButton>(find.byType(QuickCreationButton)).mode,
-      mode,
+      find.descendant(
+        of: appNavigationDestination(AppDestination.home),
+        matching: find.byIcon(AppDestination.home.selectedIcon),
+      ),
+      findsOneWidget,
+      reason: 'кадр $frame',
+    );
+    expect(
+      find.descendant(
+        of: find.byType(QuickCreationButton),
+        matching: find.byIcon(mode.icon),
+      ),
+      findsOneWidget,
+      reason: 'кадр $frame',
     );
     expect(tester.takeException(), isNull, reason: 'кадр $frame');
   }

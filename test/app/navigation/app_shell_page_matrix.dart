@@ -4,7 +4,6 @@ part of 'app_shell_pages_above_test.dart';
 /// от каркаса, которым реализована страница. Каждая строка запускает тест.
 typedef _PageCase = ({
   String name,
-  String route,
   Type page,
   bool panel,
   List<_MatrixEntry> entries,
@@ -111,105 +110,90 @@ void _registerPageMatrixTests() {
   const cases = <_PageCase>[
     (
       name: 'намерение',
-      route: IntentionDetailsRoute.name,
       page: IntentionDetailsPage,
       panel: true,
       entries: [read],
     ),
     (
       name: 'долговременная связь',
-      route: RelationDetailsRoute.name,
       page: RelationDetailsPage,
       panel: true,
       entries: [read, _MatrixEntry.relation],
     ),
     (
       name: 'дневной выбор',
-      route: DailyChoiceDetailsRoute.name,
       page: DailyChoiceDetailsPage,
       panel: true,
       entries: [daily],
     ),
     (
       name: 'навигация по тегу',
-      route: TagNavigationRoute.name,
       page: TagNavigationPage,
       panel: true,
       entries: [tags, _MatrixEntry.tag],
     ),
     (
       name: 'просмотр тегов',
-      route: TagCatalogRoute.name,
       page: TagCatalogPage,
       panel: true,
       entries: [tags],
     ),
     (
       name: 'назначение тегов',
-      route: TagCatalogRoute.name,
       page: TagCatalogPage,
       panel: false,
       entries: [read, _MatrixEntry.assignTags],
     ),
     (
       name: 'теги черновика',
-      route: TagCatalogRoute.name,
       page: TagCatalogPage,
       panel: false,
       entries: [_MatrixEntry.creation, _MatrixEntry.draftTags],
     ),
     (
       name: 'создание тега',
-      route: TagEditorRoute.name,
       page: TagEditorPage,
       panel: false,
       entries: [tags, _MatrixEntry.createTag],
     ),
     (
       name: 'изменение тега',
-      route: TagEditorRoute.name,
       page: TagEditorPage,
       panel: false,
       entries: [tags, _MatrixEntry.renameTag],
     ),
     (
       name: 'условие по тегу',
-      route: TagConditionPickerRoute.name,
       page: TagConditionPickerPage,
       panel: false,
       entries: [_MatrixEntry.condition],
     ),
     (
       name: 'поиск действия',
-      route: DailyChoiceActionPickerRoute.name,
       page: DailyChoiceActionPickerPage,
       panel: false,
       entries: [_MatrixEntry.action],
     ),
     (
       name: 'поиск основания',
-      route: DailyChoiceSourcePickerRoute.name,
       page: DailyChoiceSourcePickerPage,
       panel: false,
       entries: [daily, _MatrixEntry.replaceChoice, _MatrixEntry.replaceTopDown],
     ),
     (
       name: 'создание намерения',
-      route: IntentionEditorRoute.name,
       page: IntentionEditorPage,
       panel: false,
       entries: [_MatrixEntry.creation],
     ),
     (
       name: 'путь от намерения',
-      route: ChoicePathRoute.name,
       page: ChoicePathPage,
       panel: false,
       entries: [read, _MatrixEntry.choosePath],
     ),
     (
       name: 'подтверждение дневного выбора сверху вниз',
-      route: DailyChoiceCreationRoute.name,
       page: DailyChoiceCreationPage,
       panel: false,
       entries: [
@@ -222,7 +206,6 @@ void _registerPageMatrixTests() {
     ),
     (
       name: 'подтверждение дневного выбора снизу вверх',
-      route: DailyChoiceCreationRoute.name,
       page: DailyChoiceCreationPage,
       panel: false,
       entries: [
@@ -235,21 +218,18 @@ void _registerPageMatrixTests() {
     ),
     (
       name: 'изменение дневного выбора',
-      route: DailyChoiceEditRoute.name,
       page: DailyChoiceEditPage,
       panel: false,
       entries: [daily, _MatrixEntry.editChoice],
     ),
     (
       name: 'создание исходящей связи',
-      route: RelationEditorRoute.name,
       page: RelationEditorPage,
       panel: false,
       entries: [read, _MatrixEntry.createRelation],
     ),
     (
       name: 'создание входящей связи',
-      route: RelationEditorRoute.name,
       page: RelationEditorPage,
       panel: false,
       entries: [
@@ -260,48 +240,27 @@ void _registerPageMatrixTests() {
     ),
     (
       name: 'изменение связи',
-      route: RelationEditorRoute.name,
       page: RelationEditorPage,
       panel: false,
       entries: [read, _MatrixEntry.relation, _MatrixEntry.editRelation],
     ),
     (
       name: 'поиск исходного участника',
-      route: RelationParticipantPickerRoute.name,
       page: RelationParticipantPickerPage,
       panel: false,
       entries: [read, _MatrixEntry.createRelation, _MatrixEntry.changeSource],
     ),
     (
       name: 'поиск связанного участника',
-      route: RelationParticipantPickerRoute.name,
       page: RelationParticipantPickerPage,
       panel: false,
       entries: [read, _MatrixEntry.createRelation, _MatrixEntry.selectRelated],
     ),
   ];
 
-  test('матрица проверяет каждый зарегистрированный маршрут приложения', () {
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    Iterable<String> names(List<AutoRoute> routes) sync* {
-      for (final route in routes) {
-        yield route.name;
-        yield* names(route.children ?? const []);
-      }
-    }
-
-    expect(names(router.routes).toSet(), {
-      AppShellRoute.name,
-      for (final destination in _rootPages.keys) destination.page.name,
-      for (final row in cases) row.route,
-    });
-    expect(_rootPages.keys, unorderedEquals(AppDestination.values));
-  });
-
   for (final row in cases) {
     testWidgets('матрица: ${row.name}', (tester) async {
-      final router = await _start(tester);
+      await _start(tester);
       var destination = AppDestination.home;
       for (final entry in row.entries) {
         final root = switch (entry) {
@@ -338,7 +297,6 @@ void _registerPageMatrixTests() {
       }
       await _until(tester, find.byType(row.page));
       await tester.pumpAndSettle();
-      expect(router.current.name, row.route);
       final variant = switch (tester.widget(find.byType(row.page))) {
         TagCatalogPage(:final selectionContext) => switch (selectionContext) {
           TagBrowseContext() => 'просмотр тегов',
@@ -369,7 +327,7 @@ void _registerPageMatrixTests() {
         expect(_pageForCatalogPurpose(section.purpose), row.page);
       }
       if (row.page == IntentionEditorPage) {
-        _expectCreationSheetAboveCatalog(tester, router);
+        _expectCreationSheetAboveCatalog(tester);
       } else {
         _expectAboveShell(
           tester,

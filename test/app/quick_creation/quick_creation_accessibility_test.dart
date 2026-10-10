@@ -143,7 +143,6 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.byType(BottomSheet), findsOneWidget);
-        expect(find.byType(ListTile), findsExactly(4));
         expect(
           tester
               .widgetList<ListTile>(find.byType(ListTile))

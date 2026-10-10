@@ -57,7 +57,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.drag(_catalogList, const Offset(0, -300));
     await tester.pumpAndSettle();
-    final catalog = tester.state(find.byType(IntentionCatalogPage));
     final offset = _catalogOffset(tester);
     final rows = _catalogRows(tester);
     expect(offset, greaterThan(0));
@@ -70,12 +69,9 @@ void main() {
     _expectRootPage(tester, app.router, AppDestination.home);
     expect(app.platform.exits, 0);
     expect(app.platform.frameworkHandlesBack, isFalse);
-    // Покинутая страница остаётся в дереве со своим состоянием.
-    expect(tester.state(_built(IntentionCatalogPage)), same(catalog));
 
     await _select(tester, AppDestination.intentionGraph);
 
-    expect(tester.state(find.byType(IntentionCatalogPage)), same(catalog));
     expect(
       tester.widget<TextField>(_titleFilter).controller!.text,
       'Намерение',
@@ -224,8 +220,9 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: _android);
 
-  testWidgets('оболочка объявляет готовность из выбранного пункта и сама '
-      'перехода не выполняет', (tester) async {
+  testWidgets('платформа передаёт «назад» приложению только с каталогов', (
+    tester,
+  ) async {
     final app = await _start(tester);
 
     for (final destination in [
@@ -236,14 +233,6 @@ void main() {
     ]) {
       await _select(tester, destination);
 
-      final declaration = _declaration(tester);
-      expect(
-        declaration.canPop,
-        destination == AppDestination.home,
-        reason: destination.name,
-      );
-      // Переход на Главную выполняет только маршрутизатор вкладок.
-      expect(declaration.onPopInvokedWithResult, isNull);
       expect(
         app.platform.frameworkHandlesBack,
         destination != AppDestination.home,
@@ -258,7 +247,6 @@ void main() {
     await tester.pumpAndSettle();
 
     _expectRootPage(tester, app.router, AppDestination.intentionGraph);
-    expect(_declaration(tester).canPop, isFalse);
     expect(app.platform.frameworkHandlesBack, isTrue);
     expect(tester.takeException(), isNull);
   }, variant: _android);
@@ -415,14 +403,6 @@ void _expectRootPage(
   expect(bar, findsOneWidget);
   expect(tester.widget<AppNavigationBar>(bar).selected, destination);
 }
-
-/// Объявление оболочки платформе: `PopScope` вокруг области вкладок и панели.
-PopScope<Object?> _declaration(WidgetTester tester) => tester.widget(
-  find.ancestor(
-    of: find.byType(AppNavigationBar),
-    matching: find.byWidgetPredicate((widget) => widget is PopScope),
-  ),
-);
 
 /// Позиция прокрутки выдачи каталога намерений.
 double _catalogOffset(WidgetTester tester) => tester

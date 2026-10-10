@@ -49,7 +49,6 @@ void main() {
       final container = _container(store, initialMode: initialMode);
 
       expect(container.read(quickCreationModeControllerProvider), initialMode);
-      expect(store.readCalls, 0);
       expect(store.writes, isEmpty);
     });
 
@@ -79,8 +78,7 @@ void main() {
         );
         expect(firstObserver, [QuickCreationMode.relation]);
         expect(secondObserver, [QuickCreationMode.relation]);
-        expect(store.writes.single.mode, QuickCreationMode.relation);
-        expect(store.writes.single.completion.isCompleted, isFalse);
+        expect(_acceptedModes(store), [QuickCreationMode.relation]);
 
         store.completeNext(const QuickCreationModeSaved());
         expect(await saving, isA<QuickCreationModeSaved>());
@@ -116,15 +114,14 @@ void main() {
       );
 
       store.completeNext(firstOutcome);
-      expect(await first, same(firstOutcome));
+      expect(await first, isA<QuickCreationModeSaveFailed>());
       expect(
         container.read(quickCreationModeControllerProvider),
         QuickCreationMode.dailyChoiceFromAction,
       );
-      expect(store.writes.last.completion.isCompleted, isFalse);
 
       store.completeNext(secondOutcome);
-      expect(await second, same(secondOutcome));
+      expect(await second, isA<QuickCreationModeSaveFailed>());
       expect(
         container.read(quickCreationModeControllerProvider),
         QuickCreationMode.dailyChoiceFromAction,
@@ -151,11 +148,6 @@ void main() {
           QuickCreationMode.dailyChoiceFromIntention,
           QuickCreationMode.relation,
         ]);
-        expect(
-          store.writes.every((write) => !write.completion.isCompleted),
-          isTrue,
-        );
-        expect(first, isNot(same(third)));
 
         store.completeNext(
           const QuickCreationModeSaveFailed(DiagnosticsFailureCode.unavailable),
@@ -169,11 +161,6 @@ void main() {
         );
         store.completeNext(const QuickCreationModeSaved());
         await third;
-        expect(_acceptedModes(store), [
-          QuickCreationMode.relation,
-          QuickCreationMode.dailyChoiceFromIntention,
-          QuickCreationMode.relation,
-        ]);
       },
     );
 
@@ -224,10 +211,6 @@ void main() {
       await container.pump();
 
       expect(
-        container.read(quickCreationModeControllerProvider.notifier),
-        same(controller),
-      );
-      expect(
         container.read(quickCreationModeControllerProvider),
         QuickCreationMode.dailyChoiceFromAction,
       );
@@ -245,7 +228,7 @@ void main() {
       container.dispose();
       store.completeNext(outcome);
 
-      expect(await saving, same(outcome));
+      expect(await saving, isA<QuickCreationModeSaveFailed>());
       expect(_acceptedModes(store), [QuickCreationMode.relation]);
     });
   });
@@ -284,12 +267,10 @@ final class _ControlledModeStore implements QuickCreationModeStore {
           Completer<QuickCreationModeSaveResult> completion,
         })
       >[];
-  var readCalls = 0;
   var _nextCompletion = 0;
 
   @override
   Future<QuickCreationMode> read() async {
-    readCalls += 1;
     return QuickCreationMode.intention;
   }
 

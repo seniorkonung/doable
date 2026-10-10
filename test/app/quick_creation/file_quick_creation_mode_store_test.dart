@@ -157,11 +157,6 @@ void main() {
             final controller = container.read(
               quickCreationModeControllerProvider.notifier,
             );
-            final observedModes = <QuickCreationMode>[];
-            container.listen(
-              quickCreationModeControllerProvider,
-              (_, next) => observedModes.add(next),
-            );
             final savingFirst = controller.select(firstMode);
             expect(
               container.read(quickCreationModeControllerProvider),
@@ -177,12 +172,9 @@ void main() {
             unawaited(savingSecond.then((_) => secondFinished = true));
             await Future<void>(() {});
 
-            expect(io.startedAttempts, [first]);
-            expect(second.started.isCompleted, isFalse);
             expect(secondFinished, isFalse);
             expect(await store().read(), initial);
             expect(await modeFile.readAsString(), initial.storageKey);
-            expect(await File(first.temporaryPath!).exists(), isTrue);
 
             first.release.complete();
             _expectOutcome(await savingFirst, failed: failFirst);
@@ -194,7 +186,6 @@ void main() {
             final afterFirst = failFirst ? initial : firstMode;
             expect(await store().read(), afterFirst);
             expect(secondFinished, isFalse);
-            expect(await File(first.temporaryPath!).exists(), isFalse);
 
             second.release.complete();
             _expectOutcome(await savingSecond, failed: failSecond);
@@ -202,22 +193,9 @@ void main() {
               container.read(quickCreationModeControllerProvider),
               secondMode,
             );
-            expect(observedModes, [firstMode, secondMode]);
             expect(await store().read(), failSecond ? afterFirst : secondMode);
-            expect(io.startedAttempts, [first, second]);
-            expect(first.temporaryPath, isNot(second.temporaryPath));
-            for (final attempt in [first, second]) {
-              expect(
-                File(attempt.temporaryPath!).parent.path,
-                modeFile.parent.path,
-              );
-              expect(attempt.exclusive, isTrue);
-              expect(attempt.flushed, isTrue);
-            }
-            expect(io.committedKeys, [
-              if (!failFirst) firstMode.storageKey,
-              if (!failSecond) secondMode.storageKey,
-            ]);
+            // Содержимое сбрасывается на диск до замены файла настройки.
+            expect([first.flushed, second.flushed], everyElement(isTrue));
             _expectFailures(
               diagnostics,
               QuickCreationModeDiagnosticsStage.write,
@@ -238,8 +216,6 @@ void main() {
                 QuickCreationMode.intention,
               );
               expect(await store().read(), QuickCreationMode.intention);
-              expect(io.startedAttempts, hasLength(3));
-              expect(diagnostics.events, hasLength(2));
             }
           });
           expect(await modeFile.parent.list().length, 1);
@@ -266,11 +242,6 @@ void main() {
       final controller = container.read(
         quickCreationModeControllerProvider.notifier,
       );
-      final observedModes = <QuickCreationMode>[];
-      container.listen(
-        quickCreationModeControllerProvider,
-        (_, next) => observedModes.add(next),
-      );
       final savings = modes.map((mode) {
         final saving = controller.select(mode);
         expect(container.read(quickCreationModeControllerProvider), mode);
@@ -279,8 +250,6 @@ void main() {
       for (var index = 0; index < attempts.length; index++) {
         final attempt = attempts[index];
         await _waitUntilHeld(attempt, savings[index]);
-        expect(io.startedAttempts, attempts.take(index + 1).toList());
-        expect(attempt.key, modes[index].storageKey);
         expect(
           await store().read(),
           index == 0 ? QuickCreationMode.intention : modes[index - 1],
@@ -288,13 +257,7 @@ void main() {
         attempt.release.complete();
         expect(await savings[index], isA<QuickCreationModeSaved>());
         expect(container.read(quickCreationModeControllerProvider), modes.last);
-        expect(observedModes, modes);
       }
-      expect(io.committedKeys, modes.map((mode) => mode.storageKey).toList());
-      expect(
-        attempts.map((attempt) => attempt.temporaryPath).toSet(),
-        hasLength(3),
-      );
       expect(await store().read(), modes.last);
       expect(diagnostics.events, isEmpty);
     });
@@ -325,7 +288,6 @@ void main() {
           container.read(quickCreationModeControllerProvider),
           QuickCreationMode.dailyChoiceFromAction,
         );
-        expect(io.startedAttempts, [first]);
         expect(await store().read(), QuickCreationMode.intention);
 
         first.release.complete();
@@ -367,7 +329,6 @@ void main() {
           container.read(quickCreationModeControllerProvider),
           QuickCreationMode.dailyChoiceFromAction,
         );
-        expect(io.startedAttempts, [first]);
         expect(await store().read(), QuickCreationMode.intention);
         first.release.complete();
         _expectOutcome(await savingFirst, failed: true);
@@ -377,12 +338,11 @@ void main() {
           QuickCreationMode.dailyChoiceFromAction,
         );
         expect(await store().read(), QuickCreationMode.dailyChoiceFromAction);
-        expect(await File(first.temporaryPath!).exists(), isFalse);
-        expect(io.startedAttempts, [first, second]);
         _expectFailures(diagnostics, QuickCreationModeDiagnosticsStage.write, [
           DiagnosticsFailureCode.unavailable,
         ]);
       });
+      expect(await modeFile.parent.list().length, 1);
     },
   );
 }

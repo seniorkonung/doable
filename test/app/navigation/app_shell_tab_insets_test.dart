@@ -108,6 +108,10 @@ void main() {
     await pump(_data(keyboard: 0, safeBottom: 34));
     expect(probe.data.viewInsets.bottom, 0);
     expect(probe.data.padding.bottom, 0);
+    // Состояние содержимого: нажатие считается и после смены вставок.
+    await tester.tap(find.byType(GestureDetector));
+    await tester.pump();
+    expect(find.text('1'), findsOneWidget);
 
     await pump(_data(keyboard: 400, safeBottom: 34));
     expect(probe.data.viewInsets.bottom, 400 - AppNavigationBar.height - 34);
@@ -119,8 +123,7 @@ void main() {
     expect(probe.data.viewInsets.bottom, 0);
     expect(probe.data.padding.bottom, 0);
 
-    expect(probe.created, 1);
-    expect(probe.disposed, 0);
+    expect(find.text('1'), findsOneWidget);
   });
 
   testWidgets('тело Scaffold внутри замены заканчивается на верхней границе '
@@ -182,16 +185,20 @@ Widget _host({
 }) {
   return MediaQuery(
     data: data,
-    child: AppShellTabInsets(barHeight: barHeight, child: _ProbeWidget(probe)),
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: AppShellTabInsets(
+        barHeight: barHeight,
+        child: _ProbeWidget(probe),
+      ),
+    ),
   );
 }
 
-/// Наблюдения содержимого: полученные данные `MediaQuery` и число созданий
-/// и удалений его состояния.
+/// Наблюдение содержимого: полученные данные `MediaQuery`. Содержимое хранит
+/// число нажатий, которое видно на экране, пока его состояние не пересоздано.
 final class _Probe {
   late MediaQueryData data;
-  int created = 0;
-  int disposed = 0;
 }
 
 final class _ProbeWidget extends StatefulWidget {
@@ -204,21 +211,14 @@ final class _ProbeWidget extends StatefulWidget {
 }
 
 final class _ProbeWidgetState extends State<_ProbeWidget> {
-  @override
-  void initState() {
-    super.initState();
-    widget.probe.created += 1;
-  }
-
-  @override
-  void dispose() {
-    widget.probe.disposed += 1;
-    super.dispose();
-  }
+  var _presses = 0;
 
   @override
   Widget build(BuildContext context) {
     widget.probe.data = MediaQuery.of(context);
-    return const SizedBox.shrink();
+    return GestureDetector(
+      onTap: () => setState(() => _presses += 1),
+      child: Text('$_presses'),
+    );
   }
 }

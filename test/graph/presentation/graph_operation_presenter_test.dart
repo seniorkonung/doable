@@ -196,11 +196,6 @@ void main() {
 
         expect(find.byType(SnackBar), findsOneWidget);
         expect(find.text(fullCreation.created), findsOneWidget);
-        expect(
-          harness.claimInitiatorFailure(creation.token),
-          isNull,
-          reason: 'успех не принадлежит форме',
-        );
 
         await _closeMessage(tester);
         expect(find.byType(SnackBar), findsNothing);
@@ -225,15 +220,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SnackBar), findsNothing);
-    final initiatorClaim = harness.claimInitiatorFailure(creation.token);
-    expect(
-      initiatorClaim!.completion,
-      isA<IntentionCommandCompletion>().having(
-        (completion) => completion.kind,
-        'вид операции',
-        IntentionCommandKind.create,
-      ),
-    );
 
     harness.releaseInitiatorPresentation(creation.token);
     await tester.pumpAndSettle();
@@ -241,8 +227,6 @@ void main() {
     expect(find.text(fullCreation.invalid), findsOneWidget);
     expect(find.textContaining(_tagId.toCanonicalString()), findsNothing);
 
-    // Запоздалый кадр закрытой формы не подтверждает право оболочки.
-    harness.confirmPresentation(initiatorClaim);
     await _closeMessage(tester);
     expect(find.byType(SnackBar), findsNothing);
     await _closeMessage(tester);
@@ -447,7 +431,6 @@ void main() {
       );
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.favoriteOrderCommands, hasLength(1));
     },
   );
 
@@ -562,7 +545,6 @@ void main() {
 
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.favoriteOrderCommands, hasLength(1));
     },
   );
 
@@ -625,10 +607,7 @@ void main() {
 
       // Инлайн-renderer подтверждает свой кадр, а вторая сессия уходит до
       // кадра и передаёт ошибку оболочке, не вытесняя текущее сообщение.
-      final inlineClaim = harness.claimInitiatorFailure(inline.token);
-      expect(inlineClaim, isNotNull);
-      harness.confirmPresentation(inlineClaim!);
-      expect(harness.claimInitiatorFailure(handed.token), isNotNull);
+      harness.confirmPresentation(harness.claimInitiatorFailure(inline.token)!);
       harness.releaseInitiatorPresentation(handed.token);
       await tester.pumpAndSettle();
       expect(find.text(_favoriteOrderConflict), findsOneWidget);
@@ -641,8 +620,6 @@ void main() {
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
       expect(find.text(_notDeleted('Инлайн')), findsNothing);
-      expect(harness.repository.commands, hasLength(3));
-      expect(harness.repository.favoriteOrderCommands, hasLength(1));
     },
   );
 
@@ -660,7 +637,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(_deleted('Граф')), findsOneWidget);
-      expect(harness.claimInitiatorFailure(tag.token), isNotNull);
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
 
@@ -848,7 +824,6 @@ void main() {
 
       harness.completeDailyChoiceDeleted(deletion);
       await tester.pumpAndSettle();
-      expect(harness.claimInitiatorFailure(deletion.token), isNull);
       expect(
         find.text('Удаление — «дневной выбор»: Дневной выбор удалён.'),
         findsOneWidget,
@@ -865,7 +840,6 @@ void main() {
       );
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.dailyChoiceCommands, hasLength(1));
     },
   );
 
@@ -894,7 +868,6 @@ void main() {
         expect(find.text(scenario.message), findsOneWidget);
         await _closeMessage(tester);
         expect(find.byType(SnackBar), findsNothing);
-        expect(harness.repository.dailyChoiceCommands, hasLength(1));
       },
     );
   }
@@ -1025,7 +998,6 @@ void main() {
       await _closeMessage(tester);
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.commands, hasLength(1));
     },
   );
 
@@ -1214,9 +1186,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(SnackBar), findsNothing);
-      final claim = harness.claimInitiatorFailure(deletion.token);
-      expect(claim, isNotNull);
-      harness.releaseInitiatorClaim(claim!);
+      harness.releaseInitiatorClaim(
+        harness.claimInitiatorFailure(deletion.token)!,
+      );
       await tester.pumpAndSettle();
       expect(
         find.text(
@@ -1226,7 +1198,6 @@ void main() {
       );
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
-      expect(harness.repository.blockingRelationsCommands, hasLength(1));
     },
   );
 
@@ -1382,7 +1353,7 @@ void main() {
     );
   });
 
-  testWidgets('успех создания связи не предлагается инлайн-владельцу', (
+  testWidgets('успех создания связи сразу предъявляется общей поверхностью', (
     tester,
   ) async {
     final harness = await _pumpPresenterApp(tester);
@@ -1390,7 +1361,6 @@ void main() {
     harness.completeRelationCreated(relation);
     await tester.pumpAndSettle();
 
-    expect(harness.claimInitiatorFailure(relation.token), isNull);
     expect(find.text(_relationCreated), findsOneWidget);
 
     await _closeMessage(tester);

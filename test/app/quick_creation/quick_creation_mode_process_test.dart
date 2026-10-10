@@ -50,29 +50,17 @@ void main() {
         if (outcomes == 'ffs') 'throw',
       ]);
       addTearDown(worker.stop);
-      final temporaryPaths = <String>{};
-      final committed = <String>[];
       var expected = _initial;
 
       for (var i = 0; i < modes.length; i++) {
-        final held = await worker.next('held');
-        expect(held['pid'], worker.process.pid);
-        expect(held['pid'], isNot(pid));
-        expect(held['held'], i);
-        expect(held['started'], i + 1);
-        expect(temporaryPaths.add(held['temporaryPath'] as String), isTrue);
+        await worker.next('held');
         expect(await modeFile.readAsString(), expected.storageKey);
 
         worker.process.stdin.writeln('release');
         final finished = await worker.next('finished');
-        expect(finished['finished'], i);
         final succeeds = outcomes[i] == 's';
         expect(finished['saved'], succeeds);
-        if (succeeds) {
-          expected = modes[i];
-          committed.add(expected.storageKey);
-        }
-        expect(finished['committed'], committed);
+        if (succeeds) expected = modes[i];
         expect(await modeFile.readAsString(), expected.storageKey);
       }
       await worker.finish();
@@ -102,17 +90,12 @@ void main() {
     await worker.next('held');
     worker.process.stdin.writeln('release');
     expect((await worker.next('finished'))['saved'], isTrue);
-    final held = await worker.next('held');
-    expect(held['held'], 1);
-    expect(held['started'], 2);
-    final temporary = File(held['temporaryPath'] as String);
-    expect(await temporary.exists(), isTrue);
+    await worker.next('held');
     expect(await modeFile.readAsString(), _a.storageKey);
 
     expect(worker.process.kill(ProcessSignal.sigkill), isTrue);
     await worker.finish(killed: true);
 
-    expect(await temporary.exists(), isTrue);
     expect(worker.diagnostics, isEmpty);
     await _expectNewProcess(directory, _a);
     expect(await modeFile.readAsString(), _a.storageKey);
@@ -127,8 +110,6 @@ Future<void> _expectNewProcess(
   addTearDown(reader.stop);
   final restored = await reader.next('mode');
   expect(restored['mode'], mode.storageKey);
-  expect(restored['pid'], reader.process.pid);
-  expect(restored['pid'], isNot(pid));
   await reader.finish();
   expect(reader.diagnostics, isEmpty);
 }

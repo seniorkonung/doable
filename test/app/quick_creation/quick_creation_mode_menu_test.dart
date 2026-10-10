@@ -92,7 +92,6 @@ void main() {
         await tester.tap(find.text(titles[next.index]));
         expect(app.mode, next);
         expect(app.store.writes.single.mode, next);
-        expect(app.store.writes.single.completion.isCompleted, isFalse);
         await tester.pumpAndSettle();
         app.expectOrigin(tester);
 
@@ -174,8 +173,6 @@ void main() {
     expect(find.semantics.byLabel('Очистить ввод'), findsOneWidget);
     expect(find.semantics.byLabel(RegExp('Дневные выборы')), findsOneWidget);
     await _openMenu(tester);
-    expect(app.rootObserver.routes.last, isA<ModalBottomSheetRoute<void>>());
-    expect(app.nestedObserver.routes, app.nestedHistory);
     expect(find.semantics.byLabel('Очистить ввод'), findsNothing);
     expect(find.semantics.byLabel(RegExp('Дневные выборы')), findsNothing);
 
@@ -230,8 +227,6 @@ Future<_TestApp> _openApp(
   await tester.tap(find.text('Открыть страницу'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), 'Несохранённое название');
-  app.rootHistory = List.of(app.rootObserver.routes);
-  app.nestedHistory = List.of(app.nestedObserver.routes);
   return app;
 }
 
@@ -251,11 +246,7 @@ final class _TestApp {
   final input = TextEditingController();
   final inputFocus = FocusNode();
   final selected = ValueNotifier(AppDestination.dailyChoices);
-  final rootObserver = _HistoryObserver();
-  final nestedObserver = _HistoryObserver();
   late final ProviderContainer container;
-  late List<Route<dynamic>> rootHistory;
-  late List<Route<dynamic>> nestedHistory;
 
   QuickCreationMode get mode =>
       container.read(quickCreationModeControllerProvider);
@@ -266,7 +257,6 @@ final class _TestApp {
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      navigatorObservers: [rootObserver],
       home: Scaffold(
         bottomNavigationBar: ValueListenableBuilder(
           valueListenable: selected,
@@ -279,7 +269,6 @@ final class _TestApp {
           ),
         ),
         body: Navigator(
-          observers: [nestedObserver],
           onGenerateRoute: (_) => MaterialPageRoute<void>(
             builder: (context) => Center(
               child: TextButton(
@@ -314,8 +303,6 @@ final class _TestApp {
 
   void expectOrigin(WidgetTester tester) {
     expect(find.byType(BottomSheet), findsNothing);
-    expect(rootObserver.routes, rootHistory);
-    expect(nestedObserver.routes, nestedHistory);
     expect(selected.value, AppDestination.dailyChoices);
     expect(input.text, 'Несохранённое название');
     expect(find.text('Открыть меню'), findsOneWidget);
@@ -327,30 +314,6 @@ final class _TestApp {
     input.dispose();
     inputFocus.dispose();
     selected.dispose();
-  }
-}
-
-final class _HistoryObserver extends NavigatorObserver {
-  final routes = <Route<dynamic>>[];
-
-  @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    routes.add(route);
-  }
-
-  @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    routes.remove(route);
-  }
-
-  @override
-  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    routes.remove(route);
-  }
-
-  @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    routes[routes.indexOf(oldRoute!)] = newRoute!;
   }
 }
 

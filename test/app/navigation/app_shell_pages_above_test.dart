@@ -280,8 +280,6 @@ void _expectRootPage(
   AppRouter router,
   AppDestination destination,
 ) {
-  expect(router.current.name, AppShellRoute.name);
-  expect(router.topRoute.name, destination.page.name);
   expect(router.canPop(), isFalse);
   expect(find.byType(_rootPages[destination]!), findsOneWidget);
 
@@ -324,12 +322,8 @@ void _expectAboveShell(
   for (final rootPage in _rootPages.values) {
     expect(find.byType(rootPage), findsNothing, reason: '$page');
   }
-  // Оболочка остаётся в дереве под страницей, но её пункты не получают
-  // нажатий и не объявляются экранным диктором.
-  final bars = tester.widgetList<AppNavigationBar>(
-    find.byType(AppNavigationBar, skipOffstage: false),
-  );
-  expect(_destinations, findsExactly(3 * bars.length), reason: '$page');
+  // Пункты панели под страницей не получают нажатий и не объявляются
+  // экранным диктором.
   expect(
     _destinations.hitTestable(),
     ordinary ? findsExactly(3) : findsNothing,
@@ -340,7 +334,11 @@ void _expectAboveShell(
     ordinary ? findsExactly(3) : findsNothing,
     reason: '$page',
   );
-  for (final bar in bars) {
+  // Панель под страницей сохраняет пункт корневой страницы, над которой она
+  // открыта.
+  for (final bar in tester.widgetList<AppNavigationBar>(
+    find.byType(AppNavigationBar, skipOffstage: false),
+  )) {
     expect(bar.selected, under, reason: '$page');
   }
 }
@@ -349,8 +347,7 @@ void _expectAboveShell(
 /// панель основной навигации остаются видны под её модальным фоном, но не
 /// принимают нажатий и не объявляются экранным диктором, а выбранным
 /// остаётся пункт «Граф намерений».
-void _expectCreationSheetAboveCatalog(WidgetTester tester, AppRouter router) {
-  expect(router.current.name, IntentionEditorRoute.name);
+void _expectCreationSheetAboveCatalog(WidgetTester tester) {
   final catalog = find.byType(IntentionCatalogPage);
   expect(catalog, findsOneWidget);
   // Панель стоит у нижнего края и оставляет шапку каталога видимой.

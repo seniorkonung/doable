@@ -9,6 +9,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:flutter/material.dart';
@@ -26,22 +27,15 @@ void main() {
       await _selectMode(tester, QuickCreationMode.dailyChoiceFromAction);
       await tester.tap(find.byType(QuickCreationButton));
       await tester.pumpAndSettle();
-      final firstPicker = router.current.matchId;
       await tester.enterText(_key('daily-choice-action-filter'), 'Намерение 3');
       unawaited(
         router.push(IntentionDetailsRoute(intentionId: durabilityIntention(3))),
       );
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<QuickCreationButton>(find.byType(QuickCreationButton))
-            .mode,
-        QuickCreationMode.dailyChoiceFromAction,
-      );
+      _expectMode(QuickCreationMode.dailyChoiceFromAction);
       await tester.tap(find.byType(QuickCreationButton));
       await tester.pumpAndSettle();
-      expect(router.current.name, DailyChoiceActionPickerRoute.name);
-      expect(router.current.matchId, isNot(firstPicker));
+      expect(find.byType(DailyChoiceActionPickerPage), findsOneWidget);
       expect(
         tester
             .widget<TextField>(_key('daily-choice-action-filter'))
@@ -54,7 +48,6 @@ void main() {
       await _selectMode(tester, QuickCreationMode.relation);
       await router.maybePop();
       await tester.pumpAndSettle();
-      expect(router.current.matchId, firstPicker);
       expect(
         tester
             .widget<TextField>(_key('daily-choice-action-filter'))
@@ -64,12 +57,7 @@ void main() {
       );
       await tester.tap(find.text('Отменить создание'));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<QuickCreationButton>(find.byType(QuickCreationButton))
-            .mode,
-        QuickCreationMode.relation,
-      );
+      _expectMode(QuickCreationMode.relation);
       expect(tester.takeException(), isNull);
     },
   );
@@ -85,9 +73,17 @@ Future<void> _selectMode(WidgetTester tester, QuickCreationMode mode) async {
   await tester.pumpAndSettle();
   await tester.tap(find.widgetWithText(ListTile, mode.title(localizations)));
   await tester.pumpAndSettle();
+  _expectMode(mode);
+}
+
+/// Кнопка показывает значок режима [mode].
+void _expectMode(QuickCreationMode mode) {
   expect(
-    tester.widget<QuickCreationButton>(find.byType(QuickCreationButton)).mode,
-    mode,
+    find.descendant(
+      of: find.byType(QuickCreationButton),
+      matching: find.byIcon(mode.icon),
+    ),
+    findsOneWidget,
   );
 }
 

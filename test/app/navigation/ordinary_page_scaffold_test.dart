@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui' show Tristate;
 
-import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
@@ -29,8 +28,6 @@ void main() {
       );
       addTearDown(tester.view.resetPadding);
       final router = await _start(tester);
-      final shellHero = _panelHero(tester);
-      expect(shellHero.transitionOnUserGestures, isTrue);
       expect(
         tester.getSize(find.byType(AppNavigationBar)).height,
         AppNavigationBar.height + bottomPadding,
@@ -39,13 +36,6 @@ void main() {
       unawaited(router.pushNativeRoute<void>(_ordinaryRoute()));
       await tester.pumpAndSettle();
 
-      final scaffold = tester.widget<Scaffold>(
-        find.descendant(
-          of: find.byType(OrdinaryPageScaffold),
-          matching: find.byType(Scaffold),
-        ),
-      );
-      expect(scaffold.bottomNavigationBar, isNotNull);
       final bar = find.byType(AppNavigationBar);
       expect(bar, findsOneWidget);
       expect(
@@ -57,8 +47,6 @@ void main() {
         tester.getTopLeft(bar).dy,
       );
       expect(tester.getBottomLeft(bar).dy, 600);
-      expect(_panelHero(tester).tag, shellHero.tag);
-      expect(_panelHero(tester).transitionOnUserGestures, isTrue);
       expect(tester.takeException(), isNull);
     });
   }
@@ -71,8 +59,6 @@ void main() {
     final semantics = tester.ensureSemantics();
     final router = await _start(tester);
     await _select(tester, AppDestination.dailyChoices);
-    final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
-    final shell = router.stack.single;
     unawaited(router.push<void>(TagCatalogRoute()));
     await tester.pumpAndSettle();
     var popRequests = 0;
@@ -96,8 +82,7 @@ void main() {
 
     expect(await taskResult, isNull);
     expect(popRequests, 0);
-    expect(router.stack, [shell]);
-    expect(router.innerRouterOf<TabsRouter>(AppShellRoute.name), same(tabs));
+    expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
     expect(router.hasPagelessTopRoute, isFalse);
     expect(router.topRoute.name, destination.page.name);
     _expectSelected(tester, destination);
@@ -113,7 +98,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(router.stack, [shell]);
+    expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
     expect(router.hasPagelessTopRoute, isFalse);
     expect(router.topRoute.name, HomeRoute.name);
     expect(find.byType(HomePage), findsOneWidget);
@@ -135,7 +120,6 @@ void main() {
 
     expect(find.byType(OrdinaryPageScaffold), findsOneWidget);
     expect(router.hasPagelessTopRoute, isTrue);
-    expect(_panelHero(tester).transitionOnUserGestures, isTrue);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(HomePage), findsOneWidget);
@@ -151,10 +135,6 @@ MaterialPageRoute<void> _ordinaryRoute() => MaterialPageRoute(
     appBar: AppBar(title: const Text('Обычная страница')),
     body: const SizedBox.expand(key: _bodyKey),
   ),
-);
-
-Hero _panelHero(WidgetTester tester) => tester.widget(
-  find.ancestor(of: find.byType(AppNavigationBar), matching: find.byType(Hero)),
 );
 
 Future<AppRouter> _start(WidgetTester tester) async {

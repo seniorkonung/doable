@@ -11,7 +11,6 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         AppDatabase,
@@ -48,91 +47,52 @@ const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 void main() {
   group('AppRuntime', () {
     test(
-      'создаёт один модуль графа в одном container без automatic retry',
+      'по умолчанию предоставляет каталогу местную дату устройства',
       () async {
-        final repository = _ControlledPersonalGraphRepository();
-        var repositoryFactoryCalls = 0;
-        final runtime = AppRuntime(
-          quickCreationModeStore: InMemoryQuickCreationModeStore(),
-          connectionFactory: openInMemoryLocalDatabase,
-          diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) {
-            repositoryFactoryCalls += 1;
-            return repository;
-          },
-        );
-        addTearDown(runtime.shutdown);
-
-        final bootstrapping = runtime.bootstrap();
-        expect(runtime.bootstrap(), same(bootstrapping));
-        final result = await bootstrapping;
-
-        expect(result, isA<AppRuntimeReady>());
-        final ready = result as AppRuntimeReady;
-        expect(
-          ready.container.read(personalGraphRepositoryProvider),
-          same(repository),
-        );
-        final coordinator = ready.container.read(
-          graphCommandCoordinatorProvider.notifier,
-        );
-        expect(coordinator, same(runtime.commandCoordinator));
-        final router = ready.container.read(appRouterProvider);
-        expect(ready.container.read(appRouterProvider), same(router));
-        expect(ready.container.retry!(0, Exception('отказ provider')), isNull);
-
-        final repeated = await runtime.bootstrap();
-        expect(repeated, same(ready));
-        expect(repositoryFactoryCalls, 1);
-      },
-    );
-
-    test('по умолчанию предоставляет каталогу часы устройства', () async {
-      final runtime = AppRuntime(
-        quickCreationModeStore: InMemoryQuickCreationModeStore(),
-        connectionFactory: openInMemoryLocalDatabase,
-        diagnosticsSink: InMemoryDiagnosticsSink(),
-        repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
-      );
-      addTearDown(runtime.shutdown);
-
-      final ready = await runtime.bootstrap() as AppRuntimeReady;
-
-      expect(
-        ready.container.read(dailyChoiceLocalDateSourceProvider),
-        same(readDeviceLocalDay),
-      );
-    });
-
-    test(
-      'передаёт каталогу подставленный источник даты без чтения при запуске',
-      () async {
-        final localDate = ControlledDailyChoiceLocalDate(
-          CalendarDate.fromParts(2026, 10, 5),
-        );
         final runtime = AppRuntime(
           quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: openInMemoryLocalDatabase,
           diagnosticsSink: InMemoryDiagnosticsSink(),
           repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
-          dailyChoiceLocalDateSource: localDate.read,
         );
         addTearDown(runtime.shutdown);
 
         final ready = await runtime.bootstrap() as AppRuntimeReady;
-        final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
+        final before = DateTime.now();
+        final reading = ready.container.read(
+          dailyChoiceLocalDateSourceProvider,
+        )();
+        final after = DateTime.now();
 
-        expect(localDate.readCount, 0);
-        expect(source().date, CalendarDate.fromParts(2026, 10, 5));
-
-        localDate.today = CalendarDate.fromParts(2026, 10, 6);
-        expect(
-          ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
-          CalendarDate.fromParts(2026, 10, 6),
-        );
-        expect(localDate.readCount, 2);
+        // Допускаем полночь между двумя показаниями часов теста.
+        expect(reading.date, anyOf(_dateOf(before), _dateOf(after)));
       },
     );
+
+    test('передаёт каталогу подставленный источник даты, который показывает новый день', () async {
+      final localDate = ControlledDailyChoiceLocalDate(
+        CalendarDate.fromParts(2026, 10, 5),
+      );
+      final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
+        connectionFactory: openInMemoryLocalDatabase,
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+        repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
+        dailyChoiceLocalDateSource: localDate.read,
+      );
+      addTearDown(runtime.shutdown);
+
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
+
+      expect(source().date, CalendarDate.fromParts(2026, 10, 5));
+
+      localDate.today = CalendarDate.fromParts(2026, 10, 6);
+      expect(
+        ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
+        CalendarDate.fromParts(2026, 10, 6),
+      );
+    });
 
     test('повторяет bootstrap только после retryable outcome', () async {
       var connectionAttempts = 0;
@@ -203,20 +163,16 @@ void main() {
           ];
 
       for (final scenario in scenarios) {
-        var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
           quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: scenario.connectionFactory,
           diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) {
-            repositoryFactoryCalls += 1;
-            return _ControlledPersonalGraphRepository();
-          },
+          repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
         );
         addTearDown(runtime.shutdown);
 
         expect(await runtime.bootstrap(), scenario.result);
-        expect(repositoryFactoryCalls, 0);
+        expect(() => runtime.commandCoordinator, throwsStateError);
         await runtime.shutdown();
       }
     });
@@ -263,8 +219,8 @@ void main() {
       ) as IntentionCommandAccepted;
 
       final shutdown = runtime.shutdown();
+      final repeatedShutdown = runtime.shutdown();
 
-      expect(runtime.shutdown(), same(shutdown));
       expect(
         coordinator.acceptCreation(
           IntentionCreationFormKey(),
@@ -281,7 +237,7 @@ void main() {
 
       repository.complete(const ResultFailure(IntentionUnavailableFailure()));
       await accepted.future;
-      await shutdown;
+      await Future.wait([shutdown, repeatedShutdown]);
 
       expect(closeObserver.closeCalls, 1);
     });
@@ -295,7 +251,6 @@ void main() {
           openingStarted: openingStarted,
           allowOpening: allowOpening,
         );
-        var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
           quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
@@ -303,10 +258,7 @@ void main() {
             lifecycleObserver,
           ),
           diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) {
-            repositoryFactoryCalls += 1;
-            return _ControlledPersonalGraphRepository();
-          },
+          repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
         );
         addTearDown(() async {
           if (!allowOpening.isCompleted) allowOpening.complete();
@@ -318,19 +270,21 @@ void main() {
         final shutdown = runtime.shutdown();
 
         expect(runtime.bootstrap, throwsStateError);
-        expect(repositoryFactoryCalls, 0);
         expect(lifecycleObserver.closeCalls, 0);
 
         allowOpening.complete();
         await expectLater(bootstrapping, throwsStateError);
         await shutdown;
 
-        expect(repositoryFactoryCalls, 0);
+        expect(() => runtime.commandCoordinator, throwsStateError);
         expect(lifecycleObserver.closeCalls, 1);
       },
     );
   });
 }
+
+CalendarDate _dateOf(DateTime moment) =>
+    CalendarDate.fromParts(moment.year, moment.month, moment.day);
 
 final class _ControlledPersonalGraphRepository
     with

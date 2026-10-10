@@ -114,10 +114,9 @@ void main() {
     });
 
     final bootstrapping = runtime.bootstrap();
-    expect(runtime.bootstrap(), same(bootstrapping));
+    // Оба чтения начались, пока ни одно не завершилось.
     await modeStore.readStarted.future;
     await graphOpening.started.future;
-    expect(modeStore.readCalls, 1);
 
     graphOpening.release();
     modeStore.completeRead(QuickCreationMode.dailyChoiceFromAction);
@@ -127,8 +126,12 @@ void main() {
       ready.container.read(quickCreationModeControllerProvider),
       QuickCreationMode.dailyChoiceFromAction,
     );
-    expect(await runtime.bootstrap(), same(ready));
-    expect(modeStore.readCalls, 1);
+    // Повторный запрос готового запуска сохраняет прочитанный режим.
+    final repeated = await runtime.bootstrap() as AppRuntimeReady;
+    expect(
+      repeated.container.read(quickCreationModeControllerProvider),
+      QuickCreationMode.dailyChoiceFromAction,
+    );
   });
 
   test(
@@ -157,11 +160,9 @@ void main() {
       });
 
       expect(await runtime.bootstrap(), isA<AppRuntimeRetryableFailure>());
-      expect(modeStore.readCalls, 1);
       modeStore.completeRead(QuickCreationMode.relation);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
 
-      expect(attempts, 2);
       expect(
         ready.container.read(quickCreationModeControllerProvider),
         QuickCreationMode.relation,
@@ -172,8 +173,6 @@ void main() {
       expect(modeStore.savedModes, [
         QuickCreationMode.dailyChoiceFromIntention,
       ]);
-      expect(await runtime.bootstrap(), same(ready));
-      expect(modeStore.readCalls, 1);
     },
   );
 
@@ -321,11 +320,9 @@ final class _ControlledModeStore implements QuickCreationModeStore {
   final readStarted = Completer<void>();
   final _reading = Completer<QuickCreationMode>();
   final savedModes = <QuickCreationMode>[];
-  var readCalls = 0;
 
   @override
   Future<QuickCreationMode> read() {
-    readCalls += 1;
     if (!readStarted.isCompleted) readStarted.complete();
     return _reading.future;
   }

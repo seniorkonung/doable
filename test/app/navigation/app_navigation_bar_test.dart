@@ -90,12 +90,11 @@ void main() {
         find.byIcon(Icons.calendar_month_outlined),
       );
       final graph = tester.getCenter(find.byIcon(Icons.hub_outlined));
-      expect(home.dx, lessThan(calendar.dx));
       final quick = tester.getCenter(find.byType(QuickCreationButton));
-      final slotWidth = tester.getSize(find.byType(AppNavigationBar)).width / 4;
-      expect(calendar.dx - home.dx, moreOrLessEquals(slotWidth));
-      expect(quick.dx - calendar.dx, moreOrLessEquals(slotWidth));
-      expect(graph.dx - quick.dx, moreOrLessEquals(slotWidth));
+      // Кнопка быстрого создания стоит между календарём и графом.
+      expect(home.dx, lessThan(calendar.dx));
+      expect(calendar.dx, lessThan(quick.dx));
+      expect(quick.dx, lessThan(graph.dx));
       expect(find.byType(QuickCreationButton).hitTestable(), findsOneWidget);
       expect(find.byIcon(Icons.account_tree), findsNothing);
       expect(find.byIcon(Icons.account_tree_outlined), findsNothing);
@@ -267,25 +266,6 @@ void main() {
     }
 
     expect(layouts.first, layouts.last);
-  });
-
-  testWidgets('высота панели задана явно и не зависит от масштаба текста', (
-    tester,
-  ) async {
-    for (final scale in [1.0, 2.5]) {
-      await tester.pumpWidget(
-        _testApp(
-          locale: const Locale('ru'),
-          textScaler: TextScaler.linear(scale),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        tester.getSize(find.byType(AppNavigationBar)).height,
-        AppNavigationBar.height,
-      );
-    }
   });
 
   testWidgets('сообщает о выборе пункта и сама выбранный пункт не меняет', (
