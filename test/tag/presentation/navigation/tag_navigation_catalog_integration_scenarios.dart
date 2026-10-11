@@ -83,37 +83,6 @@ void _realTagNavigationCatalogScenarios() {
     );
   }
 
-  test('реально устаревший снимок адаптера восстанавливает первую порцию навигации', () async {
-    final h = await _RealNavigationHarness.open();
-    addTearDown(h.dispose);
-    final first = await h.loaded((_) => true);
-    h.raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-      'Новое название получателя',
-      tagFixtureId(1),
-    ]);
-
-    await h.model.loadMore();
-    final fresh = await h.loaded(
-      (state) => state.items.first.title == 'Новое название получателя',
-    );
-    expect(fresh.items, hasLength(50));
-    expect(
-      fresh.items.map((item) => item.id),
-      first.items.map((item) => item.id),
-    );
-    expect(fresh.nextCursor, isNotNull);
-    expect(
-      h.states,
-      anyElement(
-        isA<TagNavigationLoaded>().having(
-          (state) => state.freshness,
-          'обновление',
-          TagNavigationFreshness.refreshing,
-        ),
-      ),
-    );
-  });
-
   for (final scope in TaggedIntentionsScope.values) {
     test('полный пакет настоящего создания обновляет навигацию каждого '
         'начального тега и совпадает с чтением назначений: '

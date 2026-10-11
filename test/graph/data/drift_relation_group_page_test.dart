@@ -211,31 +211,6 @@ void main() {
     },
   );
 
-  test('отклоняет cursor другой группы или размера как валидацию', () async {
-    await _insertSingleActiveNeedRelation(database, ownerId);
-    final first = _page(
-      await repository.getRelationGroupPage(_query(ownerId, pageSize: 1)),
-    );
-    final cursor = first.nextCursor!;
-
-    final otherType = await repository.getRelationGroupPage(
-      RelationGroupQuery(
-        intentionId: ownerId,
-        type: LongTermRelationType.can,
-        direction: RelationDirection.outgoing,
-        scope: RelationScope.active,
-        pageSize: 1,
-        cursor: cursor,
-      ),
-    );
-    final otherSize = await repository.getRelationGroupPage(
-      _query(ownerId, pageSize: 2, cursor: cursor),
-    );
-
-    expect(_failure(otherType), isA<RelationGroupReadValidationFailure>());
-    expect(_failure(otherSize), isA<RelationGroupReadValidationFailure>());
-  });
-
   test('возвращает истёкший снимок после новой ревизии и эпохи', () async {
     await _insertSingleActiveNeedRelation(database, ownerId);
     final first = _page(

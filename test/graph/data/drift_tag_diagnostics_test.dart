@@ -46,8 +46,6 @@ final class _ReadFault extends LocalDatabaseConnectionObserver {
   }
 }
 
-final class _ForeignTaggedCursor implements TaggedIntentionsCursor {}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
@@ -79,30 +77,15 @@ void main() {
     final graph = repository(sink);
     final id =
         (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
-    TaggedIntentionsQuery query({TaggedIntentionsCursor? cursor}) =>
-        TaggedIntentionsQuery(
-          tagId: id,
-          scope: TaggedIntentionsScope.active,
-          pageSize: 1,
-          cursor: cursor,
-        );
+    TaggedIntentionsQuery query() => TaggedIntentionsQuery(
+      tagId: id,
+      scope: TaggedIntentionsScope.active,
+      pageSize: 1,
+    );
 
     expect(
       await graph.getTaggedIntentionsPage(query()),
       isA<TaggedIntentionsPageSuccess>(),
-    );
-    expect(
-      await graph.getTaggedIntentionsPage(
-        query(cursor: _ForeignTaggedCursor()),
-      ),
-      isA<TaggedIntentionsPageError>(),
-    );
-    final validation = sink.events
-        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-        .last;
-    expect(
-      (validation.status as DiagnosticsFailed).code,
-      DiagnosticsFailureCode.validation,
     );
 
     readFault.failure = sqlite.SqliteException(

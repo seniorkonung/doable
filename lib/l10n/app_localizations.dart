@@ -1988,12 +1988,6 @@ abstract class AppLocalizations {
   /// **'Could not load tagged intentions because of an unexpected error.'**
   String get tagNavigationUnexpected;
 
-  /// Недопустимое продолжение навигации
-  ///
-  /// In en, this message translates to:
-  /// **'This result continuation is invalid. Reopen tag navigation.'**
-  String get tagNavigationInvalidCursor;
-
   /// Истёкший снимок навигации
   ///
   /// In en, this message translates to:
@@ -3719,12 +3713,6 @@ abstract class AppLocalizations {
   /// **'An intention on this path no longer exists.'**
   String get choicePathNotFound;
 
-  /// Недопустимый запрос продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Continuations could not be checked because of an invalid request.'**
-  String get choicePathInvalid;
-
   /// Временная недоступность продолжений
   ///
   /// In en, this message translates to:
@@ -3910,12 +3898,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The catalog changed. Refresh it to continue.'**
   String get dailyChoiceCatalogExpired;
-
-  /// Недопустимая позиция каталога
-  ///
-  /// In en, this message translates to:
-  /// **'The catalog position is no longer valid.'**
-  String get dailyChoiceCatalogInvalid;
 
   /// Непредвиденная ошибка чтения дневного каталога
   ///

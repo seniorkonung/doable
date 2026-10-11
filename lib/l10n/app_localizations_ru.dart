@@ -1145,10 +1145,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить намерения с тегом из-за непредвиденной ошибки.';
 
   @override
-  String get tagNavigationInvalidCursor =>
-      'Продолжение выдачи недействительно. Откройте навигацию по тегу заново.';
-
-  @override
   String get tagNavigationSnapshotExpired =>
       'Список изменился. Откройте навигацию по тегу заново.';
 
@@ -2180,10 +2176,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get choicePathNotFound => 'Намерение пути больше не существует.';
 
   @override
-  String get choicePathInvalid =>
-      'Не удалось проверить продолжения из-за неверного запроса.';
-
-  @override
   String get choicePathUnavailable =>
       'Продолжения временно недоступны. Повторите попытку.';
 
@@ -2287,10 +2279,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoiceCatalogExpired =>
       'Каталог изменился. Обновите его, чтобы продолжить.';
-
-  @override
-  String get dailyChoiceCatalogInvalid =>
-      'Позиция каталога больше недействительна.';
 
   @override
   String get dailyChoiceCatalogUnexpected =>

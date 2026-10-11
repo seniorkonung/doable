@@ -1417,7 +1417,7 @@ String _initialFailureMessage(
     localizations.relationNeighborhoodInitialCorruption,
   RelationGroupUnexpectedFailure() =>
     localizations.relationNeighborhoodInitialUnexpected,
-  RelationGroupReadValidationFailure() || RelationGroupSnapshotExpired() =>
+  RelationGroupSnapshotExpired() =>
     localizations.relationNeighborhoodInitialInvalid,
   RelationGroupIntentionNotFoundFailure() =>
     localizations.relationNeighborhoodIntentionNotFound,
@@ -1433,8 +1433,6 @@ String _loadMoreFailureMessage(
     localizations.relationNeighborhoodLoadMoreCorruption,
   RelationGroupUnexpectedFailure() =>
     localizations.relationNeighborhoodLoadMoreUnexpected,
-  RelationGroupReadValidationFailure() ||
-  RelationGroupSnapshotExpired() ||
-  RelationGroupIntentionNotFoundFailure() =>
+  RelationGroupSnapshotExpired() || RelationGroupIntentionNotFoundFailure() =>
     localizations.relationNeighborhoodLoadMoreInvalid,
 };

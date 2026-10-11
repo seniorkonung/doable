@@ -14,7 +14,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
           requiresNewSnapshot: requiresNewSnapshot,
           status: status,
         ),
-        _ => RelationGroupPageReadDiagnosticsEvent(
+        RelationGroupQuery() => RelationGroupPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
           isContinuation: isContinuation,
           requiresNewSnapshot: requiresNewSnapshot,
@@ -55,13 +55,16 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     DailyChoiceGroupQuery() => _readDailyChoiceGroupPageOnCurrentSnapshot(
       query,
     ),
-    _ => throw const _InvalidRelationGroupCursor(),
   };
 
   Future<RelationGroupPage> _readLongTermRelationGroupPageOnCurrentSnapshot(
     RelationGroupQuery query,
   ) async {
-    final cursor = query.cursor;
+    final _DriftRelationGroupCursor? cursor = switch (query.cursor) {
+      null => null,
+      final _DriftRelationGroupCursor own => own,
+      _ => throw StateError('Недопустимый курсор группы связей.'),
+    };
     if (cursor == null) {
       await _requireRelationGroupOwner(query.intentionId);
       final counts = await _readVerifiedRelationCounts(query.intentionId);
@@ -88,7 +91,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
         counts: counts,
         nextCursor: hasNextPage
             ? _relationGroupCursorAt(
-                query,
                 items.last.relation,
                 revision: revision,
                 expectedCount: expectedCount,
@@ -100,10 +102,8 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
       );
     }
 
-    if (cursor is! _DriftRelationGroupCursor || !cursor.matches(query)) {
-      throw const _InvalidRelationGroupCursor();
-    }
-    if (!cursor.isCurrentFor(_epoch, _currentRevision)) {
+    if (cursor.revision.compareTo(_currentRevision) !=
+        GraphRevisionOrder.same) {
       throw const _RelationGroupSnapshotHasExpired();
     }
 
@@ -125,7 +125,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
       items: items,
       nextCursor: hasNextPage
           ? _relationGroupCursorAt(
-              query,
               items.last.relation,
               revision: cursor.revision,
               expectedCount: cursor.expectedCount,
@@ -142,13 +141,12 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   ) async {
     final _DriftDailyChoiceGroupCursor? cursor = switch (query.cursor) {
       null => null,
-      _DriftDailyChoiceGroupCursor cursor => cursor,
-      _ => throw const _InvalidRelationGroupCursor(),
+      final _DriftDailyChoiceGroupCursor own => own,
+      _ => throw StateError('Недопустимый курсор группы дневных выборов.'),
     };
-    if (cursor != null && !cursor.matches(query)) {
-      throw const _InvalidRelationGroupCursor();
-    }
-    if (cursor != null && !cursor.isCurrentFor(_epoch, _currentRevision)) {
+    if (cursor != null &&
+        cursor.revision.compareTo(_currentRevision) !=
+            GraphRevisionOrder.same) {
       throw const _RelationGroupSnapshotHasExpired();
     }
 
@@ -193,11 +191,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     final revision = _currentRevision;
     final nextCursor = hasNextPage
         ? _DriftDailyChoiceGroupCursor(
-            epoch: _epoch,
             revision: revision,
-            intentionId: query.intentionId,
-            role: query.role,
-            pageSize: query.pageSize,
             boundaryDate: _requiredStoredString(
               selectedRows.last.data,
               'choice_date',
@@ -448,20 +442,13 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   }
 
   _DriftRelationGroupCursor _relationGroupCursorAt(
-    RelationGroupQuery query,
     relation_domain.LongTermRelation boundary, {
     required GraphRevision revision,
     required int expectedCount,
     required int returnedCount,
     required int ownerActiveRelationCount,
   }) => _DriftRelationGroupCursor(
-    epoch: _epoch,
     revision: revision,
-    intentionId: query.intentionId,
-    type: query.type,
-    direction: query.direction,
-    scope: query.scope,
-    pageSize: query.pageSize,
     boundaryPriority: switch (boundary.priority) {
       relation_domain.RelationPriority.p1 => 1,
       relation_domain.RelationPriority.p2 => 2,
@@ -588,13 +575,7 @@ final class _StoredRelationGroupRow {
 
 final class _DriftRelationGroupCursor implements RelationGroupCursor {
   const _DriftRelationGroupCursor({
-    required this.epoch,
     required this.revision,
-    required this.intentionId,
-    required this.type,
-    required this.direction,
-    required this.scope,
-    required this.pageSize,
     required this.boundaryPriority,
     required this.boundaryCreationSequence,
     required this.expectedCount,
@@ -602,71 +583,34 @@ final class _DriftRelationGroupCursor implements RelationGroupCursor {
     required this.ownerActiveRelationCount,
   });
 
-  final _GraphEpoch epoch;
   final GraphRevision revision;
-  final IntentionId intentionId;
-  final relation_domain.LongTermRelationType type;
-  final relation_domain.RelationDirection direction;
-  final relation_domain.RelationScope scope;
-  final int pageSize;
   final int boundaryPriority;
   final int boundaryCreationSequence;
   final int expectedCount;
   final int returnedCount;
   final int ownerActiveRelationCount;
-
-  bool matches(RelationGroupQuery query) =>
-      intentionId == query.intentionId &&
-      type == query.type &&
-      direction == query.direction &&
-      scope == query.scope &&
-      pageSize == query.pageSize;
-
-  bool isCurrentFor(_GraphEpoch currentEpoch, GraphRevision currentRevision) =>
-      identical(epoch, currentEpoch) &&
-      revision.compareTo(currentRevision) == GraphRevisionOrder.same;
 }
 
 final class _DriftDailyChoiceGroupCursor implements RelationGroupCursor {
   const _DriftDailyChoiceGroupCursor({
-    required this.epoch,
     required this.revision,
-    required this.intentionId,
-    required this.role,
-    required this.pageSize,
     required this.boundaryDate,
     required this.boundaryCreationSequence,
     required this.expectedCount,
     required this.returnedCount,
   });
 
-  final _GraphEpoch epoch;
   final GraphRevision revision;
-  final IntentionId intentionId;
-  final DailyChoiceRelationRole role;
-  final int pageSize;
   final String boundaryDate;
   final int boundaryCreationSequence;
   final int expectedCount;
   final int returnedCount;
-
-  bool matches(DailyChoiceGroupQuery query) =>
-      intentionId == query.intentionId &&
-      role == query.role &&
-      pageSize == query.pageSize;
-
-  bool isCurrentFor(_GraphEpoch currentEpoch, GraphRevision currentRevision) =>
-      identical(epoch, currentEpoch) &&
-      revision.compareTo(currentRevision) == GraphRevisionOrder.same;
 }
 
 RelationGroupReadFailure _classifyRelationGroupReadFailure(
   Object error,
   RelationGroupPageQuery query,
 ) {
-  if (error is _InvalidRelationGroupCursor) {
-    return const RelationGroupReadValidationFailure();
-  }
   if (error is _RelationGroupSnapshotHasExpired) {
     return const RelationGroupSnapshotExpired();
   }
@@ -719,10 +663,6 @@ IntentionId _decodeStoredRelationIntentionId(String value) =>
       IntentionIdDecodingSuccess(:final id) => id,
       InvalidIntentionIdDecoding() => throw const _StoredIntentionCorruption(),
     };
-
-final class _InvalidRelationGroupCursor implements Exception {
-  const _InvalidRelationGroupCursor();
-}
 
 final class _RelationGroupSnapshotHasExpired implements Exception {
   const _RelationGroupSnapshotHasExpired();

@@ -189,23 +189,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     );
 
     final cursor = query.cursor;
-    if (cursor != null &&
-        (cursor is! _DriftIntentionCatalogCursor ||
-            !cursor.isOwnedBy(_epoch) ||
-            !cursor.matches(query))) {
-      const failure = IntentionGenericValidationFailure();
-      _recordDiagnostics(
-        CatalogPageReadDiagnosticsEvent(
-          pageSize: query.pageSize,
-          status: DiagnosticsFailed(
-            duration: stopwatch.elapsed,
-            code: _diagnosticsFailureCode(failure),
-          ),
-        ),
-      );
-      return const ResultFailure(failure);
-    }
-
     try {
       final page = await _sequencer.run(
         () => _database.transaction(
@@ -266,42 +249,37 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     }
 
     const invalidInput = IntentionGenericValidationFailure();
-    final _DriftIntentionCatalogCursor? area;
-    switch (query.boundary) {
-      case IntentionCatalogCompletedBoundary():
-        area = null;
-      case IntentionCatalogPartialPrefixBoundary(
-            continuation: final _DriftIntentionCatalogCursor continuation,
-          )
-          when continuation.isOwnedBy(_epoch) &&
-              continuation.matches(catalogQuery):
-        area = continuation;
-      case IntentionCatalogPartialPrefixBoundary():
-        return fail(invalidInput);
-    }
-    final cursor = query.cursor;
-    if (catalogQuery.cursor != null ||
-        cursor != null &&
-            (cursor is! _DriftIntentionCatalogReconciliationCursor ||
-                !cursor.isOwnedBy(_epoch) ||
-                !cursor.matches(query, area)) ||
-        !_isValidReconciliationWindow(
-          query,
-          area,
-          cursor is _DriftIntentionCatalogReconciliationCursor ? cursor : null,
-        )) {
-      return fail(invalidInput);
-    }
-
     final IntentionCatalogReconciliationOutcome outcome;
     try {
+      final _DriftIntentionCatalogCursor? area = switch (query.boundary) {
+        IntentionCatalogCompletedBoundary() => null,
+        IntentionCatalogPartialPrefixBoundary(
+          continuation: final _DriftIntentionCatalogCursor own,
+        ) =>
+          own,
+        IntentionCatalogPartialPrefixBoundary() => throw StateError(
+          'Недопустимая граница согласования.',
+        ),
+      };
+      final _DriftIntentionCatalogReconciliationCursor? cursor =
+          switch (query.cursor) {
+            null => null,
+            final _DriftIntentionCatalogReconciliationCursor own => own,
+            _ => throw StateError('Недопустимое продолжение согласования.'),
+          };
+      if (catalogQuery.cursor != null ||
+          !_isValidReconciliationWindow(query, area, cursor)) {
+        return fail(invalidInput);
+      }
       outcome = await _sequencer.run(
         () => _database.transaction(
           () => switch (cursor) {
             null => _readFirstReconciliationPortion(query, area),
-            _DriftIntentionCatalogReconciliationCursor() =>
-              _readReconciliationContinuation(query, area, cursor),
-            _ => throw StateError('Недопустимое продолжение согласования.'),
+            final continuation => _readReconciliationContinuation(
+              query,
+              area,
+              continuation,
+            ),
           },
         ),
       );
@@ -373,13 +351,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
-  ) => switch (query) {
-    RelationGroupQuery() ||
-    DailyChoiceGroupQuery() => _readRelationGroupPage(query),
-    _ => Future.value(
-      const RelationGroupPageFailure(RelationGroupReadValidationFailure()),
-    ),
-  };
+  ) => _readRelationGroupPage(query);
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
@@ -1268,24 +1240,16 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final items = await _readCatalogItems(rows, catalogQuery.pageSize);
 
     final _DriftIntentionCatalogCursor? nextPosition;
-    final List<IntentionId> pendingWindowIds;
     switch (window) {
       case IntentionCatalogInnerReconciliationWindow(:final upperEdgeRow)
           when items.length < catalogQuery.pageSize:
         nextPosition = _cursorAt(catalogQuery, upperEdgeRow);
-        pendingWindowIds = const [];
       case IntentionCatalogFinalReconciliationWindow()
           when rows.length <= catalogQuery.pageSize:
         nextPosition = null;
-        pendingWindowIds = const [];
       case IntentionCatalogInnerReconciliationWindow() ||
           IntentionCatalogFinalReconciliationWindow():
-        final last = items.last;
-        nextPosition = _cursorAt(catalogQuery, last);
-        pendingWindowIds = [
-          for (final row in window.storedRows)
-            if (catalogQuery.compare(row, last) > 0) row.id,
-        ];
+        nextPosition = _cursorAt(catalogQuery, items.last);
     }
 
     return (
@@ -1294,10 +1258,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           ? null
           : _DriftIntentionCatalogReconciliationCursor(
               position: nextPosition,
-              area: area,
-              pendingWindowIds: pendingWindowIds,
-              pendingReachesAreaEnd:
-                  window is IntentionCatalogFinalReconciliationWindow,
               revisionSequence: _mutationSequence,
             ),
     );
@@ -1503,13 +1463,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     IntentionCatalogQuery query,
     IntentionSummary boundary,
   ) => _DriftIntentionCatalogCursor(
-    epoch: _epoch,
-    scope: query.scope,
-    readinessFilter: query.readinessFilter,
-    normalizedTitleFilter: query.titleFilter?.map((value) => value),
-    tagFilter: query.tagFilter,
-    excludedIntentionId: query.excludedIntentionId,
-    order: query.order,
     boundaryTimestamp: switch (query.order.field) {
       IntentionCatalogSortField.createdAt => boundary.createdAt,
       IntentionCatalogSortField.updatedAt => boundary.updatedAt,
@@ -2070,104 +2023,26 @@ final class _StoredCatalogRowsExpression extends Expression<bool> {
   }
 }
 
-/// Продолжение согласования связано с запросом и позицией порции,
-/// границей области, строками своего окна после позиции и ревизией первой
-/// порции.
+/// Продолжение согласования хранит позицию порции и ревизию первой порции.
 final class _DriftIntentionCatalogReconciliationCursor
     implements IntentionCatalogReconciliationCursor {
   const _DriftIntentionCatalogReconciliationCursor({
     required this.position,
-    required this.area,
-    required this.pendingWindowIds,
-    required this.pendingReachesAreaEnd,
     required this.revisionSequence,
   });
 
   final _DriftIntentionCatalogCursor position;
-
-  /// Граница частичного префикса либо `null` для ранее завершённой выдачи.
-  final _DriftIntentionCatalogCursor? area;
-
-  /// Строки окна, выдавшего продолжение, после [position]: следующее окно
-  /// начинается с них в том же порядке.
-  final List<IntentionId> pendingWindowIds;
-
-  /// Окно, выдавшее продолжение, содержало последнюю сохранённую строку
-  /// области: следующее окно состоит ровно из [pendingWindowIds].
-  final bool pendingReachesAreaEnd;
   final int revisionSequence;
-
-  bool isOwnedBy(_GraphEpoch candidate) => position.isOwnedBy(candidate);
-
-  bool matches(
-    IntentionCatalogReconciliationQuery query,
-    _DriftIntentionCatalogCursor? requestedArea,
-  ) =>
-      position.matches(query.catalogQuery) &&
-      _sameArea(requestedArea) &&
-      _continuesWindow(query.window);
-
-  bool _continuesWindow(IntentionCatalogReconciliationWindow window) {
-    final rows = window.storedRows;
-    if (pendingReachesAreaEnd &&
-        (window is! IntentionCatalogFinalReconciliationWindow ||
-            rows.length != pendingWindowIds.length)) {
-      return false;
-    }
-    if (rows.length < pendingWindowIds.length) {
-      return false;
-    }
-    for (var index = 0; index < pendingWindowIds.length; index++) {
-      if (rows[index].id != pendingWindowIds[index]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool _sameArea(_DriftIntentionCatalogCursor? requestedArea) {
-    final area = this.area;
-    if (area == null || requestedArea == null) {
-      return area == null && requestedArea == null;
-    }
-    return area.boundaryTimestamp.value ==
-            requestedArea.boundaryTimestamp.value &&
-        area.boundaryId == requestedArea.boundaryId;
-  }
 }
 
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({
-    required this.epoch,
-    required this.scope,
-    required this.readinessFilter,
-    required this.normalizedTitleFilter,
-    required this.tagFilter,
-    required this.excludedIntentionId,
-    required this.order,
     required this.boundaryTimestamp,
     required this.boundaryId,
   });
 
-  final _GraphEpoch epoch;
-  final IntentionScope scope;
-  final IntentionReadinessFilter readinessFilter;
-  final String? normalizedTitleFilter;
-  final IntentionTagFilter tagFilter;
-  final IntentionId? excludedIntentionId;
-  final IntentionCatalogOrder order;
   final domain.IntentionTimestamp boundaryTimestamp;
   final IntentionId boundaryId;
-
-  bool isOwnedBy(_GraphEpoch candidate) => identical(epoch, candidate);
-
-  bool matches(IntentionCatalogQuery query) =>
-      scope == query.scope &&
-      readinessFilter == query.readinessFilter &&
-      normalizedTitleFilter == query.titleFilter?.map((value) => value) &&
-      tagFilter == query.tagFilter &&
-      excludedIntentionId == query.excludedIntentionId &&
-      order == query.order;
 }
 
 IntentionFailure _classifyDetailReadFailure(Object error) {

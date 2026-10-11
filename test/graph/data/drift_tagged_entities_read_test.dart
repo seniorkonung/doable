@@ -42,8 +42,6 @@ final class _ReadProbe extends LocalDatabaseConnectionObserver {
   }
 }
 
-final class _ForeignCursor implements TaggedIntentionsCursor {}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
@@ -607,93 +605,6 @@ void main() {
     expect(active.map((item) => item.id), [_intention(1), _intention(4)]);
   });
 
-  test(
-    'курсор привязан к тегу, охвату, размеру, экземпляру и снимку',
-    () async {
-      final first = page(
-        await graph.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: _tag(firstTagNumber),
-            scope: TaggedIntentionsScope.active,
-            pageSize: 1,
-          ),
-        ),
-      );
-      final cursor = first.nextCursor;
-      expect(cursor, isNotNull);
-      for (final query in [
-        TaggedIntentionsQuery(
-          tagId: _tag(lastTagNumber),
-          scope: TaggedIntentionsScope.active,
-          pageSize: 1,
-          cursor: cursor,
-        ),
-        TaggedIntentionsQuery(
-          tagId: _tag(firstTagNumber),
-          scope: TaggedIntentionsScope.archived,
-          pageSize: 1,
-          cursor: cursor,
-        ),
-        TaggedIntentionsQuery(
-          tagId: _tag(firstTagNumber),
-          scope: TaggedIntentionsScope.active,
-          pageSize: 2,
-          cursor: cursor,
-        ),
-      ]) {
-        expect(
-          await graph.getTaggedIntentionsPage(query),
-          isA<TaggedIntentionsPageError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TaggedIntentionsInvalidCursor>(),
-          ),
-        );
-      }
-      final other = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 28),
-        InMemoryDiagnosticsSink(),
-      );
-      expect(
-        await other.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: _tag(firstTagNumber),
-            scope: TaggedIntentionsScope.active,
-            pageSize: 1,
-            cursor: cursor,
-          ),
-        ),
-        isA<TaggedIntentionsPageError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TaggedIntentionsInvalidCursor>(),
-        ),
-      );
-
-      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-        'Новый дом',
-        tagFixtureId(firstTagNumber),
-      ]);
-      expect(
-        await graph.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: _tag(firstTagNumber),
-            scope: TaggedIntentionsScope.active,
-            pageSize: 1,
-            cursor: cursor,
-          ),
-        ),
-        isA<TaggedIntentionsPageError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TaggedIntentionsSnapshotExpired>(),
-        ),
-      );
-    },
-  );
-
   test('новое назначение следует за оставшимися', () async {
     raw.execute(
       'DELETE FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
@@ -709,24 +620,6 @@ void main() {
       1,
     );
     expect(active.map((item) => item.id), [_intention(4), _intention(1)]);
-  });
-
-  test('чужой вид продолжения отклоняется', () async {
-    final result = await graph.getTaggedIntentionsPage(
-      TaggedIntentionsQuery(
-        tagId: _tag(firstTagNumber),
-        scope: TaggedIntentionsScope.active,
-        cursor: _ForeignCursor(),
-      ),
-    );
-    expect(
-      result,
-      isA<TaggedIntentionsPageError>().having(
-        (error) => error.failure,
-        'причина',
-        isA<TaggedIntentionsInvalidCursor>(),
-      ),
-    );
   });
 
   test(

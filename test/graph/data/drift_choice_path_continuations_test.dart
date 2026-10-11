@@ -351,39 +351,6 @@ void main() {
       }
 
       final first = await fixture.page(draft, pageSize: 1);
-      for (final wrongDraft in [
-        ChoicePathDraftStart(_intention(1)),
-        fixture.bottomProgress(1, [(1002, 2, 1)]),
-      ]) {
-        final wrong = await fixture.repository.getChoicePathContinuations(
-          ChoicePathContinuationQuery(
-            draft: wrongDraft,
-            pageSize: 1,
-            cursor: first.nextCursor,
-          ),
-        );
-        expect(
-          (wrong as ChoicePathContinuationError).failure,
-          isA<ChoicePathContinuationValidationFailure>(),
-        );
-      }
-      final other = DriftPersonalGraphRepository(
-        fixture.database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 23),
-        fixture.diagnostics,
-      );
-      final foreign = await other.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: draft,
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (foreign as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
       expect(
         await fixture.repository.execute(
           EnableIntentionReadiness(_intention(3)),
@@ -652,82 +619,6 @@ void main() {
       );
       expect(last.items.single.relation.id, _relation(1102));
       expect(last.nextCursor, isNull);
-    },
-  );
-
-  test(
-    'чужой курсор и другая порция отклоняются, ошибка не становится тупиком',
-    () async {
-      fixture.intention(1);
-      fixture.intention(2, ready: true);
-      fixture.intention(3, ready: true);
-      fixture.relation(101, 1, 2);
-      fixture.relation(102, 1, 3);
-      final draft = ChoicePathDraftStart(_intention(1));
-      final first = await fixture.page(draft, pageSize: 1);
-      final wrong = await fixture.repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: draft,
-          pageSize: 2,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (wrong as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      final otherDirection = await fixture.repository
-          .getChoicePathContinuations(
-            ChoicePathContinuationQuery(
-              draft: ChoicePathDraftBottomStart(_intention(1)),
-              pageSize: 1,
-              cursor: first.nextCursor,
-            ),
-          );
-      expect(
-        (otherDirection as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      final otherDraft = await fixture.repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: fixture.progress(1, [(101, 1, 2)]),
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (otherDraft as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      final other = DriftPersonalGraphRepository(
-        fixture.database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 23),
-        fixture.diagnostics,
-      );
-      final foreign = await other.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: draft,
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (foreign as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      await fixture.database.close();
-      final failed = await fixture.repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(draft: draft),
-      );
-      expect(failed, isA<ChoicePathContinuationError>());
-      expect(
-        fixture.diagnostics.events
-            .whereType<ChoicePathContinuationReadDiagnosticsEvent>()
-            .last
-            .status,
-        isA<DiagnosticsFailed>(),
-      );
     },
   );
 

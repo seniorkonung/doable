@@ -216,7 +216,7 @@ void main() {
     expect(second.nextCursor, isNull);
   });
 
-  test('отклоняет чужой курсор и устаревшую ревизию', () async {
+  test('отклоняет устаревшую ревизию', () async {
     addChoice(201, source: 1, selected: 2, path: [101]);
     addChoice(202, source: 1, selected: 2, path: [101]);
     final first = page(
@@ -225,21 +225,6 @@ void main() {
       ),
     );
     final cursor = first.nextCursor!;
-    for (final invalid in [
-      query(DailyChoiceRelationRole.selected, pageSize: 1, cursor: cursor),
-      query(
-        DailyChoiceRelationRole.source,
-        owner: 2,
-        pageSize: 1,
-        cursor: cursor,
-      ),
-      query(DailyChoiceRelationRole.source, pageSize: 2, cursor: cursor),
-    ]) {
-      expect(
-        failure(await repository.getRelationGroupPage(invalid)),
-        isA<RelationGroupReadValidationFailure>(),
-      );
-    }
     final other = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),

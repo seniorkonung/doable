@@ -1141,10 +1141,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load tagged intentions because of an unexpected error.';
 
   @override
-  String get tagNavigationInvalidCursor =>
-      'This result continuation is invalid. Reopen tag navigation.';
-
-  @override
   String get tagNavigationSnapshotExpired =>
       'The list has changed. Reopen tag navigation.';
 
@@ -2177,10 +2173,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'An intention on this path no longer exists.';
 
   @override
-  String get choicePathInvalid =>
-      'Continuations could not be checked because of an invalid request.';
-
-  @override
   String get choicePathUnavailable =>
       'Continuations are temporarily unavailable. Try again.';
 
@@ -2284,10 +2276,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoiceCatalogExpired =>
       'The catalog changed. Refresh it to continue.';
-
-  @override
-  String get dailyChoiceCatalogInvalid =>
-      'The catalog position is no longer valid.';
 
   @override
   String get dailyChoiceCatalogUnexpected =>

@@ -20,7 +20,7 @@ final class RelationGroupQueryValidationException implements Exception {
 /// Непрозрачное продолжение одной согласованной группы связей.
 abstract interface class RelationGroupCursor {}
 
-abstract interface class RelationGroupPageQuery {
+sealed class RelationGroupPageQuery {
   IntentionId get intentionId;
   RelationGroup get group;
   int get pageSize;
@@ -114,7 +114,7 @@ final class DailyChoiceGroupQuery implements RelationGroupPageQuery {
 }
 
 /// Первая порция содержит полную сводку десяти групп на своей ревизии.
-/// Продолжение сохраняет привязку к запросу через непрозрачный курсор.
+/// Продолжение сохраняет привязку к ревизии через непрозрачный курсор.
 sealed class RelationGroupPage {
   const RelationGroupPage({required this.nextCursor, required this.revision});
 
@@ -168,14 +168,6 @@ final class DailyChoiceGroupContinuationPage extends RelationGroupPage {
 
 sealed class RelationGroupReadFailure implements GraphCommandFailure {
   const RelationGroupReadFailure();
-}
-
-final class RelationGroupReadValidationFailure
-    extends RelationGroupReadFailure {
-  const RelationGroupReadValidationFailure();
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.validation;
 }
 
 final class RelationGroupIntentionNotFoundFailure

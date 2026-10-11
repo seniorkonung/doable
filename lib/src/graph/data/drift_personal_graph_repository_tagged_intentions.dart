@@ -14,20 +14,18 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
     try {
       final page = await _sequencer.run(
         () => _database.transaction(() async {
-          final cursor = query.cursor;
+          final _DriftTaggedIntentionsCursor? cursor = switch (query.cursor) {
+            null => null,
+            final _DriftTaggedIntentionsCursor own => own,
+            _ => throw StateError('Недопустимый курсор помеченных намерений.'),
+          };
           if (cursor != null &&
-              (cursor is! _DriftTaggedIntentionsCursor ||
-                  !cursor.matches(query, _epoch))) {
-            throw const _InvalidTaggedIntentionsCursor();
-          }
-          if (cursor is _DriftTaggedIntentionsCursor &&
               cursor.revision.compareTo(_currentRevision) !=
                   GraphRevisionOrder.same) {
             throw const _TaggedIntentionsSnapshotHasExpired();
           }
 
           stage = TagReadDiagnosticsStage.read;
-          final storageVersion = await _tagReadStorageVersion();
           final tagRow = await _database
               .customSelect(
                 '''SELECT id, name,
@@ -53,19 +51,13 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
           _checkTaggedTextEncoding(tagRow.data);
           final tag = _decodeStoredTag(tagRow.data);
           if (tag.id != query.tagId) throw const _StoredIntentionCorruption();
-          if (cursor is _DriftTaggedIntentionsCursor &&
-              cursor.storageVersion != storageVersion) {
-            throw const _TaggedIntentionsSnapshotHasExpired();
-          }
           if (cursor == null) {
             // Курсор свидетельствует о проверке ссылок всего выбранного тега
-            // только для этой эпохи, ревизии и версии хранилища.
+            // только для этой ревизии.
             await _checkTaggedIntentionReferences(query.tagId);
           }
 
-          final boundary = cursor is _DriftTaggedIntentionsCursor
-              ? cursor.boundarySequence
-              : null;
+          final boundary = cursor?.boundarySequence;
           final archiveFlag = query.scope == TaggedIntentionsScope.archived
               ? 1
               : 0;
@@ -114,12 +106,7 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
             pageSize: query.pageSize,
             nextCursor: decoded.length > query.pageSize
                 ? _DriftTaggedIntentionsCursor(
-                    epoch: _epoch,
-                    tagId: query.tagId,
-                    scope: query.scope,
-                    pageSize: query.pageSize,
                     revision: revision,
-                    storageVersion: storageVersion,
                     boundarySequence: _requiredStoredInteger(
                       rows[query.pageSize - 1].data,
                       'assignment_sequence',
@@ -207,32 +194,12 @@ IntentionId _decodeTaggedIntentionId(String value) =>
 
 final class _DriftTaggedIntentionsCursor implements TaggedIntentionsCursor {
   const _DriftTaggedIntentionsCursor({
-    required this.epoch,
-    required this.tagId,
-    required this.scope,
-    required this.pageSize,
     required this.revision,
-    required this.storageVersion,
     required this.boundarySequence,
   });
 
-  final _GraphEpoch epoch;
-  final TagId tagId;
-  final TaggedIntentionsScope scope;
-  final int pageSize;
   final GraphRevision revision;
-  final _TagReadStorageVersion storageVersion;
   final int boundarySequence;
-
-  bool matches(TaggedIntentionsQuery query, _GraphEpoch owner) =>
-      identical(epoch, owner) &&
-      tagId == query.tagId &&
-      scope == query.scope &&
-      pageSize == query.pageSize;
-}
-
-final class _InvalidTaggedIntentionsCursor implements Exception {
-  const _InvalidTaggedIntentionsCursor();
 }
 
 final class _TaggedIntentionsSnapshotHasExpired implements Exception {
@@ -244,9 +211,6 @@ final class _TaggedIntentionsTagMissing implements Exception {
 }
 
 TaggedIntentionsReadFailure _classifyTaggedIntentionsReadFailure(Object error) {
-  if (error is _InvalidTaggedIntentionsCursor) {
-    return const TaggedIntentionsInvalidCursor();
-  }
   if (error is _TaggedIntentionsSnapshotHasExpired) {
     return const TaggedIntentionsSnapshotExpired();
   }

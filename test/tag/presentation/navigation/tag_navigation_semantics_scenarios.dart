@@ -5,7 +5,7 @@ void _registerNavigationSemanticsScenarios() {
   // проверяет сценарий окончания наблюдения.
   for (final failure in [
     const TaggedIntentionsUnavailableFailure(),
-    const TaggedIntentionsInvalidCursor(),
+    const TaggedIntentionsCorruptionFailure(),
   ]) {
     testWidgets(
       'причина отказа и допустимые действия доступны при масштабе 3: ${failure.runtimeType}',
@@ -30,7 +30,7 @@ void _registerNavigationSemanticsScenarios() {
           final message = switch (failure) {
             TaggedIntentionsUnavailableFailure() =>
               l10n.tagNavigationUnavailable,
-            TaggedIntentionsInvalidCursor() => l10n.tagNavigationInvalidCursor,
+            TaggedIntentionsCorruptionFailure() => l10n.tagNavigationCorruption,
             _ => throw StateError('Непредусмотренный отказ фикстуры'),
           };
           await _expectNavigationStatusSemantics(tester, message);

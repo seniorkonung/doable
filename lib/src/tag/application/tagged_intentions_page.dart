@@ -16,8 +16,7 @@ final class TaggedIntentionsQueryValidationException implements Exception {
   final TaggedIntentionsQueryValidationFailure failure;
 }
 
-/// Продолжение относится к виду чтения, тегу, охвату, размеру порции,
-/// экземпляру репозитория, эпохе и ревизии снимка.
+/// Продолжение относится к ревизии снимка.
 /// Внутреннее состояние не раскрывается и курсор не сериализуется.
 abstract interface class TaggedIntentionsCursor {}
 
@@ -129,14 +128,6 @@ final class TaggedIntentionsPage {
 
 sealed class TaggedIntentionsReadFailure implements GraphCommandFailure {
   const TaggedIntentionsReadFailure();
-}
-
-/// Продолжение другого запроса, тега, охвата, размера или экземпляра.
-final class TaggedIntentionsInvalidCursor extends TaggedIntentionsReadFailure {
-  const TaggedIntentionsInvalidCursor();
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.validation;
 }
 
 /// Эпоха или ревизия изменились: чтение нужно начать с первой порции.

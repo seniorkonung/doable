@@ -55,61 +55,6 @@ void main() {
       requiredTagIds: [_tagId(firstTagNumber)],
       excludedTagIds: [_tagId(lastTagNumber)],
     );
-    // Курсор сравнивается с запросом по равенству условий по тегам и по
-    // исключённому участнику; остальные замены проходят ту же проверку.
-    for (final (label, filter, originalExcluded, excluded) in [
-      (
-        'заменён обязательный тег при том же числе условий',
-        IntentionTagFilter(
-          requiredTagIds: [_tagId(lastTagNumber)],
-          excludedTagIds: [_tagId(lastTagNumber)],
-        ),
-        null,
-        null,
-      ),
-      (
-        'обязательный и исключённый теги поменялись местами',
-        IntentionTagFilter(
-          requiredTagIds: [_tagId(lastTagNumber)],
-          excludedTagIds: [_tagId(firstTagNumber)],
-        ),
-        null,
-        null,
-      ),
-      ('сняты условия по тегам', IntentionTagFilter.empty, null, null),
-      ('добавлен исключённый участник', originalFilter, null, _id(_uuid(3))),
-    ]) {
-      test('отклоняет несовместимый курсор: $label', () async {
-        seedTagStorageFixture(raw);
-        final first = _firstPage(
-          await repository.getCatalogPage(
-            _tagQuery(
-              tagFilter: originalFilter,
-              excludedIntentionId: originalExcluded,
-            ),
-          ),
-        );
-        expect(first.nextCursor, isNotNull);
-
-        final result = await repository.getCatalogPage(
-          _tagQuery(
-            tagFilter: filter,
-            excludedIntentionId: excluded,
-            cursor: first.nextCursor,
-          ),
-        );
-
-        expect(
-          result,
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionGenericValidationFailure>(),
-          ),
-        );
-      });
-    }
-
     test(
       'продолжает выдачу при другом порядке и повторах тех же условий',
       () async {
@@ -1344,45 +1289,6 @@ void main() {
     );
   });
 
-  test('курсор привязан к готовности', () async {
-    for (final suffix in ['201', '202']) {
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000$suffix',
-        title: 'Действие $suffix',
-        isActionReady: true,
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-    }
-    final cursor = _firstPage(
-      await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: IntentionScope.active,
-          readinessFilter: IntentionReadinessFilter.readyOnly,
-          titleFilter: null,
-          order: IntentionCatalogOrder.createdAtAscending,
-          pageSize: 1,
-        ),
-      ),
-    ).nextCursor!;
-
-    final result = await repository.getCatalogPage(
-      IntentionCatalogQuery(
-        scope: IntentionScope.active,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtAscending,
-        pageSize: 1,
-        cursor: cursor,
-      ),
-    );
-
-    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-    expect(
-      (result as ResultFailure<IntentionCatalogPage>).failure,
-      isA<IntentionValidationFailure>(),
-    );
-  });
-
   test(
     'снимки изменения готовности сохраняют точную принадлежность каталогу',
     () async {
@@ -1973,122 +1879,6 @@ void main() {
     },
   );
 
-  test(
-    'отклоняет cursor другого адаптера и cursor с другими параметрами',
-    () async {
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000051',
-        title: 'Первое',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await _insertIntention(
-        database,
-        id: '018f0b5d-6b2e-7c80-8000-000000000052',
-        title: 'Первое дополнение',
-        createdAt: DateTime.utc(2026, 9, 2, 11),
-      );
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.active,
-        titleFilter: 'Первое',
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 1,
-      );
-      final cursor = _firstPage(await repository.getCatalogPage(query))
-          .nextCursor!;
-      final invalidQueries = [
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: 'Другое',
-          order: query.order,
-          pageSize: query.pageSize,
-          cursor: cursor,
-        ),
-        IntentionCatalogQuery(
-          scope: IntentionScope.all,
-          titleFilter: 'Первое',
-          order: query.order,
-          pageSize: query.pageSize,
-          cursor: cursor,
-        ),
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: 'Первое',
-          order: const IntentionCatalogOrder(
-            field: IntentionCatalogSortField.updatedAt,
-            direction: IntentionCatalogSortDirection.descending,
-          ),
-          pageSize: query.pageSize,
-          cursor: cursor,
-        ),
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: 'Первое',
-          order: query.order,
-          pageSize: query.pageSize,
-          cursor: const _ForeignCatalogCursor(),
-        ),
-      ];
-
-      for (final invalidQuery in invalidQueries) {
-        final result = await repository.getCatalogPage(invalidQuery);
-
-        expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-        expect(
-          (result as ResultFailure<IntentionCatalogPage>).failure,
-          isA<IntentionValidationFailure>(),
-        );
-      }
-    },
-  );
-
-  test('отклоняет cursor другого экземпляра repository', () async {
-    await _insertIntention(
-      database,
-      id: '018f0b5d-6b2e-7c80-8000-000000000056',
-      title: 'Первое',
-      createdAt: DateTime.utc(2026, 9, 2, 10),
-    );
-    await _insertIntention(
-      database,
-      id: '018f0b5d-6b2e-7c80-8000-000000000057',
-      title: 'Второе',
-      createdAt: DateTime.utc(2026, 9, 2, 11),
-    );
-    final query = IntentionCatalogQuery(
-      scope: IntentionScope.active,
-      titleFilter: null,
-      order: IntentionCatalogOrder.createdAtDescending,
-      pageSize: 1,
-    );
-    final cursor = _firstPage(await repository.getCatalogPage(query))
-        .nextCursor!;
-    // Курсор принадлежит эпохе создавшего его экземпляра: заново созданный
-    // repository над тем же хранилищем не принимает чужое продолжение.
-    final recreatedRepository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 2),
-      diagnostics,
-    );
-
-    final result = await recreatedRepository.getCatalogPage(
-      IntentionCatalogQuery(
-        scope: query.scope,
-        titleFilter: null,
-        order: query.order,
-        pageSize: query.pageSize,
-        cursor: cursor,
-      ),
-    );
-
-    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-    expect(
-      (result as ResultFailure<IntentionCatalogPage>).failure,
-      isA<IntentionValidationFailure>(),
-    );
-  });
-
   test('продолжает независимые цепочки одного repository вперемешку', () async {
     for (final (id, title, createdAt) in [
       (
@@ -2676,11 +2466,6 @@ void main() {
           excludingQuery().withCursorForTest(first.nextCursor!),
         ),
       );
-      final otherFilterPage = _firstPage(
-        await repository.getCatalogPage(
-          _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
-        ),
-      );
       final all = await loadWholeCatalog(
         () => _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
       );
@@ -2705,21 +2490,6 @@ void main() {
           IntentionCatalogReconciliationQuery(
             catalogQuery: query,
             boundary: boundary,
-            window: firstWindow,
-          ),
-        ),
-      );
-      final foreignRepository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 2),
-        diagnostics,
-      );
-      final foreignPortion = _reconciliationFirstPortion(
-        await foreignRepository.getCatalogReconciliationPortion(
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
             window: firstWindow,
           ),
         ),
@@ -2771,7 +2541,6 @@ void main() {
           isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
         );
       }
-      expect(foreignPortion.nextCursor, isNotNull);
 
       for (final (label, invalid) in [
         (
@@ -2820,92 +2589,6 @@ void main() {
               stored.skip(1).take(2),
             ),
             cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение без строк своего окна после курсора',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            window: IntentionCatalogFinalReconciliationWindow([row(9)]),
-            cursor: fullInnerPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение последнего окна с другими строками',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            window: IntentionCatalogInnerReconciliationWindow([row(7), row(9)]),
-            cursor: fullFinalPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение с завершённой границей вместо префикса',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            window: nextWindow,
-            cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение с другой границей префикса',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: IntentionCatalogPartialPrefixBoundary(first.nextCursor!),
-            window: IntentionCatalogFinalReconciliationWindow(const []),
-            cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение с другими условиями',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: _tagQuery(
-              tagFilter: IntentionTagFilter(excludedTagIds: [keptTag]),
-              pageSize: 2,
-            ),
-            boundary: boundary,
-            window: nextWindow,
-            cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение другого экземпляра репозитория',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            window: nextWindow,
-            cursor: foreignPortion.nextCursor,
-          ),
-        ),
-        (
-          'посторонняя реализация продолжения',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: boundary,
-            window: nextWindow,
-            cursor: const _ForeignReconciliationCursor(),
-          ),
-        ),
-        (
-          'граница выдачи других условий',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: IntentionCatalogPartialPrefixBoundary(
-              otherFilterPage.nextCursor!,
-            ),
-            window: firstWindow,
-          ),
-        ),
-        (
-          'посторонняя реализация границы',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogPartialPrefixBoundary(
-              _ForeignCatalogCursor(),
-            ),
-            window: firstWindow,
           ),
         ),
         (
@@ -3213,15 +2896,6 @@ _readWholeReconciliation(
     }
   } while (cursor != null);
   return (totalCount: first.totalCount, portions: portions, windows: windows);
-}
-
-final class _ForeignReconciliationCursor
-    implements IntentionCatalogReconciliationCursor {
-  const _ForeignReconciliationCursor();
-}
-
-final class _ForeignCatalogCursor implements IntentionCatalogCursor {
-  const _ForeignCatalogCursor();
 }
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {

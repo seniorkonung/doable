@@ -284,7 +284,6 @@ final class _DailyChoiceCatalogPageState
       l10n.dailyChoiceCatalogUnavailable,
     DailyChoiceCatalogCorruptionFailure() => l10n.dailyChoiceCatalogCorruption,
     DailyChoiceCatalogSnapshotExpired() => l10n.dailyChoiceCatalogExpired,
-    DailyChoiceCatalogValidationFailure() => l10n.dailyChoiceCatalogInvalid,
     DailyChoiceCatalogUnexpectedFailure() => l10n.dailyChoiceCatalogUnexpected,
   };
 }

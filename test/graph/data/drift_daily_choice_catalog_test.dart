@@ -185,7 +185,7 @@ void main() {
     );
   });
 
-  test('отклоняет чужой курсор, другую выборку и устаревшую ревизию', () async {
+  test('отклоняет устаревшую ревизию', () async {
     addChoice(201);
     addChoice(202);
     final first = page(
@@ -195,35 +195,6 @@ void main() {
     );
     final cursor = first.nextCursor;
     expect(cursor, isNotNull);
-    for (final query in [
-      DailyChoiceCatalogQuery(pageSize: 2, cursor: cursor),
-      DailyChoiceCatalogQuery(pageSize: 1, isCompleted: true, cursor: cursor),
-    ]) {
-      expect(
-        await repository.getDailyChoiceCatalogPage(query),
-        isA<DailyChoiceCatalogPageError>().having(
-          (result) => result.failure.category,
-          'категория',
-          GraphFailureCategory.validation,
-        ),
-      );
-    }
-    final other = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 23),
-      diagnostics,
-    );
-    expect(
-      await other.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(pageSize: 1, cursor: cursor),
-      ),
-      isA<DailyChoiceCatalogPageError>().having(
-        (result) => result.failure.category,
-        'категория',
-        GraphFailureCategory.validation,
-      ),
-    );
 
     expect(
       await repository.execute(
@@ -421,25 +392,6 @@ void main() {
           .toSet(),
       hasLength(1),
     );
-
-    // Продолжение выбранного дня не продолжает другой день или выдачу без
-    // даты.
-    for (final foreign in [
-      DailyChoiceCatalogQuery(
-        date: CalendarDate.fromParts(2026, 9, 24),
-        cursor: pages.first.nextCursor,
-      ),
-      DailyChoiceCatalogQuery(cursor: pages.first.nextCursor),
-    ]) {
-      expect(
-        await repository.getDailyChoiceCatalogPage(foreign),
-        isA<DailyChoiceCatalogPageError>().having(
-          (result) => result.failure.category,
-          'категория',
-          GraphFailureCategory.validation,
-        ),
-      );
-    }
 
     // Внутренний запрос без даты по-прежнему охватывает все дни.
     final undated = page(
