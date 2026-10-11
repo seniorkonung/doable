@@ -1598,6 +1598,12 @@ abstract class AppLocalizations {
   /// **'{operation} — “{target}”: {outcome}'**
   String graphOperationMessage(String operation, String target, String outcome);
 
+  /// Сообщение общей поверхности с числом остальных результатов
+  ///
+  /// In en, this message translates to:
+  /// **'{message} · {count} more'**
+  String graphOperationMessageWithOthers(String message, int count);
+
   /// Безопасное обозначение создаваемой связи до подтверждения
   ///
   /// In en, this message translates to:

@@ -260,6 +260,7 @@
   "graphOperationNewIntention": "новое намерение",
   "graphOperationIntention": "намерение",
   "graphOperationMessage": "{operation} — «{target}»: {outcome}",
+  "graphOperationMessageWithOthers": "{message} · ещё {count}",
   "graphOperationNewRelation": "новая связь",
   "graphOperationRelation": "связь",
   "graphOperationDailyChoice": "дневной выбор",

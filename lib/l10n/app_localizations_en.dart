@@ -915,6 +915,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String graphOperationMessageWithOthers(String message, int count) {
+    return '$message · $count more';
+  }
+
+  @override
   String get graphOperationNewRelation => 'new relation';
 
   @override

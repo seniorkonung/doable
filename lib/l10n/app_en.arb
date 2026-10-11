@@ -1003,6 +1003,18 @@
       }
     }
   },
+  "graphOperationMessageWithOthers": "{message} · {count} more",
+  "@graphOperationMessageWithOthers": {
+    "description": "Сообщение общей поверхности с числом остальных результатов",
+    "placeholders": {
+      "message": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "graphOperationNewRelation": "new relation",
   "@graphOperationNewRelation": {
     "description": "Безопасное обозначение создаваемой связи до подтверждения"
