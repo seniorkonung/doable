@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 
 import '../../app/routing/app_router.gr.dart';
 import '../domain/daily_choice_id.dart';
