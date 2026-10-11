@@ -11,8 +11,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_suggestions_state.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_suggestions_view_model.dart';
 
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -447,12 +445,6 @@ void main() {
           .selectDate(durabilityChoiceDate);
       final details = DailyChoiceDetailsViewModel(repository, firstId);
       addTearDown(details.dispose);
-      final suggestions = ChoicePathSuggestionsViewModel.fromCoordinator(
-        repository,
-        coordinator,
-        ChoicePathSuggestionsForSource(durabilityIntention(1)),
-      );
-      addTearDown(suggestions.dispose);
 
       for (final number in [1, 3, 4, 5]) {
         container
@@ -483,7 +475,6 @@ void main() {
             container.read(dailyChoiceCatalogViewModelProvider)
                 is DailyChoiceCatalogLoaded &&
             details.state is DailyChoiceDetailsLoaded &&
-            suggestions.state is ChoicePathSuggestionsReady &&
             [1, 3].every(
               (number) => container.read(
                 relationNeighborhoodViewModelProvider(
@@ -511,7 +502,6 @@ void main() {
         diagnostics: () => [
           container.read(dailyChoiceCatalogViewModelProvider).runtimeType,
           details.state.runtimeType,
-          suggestions.state.runtimeType,
           for (final number in [1, 3, 4, 5])
             container
                 .read(
@@ -569,18 +559,12 @@ void main() {
                 GraphRevisionOrder.same &&
             catalog().totalCount == 2 &&
             group(1).items.length == 2 &&
-            group(3).items.length == 2 &&
-            suggestions.state is ChoicePathSuggestionsReady &&
-            (suggestions.state as ChoicePathSuggestionsReady).revision
-                    .compareTo(repeatRevision) ==
-                GraphRevisionOrder.same,
+            group(3).items.length == 2,
       );
       expect(catalog().items.map((item) => item.id).toSet(), {
         firstId,
         repeatId,
       });
-      expect(suggestions.state.items, hasLength(1));
-      expect(suggestions.state.items.single.originChoiceId, repeatId);
       expect(group(1).counts.dailySource, 2);
       expect(group(3).counts.dailySelected, 2);
       expect(relation(101).permissions.canDelete, isFalse);
@@ -621,11 +605,7 @@ void main() {
               (number) =>
                   group(number).revision.compareTo(replacementRevision) ==
                   GraphRevisionOrder.same,
-            ) &&
-            suggestions.state is ChoicePathSuggestionsReady &&
-            (suggestions.state as ChoicePathSuggestionsReady).revision
-                    .compareTo(replacementRevision) ==
-                GraphRevisionOrder.same,
+            ),
       );
       final opened = (details.state as DailyChoiceDetailsLoaded).details;
       expect(opened.source.id, durabilityIntention(5));
@@ -650,7 +630,6 @@ void main() {
         ],
         [1, 1, 1, 1],
       );
-      expect(suggestions.state.items.single.originChoiceId, repeatId);
       expect(relation(101).permissions.canDelete, isFalse);
       expect(relation(102).permissions.canDelete, isFalse);
       expect(relation(105).permissions.canDelete, isFalse);
@@ -678,7 +657,6 @@ void main() {
             catalog().revision.compareTo(deletionRevision) ==
                 GraphRevisionOrder.same &&
             catalog().totalCount == 1 &&
-            suggestions.state is ChoicePathSuggestionsEmpty &&
             container.read(
               relationNeighborhoodViewModelProvider(durabilityIntention(1)),
             ) is RelationGroupEmpty &&

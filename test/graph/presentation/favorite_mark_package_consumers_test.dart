@@ -1,4 +1,3 @@
-import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation, TagAssignment;
@@ -77,7 +76,7 @@ void main() {
       retry: (retryCount, error) => null,
     );
     coordinator = container.read(graphCommandCoordinatorProvider.notifier);
-    probes = PackageConsumerProbes(container, repository, coordinator)
+    probes = PackageConsumerProbes(container, repository)
       ..watchIntention(observed, observes: true)
       ..watchIntention(durabilityIntention(5), observes: false)
       ..watchDailyChoice(choice, observes: true)
@@ -104,8 +103,7 @@ void main() {
       ..relationDetails(observedRelation, observes: true)
       ..relationDetails(unobservedRelation, observes: false)
       ..dailyChoiceCatalog()
-      ..dailyChoiceDetails(choice)
-      ..choicePathSuggestions(ChoicePathSuggestionsForAction(observed));
+      ..dailyChoiceDetails(choice);
     await settlePackageConsumersUntil(
       () => probes.allLoaded,
       diagnostics: probes.describe,
