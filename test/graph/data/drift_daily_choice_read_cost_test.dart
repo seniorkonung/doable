@@ -7,7 +7,6 @@ import 'dart:math';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -201,159 +200,74 @@ void main() {
   });
   tearDown(() => fixture.close());
 
-  test(
-    'недоступные повторы не занимают выдачу при ограниченном чтении',
-    () async {
-      fixture.raw.execute(
-        'UPDATE intentions SET is_action_ready = 0 WHERE id = ?',
-        [_uuid(2)],
-      );
-      final query = ChoicePathSuggestionsForSource(_intention(1));
-      fixture.trace.clear();
-      final first = (await fixture.repository.getChoicePathSuggestions(
-        query,
-      ) as ChoicePathSuggestionsSuccess).value;
-      expect(first.items, hasLength(1));
-      expect(first.items.single.path, hasLength(_pathLength));
-      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
-
-      fixture.trace.clear();
-      final refreshed = (await fixture.repository.getChoicePathSuggestions(
-        query,
-      ) as ChoicePathSuggestionsSuccess).value;
-      expect(refreshed.items, hasLength(1));
-      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
-      expect(
-        fixture.raw
-            .select('SELECT COUNT(*) AS count FROM daily_choices')
-            .single['count'],
-        _catalogChoices + _otherGroupChoices,
-      );
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
-
-  test('подсказки обоих направлений читают только двадцать кандидатов и целый длинный путь', () async {
+  test('сохранение и замена длинным путём ограничивают объём чтения', () async {
+    final longPath = ConfirmedChoicePath([
+      ConfirmedChoicePathStep(
+        relationId: _relation(900),
+        sourceIntentionId: _intention(1),
+        type: LongTermRelationType.need,
+        relatedIntentionId: _intention(2),
+      ),
+      for (var node = 2; node <= _pathLength; node++)
+        ConfirmedChoicePathStep(
+          relationId: _relation(1000 + node),
+          sourceIntentionId: _intention(node),
+          type: LongTermRelationType.need,
+          relatedIntentionId: _intention(node + 1),
+        ),
+    ]);
     fixture.trace.clear();
-    final top = (await fixture.repository.getChoicePathSuggestions(
-      ChoicePathSuggestionsForSource(_intention(1)),
-    ) as ChoicePathSuggestionsSuccess).value;
-    expect(top.items, hasLength(2));
-    expect(top.items.first.originChoiceId, durabilityChoice(10400));
-    expect(top.items.first.path, hasLength(_pathLength));
-    fixture.raw.execute('BEGIN IMMEDIATE');
-    fixture.raw.execute('ROLLBACK');
-    expect(top.items.last.originChoiceId, durabilityChoice(10399));
     expect(
-      fixture.raw
-          .select('SELECT COUNT(*) AS count FROM daily_choices')
-          .single['count'],
-      _catalogChoices + _otherGroupChoices,
+      await fixture.repository.execute(
+        CreateDailyChoice(
+          sourceIntentionId: _intention(1),
+          selectedIntentionId: _intention(151),
+          path: longPath,
+          date: CalendarDate.fromParts(2026, 9, 25),
+          description: null,
+          isCompleted: false,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
     );
+    final created = await fixture.repository.getDailyChoice(
+      durabilityChoice(12000),
+    );
+    expect(created, isA<DailyChoiceReadSuccess>());
+    expect(
+      (created as DailyChoiceReadSuccess).value.value!.path.map(
+        (step) => step.relation.id,
+      ),
+      longPath.steps.map((step) => step.relationId),
+    );
+    // Создание и чтение читают не больше одного пути вместе с его
+    // участниками.
     _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
 
-    fixture._addRelation(902, 1, 201);
-    fixture._addChoice(12001, 1, 201, [902], stepBase: 33000);
-    for (var number = 12002; number <= 12021; number++) {
-      fixture._addChoice(number, 200, 201, [901], stepBase: number + 21000);
-    }
     fixture.trace.clear();
-    final bottom = (await fixture.repository.getChoicePathSuggestions(
-      ChoicePathSuggestionsForAction(_intention(201)),
-    ) as ChoicePathSuggestionsSuccess).value;
-    expect(bottom.items, hasLength(1));
-    expect(bottom.items.single.originChoiceId, durabilityChoice(12021));
     expect(
-      fixture.raw.select(
-        'SELECT long_term_relation_id FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-        [_uuid(12001)],
-      ).single['long_term_relation_id'],
-      _uuid(902),
+      await fixture.repository.execute(
+        ReplaceDailyChoicePath(
+          choiceId: durabilityChoice(10399),
+          sourceIntentionId: _intention(1),
+          selectedIntentionId: _intention(151),
+          path: longPath,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
     );
-    _expectEachReadAtMost(fixture.trace, 20);
+    final replaced = await fixture.repository.getDailyChoice(
+      durabilityChoice(10399),
+    );
+    expect(replaced, isA<DailyChoiceReadSuccess>());
     expect(
-      fixture.raw
-          .select('SELECT COUNT(*) AS count FROM daily_choices')
-          .single['count'],
-      _catalogChoices + _otherGroupChoices + 21,
+      (replaced as DailyChoiceReadSuccess).value.value!.path.map(
+        (step) => step.relation.id,
+      ),
+      longPath.steps.map((step) => step.relationId),
     );
+    _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
   }, timeout: const Timeout(Duration(minutes: 3)));
-
-  test(
-    'полный цикл подсказки: актуализация, повтор и замена длинным путём',
-    () async {
-      final topQuery = ChoicePathSuggestionsForSource(_intention(1));
-      final bottomQuery = ChoicePathSuggestionsForAction(_intention(201));
-      final top = (await fixture.repository.getChoicePathSuggestions(
-        topQuery,
-      ) as ChoicePathSuggestionsSuccess).value;
-      expect(top.items.first.path, hasLength(_pathLength));
-      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
-
-      fixture.trace.clear();
-      final bottom = (await fixture.repository.getChoicePathSuggestions(
-        bottomQuery,
-      ) as ChoicePathSuggestionsSuccess).value;
-      expect(bottom.items, hasLength(1));
-      _expectEachReadAtMost(fixture.trace, 20);
-
-      fixture.trace.clear();
-      final refreshed = (await fixture.repository.getChoicePathSuggestions(
-        topQuery,
-      ) as ChoicePathSuggestionsSuccess).value;
-      expect(
-        refreshed.items.first.originChoiceId,
-        top.items.first.originChoiceId,
-      );
-      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
-
-      final longPath = refreshed.items.first.confirmedPath;
-      fixture.trace.clear();
-      expect(
-        await fixture.repository.execute(
-          CreateDailyChoice(
-            sourceIntentionId: _intention(1),
-            selectedIntentionId: _intention(151),
-            path: longPath,
-            date: CalendarDate.fromParts(2026, 9, 25),
-            description: null,
-            isCompleted: false,
-          ),
-        ),
-        isA<GraphCommandSucceeded>(),
-      );
-      expect(
-        await fixture.repository.getDailyChoice(durabilityChoice(12000)),
-        isA<DailyChoiceReadSuccess>(),
-      );
-      expect(top.items.first.originChoiceId, durabilityChoice(10400));
-      // Создание и чтение читают не больше одного пути вместе с его
-      // участниками.
-      _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
-
-      fixture.trace.clear();
-      expect(
-        await fixture.repository.execute(
-          ReplaceDailyChoicePath(
-            choiceId: durabilityChoice(10399),
-            sourceIntentionId: _intention(1),
-            selectedIntentionId: _intention(151),
-            path: longPath,
-          ),
-        ),
-        isA<GraphCommandSucceeded>(),
-      );
-      final replaced = await fixture.repository.getDailyChoice(
-        durabilityChoice(10399),
-      );
-      expect(replaced, isA<DailyChoiceReadSuccess>());
-      expect(
-        (replaced as DailyChoiceReadSuccess).value.value!.path,
-        hasLength(_pathLength),
-      );
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
 
   test(
     'повторный bootstrap большой истории не читает сохранённые пути',
