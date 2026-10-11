@@ -1882,8 +1882,7 @@ void main() {
       addTearDown(owner.close);
       final editor = container.read(session.notifier)
         ..changeTitle('Купить хлеб')
-        ..changeDescription('К ужину')
-        ..markFavorite();
+        ..changeDescription('К ужину');
       final tagSet = editor.draftTagSet;
       final draftContext = TagDraftContext(tagSet);
       final search = find.byKey(const ValueKey('tag-catalog-search'));
@@ -1989,7 +1988,6 @@ void main() {
       final kept = container.read(session);
       expect(kept.draft.title, 'Купить хлеб');
       expect(kept.draft.description, 'К ужину');
-      expect(kept.draft.favoriteMark, FavoriteMark.favorite);
       expect(kept.draft.readiness, IntentionReadiness.notReady);
       expect(draftTagIds(), [_id(1), created]);
       expect(kept.draftAvailability, IntentionDraftAvailability.editable);
@@ -2038,7 +2036,6 @@ void main() {
       );
       expect(raw.select('SELECT * FROM intentions'), isEmpty);
       expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
-      expect(raw.select('SELECT * FROM favorite_intentions'), isEmpty);
       expect(tester.takeException(), isNull);
     },
   );

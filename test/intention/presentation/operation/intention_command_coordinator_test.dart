@@ -30,7 +30,6 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
@@ -145,7 +144,6 @@ void main() {
         title: 'Полное намерение',
         description: 'Описание',
         readiness: IntentionReadiness.ready,
-        favoriteMark: FavoriteMark.favorite,
         tagIds: selectedTags,
       );
 
@@ -162,7 +160,6 @@ void main() {
             title: 'Другой набор',
             description: null,
             readiness: IntentionReadiness.notReady,
-            favoriteMark: FavoriteMark.notFavorite,
             tagIds: [_tagId(_secondTagUuid)],
           ),
         ),
@@ -186,11 +183,6 @@ void main() {
               (command) => command.readiness,
               'готовность',
               IntentionReadiness.ready,
-            )
-            .having(
-              (command) => command.favoriteMark,
-              'избранное',
-              FavoriteMark.favorite,
             )
             .having((command) => command.tagIds, 'теги', {
               _tagId(_firstTagUuid),
@@ -222,7 +214,7 @@ void main() {
       expect(completion.target, isA<CreatingIntentionOperationTarget>());
       expect(completion.presentationTitle, 'Полное намерение');
       expect(completion.revision, same(revision));
-      // Готовность, избранное и назначения входят в один пакет создания на
+      // Готовность и назначения входят в один пакет создания на
       // его ревизии, а не в отдельные завершения.
       final changes = completion.confirmedChange!.changes.toList();
       expect(changes, [
@@ -274,7 +266,6 @@ void main() {
             title: 'Полное намерение',
             description: null,
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
             tagIds: [_tagId(_firstTagUuid), missingTag],
           ),
         ) as IntentionCommandAccepted;
@@ -399,126 +390,6 @@ void main() {
         await coordinator.shutdown();
       },
     );
-
-    test('принимает отметку и её снятие под ключом намерения и различает '
-        'их вид', () async {
-      final repository = _ControlledGraphRepository();
-      final coordinator = _graphCoordinator(repository);
-      final firstId = _id(_firstUuid);
-      final secondId = _id(_secondUuid);
-
-      final mark = _acceptExisting(coordinator, MarkIntentionFavorite(firstId));
-      final repeated = _acceptExisting(
-        coordinator,
-        UnmarkIntentionFavorite(firstId),
-      );
-      final blockedByMark = _acceptExisting(
-        coordinator,
-        ArchiveIntention(firstId),
-      );
-      final unmark = _acceptExisting(
-        coordinator,
-        UnmarkIntentionFavorite(secondId),
-      );
-
-      expect(mark, isA<IntentionCommandAccepted>());
-      expect(repeated, isA<IntentionCommandAlreadyRunning>());
-      expect(blockedByMark, isA<IntentionCommandAlreadyRunning>());
-      expect(unmark, isA<IntentionCommandAccepted>());
-      expect(coordinator.isKeyRunning(ExistingIntentionKey(firstId)), isTrue);
-      expect(repository.commands, [
-        isA<MarkIntentionFavorite>().having(
-          (command) => command.id,
-          'намерение',
-          firstId,
-        ),
-        isA<UnmarkIntentionFavorite>().having(
-          (command) => command.id,
-          'намерение',
-          secondId,
-        ),
-      ]);
-
-      repository.complete(
-        0,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      repository.complete(1, const ResultFailure(IntentionNotFoundFailure()));
-      final markCompletion = await (mark as IntentionCommandAccepted).future;
-      final unmarkCompletion =
-          await (unmark as IntentionCommandAccepted).future;
-
-      expect(markCompletion.kind, IntentionCommandKind.markFavorite);
-      expect(unmarkCompletion.kind, IntentionCommandKind.unmarkFavorite);
-      expect(
-        markCompletion.target,
-        isA<ExistingIntentionOperationTarget>().having(
-          (target) => target.intentionId,
-          'намерение',
-          firstId,
-        ),
-      );
-      expect(coordinator.isKeyRunning(ExistingIntentionKey(firstId)), isFalse);
-
-      coordinator.releaseInitiatorPresentation(markCompletion.token);
-      coordinator.releaseInitiatorPresentation(unmarkCompletion.token);
-      await coordinator.shutdown();
-    });
-
-    test('выполняющаяся отметка не блокирует операции других намерений, '
-        'включая их отметку', () async {
-      final repository = _ControlledGraphRepository();
-      final coordinator = _graphCoordinator(repository);
-      final firstId = _id(_firstUuid);
-      final secondId = _id(_secondUuid);
-      final thirdId = _id(_thirdUuid);
-
-      final first = _acceptExisting(
-        coordinator,
-        MarkIntentionFavorite(firstId),
-      );
-      final second = _acceptExisting(
-        coordinator,
-        MarkIntentionFavorite(secondId),
-      );
-      final third = _acceptExisting(coordinator, DeleteIntention(thirdId));
-
-      expect(first, isA<IntentionCommandAccepted>());
-      expect(second, isA<IntentionCommandAccepted>());
-      expect(third, isA<IntentionCommandAccepted>());
-      expect(repository.commands, hasLength(3));
-
-      // Завершение одной отметки не освобождает ограничение другого
-      // намерения.
-      repository.complete(
-        0,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      final firstCompletion = await (first as IntentionCommandAccepted).future;
-      expect(coordinator.isRunning(firstId), isFalse);
-      expect(coordinator.isRunning(secondId), isTrue);
-      expect(coordinator.isRunning(thirdId), isTrue);
-
-      repository.complete(
-        1,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      repository.complete(
-        2,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      final secondCompletion =
-          await (second as IntentionCommandAccepted).future;
-      final thirdCompletion = await (third as IntentionCommandAccepted).future;
-      for (final completion in [
-        firstCompletion,
-        secondCompletion,
-        thirdCompletion,
-      ]) {
-        coordinator.releaseInitiatorPresentation(completion.token);
-      }
-      await coordinator.shutdown();
-    });
 
     test(
       'публикует один completion всем текущим data consumers без replay',
@@ -1005,9 +876,8 @@ Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
   ),
 );
 
-/// Подтверждённое полное создание: одна каталожная мутация с готовностью,
-/// избранным и обоими тегами и по факту на каждое назначение, все на
-/// [revision].
+/// Подтверждённое полное создание: одна каталожная мутация с готовностью
+/// и обоими тегами и по факту на каждое назначение, все на [revision].
 Result<ConfirmedGraphResult<IntentionCommandSuccess>>
 _confirmedFullCreatedResult(GraphRevision revision) {
   final id = _id(_firstUuid);
@@ -1035,7 +905,6 @@ _confirmedFullCreatedResult(GraphRevision revision) {
             id,
             title: 'Полное намерение',
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
             tags: tags,
           ),
         ),
@@ -1066,10 +935,7 @@ IntentionCommandStart _acceptExisting(
 ) => coordinator.acceptExisting(command, presentationTitle: 'Намерение');
 
 final class _ControlledGraphRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -1179,10 +1045,7 @@ final class _ControlledGraphRepository
 }
 
 final class _ControlledPersonalGraphRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -1313,7 +1176,6 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
     IntentionId id, {
     String title = 'Намерение',
     IntentionReadiness readiness = IntentionReadiness.notReady,
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
     List<Tag> tags = const [],
   }) : summary = IntentionSummary(
          id: id,
@@ -1325,7 +1187,6 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),
          tags: tags,
-         favoriteMark: favoriteMark,
        );
 
   @override

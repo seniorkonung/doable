@@ -3,6 +3,7 @@ import 'dart:ui' show Tristate;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -10,7 +11,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
@@ -115,20 +115,6 @@ void main() {
 
     expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
     expect(find.byType(HomePage), findsNothing);
-  });
-
-  testWidgets('переход с пустой Главной открывает каталог намерений с '
-      'выбранным пунктом «Граф намерений»', (tester) async {
-    final semantics = tester.ensureSemantics();
-    await _start(tester);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Open intention graph'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(IntentionCatalogPage), findsOneWidget);
-    expect(_selected(tester), AppDestination.intentionGraph);
-    expect(find.byType(AppNavigationBar), findsOneWidget);
-    semantics.dispose();
   });
 }
 

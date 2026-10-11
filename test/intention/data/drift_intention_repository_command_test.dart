@@ -1,6 +1,5 @@
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, TagAssignment;
-import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -25,7 +24,6 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -1534,8 +1532,8 @@ void main() {
       final weekendTagId = _tagId(tagFixtureId(firstTagNumber));
       final homeTagId = _tagId(tagFixtureId(lastTagNumber));
       final newId = _id(_firstUuid);
-      final activeFavoriteId = _idForSequence(0x601);
-      final archivedFavoriteId = _idForSequence(0x602);
+      final existingActiveId = _idForSequence(0x601);
+      final existingArchivedId = _idForSequence(0x602);
       final createdAt = DateTime.utc(2026, 9, 3, 12);
       final allQuery = IntentionCatalogQuery(
         scope: IntentionScope.all,
@@ -1563,27 +1561,16 @@ void main() {
         ]);
         await _insertIntention(
           database,
-          id: activeFavoriteId.toCanonicalString(),
-          title: 'Активное избранное',
+          id: existingActiveId.toCanonicalString(),
+          title: 'Активное намерение',
           createdAt: DateTime.utc(2026, 9, 1),
         );
         await _insertIntention(
           database,
-          id: archivedFavoriteId.toCanonicalString(),
-          title: 'Архивное избранное',
+          id: existingArchivedId.toCanonicalString(),
+          title: 'Архивное намерение',
           isArchived: true,
           createdAt: DateTime.utc(2026, 9, 2),
-        );
-        // Последнее место полного порядка принадлежит архивному намерению.
-        storeFavoriteMark(
-          raw,
-          intentionId: activeFavoriteId.toCanonicalString(),
-          position: 2,
-        );
-        storeFavoriteMark(
-          raw,
-          intentionId: archivedFavoriteId.toCanonicalString(),
-          position: 5,
         );
       });
 
@@ -1595,15 +1582,12 @@ void main() {
             description: '  Вымыть окна\n',
           ),
           readiness: IntentionReadiness.notReady,
-          favoriteMark: FavoriteMark.notFavorite,
           withTags: false,
         ),
-        // Готовность, отметка и теги записываются независимо: каждый признак
-        // отдельно, а затем все вместе.
-        for (final (readiness, favoriteMark, withTags) in const [
-          (IntentionReadiness.ready, FavoriteMark.notFavorite, false),
-          (IntentionReadiness.notReady, FavoriteMark.favorite, false),
-          (IntentionReadiness.ready, FavoriteMark.favorite, true),
+        for (final (readiness, withTags) in const [
+          (IntentionReadiness.ready, false),
+          (IntentionReadiness.notReady, true),
+          (IntentionReadiness.ready, true),
         ])
           (
             name: [
@@ -1611,23 +1595,17 @@ void main() {
                 IntentionReadiness.ready => 'готовность',
                 IntentionReadiness.notReady => 'без готовности',
               },
-              switch (favoriteMark) {
-                FavoriteMark.favorite => 'избранное',
-                FavoriteMark.notFavorite => 'без избранного',
-              },
               withTags ? 'два тега' : 'без тегов',
             ].join(', '),
             command: CreateIntention.withInitialState(
               title: '  Убрать дом  ',
               description: '  Вымыть окна\n',
               readiness: readiness,
-              favoriteMark: favoriteMark,
               tagIds: withTags
                   ? [homeTagId, weekendTagId, homeTagId]
                   : const <TagId>[],
             ),
             readiness: readiness,
-            favoriteMark: favoriteMark,
             withTags: withTags,
           ),
       ];
@@ -1640,7 +1618,6 @@ void main() {
             final revisionBefore = _firstCatalogPage(
               await repository.getCatalogPage(allQuery),
             ).revision;
-            final isFavorite = scenario.favoriteMark == FavoriteMark.favorite;
             final expectedTagIds = scenario.withTags
                 ? [weekendTagId, homeTagId]
                 : const <TagId>[];
@@ -1696,7 +1673,6 @@ void main() {
             final summary = created.entry.summary;
             expect(summary.id, newId);
             expect(summary.readiness, scenario.readiness);
-            expect(summary.favoriteMark, scenario.favoriteMark);
             expect(summary.archiveState, IntentionArchiveState.active);
             expect(summary.createdAt, intention.createdAt);
             expect(summary.updatedAt, intention.createdAt);
@@ -1735,18 +1711,6 @@ void main() {
             );
             final details = await _details(repository, newId);
             expect(details.intention.readiness, scenario.readiness);
-            expect(details.favoriteMark, scenario.favoriteMark);
-            expect(_favoritePlaces(raw), [
-              (activeFavoriteId.toCanonicalString(), 2),
-              (archivedFavoriteId.toCanonicalString(), 5),
-              if (isFavorite) (newId.toCanonicalString(), 6),
-            ]);
-            final favorites = await _favoriteIntentions(repository);
-            expect(favorites.items.map((row) => row.id), [
-              activeFavoriteId,
-              if (isFavorite) newId,
-            ]);
-            expect(favorites.archivedCount, 1);
           },
         );
       }
@@ -1761,14 +1725,12 @@ void main() {
             await repository.getCatalogPage(allQuery),
           ).revision;
           final intentionsBefore = _storedRows(raw, 'intentions');
-          final placesBefore = _favoritePlaces(raw);
 
           final result = await repository.execute(
             CreateIntention.withInitialState(
               title: 'Убрать дом',
               description: null,
               readiness: IntentionReadiness.ready,
-              favoriteMark: FavoriteMark.favorite,
               tagIds: [firstMissing, homeTagId, secondMissing],
             ),
           );
@@ -1788,7 +1750,6 @@ void main() {
           );
           expect(_storedRows(raw, 'intentions'), intentionsBefore);
           expect(_storedRows(raw, 'tag_assignments'), isEmpty);
-          expect(_favoritePlaces(raw), placesBefore);
           expect(
             _firstCatalogPage(await repository.getCatalogPage(allQuery))
                 .revision
@@ -1820,7 +1781,6 @@ void main() {
               title: 'Убрать дом',
               description: null,
               readiness: IntentionReadiness.notReady,
-              favoriteMark: FavoriteMark.notFavorite,
               tagIds: [homeTagId],
             ),
           ),
@@ -1855,7 +1815,6 @@ void main() {
           await repository.getCatalogPage(allQuery),
         ).revision;
         final intentionsBefore = _storedRows(raw, 'intentions');
-        final placesBefore = _favoritePlaces(raw);
         final recreatedTagQuery = IntentionCatalogQuery(
           scope: IntentionScope.all,
           titleFilter: null,
@@ -1869,7 +1828,6 @@ void main() {
             title: 'Убрать дом',
             description: null,
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
             tagIds: [homeTagId, weekendTagId],
           ),
         );
@@ -1891,7 +1849,6 @@ void main() {
         );
         expect(_storedRows(raw, 'intentions'), intentionsBefore);
         expect(_storedRows(raw, 'tag_assignments'), isEmpty);
-        expect(_favoritePlaces(raw), placesBefore);
         expect(
           _catalogItems(await repository.getCatalogPage(recreatedTagQuery)),
           isEmpty,
@@ -1909,7 +1866,6 @@ void main() {
               title: 'Убрать дом',
               description: null,
               readiness: IntentionReadiness.ready,
-              favoriteMark: FavoriteMark.favorite,
               tagIds: [recreatedTagId, weekendTagId],
             ),
           ),
@@ -1936,7 +1892,6 @@ void main() {
             title: '   ',
             description: null,
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
             tagIds: [homeTagId],
           ),
         );
@@ -1967,7 +1922,7 @@ ConfirmedGraphResult<IntentionCommandSuccess> _confirmedCommand(
       .value;
 }
 
-/// Наблюдаемые поля сводки каталога, включая собственные теги и отметку.
+/// Наблюдаемые поля сводки каталога, включая собственные теги.
 List<Object?> _summaryFacts(IntentionSummary summary) => [
   summary.id,
   summary.title,
@@ -1978,7 +1933,6 @@ List<Object?> _summaryFacts(IntentionSummary summary) => [
   summary.createdAt,
   summary.updatedAt,
   [for (final tag in summary.tags) (tag.id, tag.name.value)],
-  summary.favoriteMark,
 ];
 
 Future<TagAssignmentsSnapshot> _tagAssignments(
@@ -1988,15 +1942,6 @@ Future<TagAssignmentsSnapshot> _tagAssignments(
   GraphResultSuccess(:final value) => value,
   GraphResultFailure(:final failure) => throw TestFailure(
     'Чтение назначений завершилось отказом $failure.',
-  ),
-};
-
-Future<FavoriteIntentionsSnapshot> _favoriteIntentions(
-  DriftPersonalGraphRepository repository,
-) async => switch (await repository.getFavoriteIntentions()) {
-  GraphResultSuccess(:final value) => value,
-  GraphResultFailure(:final failure) => throw TestFailure(
-    'Чтение избранного завершилось отказом $failure.',
   ),
 };
 
@@ -2010,14 +1955,6 @@ Future<IntentionDetails> _details(
       .value
       .value!;
 }
-
-/// Места избранного в порядке единого списка.
-List<(String, int)> _favoritePlaces(Database raw) => [
-  for (final row in raw.select(
-    'SELECT intention_id, position FROM favorite_intentions ORDER BY position',
-  ))
-    (row['intention_id'] as String, row['position'] as int),
-];
 
 List<Map<String, Object?>> _storedRows(Database raw, String table) => [
   for (final row in raw.select('SELECT * FROM $table ORDER BY 1')) {...row},

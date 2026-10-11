@@ -32,7 +32,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'neighborhood_test_support.dart';
-import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
@@ -1064,10 +1063,7 @@ DailyChoiceCatalogItem _dailyItem({
 }
 
 final class _CommandRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -1238,7 +1234,6 @@ final class _CommandRepository
         value: IntentionDetails(
           intention: testNeighborhoodIntention(id: id),
           relationCounts: testRelationCounts(),
-          favoriteMark: FavoriteMark.notFavorite,
         ),
         revision: const TestGraphRevision(1),
       ),

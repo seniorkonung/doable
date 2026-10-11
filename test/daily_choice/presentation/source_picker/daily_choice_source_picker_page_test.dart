@@ -108,8 +108,8 @@ void main() {
     ('en', 'Favorite intention', 'Total intentions: 2'),
   ]) {
     testWidgets(
-      '$language: без условий поиска звезду показывает только '
-      'избранное из одноимённых оснований, а отметка не становится действием',
+      '$language: одноимённые исходные намерения показаны без отметки '
+      'избранного и выбираются по идентификатору',
       (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = ControlledParticipantPickerRepository();
@@ -125,7 +125,6 @@ void main() {
           DailyChoiceSourcePickerRoute(),
         );
         await _settleRoute(tester);
-        // Условия поиска пусты: отметка показана без фильтра названия и тегов.
         expect(repository.queryAt(1).titleFilter, isNull);
         expect(repository.queryAt(1).tagFilter, IntentionTagFilter.empty);
         _completeFirst(repository, 1, [
@@ -133,7 +132,6 @@ void main() {
             index: 2,
             title: 'Гулять',
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
           ),
           testSummary(
             index: 3,
@@ -146,26 +144,16 @@ void main() {
         final rows = find.byType(IntentionSummaryView);
         expect(rows, findsNWidgets(2));
         expect(find.text(totalCount), findsOneWidget);
-        expect(find.byIcon(Icons.star), findsOneWidget);
+        expect(find.byIcon(Icons.star), findsNothing);
         expect(
-          find.descendant(of: rows.at(0), matching: find.byIcon(Icons.star)),
-          findsOneWidget,
+          tester.getSemantics(rows.at(0)).label,
+          isNot(contains(markLabel)),
         );
-        expect(tester.getSemantics(rows.at(0)).label, contains(markLabel));
         expect(
           tester.getSemantics(rows.at(1)).label,
           isNot(contains(markLabel)),
         );
 
-        // Отметка — подпись строки: её нельзя поставить, снять или выбрать
-        // условием поиска.
-        expect(
-          find.ancestor(
-            of: find.byIcon(Icons.star),
-            matching: find.byType(IconButton),
-          ),
-          findsNothing,
-        );
         expect(find.byIcon(Icons.star_border), findsNothing);
         expect(find.text(markLabel), findsNothing);
         expect(find.byTooltip(markLabel), findsNothing);

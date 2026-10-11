@@ -10,9 +10,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -154,80 +152,6 @@ void main() {
         expect(first.items, hasLength(_pageSize), reason: label);
         _expectJointPage(first, trace, isFirst: true);
       }
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
-
-  test(
-    'читает отметки только порции при любом числе избранных вне её',
-    () async {
-      final (:repository, :raw, :trace) = await _openJointFixture();
-
-      Future<IntentionCatalogPage> read() async {
-        trace.clear();
-        final page = _page(await repository.getCatalogPage(_jointQuery()));
-        expect(page.items, hasLength(_pageSize));
-        _expectJointPage(page, trace, isFirst: true);
-        return page;
-      }
-
-      final before = await read();
-      final pageIds = {
-        for (final item in before.items) item.id.toCanonicalString(),
-      };
-      final storedBefore = _favoriteRowCount(raw);
-
-      // Избранным становится каждое намерение вне порции.
-      final insertFavorite = raw.prepare(
-        'INSERT INTO favorite_intentions (intention_id, position) '
-        'VALUES (?, ?)',
-      );
-      var position = _fixtureSize;
-      raw.execute('BEGIN');
-      try {
-        for (var index = 0; index < _fixtureSize; index++) {
-          final id = _fixtureId(index);
-          if (_isFavorite(index) || pageIds.contains(id)) continue;
-          insertFavorite.execute([id, ++position]);
-        }
-        raw.execute('COMMIT');
-      } on Object {
-        raw.execute('ROLLBACK');
-        rethrow;
-      } finally {
-        insertFavorite.close();
-      }
-      final storedAfter = _favoriteRowCount(raw);
-      expect(storedAfter, greaterThan(storedBefore * 2));
-      expect(
-        storedAfter,
-        _fixtureSize -
-            before.items
-                .where((item) => item.favoriteMark == FavoriteMark.notFavorite)
-                .length,
-      );
-
-      final after = await read();
-
-      expect(
-        [for (final item in after.items) (item.id, item.favoriteMark)],
-        [for (final item in before.items) (item.id, item.favoriteMark)],
-      );
-
-      // Подробные данные читают не больше одной строки за чтение.
-      for (final item in after.items.take(3)) {
-        trace.clear();
-        final details = await repository.watchIntention(item.id).first;
-        expect(
-          (details as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
-              .value
-              .value!
-              .favoriteMark,
-          item.favoriteMark,
-        );
-        expect(trace.rowCounts, everyElement(lessThanOrEqualTo(1)));
-      }
-      expect(trace.writes, isEmpty);
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
@@ -542,7 +466,7 @@ Future<List<int>> _expectMassReconciliation(
       isFirst: isFirst,
       portionRows: _pageSize + 1,
     );
-    _expectFixtureTagsAndMarks(portion.items);
+    _expectFixtureTags(portion.items);
     readRows += _selectedRows(trace);
     allowedRows += _readVolumeLimit(
       portion.items,
@@ -665,9 +589,6 @@ void _populateJointTagFixture(sqlite.Database database) {
   final insertAssignment = database.prepare(
     'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
   );
-  final insertFavorite = database.prepare(
-    'INSERT INTO favorite_intentions (intention_id, position) VALUES (?, ?)',
-  );
   database.execute('BEGIN');
   try {
     // Все намерения готовы: редкость совпадений задают теги, а не готовность.
@@ -724,13 +645,6 @@ void _populateJointTagFixture(sqlite.Database database) {
         insertAssignment.execute([_fixtureId(_popularTag), _fixtureId(index)]);
       }
     }
-    // Избранных намерений во много раз больше порции: чтение отметок порции
-    // не может получать их все.
-    for (var index = 0; index < _fixtureSize; index++) {
-      if (_isFavorite(index)) {
-        insertFavorite.execute([_fixtureId(index), index + 1]);
-      }
-    }
     database.execute('COMMIT');
   } on Object {
     database.execute('ROLLBACK');
@@ -738,34 +652,17 @@ void _populateJointTagFixture(sqlite.Database database) {
   } finally {
     insertTag.close();
     insertAssignment.close();
-    insertFavorite.close();
   }
 }
 
 const _jointCandidateCount = _jointMatchCount + 10;
 
-int _favoriteRowCount(sqlite.Database raw) =>
-    raw
-            .select('SELECT count(*) AS count FROM favorite_intentions')
-            .single['count']
-        as int;
-
-/// Избранное — каждое третье намерение фикстуры: 16 667 отметок, среди них
-/// часть совместных кандидатов и большинство намерений вне любой порции.
-bool _isFavorite(int fixtureIndex) => fixtureIndex % 3 == 0;
-
-/// Порция несёт собственные теги и отметки избранного намерений фикстуры.
-void _expectFixtureTagsAndMarks(List<IntentionSummary> items) {
+/// Порция несёт полный состав собственных тегов намерений фикстуры.
+void _expectFixtureTags(List<IntentionSummary> items) {
   for (final item in items) {
     expect(
       item.tags.map((tag) => tag.id),
       _fixtureTagIds(_fixtureIndexOf(item.id)),
-    );
-    expect(
-      item.favoriteMark,
-      _isFavorite(_fixtureIndexOf(item.id))
-          ? FavoriteMark.favorite
-          : FavoriteMark.notFavorite,
     );
   }
 }
@@ -775,22 +672,19 @@ int _selectedRows(_SelectTrace trace) =>
     trace.rowCounts.fold(0, (sum, rows) => sum + rows);
 
 /// Предел строк, которые запрос может прочитать для порции [items]:
-/// количество (только первая порция), сама порция, сводки связей, теги и
-/// отметки именно этих намерений.
+/// количество (только первая порция), сама порция, сводки связей и теги
+/// именно этих намерений.
 int _readVolumeLimit(
   List<IntentionSummary> items, {
   required bool isFirst,
   required int portionRows,
 }) {
   final tagRows = items.fold(0, (sum, item) => sum + item.tags.length);
-  final markRows = items
-      .where((item) => item.favoriteMark == FavoriteMark.favorite)
-      .length;
-  return (isFirst ? 1 : 0) + portionRows + items.length + tagRows + markRows;
+  return (isFirst ? 1 : 0) + portionRows + items.length + tagRows;
 }
 
 /// Запрос порции не читает строк сверх порции и её данных, как бы ни были
-/// велики каталог, число назначений и избранного вне порции, и не пишет.
+/// велики каталог и число назначений вне порции, и не пишет.
 void _expectBoundedReadVolume(
   _SelectTrace trace,
   List<IntentionSummary> items, {
@@ -931,7 +825,7 @@ void _expectJointPage(
   _SelectTrace trace, {
   required bool isFirst,
 }) {
-  _expectFixtureTagsAndMarks(page.items);
+  _expectFixtureTags(page.items);
   _expectBoundedReadVolume(
     trace,
     page.items,

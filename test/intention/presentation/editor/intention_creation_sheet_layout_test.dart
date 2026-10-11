@@ -304,7 +304,6 @@ void main() {
           await tester.enterText(find.byKey(_description), _lines(8));
           sessions.notifier(tester)
             ..draftTagSet.add(tag)
-            ..markFavorite()
             ..confirmReadiness();
           await tester.pumpAndSettle();
           _expectFocusedInputVisible(tester, _description);
@@ -339,7 +338,6 @@ void main() {
             field == _description ? 'Исправлено' : draft.description,
           );
           expect(command.tagIds, draft.tagIds);
-          expect(command.favoriteMark, draft.favoriteMark);
           expect(command.readiness, draft.readiness);
           repository.completeCommand(
             1,
@@ -674,7 +672,6 @@ void main() {
           sessions.notifier(tester)
             ..draftTagSet.add(tags[0])
             ..draftTagSet.add(tags[1])
-            ..markFavorite()
             ..confirmReadiness();
           await tester.enterText(find.byKey(_title), 'Намерение');
           await tester.enterText(find.byKey(_description), _lines(12));
@@ -725,11 +722,6 @@ void main() {
                       _tagId(2),
                     ])
                     .having(
-                      (command) => command.favoriteMark,
-                      'избранное',
-                      FavoriteMark.favorite,
-                    )
-                    .having(
                       (command) => command.readiness,
                       'готовность',
                       IntentionReadiness.ready,
@@ -745,9 +737,6 @@ void main() {
             case _Recovery.none:
               expect(_submitButton(tester).onPressed, isNull);
               // Правки, не устраняющие причину, отказ не снимают.
-              await tester.ensureVisible(find.byKey(_favorite));
-              await tester.pumpAndSettle();
-              await tester.tap(find.byKey(_favorite));
               await tester.enterText(find.byKey(_title), 'Другое намерение');
               await tester.pumpAndSettle();
 
@@ -761,7 +750,7 @@ void main() {
     }
 
     testWidgets(
-      'любой отказ сохраняет все пять полей черновика в той же компактной панели',
+      'любой отказ сохраняет все четыре поля черновика в той же компактной панели',
       (tester) async {
         _usePhone(tester, _portrait);
         final failures = [
@@ -778,7 +767,6 @@ void main() {
           await _openEditor(tester, repository, sessions);
           sessions.notifier(tester)
             ..draftTagSet.add(tags.single)
-            ..markFavorite()
             ..confirmReadiness();
           await tester.enterText(find.byKey(_title), '  Намерение');
           await tester.enterText(find.byKey(_description), 'Описание\n');
@@ -798,7 +786,6 @@ void main() {
           );
           _expectDraftValues(state.draft, draft, reason: name);
           expect(state.draft.tagIds, [_tagId(1)], reason: name);
-          expect(state.draft.favoriteMark, FavoriteMark.favorite, reason: name);
           expect(state.draft.readiness, IntentionReadiness.ready, reason: name);
           expect(_controller(tester, _title).text, '  Намерение', reason: name);
           expect(
@@ -824,7 +811,7 @@ void main() {
       for (final textScale in [_androidMaxTextScale]) {
         final isWithinPlatformTextScale = textScale <= _androidMaxTextScale;
         testWidgets(
-          'на ${device.name} с безопасными отступами, клавиатурой и масштабом текста ${(textScale * 100).round()}% все пять полей, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
+          'на ${device.name} с безопасными отступами, клавиатурой и масштабом текста ${(textScale * 100).round()}% все четыре поля, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
           (tester) async {
             final semantics = tester.ensureSemantics();
             _usePhone(tester, device, keyboard: true);
@@ -863,9 +850,8 @@ void main() {
 
             await expectUsable(keyboard: true);
 
-            // Отметки включаются действиями панели; объяснение готовности
+            // Готовность включается действием панели; её объяснение
             // забирает фокус у поля, и платформа скрывает клавиатуру.
-            await _tapInFields(tester, _favorite);
             await _tapInFields(tester, _readiness);
             _usePhone(tester, device);
             await tester.pumpAndSettle();
@@ -876,10 +862,6 @@ void main() {
             await _tapDialogAction(tester, _readinessConfirm);
             _usePhone(tester, device, keyboard: true);
             await tester.pumpAndSettle();
-            expect(
-              sessions.state(tester).draft.favoriteMark,
-              FavoriteMark.favorite,
-            );
             expect(
               sessions.state(tester).draft.readiness,
               IntentionReadiness.ready,
@@ -894,10 +876,6 @@ void main() {
             await tester.pumpAndSettle();
             expect(sessions.state(tester).draft.description, draft.description);
             expect(sessions.state(tester).draft.tagIds, draft.tagIds);
-            expect(
-              sessions.state(tester).draft.favoriteMark,
-              draft.favoriteMark,
-            );
             expect(sessions.state(tester).draft.readiness, draft.readiness);
             await expectUsable(keyboard: true);
 
@@ -978,11 +956,6 @@ void main() {
                   )
                   .having((command) => command.tagIds, 'теги', [_tagId(2)])
                   .having(
-                    (command) => command.favoriteMark,
-                    'избранное',
-                    FavoriteMark.favorite,
-                  )
-                  .having(
                     (command) => command.readiness,
                     'готовность',
                     IntentionReadiness.ready,
@@ -1027,7 +1000,6 @@ Future<void> _expectPanelUsable(
     for (final id in tagIds)
       ValueKey('intention-editor-tag-remove-${id.toCanonicalString()}'),
     _chooseTags,
-    _favorite,
     _readiness,
   ]) {
     await _scrollToCenter(tester, control);
@@ -1364,7 +1336,6 @@ const _submit = ValueKey('intention-editor-submit');
 const _status = ValueKey('intention-creation-sheet-status');
 const _failure = ValueKey('intention-editor-failure');
 const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
-const _favorite = ValueKey('intention-editor-favorite');
 const _readiness = ValueKey('intention-editor-readiness');
 const _chooseTags = ValueKey('intention-editor-choose-tags');
 const _readinessCancel = ValueKey('intention-editor-readiness-cancel');
@@ -1586,7 +1557,6 @@ void _expectDraftValues(
   expect(actual.title, expected.title, reason: reason);
   expect(actual.description, expected.description, reason: reason);
   expect(actual.tagIds, expected.tagIds, reason: reason);
-  expect(actual.favoriteMark, expected.favoriteMark, reason: reason);
   expect(actual.readiness, expected.readiness, reason: reason);
 }
 

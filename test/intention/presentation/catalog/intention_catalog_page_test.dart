@@ -1230,8 +1230,8 @@ void main() {
 
   // Архивное состояние строки в охвате всех показывает тест архивного
   // состояния в охвате всех.
-  testWidgets('архивный охват показывает звезду архивированного '
-      'избранного намерения', (tester) async {
+  testWidgets('архивный охват показывает намерения без отметки '
+      'избранного', (tester) async {
     const scopeName = 'Archived';
     const scope = IntentionScope.archived;
     final semantics = tester.ensureSemantics();
@@ -1262,13 +1262,12 @@ void main() {
           items: [
             testSummary(
               index: 1,
-              title: 'Архивное избранное',
+              title: 'Архивное первое',
               archiveState: IntentionArchiveState.archived,
-              favoriteMark: FavoriteMark.favorite,
             ),
             testSummary(
               index: 2,
-              title: 'Архивное обычное',
+              title: 'Архивное второе',
               archiveState: IntentionArchiveState.archived,
             ),
           ],
@@ -1280,18 +1279,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final favorite = find.ancestor(
-      of: find.text('Архивное избранное'),
+    final row = find.ancestor(
+      of: find.text('Архивное первое'),
       matching: find.byType(IntentionSummaryView),
     );
-    expect(find.byIcon(Icons.star), findsOneWidget);
-    expect(
-      find.descendant(of: favorite, matching: find.byIcon(Icons.star)),
-      findsOneWidget,
-    );
-    final label = tester.getSemantics(favorite).label;
-    expect(label, contains('Архивное избранное'));
-    expect(label, contains('Favorite intention'));
+    expect(find.byIcon(Icons.star), findsNothing);
+    final label = tester.getSemantics(row).label;
+    expect(label, contains('Архивное первое'));
+    expect(label, isNot(contains('Favorite intention')));
     // Архивный охват сообщает архивное состояние самим выбранным охватом.
     expect(label.contains('Archived'), isFalse);
     expect(find.text('Total intentions: 2'), findsOneWidget);

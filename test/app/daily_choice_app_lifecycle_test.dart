@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
@@ -18,8 +19,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/favorite/application/favorite_intentions.dart';
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -970,10 +969,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
     catalogQueries.add(query);
     return _delegate.getDailyChoiceCatalogPage(query);
   }
-
-  @override
-  Future<FavoriteIntentionsResult> getFavoriteIntentions() =>
-      _delegate.getFavoriteIntentions();
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

@@ -9,7 +9,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/favorite/application/favorite_order_command.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -29,7 +28,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 
-import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
@@ -56,7 +54,6 @@ final class ControlledDetailRequest {
     Result<Intention?> result, {
     GraphRevision revision = const TestDetailsRevision(0),
     RelationCounts? relationCounts,
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
   }) {
     final snapshotResult = switch (result) {
       ResultSuccess(:final value) =>
@@ -67,7 +64,6 @@ final class ControlledDetailRequest {
                 : IntentionDetails(
                     intention: value,
                     relationCounts: relationCounts ?? testRelationCounts(),
-                    favoriteMark: favoriteMark,
                   ),
             revision: revision,
           ),
@@ -82,10 +78,7 @@ final class ControlledDetailRequest {
 }
 
 final class ControlledDetailsRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -130,7 +123,6 @@ final class ControlledDetailsRepository
   final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final tagCommands = <TagCommand>[];
-  final favoriteOrderCommands = <MoveFavoriteIntention>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
@@ -138,8 +130,6 @@ final class ControlledDetailsRepository
       <Completer<DeleteBlockingRelationsResult>>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
-  final _favoriteOrderCommandRequests =
-      <Completer<FavoriteOrderCommandResult>>[];
   var _watchCallCount = 0;
 
   Result<IntentionCatalogPage>? catalogResult;
@@ -257,7 +247,6 @@ final class ControlledDetailsRepository
         await _executeBlockingRelationsDelete(deletion),
       final DailyChoiceCommand choice => await _executeDailyChoice(choice),
       final TagCommand tag => await _executeTag(tag),
-      final MoveFavoriteIntention move => await _executeFavoriteOrder(move),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -296,23 +285,6 @@ final class ControlledDetailsRepository
 
   void failTagCommand(int index, Object error) =>
       _tagCommandRequests[index].completeError(error);
-
-  Future<FavoriteOrderCommandResult> _executeFavoriteOrder(
-    MoveFavoriteIntention command,
-  ) {
-    favoriteOrderCommands.add(command);
-    final request = Completer<FavoriteOrderCommandResult>();
-    _favoriteOrderCommandRequests.add(request);
-    return request.future;
-  }
-
-  void completeFavoriteOrderCommand(
-    int index,
-    FavoriteOrderCommandResult result,
-  ) => _favoriteOrderCommandRequests[index].complete(result);
-
-  void failFavoriteOrderCommand(int index, Object error) =>
-      _favoriteOrderCommandRequests[index].completeError(error);
 
   Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
     DeleteBlockingRelations command,
@@ -407,7 +379,6 @@ IntentionId testDetailsIntentionId(int index) {
 IntentionSummary testDetailsSummary(
   Intention intention, {
   int activeRelationCount = 0,
-  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
 }) => IntentionSummary(
   id: intention.id,
   title: intention.title,
@@ -417,7 +388,6 @@ IntentionSummary testDetailsSummary(
   activeRelationCount: activeRelationCount,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
-  favoriteMark: favoriteMark,
 );
 
 RelationCounts testRelationCounts({
@@ -462,21 +432,13 @@ Result<IntentionCommandSuccess> testDetailsSavedResult(
   Intention? before,
   GraphRevision revision = const TestDetailsRevision(0),
   Iterable<GraphChange> additionalChanges = const [],
-  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
-  FavoriteMark beforeFavoriteMark = FavoriteMark.notFavorite,
 }) {
-  final afterSnapshot = _DetailsCatalogEntrySnapshot(
-    intention,
-    favoriteMark: favoriteMark,
-  );
+  final afterSnapshot = _DetailsCatalogEntrySnapshot(intention);
   final mutation = before == null
       ? IntentionCatalogUnchanged(revision: revision, entry: afterSnapshot)
       : IntentionCatalogUpdated(
           revision: revision,
-          before: _DetailsCatalogEntrySnapshot(
-            before,
-            favoriteMark: beforeFavoriteMark,
-          ),
+          before: _DetailsCatalogEntrySnapshot(before),
           after: afterSnapshot,
         );
   return ResultSuccess(
@@ -503,10 +465,8 @@ Result<IntentionCommandSuccess> testDetailsDeletedResult(
 
 final class _DetailsCatalogEntrySnapshot
     implements IntentionCatalogEntrySnapshot {
-  _DetailsCatalogEntrySnapshot(
-    Intention intention, {
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
-  }) : summary = testDetailsSummary(intention, favoriteMark: favoriteMark);
+  _DetailsCatalogEntrySnapshot(Intention intention)
+    : summary = testDetailsSummary(intention);
 
   @override
   final IntentionSummary summary;

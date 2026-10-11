@@ -1,7 +1,9 @@
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -9,9 +11,9 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
@@ -22,13 +24,13 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 /// Намерения «Намерение 01» … «Намерение 40»: выдача каталога намерений
-/// длиннее экрана. Первое — избранное, исходное намерение дневных выборов.
+/// длиннее экрана. Первое — исходное намерение дневных выборов.
 const _intentionCount = 40;
 
 /// Намерение «Прочее», которое фильтр названия «Намерение» исключает.
@@ -127,7 +129,21 @@ void main() {
   ) async {
     final app = await _start(tester);
 
-    await _open(tester, find.byType(HomeIntentionRow), IntentionDetailsPage);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
+      wait: _until,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-title')),
+      'Новое намерение с Главной',
+    );
+    await _open(
+      tester,
+      find.byKey(const ValueKey('intention-editor-submit')),
+      IntentionDetailsPage,
+    );
     expect(app.platform.frameworkHandlesBack, isTrue);
     await _back(tester);
 
@@ -304,7 +320,7 @@ final class _App {
   final _PlatformBack platform;
 }
 
-/// Запускает приложение на засеянном хранилище и ждёт Главную со списком.
+/// Запускает приложение на засеянном хранилище и ждёт Главную.
 Future<_App> _start(WidgetTester tester) async {
   // Framework сообщает платформе о готовности только работающему приложению.
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -336,12 +352,16 @@ Future<_App> _start(WidgetTester tester) async {
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
   _seed(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
-  await _until(tester, find.byType(HomeIntentionRow));
+  await _until(tester, find.byType(HomePage));
+  await _waitFor(
+    tester,
+    () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+  );
   await tester.pumpAndSettle();
   return _App(ready.container.read(appRouterProvider), platform);
 }
 
-/// Намерения, одна отметка избранного, связь и два дневных выбора по ней на
+/// Намерения, связь и два дневных выбора по ней на
 /// разные даты: каждая корневая страница получает содержимое и параметры.
 void _seed(sqlite.Database database) {
   for (var number = 1; number <= _intentionCount + 1; number++) {
@@ -386,7 +406,6 @@ void _seed(sqlite.Database database) {
       ],
     );
   }
-  storeFavoriteMark(database, intentionId: tagFixtureId(1), position: 1);
 }
 
 /// Корневая страница пункта [destination] показана без страниц поверх, а
@@ -438,6 +457,10 @@ Future<void> _back(WidgetTester tester) async {
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
   await tester.tap(appNavigationDestination(destination));
   await _until(tester, find.byType(_rootPages[destination]!));
+  await _waitFor(
+    tester,
+    () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+  );
   await tester.pumpAndSettle();
 }
 

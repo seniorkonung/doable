@@ -228,12 +228,9 @@ final class _IntentionEditorPageState
               ],
               const SizedBox(height: 8),
               _DraftOptions(
-                favoriteMark: editor.draft.favoriteMark,
                 readiness: editor.draft.readiness,
                 enabled: !isDraftFixed,
                 onChooseTags: () => unawaited(_chooseTags()),
-                onMarkFavorite: notifier.markFavorite,
-                onUnmarkFavorite: notifier.unmarkFavorite,
                 onEnableReadiness: () => unawaited(_confirmReadiness()),
                 onDisableReadiness: notifier.disableReadiness,
               ),
@@ -664,34 +661,27 @@ final class _CloseConfirmationDialogState
   }
 }
 
-/// Быстрые действия черновика: общий выбор тегов и отметки избранного и
-/// начальной готовности.
+/// Быстрые действия черновика: общий выбор тегов и начальной готовности.
 ///
 /// Действия меняют только черновик сессии и не отправляют команд графа.
-/// Включённое состояние отметок отличается формой значка и признаком
+/// Включённое состояние готовности отличается формой значка и признаком
 /// включения для экранного диктора, а подсказка называет назначение и
 /// состояние, не выдавая черновик за сохранённое намерение.
 final class _DraftOptions extends StatelessWidget {
   const _DraftOptions({
-    required this.favoriteMark,
     required this.readiness,
     required this.enabled,
     required this.onChooseTags,
-    required this.onMarkFavorite,
-    required this.onUnmarkFavorite,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
   });
 
-  final FavoriteMark favoriteMark;
   final IntentionReadiness readiness;
 
   /// Черновик принимает правки: во время отправки и после завершения сессии
   /// действия недоступны.
   final bool enabled;
   final VoidCallback onChooseTags;
-  final VoidCallback onMarkFavorite;
-  final VoidCallback onUnmarkFavorite;
 
   /// Начинает включение готовности с объяснения критериев действия.
   final VoidCallback onEnableReadiness;
@@ -700,7 +690,7 @@ final class _DraftOptions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    // Нажатия отметок не считаются нажатием вне поля ввода: ввод
+    // Нажатия действий не считаются нажатием вне поля ввода: ввод
     // продолжается с прежним фокусом.
     return TextFieldTapRegion(
       child: Wrap(
@@ -713,24 +703,6 @@ final class _DraftOptions extends StatelessWidget {
             onPressed: enabled ? onChooseTags : null,
             icon: const Icon(Icons.label_outline),
           ),
-          switch (favoriteMark) {
-            FavoriteMark.favorite => _DraftOptionButton(
-              optionKey: const ValueKey('intention-editor-favorite'),
-              label: localizations.editorFavoriteOption,
-              tooltip: localizations.editorFavoriteOptionOn,
-              isOn: true,
-              icon: Icons.star,
-              onPressed: enabled ? onUnmarkFavorite : null,
-            ),
-            FavoriteMark.notFavorite => _DraftOptionButton(
-              optionKey: const ValueKey('intention-editor-favorite'),
-              label: localizations.editorFavoriteOption,
-              tooltip: localizations.editorFavoriteOptionOff,
-              isOn: false,
-              icon: Icons.star_border,
-              onPressed: enabled ? onMarkFavorite : null,
-            ),
-          },
           switch (readiness) {
             IntentionReadiness.ready => _DraftOptionButton(
               optionKey: const ValueKey('intention-editor-readiness'),

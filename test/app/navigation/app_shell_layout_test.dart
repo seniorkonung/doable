@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -16,7 +17,6 @@ import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -39,7 +39,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -440,7 +439,7 @@ void main() {
         final app = await _start(tester, insets: _safeArea);
         await _select(tester, destination);
 
-        _acceptMark(app, intention: 2);
+        _acceptArchive(app, intention: 2);
         await _until(tester, _messageOf(2));
         await tester.pumpAndSettle();
 
@@ -481,8 +480,8 @@ void main() {
       final app = await _start(tester, insets: _safeArea);
       await _buildEveryTab(tester);
 
-      _acceptMark(app, intention: 2);
-      _acceptMark(app, intention: 3);
+      _acceptArchive(app, intention: 2);
+      _acceptArchive(app, intention: 3);
       await _until(tester, _messageOf(2));
       await tester.pumpAndSettle();
 
@@ -518,7 +517,7 @@ void main() {
       final app = await _start(tester, insets: _safeArea);
       await _buildEveryTab(tester);
       await _select(tester, AppDestination.intentionGraph);
-      _acceptMark(app, intention: 2);
+      _acceptArchive(app, intention: 2);
       await _until(tester, _messageOf(2));
       await tester.pumpAndSettle();
 
@@ -650,7 +649,7 @@ void _apply(WidgetTester tester, _Insets insets) {
   tester.view.viewInsets = FakeViewPadding(bottom: insets.keyboard);
 }
 
-/// Запускает приложение на засеянном хранилище и ждёт Главную со списком.
+/// Запускает приложение на засеянном хранилище и ждёт Главную.
 Future<_App> _start(
   WidgetTester tester, {
   int intentions = 40,
@@ -698,7 +697,11 @@ Future<_App> _start(
   _seed(raw, intentions: intentions, dailyChoices: dailyChoices);
   seedAdditional?.call(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
-  await _until(tester, find.byType(HomeIntentionRow));
+  await _until(tester, find.byType(HomePage));
+  await _waitFor(
+    tester,
+    () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+  );
   await tester.pumpAndSettle();
   final ready = await runtime.bootstrap() as AppRuntimeReady;
   return _App(
@@ -707,7 +710,7 @@ Future<_App> _start(
   );
 }
 
-/// Намерения, одна отметка избранного, связь и дневные выборы по ней на
+/// Намерения, связь и дневные выборы по ней на
 /// локальное сегодня: каждая корневая страница получает содержимое.
 void _seed(
   sqlite.Database database, {
@@ -750,18 +753,17 @@ void _seed(
       ],
     );
   }
-  storeFavoriteMark(database, intentionId: tagFixtureId(1), position: 1);
 }
 
-/// Принимает отметку избранного: её успех предъявляет общая поверхность на
+/// Принимает архивирование: его успех предъявляет общая поверхность на
 /// той странице, которая открыта в момент результата.
-void _acceptMark(_App app, {required int intention}) {
+void _acceptArchive(_App app, {required int intention}) {
   final id = (IntentionId.decode(
     tagFixtureId(intention),
   ) as IntentionIdDecodingSuccess).id;
   expect(
     app.coordinator.acceptExisting(
-      MarkIntentionFavorite(id),
+      ArchiveIntention(id),
       presentationTitle: _intentionTitle(intention),
     ),
     isA<IntentionCommandAccepted>(),
@@ -970,6 +972,10 @@ Future<void> _select(WidgetTester tester, AppDestination destination) async {
   expect(entry.hitTestable(), findsOneWidget);
   await tester.tap(entry);
   await _until(tester, find.byType(_rootPages[destination]!));
+  await _waitFor(
+    tester,
+    () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+  );
   await tester.pumpAndSettle();
 }
 

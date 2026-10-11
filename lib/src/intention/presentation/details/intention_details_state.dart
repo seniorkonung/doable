@@ -23,7 +23,6 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     required super.isOperationRunning,
     this.edit,
     this.stateChange,
-    this.isAwaitingFavoriteMarkSnapshot = false,
   });
 
   final application.IntentionDetails details;
@@ -31,10 +30,6 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
   Intention get intention => details.intention;
   final IntentionDetailsEdit? edit;
   final IntentionDetailsStateChange? stateChange;
-
-  /// Отметка или её снятие подтверждены, а [details] ещё несут прежнюю
-  /// отметку: до цельного снимка действие по ней не предлагается.
-  final bool isAwaitingFavoriteMarkSnapshot;
 
   IntentionDetailsLoaded copyWith({
     application.IntentionDetails? details,
@@ -44,15 +39,12 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     bool clearEdit = false,
     IntentionDetailsStateChange? stateChange,
     bool clearStateChange = false,
-    bool? isAwaitingFavoriteMarkSnapshot,
   }) => IntentionDetailsLoaded(
     details: details ?? this.details,
     revision: revision ?? this.revision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     edit: clearEdit ? null : edit ?? this.edit,
     stateChange: clearStateChange ? null : stateChange ?? this.stateChange,
-    isAwaitingFavoriteMarkSnapshot:
-        isAwaitingFavoriteMarkSnapshot ?? this.isAwaitingFavoriteMarkSnapshot,
   );
 }
 
@@ -62,12 +54,6 @@ enum IntentionDetailsStateChangeKind {
   archive,
   restore,
   delete,
-
-  /// Отметка намерения избранным; применима, пока подтверждённой отметки нет.
-  markFavorite,
-
-  /// Снятие отметки; применимо только к подтверждённо избранному намерению.
-  unmarkFavorite,
 }
 
 final class IntentionDetailsStateChange {

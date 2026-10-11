@@ -26,7 +26,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_descript
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 import '../neighborhood/neighborhood_test_support.dart';
-import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
@@ -65,10 +64,7 @@ final class ControlledRelationWatch {
 
 /// Управляемый граф для подробного просмотра связи и переходов к участникам.
 final class ControlledRelationDetailsRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -126,11 +122,7 @@ final class ControlledRelationDetailsRepository
   }) => _intentionControllerFor(intention.id).add(
     ResultSuccess(
       GraphSnapshot(
-        value: IntentionDetails(
-          intention: intention,
-          relationCounts: counts,
-          favoriteMark: FavoriteMark.notFavorite,
-        ),
+        value: IntentionDetails(intention: intention, relationCounts: counts),
         revision: revision,
       ),
     ),

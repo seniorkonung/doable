@@ -38,7 +38,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
-import '../support/favorite_read_contract_test_fallback.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -886,10 +885,7 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -1099,7 +1095,6 @@ final class _DelayedPersonalGraphRepository
               value: IntentionDetails(
                 intention: intention,
                 relationCounts: _countsFor(intention.id),
-                favoriteMark: FavoriteMark.notFavorite,
               ),
               revision: _Revision(index),
             ),
@@ -1177,7 +1172,6 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   activeRelationCount: 0,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
-  favoriteMark: FavoriteMark.notFavorite,
 );
 
 final _relationId = switch (LongTermRelationId.decode(

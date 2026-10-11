@@ -25,7 +25,6 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -155,144 +154,6 @@ void main() {
                 code,
               ),
             ),
-          );
-          expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-        }
-      },
-    );
-  });
-
-  group('Чтения намерений — отказы получения отметки избранного', () {
-    test(
-      'отказ чтения отметки сохраняет категорию без частичного успеха',
-      () async {
-        for (final (error, expected, code)
-            in <(Object, Matcher, DiagnosticsFailureCode)>[
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_BUSY,
-                  message: 'CANARY-недоступность',
-                ),
-                isA<IntentionUnavailableFailure>(),
-                DiagnosticsFailureCode.unavailable,
-              ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_CORRUPT,
-                  message: 'CANARY-повреждение',
-                ),
-                isA<IntentionCorruptionFailure>(),
-                DiagnosticsFailureCode.corruption,
-              ),
-              (
-                StateError('CANARY-неизвестный-отказ'),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
-            ]) {
-          final interceptor = _FavoriteMarkReadInterceptor(failure: error);
-          late Database raw;
-          final replacement = await _replaceDatabase(
-            interceptor,
-            database,
-            diagnostics,
-            setup: (connection) => raw = connection,
-          );
-          database = replacement.database;
-          repository = replacement.repository;
-          await _insertIntention(
-            database,
-            id: _id(_firstUuid),
-            title: 'CANARY-намерение',
-            createdAt: DateTime.utc(2026, 9, 2, 10),
-          );
-          storeFavoriteMark(raw, intentionId: _firstUuid, position: 1);
-          final query = IntentionCatalogQuery(
-            scope: IntentionScope.all,
-            titleFilter: null,
-            order: IntentionCatalogOrder.createdAtAscending,
-            pageSize: 1,
-          );
-          Matcher failed<TEvent extends DiagnosticsEvent>(
-            DiagnosticsStatus Function(TEvent) status,
-          ) => isA<TEvent>().having(
-            status,
-            'исход',
-            isA<DiagnosticsFailed>().having(
-              (status) => status.code,
-              'категория',
-              code,
-            ),
-          );
-
-          expect(
-            await repository.getCatalogPage(query),
-            isA<ResultFailure<IntentionCatalogPage>>().having(
-              (result) => result.failure,
-              'причина',
-              expected,
-            ),
-          );
-          expect(
-            diagnostics.events.last,
-            failed<CatalogPageReadDiagnosticsEvent>((event) => event.status),
-          );
-
-          expect(
-            await repository.getCatalogReconciliationPortion(
-              IntentionCatalogReconciliationQuery(
-                catalogQuery: query,
-                boundary: const IntentionCatalogCompletedBoundary(),
-                window: IntentionCatalogFinalReconciliationWindow(const []),
-              ),
-            ),
-            isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
-              (result) => result.failure,
-              'причина',
-              expected,
-            ),
-          );
-
-          expect(
-            await repository.watchIntention(_id(_firstUuid)).first,
-            isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
-              (result) => result.failure,
-              'причина',
-              expected,
-            ),
-          );
-          expect(
-            diagnostics.events.last,
-            failed<IntentionDetailReadDiagnosticsEvent>(
-              (event) => event.status,
-            ),
-          );
-
-          // Снимок «до» читает отметку раньше записи: команда не оставляет
-          // изменения намерения.
-          expect(
-            await repository.execute(
-              UpdateIntention(
-                id: _id(_firstUuid),
-                title: 'CANARY-новое название',
-                description: null,
-              ),
-            ),
-            isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-                .having((result) => result.failure, 'причина', expected),
-          );
-          expect(
-            diagnostics.events.last,
-            _failedCommand(IntentionCommandDiagnosticsType.update, code),
-          );
-          await _expectStoredIntention(
-            database,
-            id: _id(_firstUuid),
-            title: 'CANARY-намерение',
-            description: null,
-            isActionReady: false,
-            isArchived: false,
-            createdAt: DateTime.utc(2026, 9, 2, 10),
           );
           expect(diagnostics.events.toString(), isNot(contains('CANARY')));
         }
@@ -436,15 +297,14 @@ void main() {
     final homeTagId = _tagId(tagFixtureId(firstTagNumber));
     final weekendTagId = _tagId(tagFixtureId(lastTagNumber));
     final missingTagId = _tagId(tagFixtureId(777));
-    final activeFavoriteId = _id(_firstUuid);
-    final archivedFavoriteId = _id(_archivedUuid);
+    final existingActiveId = _id(_firstUuid);
+    final existingArchivedId = _id(_archivedUuid);
     final newId = _id(_secondUuid);
     late Database raw;
 
-    /// Подменяет хранилище и готовит прежний граф: активное избранное
-    /// намерение, архивированное избранное на последнем месте порядка, теги
-    /// «Дом» и «Выходные» и самостоятельный «Спорт», созданный отдельной
-    /// командой до создания намерения. Возвращает идентификатор «Спорта».
+    /// Подменяет хранилище и готовит прежний граф: активное и архивированное
+    /// намерения, теги «Дом» и «Выходные» и самостоятельный «Спорт», созданный
+    /// отдельной командой до создания намерения. Возвращает идентификатор «Спорта».
     Future<TagId> replaceWithSeededGraph(
       LocalDatabaseConnectionObserver observer,
     ) async {
@@ -461,26 +321,16 @@ void main() {
       repository = replacement.repository;
       await _insertIntention(
         database,
-        id: activeFavoriteId,
-        title: 'Активное избранное',
+        id: existingActiveId,
+        title: 'Активное намерение',
         createdAt: DateTime.utc(2026, 9, 1),
       );
       await _insertIntention(
         database,
-        id: archivedFavoriteId,
-        title: 'Архивное избранное',
+        id: existingArchivedId,
+        title: 'Архивное намерение',
         isArchived: true,
         createdAt: DateTime.utc(2026, 9, 2),
-      );
-      storeFavoriteMark(
-        raw,
-        intentionId: activeFavoriteId.toCanonicalString(),
-        position: 2,
-      );
-      storeFavoriteMark(
-        raw,
-        intentionId: archivedFavoriteId.toCanonicalString(),
-        position: 5,
       );
       raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
         homeTagId.toCanonicalString(),
@@ -504,12 +354,11 @@ void main() {
           title: 'Полное намерение',
           description: 'Описание полного намерения',
           readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
           tagIds: tagIds,
         );
 
-    /// Отказ не оставил части создания: публичные чтения, поиск, места
-    /// избранного, строки хранилища и ревизия совпадают с [before], FTS
+    /// Отказ не оставил части создания: публичные чтения, поиск,
+    /// строки хранилища и ревизия совпадают с [before], FTS
     /// целостна, а самостоятельный «Спорт» по-прежнему доступен.
     Future<void> expectRolledBack(
       _ObservedCreationGraph before, {
@@ -545,7 +394,7 @@ void main() {
     }
 
     test('отказ в представительных точках транзакции откатывает намерение, '
-        'назначения, место избранного и FTS, сохраняя прежний граф, ревизию '
+        'назначения и FTS, сохраняя прежний граф, ревизию '
         'и самостоятельный тег', () async {
       // Пробное выполнение без отказа фиксирует операции транзакции.
       final probe = _StatementFaultInjector();
@@ -573,14 +422,12 @@ void main() {
       expect(operations.skip(lastWrite + 1), isNotEmpty);
 
       // Точки с разным исходом: первая проверка, первая запись (намерение),
-      // первое назначение, последняя запись (место избранного) и первое
-      // чтение окончательного результата. Остальные операции повторяют
-      // те же ветки.
+      // первое назначение и первое чтение окончательного результата.
+      // Остальные операции повторяют те же ветки.
       for (final failAfter in <int>{
         1,
         firstWrite + 1,
         writeIndexes[1] + 1,
-        lastWrite + 1,
         lastWrite + 2,
       }) {
         final faulted = operations[failAfter - 1];
@@ -611,7 +458,7 @@ void main() {
         );
 
         // Повтор той же команды с тем же идентификатором создаёт весь набор
-        // в конце полного порядка на новой ревизии.
+        // на новой ревизии.
         final retried = await repository.execute(command);
         expect(
           retried,
@@ -630,12 +477,6 @@ void main() {
           homeTagId,
           weekendTagId,
           sportTagId,
-        ], reason: reason);
-        expect(summary.favoriteMark, FavoriteMark.favorite, reason: reason);
-        expect(storedFavoriteMarks(raw), [
-          (activeFavoriteId.toCanonicalString(), 2),
-          (archivedFavoriteId.toCanonicalString(), 5),
-          (newId.toCanonicalString(), 6),
         ], reason: reason);
       }
     });
@@ -1120,24 +961,6 @@ final class _TagAssignmentReadInterceptor
   }
 }
 
-final class _FavoriteMarkReadInterceptor
-    extends LocalDatabaseConnectionObserver {
-  _FavoriteMarkReadInterceptor({required this.failure});
-
-  final Object failure;
-
-  @override
-  List<Map<String, Object?>> afterSelect(
-    LocalDatabaseSqlStatement statement,
-    List<Map<String, Object?>> rows,
-  ) {
-    if (statement.statements.single.contains('FROM favorite_intentions')) {
-      throw failure;
-    }
-    return rows;
-  }
-}
-
 enum _DmlOperation { update, delete }
 
 final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
@@ -1345,7 +1168,6 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
   Database raw,
 ) async {
   final page = _readValue(await repository.getCatalogPage(_allIntentionsQuery));
-  final favorites = _readValue(await repository.getFavoriteIntentions());
   final tags = _readValue(
     await repository.getTagCatalog(const TagCatalogBrowseMode()),
   );
@@ -1358,13 +1180,10 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
             item.title,
             item.readiness,
             item.archiveState,
-            item.favoriteMark,
             [for (final tag in item.tags) tag.id],
           ],
       ],
       await _matchingIds(repository, 'полное'),
-      [for (final row in favorites.items) row.id],
-      favorites.archivedCount,
       [
         for (final tag in tags.items) [tag.id, tag.name.value],
       ],
@@ -1387,12 +1206,7 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
 
 /// Строки всех таблиц, которые затрагивает создание намерения.
 List<Object?> _storedCreationRows(Database raw) => [
-  for (final table in [
-    'intentions',
-    'tag_assignments',
-    'favorite_intentions',
-    'tags',
-  ])
+  for (final table in ['intentions', 'tag_assignments', 'tags'])
     [
       for (final row in raw.select('SELECT * FROM $table ORDER BY 1')) {...row},
     ],

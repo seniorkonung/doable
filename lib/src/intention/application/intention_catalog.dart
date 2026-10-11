@@ -268,7 +268,6 @@ final class IntentionSummary {
     required this.createdAt,
     required this.updatedAt,
     List<Tag> tags = const [],
-    required this.favoriteMark,
   }) : title = IntentionText.normalizeTitle(title),
        activeRelationCount = _requireNonNegativeCount(activeRelationCount),
        tags = List.unmodifiable(tags);
@@ -286,18 +285,10 @@ final class IntentionSummary {
   /// Пустой список означает проверенное отсутствие назначений.
   final List<Tag> tags;
 
-  /// Подтверждённая отметка избранного намерения с идентификатором [id].
-  /// [FavoriteMark.notFavorite] означает проверенное отсутствие отметки.
-  ///
-  /// Отметка не входит в условия поиска: она не меняет принадлежность
-  /// запросу, порядок выдачи и количество совпадений.
-  final FavoriteMark favoriteMark;
-
   /// Заменяет только производный счётчик активных связей.
   ///
-  /// Остальные данные краткого представления, включая отметку избранного,
-  /// переносятся без изменений, поэтому соответствие фильтру, порядок и
-  /// временные метки сохраняются.
+  /// Остальные данные краткого представления переносятся без изменений,
+  /// поэтому соответствие фильтру, порядок и временные метки сохраняются.
   IntentionSummary withActiveRelationCount(int activeRelationCount) =>
       IntentionSummary(
         id: id,
@@ -309,14 +300,12 @@ final class IntentionSummary {
         createdAt: createdAt,
         updatedAt: updatedAt,
         tags: tags,
-        favoriteMark: favoriteMark,
       );
 
   /// Заменяет название назначенного тега той же идентичности.
   ///
-  /// Состав и порядок тегов и отметка избранного переносятся без изменений,
-  /// поэтому соответствие фильтру, порядок выдачи и временные метки
-  /// сохраняются. Если тег не
+  /// Состав и порядок тегов переносятся без изменений, поэтому соответствие
+  /// фильтру, порядок выдачи и временные метки сохраняются. Если тег не
   /// назначен намерению, возвращается та же сводка.
   IntentionSummary withRenamedTag(Tag renamed) {
     if (!tags.any((tag) => tag.id == renamed.id)) {
@@ -332,14 +321,12 @@ final class IntentionSummary {
       createdAt: createdAt,
       updatedAt: updatedAt,
       tags: [for (final tag in tags) tag.id == renamed.id ? renamed : tag],
-      favoriteMark: favoriteMark,
     );
   }
 
   /// Убирает назначение физически удалённого тега.
   ///
-  /// Порядок остальных тегов, отметка избранного и временные метки
-  /// сохраняются. Если тег не
+  /// Порядок остальных тегов и временные метки сохраняются. Если тег не
   /// назначен намерению, возвращается та же сводка.
   IntentionSummary withoutTag(TagId deletedTagId) {
     if (!tags.any((tag) => tag.id == deletedTagId)) {
@@ -358,7 +345,6 @@ final class IntentionSummary {
         for (final tag in tags)
           if (tag.id != deletedTagId) tag,
       ],
-      favoriteMark: favoriteMark,
     );
   }
 
@@ -468,10 +454,10 @@ sealed class IntentionCommandSuccess implements GraphCommandOutcome {
 ///
 /// Для `CreateIntention` это единственный окончательный результат всего
 /// создания: [catalogMutation] — одна [IntentionCatalogCreated] с полным
-/// снимком нового намерения, включая теги, готовность и отметку избранного, а
+/// снимком нового намерения, включая теги и готовность, а
 /// [additionalChanges] несут по одному `TagAssignmentChangedChange` на каждое
 /// созданное назначение. Все факты принадлежат одной новой ревизии; отдельных
-/// результатов готовности, избранного или назначений создание не порождает.
+/// результатов готовности или назначений создание не порождает.
 final class IntentionSaved extends IntentionCommandSuccess {
   IntentionSaved(
     this.intention, {

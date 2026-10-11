@@ -431,7 +431,6 @@ void main() {
       title: 'Ходить в лес',
       readiness: IntentionReadiness.ready,
       tags: [health, rest],
-      favoriteMark: FavoriteMark.favorite,
     );
 
     for (final (name, pageRevision, packageFirst) in [
@@ -624,7 +623,6 @@ void main() {
         title: 'Ходить в лес',
         readiness: IntentionReadiness.ready,
         tags: [health, rest],
-        favoriteMark: FavoriteMark.favorite,
       );
       await completeFullCreation(
         container,

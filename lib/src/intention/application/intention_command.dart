@@ -12,11 +12,11 @@ sealed class IntentionCommand
 
 /// Создаёт новое активное намерение вместе с его полным начальным состоянием.
 ///
-/// Намерение, назначения всех тегов [tagIds] и отметка избранного
-/// сохраняются одной атомарной операцией с начальной готовностью
+/// Намерение и назначения всех тегов [tagIds] сохраняются одной атомарной
+/// операцией с начальной готовностью
 /// [readiness]: при любом отказе не остаётся ни намерения, ни части его
-/// назначений, ни отметки или места в порядке избранных. Успех подтверждается
-/// одним [IntentionSaved] по правилам результата создания.
+/// назначений. Успех подтверждается одним [IntentionSaved] по правилам
+/// результата создания.
 ///
 /// Выбранные теги определяются только идентификаторами. Если хотя бы один из
 /// них отсутствует на момент атомарной проверки, всё создание отклоняется
@@ -26,11 +26,9 @@ sealed class IntentionCommand
 /// Принятую отправку до результата удерживает координатор команд графа:
 /// уход инициатора не отменяет и не повторяет её.
 final class CreateIntention extends IntentionCommand {
-  /// Минимальные данные: намерение создаётся неготовым, без отметки
-  /// избранного и без тегов.
+  /// Минимальные данные: намерение создаётся неготовым и без тегов.
   const CreateIntention({required this.title, required this.description})
     : readiness = IntentionReadiness.notReady,
-      favoriteMark = FavoriteMark.notFavorite,
       tagIds = const {};
 
   /// Полное начальное состояние, подготовленное до создания намерения.
@@ -42,7 +40,6 @@ final class CreateIntention extends IntentionCommand {
     required this.title,
     required this.description,
     required this.readiness,
-    required this.favoriteMark,
     required Iterable<TagId> tagIds,
   }) : tagIds = Set.unmodifiable(tagIds);
 
@@ -51,10 +48,6 @@ final class CreateIntention extends IntentionCommand {
 
   /// Начальная готовность к действию, выбранная явным решением человека.
   final IntentionReadiness readiness;
-
-  /// Начальная отметка избранного. Отмеченное намерение занимает последнее
-  /// место всего порядка избранных на момент сохранения.
-  final FavoriteMark favoriteMark;
 
   /// Неизменяемый набор тегов будущих назначений; пустой набор означает
   /// создание без тегов.
@@ -96,16 +89,4 @@ final class RestoreIntention extends ExistingIntentionCommand {
 
 final class DeleteIntention extends ExistingIntentionCommand {
   const DeleteIntention(super.id);
-}
-
-/// Отмечает намерение избранным. Отметка уже избранного намерения успешно
-/// оставляет одну отметку и прежнее место в порядке избранных.
-final class MarkIntentionFavorite extends ExistingIntentionCommand {
-  const MarkIntentionFavorite(super.id);
-}
-
-/// Снимает отметку избранного намерения. Снятие отсутствующей отметки
-/// успешно оставляет намерение без отметки.
-final class UnmarkIntentionFavorite extends ExistingIntentionCommand {
-  const UnmarkIntentionFavorite(super.id);
 }

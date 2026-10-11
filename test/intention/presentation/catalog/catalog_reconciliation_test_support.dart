@@ -110,7 +110,6 @@ Future<IntentionCommandCompletion> completeFullCreation(
     title: created.title,
     description: null,
     readiness: created.readiness,
-    favoriteMark: created.favoriteMark,
     tagIds: [for (final tag in created.tags) tag.id],
   ),
   fullCreationSuccess(created, revision: revision),

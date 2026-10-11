@@ -17,9 +17,6 @@ import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_description.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../favorite/application/favorite_intentions.dart';
-import '../../favorite/application/favorite_order_command.dart';
-import '../../favorite/domain/favorite_order.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -78,9 +75,6 @@ part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
-part 'drift_personal_graph_repository_favorite_marks.dart';
-part 'drift_personal_graph_repository_favorite_list.dart';
-part 'drift_personal_graph_repository_favorite_order.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -121,10 +115,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
-
-  @override
-  Future<FavoriteIntentionsResult> getFavoriteIntentions() =>
-      _readFavoriteIntentions();
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
@@ -445,7 +435,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         value: IntentionDetails(
           intention: _rehydrateDetailRow(row),
           relationCounts: await _readVerifiedRelationCounts(id),
-          favoriteMark: await _readFavoriteMark(id),
         ),
         revision: _currentRevision,
       );
@@ -510,8 +499,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       final RemoveTagAssignment removeTagAssignment => await _executeTag(
         removeTagAssignment,
       ),
-      final MoveFavoriteIntention moveFavoriteIntention =>
-        await _executeFavoriteOrder(moveFavoriteIntention),
       _ => throw UnsupportedError(
         'Команда не поддерживается модулем личного графа.',
       ),
@@ -525,9 +512,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<GraphCommandResult<IntentionCommandSuccess, IntentionFailure>>
   _executeIntention(IntentionCommand command) async {
     final stopwatch = Stopwatch()..start();
-    var favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.validation;
-    void onFavoriteMarkWrite() =>
-        favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.write;
     var creationStage = IntentionCreationCommandDiagnosticsStage.validation;
 
     try {
@@ -557,14 +541,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
               domain.IntentionArchiveState.active,
             ),
             DeleteIntention() => _deleteIntention(command.id),
-            MarkIntentionFavorite() => _markFavorite(
-              command.id,
-              onWrite: onFavoriteMarkWrite,
-            ),
-            UnmarkIntentionFavorite() => _unmarkFavorite(
-              command.id,
-              onWrite: onFavoriteMarkWrite,
-            ),
           },
         );
         if (committed.didMutate) {
@@ -581,7 +557,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _recordDiagnostics(
         _commandDiagnosticsEvent(
           command,
-          favoriteMarkStage: favoriteMarkStage,
           creationStage: creationStage,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
@@ -592,7 +567,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _recordDiagnostics(
         _commandDiagnosticsEvent(
           command,
-          favoriteMarkStage: favoriteMarkStage,
           creationStage: creationStage,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
@@ -652,8 +626,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   /// Выбранные теги подтверждаются до генерации идентификатора и показания
   /// часов: отсутствие хотя бы одного отклоняет всё создание. Окончательный
   /// снимок читается и сверяется с командой до подтверждения транзакции,
-  /// поэтому любой отказ откатывает намерение, назначения и место избранного
-  /// вместе.
+  /// поэтому любой отказ откатывает намерение и назначения вместе.
   ///
   /// [onStage] сообщает диагностике переход к записи и к проверке
   /// результата: отказ относится к последнему сообщённому этапу, до первого
@@ -707,10 +680,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
             ),
           );
     }
-    if (command.favoriteMark == domain.FavoriteMark.favorite) {
-      await _insertFavoritePlace(intention.id);
-    }
-
     onStage(IntentionCreationCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(intention.id);
     if (stored == null) throw const _StoredIntentionCorruption();
@@ -719,7 +688,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final after = await _catalogEntrySnapshot(stored, counts);
     final assignedTagIds = [for (final tag in after.summary.tags) tag.id];
     if (!_sameIntention(storedIntention, intention) ||
-        after.summary.favoriteMark != command.favoriteMark ||
         assignedTagIds.length != command.tagIds.length ||
         !command.tagIds.containsAll(assignedTagIds)) {
       throw const _StoredIntentionCorruption();
@@ -1381,15 +1349,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final intentionIds = [for (final row in itemRows) row.intentionId];
     final aggregates = await _relationCountAggregates.read(intentionIds);
     final tags = await _readIntentionTags(intentionIds);
-    final favoriteMarks = await _readFavoriteMarks(intentionIds);
     return [
       for (var index = 0; index < itemRows.length; index++)
         _rehydrateSummary(
           itemRows[index],
           _requireValidAggregate(aggregates[intentionIds[index]]),
           tags[intentionIds[index]] ??
-              (throw const _StoredIntentionCorruption()),
-          favoriteMarks[intentionIds[index]] ??
               (throw const _StoredIntentionCorruption()),
         ),
     ];
@@ -1438,7 +1403,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     ({IntentionId intentionId, _StoredIntentionDetail stored}) row,
     RelationCounts relationCounts,
     List<tag_domain.Tag> tags,
-    domain.FavoriteMark favoriteMark,
   ) => IntentionSummary(
     id: row.intentionId,
     title: row.stored.title,
@@ -1449,7 +1413,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     createdAt: row.stored.createdAt,
     updatedAt: row.stored.updatedAt,
     tags: tags,
-    favoriteMark: favoriteMark,
   );
 
   _DriftIntentionCatalogCursor _cursorAt(
@@ -1491,7 +1454,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
         tags: tags[intention.id] ?? (throw const _StoredIntentionCorruption()),
-        favoriteMark: await _readFavoriteMark(intention.id),
       ),
       storedTitleSearchKey: stored.titleSearchKey,
     );
@@ -2107,19 +2069,15 @@ void _validateCommandText(IntentionCommand command) {
         DisableIntentionReadiness() ||
         ArchiveIntention() ||
         RestoreIntention() ||
-        DeleteIntention() ||
-        MarkIntentionFavorite() ||
-        UnmarkIntentionFavorite():
+        DeleteIntention():
       return;
   }
 }
 
-/// Событие диагностики команды намерения. Этап [favoriteMarkStage] несут
-/// только отметка избранного и её снятие, этап [creationStage] — только
-/// создание.
+/// Событие диагностики команды намерения. Этап [creationStage] несёт
+/// только создание.
 IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
   IntentionCommand command, {
-  required FavoriteMarkCommandDiagnosticsStage favoriteMarkStage,
   required IntentionCreationCommandDiagnosticsStage creationStage,
   required DiagnosticsStatus status,
 }) {
@@ -2145,15 +2103,6 @@ IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
     ArchiveIntention() => event(IntentionCommandDiagnosticsType.archive),
     RestoreIntention() => event(IntentionCommandDiagnosticsType.restore),
     DeleteIntention() => event(IntentionCommandDiagnosticsType.delete),
-    MarkIntentionFavorite() => IntentionCommandDiagnosticsEvent.markFavorite(
-      stage: favoriteMarkStage,
-      status: status,
-    ),
-    UnmarkIntentionFavorite() =>
-      IntentionCommandDiagnosticsEvent.unmarkFavorite(
-        stage: favoriteMarkStage,
-        status: status,
-      ),
   };
 }
 

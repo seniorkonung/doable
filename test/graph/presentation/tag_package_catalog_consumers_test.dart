@@ -219,7 +219,6 @@ void main() {
           title: 'Ходить пешком',
           description: 'Каждый день',
           readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
           tagIds: [tagId],
         ),
       ) as IntentionCommandAccepted).future;

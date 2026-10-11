@@ -19,9 +19,9 @@ part 'intention_editor_view_model.g.dart';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
-/// До отправки владеет черновиком: правки текста, набора тегов и обеих
-/// отметок меняют только его и не отправляют команд графа. Отправка передаёт
-/// координатору одну команду с неизменяемым снимком всех пяти полей и до
+/// До отправки владеет черновиком: правки текста, набора тегов и готовности
+/// меняют только его и не отправляют команд графа. Отправка передаёт
+/// координатору одну команду с неизменяемым снимком всех четырёх полей и до
 /// результата отвергает правки черновика и повторную отправку. Принятую
 /// отправку удерживает координатор: освобождение сессии её не отменяет и не
 /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -143,10 +143,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     }
   }
 
-  void markFavorite() => _changeFavoriteMark(FavoriteMark.favorite);
-
-  void unmarkFavorite() => _changeFavoriteMark(FavoriteMark.notFavorite);
-
   /// Включает начальную готовность. Вызывается только после явного
   /// подтверждения человеком обоих критериев действия; другие поля черновика
   /// готовность не включают.
@@ -170,7 +166,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         title: draft.title,
         description: draft.description.isEmpty ? null : draft.description,
         readiness: draft.readiness,
-        favoriteMark: draft.favoriteMark,
         tagIds: draft.tagIds,
       ),
     );
@@ -500,12 +495,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       observation.release();
     }
     _tagObservations.clear();
-  }
-
-  void _changeFavoriteMark(FavoriteMark value) {
-    if (_acceptsDraftChanges) {
-      state = state.withFavoriteMark(value);
-    }
   }
 
   void _changeReadiness(IntentionReadiness value) {

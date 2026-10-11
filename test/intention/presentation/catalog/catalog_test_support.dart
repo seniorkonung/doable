@@ -31,11 +31,10 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 
-import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 
 final class ControlledCatalogRepository
-    with TagReadContractTestFallback, FavoriteReadContractTestFallback
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -306,7 +305,6 @@ IntentionSummary testSummary({
   int? createdDay,
   int? updatedDay,
   List<Tag> tags = const [],
-  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
 }) {
   final encodedId =
       '018f0000-0000-7000-8000-${index.toString().padLeft(12, '0')}';
@@ -332,7 +330,6 @@ IntentionSummary testSummary({
     createdAt: createdAt,
     updatedAt: updatedAt,
     tags: tags,
-    favoriteMark: favoriteMark,
   );
 }
 

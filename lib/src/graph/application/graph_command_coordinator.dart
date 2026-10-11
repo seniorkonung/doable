@@ -5,7 +5,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
 import '../../daily_choice/application/daily_choice_result.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../favorite/application/favorite_order_command.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -32,8 +31,6 @@ enum IntentionCommandKind {
   archive,
   restore,
   delete,
-  markFavorite,
-  unmarkFavorite,
 }
 
 sealed class GraphCommandKey {
@@ -108,73 +105,49 @@ final class ExistingTagKey extends GraphCommandKey {
   int get hashCode => Object.hash(ExistingTagKey, tagId);
 }
 
-/// Единственный ключ единого порядка избранных намерений.
-///
-/// Не пересекается с ключами намерений: одновременно выполняется не больше
-/// одной перестановки, а перестановка и операции отдельных намерений не
-/// блокируют приём друг друга.
-final class FavoriteOrderKey extends GraphCommandKey {
-  const FavoriteOrderKey._();
-
-  static const instance = FavoriteOrderKey._();
-}
-
 sealed class GraphOperationToken {
   const GraphOperationToken();
 }
 
-/// Токен операции, отказ которой по ADR-0012 сначала принадлежит открытой
-/// экранной сессии инициатора.
-sealed class GraphInitiatorOperationToken extends GraphOperationToken {
-  const GraphInitiatorOperationToken();
-}
-
-final class IntentionOperationToken extends GraphInitiatorOperationToken {
+final class IntentionOperationToken extends GraphOperationToken {
   IntentionOperationToken._();
 
   @override
   String toString() => 'IntentionOperationToken';
 }
 
-final class LongTermRelationOperationToken
-    extends GraphInitiatorOperationToken {
+final class LongTermRelationOperationToken extends GraphOperationToken {
   LongTermRelationOperationToken._();
 
   @override
   String toString() => 'LongTermRelationOperationToken';
 }
 
-final class BlockingRelationsDeleteOperationToken
-    extends GraphInitiatorOperationToken {
+final class BlockingRelationsDeleteOperationToken extends GraphOperationToken {
   BlockingRelationsDeleteOperationToken._();
 
   @override
   String toString() => 'BlockingRelationsDeleteOperationToken';
 }
 
-final class DailyChoiceOperationToken extends GraphInitiatorOperationToken {
+final class DailyChoiceOperationToken extends GraphOperationToken {
   DailyChoiceOperationToken._();
 
   @override
   String toString() => 'DailyChoiceOperationToken';
 }
 
-final class TagOperationToken extends GraphInitiatorOperationToken {
+final class TagOperationToken extends GraphOperationToken {
   TagOperationToken._();
 
   @override
   String toString() => 'TagOperationToken';
 }
 
-/// Токен перестановки избранных намерений. Её отказ по ADR-0016 сразу
-/// принадлежит общей поверхности, поэтому права инициатора токен не адресует.
-final class FavoriteOrderOperationToken extends GraphOperationToken {
-  FavoriteOrderOperationToken._();
-
-  @override
-  String toString() => 'FavoriteOrderOperationToken';
-}
-
+/// Завершение, право предъявления которого выдаёт coordinator.
+///
+/// По протоколу ADR-0012 успех сразу принадлежит оболочке, а отказ — открытой
+/// экранной сессии инициатора.
 sealed class GraphCommandCompletion {
   const GraphCommandCompletion();
 
@@ -187,18 +160,7 @@ sealed class GraphCommandCompletion {
   bool get isFailure;
 }
 
-/// Завершение, право предъявления которого выдаёт coordinator.
-///
-/// Политику предъявления задаёт вид завершения. По умолчанию действует
-/// протокол ADR-0012: успех сразу принадлежит оболочке, а отказ — открытой
-/// экранной сессии инициатора. У операции с политикой «только отказ» по
-/// ADR-0016 предъявляемо только завершение отказа, и оно сразу принадлежит
-/// оболочке.
-sealed class GraphPresentableCompletion extends GraphCommandCompletion {
-  const GraphPresentableCompletion();
-}
-
-final class IntentionCommandCompletion extends GraphPresentableCompletion {
+final class IntentionCommandCompletion extends GraphCommandCompletion {
   const IntentionCommandCompletion._({
     required this.token,
     required this.kind,
@@ -241,8 +203,7 @@ final class IntentionCommandCompletion extends GraphPresentableCompletion {
 
 enum LongTermRelationCommandKind { create, update, archive, restore, delete }
 
-final class LongTermRelationCommandCompletion
-    extends GraphPresentableCompletion {
+final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
     required this.token,
     required this.kind,
@@ -275,8 +236,7 @@ final class LongTermRelationCommandCompletion
   };
 }
 
-final class BlockingRelationsDeleteCompletion
-    extends GraphPresentableCompletion {
+final class BlockingRelationsDeleteCompletion extends GraphCommandCompletion {
   const BlockingRelationsDeleteCompletion._({
     required this.token,
     required this.intentionId,
@@ -305,7 +265,7 @@ final class BlockingRelationsDeleteCompletion
 
 enum DailyChoiceCommandKind { create, update, replace, delete }
 
-final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
+final class DailyChoiceCommandCompletion extends GraphCommandCompletion {
   const DailyChoiceCommandCompletion._({
     required this.token,
     required this.kind,
@@ -335,7 +295,7 @@ final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
 
 enum TagCommandKind { create, rename, delete, assign, removeAssignment }
 
-final class TagCommandCompletion extends GraphPresentableCompletion {
+final class TagCommandCompletion extends GraphCommandCompletion {
   const TagCommandCompletion._({
     required this.token,
     required this.kind,
@@ -361,48 +321,6 @@ final class TagCommandCompletion extends GraphPresentableCompletion {
 
   @override
   bool get isFailure => confirmedResult is GraphResultFailure;
-}
-
-/// Завершение перестановки избранных намерений с политикой «только отказ»
-/// по ADR-0016.
-///
-/// Подтверждённый успех, включая отсутствие изменения, виден как новый
-/// порядок списка: он публикуется для согласования и права предъявления не
-/// образует. Отказ сразу принадлежит общей поверхности.
-sealed class FavoriteOrderCommandCompletion extends GraphCommandCompletion {
-  const FavoriteOrderCommandCompletion._(this.token);
-
-  @override
-  final FavoriteOrderOperationToken token;
-}
-
-final class FavoriteOrderConfirmedCompletion
-    extends FavoriteOrderCommandCompletion {
-  const FavoriteOrderConfirmedCompletion._(super.token, this.confirmedResult)
-    : super._();
-
-  final ConfirmedGraphResult<FavoriteOrderCommandSuccess> confirmedResult;
-
-  FavoriteOrderCommandSuccess get success => confirmedResult.value;
-
-  @override
-  ConfirmedGraphChangePackage get confirmedChange => confirmedResult;
-
-  @override
-  bool get isFailure => false;
-}
-
-final class FavoriteOrderFailedCompletion extends FavoriteOrderCommandCompletion
-    implements GraphPresentableCompletion {
-  const FavoriteOrderFailedCompletion._(super.token, this.failure) : super._();
-
-  final FavoriteOrderCommandFailure failure;
-
-  @override
-  ConfirmedGraphChangePackage? get confirmedChange => null;
-
-  @override
-  bool get isFailure => true;
 }
 
 sealed class IntentionOperationTarget {
@@ -508,25 +426,6 @@ final class TagCommandAlreadyRunning extends TagCommandStart {
   const TagCommandAlreadyRunning();
 }
 
-sealed class FavoriteOrderCommandStart {
-  const FavoriteOrderCommandStart();
-}
-
-final class FavoriteOrderCommandAccepted extends FavoriteOrderCommandStart {
-  const FavoriteOrderCommandAccepted({
-    required this.token,
-    required this.future,
-  });
-
-  final FavoriteOrderOperationToken token;
-  final Future<FavoriteOrderCommandCompletion> future;
-}
-
-final class FavoriteOrderCommandAlreadyRunning
-    extends FavoriteOrderCommandStart {
-  const FavoriteOrderCommandAlreadyRunning();
-}
-
 final class BlockingRelationsDeleteAccepted
     extends BlockingRelationsDeleteStart {
   const BlockingRelationsDeleteAccepted({
@@ -548,8 +447,7 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart
         LongTermRelationCommandStart,
         BlockingRelationsDeleteStart,
         DailyChoiceCommandStart,
-        TagCommandStart,
-        FavoriteOrderCommandStart {
+        TagCommandStart {
   const GraphCommandCoordinatorDraining();
 }
 
@@ -561,7 +459,7 @@ sealed class GraphPresentationClaim {
   const GraphPresentationClaim._(this.completion, this._entry);
 
   GraphOperationToken get token;
-  final GraphPresentableCompletion completion;
+  final GraphCommandCompletion completion;
   final _PresentationEntry _entry;
 }
 
@@ -574,11 +472,10 @@ final class GraphInitiatorPresentationClaim extends GraphPresentationClaim {
   ) : super._();
 
   @override
-  final GraphInitiatorOperationToken token;
+  final GraphOperationToken token;
 }
 
-/// Право оболочки предъявить success, fallback-ошибку либо отказ операции с
-/// политикой «только отказ».
+/// Право оболочки предъявить успех или переданный ей отказ.
 final class GraphAppPresentationClaim extends GraphPresentationClaim {
   const GraphAppPresentationClaim._(
     this.token,
@@ -654,8 +551,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
   bool isTagRunning(TagId tagId) => isKeyRunning(ExistingTagKey(tagId));
 
-  bool get isFavoriteOrderRunning => isKeyRunning(FavoriteOrderKey.instance);
-
   bool isKeyRunning(GraphCommandKey key) => _gates.containsKey(key);
 
   /// Принимает отправку формы [formKey] вместе со всем начальным состоянием
@@ -664,8 +559,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// Пока принятая команда выполняется, повтор той же формы не принимается,
   /// не запускается и не ставится в очередь. Уход формы освобождает только её
   /// право предъявления: команда выполняется один раз, а ограничение формы
-  /// снимается вместе с публикацией окончательного завершения. Готовность,
-  /// избранное и назначения входят в пакет этого завершения и отдельных
+  /// снимается вместе с публикацией окончательного завершения. Готовность
+  /// и назначения входят в пакет этого завершения и отдельных
   /// результатов не образуют. Успех сразу принадлежит общей поверхности,
   /// отказ — сначала живой форме по ADR-0012.
   IntentionCommandStart acceptCreation(
@@ -788,44 +683,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         command,
         TagCommandKind.removeAssignment,
       );
-
-  /// Принимает перестановку избранных намерений под единственным ключом
-  /// порядка.
-  ///
-  /// Пока принятая перестановка выполняется, следующая не принимается, не
-  /// запускается и не ставится в очередь. Принятая перестановка завершается
-  /// независимо от экрана; её успех не предъявляется, а отказ сразу
-  /// принадлежит общей поверхности.
-  FavoriteOrderCommandStart acceptFavoriteOrderMove(
-    MoveFavoriteIntention command,
-  ) {
-    final token = FavoriteOrderOperationToken._();
-    final acceptance = _acceptOperation(
-      keys: {FavoriteOrderKey.instance},
-      entry: _PresentationEntry(token),
-      execute: () async => switch (await _executeFavoriteOrder(command)) {
-        GraphResultSuccess(:final value) => FavoriteOrderConfirmedCompletion._(
-          token,
-          value,
-        ),
-        GraphResultFailure(:final failure) => FavoriteOrderFailedCompletion._(
-          token,
-          failure,
-        ),
-      },
-    );
-    return switch (acceptance) {
-      _GraphCommandAccepted(:final future) => FavoriteOrderCommandAccepted(
-        token: token,
-        future: future.then(
-          (completion) => completion as FavoriteOrderCommandCompletion,
-        ),
-      ),
-      _GraphCommandAlreadyRunning() =>
-        const FavoriteOrderCommandAlreadyRunning(),
-      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
-    };
-  }
 
   Set<GraphCommandKey> _assignmentKeys(TagId tagId, IntentionId intentionId) =>
       {ExistingTagKey(tagId), ExistingIntentionKey(intentionId)};
@@ -1007,14 +864,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
       final completion = await operationFuture;
-      switch (completion) {
-        case GraphPresentableCompletion():
-          entry.completion = completion;
-        case FavoriteOrderConfirmedCompletion():
-          // Успех виден в согласуемых данных и не оставляет непредъявленной
-          // записи (ADR-0016).
-          _discardEntry(entry);
-      }
+      entry.completion = completion;
       for (final key in keys) {
         if (identical(_gates[key], entry)) {
           _gates.remove(key);
@@ -1039,13 +889,13 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// Success инициатору не выдаётся: он сразу принадлежит оболочке. После
   /// освобождения сессии или выдачи права оболочке возвращает `null`.
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
-    GraphInitiatorOperationToken token,
+    GraphOperationToken token,
   ) {
     final entry = _entries[token];
     final completion = entry?.completion;
     if (entry == null ||
         completion == null ||
-        !_initiatorOwnsFailure(completion) ||
+        !completion.isFailure ||
         entry.initiatorReleased ||
         entry.appClaim != null) {
       return null;
@@ -1062,7 +912,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ///
   /// Неподтверждённая ошибка становится доступной оболочке в своём прежнем
   /// порядке; прежний initiator claim больше не может её подтвердить.
-  void releaseInitiatorPresentation(GraphInitiatorOperationToken token) {
+  void releaseInitiatorPresentation(GraphOperationToken token) {
     final entry = _entries[token];
     if (entry == null || entry.initiatorReleased) {
       return;
@@ -1211,8 +1061,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       if (completion == null || entry.appClaim != null) {
         continue;
       }
-      final belongsToApp =
-          !_initiatorOwnsFailure(completion) || entry.initiatorReleased;
+      final belongsToApp = !completion.isFailure || entry.initiatorReleased;
       if (belongsToApp) {
         return entry;
       }
@@ -1278,16 +1127,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     }
   }
 
-  Future<FavoriteOrderCommandResult> _executeFavoriteOrder(
-    MoveFavoriteIntention command,
-  ) async {
-    try {
-      return await _repository.execute(command);
-    } on Object {
-      return const FavoriteOrderCommandFailed(FavoriteOrderUnexpectedFailure());
-    }
-  }
-
   void _discardEntry(_PresentationEntry entry) {
     if (identical(_entries[entry.token], entry)) {
       _entries.remove(entry.token);
@@ -1321,7 +1160,7 @@ final class _PresentationEntry {
   _PresentationEntry(this.token);
 
   final GraphOperationToken token;
-  GraphPresentableCompletion? completion;
+  GraphCommandCompletion? completion;
   bool initiatorReleased = false;
   GraphInitiatorPresentationClaim? initiatorClaim;
   GraphAppPresentationClaim? appClaim;
@@ -1345,19 +1184,6 @@ final class _GraphCommandDraining extends _GraphCommandAcceptance {
   const _GraphCommandDraining();
 }
 
-/// Принадлежит ли отказ открытой экранной сессии инициатора: отказ
-/// перестановки по ADR-0016 сразу принадлежит оболочке, остальные — по
-/// ADR-0012, а успех всегда принадлежит оболочке.
-bool _initiatorOwnsFailure(GraphPresentableCompletion completion) =>
-    switch (completion) {
-      FavoriteOrderFailedCompletion() => false,
-      IntentionCommandCompletion() ||
-      LongTermRelationCommandCompletion() ||
-      BlockingRelationsDeleteCompletion() ||
-      DailyChoiceCommandCompletion() ||
-      TagCommandCompletion() => completion.isFailure,
-    };
-
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   CreateIntention() => IntentionCommandKind.create,
   UpdateIntention() => IntentionCommandKind.update,
@@ -1366,6 +1192,4 @@ IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   ArchiveIntention() => IntentionCommandKind.archive,
   RestoreIntention() => IntentionCommandKind.restore,
   DeleteIntention() => IntentionCommandKind.delete,
-  MarkIntentionFavorite() => IntentionCommandKind.markFavorite,
-  UnmarkIntentionFavorite() => IntentionCommandKind.unmarkFavorite,
 };

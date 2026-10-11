@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -19,11 +20,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/favorite/application/favorite_intentions.dart';
-import 'package:doable/src/favorite/application/favorite_order_command.dart';
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/favorite/presentation/home/home_state.dart';
-import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -62,16 +58,16 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
-/// Активные избранные намерения «Избранное 01» … «Избранное 40» на местах
-/// 1…40: список Главной длиннее экрана.
-const _favoriteCount = 40;
+/// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
+/// длиннее экрана.
+const _activeCount = 40;
 
-/// Активные намерения «Обычное 1» … «Обычное 5» без отметки.
+/// Активные намерения «Обычное 1» … «Обычное 5», которые исключает фильтр
+/// названия «Намерение».
 const _firstPlain = 41;
 const _plainCount = 5;
 
@@ -87,10 +83,10 @@ const _untaggedCount = 10;
 
 const _healthTag = 601;
 
-/// Связь «Избранное 01» → «Избранное 02» — путь каждого дневного выбора.
+/// Связь «Намерение 01» → «Намерение 02» — путь каждого дневного выбора.
 const _relation = 501;
 
-/// Дневные выборы на одну дату с источником «Избранное 01»: чётные по
+/// Дневные выборы на одну дату с источником «Намерение 01»: чётные по
 /// порядку создания не выполнены, нечётные выполнены.
 const _firstChoice = 1001;
 const _choiceCount = 240;
@@ -111,11 +107,10 @@ const _intentionPageSize = 100;
 const _dailyChoicePageSize = 50;
 
 const _message = ValueKey('graph-operation-message');
-const _favoriteControl = ValueKey('intention-details-favorite-mark');
 
 void main() {
   group('повторный выбор уже выбранного пункта', () {
-    for (final destination in AppDestination.values) {
+    for (final destination in _rootPageStates.keys) {
       testWidgets('«${_names[destination]}»: состояние страницы не меняется', (
         tester,
       ) async {
@@ -141,13 +136,14 @@ void main() {
       await _prepareDailyChoiceCatalog(tester, app);
       final dailyBefore = _dailyChoiceParameters(tester, app);
       await _select(tester, AppDestination.intentionGraph);
-      await _enterTitleFilter(tester, app, 'Избранное', total: _favoriteCount);
+      await _enterTitleFilter(tester, app, 'Намерение', total: _activeCount);
+      await _selectOrder(tester, app.l10n.catalogOrderCreatedOldest);
       final catalogBefore = _intentionCatalogParameters(tester, app);
-      final target = app.home.items.first;
-      final targetRow = find.widgetWithText(HomeIntentionRow, target.title);
+      final target = app.intentionCatalog.items.first;
       final router = app.container.read(appRouterProvider);
-      unawaited(router.push(IntentionDetailsRoute(intentionId: target.id)));
+      await tester.tap(_catalogRow(target.title).hitTestable());
       await _until(tester, find.byType(IntentionDetailsPage));
+      await tester.pumpAndSettle();
       app.repository.holdNextCommand();
       await _tap(
         tester,
@@ -156,7 +152,6 @@ void main() {
       await _waitFor(tester, () => app.repository.isHolding);
 
       await _select(tester, AppDestination.home);
-      expect(targetRow, findsOneWidget);
       expect(
         app.raw.select('SELECT is_archived FROM intentions WHERE id = ?', [
           target.id.toCanonicalString(),
@@ -165,7 +160,10 @@ void main() {
       );
 
       app.repository.releaseCommand();
-      await _waitFor(tester, () => targetRow.evaluate().isEmpty);
+      await _waitFor(
+        tester,
+        () => app.intentionCatalog.items.every((item) => item.id != target.id),
+      );
       await _settle(tester);
       expect(
         app.raw.select('SELECT is_archived FROM intentions WHERE id = ?', [
@@ -179,11 +177,12 @@ void main() {
         findsNothing,
       );
       expect(find.byKey(_message), findsOneWidget);
+      expect(app.repository.commands.single, isA<ArchiveIntention>());
       await _closeMessage(tester);
 
       await _select(tester, AppDestination.intentionGraph);
       expect(
-        find.text('Total intentions: ${_favoriteCount - 1}'),
+        find.text('Total intentions: ${_activeCount - 1}'),
         findsOneWidget,
       );
       expect(find.text(target.title), findsNothing);
@@ -199,7 +198,7 @@ void main() {
     // пункта и перехода на другой.
     for (final (origin, destination) in [
       (AppDestination.intentionGraph, AppDestination.intentionGraph),
-      (AppDestination.home, AppDestination.dailyChoices),
+      (AppDestination.intentionGraph, AppDestination.dailyChoices),
     ]) {
       testWidgets('из «${_names[origin]}» в «${_names[destination]}» '
           'сохраняет состояние всех корневых страниц без повторного чтения', (
@@ -213,17 +212,25 @@ void main() {
         }
         await _select(tester, origin);
         final router = app.container.read(appRouterProvider);
-        unawaited(
-          router.push(
-            IntentionDetailsRoute(intentionId: app.home.items.first.id),
-          ),
+        await tester.tap(
+          find
+              .descendant(
+                of: find.byType(catalog_page.IntentionCatalogPage),
+                matching: find.byType(IntentionSummaryView),
+              )
+              .hitTestable()
+              .first,
         );
         await _until(tester, find.byType(IntentionDetailsPage));
         await tester.pumpAndSettle();
         expect(_selected(tester), origin);
         // Вторая страница создаёт глубокую историю над тем же пунктом.
         unawaited(
-          router.push(IntentionDetailsRoute(intentionId: app.home.items[1].id)),
+          router.push(
+            IntentionDetailsRoute(
+              intentionId: app.intentionCatalog.items[1].id,
+            ),
+          ),
         );
         await tester.pumpAndSettle();
         expect(_selected(tester), origin);
@@ -247,14 +254,14 @@ void main() {
 
   group('невыбранная корневая страница согласуется с подтверждёнными '
       'изменениями', () {
-    testWidgets('переименование со страницы намерения, открытой с Главной, '
-        'видно в строке каталога намерений без сброса его параметров и '
+    testWidgets('переименование участника дневного выбора видно в строке '
+        'каталога намерений без сброса его параметров и '
         'позиции', (tester) async {
       final app = await _start(tester);
-      final renamed = _favoriteTitle(3);
-      const newTitle = 'Избранное 03 после переименования';
+      final renamed = _activeTitle(2);
+      const newTitle = 'Намерение 02 после переименования';
       await _select(tester, AppDestination.intentionGraph);
-      await _enterTitleFilter(tester, app, 'Избранное', total: _favoriteCount);
+      await _enterTitleFilter(tester, app, 'Намерение', total: _activeCount);
       await _selectOrder(tester, app.l10n.catalogOrderCreatedOldest);
       // Строка переименуемого намерения остаётся в видимой части.
       _catalogPosition(tester).jumpTo(60);
@@ -262,10 +269,12 @@ void main() {
       expect(_catalogRow(renamed), findsOneWidget);
       final before = _intentionCatalogParameters(tester, app);
 
-      await _select(tester, AppDestination.home);
+      await _select(tester, AppDestination.dailyChoices);
+      await _selectDay(tester, app, _choiceDate, total: _choiceCount);
+      await _open(tester, _dailyChoiceRows.first, DailyChoiceDetailsPage);
       await _open(
         tester,
-        find.widgetWithText(HomeIntentionRow, renamed),
+        find.byKey(const ValueKey('daily-choice-intention-2')),
         IntentionDetailsPage,
       );
       await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
@@ -286,39 +295,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('отметка, подтверждённая со страницы, открытой из каталога '
-        'намерений, видна на Главной последней без сброса её позиции', (
-      tester,
-    ) async {
-      final app = await _start(tester);
-      final marked = _plainTitle(3);
-      await _prepareHome(tester, app);
-      final before = _homePosition(tester).pixels;
-
-      await _select(tester, AppDestination.intentionGraph);
-      await _open(tester, _catalogRow(marked), IntentionDetailsPage);
-      await _tap(tester, find.byKey(_favoriteControl));
-      await _waitFor(
-        tester,
-        () => _favoriteTooltip(tester) == app.l10n.detailsUnmarkFavoriteAction,
-      );
-      await _closeTop(tester, IntentionDetailsPage);
-      await _select(tester, AppDestination.home);
-
-      expect(_homePosition(tester).pixels, before);
-      await _scrollToEnd(tester, _homePosition(tester));
-      expect(
-        tester.widgetList<HomeIntentionRow>(find.byType(HomeIntentionRow)).last,
-        isA<HomeIntentionRow>().having(
-          (row) => row.row.title,
-          'название',
-          marked,
-        ),
-      );
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('изменение дневного выбора со страницы, открытой с Главной, '
+    testWidgets('изменение дневного выбора через страницу намерения '
         'согласуется со скрытым каталогом дневных выборов: календарь, фильтры '
         'и позиция сохраняются, а количество и продолжение выдачи относятся к '
         'новой ревизии', (tester) async {
@@ -331,12 +308,9 @@ void main() {
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
 
-      await _select(tester, AppDestination.home);
-      await _open(
-        tester,
-        find.widgetWithText(HomeIntentionRow, _favoriteTitle(1)),
-        IntentionDetailsPage,
-      );
+      await _select(tester, AppDestination.intentionGraph);
+      await _enterTitleFilter(tester, app, _activeTitle(1), total: 1);
+      await _open(tester, _catalogRow(_activeTitle(1)), IntentionDetailsPage);
       await _tap(
         tester,
         find.byKey(const ValueKey('relation-neighborhood-daily-source')),
@@ -558,9 +532,8 @@ void main() {
           find.descendant(
             of: _dailyChoiceRows.hitTestable().first,
             matching: find.text(
-              lookupAppLocalizations(
-                resolved,
-              ).dailyChoiceDetailsPhrase(_favoriteTitle(1), _favoriteTitle(2)),
+              lookupAppLocalizations(resolved)
+                  .dailyChoiceDetailsPhrase(_activeTitle(1), _activeTitle(2)),
             ),
           ),
           findsOneWidget,
@@ -576,98 +549,33 @@ void main() {
     });
   });
 
-  group('перестановка на Главной', () {
-    testWidgets('на экране телефона последняя строка и её ручка доступны над '
-        'панелью, а перестановка ручкой сохраняется без сообщения и не '
-        'сбрасывает позицию прокрутки ни результатом, ни переключением '
-        'пунктов', (tester) async {
-      final app = await _start(tester);
-      tester.view.physicalSize = const Size(360, 780);
-      await tester.pumpAndSettle();
-      final position = _homePosition(tester);
-      await _scrollToEnd(tester, position);
-      final offset = position.pixels;
-      expect(offset, greaterThan(0));
-
-      final panelTop = tester.getRect(find.byType(AppNavigationBar)).top;
-      final handle = _homeHandle(_favoriteCount);
-      expect(
-        tester.getRect(_homeRow(_favoriteCount)).bottom,
-        lessThanOrEqualTo(panelTop),
-      );
-      expect(tester.getRect(handle).bottom, lessThanOrEqualTo(panelTop));
-      final listener = tester.renderObject<RenderBox>(handle);
-      expect(
-        tester
-            .hitTestOnBinding(tester.getCenter(handle))
-            .path
-            .any((entry) => identical(entry.target, listener)),
-        isTrue,
-      );
-
-      // Последнее избранное намерение ставится сразу после 38-го.
-      await _dragHomeRowUp(tester, _favoriteCount);
-      await _waitFor(
-        tester,
-        () =>
-            app.home.reorder is HomeReorderIdle &&
-            app.home.items[_favoriteCount - 2].title ==
-                _favoriteTitle(_favoriteCount),
-      );
-      await tester.pumpAndSettle();
-
-      final reordered = [
-        for (var number = 1; number <= _favoriteCount - 2; number++) number,
-        _favoriteCount,
-        _favoriteCount - 1,
-      ];
-      expect(
-        [for (final (id, _) in storedFavoriteMarks(app.raw)) id],
-        [for (final number in reordered) tagFixtureId(number)],
-      );
-      expect(
-        [for (final row in app.home.items) row.title],
-        [for (final number in reordered) _favoriteTitle(number)],
-      );
-      expect(
-        app.repository.commands.whereType<MoveFavoriteIntention>(),
-        hasLength(1),
-      );
-      expect(_homePosition(tester).pixels, offset);
-      expect(_builtMessages, findsNothing);
-
-      await _select(tester, AppDestination.dailyChoices);
-      await _select(tester, AppDestination.intentionGraph);
-      await _select(tester, AppDestination.home);
-
-      expect(_homePosition(tester).pixels, offset);
-      expect(
-        [for (final row in app.home.items) row.title],
-        [for (final number in reordered) _favoriteTitle(number)],
-      );
-      expect(_builtMessages, findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-  });
-
   group('операция, принятая до смены пункта', () {
     for (final fails in [false, true]) {
       testWidgets(
         fails
-            ? 'отказ отметки предъявляется один раз, а смена пункта не '
+            ? 'отказ архивирования предъявляется один раз, а смена пункта не '
                   'повторяет и не откладывает операцию'
-            : 'отметка завершается и предъявляется один раз, а смена пункта '
+            : 'архивирование завершается и предъявляется один раз, а смена пункта '
                   'не отменяет, не повторяет и не откладывает операцию',
         (tester) async {
           final app = await _start(tester);
           final l10n = app.l10n;
-          final marked = _plainTitle(2);
-          final marksBefore = storedFavoriteMarks(app.raw);
+          final archived = _plainTitle(2);
+          final id = tagFixtureId(_plain(2));
+          int archiveState() =>
+              app.raw.select(
+                    'SELECT is_archived FROM intentions WHERE id = ?',
+                    [id],
+                  ).single['is_archived']
+                  as int;
           await _select(tester, AppDestination.intentionGraph);
-          await _open(tester, _catalogRow(marked), IntentionDetailsPage);
+          await _open(tester, _catalogRow(archived), IntentionDetailsPage);
           app.repository.holdNextCommand();
-          if (fails) app.faults.failNextMarkWrite();
-          await _tap(tester, find.byKey(_favoriteControl));
+          if (fails) app.faults.failNextArchiveWrite();
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('intention-details-archive')),
+          );
           // Операция принята и дошла до хранилища до смены пункта.
           await _waitFor(tester, () => app.repository.isHolding);
           await _closeTop(tester, IntentionDetailsPage);
@@ -677,7 +585,7 @@ void main() {
           await _select(tester, AppDestination.dailyChoices);
 
           expect(_builtMessages, findsNothing);
-          expect(storedFavoriteMarks(app.raw), marksBefore);
+          expect(archiveState(), 0);
 
           // Результат приходит, пока выбран другой пункт, и предъявляется
           // сразу на его странице, а не при возвращении к началу перехода.
@@ -687,11 +595,11 @@ void main() {
 
           final message = find.text(
             l10n.graphOperationMessage(
-              l10n.graphOperationMarkFavorite,
-              marked,
+              l10n.graphOperationArchive,
+              archived,
               fails
-                  ? l10n.detailsFavoriteMarkUnavailable
-                  : l10n.detailsFavoriteMarked,
+                  ? l10n.detailsStateChangeUnavailable
+                  : l10n.detailsArchivedSuccess,
             ),
           );
           expect(find.byKey(_message), findsOneWidget);
@@ -702,36 +610,22 @@ void main() {
             ),
             findsOneWidget,
           );
-          expect(app.repository.commands, hasLength(1));
-          final marksAfter = storedFavoriteMarks(app.raw);
-          expect(
-            marksAfter,
-            fails
-                ? marksBefore
-                : [
-                    ...marksBefore,
-                    (tagFixtureId(_plain(2)), _favoriteCount + 1),
-                  ],
-          );
-
+          expect(app.repository.commands.single, isA<ArchiveIntention>());
+          expect(archiveState(), fails ? 0 : 1);
           // Смена пункта не предъявляет результат заново.
           await _select(tester, AppDestination.home);
           expect(find.byKey(_message), findsOneWidget);
           expect(message, findsOneWidget);
-          expect(
-            app.home.items.map((row) => row.title),
-            fails ? isNot(contains(marked)) : contains(marked),
-          );
           await _select(tester, AppDestination.intentionGraph);
           expect(find.byKey(_message), findsOneWidget);
-          expect(_catalogStar(tester, marked), !fails);
+          expect(_catalogRow(archived), fails ? findsOneWidget : findsNothing);
 
           await _closeMessage(tester);
           for (final destination in AppDestination.values) {
             await _select(tester, destination);
             expect(_builtMessages, findsNothing, reason: destination.name);
           }
-          expect(storedFavoriteMarks(app.raw), marksAfter);
+          expect(archiveState(), fails ? 0 : 1);
           expect(tester.takeException(), isNull);
         },
       );
@@ -759,7 +653,6 @@ typedef _RootPageState = ({
 });
 
 const _rootPageStates = <AppDestination, _RootPageState>{
-  AppDestination.home: (prepare: _prepareHome, view: _homeView),
   AppDestination.dailyChoices: (
     prepare: _prepareDailyChoiceCatalog,
     view: _dailyChoiceCatalogView,
@@ -770,8 +663,8 @@ const _rootPageStates = <AppDestination, _RootPageState>{
   ),
 };
 
-String _favoriteTitle(int number) =>
-    'Избранное ${number.toString().padLeft(2, '0')}';
+String _activeTitle(int number) =>
+    'Намерение ${number.toString().padLeft(2, '0')}';
 
 int _plain(int number) => _firstPlain + number - 1;
 
@@ -787,7 +680,7 @@ final class _App {
   final sqlite.Database raw;
   final ProviderContainer container;
   final _ObservedRepository repository;
-  final _MarkWriteFaults faults;
+  final _ArchiveWriteFaults faults;
   final AppLocalizations l10n = lookupAppLocalizations(const Locale('en'));
 
   IntentionCatalogLoaded get intentionCatalog => switch (container
@@ -807,14 +700,9 @@ final class _App {
   bool get hasDailyChoiceCatalogResult =>
       container.read(dailyChoiceCatalogViewModelProvider)
           is DailyChoiceCatalogLoaded;
-
-  HomeList get home => switch (container.read(homeViewModelProvider)) {
-    final HomeList list => list,
-    final other => fail('Главная не показывает список: $other'),
-  };
 }
 
-/// Запускает приложение на засеянном хранилище и ждёт Главную со списком.
+/// Запускает приложение на засеянном хранилище и ждёт Главную.
 ///
 /// [today] — локальное сегодня приложения; по умолчанию [_today].
 Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
@@ -829,7 +717,7 @@ Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
   addTearDown(tester.view.reset);
   late sqlite.Database raw;
   late _ObservedRepository repository;
-  final faults = _MarkWriteFaults();
+  final faults = _ArchiveWriteFaults();
   final diagnostics = InMemoryDiagnosticsSink();
   final runtime = AppRuntime(
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
@@ -858,7 +746,11 @@ Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
   _seed(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
-  await _until(tester, find.byType(HomeIntentionRow));
+  await _until(tester, find.byType(HomePage));
+  await _waitFor(
+    tester,
+    () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+  );
   await tester.pumpAndSettle();
   return _App(raw, ready.container, repository, faults);
 }
@@ -880,13 +772,8 @@ void _seed(sqlite.Database database) {
     tagFixtureId(_healthTag),
     'Здоровье',
   ]);
-  for (var number = 1; number <= _favoriteCount; number++) {
-    insertIntention(number, _favoriteTitle(number));
-    storeFavoriteMark(
-      database,
-      intentionId: tagFixtureId(number),
-      position: number,
-    );
+  for (var number = 1; number <= _activeCount; number++) {
+    insertIntention(number, _activeTitle(number));
   }
   for (var number = 1; number <= _plainCount; number++) {
     insertIntention(_plain(number), _plainTitle(number));
@@ -1054,14 +941,6 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   expect(position.pixels, greaterThan(0));
 }
 
-/// Главная, прокрученная внутри списка избранных намерений.
-Future<void> _prepareHome(WidgetTester tester, _App app) async {
-  await _select(tester, AppDestination.home);
-  _homePosition(tester).jumpTo(500);
-  await _settle(tester);
-  expect(_homePosition(tester).pixels, 500);
-}
-
 /// Наблюдаемое состояние каталога намерений: страница, выдача, параметры,
 /// позиция и число обращений к выдаче в хранилище.
 Map<String, Object?> _intentionCatalogView(WidgetTester tester, _App app) {
@@ -1070,6 +949,8 @@ Map<String, Object?> _intentionCatalogView(WidgetTester tester, _App app) {
     ..._intentionCatalogParameters(tester, app),
     'загруженные намерения': [for (final item in catalog.items) item.title],
     'всего': catalog.totalCount,
+    'чтения выдачи': app.repository.catalogReads,
+    'чтения первой порции': app.repository.firstCatalogPortions,
   };
 }
 
@@ -1099,6 +980,7 @@ Map<String, Object?> _dailyChoiceCatalogView(WidgetTester tester, _App app) {
     'загруженные записи': [
       for (final item in catalog.items) item.id.toCanonicalString(),
     ],
+    'чтения выдачи': app.repository.dailyChoiceCatalogReads,
   };
 }
 
@@ -1153,12 +1035,6 @@ final _calendarCommands = {
   Locale('en'): ['Previous month', 'Next month', 'Collapse calendar'],
 };
 
-/// Наблюдаемое состояние Главной.
-Map<String, Object?> _homeView(WidgetTester tester, _App app) => {
-  'намерения': [for (final row in app.home.items) row.title],
-  'позиция прокрутки': _homePosition(tester).pixels,
-};
-
 /// Тексты элемента [finder] в порядке дерева; при [skipOffstage] — только
 /// видимые.
 List<String?> _texts(Finder finder, {bool skipOffstage = true}) => [
@@ -1192,17 +1068,6 @@ ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester
       find.descendant(of: scrollView, matching: find.byType(Scrollable)).first,
     )
     .position;
-
-/// Прокручивает [position] до конца: длина ленивого списка уточняется по
-/// мере раскладки строк.
-Future<void> _scrollToEnd(WidgetTester tester, ScrollPosition position) async {
-  for (var attempt = 0; attempt < 20; attempt++) {
-    position.jumpTo(position.maxScrollExtent);
-    await tester.pumpAndSettle();
-    if (position.pixels == position.maxScrollExtent) return;
-  }
-  fail('Список не дошёл до конца.');
-}
 
 ScrollPosition _catalogPosition(WidgetTester tester) => _positionOf(
   tester,
@@ -1254,55 +1119,11 @@ final _dailyChoiceRows = find.byWidgetPredicate(
   },
 );
 
-ScrollPosition _homePosition(WidgetTester tester) => _positionOf(
-  tester,
-  find.byKey(const PageStorageKey<String>('home-favorite-intentions')),
-);
-
-/// Строка Главной избранного намерения с номером [number] фикстуры.
-Finder _homeRow(int number) => find.byKey(
-  ValueKey(
-    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
-  ),
-);
-
-/// Ручка строки Главной, с которой начинается перетаскивание.
-Finder _homeHandle(int number) => find.descendant(
-  of: _homeRow(number),
-  matching: find.byType(ReorderableDragStartListener),
-);
-
-/// Перетаскивает строку Главной намерения [number] ручкой на одно место
-/// выше: строка занимает место соседа, когда её край заходит за его
-/// середину.
-Future<void> _dragHomeRowUp(WidgetTester tester, int number) async {
-  final rowHeight = tester.getSize(_homeRow(number)).height;
-  final gesture = await tester.startGesture(
-    tester.getCenter(_homeHandle(number)),
-  );
-  const steps = 10;
-  for (var step = 0; step < steps; step++) {
-    await gesture.moveBy(Offset(0, -0.75 * rowHeight / steps));
-    await tester.pump();
-  }
-  await gesture.up();
-  await tester.pumpAndSettle();
-}
-
 /// Строка выдачи каталога намерений с названием [title].
 Finder _catalogRow(String title) => find.descendant(
   of: find.byType(catalog_page.IntentionCatalogPage),
   matching: find.widgetWithText(IntentionSummaryView, title),
 );
-
-/// Показывает ли строка каталога намерений звезду избранного намерения.
-bool _catalogStar(WidgetTester tester, String title) {
-  expect(_catalogRow(title), findsOneWidget);
-  return find
-      .descendant(of: _catalogRow(title), matching: find.byIcon(Icons.star))
-      .evaluate()
-      .isNotEmpty;
-}
 
 /// Подпись строки каталога дневных выборов с номером [number].
 String? _dailyChoiceRow(WidgetTester tester, int number) => tester
@@ -1319,9 +1140,6 @@ String? _dailyChoiceRow(WidgetTester tester, int number) => tester
 String _completion(AppLocalizations l10n, bool completed) =>
     '${l10n.dailyChoiceDetailsDate(_choiceDate.toCanonicalString())} · '
     '${completed ? l10n.dailyChoiceDetailsCompleted : l10n.dailyChoiceDetailsNotCompleted}';
-
-String? _favoriteTooltip(WidgetTester tester) =>
-    tester.widget<IconButton>(find.byKey(_favoriteControl)).tooltip;
 
 /// Сообщения общей поверхности в дереве, включая невыбранные вкладки.
 final _builtMessages = find.byKey(_message, skipOffstage: false);
@@ -1430,26 +1248,26 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
-/// Отказывает ближайшей записи отметки устранимой недоступностью хранилища:
+/// Отказывает ближайшей записи архивирования недоступностью хранилища:
 /// транзакция команды откатывается самим адаптером.
-final class _MarkWriteFaults extends LocalDatabaseConnectionObserver {
+final class _ArchiveWriteFaults extends LocalDatabaseConnectionObserver {
   var _failNext = false;
 
-  void failNextMarkWrite() => _failNext = true;
+  void failNextArchiveWrite() => _failNext = true;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (!_failNext ||
         statement.operation == LocalDatabaseSqlOperation.select ||
         !statement.statements.any(
-          (sql) => sql.contains('favorite_intentions'),
+          (sql) => sql.contains('intentions') && sql.contains('is_archived'),
         )) {
       return;
     }
     _failNext = false;
     throw sqlite.SqliteException(
       extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-      message: 'Управляемый отказ записи отметки',
+      message: 'Управляемый отказ архивирования',
     );
   }
 }
@@ -1478,9 +1296,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   /// Обращения к выдаче каталога дневных выборов.
   var dailyChoiceCatalogReads = 0;
 
-  /// Чтения списка избранных намерений.
-  var favoriteReads = 0;
-
   void holdNextCommand() => _gate = Completer<void>();
 
   void releaseCommand() {
@@ -1494,9 +1309,7 @@ final class _ObservedRepository implements PersonalGraphRepository {
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
     commands.add(command);
-    if (command is MarkIntentionFavorite ||
-        command is UnmarkIntentionFavorite ||
-        command is ArchiveIntention) {
+    if (command is ArchiveIntention) {
       final gate = _gate;
       if (gate != null) {
         isHolding = true;
@@ -1506,12 +1319,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
       }
     }
     return _delegate.execute(command);
-  }
-
-  @override
-  Future<FavoriteIntentionsResult> getFavoriteIntentions() {
-    favoriteReads++;
-    return _delegate.getFavoriteIntentions();
   }
 
   @override

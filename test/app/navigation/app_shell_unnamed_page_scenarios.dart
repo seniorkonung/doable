@@ -128,11 +128,16 @@ void _registerUnnamedPageTests() {
     tester,
   ) async {
     final router = await _start(tester);
-    await _open(tester, find.byType(HomeIntentionRow), IntentionDetailsPage);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(
+      tester,
+      _summary(IntentionCatalogPage, 'Читать'),
+      IntentionDetailsPage,
+    );
     _expectAboveShell(
       tester,
       IntentionDetailsPage,
-      AppDestination.home,
+      AppDestination.intentionGraph,
       expectedPanel: true,
     );
     await _tap(tester, find.byKey(const ValueKey('intention-details-delete')));
@@ -155,11 +160,11 @@ void _registerUnnamedPageTests() {
     _expectAboveShell(
       tester,
       IntentionDetailsPage,
-      AppDestination.home,
+      AppDestination.intentionGraph,
       expectedPanel: true,
     );
     await _close(tester, IntentionDetailsPage);
-    _expectRootPage(tester, router, AppDestination.home);
+    _expectRootPage(tester, router, AppDestination.intentionGraph);
     expect(tester.takeException(), isNull);
   });
 }

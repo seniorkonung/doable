@@ -416,47 +416,6 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('краткие представления участников связи не '
-      'показывают отметку избранного', (tester) async {
-    final semantics = tester.ensureSemantics();
-    final repository = ControlledRelationDetailsRepository();
-    addTearDown(repository.dispose);
-    final relationId = testRelationId(9);
-
-    await _pumpRelationDetails(tester, repository, relationId);
-    repository
-        .watchAt(0)
-        .emitDetails(
-          testRelationDetails(
-            relationId: relationId,
-            sourceId: testIntentionId(1),
-            relatedId: testIntentionId(2),
-            sourceTitle: 'Быть здоровым',
-            relatedTitle: 'Гулять',
-          ),
-          revision: revision,
-        );
-    await tester.pumpAndSettle();
-
-    // Данные участника связи отметку не несут, поэтому представление без
-    // поиска не выводит её и для избранных намерений.
-    expect(find.text('Быть здоровым'), findsOneWidget);
-    expect(find.text('Гулять'), findsOneWidget);
-    expect(find.byIcon(Icons.star), findsNothing);
-    expect(find.byIcon(Icons.star_border), findsNothing);
-    for (final key in const [
-      'relation-details-source-participant',
-      'relation-details-related-participant',
-    ]) {
-      expect(
-        tester.getSemantics(find.byKey(ValueKey(key))).label,
-        isNot(contains('Favorite intention')),
-      );
-    }
-
-    semantics.dispose();
-  });
-
   testWidgets('повторно открытый просмотр показывает выполняющееся изменение', (
     tester,
   ) async {

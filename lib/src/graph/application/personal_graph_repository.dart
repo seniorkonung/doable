@@ -2,7 +2,6 @@ import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../favorite/application/favorite_intentions.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
@@ -24,7 +23,7 @@ abstract interface class GraphCommandRepository {
 }
 
 abstract interface class PersonalGraphRepository
-    implements GraphCommandRepository, TagReadContract, FavoriteReadContract {
+    implements GraphCommandRepository, TagReadContract {
   /// Проверяет весь направленный черновик на одном снимке графа. Ноль шагов
   /// допустим, но не подтверждаем. Для нижнего обхода начало — фиксированное
   /// активное готовое действие, а текущее намерение — возможное основание

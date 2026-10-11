@@ -12,6 +12,7 @@
 
 import 'package:auto_route/auto_route.dart' as _i22;
 import 'package:collection/collection.dart' as _i29;
+import 'package:doable/src/app/home/home_page.dart' as _i10;
 import 'package:doable/src/app/navigation/app_shell_page.dart' as _i1;
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart'
     as _i24;
@@ -39,7 +40,6 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
     as _i2;
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart'
     as _i9;
-import 'package:doable/src/favorite/presentation/home/home_page.dart' as _i10;
 import 'package:doable/src/intention/domain/intention_id.dart' as _i23;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as _i11;

@@ -8,9 +8,26 @@ readiness, archiving, restoration, deletion, Russian and English localization,
 and persistence within one application installation.
 
 The product model is maintained in
-[`docs/discussions/action-centered-goal-system.md`](docs/discussions/action-centered-goal-system.md),
-and the implementation sequence is maintained in
-[`docs/discussions/development-change-sequence.md`](docs/discussions/development-change-sequence.md).
+[`docs/discussions/action-centered-goal-system.md`](docs/discussions/action-centered-goal-system.md).
+
+## Local data before launch and rollback
+
+The SQLite schema remains version 1 (`user_version = 1`), with favorite-intention
+storage removed. Earlier builds used an incompatible structure with that storage
+under the same version. The version cannot distinguish the two structures, so
+compatibility with or detection of an older database is not guaranteed. No data
+migration is provided; the app does not automatically delete or recreate an
+existing database.
+
+Before first launching this build over an older installation, stop Doable and
+manually clear its local app data. On Android, clear Doable's storage through the
+system app settings. This permanently deletes the installation's local data;
+the next launch creates a fresh database with the current structure.
+
+Before rolling back to an earlier build, stop Doable and manually clear local app
+data again if this build has created a database: the earlier code expects the
+removed favorite-intention table. Rolling back the build cannot restore data
+already deleted during either cleanup.
 
 ## Reproducible generation
 

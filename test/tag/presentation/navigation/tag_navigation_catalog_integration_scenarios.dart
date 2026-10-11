@@ -120,7 +120,6 @@ void _realTagNavigationCatalogScenarios() {
           title: 'Одинаковое намерение',
           description: 'Создано сразу с тегами',
           readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
           tagIds: [otherTagId, h.tagId],
         ),
       );
@@ -229,7 +228,6 @@ void _realTagNavigationCatalogScenarios() {
         title: 'Навести порядок',
         description: null,
         readiness: IntentionReadiness.notReady,
-        favoriteMark: FavoriteMark.notFavorite,
         tagIds: [fixtureTag(lastTagNumber), h.tagId, fixtureTag(303)],
       ),
     );
