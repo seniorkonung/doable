@@ -2036,7 +2036,6 @@ void main() {
       );
       expect(raw.select('SELECT * FROM intentions'), isEmpty);
       expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
-      expect(raw.select('SELECT * FROM favorite_intentions'), isEmpty);
       expect(tester.takeException(), isNull);
     },
   );

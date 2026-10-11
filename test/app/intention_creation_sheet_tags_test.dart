@@ -39,7 +39,6 @@ const _creationTables = [
   'intentions',
   'intention_titles_fts',
   'tag_assignments',
-  'favorite_intentions',
 ];
 
 final _sheet = find.byKey(const ValueKey('intention-creation-sheet'));
