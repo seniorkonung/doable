@@ -1,7 +1,6 @@
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
@@ -83,7 +82,7 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
   }
   for (final (id, source, action, date, description) in [
     (201, 1, 3, _replacedChoiceDate, 'Прежнее описание'),
-    (202, 4, 5, _catalogToday, 'Описание подсказки'),
+    (202, 4, 5, _catalogToday, 'Описание другого выбора'),
   ]) {
     await database.customInsert(
       '''INSERT INTO daily_choices
@@ -335,28 +334,12 @@ void main() {
         _uuid(104),
       ]);
       expect(_choiceCount(harness), 2);
-      final suggestions = await repository.getChoicePathSuggestions(
-        ChoicePathSuggestionsForSource(after.choice.sourceIntentionId),
-      );
-      expect(suggestions, isA<ChoicePathSuggestionsSuccess>());
-      final updatedSuggestion = (suggestions as ChoicePathSuggestionsSuccess)
-          .value
-          .items
-          .singleWhere((item) => item.originChoiceId == _choice(201));
-      expect(
-        updatedSuggestion.path.map(
-          (step) => step.relation.id.toCanonicalString(),
-        ),
-        [_uuid(104)],
-      );
     },
   );
 
-  // Направление и способ выбора не зависят друг от друга: диагональ покрывает
-  // оба значения каждой оси. Язык не влияет на путь замены, поэтому русский.
-  for (final (bottomUp, suggestion) in [(false, false), (true, true)]) {
+  for (final bottomUp in [false, true]) {
     testWidgets(
-      'замена ${bottomUp ? 'снизу' : 'сверху'} ${suggestion ? 'по подсказке' : 'по шагам'} сохраняет идентичность и поля',
+      'замена ${bottomUp ? 'снизу' : 'сверху'} по шагам сохраняет идентичность и поля',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 2400);
         tester.view.devicePixelRatio = 1;
@@ -422,31 +405,24 @@ void main() {
           find.text(bottomUp ? 'Новое действие' : 'Новое основание'),
         );
 
-        if (suggestion) {
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('choice-suggestion-select-0')),
-          );
-        } else {
-          await _tap(
-            tester,
-            find.byKey(ValueKey('choice-path-continue-${_uuid(103)}')),
-          );
-          await _tap(
-            tester,
-            find.byKey(
-              ValueKey(
-                bottomUp
-                    ? 'choice-path-select-source'
-                    : 'choice-path-select-action',
-              ),
+        await _tap(
+          tester,
+          find.byKey(ValueKey('choice-path-continue-${_uuid(103)}')),
+        );
+        await _tap(
+          tester,
+          find.byKey(
+            ValueKey(
+              bottomUp
+                  ? 'choice-path-select-source'
+                  : 'choice-path-select-action',
             ),
-          );
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('choice-path-open-confirmation')),
-          );
-        }
+          ),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
         await _waitFor(tester, find.byType(DailyChoicePathReplacePage));
         await _waitFor(
           tester,
