@@ -155,8 +155,9 @@ void _registerQuickCreationFlowTests() {
           tester.getRect(message).bottom,
           lessThanOrEqualTo(tester.getRect(find.byType(AppNavigationBar)).top),
         );
-        await tester.drag(find.byType(SnackBar), const Offset(0, 400));
+        await tester.drag(find.byType(SnackBar), const Offset(600, 0));
         await tester.pumpAndSettle();
+        expect(message, findsNothing);
         await tester.pump(const Duration(seconds: 6));
         await tester.pumpAndSettle();
         expect(message, findsNothing);

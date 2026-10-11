@@ -14,6 +14,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionCatalogOrder, IntentionTagFilter;
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -44,6 +45,92 @@ void main() {
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
   _registerNestedQuickCreationTests();
+  testWidgets('создание при занятой поверхности закрывает форму и обновляет '
+      'каталог до сообщения, а возвращение не повторяет результат', (
+    tester,
+  ) async {
+    final app = await _start(tester, fileBacked: true);
+    const origin = IntentionCreationOrigin.graph;
+    const flow = _Flow.intention;
+    final history = await origin.open(
+      tester,
+      app.router,
+      participantId: durabilityIntention(2),
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
+    await flow.open(tester, app, origin);
+    await flow.fill(tester);
+    const title = 'Намерение новое';
+    await tester.enterText(_key('intention-editor-title'), title);
+    final coordinator = app.container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final completions = <GraphCommandCompletion>[];
+    final subscription = coordinator.completions.listen(completions.add);
+    addTearDown(subscription.cancel);
+    coordinator.acceptExisting(
+      EnableIntentionReadiness(durabilityIntention(5)),
+      presentationTitle: 'Намерение 5',
+    );
+    await _until(tester, () => completions.length == 1);
+    await tester.pumpAndSettle();
+    final first = app.l10n.graphOperationMessage(
+      app.l10n.graphOperationEnableReadiness,
+      'Намерение 5',
+      app.l10n.detailsReadinessEnabled,
+    );
+    final createdMessage = app.l10n.graphOperationMessage(
+      app.l10n.graphOperationCreate,
+      title,
+      app.l10n.editorCreated,
+    );
+    expect(find.text(first).hitTestable(), findsOneWidget);
+
+    app.observer.observe(flow.table);
+    await _submit(tester, app, flow);
+    await _until(tester, () => app.router.current.name == flow.resultRoute);
+    await tester.pumpAndSettle();
+    expect(_key('intention-editor-title'), findsNothing);
+    expect(find.text(title), findsOneWidget);
+    expect(find.text(first).hitTestable(), findsOneWidget);
+    expect(find.text(createdMessage, skipOffstage: false), findsNothing);
+    final stored = (await tester.runAsync(
+      () => durabilityRows(app.database, flow.table),
+    ))!;
+    expect(stored, hasLength(flow.initialRows + 1));
+    expect(stored.last['title'], title);
+    expect(stored.last['description'], 'Сохранённое описание');
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    history.expectRestored(tester, app.router);
+    expect(find.text(title), findsOneWidget);
+    expect(find.text(app.l10n.catalogTotalCount(6)), findsOneWidget);
+    expect(find.text(first).hitTestable(), findsOneWidget);
+    expect(find.text(createdMessage, skipOffstage: false), findsNothing);
+    await tester.drag(find.text(first), const Offset(600, 0));
+    await tester.pumpAndSettle();
+    expect(find.text(createdMessage).hitTestable(), findsOneWidget);
+    await tester.drag(find.text(createdMessage), const Offset(600, 0));
+    await tester.pumpAndSettle();
+    await _tap(tester, find.text(title));
+    await _until(tester, () => app.router.current.name == flow.resultRoute);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+    history.expectRestored(tester, app.router);
+    expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+    expect(app.observer.attempts, 1);
+    expect(completions, hasLength(2));
+    expect(
+      await tester.runAsync(() => durabilityRows(app.database, flow.table)),
+      stored,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   // Варианты потоков связи и дневного выбора принадлежат их собственным
   // тестам. Здесь намерение проверяется над корневой и глубокой историей, а
   // дневной выбор от действия — как одна связка общей кнопки с другим потоком.
