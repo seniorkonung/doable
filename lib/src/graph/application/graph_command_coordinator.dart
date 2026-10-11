@@ -109,43 +109,35 @@ sealed class GraphOperationToken {
   const GraphOperationToken();
 }
 
-/// Токен операции, отказ которой по ADR-0012 сначала принадлежит открытой
-/// экранной сессии инициатора.
-sealed class GraphInitiatorOperationToken extends GraphOperationToken {
-  const GraphInitiatorOperationToken();
-}
-
-final class IntentionOperationToken extends GraphInitiatorOperationToken {
+final class IntentionOperationToken extends GraphOperationToken {
   IntentionOperationToken._();
 
   @override
   String toString() => 'IntentionOperationToken';
 }
 
-final class LongTermRelationOperationToken
-    extends GraphInitiatorOperationToken {
+final class LongTermRelationOperationToken extends GraphOperationToken {
   LongTermRelationOperationToken._();
 
   @override
   String toString() => 'LongTermRelationOperationToken';
 }
 
-final class BlockingRelationsDeleteOperationToken
-    extends GraphInitiatorOperationToken {
+final class BlockingRelationsDeleteOperationToken extends GraphOperationToken {
   BlockingRelationsDeleteOperationToken._();
 
   @override
   String toString() => 'BlockingRelationsDeleteOperationToken';
 }
 
-final class DailyChoiceOperationToken extends GraphInitiatorOperationToken {
+final class DailyChoiceOperationToken extends GraphOperationToken {
   DailyChoiceOperationToken._();
 
   @override
   String toString() => 'DailyChoiceOperationToken';
 }
 
-final class TagOperationToken extends GraphInitiatorOperationToken {
+final class TagOperationToken extends GraphOperationToken {
   TagOperationToken._();
 
   @override
@@ -480,7 +472,7 @@ final class GraphInitiatorPresentationClaim extends GraphPresentationClaim {
   ) : super._();
 
   @override
-  final GraphInitiatorOperationToken token;
+  final GraphOperationToken token;
 }
 
 /// Право оболочки предъявить успех или переданный ей отказ.
@@ -897,7 +889,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// Success инициатору не выдаётся: он сразу принадлежит оболочке. После
   /// освобождения сессии или выдачи права оболочке возвращает `null`.
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
-    GraphInitiatorOperationToken token,
+    GraphOperationToken token,
   ) {
     final entry = _entries[token];
     final completion = entry?.completion;
@@ -920,7 +912,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ///
   /// Неподтверждённая ошибка становится доступной оболочке в своём прежнем
   /// порядке; прежний initiator claim больше не может её подтвердить.
-  void releaseInitiatorPresentation(GraphInitiatorOperationToken token) {
+  void releaseInitiatorPresentation(GraphOperationToken token) {
     final entry = _entries[token];
     if (entry == null || entry.initiatorReleased) {
       return;

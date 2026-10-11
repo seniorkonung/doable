@@ -1592,7 +1592,7 @@ final class _PresenterHarness {
   void failTagWithException(TagCommandAccepted accepted, Object error) =>
       repository.failTagCommand(_tagIndexes[accepted]!, error);
 
-  void releaseInitiatorPresentation(GraphInitiatorOperationToken token) =>
+  void releaseInitiatorPresentation(GraphOperationToken token) =>
       _coordinator.releaseInitiatorPresentation(token);
 
   DailyChoiceCommandAccepted startDailyChoice(DailyChoiceCommandKind kind) =>
@@ -2001,7 +2001,7 @@ final class _PresenterHarness {
   }
 
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
-    GraphInitiatorOperationToken token,
+    GraphOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
 
   void releaseInitiatorClaim(GraphInitiatorPresentationClaim claim) =>
