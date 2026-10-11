@@ -102,31 +102,6 @@ void main() {
         },
       );
     }
-
-    testWidgets(
-      '${_label(mode)}: отказ открытия освобождает запуск без повтора',
-      (tester) async {
-        final errors = _captureLaunchErrors();
-        final router = _FailingRouter(_firstRoute(mode));
-        await _openApp(tester, router: router);
-        final source = await _source(tester, router, _Origin.home);
-        final history = _history(router);
-        final launcher = QuickCreationLauncher();
-        final first = launcher.launch(sourceContext: source, mode: mode);
-        await tester.pumpAndSettle();
-        await first;
-        expect(_history(router), history);
-        expect(errors, hasLength(1));
-        expect(errors.single.exception.toString(), isNot(contains('Секрет')));
-        final next = launcher.launch(sourceContext: source, mode: mode);
-        await tester.pumpAndSettle();
-        expect(router.current.name, _firstRoute(mode));
-        await _cancel(tester, mode);
-        await next;
-        expect(_history(router), history);
-        expect(tester.takeException(), isNull);
-      },
-    );
   }
 
   for (final mode in _dailyModes) {

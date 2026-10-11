@@ -143,40 +143,6 @@ Future<RootStackRouter> _openApp(
   return appRouter;
 }
 
-List<FlutterErrorDetails> _captureLaunchErrors() {
-  final errors = <FlutterErrorDetails>[];
-  final previous = FlutterError.onError;
-  FlutterError.onError = (details) {
-    if (details.library == 'quick creation' ||
-        details.library == 'daily choice creation') {
-      errors.add(details);
-    } else {
-      previous?.call(details);
-    }
-  };
-  addTearDown(() => FlutterError.onError = previous);
-  return errors;
-}
-
-final class _FailingRouter extends RootStackRouter {
-  _FailingRouter(this.target);
-  final String target;
-  bool _failed = false;
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-  @override
-  Future<T?> push<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    if (!_failed && route.routeName == target) {
-      _failed = true;
-      return Future<T?>.error(StateError('Секрет'));
-    }
-    return super.push<T>(route, onFailure: onFailure);
-  }
-}
-
 /// Настоящий поиск закрывается сразу, а его ID доставляется после сброса.
 final class _DelayedPickerRouter extends RootStackRouter {
   final _gate = Completer<void>();

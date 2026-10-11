@@ -15,7 +15,7 @@ import 'daily_choice_picker_context.dart';
 /// запускающего объекта. Повторный вызов во время живого запуска отклоняется;
 /// разные страницы используют независимые экземпляры. Возврат из поиска
 /// открывает путь только над той же исходной историей. Future завершается
-/// при открытии пути или закрытии поиска; отказ диагностируется без повтора.
+/// при открытии пути или закрытии поиска.
 final class DailyChoiceCreationLauncher {
   _Launch? _pending;
 
@@ -45,8 +45,6 @@ final class DailyChoiceCreationLauncher {
       });
       if (id == null || !launch.canOpenPath) return;
       await launch.openPath(id, direction);
-    } catch (_, stack) {
-      _reportFailure(stack);
     } finally {
       launch.dispose();
       if (identical(_pending, launch)) _pending = null;
@@ -121,17 +119,7 @@ final class _Launch implements DailyChoicePickerLaunch {
       // Future push означает возврат со страницы. Открытие подтверждает
       // конкретный маршрут: replace пути может вообще не завершить Future.
       // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/push.html
-      unawaited(
-        router
-            .push<void>(path)
-            .then<void>(
-              (_) => finish(),
-              onError: (Object _, StackTrace stack) {
-                _reportFailure(stack);
-                finish();
-              },
-            ),
-      );
+      unawaited(router.push<void>(path).then<void>((_) => finish()));
       check();
       await opened.future;
     } finally {
@@ -155,15 +143,4 @@ final class _Launch implements DailyChoicePickerLaunch {
       sourceRouter.removeListener(_checkSource);
     }
   }
-}
-
-void _reportFailure(StackTrace stack) {
-  FlutterError.reportError(
-    FlutterErrorDetails(
-      exception: FlutterError('Не удалось начать дневной выбор.'),
-      stack: stack,
-      library: 'daily choice creation',
-      context: ErrorDescription('при запуске создания через поиск'),
-    ),
-  );
 }

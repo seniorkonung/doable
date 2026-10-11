@@ -27,54 +27,6 @@ import '../../support/quick_creation.dart';
 
 void main() {
   _defineLatePickerTests();
-  for (final failPath in [false, true]) {
-    testWidgets(
-      'отказ открытия ${failPath ? 'пути' : 'поиска'} сохраняет историю и разрешает новый запуск',
-      (tester) async {
-        final errors = <FlutterErrorDetails>[];
-        final previousOnError = FlutterError.onError;
-        FlutterError.onError = (details) {
-          if (details.library == 'daily choice creation') {
-            errors.add(details);
-          } else {
-            previousOnError?.call(details);
-          }
-        };
-        addTearDown(() => FlutterError.onError = previousOnError);
-        final router = _FailingLaunchRouter(failPath: failPath);
-        await _openApp(tester, router: router);
-        final source = await _sourceContext(tester, router);
-        final history = router.stackData.map((route) => route.matchId).toList();
-        final launcher = DailyChoiceCreationLauncher();
-        final first = launcher.launch(
-          sourceContext: source,
-          direction: ChoicePathDraftDirection.topDown,
-        );
-        await tester.pumpAndSettle();
-        if (failPath) {
-          await _choose(tester, ChoicePathDraftDirection.topDown, 1);
-        }
-        await first;
-        expect(router.stackData.map((route) => route.matchId), history);
-        expect(errors, hasLength(1));
-        expect(
-          errors.single.exception.toString(),
-          isNot(contains('Секретный текст')),
-        );
-        final next = launcher.launch(
-          sourceContext: source,
-          direction: ChoicePathDraftDirection.topDown,
-        );
-        await tester.pumpAndSettle();
-        expect(router.current.name, DailyChoiceSourcePickerRoute.name);
-        await tester.tap(find.text('Отменить создание'));
-        await tester.pumpAndSettle();
-        await next;
-        expect(router.stackData.map((route) => route.matchId), history);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
   testWidgets(
     'общая панель запускает начальное создание от действия с отменой',
     (tester) async {
@@ -541,32 +493,6 @@ final class _DelayedPickerRouter extends RootStackRouter {
     final result = await super.push<T>(route, onFailure: onFailure);
     if (hold) await _gate.future;
     return result;
-  }
-}
-
-final class _FailingLaunchRouter extends RootStackRouter {
-  _FailingLaunchRouter({required this.failPath});
-
-  final bool failPath;
-  bool _failed = false;
-
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-
-  @override
-  Future<T?> push<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    if (!_failed &&
-        route.routeName ==
-            (failPath
-                ? ChoicePathRoute.name
-                : DailyChoiceSourcePickerRoute.name)) {
-      _failed = true;
-      return Future<T?>.error(StateError('Секретный текст'));
-    }
-    return super.push<T>(route, onFailure: onFailure);
   }
 }
 
