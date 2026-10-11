@@ -187,7 +187,6 @@ Future<_App> _launch(
     diagnosticsSink: diagnostics,
   );
   addTearDown(() async {
-    storage.release();
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });

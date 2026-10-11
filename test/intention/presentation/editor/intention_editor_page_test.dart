@@ -15,20 +15,15 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
-import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -480,308 +475,6 @@ void main() {
       );
     },
   );
-
-  // Синхронный и асинхронный отказ проходят один обработчик, а все способы
-  // ухода ведут к одному запросу закрытия сессии: каждое значение измерения
-  // проверяется один раз.
-  for (final (synchronous, exit, awaitingConfirmation) in [
-    (true, _CreationExit.closeButton, false),
-    (false, _CreationExit.systemBack, true),
-  ]) {
-    testWidgets(
-      '${synchronous ? 'синхронный' : 'асинхронный'} отказ перехода сохраняет успех и допускает выход: ${exit.label}${awaitingConfirmation ? ' при прежнем подтверждении' : ''}',
-      (tester) async {
-        final repository = ControlledCatalogRepository();
-        final sessions = _EditorSessions();
-        final failureGate = synchronous ? null : Completer<void>();
-        final router = _FailingReplacementRouter(
-          synchronous: synchronous,
-          failureGate: failureGate?.future,
-        );
-        await _openEditor(
-          tester,
-          repository,
-          observers: [sessions],
-          navigationRouter: router,
-        );
-        final container = ProviderScope.containerOf(
-          tester.element(find.byType(IntentionEditorPage)),
-        );
-        final provider = sessions.latest!;
-        await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
-        await tester.tap(find.byKey(_submit));
-        await tester.pump();
-        final lateClose = tester
-            .widget<IconButton>(find.byKey(_closeButton))
-            .onPressed!;
-        VoidCallback? lateDiscard;
-        VoidCallback? lateContinue;
-        if (awaitingConfirmation) {
-          await _tapClose(tester);
-          await tester.pumpAndSettle();
-          expect(find.byKey(_closeConfirmation), findsOneWidget);
-          lateDiscard = tester
-              .widget<FilledButton>(find.byKey(_closeDiscard))
-              .onPressed!;
-          lateContinue = tester
-              .widget<TextButton>(find.byKey(_closeContinue))
-              .onPressed!;
-        }
-
-        final errors = <FlutterErrorDetails>[];
-        final previousHandler = FlutterError.onError;
-        FlutterError.onError = errors.add;
-        try {
-          repository.completeCommand(
-            0,
-            _savedResult(title: 'Сохранённое намерение'),
-          );
-          await tester.pump();
-          await tester.pump();
-          if (failureGate != null) {
-            // Запрос, пришедший во время эффекта, не конкурирует с ним.
-            lateClose();
-            expect(router.current.name, IntentionEditorRoute.name);
-            expect(errors, isEmpty);
-            failureGate.complete();
-          }
-          _completeCatalogRefresh(repository);
-          await tester.pumpAndSettle();
-        } finally {
-          FlutterError.onError = previousHandler;
-        }
-
-        expect(errors, hasLength(1));
-        expect(errors.single.exception, isA<StateError>());
-        expect(
-          errors.single.context.toString(),
-          contains('при открытии созданного намерения'),
-        );
-        expect(
-          container.read(provider).operation,
-          isA<OperationSucceeded<Intention>>(),
-        );
-        expect(container.read(provider).event, isNull);
-        expect(
-          container.read(provider).draftAvailability,
-          IntentionDraftAvailability.closed,
-        );
-        expect(container.read(provider).canSubmit, isFalse);
-        expect(tester.widget<TextField>(find.byKey(_title)).readOnly, isTrue);
-        expect(
-          tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
-          isNull,
-        );
-        expect(router.current.name, IntentionEditorRoute.name);
-        expect(router.replacementAttempts, 1);
-        expect(
-          find.textContaining('Intention created.').hitTestable(),
-          findsOneWidget,
-        );
-        expect(find.byKey(_pinnedFailure), findsNothing);
-        expect(find.byKey(_closeConfirmation), findsNothing);
-        await tester.pump(const Duration(seconds: 1));
-        await exit.request(tester);
-        await tester.pumpAndSettle();
-
-        expectIntentionGraphRootPage(router);
-        expect(find.byKey(_closeConfirmation), findsNothing);
-        expect(
-          find.byType(IntentionEditorPage, skipOffstage: false),
-          findsNothing,
-        );
-        lateClose();
-        await tester.pump();
-        expectIntentionGraphRootPage(router);
-
-        await _closeOperationMessage(tester);
-        await openQuickCreation(
-          tester,
-          QuickCreationMode.intention,
-          openedPage: find.byType(IntentionEditorPage),
-        );
-        await tester.enterText(find.byKey(_title), 'Следующий черновик');
-        lateClose();
-        lateClose();
-        lateDiscard?.call();
-        lateContinue?.call();
-        await tester.pump(const Duration(seconds: 1));
-        expect(router.current.name, IntentionEditorRoute.name);
-        expect(
-          _fieldText(tester, 'intention-editor-title'),
-          'Следующий черновик',
-        );
-        expect(find.textContaining('Intention created.'), findsNothing);
-        expect(router.replacementAttempts, 1);
-        expect(repository.commands, hasLength(1));
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
-
-  // Отказ после удаления формы проходит один обработчик независимо от
-  // страницы над историей: новая сессия проверяется вместе с ответами
-  // прежнего подтверждения.
-  for (final (openNewForm, awaitingConfirmation) in [
-    (false, false),
-    (true, true),
-  ]) {
-    testWidgets(
-      'поздний отказ открытия после удаления формы сохраняет ${openNewForm ? 'новую сессию' : 'страницу намерения'}${awaitingConfirmation ? ' при прежнем подтверждении' : ''}',
-      (tester) async {
-        final repository = ControlledCatalogRepository();
-        final saved = _savedResult(title: 'Сохранённое намерение');
-        final details = IntentionDetails(
-          intention: saved.value.intention,
-          relationCounts: testRelationCounts(),
-          favoriteMark: FavoriteMark.notFavorite,
-        );
-        repository.intentionObservations = (id) => Stream.multi((controller) {
-          expect(id, details.intention.id);
-          controller.add(
-            ResultSuccess(
-              GraphSnapshot(
-                value: details,
-                revision: const TestCatalogRevision(1),
-              ),
-            ),
-          );
-        });
-        final sessions = _EditorSessions();
-        final failureGate = Completer<void>();
-        final router = _FailingReplacementRouter(
-          synchronous: false,
-          replaceBeforeFailure: true,
-          failureGate: failureGate.future,
-        );
-        await _openEditor(
-          tester,
-          repository,
-          observers: [sessions],
-          navigationRouter: router,
-        );
-        await tester.enterText(find.byKey(_title), 'Сохранённое намерение');
-        await tester.tap(find.byKey(_submit));
-        await tester.pump();
-        final lateClose = tester
-            .widget<IconButton>(find.byKey(_closeButton))
-            .onPressed!;
-        VoidCallback? lateDiscard;
-        VoidCallback? lateContinue;
-        if (awaitingConfirmation) {
-          await _tapClose(tester);
-          await tester.pumpAndSettle();
-          expect(find.byKey(_closeConfirmation), findsOneWidget);
-          lateDiscard = tester
-              .widget<FilledButton>(find.byKey(_closeDiscard))
-              .onPressed!;
-          lateContinue = tester
-              .widget<TextButton>(find.byKey(_closeContinue))
-              .onPressed!;
-        }
-        repository.completeCommand(0, saved);
-        await tester.pump();
-        await tester.pump();
-        _completeCatalogRefresh(repository);
-        expect(router.current.name, IntentionDetailsRoute.name);
-        await tester.pumpAndSettle();
-        final container = ProviderScope.containerOf(
-          tester.element(find.byType(IntentionDetailsPage)),
-          listen: false,
-        );
-        final detailsProvider = intentionDetailsViewModelProvider(
-          details.intention.id,
-        );
-        expect(
-          container.read(detailsProvider),
-          isA<IntentionDetailsLoaded>().having(
-            (state) => state.details.intention.title,
-            'подтверждённые подробные данные',
-            details.intention.title,
-          ),
-        );
-        lateClose();
-        lateDiscard?.call();
-        lateContinue?.call();
-        if (openNewForm) {
-          await tester.pumpAndSettle();
-          await returnToIntentionGraphAfterCreation(tester, router);
-          await openQuickCreation(
-            tester,
-            QuickCreationMode.intention,
-            openedPage: find.byType(IntentionEditorPage),
-          );
-          await tester.enterText(find.byKey(_title), 'Следующий черновик');
-          await tester.enterText(
-            find.byKey(_description),
-            'Описание следующего черновика',
-          );
-          await tester.pumpAndSettle();
-        }
-        final currentRoute = router.current.name;
-        final errors = <FlutterErrorDetails>[];
-        final previousHandler = FlutterError.onError;
-        FlutterError.onError = errors.add;
-        try {
-          failureGate.complete();
-          await tester.pump();
-          lateClose();
-          lateDiscard?.call();
-          lateContinue?.call();
-          await tester.pumpAndSettle();
-        } finally {
-          FlutterError.onError = previousHandler;
-        }
-        expect(errors, hasLength(1));
-        expect(errors.single.exception, isA<StateError>());
-        expect(router.stackData.map((route) => route.name), [
-          AppShellRoute.name,
-          currentRoute,
-        ]);
-        expect(find.byKey(_closeConfirmation), findsNothing);
-        if (openNewForm) {
-          expect(
-            _fieldText(tester, 'intention-editor-title'),
-            'Следующий черновик',
-          );
-          expect(
-            sessions.state(tester).draftAvailability,
-            IntentionDraftAvailability.editable,
-          );
-          expect(
-            _fieldText(tester, 'intention-editor-description'),
-            'Описание следующего черновика',
-          );
-        } else {
-          expect(
-            container.read(detailsProvider),
-            isA<IntentionDetailsLoaded>(),
-          );
-          expect(
-            tester
-                .widget<Text>(
-                  find.byKey(const ValueKey('intention-details-title')),
-                )
-                .data,
-            details.intention.title,
-          );
-          expect(
-            router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-            testIntention(title: 'Сохранённое намерение').id,
-          );
-          expect(
-            find.byType(IntentionEditorPage, skipOffstage: false),
-            findsNothing,
-          );
-        }
-        await tester.pump(const Duration(seconds: 1));
-        expect(router.current.name, currentRoute);
-        expect(repository.commands, hasLength(1));
-        expect(router.replacementAttempts, 1);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
 
   testWidgets(
     'успех после подтверждённого ухода во время анимации не открывает намерение',
@@ -2801,9 +2494,8 @@ Future<RootStackRouter> _openEditor(
   ControlledCatalogRepository repository, {
   Locale locale = const Locale('en'),
   List<ProviderObserver> observers = const [],
-  RootStackRouter? navigationRouter,
 }) async {
-  final router = navigationRouter ?? AppRouter();
+  final router = AppRouter();
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
@@ -2845,7 +2537,6 @@ Future<RootStackRouter> _openEditor(
   return router;
 }
 
-/// Настоящий стек с маршрутами приложения и управляемым отказом его эффекта.
 /// Черновик сохранил введённые значения.
 void _expectDraftValues(
   IntentionCreationDraft actual,
@@ -2856,54 +2547,6 @@ void _expectDraftValues(
   expect(actual.tagIds, expected.tagIds);
   expect(actual.favoriteMark, expected.favoriteMark);
   expect(actual.readiness, expected.readiness);
-}
-
-final class _FailingReplacementRouter extends RootStackRouter {
-  _FailingReplacementRouter({
-    required this.synchronous,
-    this.replaceBeforeFailure = false,
-    this.failureGate,
-  });
-
-  final bool synchronous;
-  final bool replaceBeforeFailure;
-  final Future<void>? failureGate;
-  final failure = StateError('Не удалось заменить маршрут.');
-  var replacementAttempts = 0;
-
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-
-  @override
-  Future<T?> replace<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    replacementAttempts++;
-    if (replaceBeforeFailure) {
-      unawaited(super.replace<T>(route, onFailure: onFailure));
-    }
-    if (synchronous) throw failure;
-    return (failureGate ?? Future<void>.value()).then<T?>((_) => throw failure);
-  }
-}
-
-enum _CreationExit {
-  closeButton('кнопка закрытия'),
-  systemBack('системное «назад»');
-
-  const _CreationExit(this.label);
-
-  final String label;
-
-  Future<void> request(WidgetTester tester) async {
-    switch (this) {
-      case _CreationExit.closeButton:
-        await _tapClose(tester);
-      case _CreationExit.systemBack:
-        await tester.binding.handlePopRoute();
-    }
-  }
 }
 
 ResultSuccess<IntentionSaved> _savedResult({required String title}) {

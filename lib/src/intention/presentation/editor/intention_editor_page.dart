@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -77,7 +76,7 @@ final class _IntentionEditorPageState
   /// черновик остаются прежними.
   IntentionCreationSheetReveal? _failureReveal;
 
-  /// Попытка открытия одноразова, но её отказ может оставить форму в стеке.
+  /// Открытие созданного намерения одноразово: после него форма недоступна.
   var _routeState = _EditorRouteState.active;
 
   /// Объяснение критериев действия уже открыто.
@@ -420,15 +419,6 @@ final class _IntentionEditorPageState
       await context.router.push<void>(
         TagCatalogRoute(selectionContext: TagDraftContext(tagSet)),
       );
-    } catch (error, stack) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stack,
-          library: 'intention editor',
-          context: ErrorDescription('при открытии выбора тегов'),
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() => _isChoosingTags = false);
@@ -454,7 +444,7 @@ final class _IntentionEditorPageState
       return false;
     }
     switch (_routeState) {
-      case _EditorRouteState.active || _EditorRouteState.openingFailed:
+      case _EditorRouteState.active:
         final route = context.routeData;
         return context.router.stackData.any(
           (entry) => entry.matchId == route.matchId,
@@ -476,53 +466,14 @@ final class _IntentionEditorPageState
     if (router.stackData.lastOrNull?.matchId != route.matchId) {
       return;
     }
-    final history = router.stackData
-        .take(router.stackData.length - 1)
-        .map((entry) => entry.matchId)
-        .toList();
     _routeState = _EditorRouteState.openingCreatedIntention;
     ref.read(_provider.notifier).consumeEvent();
 
     // replace удаляет форму вместе с её диалогами, сохраняя исходную историю:
     // https://pub.dev/packages/auto_route/versions/11.1.0#navigating-between-screens
     // Future завершается при возврате со страницы; сессия его не ждёт.
-    // Future.sync отделяет даже синхронный отказ эффекта от успешной записи:
-    // https://api.dart.dev/dart-async/Future/Future.sync.html
     unawaited(
-      Future<void>.sync(
-        () => router.replace<void>(
-          IntentionDetailsRoute(intentionId: intentionId),
-        ),
-      ).catchError((Object error, StackTrace stack) {
-        if (listEquals(
-          router.stackData.map((entry) => entry.matchId).toList(),
-          history,
-        )) {
-          // replace мог удалить панель без уведомления. Показываем точную
-          // исходную историю; поздний отказ не трогает другие маршруты:
-          // https://pub.dev/documentation/auto_route/11.1.0/auto_route/RoutingController/notifyAll.html
-          router.notifyAll(forceUrlRebuild: true);
-        }
-        // Отказ разрешает только новый запрос ухода оставшейся формы.
-        // Захваченные router и route позволяют обойтись без её контекста.
-        if (mounted &&
-            _routeState == _EditorRouteState.openingCreatedIntention) {
-          _routeState =
-              router.stackData.any((entry) => entry.matchId == route.matchId)
-              ? _EditorRouteState.openingFailed
-              : _EditorRouteState.removed;
-        }
-        // Диагностика перехода не меняет результат и не повторяет создание:
-        // https://api.flutter.dev/flutter/foundation/FlutterError/reportError.html
-        FlutterError.reportError(
-          FlutterErrorDetails(
-            exception: error,
-            stack: stack,
-            library: 'intention editor',
-            context: ErrorDescription('при открытии созданного намерения'),
-          ),
-        );
-      }),
+      router.replace<void>(IntentionDetailsRoute(intentionId: intentionId)),
     );
   }
 
@@ -539,13 +490,8 @@ final class _IntentionEditorPageState
   };
 }
 
-/// Разделяет допуск действий, одноразовый эффект и выход после его отказа.
-enum _EditorRouteState {
-  active,
-  openingCreatedIntention,
-  openingFailed,
-  removed,
-}
+/// Разделяет допуск действий и одноразовый переход к созданному намерению.
+enum _EditorRouteState { active, openingCreatedIntention, removed }
 
 /// Где панель показывает отказ сохранения: под своим полем в прокручиваемых
 /// полях или в закреплённой области рядом с сохранением.

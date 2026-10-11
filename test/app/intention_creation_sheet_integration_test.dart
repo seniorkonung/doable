@@ -7,11 +7,10 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    show observeConfiguredLocalDatabaseConnection, openFileBackedLocalDatabase;
+    show openFileBackedLocalDatabase;
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
@@ -19,7 +18,6 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show
         IntentionCatalogCreated,
@@ -60,7 +58,6 @@ import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_creation_origin.dart';
-import '../support/intention_creation_storage_observer.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -163,99 +160,6 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// открывает навигацию после результата, а заранее загруженной и скрытой во
 /// время создания остаётся Главная.
 void main() {
-  // Отказы перехода при оставшейся форме, после открытия результата и после
-  // нового открытия формы проверяет тест страницы панели. Здесь — только
-  // отказ после удаления формы, который оставляет исходную историю без
-  // страниц создания.
-  testWidgets(
-    'отказ перехода после удаления панели над правкой намерения над черновиком связи сохраняет успех и новую сессию',
-    (tester) async {
-      const origin = IntentionCreationOrigin.deep;
-      final install = await _install(tester, const Locale('ru'));
-      final router = _FailingCreatedRouteRouter();
-      final storage = IntentionCreationStorageObserver(
-        snapshotGraph: _storedGraph,
-      );
-      final app = await _launch(
-        tester,
-        install,
-        seed: _seedGraph,
-        navigationRouter: router,
-        storage: storage,
-      );
-      await openIntentionGraph(tester, waitFor: _until);
-      final history = await origin.open(
-        tester,
-        router,
-        participantId: _intentionId(_walk),
-        waitFor: _until,
-      );
-      await _openSheet(tester, app);
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-editor-title')),
-        _title,
-      );
-      final staleClose = tester
-          .widget<IconButton>(
-            find.byKey(const ValueKey('intention-editor-close')),
-          )
-          .onPressed!;
-      storage.observeCreation();
-      storage.hold();
-      await _tap(tester, _submit);
-      await _waitFor(tester, () => storage.isHolding);
-      final errors = <FlutterErrorDetails>[];
-      final previousHandler = FlutterError.onError;
-      late IntentionCommandCompletion creation;
-      FlutterError.onError = errors.add;
-      try {
-        storage.release();
-        creation = await _creation(tester, app);
-        await _waitFor(tester, () => router.replacementAttempts == 1);
-        router.releaseFailure();
-        await _waitFor(tester, () => errors.isNotEmpty);
-        await tester.pumpAndSettle();
-      } finally {
-        FlutterError.onError = previousHandler;
-      }
-      expect(errors, hasLength(1));
-      expect(errors.single.exception, isA<StateError>());
-      final id = _createdId(creation);
-      _expectStoredIntention(
-        app.raw,
-        id,
-        title: _title,
-        description: null,
-        readiness: IntentionReadiness.notReady,
-      );
-      history.expectPrefix(router);
-      expect(_sheet, findsNothing);
-      history.expectRestored(tester, router);
-      await _acceptMessage(
-        tester,
-        app.l10n.graphOperationMessage(
-          app.l10n.graphOperationCreate,
-          _title,
-          app.l10n.editorCreated,
-        ),
-      );
-      await _openSheet(tester, app);
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-editor-title')),
-        'Новый черновик',
-      );
-      staleClose();
-      await tester.pumpAndSettle();
-      expect(router.current.name, IntentionEditorRoute.name);
-      expect(_text(tester, 'intention-editor-title'), 'Новый черновик');
-      expect(router.replacementAttempts, 1);
-      expect(app.completions.whereType<IntentionCommandCompletion>(), [
-        creation,
-      ]);
-      expect(find.byType(AlertDialog, skipOffstage: false), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-  );
   // Проверки читают системные строки из локализаций: второй язык не меняет
   // создание, согласование и чтение результата.
   for (final locale in const [Locale('ru')]) {
@@ -702,31 +606,22 @@ Future<_Launch> _launch(
   WidgetTester tester,
   _Install install, {
   void Function(sqlite.Database database)? seed,
-  RootStackRouter? navigationRouter,
-  IntentionCreationStorageObserver? storage,
 }) async {
   late sqlite.Database raw;
   final diagnostics = InMemoryDiagnosticsSink();
   final runtime = AppRuntime(
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
-    connectionFactory: () {
-      final connection = openFileBackedLocalDatabase(
-        install.harness.databaseFile,
-        setup: (database) => raw = database,
-      );
-      return storage == null
-          ? connection
-          : observeConfiguredLocalDatabaseConnection(connection, storage);
-    },
+    connectionFactory: () => openFileBackedLocalDatabase(
+      install.harness.databaseFile,
+      setup: (database) => raw = database,
+    ),
     diagnosticsSink: diagnostics,
   );
   addTearDown(() async {
-    storage?.release();
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
-  if (storage != null) storage.connection = raw;
   seed?.call(raw);
   final completions = <GraphCommandCompletion>[];
   final subscription = ready.container
@@ -734,25 +629,8 @@ Future<_Launch> _launch(
       .completions
       .listen(completions.add);
   addTearDown(subscription.cancel);
-  final RootStackRouter router =
-      navigationRouter ?? ready.container.read(appRouterProvider);
-  if (navigationRouter != null) addTearDown(navigationRouter.dispose);
-  await tester.pumpWidget(
-    navigationRouter == null
-        ? MainApp(runtime: runtime)
-        : UncontrolledProviderScope(
-            container: ready.container,
-            child: MaterialApp.router(
-              locale: Locale(install.l10n.localeName),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              routerConfig: router.config(),
-              builder: (context, child) => GraphOperationPresenter(
-                child: child ?? const SizedBox.shrink(),
-              ),
-            ),
-          ),
-  );
+  final router = ready.container.read(appRouterProvider);
+  await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
   await _waitFor(
     tester,
@@ -1647,31 +1525,4 @@ Future<void> _waitFor(
     await tester.pump(const Duration(milliseconds: 20));
   }
   expect(done(), isTrue, reason: reason?.call());
-}
-
-/// Настоящий стек приложения с отказом только открытия созданного намерения:
-/// как и `replace` в auto_route, переход сначала без уведомления удаляет
-/// панель, а отказ приходит после [releaseFailure].
-final class _FailingCreatedRouteRouter extends RootStackRouter {
-  final failure = StateError('Управляемый отказ открытия созданного намерения');
-  final _failureGate = Completer<void>();
-  var replacementAttempts = 0;
-
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-
-  void releaseFailure() => _failureGate.complete();
-
-  @override
-  Future<T?> replace<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    if (route.routeName != IntentionDetailsRoute.name) {
-      return super.replace<T>(route, onFailure: onFailure);
-    }
-    replacementAttempts++;
-    removeRoute(stackData.last, notify: false);
-    return _failureGate.future.then<T?>((_) => throw failure);
-  }
 }
