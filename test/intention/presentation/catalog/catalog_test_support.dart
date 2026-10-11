@@ -313,7 +313,6 @@ IntentionSummary testSummary({
   int? createdDay,
   int? updatedDay,
   List<Tag> tags = const [],
-  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
 }) {
   final encodedId =
       '018f0000-0000-7000-8000-${index.toString().padLeft(12, '0')}';
@@ -339,7 +338,6 @@ IntentionSummary testSummary({
     createdAt: createdAt,
     updatedAt: updatedAt,
     tags: tags,
-    favoriteMark: favoriteMark,
   );
 }
 

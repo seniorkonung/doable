@@ -1239,7 +1239,6 @@ _Package _creation(
       entry: _Entry(
         intention,
         readiness: IntentionReadiness.ready,
-        favoriteMark: FavoriteMark.favorite,
         tags: [
           for (final number in tagNumbers) _tag('Тег $number', id: number),
         ],
@@ -1261,7 +1260,6 @@ final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
   _Entry(
     TaggedIntention intention, {
     IntentionReadiness readiness = IntentionReadiness.notReady,
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
     List<Tag> tags = const [],
   }) : summary = IntentionSummary(
          id: intention.id,
@@ -1273,7 +1271,6 @@ final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),
          tags: tags,
-         favoriteMark: favoriteMark,
        );
 
   @override

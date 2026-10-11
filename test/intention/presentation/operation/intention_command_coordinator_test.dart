@@ -907,7 +907,6 @@ _confirmedFullCreatedResult(GraphRevision revision) {
             id,
             title: 'Полное намерение',
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
             tags: tags,
           ),
         ),
@@ -1189,7 +1188,6 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
     IntentionId id, {
     String title = 'Намерение',
     IntentionReadiness readiness = IntentionReadiness.notReady,
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
     List<Tag> tags = const [],
   }) : summary = IntentionSummary(
          id: id,
@@ -1201,7 +1199,6 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),
          tags: tags,
-         favoriteMark: favoriteMark,
        );
 
   @override

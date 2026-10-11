@@ -721,7 +721,6 @@ void main() {
       title: title,
       readiness: IntentionReadiness.ready,
       tags: tags,
-      favoriteMark: FavoriteMark.favorite,
     );
 
     // Готовность при выборе действия проверяет создание через настоящий

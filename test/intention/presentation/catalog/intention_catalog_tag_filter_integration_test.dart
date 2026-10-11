@@ -1302,13 +1302,7 @@ IntentionId _createdId(IntentionCommandCompletion completion) =>
 /// состояния.
 List<List<Object?>> _contents(List<IntentionSummary> items) => [
   for (final item in items)
-    [
-      item.id,
-      item.title,
-      item.readiness,
-      item.favoriteMark,
-      ...item.tags.map((tag) => tag.id),
-    ],
+    [item.id, item.title, item.readiness, ...item.tags.map((tag) => tag.id)],
 ];
 
 /// Читает всю выдачу [query] заново настоящим адаптером.

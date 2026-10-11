@@ -740,7 +740,6 @@ final class _PathRepository
             archivedCanIncoming: 0,
             archivedCanOutgoing: 0,
           ),
-          favoriteMark: FavoriteMark.notFavorite,
         ),
         revision: _Revision(revision),
       ),

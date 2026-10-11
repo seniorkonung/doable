@@ -1264,7 +1264,6 @@ void main() {
               index: 1,
               title: 'Архивное первое',
               archiveState: IntentionArchiveState.archived,
-              favoriteMark: FavoriteMark.favorite,
             ),
             testSummary(
               index: 2,

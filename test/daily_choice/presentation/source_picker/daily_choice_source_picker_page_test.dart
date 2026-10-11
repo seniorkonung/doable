@@ -132,7 +132,6 @@ void main() {
             index: 2,
             title: 'Гулять',
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
           ),
           testSummary(
             index: 3,

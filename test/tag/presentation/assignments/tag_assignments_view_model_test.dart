@@ -529,7 +529,6 @@ final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
         createdAt: IntentionTimestamp(DateTime.utc(2026)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
         tags: tags,
-        favoriteMark: FavoriteMark.notFavorite,
       );
 
   @override

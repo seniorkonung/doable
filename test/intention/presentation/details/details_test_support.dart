@@ -55,7 +55,6 @@ final class ControlledDetailRequest {
     Result<Intention?> result, {
     GraphRevision revision = const TestDetailsRevision(0),
     RelationCounts? relationCounts,
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
   }) {
     final snapshotResult = switch (result) {
       ResultSuccess(:final value) =>
@@ -66,7 +65,6 @@ final class ControlledDetailRequest {
                 : IntentionDetails(
                     intention: value,
                     relationCounts: relationCounts ?? testRelationCounts(),
-                    favoriteMark: favoriteMark,
                   ),
             revision: revision,
           ),
@@ -387,7 +385,6 @@ IntentionId testDetailsIntentionId(int index) {
 IntentionSummary testDetailsSummary(
   Intention intention, {
   int activeRelationCount = 0,
-  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
 }) => IntentionSummary(
   id: intention.id,
   title: intention.title,
@@ -397,7 +394,6 @@ IntentionSummary testDetailsSummary(
   activeRelationCount: activeRelationCount,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
-  favoriteMark: favoriteMark,
 );
 
 RelationCounts testRelationCounts({
@@ -442,21 +438,13 @@ Result<IntentionCommandSuccess> testDetailsSavedResult(
   Intention? before,
   GraphRevision revision = const TestDetailsRevision(0),
   Iterable<GraphChange> additionalChanges = const [],
-  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
-  FavoriteMark beforeFavoriteMark = FavoriteMark.notFavorite,
 }) {
-  final afterSnapshot = _DetailsCatalogEntrySnapshot(
-    intention,
-    favoriteMark: favoriteMark,
-  );
+  final afterSnapshot = _DetailsCatalogEntrySnapshot(intention);
   final mutation = before == null
       ? IntentionCatalogUnchanged(revision: revision, entry: afterSnapshot)
       : IntentionCatalogUpdated(
           revision: revision,
-          before: _DetailsCatalogEntrySnapshot(
-            before,
-            favoriteMark: beforeFavoriteMark,
-          ),
+          before: _DetailsCatalogEntrySnapshot(before),
           after: afterSnapshot,
         );
   return ResultSuccess(
@@ -483,10 +471,8 @@ Result<IntentionCommandSuccess> testDetailsDeletedResult(
 
 final class _DetailsCatalogEntrySnapshot
     implements IntentionCatalogEntrySnapshot {
-  _DetailsCatalogEntrySnapshot(
-    Intention intention, {
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
-  }) : summary = testDetailsSummary(intention, favoriteMark: favoriteMark);
+  _DetailsCatalogEntrySnapshot(Intention intention)
+    : summary = testDetailsSummary(intention);
 
   @override
   final IntentionSummary summary;

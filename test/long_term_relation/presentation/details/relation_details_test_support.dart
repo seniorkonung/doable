@@ -128,11 +128,7 @@ final class ControlledRelationDetailsRepository
   }) => _intentionControllerFor(intention.id).add(
     ResultSuccess(
       GraphSnapshot(
-        value: IntentionDetails(
-          intention: intention,
-          relationCounts: counts,
-          favoriteMark: FavoriteMark.notFavorite,
-        ),
+        value: IntentionDetails(intention: intention, relationCounts: counts),
         revision: revision,
       ),
     ),

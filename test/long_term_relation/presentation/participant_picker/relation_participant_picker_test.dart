@@ -150,11 +150,7 @@ void main() {
       expect(repository.queryAt(1).titleFilter, isNull);
       expect(repository.queryAt(1).tagFilter, IntentionTagFilter.empty);
       _completePage(repository, 1, [
-        testSummary(
-          index: 1,
-          title: 'Гулять',
-          favoriteMark: FavoriteMark.favorite,
-        ),
+        testSummary(index: 1, title: 'Гулять'),
         testSummary(index: 2, title: 'Гулять'),
       ]);
       await tester.pumpAndSettle();

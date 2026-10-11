@@ -1922,7 +1922,7 @@ ConfirmedGraphResult<IntentionCommandSuccess> _confirmedCommand(
       .value;
 }
 
-/// Наблюдаемые поля сводки каталога, включая собственные теги и отметку.
+/// Наблюдаемые поля сводки каталога, включая собственные теги.
 List<Object?> _summaryFacts(IntentionSummary summary) => [
   summary.id,
   summary.title,
@@ -1933,7 +1933,6 @@ List<Object?> _summaryFacts(IntentionSummary summary) => [
   summary.createdAt,
   summary.updatedAt,
   [for (final tag in summary.tags) (tag.id, tag.name.value)],
-  summary.favoriteMark,
 ];
 
 Future<TagAssignmentsSnapshot> _tagAssignments(

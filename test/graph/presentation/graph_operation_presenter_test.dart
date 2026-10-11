@@ -1878,12 +1878,7 @@ final class _PresenterHarness {
           intention,
           catalogMutation: IntentionCatalogCreated(
             revision: revision,
-            entry: _CreatedCatalogEntrySnapshot(
-              testDetailsSummary(
-                intention,
-                favoriteMark: FavoriteMark.favorite,
-              ),
-            ),
+            entry: _CreatedCatalogEntrySnapshot(testDetailsSummary(intention)),
           ),
           additionalChanges: [
             for (final tagId in [_tagId, _otherTagId])

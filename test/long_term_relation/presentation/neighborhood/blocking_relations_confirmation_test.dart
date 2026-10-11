@@ -1234,7 +1234,6 @@ final class _CommandRepository
         value: IntentionDetails(
           intention: testNeighborhoodIntention(id: id),
           relationCounts: testRelationCounts(),
-          favoriteMark: FavoriteMark.notFavorite,
         ),
         revision: const TestGraphRevision(1),
       ),

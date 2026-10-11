@@ -2438,7 +2438,6 @@ ResultSuccess<IntentionSaved> _savedResult({required String title}) {
             activeRelationCount: 0,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
-            favoriteMark: FavoriteMark.notFavorite,
           ),
         ),
       ),

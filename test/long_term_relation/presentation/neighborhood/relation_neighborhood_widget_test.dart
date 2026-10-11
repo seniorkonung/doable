@@ -857,7 +857,6 @@ void main() {
       testNeighborhoodIntention(id: ownerId, title: 'Моё намерение'),
       counts: counts,
       revision: revision,
-      favoriteMark: FavoriteMark.favorite,
     );
     repository.completePage(
       0,
