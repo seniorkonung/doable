@@ -1,7 +1,6 @@
 import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
-import '../../daily_choice/application/choice_path_suggestions.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../favorite/application/favorite_intentions.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -26,18 +25,6 @@ abstract interface class GraphCommandRepository {
 
 abstract interface class PersonalGraphRepository
     implements GraphCommandRepository, TagReadContract, FavoriteReadContract {
-  /// Читает подсказки для исходного намерения либо выбранного действия на
-  /// одной ревизии. Выборка ограничена последними 20 выборами участника по
-  /// порядку создания до устранения повторов; возвращается до пяти разных
-  /// текущих маршрутов с наиболее новым представителем каждого. Дата и
-  /// выполнение не участвуют в отборе. Пустой успех, отсутствие участника и
-  /// отказ чтения различны; повреждение любого кандидата отклоняет всё чтение.
-  /// Чтение не меняет граф. Допустимость предложения повторно проверяется
-  /// командой сохранения. SQL и технический порядок остаются за репозиторием.
-  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
-    ChoicePathSuggestionsQuery query,
-  );
-
   /// Проверяет весь направленный черновик на одном снимке графа. Ноль шагов
   /// допустим, но не подтверждаем. Для нижнего обхода начало — фиксированное
   /// активное готовое действие, а текущее намерение — возможное основание
