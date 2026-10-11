@@ -36,12 +36,6 @@ CREATE INDEX daily_choices_source_date_creation_order
 CREATE INDEX daily_choices_selected_date_creation_order
   ON daily_choices (selected_intention_id, choice_date, creation_sequence);
 
-CREATE INDEX daily_choices_source_recent
-  ON daily_choices (source_intention_id, creation_sequence DESC);
-
-CREATE INDEX daily_choices_selected_recent
-  ON daily_choices (selected_intention_id, creation_sequence DESC);
-
 CREATE TRIGGER daily_choices_immutable_identity
 AFTER UPDATE OF creation_sequence, id ON daily_choices
 WHEN

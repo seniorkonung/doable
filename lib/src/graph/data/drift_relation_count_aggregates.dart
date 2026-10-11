@@ -189,14 +189,16 @@ String _aggregateSql(String requestedValues) =>
   daily_sources AS (
     SELECT requested.owner_id, COUNT(*) AS daily_source
     FROM requested
-    JOIN daily_choices AS choice INDEXED BY daily_choices_source_recent
+    JOIN daily_choices AS choice
+      INDEXED BY daily_choices_source_date_creation_order
       ON choice.source_intention_id = requested.owner_id
     GROUP BY requested.owner_id
   ),
   daily_selected AS (
     SELECT requested.owner_id, COUNT(*) AS daily_selected
     FROM requested
-    JOIN daily_choices AS choice INDEXED BY daily_choices_selected_recent
+    JOIN daily_choices AS choice
+      INDEXED BY daily_choices_selected_date_creation_order
       ON choice.selected_intention_id = requested.owner_id
     GROUP BY requested.owner_id
   )

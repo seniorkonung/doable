@@ -3021,14 +3021,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'daily_choices_selected_date_creation_order',
     'CREATE INDEX daily_choices_selected_date_creation_order ON daily_choices (selected_intention_id, choice_date, creation_sequence)',
   );
-  late final Index dailyChoicesSourceRecent = Index(
-    'daily_choices_source_recent',
-    'CREATE INDEX daily_choices_source_recent ON daily_choices (source_intention_id, creation_sequence DESC)',
-  );
-  late final Index dailyChoicesSelectedRecent = Index(
-    'daily_choices_selected_recent',
-    'CREATE INDEX daily_choices_selected_recent ON daily_choices (selected_intention_id, creation_sequence DESC)',
-  );
   late final Trigger dailyChoicesImmutableIdentity = Trigger(
     'CREATE TRIGGER daily_choices_immutable_identity AFTER UPDATE OF creation_sequence, id ON daily_choices WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'daily choice identity is immutable\');END',
     'daily_choices_immutable_identity',
@@ -3115,8 +3107,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     dailyChoicesDateCreationOrder,
     dailyChoicesSourceDateCreationOrder,
     dailyChoicesSelectedDateCreationOrder,
-    dailyChoicesSourceRecent,
-    dailyChoicesSelectedRecent,
     dailyChoicesImmutableIdentity,
     longTermRelations,
     dailyChoicePathSteps,
