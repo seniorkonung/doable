@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -8,9 +7,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_suggestions_state.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_suggestions_view_model.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
@@ -65,11 +61,10 @@ final class PackageConsumerProbe {
 /// Потребители подтверждённых пакетов вне поиска на настоящем хранилище:
 /// наблюдения прикладной границы и модели открытых представлений.
 final class PackageConsumerProbes {
-  PackageConsumerProbes(this._container, this._repository, this._coordinator);
+  PackageConsumerProbes(this._container, this._repository);
 
   final ProviderContainer _container;
   final DriftPersonalGraphRepository _repository;
-  final GraphCommandCoordinator _coordinator;
   final all = <PackageConsumerProbe>[];
   final _subscriptions = <StreamSubscription<Object?>>[];
   final _providerSubscriptions = <ProviderSubscription<Object?>>[];
@@ -362,40 +357,6 @@ final class PackageConsumerProbes {
     });
   }
 
-  void choicePathSuggestions(ChoicePathSuggestionsQuery query) {
-    final probe = _add('предложения пути', observes: true);
-    final model = ChoicePathSuggestionsViewModel.fromCoordinator(
-      _repository,
-      _coordinator,
-      query,
-    );
-    _notifiers.add(model);
-    model.addListener(() {
-      final state = model.state;
-      switch (state) {
-        case ChoicePathSuggestionsCurrent():
-          probe
-            ..loaded = true
-            ..content = () => _suggestionsContent(state.items);
-          final order = probe.revision == null
-              ? null
-              : state.revision.compareTo(probe.revision!);
-          if (order != null && order != GraphRevisionOrder.same) {
-            probe.updates += 1;
-          }
-          probe.revision = state.revision;
-        case ChoicePathSuggestionsUpdating():
-          break;
-        case ChoicePathSuggestionsLoading():
-          if (probe.loaded) probe.forbiddenStates.add(state);
-        case ChoicePathSuggestionsRefreshFailure() ||
-            ChoicePathSuggestionsNotFound() ||
-            ChoicePathSuggestionsLoadFailure():
-          probe.forbiddenStates.add(state);
-      }
-    });
-  }
-
   bool get allLoaded => all.every((probe) => probe.loaded);
 
   /// Каталог дневных выборов загружен для явно выбранного дня выбора
@@ -570,16 +531,6 @@ Object _neighborhoodContent(RelationGroupConfirmedState state) => [
     ],
     RelationGroupEmpty() => const [],
   },
-];
-
-Object _suggestionsContent(List<AvailableChoicePathSuggestion> items) => [
-  for (final item in items)
-    [
-      item.originChoiceId,
-      _intention(item.source),
-      _intention(item.action),
-      _pathContent(item.path),
-    ],
 ];
 
 Future<void> quiescePackageConsumers() async {
