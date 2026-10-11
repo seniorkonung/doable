@@ -19,7 +19,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/daily_choice/presentation/path/choice_path_suggestions_view.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `test/daily_choice/presentation/path/choice_path_suggestions_view_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
   - **Объём:** M.
 
-- [ ] 1.3 Сократить выход из создания до оставшихся страниц собственного потока
+- [x] 1.3 Сократить выход из создания до оставшихся страниц собственного потока
   - **Критерии приёмки:**
     - Из действия выхода и обработчика завершения удалены параметр `previewRoute` и ветви владения предпросмотром.
     - Сохраняются проверки принадлежности страниц потоку и наличия безымянной страницы сверху, необходимые при открытом диалоге; обычный возврат, отмена и поздний результат следуют решению 3 дизайна и навигационному контексту из [ADR-манифеста](adr.md).
