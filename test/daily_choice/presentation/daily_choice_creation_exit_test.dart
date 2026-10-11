@@ -35,7 +35,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
-enum _Step { path, preview, confirmation }
+enum _Step { path, confirmation }
 
 void main() {
   setUp(() {
@@ -123,8 +123,7 @@ void main() {
   // наборе.
   for (final (direction, step) in [
     (ChoicePathDraftDirection.topDown, _Step.path),
-    (ChoicePathDraftDirection.bottomUp, _Step.preview),
-    (ChoicePathDraftDirection.topDown, _Step.confirmation),
+    (ChoicePathDraftDirection.bottomUp, _Step.confirmation),
   ]) {
     testWidgets(
       'отмена $direction из $step сохраняет историю и чужой черновик',
@@ -224,7 +223,7 @@ void main() {
     },
   );
   testWidgets(
-    'прежние действия пути и подсказки ChoicePathDraftDirection.topDown не закрывают другую верхнюю страницу',
+    'прежнее действие пути ChoicePathDraftDirection.topDown не закрывает подтверждение',
     (tester) async {
       final app = await _launch(
         tester,
@@ -234,18 +233,8 @@ void main() {
       final rootExit = tester
           .widget<CreationExitAction>(find.byType(CreationExitAction))
           .onExit;
-      await _tap(tester, 'choice-suggestion-view-0');
-      final previewExit = tester
-          .widget<CreationExitAction>(find.byType(CreationExitAction))
-          .onExit;
+      await _confirmPath(tester, ChoicePathDraftDirection.topDown);
       rootExit();
-      expect(app.router.pagelessRoutesObserver.hasPagelessTopRoute, isTrue);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      previewExit();
-      await _tap(tester, 'choice-suggestion-select-0');
-      rootExit();
-      previewExit();
       expect(app.router.current.name, DailyChoiceCreationRoute.name);
       tester
           .widget<CreationExitAction>(find.byType(CreationExitAction))
@@ -257,16 +246,13 @@ void main() {
     },
   );
   testWidgets(
-    'назад из подсказки и подтверждения ChoicePathDraftDirection.bottomUp сохраняет поток',
+    'назад из подтверждения ChoicePathDraftDirection.bottomUp сохраняет поток',
     (tester) async {
       final app = await _launch(
         tester,
         ChoicePathDraftDirection.bottomUp,
-        _Step.preview,
+        _Step.confirmation,
       );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      await _tap(tester, 'choice-suggestion-select-0');
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
         'Черновик подтверждения',
@@ -277,7 +263,8 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(app.router.current.name, ChoicePathRoute.name);
-      await _tap(tester, 'choice-suggestion-select-0');
+      await _tap(tester, 'choice-path-select-source');
+      await _tap(tester, 'choice-path-open-confirmation');
       tester
           .widget<CreationExitAction>(find.byType(CreationExitAction))
           .onExit();
@@ -380,13 +367,30 @@ Future<_App> _launch(
   switch (step) {
     case _Step.path:
       break;
-    case _Step.preview:
-      await _tap(tester, 'choice-suggestion-view-0');
     case _Step.confirmation:
-      await _tap(tester, 'choice-suggestion-select-0');
+      await _confirmPath(tester, direction);
       expect(find.byType(DailyChoiceCreationPage), findsOneWidget);
   }
   return _App(router, database, repository, history, completions);
+}
+
+Future<void> _confirmPath(
+  WidgetTester tester,
+  ChoicePathDraftDirection direction,
+) async {
+  for (final relation
+      in direction == ChoicePathDraftDirection.topDown
+          ? [101, 102]
+          : [102, 101]) {
+    await _tap(tester, 'choice-path-continue-${durabilityUuid(relation)}');
+  }
+  await _tap(
+    tester,
+    direction == ChoicePathDraftDirection.topDown
+        ? 'choice-path-select-action'
+        : 'choice-path-select-source',
+  );
+  await _tap(tester, 'choice-path-open-confirmation');
 }
 
 Future<void> _tap(WidgetTester tester, String key) async {

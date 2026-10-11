@@ -166,7 +166,7 @@ final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
 
 void main() {
   testWidgets(
-    'повтор по подсказке завершается после ухода, смены фокуса и повторного открытия',
+    'создание снизу вверх завершается после ухода, смены фокуса и повторного открытия',
     (tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
@@ -215,7 +215,19 @@ void main() {
       await _tap(tester, find.text('Намерение 3'));
       await _tap(
         tester,
-        find.byKey(const ValueKey('choice-suggestion-select-0')),
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
       await _until(
         tester,
