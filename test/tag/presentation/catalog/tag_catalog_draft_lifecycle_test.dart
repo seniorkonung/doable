@@ -86,8 +86,7 @@ void main() {
         await tester.tap(_editorSubmit);
         await tester.pumpAndSettle();
         final tagClaim = await presenter.nextClaim();
-        expect(tagClaim!.completion, isA<TagCommandCompletion>());
-        host.coordinator.confirmPresentation(tagClaim);
+        expect(tagClaim!.completions.single, isA<TagCommandCompletion>());
         final created = repository.tagNamed('Домашнее');
 
         expect(host.router.current.name, TagCatalogRoute.name);
@@ -98,6 +97,10 @@ void main() {
           findsOneWidget,
         );
         _expectFirstDraft(first.state, tagIds: [_home.id]);
+        host.coordinator.confirmAppPresentation(
+          tagClaim,
+          tagClaim.completions.map((completion) => completion.token),
+        );
         await tester.tap(_addToDraft);
         await tester.pump();
         expect(first.tagSet.current.tagIds, [_home.id, created.id]);
@@ -187,14 +190,13 @@ void main() {
         await tester.pumpAndSettle();
         final claim = await presenter.nextClaim();
         expect(
-          claim!.completion,
+          claim!.completions.single,
           isA<IntentionCommandCompletion>().having(
             (completion) => completion.result,
             'результат',
             outcome.matcher,
           ),
         );
-        host.coordinator.confirmPresentation(claim);
 
         final afterOutcome = second.state;
         expect(afterOutcome.operation, isA<OperationIdle<Intention>>());
@@ -214,6 +216,10 @@ void main() {
         expect(
           find.descendant(of: _editorName, matching: find.text('Дача')),
           findsOneWidget,
+        );
+        host.coordinator.confirmAppPresentation(
+          claim,
+          claim.completions.map((completion) => completion.token),
         );
 
         // Отмена редактора возвращает то же открытие с прежними поиском и

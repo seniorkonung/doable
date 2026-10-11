@@ -101,7 +101,12 @@ void main() {
         repository.fail(const TagUnavailableFailure());
         await tester.pumpAndSettle();
         // Оболочка показывает отказ первой отправки и подтверждает показ.
-        coordinator.confirmPresentation((await firstClaim)!);
+        final claim = (await firstClaim)!;
+        expect(claim.completions.single.isFailure, isTrue);
+        coordinator.confirmAppPresentation(
+          claim,
+          claim.completions.map((completion) => completion.token),
+        );
         await tester.pump();
         expect(notice, findsNothing);
         expect(
@@ -176,6 +181,18 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     expect(fallback, isNotNull);
+    expect(
+      fallback!.completions.single,
+      isA<TagCommandCompletion>().having(
+        (completion) => completion.confirmedResult,
+        'результат',
+        isA<TagCommandFailed>().having(
+          (result) => result.failure,
+          'ошибка',
+          isA<TagNameOccupiedFailure>(),
+        ),
+      ),
+    );
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   });
 }
