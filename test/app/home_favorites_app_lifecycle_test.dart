@@ -72,8 +72,9 @@ const _freeRelation = 102;
 /// действия и исходного намерения.
 const _openChoice = 201;
 
-/// Идентификатор, которому не соответствует ни одно намерение.
-const _missing = 99;
+/// Архивированное избранное намерение с названием, которое не проходит
+/// проверку при чтении списка Главной.
+const _corrupted = 99;
 
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
@@ -83,9 +84,10 @@ void main() {
   // home_accessibility_test.
   const locale = Locale('ru');
 
-  testWidgets('место без существующего намерения даёт на Главной отдельное '
-      'неповторяемое повреждение, а каталог намерений, поиски и страница '
-      'намерения продолжают работать с целостными отметками', (tester) async {
+  testWidgets('сохранённые данные избранного, не прошедшие проверку, дают на '
+      'Главной отдельное неповторяемое повреждение, а каталог намерений, '
+      'поиски и страница намерения продолжают работать с целостными '
+      'отметками', (tester) async {
     final install = await _install(tester, locale);
     final l10n = install.l10n;
     final app = await _launch(
@@ -93,19 +95,32 @@ void main() {
       install,
       seed: (database) {
         _seedGraph(database, favorites: const [_walk, _read]);
-        storeFavoritePlaceWithoutIntention(
+        // Название с пробелами по краям приложение не сохраняет, а схема
+        // допускает.
+        database.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            tagFixtureId(_corrupted),
+            ' Повреждённое ',
+            0,
+            1,
+            _corrupted,
+            _corrupted,
+          ],
+        );
+        storeFavoriteMark(
           database,
-          intentionId: tagFixtureId(_missing),
+          intentionId: tagFixtureId(_corrupted),
           position: 3,
         );
       },
     );
     _expectCorruption(tester, l10n);
-    // Повреждение не исправляется: место без намерения остаётся.
+    // Повреждение не исправляется: отметка остаётся.
     final marks = [
       (tagFixtureId(_walk), 1),
       (tagFixtureId(_read), 2),
-      (tagFixtureId(_missing), 3),
+      (tagFixtureId(_corrupted), 3),
     ];
     expect(storedFavoriteMarks(app.raw), marks);
 

@@ -132,30 +132,6 @@ void main() {
       ]);
     });
   });
-
-  group('Диагностика этапа и исхода', () {
-    test('недопустимое место сохранённой отметки — повреждение на этапе '
-        'проверки без записи', () async {
-      _insertIntention(raw, number: 1, title: 'CANARY-первое');
-      storeFavoriteMarkWithInvalidPosition(
-        raw,
-        intentionId: _uuid(1),
-        position: 0,
-      );
-
-      final result = await repository.execute(UnmarkIntentionFavorite(_id(1)));
-
-      expect(result, _failure(isA<IntentionCorruptionFailure>()));
-      expect(_storedMarks(raw), [(_uuid(1), 0)]);
-      expect(diagnostics.commandEvents, [
-        _failedCommand(
-          IntentionCommandDiagnosticsType.unmarkFavorite,
-          FavoriteMarkCommandDiagnosticsStage.validation,
-          DiagnosticsFailureCode.corruption,
-        ),
-      ]);
-    });
-  });
 }
 
 final _busy = sqlite.SqliteException(

@@ -246,8 +246,8 @@ void main() {
   test(
     'обнаруживает повреждение до фильтрации групп без частичной выдачи',
     () async {
-      await database.customStatement('PRAGMA ignore_check_constraints = ON');
-      await database.customStatement('PRAGMA foreign_keys = OFF');
+      // Каждое повреждение схема пропускает: формат и тип идентификаторов она
+      // не проверяет, а описание связи проверяет только на NUL.
       final owners = <String>[];
 
       Future<(String, String)> participants(int fixture) async {
@@ -277,43 +277,7 @@ void main() {
         relatedId: invalidParticipantId.$1,
       );
 
-      final invalidType = await participants(2);
-      await _insertRawRelation(
-        database,
-        id: _uuid(901),
-        sourceId: invalidType.$1,
-        relatedId: invalidType.$2,
-        type: 'other',
-      );
-
-      final invalidPriorityStorage = await participants(3);
-      await _insertRawRelation(
-        database,
-        id: _uuid(902),
-        sourceId: invalidPriorityStorage.$1,
-        relatedId: invalidPriorityStorage.$2,
-        priority: Uint8List.fromList([1]),
-      );
-
-      final invalidArchiveStorage = await participants(4);
-      await _insertRawRelation(
-        database,
-        id: _uuid(903),
-        sourceId: invalidArchiveStorage.$1,
-        relatedId: invalidArchiveStorage.$2,
-        isArchived: Uint8List.fromList([0]),
-      );
-
-      final invalidSequence = await participants(5);
-      await _insertRawRelation(
-        database,
-        creationSequence: -1,
-        id: _uuid(904),
-        sourceId: invalidSequence.$1,
-        relatedId: invalidSequence.$2,
-      );
-
-      final whitespaceDescription = await participants(6);
+      final whitespaceDescription = await participants(2);
       await _insertRawRelation(
         database,
         id: _uuid(905),
@@ -322,7 +286,7 @@ void main() {
         description: ' \n\t ',
       );
 
-      final malformedUtf8Description = await participants(7);
+      final malformedUtf8Description = await participants(3);
       await database.customStatement(
         '''
           INSERT INTO long_term_relations (
@@ -338,19 +302,7 @@ void main() {
         [_uuid(906), malformedUtf8Description.$1, malformedUtf8Description.$2],
       );
 
-      final missingParticipant = await participants(8);
-      await database.customStatement('DELETE FROM intentions WHERE id = ?', [
-        missingParticipant.$2,
-      ]);
-      await _insertRawRelation(
-        database,
-        id: _uuid(907),
-        sourceId: missingParticipant.$1,
-        relatedId: missingParticipant.$2,
-        isArchived: 1,
-      );
-
-      final relationIdStorage = await participants(9);
+      final relationIdStorage = await participants(4);
       await _insertRawRelation(
         database,
         id: Uint8List.fromList(utf8.encode(_uuid(908))),
@@ -358,7 +310,7 @@ void main() {
         relatedId: relationIdStorage.$2,
       );
 
-      final participantIdStorage = await participants(10);
+      final participantIdStorage = await participants(5);
       final blobParticipantId = Uint8List.fromList(utf8.encode(_uuid(909)));
       await _insertRawIntention(database, blobParticipantId);
       await _insertRawRelation(
@@ -366,51 +318,6 @@ void main() {
         id: _uuid(910),
         sourceId: participantIdStorage.$1,
         relatedId: blobParticipantId,
-      );
-
-      final typeStorage = await participants(11);
-      await _insertRawRelation(
-        database,
-        id: _uuid(911),
-        sourceId: typeStorage.$1,
-        relatedId: typeStorage.$2,
-        type: Uint8List.fromList(utf8.encode('need')),
-      );
-
-      final descriptionStorage = await participants(12);
-      await _insertRawRelation(
-        database,
-        id: _uuid(912),
-        sourceId: descriptionStorage.$1,
-        relatedId: descriptionStorage.$2,
-        description: Uint8List.fromList(utf8.encode('Описание')),
-      );
-
-      final invalidParticipantState = await participants(13);
-      await _insertRawRelation(
-        database,
-        id: _uuid(913),
-        sourceId: invalidParticipantState.$1,
-        relatedId: invalidParticipantState.$2,
-      );
-      await database.customStatement(
-        'UPDATE intentions SET is_archived = 2 WHERE id = ?',
-        [invalidParticipantState.$2],
-      );
-
-      final archivedActiveParticipant = await participants(14);
-      await _insertRawRelation(
-        database,
-        id: _uuid(914),
-        sourceId: archivedActiveParticipant.$1,
-        relatedId: archivedActiveParticipant.$2,
-      );
-      await database.customStatement(
-        'DROP TRIGGER intentions_archive_requires_no_active_relations',
-      );
-      await database.customStatement(
-        'UPDATE intentions SET is_archived = 1 WHERE id = ?',
-        [archivedActiveParticipant.$2],
       );
 
       final result = await aggregates.read(owners.map(_id));
@@ -537,18 +444,13 @@ Future<void> _insertStep(
 
 Future<void> _insertRawRelation(
   AppDatabase database, {
-  int? creationSequence,
   required Object id,
   required Object sourceId,
   required Object relatedId,
-  Object type = 'need',
-  Object priority = 1,
   Object? description,
-  Object isArchived = 0,
 }) => database.customStatement(
   '''
     INSERT INTO long_term_relations (
-      ${creationSequence == null ? '' : 'creation_sequence,'}
       id,
       source_intention_id,
       related_intention_id,
@@ -556,21 +458,9 @@ Future<void> _insertRawRelation(
       priority,
       description,
       is_archived
-    ) VALUES (
-      ${creationSequence == null ? '' : '?,'}
-      ?, ?, ?, ?, ?, ?, ?
-    )
+    ) VALUES (?, ?, ?, 'need', 1, ?, 0)
   ''',
-  [
-    ?creationSequence,
-    id,
-    sourceId,
-    relatedId,
-    type,
-    priority,
-    description,
-    isArchived,
-  ],
+  [id, sourceId, relatedId, description],
 );
 
 String _uuid(int suffix) =>

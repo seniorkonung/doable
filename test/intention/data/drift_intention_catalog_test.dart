@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
-import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -1057,8 +1056,8 @@ void main() {
     );
 
     // По одному случаю на проверку чтения: начальный BOM, разбор
-    // идентификатора, каноничность названия и порядок назначения (выше нуля и
-    // совпадение с порядком тега). Прочие варианты проходят те же проверки.
+    // идентификатора и порядок назначения (выше нуля и совпадение с порядком
+    // тега). Прочие варианты проходят те же проверки.
     for (final (label, corrupt) in <(String, void Function(Database))>[
       (
         'начальный BOM в идентификаторе тега',
@@ -1097,26 +1096,6 @@ void main() {
           );
         },
       ),
-      for (final (reason, invalidName) in <(String, Object)>[
-        ('окружающие пробелы', ' Дом '),
-      ])
-        (
-          'недопустимое название: $reason',
-          (connection) {
-            connection.execute('PRAGMA ignore_check_constraints = ON');
-            connection.createFunction(
-              functionName: tagNameKeyFunctionName,
-              argumentCount: const AllowedArgumentCount(1),
-              deterministic: true,
-              directOnly: false,
-              function: (_) => 'повреждённый ключ',
-            );
-            connection.execute('UPDATE tags SET name = ? WHERE id = ?', [
-              invalidName,
-              _uuid(firstTagNumber),
-            ]);
-          },
-        ),
       for (final order in <Object>[0, 1000])
         (
           'несогласованный порядок назначения $order',
@@ -1663,56 +1642,64 @@ void main() {
       everyElement(isTrue),
     );
 
+    // Схема пропускает все три значения: описание она проверяет только на NUL
+    // и на отсутствие одних ASCII-пробелов, а длину не ограничивает.
     final invalidDescriptions = [
-      'недопустимый\u0000NUL',
-      '',
-      ' \t\r\n ',
       '\u00a0',
       '\ufeff',
       List.filled(4097, 'а').join(),
     ];
-    await database.customStatement('PRAGMA ignore_check_constraints = ON');
-    for (var index = 0; index < invalidDescriptions.length; index++) {
+    for (final (index, description) in invalidDescriptions.indexed) {
+      final id =
+          '018f0b5d-6b2e-7c80-8000-${(0x73 + index).toRadixString(16).padLeft(12, '0')}';
       await _insertIntention(
         database,
-        id: '018f0b5d-6b2e-7c80-8000-${(0x73 + index).toRadixString(16).padLeft(12, '0')}',
+        id: id,
         title: 'Повреждённое описание $index',
-        description: invalidDescriptions[index],
+        description: description,
         createdAt: DateTime.utc(2026, 9, 3, index),
       );
-    }
-    await database.customStatement('PRAGMA ignore_check_constraints = OFF');
 
-    final result = await repository.getCatalogPage(
-      IntentionCatalogQuery(
-        scope: IntentionScope.active,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 10,
-      ),
-    );
-
-    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-    expect(
-      (result as ResultFailure<IntentionCatalogPage>).failure,
-      isA<IntentionCorruptionFailure>(),
-    );
-    expect(
-      diagnostics.events.last,
-      isA<CatalogPageReadDiagnosticsEvent>().having(
-        (event) => event.status,
-        'status',
-        isA<DiagnosticsFailed>().having(
-          (status) => status.code,
-          'code',
-          DiagnosticsFailureCode.corruption,
+      final result = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 10,
         ),
-      ),
-    );
-    expect(
-      diagnostics.events.toString(),
-      isNot(contains('недопустимый\u0000NUL')),
-    );
+      );
+
+      expect(
+        result,
+        isA<ResultFailure<IntentionCatalogPage>>().having(
+          (result) => result.failure,
+          'failure',
+          isA<IntentionCorruptionFailure>(),
+        ),
+        reason: 'описание $index',
+      );
+      expect(
+        diagnostics.events.last,
+        isA<CatalogPageReadDiagnosticsEvent>().having(
+          (event) => event.status,
+          'status',
+          isA<DiagnosticsFailed>().having(
+            (status) => status.code,
+            'code',
+            DiagnosticsFailureCode.corruption,
+          ),
+        ),
+        reason: 'описание $index',
+      );
+      expect(
+        diagnostics.events.toString(),
+        isNot(contains(description)),
+        reason: 'описание $index',
+      );
+      await database.customStatement('DELETE FROM intentions WHERE id = ?', [
+        id,
+      ]);
+    }
   });
 
   test(

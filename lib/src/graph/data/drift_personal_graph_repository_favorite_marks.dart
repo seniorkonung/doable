@@ -14,11 +14,10 @@ extension _FavoriteMarkReading on DriftPersonalGraphRepository {
   /// чтения или команды.
   ///
   /// Результат содержит каждое запрошенное намерение: отсутствие строки —
-  /// проверенное отсутствие отметки. Проверяются только прочитанные строки,
-  /// то есть отметки запрошенных намерений: недопустимое место даёт
-  /// повреждение, а не отсутствие отметки. Строки остальных избранных
-  /// намерений чтение не получает, поэтому его стоимость ограничена числом
-  /// запрошенных идентификаторов.
+  /// проверенное отсутствие отметки. Единственность отметки и положительное
+  /// место гарантирует схема. Строки остальных избранных намерений чтение не
+  /// получает, поэтому его стоимость ограничена числом запрошенных
+  /// идентификаторов.
   Future<Map<IntentionId, domain.FavoriteMark>> _readFavoriteMarks(
     List<IntentionId> intentionIds,
   ) async {
@@ -28,27 +27,22 @@ extension _FavoriteMarkReading on DriftPersonalGraphRepository {
     };
     final rows = await _database
         .customSelect(
-          '''SELECT intention_id, position
+          '''SELECT intention_id
        FROM favorite_intentions
        WHERE intention_id IN (${List.filled(requested.length, '?').join(', ')})''',
           variables: [for (final id in requested.keys) Variable<String>(id)],
           readsFrom: {_database.favoriteIntentions},
         )
         .get();
-    final marks = {
-      for (final id in intentionIds) id: domain.FavoriteMark.notFavorite,
+    final favoriteIds = {
+      for (final row in rows) _requiredStoredString(row.data, 'intention_id'),
     };
-    for (final row in rows) {
-      final id = requested[_requiredStoredString(row.data, 'intention_id')];
-      if (id == null || marks[id] == domain.FavoriteMark.favorite) {
-        throw const _StoredIntentionCorruption();
-      }
-      if (_requiredStoredInteger(row.data, 'position') <= 0) {
-        throw const _StoredIntentionCorruption();
-      }
-      marks[id] = domain.FavoriteMark.favorite;
-    }
-    return marks;
+    return {
+      for (final entry in requested.entries)
+        entry.value: favoriteIds.contains(entry.key)
+            ? domain.FavoriteMark.favorite
+            : domain.FavoriteMark.notFavorite,
+    };
   }
 }
 

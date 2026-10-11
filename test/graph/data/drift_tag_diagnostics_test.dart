@@ -1,5 +1,4 @@
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -170,9 +169,8 @@ void main() {
     const privateName = 'CANARY-название-тега';
     const renamedName = 'CANARY-переименованное';
     const privateError = 'CANARY-ошибка-SQL-и-параметр';
-    const privateKey = 'CANARY-ключ-сопоставления';
     const privateAssignment = 'CANARY-назначение';
-    const damagedId = '018f0b5d-6b2e-7c80-8000-000000000123';
+    const damagedId = 'CANARY-повреждённый-идентификатор';
 
     final created = await graph.execute(
       CreateTag(TagName.fromInput(privateName)),
@@ -226,38 +224,11 @@ void main() {
       isA<DiagnosticsSucceeded>(),
     );
 
+    // Схема не проверяет формат идентификатора тега.
     raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
       damagedId,
       privateAssignment,
     ]);
-    raw.execute('PRAGMA ignore_check_constraints = ON');
-    raw.createFunction(
-      functionName: tagNameKeyFunctionName,
-      argumentCount: const sqlite.AllowedArgumentCount(1),
-      deterministic: true,
-      directOnly: false,
-      function: (_) => privateKey,
-    );
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-      ' $privateAssignment ',
-      damagedId,
-    ]);
-    final storedId = (TagId.decode(damagedId) as TagIdDecodingSuccess).id;
-    expect(
-      await graph.watchTag(storedId).first,
-      isA<TagReadError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagReadCorruptionFailure>(),
-      ),
-    );
-    final detailEvent = sink.events
-        .whereType<TagDetailReadDiagnosticsEvent>()
-        .last;
-    expect(
-      (detailEvent.status as DiagnosticsFailed).code,
-      DiagnosticsFailureCode.corruption,
-    );
     expect(
       await graph.getTagCatalog(const TagCatalogBrowseMode()),
       isA<TagCatalogError>().having(
@@ -283,7 +254,6 @@ void main() {
       privateName,
       renamedName,
       privateError,
-      privateKey,
       privateAssignment,
       damagedId,
       id.toCanonicalString(),

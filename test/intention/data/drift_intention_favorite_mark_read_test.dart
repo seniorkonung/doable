@@ -3,12 +3,10 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -243,124 +241,7 @@ void main() {
       },
     );
   });
-
-  group('Недопустимое место отметки запрошенного намерения', () {
-    // Две проверки чтения: место не целое (тип хранимого значения) и не
-    // положительное (граница 0).
-    for (final position in <Object>[0, 'CANARY-место']) {
-      test('$position даёт повреждение без частичного результата', () async {
-        _insertIntention(raw, number: 1, title: 'CANARY-здоровое');
-        _insertIntention(raw, number: 2, title: 'CANARY-повреждённое');
-        storeFavoriteMark(raw, intentionId: _uuid(1), position: 1);
-        storeFavoriteMarkWithInvalidPosition(
-          raw,
-          intentionId: _uuid(2),
-          position: position,
-        );
-        final tagId = switch (await repository.execute(
-          CreateTag(TagName.fromInput('CANARY-тег')),
-        )) {
-          TagCommandSucceeded(
-            value: ConfirmedGraphResult(:final TagCreated value),
-          ) =>
-            value.change.after.id,
-          final other => fail('Тег не создан: $other'),
-        };
-        final storedBefore = _storedGraph(raw);
-
-        expect(
-          await repository.watchIntention(_id(2)).first,
-          isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          diagnostics.events.last,
-          isA<IntentionDetailReadDiagnosticsEvent>().having(
-            (event) => event.status,
-            'исход',
-            _failedWith(DiagnosticsFailureCode.corruption),
-          ),
-        );
-
-        expect(
-          await repository.getCatalogPage(_query()),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          diagnostics.events.last,
-          isA<CatalogPageReadDiagnosticsEvent>().having(
-            (event) => event.status,
-            'исход',
-            _failedWith(DiagnosticsFailureCode.corruption),
-          ),
-        );
-
-        expect(
-          await repository.getCatalogReconciliationPortion(
-            _reconciliationQuery(),
-          ),
-          isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          diagnostics.events.last,
-          isA<CatalogReconciliationReadDiagnosticsEvent>(),
-        );
-
-        expect(
-          await repository.execute(
-            UpdateIntention(
-              id: _id(2),
-              title: 'CANARY-новое название',
-              description: null,
-            ),
-          ),
-          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-              .having(
-                (result) => result.failure,
-                'причина',
-                isA<IntentionCorruptionFailure>(),
-              ),
-        );
-        expect(
-          diagnostics.events.last,
-          isA<IntentionCommandDiagnosticsEvent>().having(
-            (event) => event.status,
-            'исход',
-            _failedWith(DiagnosticsFailureCode.corruption),
-          ),
-        );
-
-        expect(
-          await repository.execute(
-            AssignTag(tagId: tagId, intentionId: _id(2)),
-          ),
-          isA<TagCommandFailed>().having(
-            (result) => result.failure,
-            'причина',
-            isA<TagCorruptionFailure>(),
-          ),
-        );
-
-        expect(_storedGraph(raw), storedBefore);
-        expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-      });
-    }
-  });
 }
-
-Matcher _failedWith(DiagnosticsFailureCode code) =>
-    isA<DiagnosticsFailed>().having((status) => status.code, 'категория', code);
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -399,15 +280,6 @@ void _insertIntention(
     ],
   );
 }
-
-/// Строки намерений, отметок и назначений тегов для сравнения до и после.
-List<List<Map<String, Object?>>> _storedGraph(sqlite.Database database) => [
-  for (final table in ['intentions', 'favorite_intentions', 'tag_assignments'])
-    [
-      for (final row in database.select('SELECT * FROM $table ORDER BY 1, 2'))
-        {...row},
-    ],
-];
 
 IntentionCatalogQuery _query({
   IntentionScope scope = IntentionScope.all,

@@ -16,7 +16,6 @@ extension _TagReading on DriftPersonalGraphRepository {
          a.tag_creation_sequence AS creation_sequence,
          t.creation_sequence AS actual_tag_creation_sequence, t.id, t.name,
          CASE WHEN substr(t.id, 1, 1) = char(65279)
-           OR substr(t.name, 1, 1) = char(65279)
            THEN 1 ELSE 0 END AS has_leading_bom
        FROM tag_assignments a LEFT JOIN tags t ON t.id = a.tag_id
        WHERE a.intention_id IN (${List.filled(requested.length, '?').join(', ')})
@@ -130,9 +129,9 @@ extension _TagReading on DriftPersonalGraphRepository {
           final rows = await _database
               .customSelect(
                 intentionId == null
-                    ? '''SELECT creation_sequence, id, name FROM tags
+                    ? '''SELECT id, name FROM tags
                    ORDER BY creation_sequence ASC'''
-                    : '''SELECT t.creation_sequence, t.id, t.name,
+                    : '''SELECT t.id, t.name,
                    EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.intention_id = ?) AS is_assigned
                    FROM tags t
                    ORDER BY t.creation_sequence ASC''',
@@ -146,18 +145,9 @@ extension _TagReading on DriftPersonalGraphRepository {
                 },
               )
               .get();
-          var previousSequence = 0;
           final decoded = <tag_domain.Tag>[];
           final selectionRows = <TagSelectionRow>[];
           for (final row in rows) {
-            final sequence = _requiredStoredInteger(
-              row.data,
-              'creation_sequence',
-            );
-            if (sequence <= previousSequence) {
-              throw const _StoredIntentionCorruption();
-            }
-            previousSequence = sequence;
             final tag = _decodeStoredTag(row.data);
             decoded.add(tag);
             if (intentionId != null) {
@@ -215,7 +205,6 @@ extension _TagReading on DriftPersonalGraphRepository {
                  a.tag_creation_sequence AS creation_sequence,
                  t.creation_sequence AS actual_tag_creation_sequence, t.id, t.name,
                  CASE WHEN substr(t.id, 1, 1) = char(65279)
-                   OR substr(t.name, 1, 1) = char(65279)
                    THEN 1 ELSE 0 END AS has_leading_bom
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.intention_id = ?
@@ -368,19 +357,18 @@ extension _TagReading on DriftPersonalGraphRepository {
   return (sequence: sequence, tag: tag);
 }
 
+/// Название тега проверяет `CHECK` схемы той же функцией [TagName.fromStored],
+/// поэтому здесь оно только преобразуется в тип; идентификатор схема не
+/// проверяет.
 tag_domain.Tag _decodeStoredTag(Map<String, Object?> data) {
   final id = switch (TagId.decode(_requiredStoredString(data, 'id'))) {
     TagIdDecodingSuccess(:final id) => id,
     InvalidTagIdDecoding() => throw const _StoredIntentionCorruption(),
   };
-  try {
-    return tag_domain.Tag(
-      id: id,
-      name: TagName.fromStored(_requiredStoredString(data, 'name')),
-    );
-  } on TagNameValidationException {
-    throw const _StoredIntentionCorruption();
-  }
+  return tag_domain.Tag(
+    id: id,
+    name: TagName.fromStored(_requiredStoredString(data, 'name')),
+  );
 }
 
 final class _TagReadIntentionMissing implements Exception {

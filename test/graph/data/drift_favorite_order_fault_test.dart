@@ -153,50 +153,46 @@ void main() {
     });
   });
 
-  group('Повреждение сохранённого порядка до записи', () {
-    for (final corruption in _storedCorruptions) {
-      test('${corruption.name} — повреждение без записи, пропуска и '
-          'исправления данных', () async {
-        await seedDurabilityGraph(database);
-        for (final number in [6, 7]) {
-          _insertArchivedIntention(raw, number: number);
-        }
-        for (final (number, position) in [(1, 2), (2, 6), (3, 10)]) {
-          storeFavoriteMark(
-            raw,
-            intentionId: _uuid(number),
-            position: position,
-          );
-        }
-        corruption.store(raw);
-        final graphBefore = _storedGraph(raw);
-        final revisionBefore = await _graphRevision(repository);
-
-        // Участники перемещения активны и целостны: повреждение лежит вне
-        // них и не пропускается.
-        final result = await repository.execute(
-          MoveFavoriteIntention(
-            intentionId: _id(3),
-            placement: AfterFavoritePlacement(_id(1)),
-          ),
-        );
-
-        expect(_failureOf(result), isA<FavoriteOrderCorruptionFailure>());
-        expect(_storedGraph(raw), graphBefore);
-        expect(
-          (await _graphRevision(repository)).compareTo(revisionBefore),
-          GraphRevisionOrder.same,
-        );
-        expect(
-          await repository.getFavoriteIntentions(),
-          isA<FavoriteIntentionsError>().having(
-            (result) => result.failure,
-            'причина',
-            isA<FavoriteIntentionsCorruptionFailure>(),
-          ),
-        );
-      });
+  test('избранное намерение с нераспознаваемым идентификатором — повреждение '
+      'без записи, пропуска и исправления данных', () async {
+    await seedDurabilityGraph(database);
+    for (final (number, position) in [(1, 2), (2, 6), (3, 10)]) {
+      storeFavoriteMark(raw, intentionId: _uuid(number), position: position);
     }
+    // Формат идентификатора намерения схема не проверяет.
+    const damagedId = 'CANARY-неверный-идентификатор';
+    raw.execute(
+      'INSERT INTO intentions (id, title, created_at, updated_at) '
+      'VALUES (?, ?, 1, 1)',
+      [damagedId, 'CANARY-повреждённое'],
+    );
+    storeFavoriteMark(raw, intentionId: damagedId, position: 4);
+    final graphBefore = _storedGraph(raw);
+    final revisionBefore = await _graphRevision(repository);
+
+    // Участники перемещения активны и целостны: повреждение лежит вне них и
+    // не пропускается.
+    final result = await repository.execute(
+      MoveFavoriteIntention(
+        intentionId: _id(3),
+        placement: AfterFavoritePlacement(_id(1)),
+      ),
+    );
+
+    expect(_failureOf(result), isA<FavoriteOrderCorruptionFailure>());
+    expect(_storedGraph(raw), graphBefore);
+    expect(
+      (await _graphRevision(repository)).compareTo(revisionBefore),
+      GraphRevisionOrder.same,
+    );
+    expect(
+      await repository.getFavoriteIntentions(),
+      isA<FavoriteIntentionsError>().having(
+        (result) => result.failure,
+        'причина',
+        isA<FavoriteIntentionsCorruptionFailure>(),
+      ),
+    );
   });
 
   group('Непредставимое промежуточное место', () {
@@ -269,46 +265,6 @@ final _moveTwoFirst = MoveFavoriteIntention(
   intentionId: _id(2),
   placement: const FirstFavoritePlacement(),
 );
-
-/// Повреждения сохранённого порядка, недостижимые через приложение, рядом
-/// со скрытыми архивированными намерениями 6 и 7 — по одному на каждую
-/// проверку прочитанного порядка. Целостный порядок: 1 на месте 2, 2 на
-/// месте 6, 3 на месте 10.
-final _storedCorruptions =
-    <({String name, void Function(sqlite.Database) store})>[
-      (
-        name: 'дробное место скрытого архивированного намерения',
-        store: (database) => storeFavoriteMarkWithInvalidPosition(
-          database,
-          intentionId: _uuid(6),
-          position: 4.5,
-        ),
-      ),
-      (
-        name: 'нулевое место скрытого архивированного намерения',
-        store: (database) => storeFavoriteMarkWithInvalidPosition(
-          database,
-          intentionId: _uuid(6),
-          position: 0,
-        ),
-      ),
-      (
-        name: 'вторая отметка скрытого архивированного намерения',
-        store: (database) {
-          removeFavoriteSchemaProtection(database);
-          storeFavoriteMark(database, intentionId: _uuid(6), position: 4);
-          storeFavoriteMark(database, intentionId: _uuid(6), position: 8);
-        },
-      ),
-      (
-        name: 'место без намерения перед всеми избранными',
-        store: (database) => storeFavoritePlaceWithoutIntention(
-          database,
-          intentionId: _uuid(9),
-          position: 1,
-        ),
-      ),
-    ];
 
 /// Сохранённые места фикстуры: номер намерения и место.
 const _seededPlaces = [(6, 3), (1, 4), (7, 9), (2, 15), (3, 16), (5, 30)];

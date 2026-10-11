@@ -270,10 +270,13 @@ void main() {
   test(
     'повреждение сохранённой связи отличается от конфликта маршрута',
     () async {
-      await database.customStatement('PRAGMA ignore_check_constraints = ON');
+      // Пробельное описание связи приложение не сохраняет, а схема допускает.
       await database.customUpdate(
-        'UPDATE long_term_relations SET priority = 9 WHERE id = ?',
-        variables: [Variable.withString(_uuid(102))],
+        'UPDATE long_term_relations SET description = ? WHERE id = ?',
+        variables: [
+          Variable.withString('   '),
+          Variable.withString(_uuid(102)),
+        ],
       );
       final result = await repository.execute(command());
       expect(

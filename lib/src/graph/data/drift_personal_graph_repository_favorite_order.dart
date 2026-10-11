@@ -88,57 +88,44 @@ extension _FavoriteOrderCommandExecution on DriftPersonalGraphRepository {
   }
 
   /// Читает места всех избранных намерений, включая архивированные, вместе с
-  /// существованием и архивным состоянием их намерений. Вызывается внутри
-  /// транзакции команды.
+  /// архивным состоянием их намерений. Вызывается внутри транзакции команды.
   Future<List<QueryRow>> _readStoredFavoriteOrder() => _database
       .customSelect(
-        '''SELECT f.intention_id, f.position, i.id, i.is_archived
+        '''SELECT f.intention_id, f.position, i.is_archived
        FROM favorite_intentions f
-       LEFT JOIN intentions i ON i.id = f.intention_id
+       JOIN intentions i ON i.id = f.intention_id
        ORDER BY f.position ASC''',
         readsFrom: {_database.favoriteIntentions, _database.intentions},
       )
       .get();
 
-  /// Проверяет все сохранённые места до вычисления и записи. Место без
-  /// существующего намерения, неоднозначный порядок, недопустимое место,
-  /// недопустимый идентификатор и недопустимое архивное состояние дают
-  /// повреждение без пропуска или исправления данных.
+  /// Декодирует прочитанные места до вычисления и записи. Уникальность и
+  /// положительность места, единственность отметки намерения и существование
+  /// намерения гарантирует схема; недопустимый сохранённый идентификатор или
+  /// архивное состояние дают повреждение без пропуска или исправления данных.
+  /// Канонический вид идентификатора гарантирует декодирование, поэтому
+  /// итоговые места назначаются по тем же строкам, что хранятся.
   ({FavoriteOrder order, int maxPosition}) _verifiedFavoriteOrder(
     List<QueryRow> rows,
   ) {
-    var previousPosition = 0;
+    var maxPosition = 0;
     final entries = <FavoriteOrderEntry>[];
     for (final row in rows) {
-      final position = _requiredStoredInteger(row.data, 'position');
-      if (position <= previousPosition) {
-        throw const _StoredIntentionCorruption();
-      }
-      previousPosition = position;
-      final storedId = _requiredStoredString(row.data, 'intention_id');
-      // Канонический вид идентификатора гарантирует декодирование, поэтому
-      // итоговые места назначаются по тем же строкам, что хранятся.
-      final intentionId = _decodeStoredIntentionId(storedId);
-      if (row.data['id'] != storedId) throw const _StoredIntentionCorruption();
+      // Строки идут по возрастанию места, поэтому последнее — наибольшее.
+      maxPosition = _requiredStoredInteger(row.data, 'position');
       entries.add(
         FavoriteOrderEntry(
-          intentionId: intentionId,
-          archiveState: switch (_requiredStoredInteger(
+          intentionId: _decodeStoredIntentionId(
+            _requiredStoredString(row.data, 'intention_id'),
+          ),
+          archiveState: _StoredIntentionDetail._archiveState(
             row.data,
             'is_archived',
-          )) {
-            0 => domain.IntentionArchiveState.active,
-            1 => domain.IntentionArchiveState.archived,
-            _ => throw const _StoredIntentionCorruption(),
-          },
+          ),
         ),
       );
     }
-    try {
-      return (order: FavoriteOrder(entries), maxPosition: previousPosition);
-    } on FavoriteOrderValidationException {
-      throw const _StoredIntentionCorruption();
-    }
+    return (order: FavoriteOrder(entries), maxPosition: maxPosition);
   }
 
   /// Переписывает места всех избранных намерений значениями `1..n` в порядке

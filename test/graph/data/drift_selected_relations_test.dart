@@ -333,7 +333,6 @@ void main() {
   });
 
   test('повреждение одной выбранной связи отказывает всему набору', () async {
-    await database.customStatement('PRAGMA ignore_check_constraints = ON');
     await database.customStatement(
       'UPDATE long_term_relations SET description = ? WHERE id = ?',
       [' ', _second.toCanonicalString()],

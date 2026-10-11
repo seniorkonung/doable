@@ -28,9 +28,7 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
           stage = TagReadDiagnosticsStage.read;
           final tagRow = await _database
               .customSelect(
-                '''SELECT id, name,
-                   CASE WHEN substr(name, 1, 1) = char(65279) THEN 1 ELSE 0 END AS has_leading_bom
-                   FROM tags WHERE id = ?''',
+                'SELECT id, name FROM tags WHERE id = ?',
                 variables: [Variable<String>(query.tagId.toCanonicalString())],
                 readsFrom: {_database.tags},
               )
@@ -48,7 +46,6 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
             if (dangling != null) throw const _StoredIntentionCorruption();
             throw const _TaggedIntentionsTagMissing();
           }
-          _checkTaggedTextEncoding(tagRow.data);
           final tag = _decodeStoredTag(tagRow.data);
           if (tag.id != query.tagId) throw const _StoredIntentionCorruption();
           if (cursor == null) {

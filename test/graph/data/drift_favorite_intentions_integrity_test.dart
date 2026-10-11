@@ -1,14 +1,8 @@
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -71,48 +65,6 @@ void main() {
     );
     expect(_storedGraph(raw), storedBefore);
   }
-
-  test('место без существующего намерения между местами избранных '
-      'намерений даёт повреждение без списка', () async {
-    seedFavorites();
-    storeFavoritePlaceWithoutIntention(
-      raw,
-      intentionId: _uuid(101),
-      position: 3,
-    );
-
-    await expectCorruption();
-  });
-
-  group('Неоднозначный порядок', () {
-    test('два намерения на одном месте дают повреждение', () async {
-      seedFavorites();
-      removeFavoriteSchemaProtection(raw);
-      storeFavoriteMark(raw, intentionId: _uuid(4), position: 6);
-
-      await expectCorruption();
-    });
-
-    test('вторая отметка одного намерения даёт повреждение', () async {
-      seedFavorites();
-      removeFavoriteSchemaProtection(raw);
-      storeFavoriteMark(raw, intentionId: _uuid(1), position: 8);
-
-      await expectCorruption();
-    });
-  });
-
-  test('дробное место избранного намерения даёт повреждение', () async {
-    seedFavorites();
-    _insertIntention(raw, number: 5, title: 'CANARY-повреждённое');
-    storeFavoriteMarkWithInvalidPosition(
-      raw,
-      intentionId: _uuid(5),
-      position: 1.5,
-    );
-
-    await expectCorruption();
-  });
 
   group('Недопустимые поля намерения', () {
     test('название с пробелами по краям у архивированного избранного '
@@ -180,84 +132,8 @@ void main() {
       expect(snapshot.items.map(_rowId), [_uuid(1), _uuid(3)]);
       expect(snapshot.archivedCount, 1);
     });
-
-    test('повтор после повреждения возвращает то же повреждение', () async {
-      seedFavorites();
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _uuid(101),
-        position: 3,
-      );
-
-      await expectCorruption();
-      await expectCorruption();
-    });
-  });
-
-  group('Чтения состояния отметки при месте без существующего намерения', () {
-    setUp(() {
-      seedFavorites();
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _uuid(101),
-        position: 3,
-      );
-    });
-
-    test(
-      'подробные данные остаются успешными, а список — повреждение',
-      () async {
-        for (final (number, mark) in _intactMarks) {
-          final result = await repository.watchIntention(_id(number)).first;
-          expect(
-            result,
-            isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>().having(
-              (result) => result.value.value?.favoriteMark,
-              'отметка',
-              mark,
-            ),
-            reason: 'намерение $number',
-          );
-        }
-
-        await expectCorruption();
-      },
-    );
-
-    test('порция с целостными отметками остаётся успешной, а список — '
-        'повреждение', () async {
-      final result = await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: IntentionScope.all,
-          titleFilter: null,
-          order: IntentionCatalogOrder.createdAtAscending,
-          pageSize: 10,
-          cursor: null,
-        ),
-      );
-
-      expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
-      expect(
-        {
-          for (final item
-              in (result as ResultSuccess<IntentionCatalogPage>).value.items)
-            item.id.toCanonicalString(): item.favoriteMark,
-        },
-        {for (final (number, mark) in _intactMarks) _uuid(number): mark},
-      );
-
-      await expectCorruption();
-    });
   });
 }
-
-/// Подтверждённые отметки намерений фикстуры, чьи сохранённые данные целостны.
-const _intactMarks = [
-  (1, FavoriteMark.favorite),
-  (2, FavoriteMark.favorite),
-  (3, FavoriteMark.favorite),
-  (4, FavoriteMark.notFavorite),
-];
 
 final _busy = sqlite.SqliteException(
   extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
@@ -366,11 +242,6 @@ Matcher _failure(Matcher failure) => isA<FavoriteIntentionsError>().having(
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
-IntentionId _id(int number) => switch (IntentionId.decode(_uuid(number))) {
-  IntentionIdDecodingSuccess(:final id) => id,
-  InvalidIntentionIdDecoding() => throw ArgumentError.value(number, 'number'),
-};
-
 String _rowId(FavoriteIntentionRow row) => row.id.toCanonicalString();
 
 /// Намерение фикстуры: время создания растёт с номером.
@@ -405,25 +276,17 @@ void _insertIntentionWithId(
   );
 }
 
-/// Записывает в поле намерения значение, которое схема отклоняет или
-/// приложение не сохраняет. Проверка `CHECK` отключается только на время
-/// записи этого значения.
+/// Записывает в поле намерения значение, которое приложение не сохраняет, но
+/// схема допускает: ограничения схемы остаются включёнными.
 void _corruptIntentionField(
   sqlite.Database database, {
   required int number,
   required String column,
   required Object? value,
-}) {
-  database.execute('PRAGMA ignore_check_constraints = ON');
-  try {
-    database.execute('UPDATE intentions SET $column = ? WHERE id = ?', [
-      value,
-      _uuid(number),
-    ]);
-  } finally {
-    database.execute('PRAGMA ignore_check_constraints = OFF');
-  }
-}
+}) => database.execute('UPDATE intentions SET $column = ? WHERE id = ?', [
+  value,
+  _uuid(number),
+]);
 
 /// Строки намерений и отметок для сравнения до и после чтения.
 List<List<Map<String, Object?>>> _storedGraph(sqlite.Database database) => [

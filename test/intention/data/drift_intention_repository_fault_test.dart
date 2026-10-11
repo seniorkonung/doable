@@ -1,6 +1,5 @@
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
-import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -356,130 +355,6 @@ void main() {
         }
       },
     );
-
-    test('место без намерения вне запрошенных не отказывает чтению, а повреждённая отметка запрошенного отказывает', () async {
-      late Database raw;
-      final replacement = await _replaceDatabase(
-        const _PassiveObserver(),
-        database,
-        diagnostics,
-        setup: (connection) => raw = connection,
-      );
-      database = replacement.database;
-      repository = replacement.repository;
-      await _insertIntention(
-        database,
-        id: _id(_firstUuid),
-        title: 'CANARY-целостное',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await _insertIntention(
-        database,
-        id: _id(_secondUuid),
-        title: 'CANARY-повреждённое',
-        createdAt: DateTime.utc(2026, 9, 2, 11),
-      );
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _relationUuid,
-        position: 1,
-      );
-      storeFavoriteMark(raw, intentionId: _firstUuid, position: 2);
-      storeFavoriteMarkWithInvalidPosition(
-        raw,
-        intentionId: _secondUuid,
-        position: 0,
-      );
-      IntentionCatalogQuery query({
-        required int pageSize,
-        IntentionCatalogCursor? cursor,
-      }) => IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtAscending,
-        pageSize: pageSize,
-        cursor: cursor,
-      );
-      Matcher corrupted<TEvent extends DiagnosticsEvent>(
-        DiagnosticsStatus Function(TEvent) status,
-      ) => isA<TEvent>().having(
-        status,
-        'исход',
-        isA<DiagnosticsFailed>().having(
-          (status) => status.code,
-          'категория',
-          DiagnosticsFailureCode.corruption,
-        ),
-      );
-
-      // Порция и подробные данные целостного намерения не зависят от
-      // места без намерения и от повреждённой отметки вне запрошенных.
-      final intactPage = await repository.getCatalogPage(query(pageSize: 1));
-      expect(intactPage, isA<ResultSuccess<IntentionCatalogPage>>());
-      final page = (intactPage as ResultSuccess<IntentionCatalogPage>).value;
-      expect(page.items.single.id, _id(_firstUuid));
-      expect(page.items.single.favoriteMark, FavoriteMark.favorite);
-      expect(
-        diagnostics.events.last,
-        isA<CatalogPageReadDiagnosticsEvent>().having(
-          (event) => event.status,
-          'исход',
-          isA<DiagnosticsSucceeded>(),
-        ),
-      );
-      final intactDetails = await repository
-          .watchIntention(_id(_firstUuid))
-          .first;
-      expect(
-        intactDetails,
-        isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>(),
-      );
-      expect(
-        (intactDetails as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
-            .value
-            .value!
-            .favoriteMark,
-        FavoriteMark.favorite,
-      );
-
-      // Повреждённая отметка запрошенного намерения отклоняет порцию,
-      // её продолжение и подробные данные целиком.
-      for (final failing in [
-        query(pageSize: 2),
-        query(pageSize: 1, cursor: page.nextCursor),
-      ]) {
-        expect(
-          await repository.getCatalogPage(failing),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          diagnostics.events.last,
-          corrupted<CatalogPageReadDiagnosticsEvent>((event) => event.status),
-        );
-      }
-      expect(
-        await repository.watchIntention(_id(_secondUuid)).first,
-        isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
-          (result) => result.failure,
-          'причина',
-          isA<IntentionCorruptionFailure>(),
-        ),
-      );
-      expect(
-        diagnostics.events.last,
-        corrupted<IntentionDetailReadDiagnosticsEvent>((event) => event.status),
-      );
-      expect(storedFavoriteMarks(raw), [
-        (_secondUuid, 0),
-        (_relationUuid, 1),
-        (_firstUuid, 2),
-      ]);
-      expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-    });
   });
 
   group('DriftPersonalGraphRepository.execute — откат после DML', () {
@@ -906,56 +781,6 @@ void main() {
       }
     });
 
-    test('повреждённые сохранённые данные выбранного тега остаются '
-        'повреждением и рядом с отсутствующим тегом', () async {
-      final sportTagId = await replaceWithSeededGraph(const _PassiveObserver());
-      // Неканоничное название недостижимо через приложение: для его записи
-      // отключается проверка схемы и подменяется функция ключа названия.
-      raw.execute('PRAGMA ignore_check_constraints = ON');
-      raw.createFunction(
-        functionName: tagNameKeyFunctionName,
-        argumentCount: const AllowedArgumentCount(1),
-        deterministic: true,
-        directOnly: false,
-        function: (_) => 'повреждённый ключ',
-      );
-      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-        ' Дом ',
-        homeTagId.toCanonicalString(),
-      ]);
-      raw.execute('PRAGMA ignore_check_constraints = OFF');
-
-      for (final tagIds in [
-        [homeTagId],
-        [missingTagId, homeTagId, weekendTagId, sportTagId],
-      ]) {
-        final reason = 'набор из ${tagIds.length}';
-        final storedBefore = _storedCreationRows(raw);
-        final revisionBefore = _catalogRevision(
-          await repository.getCatalogPage(_allIntentionsQuery),
-        );
-
-        final result = await repository.execute(fullCommand(tagIds));
-
-        expect(result, _failure<IntentionCorruptionFailure>(), reason: reason);
-        expect(_storedCreationRows(raw), storedBefore, reason: reason);
-        expect(
-          _catalogRevision(await repository.getCatalogPage(_allIntentionsQuery))
-              .compareTo(revisionBefore),
-          GraphRevisionOrder.same,
-          reason: reason,
-        );
-        expect(
-          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
-          _failedCreation(
-            IntentionCreationCommandDiagnosticsStage.validation,
-            DiagnosticsFailureCode.corruption,
-          ),
-          reason: reason,
-        );
-      }
-    });
-
     test('длительность охватывает всю операцию до окончательного исхода, '
         'включая проверку результата', () async {
       const delay = Duration(milliseconds: 15);
@@ -1352,11 +1177,6 @@ final class _TagAssignmentReadInterceptor
   }
 }
 
-/// Наблюдатель без вмешательства: даёт доступ к соединению хранилища.
-final class _PassiveObserver extends LocalDatabaseConnectionObserver {
-  const _PassiveObserver();
-}
-
 final class _FavoriteMarkReadInterceptor
     extends LocalDatabaseConnectionObserver {
   _FavoriteMarkReadInterceptor({required this.failure});
@@ -1642,9 +1462,6 @@ T _readValue<T, F extends GraphCommandFailure>(GraphResult<T, F> result) =>
         'Ожидался успех чтения, получен отказ $failure.',
       ),
     };
-
-GraphRevision _catalogRevision(Result<IntentionCatalogPage> result) =>
-    _readValue(result).revision;
 
 IntentionDetails? _watched(Result<GraphSnapshot<IntentionDetails?>> result) =>
     _readValue(result).value;

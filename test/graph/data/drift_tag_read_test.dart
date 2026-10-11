@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -172,51 +171,6 @@ void main() {
               as DiagnosticsFailed)
           .code,
       DiagnosticsFailureCode.corruption,
-    );
-  });
-
-  test('неверный тип порядка и неканоничное название не скрываются', () async {
-    raw.execute('PRAGMA ignore_check_constraints = ON');
-    raw.execute(
-      'INSERT INTO tags (creation_sequence, id, name) VALUES (-1, ?, ?)',
-      [_uuid(1), 'Первый'],
-    );
-    expect(
-      await repository.getTagCatalog(const TagCatalogBrowseMode()),
-      isA<TagCatalogError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagCatalogCorruptionFailure>(),
-      ),
-    );
-    raw.execute('DELETE FROM tags');
-    addTag(2, 'Второй');
-    raw.createFunction(
-      functionName: tagNameKeyFunctionName,
-      argumentCount: const sqlite.AllowedArgumentCount(1),
-      deterministic: true,
-      directOnly: false,
-      function: (_) => 'повреждённый ключ',
-    );
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-      ' Второй ',
-      _uuid(2),
-    ]);
-    expect(
-      await repository.getTagCatalog(const TagCatalogBrowseMode()),
-      isA<TagCatalogError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagCatalogCorruptionFailure>(),
-      ),
-    );
-    expect(
-      await repository.watchTag(_tagId(2)).first,
-      isA<TagReadError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagReadCorruptionFailure>(),
-      ),
     );
   });
 

@@ -202,15 +202,6 @@ void main() {
     await expectCorruption(TaggedIntentionsScope.active);
   });
 
-  test('начальный BOM названия тега не удаляется при чтении', () async {
-    raw.execute('PRAGMA ignore_check_constraints = ON');
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-      '\uFEFFДом',
-      tagFixtureId(firstTagNumber),
-    ]);
-    await expectCorruption(TaggedIntentionsScope.active);
-  });
-
   test('недопустимый UTF-8 идентичности даёт повреждение', () async {
     raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
       tagFixtureId(firstTagNumber),
@@ -240,36 +231,6 @@ void main() {
         [tagFixtureId(firstTagNumber), 'CANARY-неверный-id'],
       );
       await expectCorruption(TaggedIntentionsScope.active);
-    },
-  );
-
-  test(
-    'недопустимое архивное состояние намерения не скрывается охватом',
-    () async {
-      raw.execute('PRAGMA ignore_check_constraints = ON');
-      raw.execute('UPDATE intentions SET is_archived = 2 WHERE id = ?', [
-        tagFixtureId(2),
-      ]);
-      await expectCorruption(TaggedIntentionsScope.active);
-      await expectCorruption(TaggedIntentionsScope.archived);
-    },
-  );
-
-  test(
-    'повреждение назначений другого тега не затрагивает выбранный',
-    () async {
-      raw.execute('PRAGMA foreign_keys = OFF');
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(lastTagNumber), tagFixtureId(999)],
-      );
-      final result = await graph.getTaggedIntentionsPage(
-        TaggedIntentionsQuery(
-          tagId: _tag(firstTagNumber),
-          scope: TaggedIntentionsScope.active,
-        ),
-      );
-      expect(result, isA<TaggedIntentionsPageSuccess>());
     },
   );
 

@@ -264,13 +264,13 @@ void main() {
     final neighbor = _id(_uuid(51));
     await _insertIntention(database, owner, title: 'Владелец');
     await _insertIntention(database, neighbor, title: 'Сосед');
-    await database.customStatement('PRAGMA ignore_check_constraints = ON');
+    // Схема не проверяет формат идентификатора связи.
     await _insertRelation(
       database,
-      id: _uuid(150),
+      id: 'не-uuid',
       sourceId: owner,
       relatedId: neighbor,
-      type: 'повреждённый-тип',
+      type: 'need',
       isArchived: false,
     );
 

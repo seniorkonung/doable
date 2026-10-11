@@ -139,7 +139,6 @@ void main() {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     final database = await harness.openReadyDatabase();
-    await database.customStatement('PRAGMA ignore_check_constraints = ON');
     await _insertIntention(database, _ownerIdValue, 'Владелец');
     await _insertIntention(database, _participantId(1), 'Участник');
     await database.customStatement(
