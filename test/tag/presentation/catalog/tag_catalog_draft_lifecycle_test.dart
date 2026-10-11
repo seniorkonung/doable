@@ -66,7 +66,6 @@ void main() {
         first.editor
           ..changeTitle(_rawTitle)
           ..changeDescription(_rawDescription)
-          ..markFavorite()
           ..confirmReadiness();
         await host.openChooser(tester, first);
         final l10n = AppLocalizations.of(
@@ -129,11 +128,6 @@ void main() {
                 (command) => command.readiness,
                 'готовность',
                 IntentionReadiness.ready,
-              )
-              .having(
-                (command) => command.favoriteMark,
-                'избранное',
-                FavoriteMark.favorite,
               )
               .having((command) => command.tagIds, 'теги', {
                 _home.id,
@@ -282,7 +276,6 @@ void main() {
         expect(kept.draft.title, 'Позвонить маме');
         expect(kept.draft.description, isEmpty);
         expect(kept.draft.readiness, IntentionReadiness.notReady);
-        expect(kept.draft.favoriteMark, FavoriteMark.notFavorite);
         expect(kept.draft.tagIds, [_home.id, _work.id]);
         expect(repository.creations, hasLength(1));
         expect(repository.tagCommands, [
@@ -350,7 +343,6 @@ void _expectFirstDraft(
   expect(state.draft.title, _rawTitle);
   expect(state.draft.description, _rawDescription);
   expect(state.draft.readiness, IntentionReadiness.ready);
-  expect(state.draft.favoriteMark, FavoriteMark.favorite);
   expect(state.draft.tagIds, tagIds);
 }
 
@@ -555,11 +547,7 @@ final class _Repository extends Fake implements PersonalGraphRepository {
             catalogMutation: IntentionCatalogCreated(
               revision: revision,
               entry: TestCatalogEntrySnapshot(
-                testSummary(
-                  title: 'Купить хлеб',
-                  readiness: command.readiness,
-                  favoriteMark: command.favoriteMark,
-                ),
+                testSummary(title: 'Купить хлеб', readiness: command.readiness),
               ),
             ),
             additionalChanges: [

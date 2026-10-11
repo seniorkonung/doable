@@ -36,8 +36,7 @@ final class IntentionCreationDraft {
     : title = '',
       description = '',
       tagIds = const {},
-      readiness = IntentionReadiness.notReady,
-      favoriteMark = FavoriteMark.notFavorite;
+      readiness = IntentionReadiness.notReady;
 
   /// [tagIds] должен быть неизменяемым; копию создают только методы правки
   /// набора, чтобы неизменённый набор сохранял свою идентичность.
@@ -46,7 +45,6 @@ final class IntentionCreationDraft {
     required this.description,
     required this.tagIds,
     required this.readiness,
-    required this.favoriteMark,
   });
 
   final String title;
@@ -55,16 +53,14 @@ final class IntentionCreationDraft {
 
   /// Начальная готовность к действию; включается только явным решением.
   final IntentionReadiness readiness;
-  final FavoriteMark favoriteMark;
 
-  /// Отличается ли хотя бы одно из пяти полей от начального значения.
+  /// Отличается ли хотя бы одно из четырёх полей от начального значения.
   /// Полностью пробельный текст тоже считается изменением.
   bool get isChanged =>
       title.isNotEmpty ||
       description.isNotEmpty ||
       tagIds.isNotEmpty ||
-      readiness != IntentionReadiness.notReady ||
-      favoriteMark != FavoriteMark.notFavorite;
+      readiness != IntentionReadiness.notReady;
 
   IntentionCreationDraft withTitle(String value) => _copy(title: value);
 
@@ -82,21 +78,16 @@ final class IntentionCreationDraft {
   IntentionCreationDraft withReadiness(IntentionReadiness value) =>
       _copy(readiness: value);
 
-  IntentionCreationDraft withFavoriteMark(FavoriteMark value) =>
-      _copy(favoriteMark: value);
-
   IntentionCreationDraft _copy({
     String? title,
     String? description,
     Set<TagId>? tagIds,
     IntentionReadiness? readiness,
-    FavoriteMark? favoriteMark,
   }) => IntentionCreationDraft._(
     title: title ?? this.title,
     description: description ?? this.description,
     tagIds: tagIds ?? this.tagIds,
     readiness: readiness ?? this.readiness,
-    favoriteMark: favoriteMark ?? this.favoriteMark,
   );
 }
 
@@ -288,11 +279,6 @@ final class IntentionEditorState {
 
   IntentionEditorState withReadiness(IntentionReadiness value) =>
       draft.readiness == value ? this : _withDraft(draft.withReadiness(value));
-
-  IntentionEditorState withFavoriteMark(FavoriteMark value) =>
-      draft.favoriteMark == value
-      ? this
-      : _withDraft(draft.withFavoriteMark(value));
 
   /// Меняет состояние отправки и публикует только переданное право ошибки
   /// [failurePresentation]; прежнее неподтверждённое право сессия передаёт

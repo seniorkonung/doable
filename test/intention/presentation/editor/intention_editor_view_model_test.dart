@@ -126,7 +126,6 @@ void main() {
       container.read(previousProvider.notifier)
         ..changeTitle('Прежний черновик')
         ..changeDescription('Прежнее описание')
-        ..markFavorite()
         ..confirmReadiness()
         ..draftTagSet.add(_tag(1, 'Дом'));
       previousSubscription.close();
@@ -143,7 +142,6 @@ void main() {
       expect(state.draft.description, isEmpty);
       expect(state.draft.tagIds, isEmpty);
       expect(state.draft.readiness, IntentionReadiness.notReady);
-      expect(state.draft.favoriteMark, FavoriteMark.notFavorite);
       expect(state.draft.isChanged, isFalse);
       expect(state.selectedTags, isEmpty);
       expect(state.operation, isA<OperationIdle<Intention>>());
@@ -155,7 +153,7 @@ void main() {
       expect(repository.tagCommands, isEmpty);
     });
 
-    test('каждое из пяти полей отдельно делает черновик изменённым, а возврат к началу снимает изменённость', () {
+    test('каждое из четырёх полей отдельно делает черновик изменённым, а возврат к началу снимает изменённость', () {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
       final provider = intentionEditorViewModelProvider(
@@ -180,7 +178,6 @@ void main() {
           () => editor.removeTag(_tagId(1)),
         ),
         'готовность': (editor.confirmReadiness, editor.disableReadiness),
-        'избранное': (editor.markFavorite, editor.unmarkFavorite),
       };
       for (final MapEntry(key: field, value: (change, revert))
           in edits.entries) {
@@ -332,7 +329,6 @@ void main() {
 
       container.read(firstProvider.notifier)
         ..changeTitle('Первое')
-        ..markFavorite()
         ..confirmReadiness()
         ..draftTagSet.add(_tag(1, 'Дом'));
       container
@@ -345,7 +341,6 @@ void main() {
       expect(first.draft.tagIds, [_tagId(1)]);
       expect(second.draft.tagIds, [_tagId(2)]);
       expect(second.draft.title, isEmpty);
-      expect(second.draft.favoriteMark, FavoriteMark.notFavorite);
       expect(second.draft.readiness, IntentionReadiness.notReady);
       expect(
         container.read(secondProvider.notifier).draftTagSet.current.tagIds,
@@ -425,7 +420,6 @@ void main() {
         editor
           ..changeTitle('Поздняя правка')
           ..changeDescription('Поздняя правка')
-          ..markFavorite()
           ..confirmReadiness()
           ..removeTag(_tagId(1));
 
@@ -452,7 +446,6 @@ void main() {
       final editor = container.read(provider.notifier)
         ..changeTitle('Название')
         ..changeDescription('Описание')
-        ..markFavorite()
         ..confirmReadiness();
       // Общий выбор получил контракт набора до отправки и вызывает его позже.
       final tagSet = editor.draftTagSet..add(_tag(1, 'Дом'));
@@ -469,7 +462,6 @@ void main() {
         ..changeTitle('Правка во время отправки')
         ..changeDescription('Правка во время отправки')
         ..removeTag(_tagId(1))
-        ..unmarkFavorite()
         ..disableReadiness()
         ..submit();
       await _deliverEvents(container);
@@ -480,7 +472,6 @@ void main() {
       expect(submitted.draft.description, 'Описание');
       expect(submitted.draft.tagIds, [_tagId(1)]);
       expect(submitted.draft.readiness, IntentionReadiness.ready);
-      expect(submitted.draft.favoriteMark, FavoriteMark.favorite);
       expect(
         submitted.draftAvailability,
         IntentionDraftAvailability.submitting,
@@ -498,7 +489,6 @@ void main() {
       expect(command.description, 'Описание');
       expect(command.tagIds, {_tagId(1)});
       expect(command.readiness, IntentionReadiness.ready);
-      expect(command.favoriteMark, FavoriteMark.favorite);
       expect(repository.tagCommands, isEmpty);
 
       // Результат снимает фиксацию черновика, но не меняет принятую команду.
@@ -511,14 +501,8 @@ void main() {
       expect(tagSet.current.availability, IntentionDraftAvailability.editable);
       expect(published.last.availability, IntentionDraftAvailability.editable);
       expect(tagSet.add(_tag(2, 'Выходные')), IntentionDraftTagAddition.added);
-      editor.unmarkFavorite();
       expect(container.read(provider).draft.tagIds, [_tagId(1), _tagId(2)]);
-      expect(
-        container.read(provider).draft.favoriteMark,
-        FavoriteMark.notFavorite,
-      );
       expect(command.tagIds, {_tagId(1)});
-      expect(command.favoriteMark, FavoriteMark.favorite);
       expect(repository.commands, hasLength(1));
     });
 
@@ -548,7 +532,6 @@ void main() {
       addTearDown(otherSubscription.close);
       final editor = container.read(provider.notifier)
         ..changeTitle('Намерение')
-        ..markFavorite()
         ..submit();
       final otherEditor = container.read(otherProvider.notifier)
         ..changeTitle('Намерение')
@@ -651,7 +634,6 @@ void main() {
       final firstSubscription = container.listen(provider, (_, _) {});
       final editor = container.read(provider.notifier)
         ..changeTitle('Полное намерение')
-        ..markFavorite()
         ..confirmReadiness();
       editor.draftTagSet.add(_tag(1, 'Дом'));
       editor.submit();
@@ -675,11 +657,6 @@ void main() {
               (command) => command.readiness,
               'готовность',
               IntentionReadiness.ready,
-            )
-            .having(
-              (command) => command.favoriteMark,
-              'избранное',
-              FavoriteMark.favorite,
             )
             .having((command) => command.tagIds, 'теги', {_tagId(1)}),
       );
@@ -720,11 +697,6 @@ void main() {
             IntentionReadiness.ready,
             reason: name,
           );
-          expect(
-            failed.draft.favoriteMark,
-            FavoriteMark.favorite,
-            reason: name,
-          );
           expect(_tagNames(failed), {
             _tagId(1): 'Дом',
             _tagId(2): 'Выходные',
@@ -758,14 +730,13 @@ void main() {
       final edits = <String, void Function(IntentionEditorViewModel)>{
         'название': (editor) => editor.changeTitle('Исправленное название'),
         'описание': (editor) => editor.changeDescription('Исправленное'),
-        // Снятие доступного тега меняет набор так же, как добавление, а
-        // готовность — так же, как избранное.
+        // Снятие доступного тега меняет набор так же, как добавление.
         'добавление нового тега': (editor) =>
             editor.draftTagSet.add(_tag(3, 'Спорт')),
         'повторное добавление включённого тега с новым названием': (editor) =>
             editor.draftTagSet.add(_tag(1, 'Быт')),
         'снятие отсутствующего тега': (editor) => editor.removeTag(_tagId(1)),
-        'избранное': (editor) => editor.unmarkFavorite(),
+        'готовность': (editor) => editor.disableReadiness(),
       };
       _Recovery expected(IntentionFailure failure, String edit) =>
           switch (failure) {
@@ -858,8 +829,7 @@ void main() {
       );
       editor
         ..removeTag(_tagId(2))
-        ..changeTitle('Другое название')
-        ..unmarkFavorite();
+        ..changeTitle('Другое название');
       await _deliverEvents(session.container);
 
       expect(session.state.draft.tagIds, [_tagId(1), _tagId(3), _tagId(4)]);
@@ -913,11 +883,6 @@ void main() {
               (command) => command.readiness,
               'готовность',
               IntentionReadiness.ready,
-            )
-            .having(
-              (command) => command.favoriteMark,
-              'избранное',
-              FavoriteMark.notFavorite,
             ),
       );
       session.repository.completeCommand(1, _savedResult());
@@ -990,7 +955,6 @@ void main() {
       final editor = container.read(provider.notifier)
         ..changeTitle(_rawTitle)
         ..changeDescription(_rawDescription)
-        ..markFavorite()
         ..confirmReadiness();
       editor.draftTagSet
         ..add(_tag(1, 'Дом'))
@@ -1014,7 +978,6 @@ void main() {
       expect(failed.draft.description, _rawDescription);
       expect(failed.draft.tagIds, [_tagId(1), _tagId(2)]);
       expect(failed.draft.readiness, IntentionReadiness.ready);
-      expect(failed.draft.favoriteMark, FavoriteMark.favorite);
       expect(_tagNames(failed), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
       expect(failed.draftAvailability, IntentionDraftAvailability.editable);
       expect(failed.canSubmit, isFalse);
@@ -1040,7 +1003,6 @@ void main() {
       final first = container.read(firstProvider.notifier)
         ..changeTitle('Первое')
         ..changeDescription('Описание первого')
-        ..markFavorite()
         ..confirmReadiness();
       first.draftTagSet.add(_tag(1, 'Дом'));
       final second = container.read(secondProvider.notifier)
@@ -1063,10 +1025,7 @@ void main() {
         second.draftTagSet.add(_tag(1, 'Дом')),
         IntentionDraftTagAddition.added,
       );
-      second
-        ..unmarkFavorite()
-        ..markFavorite()
-        ..submit();
+      second.submit();
       await _deliverEvents(container);
 
       expect(repository.commands, hasLength(2));
@@ -1089,7 +1048,6 @@ void main() {
       expect(firstFailed.draft.description, 'Описание первого');
       expect(firstFailed.draft.tagIds, [_tagId(1)]);
       expect(firstFailed.draft.readiness, IntentionReadiness.ready);
-      expect(firstFailed.draft.favoriteMark, FavoriteMark.favorite);
       // Отказ первой сессии не помечает тот же тег отсутствующим во второй
       // и не снимает фиксацию её принятой отправки.
       final secondRunning = container.read(secondProvider);
@@ -1138,15 +1096,9 @@ void main() {
               (command) => command.readiness,
               'готовность',
               IntentionReadiness.notReady,
-            )
-            .having(
-              (command) => command.favoriteMark,
-              'избранное',
-              FavoriteMark.favorite,
             ),
       ]);
       expect(firstCommand.tagIds, {_tagId(1)});
-      expect(firstCommand.favoriteMark, FavoriteMark.favorite);
       expect(repository.tagCommands, isEmpty);
     });
   });
@@ -1594,7 +1546,6 @@ void main() {
       final editor = container.read(provider.notifier)
         ..changeTitle('Оставленный черновик')
         ..changeDescription('Описание')
-        ..markFavorite()
         ..confirmReadiness();
       editor.draftTagSet.add(_tag(1, 'Дом'));
       editor.submit();
@@ -1628,7 +1579,6 @@ void main() {
       expect(reopened.draft.description, isEmpty);
       expect(reopened.draft.tagIds, isEmpty);
       expect(reopened.draft.readiness, IntentionReadiness.notReady);
-      expect(reopened.draft.favoriteMark, FavoriteMark.notFavorite);
       expect(reopened.selectedTags, isEmpty);
       expect(reopened.closing, isA<IntentionCreationCloseNotRequested>());
       expect(reopened.draftAvailability, IntentionDraftAvailability.editable);
@@ -1997,7 +1947,6 @@ Future<_FailedSession> _failedFullDraftSession(
   final editor = container.read(provider.notifier)
     ..changeTitle(_rawTitle)
     ..changeDescription(_rawDescription)
-    ..markFavorite()
     ..confirmReadiness();
   for (final tag in tags ?? [_tag(1, 'Дом'), _tag(2, 'Выходные')]) {
     editor.draftTagSet.add(tag);

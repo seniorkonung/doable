@@ -146,7 +146,6 @@ void main() {
         title: 'Полное намерение',
         description: 'Описание',
         readiness: IntentionReadiness.ready,
-        favoriteMark: FavoriteMark.favorite,
         tagIds: selectedTags,
       );
 
@@ -163,7 +162,6 @@ void main() {
             title: 'Другой набор',
             description: null,
             readiness: IntentionReadiness.notReady,
-            favoriteMark: FavoriteMark.notFavorite,
             tagIds: [_tagId(_secondTagUuid)],
           ),
         ),
@@ -187,11 +185,6 @@ void main() {
               (command) => command.readiness,
               'готовность',
               IntentionReadiness.ready,
-            )
-            .having(
-              (command) => command.favoriteMark,
-              'избранное',
-              FavoriteMark.favorite,
             )
             .having((command) => command.tagIds, 'теги', {
               _tagId(_firstTagUuid),
@@ -275,7 +268,6 @@ void main() {
             title: 'Полное намерение',
             description: null,
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
             tagIds: [_tagId(_firstTagUuid), missingTag],
           ),
         ) as IntentionCommandAccepted;

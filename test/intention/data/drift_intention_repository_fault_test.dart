@@ -436,15 +436,14 @@ void main() {
     final homeTagId = _tagId(tagFixtureId(firstTagNumber));
     final weekendTagId = _tagId(tagFixtureId(lastTagNumber));
     final missingTagId = _tagId(tagFixtureId(777));
-    final activeFavoriteId = _id(_firstUuid);
-    final archivedFavoriteId = _id(_archivedUuid);
+    final existingActiveId = _id(_firstUuid);
+    final existingArchivedId = _id(_archivedUuid);
     final newId = _id(_secondUuid);
     late Database raw;
 
-    /// Подменяет хранилище и готовит прежний граф: активное избранное
-    /// намерение, архивированное избранное на последнем месте порядка, теги
-    /// «Дом» и «Выходные» и самостоятельный «Спорт», созданный отдельной
-    /// командой до создания намерения. Возвращает идентификатор «Спорта».
+    /// Подменяет хранилище и готовит прежний граф: активное и архивированное
+    /// намерения, теги «Дом» и «Выходные» и самостоятельный «Спорт», созданный
+    /// отдельной командой до создания намерения. Возвращает идентификатор «Спорта».
     Future<TagId> replaceWithSeededGraph(
       LocalDatabaseConnectionObserver observer,
     ) async {
@@ -461,26 +460,16 @@ void main() {
       repository = replacement.repository;
       await _insertIntention(
         database,
-        id: activeFavoriteId,
-        title: 'Активное избранное',
+        id: existingActiveId,
+        title: 'Активное намерение',
         createdAt: DateTime.utc(2026, 9, 1),
       );
       await _insertIntention(
         database,
-        id: archivedFavoriteId,
-        title: 'Архивное избранное',
+        id: existingArchivedId,
+        title: 'Архивное намерение',
         isArchived: true,
         createdAt: DateTime.utc(2026, 9, 2),
-      );
-      storeFavoriteMark(
-        raw,
-        intentionId: activeFavoriteId.toCanonicalString(),
-        position: 2,
-      );
-      storeFavoriteMark(
-        raw,
-        intentionId: archivedFavoriteId.toCanonicalString(),
-        position: 5,
       );
       raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
         homeTagId.toCanonicalString(),
@@ -504,12 +493,11 @@ void main() {
           title: 'Полное намерение',
           description: 'Описание полного намерения',
           readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
           tagIds: tagIds,
         );
 
-    /// Отказ не оставил части создания: публичные чтения, поиск, места
-    /// избранного, строки хранилища и ревизия совпадают с [before], FTS
+    /// Отказ не оставил части создания: публичные чтения, поиск,
+    /// строки хранилища и ревизия совпадают с [before], FTS
     /// целостна, а самостоятельный «Спорт» по-прежнему доступен.
     Future<void> expectRolledBack(
       _ObservedCreationGraph before, {
@@ -545,7 +533,7 @@ void main() {
     }
 
     test('отказ в представительных точках транзакции откатывает намерение, '
-        'назначения, место избранного и FTS, сохраняя прежний граф, ревизию '
+        'назначения и FTS, сохраняя прежний граф, ревизию '
         'и самостоятельный тег', () async {
       // Пробное выполнение без отказа фиксирует операции транзакции.
       final probe = _StatementFaultInjector();
@@ -573,14 +561,12 @@ void main() {
       expect(operations.skip(lastWrite + 1), isNotEmpty);
 
       // Точки с разным исходом: первая проверка, первая запись (намерение),
-      // первое назначение, последняя запись (место избранного) и первое
-      // чтение окончательного результата. Остальные операции повторяют
-      // те же ветки.
+      // первое назначение и первое чтение окончательного результата.
+      // Остальные операции повторяют те же ветки.
       for (final failAfter in <int>{
         1,
         firstWrite + 1,
         writeIndexes[1] + 1,
-        lastWrite + 1,
         lastWrite + 2,
       }) {
         final faulted = operations[failAfter - 1];
@@ -611,7 +597,7 @@ void main() {
         );
 
         // Повтор той же команды с тем же идентификатором создаёт весь набор
-        // в конце полного порядка на новой ревизии.
+        // на новой ревизии.
         final retried = await repository.execute(command);
         expect(
           retried,
@@ -630,12 +616,6 @@ void main() {
           homeTagId,
           weekendTagId,
           sportTagId,
-        ], reason: reason);
-        expect(summary.favoriteMark, FavoriteMark.favorite, reason: reason);
-        expect(storedFavoriteMarks(raw), [
-          (activeFavoriteId.toCanonicalString(), 2),
-          (archivedFavoriteId.toCanonicalString(), 5),
-          (newId.toCanonicalString(), 6),
         ], reason: reason);
       }
     });
@@ -1345,7 +1325,6 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
   Database raw,
 ) async {
   final page = _readValue(await repository.getCatalogPage(_allIntentionsQuery));
-  final favorites = _readValue(await repository.getFavoriteIntentions());
   final tags = _readValue(
     await repository.getTagCatalog(const TagCatalogBrowseMode()),
   );
@@ -1358,13 +1337,10 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
             item.title,
             item.readiness,
             item.archiveState,
-            item.favoriteMark,
             [for (final tag in item.tags) tag.id],
           ],
       ],
       await _matchingIds(repository, 'полное'),
-      [for (final row in favorites.items) row.id],
-      favorites.archivedCount,
       [
         for (final tag in tags.items) [tag.id, tag.name.value],
       ],
@@ -1387,12 +1363,7 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
 
 /// Строки всех таблиц, которые затрагивает создание намерения.
 List<Object?> _storedCreationRows(Database raw) => [
-  for (final table in [
-    'intentions',
-    'tag_assignments',
-    'favorite_intentions',
-    'tags',
-  ])
+  for (final table in ['intentions', 'tag_assignments', 'tags'])
     [
       for (final row in raw.select('SELECT * FROM $table ORDER BY 1')) {...row},
     ],

@@ -867,7 +867,6 @@ void main() {
         title: 'Прогулка',
         description: null,
         readiness: IntentionReadiness.notReady,
-        favoriteMark: FavoriteMark.notFavorite,
         tagIds: [home, weekend, _tagId(home.toCanonicalString()), home],
       );
 

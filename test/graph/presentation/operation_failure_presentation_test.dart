@@ -709,7 +709,6 @@ final class _FailureHarness {
         title: 'Полное намерение',
         description: null,
         readiness: IntentionReadiness.ready,
-        favoriteMark: FavoriteMark.favorite,
         tagIds: [missingTag],
       ),
     ) as IntentionCommandAccepted;

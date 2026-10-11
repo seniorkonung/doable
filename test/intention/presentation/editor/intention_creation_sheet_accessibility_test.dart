@@ -76,7 +76,6 @@ void main() {
         sessions.notifier(tester)
           ..draftTagSet.add(_home)
           ..draftTagSet.add(_work)
-          ..markFavorite()
           ..confirmReadiness();
         await tester.pumpAndSettle();
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
@@ -87,7 +86,6 @@ void main() {
           _tagRemove(_home),
           _tagRemove(_work),
           _chooseTags,
-          _favorite,
           _readiness,
           _submit,
           _closeButton,
@@ -150,7 +148,7 @@ void main() {
     );
 
     testWidgets(
-      'экранный диктор без жестов открывает панель, готовит все пять полей черновика через общий выбор тегов и объяснение готовности и возвращается в ту же панель — $code',
+      'экранный диктор без жестов открывает панель, готовит все четыре поля черновика через общий выбор тегов и объяснение готовности и возвращается в ту же панель — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester);
@@ -198,14 +196,6 @@ void main() {
           ),
         );
         expect(_traversal(tester), _panel(l10n));
-        _expectOption(
-          tester,
-          _favorite,
-          label: l10n.editorFavoriteOption,
-          tooltip: l10n.editorFavoriteOptionOff,
-          isOn: false,
-          icon: Icons.star_border,
-        );
         _expectOption(
           tester,
           _readiness,
@@ -268,17 +258,6 @@ void main() {
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
         _expectNoSizeActions();
 
-        tester.semantics.tap(_nodeOf(tester, find.byKey(_favorite)));
-        await tester.pumpAndSettle();
-        _expectOption(
-          tester,
-          _favorite,
-          label: l10n.editorFavoriteOption,
-          tooltip: l10n.editorFavoriteOptionOn,
-          isOn: true,
-          icon: Icons.star,
-        );
-
         // Объяснение готовности — верхняя поверхность: диктор слышит оба
         // критерия, а фокус остаётся в объяснении до ответа.
         tester.semantics.tap(_nodeOf(tester, find.byKey(_readiness)));
@@ -322,7 +301,6 @@ void main() {
         expect(draft.title, _userTitle);
         expect(draft.description, _userDescription);
         expect(draft.tagIds, [_home.id]);
-        expect(draft.favoriteMark, FavoriteMark.favorite);
         expect(draft.readiness, IntentionReadiness.ready);
         expect(repository.commands, isEmpty);
         expect(repository.tagCommands, isEmpty);
@@ -350,7 +328,6 @@ void main() {
         sessions.notifier(tester)
           ..draftTagSet.add(_home)
           ..draftTagSet.add(_work)
-          ..markFavorite()
           ..confirmReadiness();
         await tester.pumpAndSettle();
         final tags = ['Дом', 'Работа'];
@@ -397,12 +374,7 @@ void main() {
             hasTapAction: false,
           ),
         );
-        for (final control in [
-          _favorite,
-          _readiness,
-          _chooseTags,
-          _tagRemove(_home),
-        ]) {
+        for (final control in [_readiness, _chooseTags, _tagRemove(_home)]) {
           expect(
             tester.getSemantics(find.byKey(control)),
             isSemantics(
@@ -520,11 +492,6 @@ void main() {
               )
               .having((command) => command.tagIds, 'теги', [_work.id])
               .having(
-                (command) => command.favoriteMark,
-                'избранное',
-                FavoriteMark.favorite,
-              )
-              .having(
                 (command) => command.readiness,
                 'готовность',
                 IntentionReadiness.ready,
@@ -592,10 +559,9 @@ void main() {
         await tester.pumpAndSettle();
 
         // Порядок обхода совпадает с порядком чтения и замыкается в панели.
-        expect(await _tabOrder(tester, steps: 8), [
+        expect(await _tabOrder(tester, steps: 7), [
           _description,
           _chooseTags,
-          _favorite,
           _readiness,
           _submit,
           _closeButton,
@@ -606,24 +572,6 @@ void main() {
           _title,
           _closeButton,
         ]);
-
-        // Отметки переключаются пробелом и вводом.
-        await _tabTo(tester, find.byKey(_favorite));
-        await tester.sendKeyEvent(LogicalKeyboardKey.space);
-        await tester.pumpAndSettle();
-        expect(
-          sessions.state(tester).draft.favoriteMark,
-          FavoriteMark.favorite,
-        );
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pumpAndSettle();
-        expect(
-          sessions.state(tester).draft.favoriteMark,
-          FavoriteMark.notFavorite,
-        );
-        await tester.sendKeyEvent(LogicalKeyboardKey.space);
-        await tester.pumpAndSettle();
-        expect(_isFocusedIn(tester, find.byKey(_favorite)), isTrue);
 
         // Объяснение готовности удерживает обход в себе; Escape закрывает
         // его без включения, а фокус возвращается к отметке.
@@ -712,11 +660,6 @@ void main() {
               .having((command) => command.title, 'название', _userTitle)
               .having((command) => command.tagIds, 'теги', isEmpty)
               .having(
-                (command) => command.favoriteMark,
-                'избранное',
-                FavoriteMark.favorite,
-              )
-              .having(
                 (command) => command.readiness,
                 'готовность',
                 IntentionReadiness.ready,
@@ -756,7 +699,6 @@ void main() {
           sessions.notifier(tester)
             ..draftTagSet.add(_home)
             ..draftTagSet.add(_work)
-            ..markFavorite()
             ..confirmReadiness();
           await tester.pumpAndSettle();
           await _expectGuidelines(tester, 'заполненная компактная панель');
@@ -825,7 +767,6 @@ const _heading = ValueKey('intention-editor-heading');
 const _title = ValueKey('intention-editor-title');
 const _description = ValueKey('intention-editor-description');
 const _chooseTags = ValueKey('intention-editor-choose-tags');
-const _favorite = ValueKey('intention-editor-favorite');
 const _readiness = ValueKey('intention-editor-readiness');
 const _submit = ValueKey('intention-editor-submit');
 const _failure = ValueKey('intention-editor-failure');
@@ -891,7 +832,6 @@ List<String> _panel(AppLocalizations l10n, {List<String> tags = const []}) => [
   l10n.editorDescriptionLabel,
   for (final tag in tags) ...[tag, l10n.editorRemoveDraftTag(tag)],
   l10n.editorChooseTags,
-  l10n.editorFavoriteOption,
   l10n.editorReadinessOption,
   l10n.editorSaveAction,
 ];
@@ -1042,7 +982,6 @@ const _focusTargets = [
   _title,
   _description,
   _chooseTags,
-  _favorite,
   _readiness,
   _submit,
   _closeButton,
@@ -1237,11 +1176,7 @@ Result<IntentionCommandSuccess> _savedResult() {
       catalogMutation: IntentionCatalogCreated(
         revision: const TestCatalogRevision(1),
         entry: TestCatalogEntrySnapshot(
-          testSummary(
-            title: _userTitle,
-            readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
-          ),
+          testSummary(title: _userTitle, readiness: IntentionReadiness.ready),
         ),
       ),
     ),

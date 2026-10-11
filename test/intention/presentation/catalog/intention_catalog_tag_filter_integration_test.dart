@@ -805,7 +805,6 @@ void main() {
             title: 'Ходить по лесу',
             description: 'Тропа у реки',
             readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
             tagIds: [_tagId(303), _tagId(301)],
           ),
         );
@@ -834,7 +833,6 @@ void main() {
           expect(row.title, 'Ходить по лесу');
           expect(row.hasDescription, isTrue);
           expect(row.readiness, IntentionReadiness.ready);
-          expect(row.favoriteMark, FavoriteMark.favorite);
           expect(row.tags.map((tag) => (tag.id, tag.name.value)), [
             (_tagId(301), 'Здоровье'),
             (_tagId(303), 'Отдых'),
@@ -888,7 +886,6 @@ void main() {
           title: title,
           description: null,
           readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
           tagIds: [for (final number in tagNumbers) _tagId(number)],
         ),
       );
@@ -952,7 +949,6 @@ void main() {
             title: 'Ходить по лесу',
             description: null,
             readiness: readiness,
-            favoriteMark: FavoriteMark.notFavorite,
             tagIds: [_tagId(301), _tagId(303)],
           ),
         );

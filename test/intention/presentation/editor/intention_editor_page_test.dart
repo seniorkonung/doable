@@ -768,13 +768,12 @@ void main() {
           String,
           Future<void> Function(WidgetTester tester, _EditorSessions sessions)
         >{
-          // Изменённость каждого из пяти полей проверяет модель сессии;
+          // Изменённость каждого из четырёх полей проверяет модель сессии;
           // страница одинаково обрабатывает любое изменение.
           'название из одних пробелов': (tester, _) => tester.enterText(
             find.byKey(const ValueKey('intention-editor-title')),
             '   ',
           ),
-          'избранное': (tester, _) => tester.tap(find.byKey(_favorite)),
         };
     for (final MapEntry(key: field, value: change) in changes.entries) {
       testWidgets(
@@ -1308,54 +1307,31 @@ void main() {
     );
   });
 
-  group('быстрые отметки избранного и готовности', () {
+  group('начальная готовность к действию', () {
     testWidgets(
-      'новая панель показывает выключенные отметки с локализованными назначением и состоянием и действие «Сохранить»',
+      'новая панель показывает готовность и сохранение без управления избранным',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        for (final (
-              locale,
-              favorite,
-              favoriteOff,
-              readiness,
-              readinessOff,
-              save,
-            )
-            in [
-              (
-                const Locale('en'),
-                'Create as favorite',
-                'Create as favorite: off',
-                'Create as ready for action',
-                'Create as ready for action: off',
-                'Save',
-              ),
-              (
-                const Locale('ru'),
-                'Создать избранным',
-                'Создать избранным: выключено',
-                'Создать готовым к действию',
-                'Создать готовым к действию: выключено',
-                'Сохранить',
-              ),
-            ]) {
+        for (final (locale, favoriteOff, readiness, readinessOff, save) in [
+          (
+            const Locale('en'),
+            'Create as favorite: off',
+            'Create as ready for action',
+            'Create as ready for action: off',
+            'Save',
+          ),
+          (
+            const Locale('ru'),
+            'Создать избранным: выключено',
+            'Создать готовым к действию',
+            'Создать готовым к действию: выключено',
+            'Сохранить',
+          ),
+        ]) {
           final repository = ControlledCatalogRepository();
           await _openEditor(tester, repository, locale: locale);
 
-          expect(_iconOf(tester, _favorite), Icons.star_border);
-          expect(_tooltipOf(tester, _favorite), favoriteOff);
-          expect(
-            tester.getSemantics(find.byKey(_favorite)),
-            isSemantics(
-              label: favorite,
-              isButton: true,
-              hasToggledState: true,
-              isToggled: false,
-              hasEnabledState: true,
-              isEnabled: true,
-              hasTapAction: true,
-            ),
-          );
+          expect(find.byTooltip(favoriteOff), findsNothing);
           expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
           expect(_tooltipOf(tester, _readiness), readinessOff);
           expect(
@@ -1374,80 +1350,6 @@ void main() {
           expect(repository.commands, isEmpty);
           await tester.pumpWidget(const SizedBox.shrink());
         }
-        semantics.dispose();
-      },
-    );
-
-    testWidgets(
-      'избранное переключается только в черновике, отличается формой и семантикой и сохраняется одной командой',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final sessions = _EditorSessions();
-        final repository = ControlledCatalogRepository();
-        await _openEditor(tester, repository, observers: [sessions]);
-
-        await tester.tap(find.byKey(_favorite));
-        await tester.pump();
-
-        expect(
-          sessions.state(tester).draft.favoriteMark,
-          FavoriteMark.favorite,
-        );
-        expect(_iconOf(tester, _favorite), Icons.star);
-        expect(_tooltipOf(tester, _favorite), 'Create as favorite: on');
-        expect(
-          tester.getSemantics(find.byKey(_favorite)),
-          isSemantics(
-            label: 'Create as favorite',
-            hasToggledState: true,
-            isToggled: true,
-          ),
-        );
-        // Включение отметки не трогает готовность и не пишет в граф.
-        expect(
-          sessions.state(tester).draft.readiness,
-          IntentionReadiness.notReady,
-        );
-        expect(find.byKey(_readinessConfirmation), findsNothing);
-        expect(repository.commands, isEmpty);
-
-        await tester.tap(find.byKey(_favorite));
-        await tester.pump();
-        expect(
-          sessions.state(tester).draft.favoriteMark,
-          FavoriteMark.notFavorite,
-        );
-        expect(_iconOf(tester, _favorite), Icons.star_border);
-        expect(_tooltipOf(tester, _favorite), 'Create as favorite: off');
-        expect(sessions.state(tester).draft.isChanged, isFalse);
-        expect(repository.commands, isEmpty);
-
-        await tester.tap(find.byKey(_favorite));
-        await tester.enterText(find.byKey(_title), 'Гулять');
-        await tester.tap(find.byKey(_submit));
-        await tester.pump();
-
-        expect(
-          repository.commands.single,
-          isA<CreateIntention>()
-              .having((command) => command.title, 'название', 'Гулять')
-              .having(
-                (command) => command.favoriteMark,
-                'избранное',
-                FavoriteMark.favorite,
-              )
-              .having(
-                (command) => command.readiness,
-                'готовность',
-                IntentionReadiness.notReady,
-              )
-              .having((command) => command.tagIds, 'теги', isEmpty),
-        );
-        repository.completeCommand(
-          0,
-          const ResultFailure(IntentionUnexpectedFailure()),
-        );
-        await tester.pumpAndSettle();
         semantics.dispose();
       },
     );
@@ -1529,10 +1431,6 @@ void main() {
           _fieldText(tester, 'intention-editor-title'),
           '  Позвонить врачу  ',
         );
-        expect(
-          sessions.state(tester).draft.favoriteMark,
-          FavoriteMark.notFavorite,
-        );
         expect(repository.commands, isEmpty);
 
         // Выключение не требует объяснения и меняет только черновик.
@@ -1562,11 +1460,6 @@ void main() {
                 (command) => command.readiness,
                 'готовность',
                 IntentionReadiness.ready,
-              )
-              .having(
-                (command) => command.favoriteMark,
-                'избранное',
-                FavoriteMark.notFavorite,
               ),
         );
         repository.completeCommand(
@@ -1590,7 +1483,6 @@ void main() {
           observers: [sessions],
         );
         await tester.enterText(find.byKey(_title), 'Намерение');
-        await tester.tap(find.byKey(_favorite));
         await tester.tap(find.byKey(_readiness));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(_readinessConfirm));
@@ -1611,7 +1503,7 @@ void main() {
           tester.widget<TextField>(find.byKey(_description)).readOnly,
           isTrue,
         );
-        for (final option in [_favorite, _readiness]) {
+        for (final option in [_readiness]) {
           expect(
             tester.widget<IconButton>(find.byKey(option)).onPressed,
             isNull,
@@ -1629,7 +1521,6 @@ void main() {
 
         // Повторные нажатия отметок и сохранения ничего не меняют и не
         // отправляют вторую команду.
-        await tester.tap(find.byKey(_favorite), warnIfMissed: false);
         await tester.tap(find.byKey(_readiness), warnIfMissed: false);
         await tester.tap(find.byKey(_submit), warnIfMissed: false);
         await tester.pumpAndSettle();
@@ -1653,12 +1544,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Отказ возвращает доступ к отметкам с прежними состояниями.
-        expect(_iconOf(tester, _favorite), Icons.star);
         expect(_iconOf(tester, _readiness), Icons.check_circle);
-        expect(
-          tester.widget<IconButton>(find.byKey(_favorite)).onPressed,
-          isNotNull,
-        );
         expect(
           tester.widget<IconButton>(find.byKey(_readiness)).onPressed,
           isNotNull,
@@ -1669,17 +1555,11 @@ void main() {
         expect(repository.commands, hasLength(2));
         expect(
           repository.commands.last,
-          isA<CreateIntention>()
-              .having(
-                (command) => command.favoriteMark,
-                'избранное',
-                FavoriteMark.favorite,
-              )
-              .having(
-                (command) => command.readiness,
-                'готовность',
-                IntentionReadiness.ready,
-              ),
+          isA<CreateIntention>().having(
+            (command) => command.readiness,
+            'готовность',
+            IntentionReadiness.ready,
+          ),
         );
         repository.completeCommand(
           1,
@@ -1883,7 +1763,6 @@ void main() {
         );
         await tester.enterText(find.byKey(_title), 'Намерение');
         await tester.enterText(find.byKey(_description), 'Описание');
-        sessions.notifier(tester).markFavorite();
         sessions.notifier(tester).confirmReadiness();
         await tester.pump();
         final session = sessions.latest!;
@@ -1965,11 +1844,6 @@ void main() {
               .having((command) => command.tagIds, 'актуальные теги', [
                 _tagId(1),
               ])
-              .having(
-                (command) => command.favoriteMark,
-                'избранное',
-                draft.favoriteMark,
-              )
               .having(
                 (command) => command.readiness,
                 'готовность',
@@ -2329,7 +2203,6 @@ const _closeButton = ValueKey('intention-editor-close');
 const _title = ValueKey('intention-editor-title');
 const _description = ValueKey('intention-editor-description');
 const _submit = ValueKey('intention-editor-submit');
-const _favorite = ValueKey('intention-editor-favorite');
 const _readiness = ValueKey('intention-editor-readiness');
 const _readinessConfirmation = ValueKey(
   'intention-editor-readiness-confirmation',
@@ -2545,7 +2418,6 @@ void _expectDraftValues(
   expect(actual.title, expected.title);
   expect(actual.description, expected.description);
   expect(actual.tagIds, expected.tagIds);
-  expect(actual.favoriteMark, expected.favoriteMark);
   expect(actual.readiness, expected.readiness);
 }
 

@@ -659,8 +659,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   /// Выбранные теги подтверждаются до генерации идентификатора и показания
   /// часов: отсутствие хотя бы одного отклоняет всё создание. Окончательный
   /// снимок читается и сверяется с командой до подтверждения транзакции,
-  /// поэтому любой отказ откатывает намерение, назначения и место избранного
-  /// вместе.
+  /// поэтому любой отказ откатывает намерение и назначения вместе.
   ///
   /// [onStage] сообщает диагностике переход к записи и к проверке
   /// результата: отказ относится к последнему сообщённому этапу, до первого
@@ -714,10 +713,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
             ),
           );
     }
-    if (command.favoriteMark == domain.FavoriteMark.favorite) {
-      await _insertFavoritePlace(intention.id);
-    }
-
     onStage(IntentionCreationCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(intention.id);
     if (stored == null) throw const _StoredIntentionCorruption();
@@ -726,7 +721,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final after = await _catalogEntrySnapshot(stored, counts);
     final assignedTagIds = [for (final tag in after.summary.tags) tag.id];
     if (!_sameIntention(storedIntention, intention) ||
-        after.summary.favoriteMark != command.favoriteMark ||
         assignedTagIds.length != command.tagIds.length ||
         !command.tagIds.containsAll(assignedTagIds)) {
       throw const _StoredIntentionCorruption();

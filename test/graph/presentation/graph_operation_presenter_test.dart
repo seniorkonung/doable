@@ -2218,7 +2218,6 @@ final class _PresenterHarness {
         title: 'Полное намерение',
         description: null,
         readiness: IntentionReadiness.ready,
-        favoriteMark: FavoriteMark.favorite,
         tagIds: [_tagId, _otherTagId],
       ),
     ) as IntentionCommandAccepted;
