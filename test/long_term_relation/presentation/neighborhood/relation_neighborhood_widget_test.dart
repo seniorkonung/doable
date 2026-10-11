@@ -876,9 +876,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Намерение избранное: шапка страницы показывает его отметку.
-    expect(find.byIcon(Icons.star), findsOneWidget);
-
     await _scrollTo(tester, find.text('To Моё намерение, you need Сосед один'));
     final neighborhood = find.byType(RelationNeighborhoodSliver);
     // Избранное намерение само участвует в каждой связи своего соседства.

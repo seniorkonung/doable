@@ -111,13 +111,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       return;
     }
     state = current.copyWith(clearEdit: true);
-    if (current.isAwaitingFavoriteMarkSnapshot) {
-      // Открытая форма могла удержать прежние данные при отказе чтения:
-      // ожидание снимка заканчивает новое чтение, а не возврат управления.
-      _advanceGeneration();
-      _preserveAuthoritativeStateWhileLoading = true;
-      _startObservation();
-    }
   }
 
   void changeTitle(String value) {
@@ -204,14 +197,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       _ => false,
     };
   }
-
-  /// Отмечает намерение избранным. Новое значение публикует только
-  /// подтверждённый снимок: до него состояние несёт прежнюю отметку.
-  void markFavorite() =>
-      _startStateChange(IntentionDetailsStateChangeKind.markFavorite);
-
-  void unmarkFavorite() =>
-      _startStateChange(IntentionDetailsStateChangeKind.unmarkFavorite);
 
   void retryStateChange() {
     final current = state;
@@ -432,19 +417,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
             when intention.id == _intentionId &&
                 kind != IntentionDetailsStateChangeKind.delete:
           if (current is IntentionDetailsLoaded) {
-            state = current.copyWith(
-              clearStateChange: true,
-              isAwaitingFavoriteMarkSnapshot: switch (kind) {
-                IntentionDetailsStateChangeKind.markFavorite ||
-                IntentionDetailsStateChangeKind.unmarkFavorite =>
-                  _isOlderThanConfirmedChange(current.revision, completion),
-                IntentionDetailsStateChangeKind.enableReadiness ||
-                IntentionDetailsStateChangeKind.disableReadiness ||
-                IntentionDetailsStateChangeKind.archive ||
-                IntentionDetailsStateChangeKind.restore ||
-                IntentionDetailsStateChangeKind.delete => null,
-              },
-            );
+            state = current.copyWith(clearStateChange: true);
           }
         case ResultSuccess(value: IntentionDeleted(:final id))
             when id == _intentionId &&
@@ -492,12 +465,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     IntentionDetailsStateChangeKind.archive => ArchiveIntention(_intentionId),
     IntentionDetailsStateChangeKind.restore => RestoreIntention(_intentionId),
     IntentionDetailsStateChangeKind.delete => DeleteIntention(_intentionId),
-    IntentionDetailsStateChangeKind.markFavorite => MarkIntentionFavorite(
-      _intentionId,
-    ),
-    IntentionDetailsStateChangeKind.unmarkFavorite => UnmarkIntentionFavorite(
-      _intentionId,
-    ),
   };
 
   bool _isStateChangeApplicable(
@@ -515,30 +482,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       IntentionDetailsStateChangeKind.restore =>
         details.intention.archiveState == IntentionArchiveState.archived,
       IntentionDetailsStateChangeKind.delete => true,
-      // До снимка подтверждённой отметки действие по прежней неприменимо.
-      IntentionDetailsStateChangeKind.markFavorite =>
-        !loaded.isAwaitingFavoriteMarkSnapshot &&
-            details.favoriteMark == FavoriteMark.notFavorite,
-      IntentionDetailsStateChangeKind.unmarkFavorite =>
-        !loaded.isAwaitingFavoriteMarkSnapshot &&
-            details.favoriteMark == FavoriteMark.favorite,
-    };
-  }
-
-  /// Показанный снимок старше подтверждённого пакета, и отметку опубликует
-  /// только чтение, начатое этим пакетом. Завершение без изменения на ревизии
-  /// показанного снимка ожидания не образует.
-  bool _isOlderThanConfirmedChange(
-    GraphRevision shown,
-    IntentionCommandCompletion completion,
-  ) {
-    final confirmed = completion.confirmedChange?.revision;
-    if (confirmed == null) {
-      return false;
-    }
-    return switch (shown.compareTo(confirmed)) {
-      GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => true,
-      GraphRevisionOrder.same || GraphRevisionOrder.newer => false,
     };
   }
 

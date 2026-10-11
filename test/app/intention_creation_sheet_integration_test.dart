@@ -1045,13 +1045,6 @@ Future<void> _expectCreatedPage(
     ),
     findsOneWidget,
   );
-  expect(
-    _iconOf(
-      tester,
-      find.byKey(const ValueKey('intention-details-favorite-mark')),
-    ),
-    favoriteMark == FavoriteMark.favorite ? Icons.star : Icons.star_border,
-  );
   for (final tag in assignments.items) {
     final row = find.byKey(
       ValueKey('tag-assignment-row-${tag.id.toCanonicalString()}'),

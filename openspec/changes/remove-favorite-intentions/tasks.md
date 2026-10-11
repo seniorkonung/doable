@@ -28,7 +28,7 @@
   - **Вероятные файлы:** `lib/src/favorite/presentation/home/` → `lib/src/app/home/home_page.dart` (новый путь задан дизайном), `lib/src/app/routing/app_router.gr.dart`, `test/app/navigation/app_start_page_test.dart`, импорты в `test/support/app_root_pages.dart` и тестах навигации; удаляемые `test/favorite/presentation/home/` и `test/app/home_favorites*_test.dart`; `widgetbook/lib/catalog.dart`, `widgetbook/lib/favorite/home_row_use_cases.dart`, `widgetbook/test/widgetbook_app_test.dart`.
   - **Объём:** M.
 
-- [ ] 1.4 Удалить управление избранностью со страницы намерения
+- [x] 1.4 Удалить управление избранностью со страницы намерения
   - **Критерии приёмки:**
     - Страница активного и архивированного намерения не предоставляет отметку избранного; из её состояния и ViewModel удалены соответствующие действия, ожидание снимка, ошибка и повтор.
     - Редактирование, готовность, архивирование, восстановление, теги и удаление сохраняют прежние контракты. Из смешанных проверок удалены только обязанности избранного; специализированные проверки управления отметкой удалены.
