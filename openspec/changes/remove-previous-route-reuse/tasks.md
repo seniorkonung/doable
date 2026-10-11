@@ -73,7 +73,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/application/choice_path_suggestions.dart`, `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_choice_path_suggestions.dart`, `test/daily_choice/application/choice_path_suggestions_test.dart`, `test/graph/data/drift_choice_path_suggestions_test.dart`; реализации и обёртки репозитория в `test/app/`, `test/intention/presentation/`, `test/long_term_relation/presentation/`, `test/graph/application/`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart` и `test/daily_choice/presentation/daily_choice_creation_exit_test.dart`.
   - **Объём:** M; одна согласованная правка контракта с механическим удалением его повторяющихся реализаций в тестах.
 
-- [ ] 1.9 Удалить индексы недавних выборов, сохранив чтение общих счётчиков и целостность схемы
+- [x] 1.9 Удалить индексы недавних выборов, сохранив чтение общих счётчиков и целостность схемы
   - **Критерии приёмки:**
     - `daily_choices_source_recent` и `daily_choices_selected_recent` удалены из единственной схемы версии 1 и её производных артефактов по решению 4 дизайна, без миграции и удаления пользовательских записей.
     - Принудительные ссылки `INDEXED BY` в агрегатах дневных связей переведены на сохраняемые `daily_choices_source_date_creation_order` и `daily_choices_selected_date_creation_order`; запросы счётчиков и групп продолжают работать.
