@@ -121,7 +121,7 @@
   - **Вероятные файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/application/intention_details.dart`, `lib/src/intention/domain/intention.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, удаляемая часть `drift_personal_graph_repository_favorite_marks.dart`; конструкторы и проверки в `test/intention/`, `test/graph/`, `test/tag/`, `test/support/`.
   - **Объём:** M.
 
-- [ ] 1.14 Сократить диагностику до сохраняющихся операций графа
+- [x] 1.14 Сократить диагностику до сохраняющихся операций графа
   - **Критерии приёмки:**
     - Удалены события, виды команд, этапы и сериализация избранного; вместо семейства `IntentionCommandDiagnosticsStage` используется оставшийся `IntentionCreationCommandDiagnosticsStage` по решению 4 дизайна.
     - Создание сохраняет этапы проверки, записи и проверки результата; существующие тесты подтверждают безопасную передачу диагностики, отсутствие данных личного графа и неизменность результатов при отказе диагностического приёмника.
