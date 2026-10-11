@@ -6,24 +6,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
-import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../application/choice_path_continuations.dart';
 import '../../application/choice_path_draft.dart';
-import '../../application/choice_path_suggestions.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../domain/calendar_date.dart';
 import '../daily_choice_creation_exit_action.dart';
 import '../daily_choice_creation_flow_session.dart';
 import '../editor/daily_choice_creation_page.dart';
 import 'choice_path_state.dart';
-import 'choice_path_suggestions_view.dart';
-import 'choice_path_suggestions_view_model.dart';
 import 'choice_path_view_model.dart';
 
 @RoutePage()
@@ -69,7 +64,6 @@ final class ChoicePathSelection {
 }
 
 final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
-  late final ChoicePathSuggestionsViewModel _suggestions;
   DailyChoiceCreationFlowSession? _creationSession;
 
   /// Сессия конкретного корня; вспомогательный выбор ею не владеет.
@@ -82,23 +76,6 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
 
   void _creationChanged() {
     if (mounted) setState(() {});
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _suggestions = ChoicePathSuggestionsViewModel.fromCoordinator(
-      ref.read(personalGraphRepositoryProvider),
-      ref.read(graphCommandCoordinatorProvider.notifier),
-      switch (widget.direction) {
-        ChoicePathDraftDirection.topDown => ChoicePathSuggestionsForSource(
-          widget.sourceIntentionId,
-        ),
-        ChoicePathDraftDirection.bottomUp => ChoicePathSuggestionsForAction(
-          widget.sourceIntentionId,
-        ),
-      },
-    );
   }
 
   @override
@@ -127,7 +104,6 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
   void dispose() {
     _creationSession?.changes.removeListener(_creationChanged);
     _creationSession?.leave();
-    _suggestions.dispose();
     super.dispose();
   }
 
@@ -166,27 +142,6 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
             ).notifier,
           )
           .refresh(),
-    );
-  }
-
-  void _selectSuggestion(AvailableChoicePathSuggestion suggestion) {
-    if (!_canContinue) return;
-    if (!identical(
-      _suggestions.confirmable(suggestion.originChoiceId),
-      suggestion,
-    )) {
-      return;
-    }
-    unawaited(
-      _openConfirmation(
-        ChoicePathSelection(
-          path: suggestion.confirmedPath,
-          steps: [
-            for (final step in suggestion.path)
-              DailyChoiceCreationStep.fromSuggestion(step),
-          ],
-        ),
-      ),
     );
   }
 
@@ -242,18 +197,6 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
               Text(l10n.choicePathBottomPathDirection),
               const SizedBox(height: 12),
             ],
-            if (canContinue)
-              ListenableBuilder(
-                listenable: _suggestions,
-                builder: (context, _) => ChoicePathSuggestionsView(
-                  state: _suggestions.state,
-                  onSelected: _selectSuggestion,
-                  onRetry: _suggestions.retry,
-                  onRefresh: _suggestions.refresh,
-                  creationSession: _creationSession,
-                ),
-              ),
-            const SizedBox(height: 16),
             _PathPrefix(
               state: state,
               onBack: canContinue
