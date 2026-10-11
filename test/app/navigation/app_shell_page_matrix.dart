@@ -38,7 +38,7 @@ enum _MatrixEntry {
   selectRelated;
 
   Finder get finder => switch (this) {
-    _MatrixEntry.intention => find.byType(HomeIntentionRow),
+    _MatrixEntry.intention => _summary(IntentionCatalogPage, 'Читать'),
     _MatrixEntry.dailyChoice => find.byKey(
       const ValueKey('daily-choice-row-1'),
     ),
@@ -264,6 +264,7 @@ void _registerPageMatrixTests() {
       var destination = AppDestination.home;
       for (final entry in row.entries) {
         final root = switch (entry) {
+          _MatrixEntry.intention ||
           _MatrixEntry.tags ||
           _MatrixEntry.creation ||
           _MatrixEntry.condition => AppDestination.intentionGraph,

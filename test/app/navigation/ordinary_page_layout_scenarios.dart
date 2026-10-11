@@ -220,7 +220,7 @@ void _registerOrdinaryLayoutTests() {
         screen: screen,
         insets: insets,
       );
-      _acceptMark(app, intention: 2);
+      _acceptArchive(app, intention: 2);
       await _until(tester, _messageOf(2));
       await tester.pumpAndSettle();
       unawaited(
@@ -232,7 +232,7 @@ void _registerOrdinaryLayoutTests() {
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
       await _closeMessage(tester);
-      _acceptMark(app, intention: 3);
+      _acceptArchive(app, intention: 3);
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);

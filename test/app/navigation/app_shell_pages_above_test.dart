@@ -48,7 +48,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -57,7 +56,7 @@ import '../../support/quick_creation.dart';
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
 
-/// Активное готовое избранное намерение «Читать» с тегом «Дом»: исходный
+/// Активное готовое намерение «Читать» с тегом «Дом»: исходный
 /// участник связи и исходное намерение дневного выбора.
 const _read = 1;
 
@@ -139,7 +138,12 @@ void main() {
     'незавершённую форму связи и правку намерения без сохранения',
     (tester) async {
       final router = await _start(tester);
-      await _open(tester, find.byType(HomeIntentionRow), IntentionDetailsPage);
+      await _select(tester, AppDestination.intentionGraph);
+      await _open(
+        tester,
+        _summary(IntentionCatalogPage, 'Читать'),
+        IntentionDetailsPage,
+      );
       await _open(
         tester,
         find.byKey(const ValueKey('relation-neighborhood-create-relation')),
@@ -169,7 +173,11 @@ void main() {
         find.byKey(const ValueKey('relation-editor-open-source-details')),
         IntentionDetailsPage,
       );
-      _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+      _expectAboveShell(
+        tester,
+        IntentionDetailsPage,
+        AppDestination.intentionGraph,
+      );
       await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
       await tester.enterText(
         find.byKey(const ValueKey('intention-details-edit-title')),
@@ -181,7 +189,11 @@ void main() {
       );
       tester.testTextInput.hide();
       await tester.pumpAndSettle();
-      _expectAboveShell(tester, IntentionDetailsPage, AppDestination.home);
+      _expectAboveShell(
+        tester,
+        IntentionDetailsPage,
+        AppDestination.intentionGraph,
+      );
 
       await _select(tester, destination);
 
@@ -198,7 +210,12 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       _expectRootPage(tester, router, AppDestination.home);
-      await _open(tester, find.byType(HomeIntentionRow), IntentionDetailsPage);
+      await _select(tester, AppDestination.intentionGraph);
+      await _open(
+        tester,
+        _summary(IntentionCatalogPage, 'Читать'),
+        IntentionDetailsPage,
+      );
       expect(
         tester
             .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
@@ -375,7 +392,7 @@ void _expectCreationSheetAboveCatalog(WidgetTester tester) {
   );
 }
 
-/// Запускает приложение на засеянном хранилище и ждёт Главную со списком.
+/// Запускает приложение на засеянном хранилище и ждёт Главную.
 Future<AppRouter> _start(WidgetTester tester) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
@@ -401,13 +418,17 @@ Future<AppRouter> _start(WidgetTester tester) async {
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
   _seed(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
-  await _until(tester, find.byType(HomeIntentionRow));
+  await _until(tester, find.byType(HomePage));
+  await _waitFor(
+    tester,
+    () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+  );
   await tester.pumpAndSettle();
   return ready.container.read(appRouterProvider);
 }
 
-/// Два намерения, связь между ними, дневной выбор по этой связи, тег и
-/// отметка избранного: каждая страница приложения получает свои данные.
+/// Два намерения, связь между ними, дневной выбор по этой связи и тег:
+/// каждая страница приложения получает свои данные.
 void _seed(sqlite.Database database) {
   for (final (number, title) in [(_read, 'Читать'), (_run, 'Бегать')]) {
     database.execute(
@@ -453,7 +474,6 @@ void _seed(sqlite.Database database) {
     'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
     [tagFixtureId(_tag), tagFixtureId(_read)],
   );
-  storeFavoriteMark(database, intentionId: tagFixtureId(_read), position: 1);
 }
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
