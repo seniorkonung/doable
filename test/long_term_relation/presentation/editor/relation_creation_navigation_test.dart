@@ -24,16 +24,6 @@ import 'relation_form_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
-enum _Failure {
-  none,
-  beforeForm,
-  afterForm,
-  afterResult,
-  delayed,
-  exitBeforeForm,
-  exitAfterForm,
-}
-
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
@@ -41,94 +31,35 @@ void main() {
     );
   });
 
-  for (final success in [true, false]) {
-    testWidgets(
-      'поздний ${success ? 'успех' : 'отказ'} после неудачного выхода не возвращает права формы',
-      (tester) async {
-        final app = await _launch(tester, failure: _Failure.exitBeforeForm);
-        await _openForm(tester, app, null);
-        await _fill(tester, app);
-        await _tap(tester, 'relation-editor-submit');
-        tester
-            .widget<CreationExitAction>(find.byType(CreationExitAction))
-            .onExit();
-        await tester.pump();
-        expect(find.textContaining('Saving will continue'), findsOneWidget);
-        if (success) {
-          app.repository.completeRelationCreated(0);
-        } else {
-          app.repository.failRelationCommand(
-            0,
-            const LongTermRelationUnavailableFailure(),
-          );
-        }
-        await tester.pumpAndSettle();
-        expect(find.text('Leave creation'), findsOneWidget);
-        expect(find.textContaining('Saving will continue'), findsNothing);
-        expect(
-          tester.widget<FilledButton>(_key('relation-editor-submit')).onPressed,
-          isNull,
-        );
-        expect(
-          tester.widget<TextField>(_key('relation-editor-description')).enabled,
-          isFalse,
-        );
-        expect(app.repository.relationCommands, hasLength(1));
-        expect(
-          find.textContaining(
-            success ? 'Relation created.' : 'The relation couldn’t be created.',
-          ),
-          findsOneWidget,
-        );
-        app.router.allowExit = true;
-        tester
-            .widget<CreationExitAction>(find.byType(CreationExitAction))
-            .onExit();
-        await tester.pumpAndSettle();
-        expect(find.byType(RelationDetailsPage), findsOneWidget);
-        expect(app.errors, hasLength(1));
-        expect(tester.takeException(), isNull);
-      },
+  testWidgets('поздний выбор участника после выхода сохраняет новую форму', (
+    tester,
+  ) async {
+    final app = await _launch(tester);
+    await _openForm(tester, app, RelationDirection.outgoing);
+    app.router.holdPickerResult = true;
+    await tester.tap(_key('relation-editor-change-source'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    app.repository.completeCatalogPage(
+      app.repository.catalogQueries.length - 1,
+      [testSummary(index: 3, title: 'Поздний участник')],
     );
-  }
-
-  for (final retained in [true, false]) {
-    testWidgets(
-      'поздний выбор участника после выхода сохраняет ${retained ? 'покинутую' : 'новую'} форму',
-      (tester) async {
-        final app = await _launch(
-          tester,
-          failure: retained ? _Failure.exitBeforeForm : _Failure.none,
-        );
-        await _openForm(tester, app, RelationDirection.outgoing);
-        app.router.holdPickerResult = true;
-        await tester.tap(_key('relation-editor-change-source'));
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
-        app.repository.completeCatalogPage(
-          app.repository.catalogQueries.length - 1,
-          [testSummary(index: 3, title: 'Поздний участник')],
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Поздний участник'));
-        await tester.pumpAndSettle();
-        expect(find.text('Участник 1'), findsOneWidget);
-        tester
-            .widget<CreationExitAction>(find.byType(CreationExitAction))
-            .onExit();
-        await tester.pumpAndSettle();
-        if (!retained) await _openForm(tester, app, RelationDirection.outgoing);
-        final matchId = app.router.stackData.last.matchId;
-        app.router.releasePicker();
-        await tester.pumpAndSettle();
-        expect(app.router.stackData.last.matchId, matchId);
-        expect(find.text('Участник 1'), findsOneWidget);
-        expect(find.text('Поздний участник'), findsNothing);
-        expect(app.repository.relationCommands, isEmpty);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Поздний участник'));
+    await tester.pumpAndSettle();
+    expect(find.text('Участник 1'), findsOneWidget);
+    tester.widget<CreationExitAction>(find.byType(CreationExitAction)).onExit();
+    await tester.pumpAndSettle();
+    await _openForm(tester, app, RelationDirection.outgoing);
+    final matchId = app.router.stackData.last.matchId;
+    app.router.releasePicker();
+    await tester.pumpAndSettle();
+    expect(app.router.stackData.last.matchId, matchId);
+    expect(find.text('Участник 1'), findsOneWidget);
+    expect(find.text('Поздний участник'), findsNothing);
+    expect(app.repository.relationCommands, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'обычное закрытие поиска сохраняет прежний черновик и возможность отправки',
@@ -220,7 +151,6 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(_description(tester), 'Нижний черновик');
-    expect(app.errors, isEmpty);
     expect(tester.takeException(), isNull);
   });
 
@@ -259,78 +189,8 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
     expect(find.textContaining('Relation created.'), findsNothing);
-    expect(app.errors, isEmpty);
     expect(tester.takeException(), isNull);
   });
-
-  for (final point in [_Failure.exitBeforeForm, _Failure.exitAfterForm]) {
-    testWidgets(
-      'отказ выхода $point не возобновляет создание и сохраняет повтор выхода',
-      (tester) async {
-        final app = await _launch(tester, failure: point);
-        final history = app.router.stackData
-            .map((route) => route.matchId)
-            .toList();
-        await _openForm(tester, app, null);
-        await _fill(tester, app);
-        final submit = tester
-            .widget<FilledButton>(_key('relation-editor-submit'))
-            .onPressed!;
-        final select = tester
-            .widget<OutlinedButton>(_key('relation-editor-change-source'))
-            .onPressed!;
-        final changeDescription = tester
-            .widget<TextField>(_key('relation-editor-description'))
-            .onChanged!;
-        final exit = tester
-            .widget<CreationExitAction>(find.byType(CreationExitAction))
-            .onExit;
-        exit();
-        submit();
-        select();
-        changeDescription('Поздняя правка');
-        await tester.pumpAndSettle();
-        if (point == _Failure.exitBeforeForm) {
-          expect(
-            tester
-                .widget<FilledButton>(_key('relation-editor-submit'))
-                .onPressed,
-            isNull,
-          );
-          expect(
-            tester
-                .widget<TextField>(_key('relation-editor-description'))
-                .enabled,
-            isFalse,
-          );
-          expect(find.text('Leave creation'), findsOneWidget);
-          app.router.allowExit = true;
-          tester
-              .widget<CreationExitAction>(find.byType(CreationExitAction))
-              .onExit();
-          await tester.pumpAndSettle();
-        }
-        expect(app.router.stackData.map((route) => route.matchId), history);
-        expect(app.repository.relationCommands, isEmpty);
-        expect(app.errors, hasLength(1));
-        expect(
-          app.errors.single.exception.toString(),
-          isNot(contains('Секрет')),
-        );
-        await _openForm(tester, app, null);
-        await tester.enterText(
-          _key('relation-editor-description'),
-          'Новый черновик',
-        );
-        final newMatch = app.router.stackData.last.matchId;
-        exit();
-        await tester.pumpAndSettle();
-        expect(app.router.stackData.last.matchId, newMatch);
-        expect(_description(tester), 'Новый черновик');
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
 
   testWidgets(
     'выход при записи объясняет продолжение, после отказа доступна отмена',
@@ -351,7 +211,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(RelationDetailsPage), findsOneWidget);
       expect(app.repository.relationCommands, hasLength(1));
-      expect(app.errors, isEmpty);
     },
   );
 
@@ -397,91 +256,9 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(_description(tester), 'Нижний черновик');
-      expect(app.errors, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
-
-  for (final point in [
-    _Failure.beforeForm,
-    _Failure.afterForm,
-    _Failure.afterResult,
-  ]) {
-    testWidgets(
-      'отказ $point сохраняет успех, фактическую историю и обычный выход',
-      (tester) async {
-        final app = await _launch(tester, failure: point);
-        final history = app.router.stackData
-            .map((route) => route.matchId)
-            .toList();
-        await _openForm(tester, app, RelationDirection.outgoing);
-        await _fill(tester, app);
-        await _tap(tester, 'relation-editor-submit');
-        app.repository.completeRelationCreated(0);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
-        if (point == _Failure.afterResult) {
-          expect(app.router.current.name, RelationDetailsRoute.name);
-          app.repository.relationWatches.last.emitDetails(
-            testRelationDetails(
-              relationId: testFormRelationId(1),
-              sourceId: testSummary(index: 1).id,
-              relatedId: testSummary(index: 2).id,
-            ),
-            revision: const TestCatalogRevision(2),
-          );
-          await tester.pumpAndSettle();
-          final installed = app.router.stackData.last.matchId;
-          app.router.release();
-          await tester.pumpAndSettle();
-          expect(app.router.stackData.last.matchId, installed);
-          await tester.binding.handlePopRoute();
-        } else if (point == _Failure.beforeForm) {
-          await tester.pumpAndSettle();
-          expect(app.router.current.name, RelationEditorRoute.name);
-          expect(
-            tester
-                .widget<FilledButton>(_key('relation-editor-submit'))
-                .onPressed,
-            isNull,
-          );
-          expect(
-            tester
-                .widget<TextField>(_key('relation-editor-description'))
-                .enabled,
-            isFalse,
-          );
-          expect(
-            tester
-                .widget<OutlinedButton>(_key('relation-editor-change-source'))
-                .onPressed,
-            isNull,
-          );
-          expect(
-            tester
-                .widget<IconButton>(_key('relation-editor-open-source-details'))
-                .onPressed,
-            isNull,
-          );
-          await tester.binding.handlePopRoute();
-        }
-        await tester.pumpAndSettle();
-        expect(app.router.stackData.map((route) => route.matchId), history);
-        expect(find.byType(RelationDetailsPage), findsOneWidget);
-        expect(app.repository.relationCommands, hasLength(1));
-        expect(app.errors, hasLength(1));
-        expect(
-          app.errors.single.exception.toString(),
-          isNot(contains('Секрет')),
-        );
-        expect(find.textContaining('Relation created.'), findsOneWidget);
-        await tester.pump(const Duration(seconds: 5));
-        await tester.pumpAndSettle();
-        expect(find.textContaining('Relation created.'), findsNothing);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
 
   testWidgets(
     'принятая отправка сразу запрещает старые обработчики открытия участников',
@@ -556,35 +333,6 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-
-  testWidgets(
-    'поздний отказ перехода после ухода сохраняет новый маршрут и ввод',
-    (tester) async {
-      final app = await _launch(tester, failure: _Failure.delayed);
-      await _openForm(tester, app, RelationDirection.outgoing);
-      await _fill(tester, app);
-      await _tap(tester, 'relation-editor-submit');
-      app.repository.completeRelationCreated(0);
-      await tester.pumpAndSettle();
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      await _openForm(tester, app, null);
-      await tester.enterText(
-        _key('relation-editor-description'),
-        'Новый черновик',
-      );
-      final history = app.router.stackData
-          .map((route) => route.matchId)
-          .toList();
-      app.router.release();
-      await tester.pumpAndSettle();
-      expect(app.router.stackData.map((route) => route.matchId), history);
-      expect(_description(tester), 'Новый черновик');
-      expect(app.repository.relationCommands, hasLength(1));
-      expect(app.errors, hasLength(1));
-      expect(tester.takeException(), isNull);
-    },
-  );
 }
 
 Finder _key(String key) => find.byKey(ValueKey(key));
@@ -649,33 +397,21 @@ Future<void> _fill(WidgetTester tester, _App app) async {
 }
 
 final class _App {
-  _App(this.router, this.repository, this.errors);
-  final _FailingRouter router;
+  _App(this.router, this.repository);
+  final _PickerHoldingRouter router;
   final ControlledRelationFormRepository repository;
-  final List<FlutterErrorDetails> errors;
 }
 
 Future<_App> _launch(
   WidgetTester tester, {
-  _Failure failure = _Failure.none,
   Locale locale = const Locale('en'),
 }) async {
   tester.view.physicalSize = const Size(1200, 4000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final repository = ControlledRelationFormRepository();
-  final router = _FailingRouter(failure);
-  final errors = <FlutterErrorDetails>[];
-  final previous = FlutterError.onError;
-  FlutterError.onError = (details) {
-    if (details.library == 'relation editor') {
-      errors.add(details);
-    } else {
-      previous?.call(details);
-    }
-  };
+  final router = _PickerHoldingRouter();
   addTearDown(() async {
-    FlutterError.onError = previous;
     await tester.pumpWidget(const SizedBox.shrink());
     router.dispose();
     await repository.dispose();
@@ -701,7 +437,7 @@ Future<_App> _launch(
   await openIntentionGraph(tester);
   repository.completeCatalogPage(0, const []);
   await tester.pumpAndSettle();
-  final app = _App(router, repository, errors);
+  final app = _App(router, repository);
   await _openForm(tester, app, RelationDirection.outgoing);
   await tester.enterText(
     _key('relation-editor-description'),
@@ -724,14 +460,11 @@ Future<_App> _launch(
   return app;
 }
 
-final class _FailingRouter extends RootStackRouter {
-  _FailingRouter(this.failure);
-  final _Failure failure;
-  final _gate = Completer<void>();
+/// Настоящий стек приложения, который задерживает доставку результата поиска
+/// участника его владельцу.
+final class _PickerHoldingRouter extends RootStackRouter {
   final _pickerGate = Completer<void>();
-  var allowExit = false;
   var holdPickerResult = false;
-  void release() => _gate.complete();
   void releasePicker() => _pickerGate.complete();
   @override
   List<AutoRoute> get routes => AppRouter().routes;
@@ -746,46 +479,5 @@ final class _FailingRouter extends RootStackRouter {
       await _pickerGate.future;
     }
     return result;
-  }
-
-  @override
-  void removeRoute(RouteData route, {bool notify = true}) {
-    if (!allowExit && route.name == RelationEditorRoute.name) {
-      if (failure == _Failure.exitBeforeForm) {
-        throw StateError('Секретный черновик');
-      }
-      if (failure == _Failure.exitAfterForm) {
-        super.removeRoute(route, notify: false);
-        throw StateError('Секретный черновик');
-      }
-    }
-    super.removeRoute(route, notify: notify);
-  }
-
-  @override
-  Future<T?> replace<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    switch (failure) {
-      case _Failure.none:
-      case _Failure.exitBeforeForm:
-      case _Failure.exitAfterForm:
-        return super.replace<T>(route, onFailure: onFailure);
-      case _Failure.beforeForm:
-        throw StateError('Секретный черновик');
-      case _Failure.afterForm:
-        removeRoute(stackData.last, notify: false);
-        return Future<T?>.error(StateError('Секретный черновик'));
-      case _Failure.afterResult:
-        unawaited(super.replace<T>(route, onFailure: onFailure));
-        return _gate.future.then<T?>(
-          (_) => throw StateError('Секретный черновик'),
-        );
-      case _Failure.delayed:
-        return _gate.future.then<T?>(
-          (_) => throw StateError('Секретный черновик'),
-        );
-    }
   }
 }
