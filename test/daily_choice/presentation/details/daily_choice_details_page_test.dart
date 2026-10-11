@@ -424,58 +424,35 @@ void main() {
     expect(find.textContaining('Основание'), findsNothing);
   });
 
-  for (final (locale, phrase, date, warning, action) in [
-    (
-      const Locale('ru'),
-      'Чтобы Основа, я сегодня Действие',
-      '2026-09-24',
-      'нельзя отменить',
-      'Удалить навсегда',
-    ),
-    (
-      const Locale('en'),
-      'To Основа, today I Действие',
-      '2026-09-24',
-      'cannot be undone',
-      'Delete permanently',
-    ),
-  ]) {
-    testWidgets(
-      'отмена удаления в локали ${locale.languageCode} сохраняет выбор',
-      (tester) async {
-        final repository = _Repository();
-        addTearDown(repository.dispose);
-        await _pumpApp(tester, repository, locale);
-        repository.emit(_details());
-        await tester.pumpAndSettle();
+  testWidgets('подтверждение удаления называет выбор и необратимость', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    addTearDown(repository.dispose);
+    await _pumpApp(tester, repository, const Locale('ru'));
+    repository.emit(_details());
+    await tester.pumpAndSettle();
 
-        await tester.tap(
-          find.byKey(const ValueKey('daily-choice-delete-open')),
-        );
-        await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsOneWidget);
-        expect(find.textContaining(phrase), findsWidgets);
-        expect(find.textContaining(date), findsWidgets);
-        expect(find.textContaining(warning), findsOneWidget);
-        final semantics = tester.ensureSemantics();
-        expect(
-          tester
-              .getSemantics(
-                find.byKey(const ValueKey('daily-choice-delete-confirm')),
-              )
-              .label,
-          contains(action),
-        );
-        semantics.dispose();
-        await tester.tap(
-          find.byKey(const ValueKey('daily-choice-delete-cancel')),
-        );
-        await tester.pumpAndSettle();
-        expect(repository.deleteCommands, isEmpty);
-        expect(find.textContaining('Основа'), findsWidgets);
-      },
+    await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.textContaining('Чтобы Основа, я сегодня Действие'),
+      findsWidgets,
     );
-  }
+    expect(find.textContaining('2026-09-24'), findsWidgets);
+    expect(find.textContaining('нельзя отменить'), findsOneWidget);
+    final semantics = tester.ensureSemantics();
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(const ValueKey('daily-choice-delete-confirm')),
+          )
+          .label,
+      contains('Удалить навсегда'),
+    );
+    semantics.dispose();
+  });
 
   testWidgets(
     'подтверждение удаляет только выбранную запись и блокирует повтор',

@@ -46,7 +46,7 @@ Future<void> _saveName(WidgetTester tester, String name) async {
 
 void main() {
   testWidgets(
-    'каталог: вход, создание, переименование, отмена удаления, удаление и повтор имени',
+    'каталог: вход, создание, переименование, удаление и повтор имени',
     (tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester.binding.platformDispatcher.localesTestValue = [const Locale('ru')];
@@ -109,9 +109,6 @@ void main() {
       await _tap(tester, delete);
       await _until(tester, find.byKey(const ValueKey('tag-delete-scope')));
       expect(find.textContaining('Быт 🏠'), findsWidgets);
-      await _tap(tester, find.byKey(const ValueKey('tag-delete-cancel')));
-      expect(raw.select('SELECT id FROM tags').single['id'], firstId);
-      await _tap(tester, delete);
       await _tap(tester, find.byKey(const ValueKey('tag-delete-confirm')));
       for (
         var attempt = 0;

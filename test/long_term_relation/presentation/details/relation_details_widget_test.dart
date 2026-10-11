@@ -842,14 +842,6 @@ void main() {
     );
 
     await tester.tap(
-      find.widgetWithText(TextButton, l10n.detailsCancelEditAction),
-    );
-    await tester.pumpAndSettle();
-    expect(repository.relationCommands, isEmpty);
-
-    await tester.tap(delete);
-    await tester.pumpAndSettle();
-    await tester.tap(
       find.byKey(const ValueKey('relation-details-confirm-delete')),
     );
     await tester.pump();

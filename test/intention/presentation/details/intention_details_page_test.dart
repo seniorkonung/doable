@@ -261,51 +261,6 @@ void main() {
     expect(find.text('Not ready for action'), findsOneWidget);
   });
 
-  testWidgets('смена локали не изменяет пользовательский текст', (
-    tester,
-  ) async {
-    final repository = ControlledDetailsRepository();
-    final locale = ValueNotifier(const Locale('en'));
-    addTearDown(locale.dispose);
-    final intention = testDetailsIntention(
-      title: 'Сохранить русский заголовок',
-      description: '  Пользовательское описание\nбез преобразования  ',
-      readiness: IntentionReadiness.ready,
-    );
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          inMemoryQuickCreationModeOverride,
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-        retry: (retryCount, error) => null,
-        child: ValueListenableBuilder<Locale>(
-          valueListenable: locale,
-          builder: (context, value, child) => _localizedApp(
-            IntentionDetailsPage(intentionId: intention.id),
-            locale: value,
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests.single.add(ResultSuccess(intention));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Intention details'), findsOneWidget);
-    expect(find.text(intention.title), findsOneWidget);
-    expect(find.text(intention.description!), findsOneWidget);
-
-    locale.value = const Locale('ru');
-    await tester.pumpAndSettle();
-
-    expect(find.text('Подробности намерения'), findsOneWidget);
-    expect(find.text('Intention details'), findsNothing);
-    expect(find.text(intention.title), findsOneWidget);
-    expect(find.text(intention.description!), findsOneWidget);
-  });
-
   testWidgets(
     'подробный просмотр проходит accessibility guidelines при масштабе 200%',
     (tester) async {

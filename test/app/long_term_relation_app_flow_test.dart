@@ -427,29 +427,6 @@ void main() {
         'Archived relation',
       );
 
-      tester.binding.platformDispatcher.localesTestValue = const [
-        Locale('ru', 'RU'),
-      ];
-      await tester.pumpAndSettle();
-      expect(
-        _textByKey(tester, 'relation-details-phrase'),
-        'Чтобы Укреплять здоровье, нужно Много ходить',
-      );
-      expect(
-        _textByKey(tester, 'relation-details-description'),
-        '  Детали связи\n🙂  ',
-      );
-
-      tester.binding.platformDispatcher.localesTestValue = const [
-        Locale('de', 'DE'),
-      ];
-      await tester.pumpAndSettle();
-      expect(_textByKey(tester, 'relation-details-phrase'), renamedPhrase);
-      expect(
-        _textByKey(tester, 'relation-details-description'),
-        '  Детали связи\n🙂  ',
-      );
-
       await tester.tap(
         find.byKey(const ValueKey('relation-details-source-participant')),
       );

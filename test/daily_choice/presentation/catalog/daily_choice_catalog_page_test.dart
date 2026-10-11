@@ -275,12 +275,11 @@ void main() {
       expect(repository.queries, hasLength(4));
     });
 
-    testWidgets('в раскрытом месяце 2028-02-29 выбирается после просмотра '
+    testWidgets('в раскрытом месяце день выбирается после просмотра '
         'соседнего месяца, а календарь остаётся раскрытым', (tester) async {
-      final today = date(2028, 1, 20);
-      final leapDay = date(2028, 2, 29);
+      final selectedDay = date(2026, 10, 15);
       final repository = _Repository();
-      await _open(tester, repository, today: today);
+      await _open(tester, repository);
       final l10n = lookupAppLocalizations(const Locale('ru'));
       repository.completeFirst([], total: 0);
       await tester.pumpAndSettle();
@@ -288,21 +287,24 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
-      expect(visibleWeeks(tester), weeksFrom(date(2028, 1, 31), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
       // Выбранный день вне просматриваемого месяца остаётся названным.
-      expect(find.text(_selectedDateLabel(tester, today)), findsOneWidget);
+      expect(find.text(_selectedDateLabel(tester, _today)), findsOneWidget);
       expect(repository.queries, hasLength(1));
 
-      await tester.tap(calendarDay(leapDay));
+      await tester.tap(calendarDay(selectedDay));
       expect(repository.queries, hasLength(2));
-      expect(repository.queries[1].date, leapDay);
+      expect(repository.queries[1].date, selectedDay);
       expect(repository.queries[1].isCompleted, isNull);
 
       await _settleCalendar(tester);
-      _expectSelected(tester, leapDay);
-      expect(visibleWeeks(tester), weeksFrom(date(2028, 1, 31), 5));
+      _expectSelected(tester, selectedDay);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
       expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
-      expect(find.text(_selectedDateLabel(tester, leapDay)), findsOneWidget);
+      expect(
+        find.text(_selectedDateLabel(tester, selectedDay)),
+        findsOneWidget,
+      );
       expect(repository.queries, hasLength(2));
     });
 

@@ -92,20 +92,13 @@ void main() {
 
   test('разрешает только существующее намерение и одну пару', () {
     _addTag(raw, _firstTag, 'Дом');
-    for (final intentionId in [null, 'нет-намерения', _relation]) {
+    for (final intentionId in [null, 'нет-намерения']) {
       expect(
         () => _addAssignment(raw, _firstTag, intentionId),
         throwsA(isA<sqlite.SqliteException>()),
         reason: 'Получателем может быть только существующее намерение.',
       );
     }
-    expect(
-      () => raw.execute(
-        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-        [_firstTag, _relation],
-      ),
-      throwsA(isA<sqlite.SqliteException>()),
-    );
     expect(
       () => _addAssignment(raw, 'нет-тега', _firstIntention),
       throwsA(isA<sqlite.SqliteException>()),

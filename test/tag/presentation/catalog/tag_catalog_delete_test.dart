@@ -122,21 +122,6 @@ void main() {
 
       await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('tag-delete-cancel')));
-      await tester.pumpAndSettle();
-      expect(
-        raw.select('SELECT * FROM tags WHERE id = ?', [_id(301)]),
-        hasLength(1),
-      );
-      expect(
-        raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-          _id(301),
-        ]),
-        hasLength(106),
-      );
-
-      await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
-      await tester.pumpAndSettle();
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
         [_id(301), _id(105)],

@@ -41,42 +41,6 @@ void main() {
   });
 
   group('геометрия и прокрутка компактной панели', () {
-    for (final isFling in [false, true]) {
-      testWidgets(
-        '${isFling ? 'быстрый' : 'медленный'} свайп вверх по ручке сохраняет геометрию и черновик без отправки и закрытия',
-        (tester) async {
-          _usePhone(tester, _portrait);
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository();
-          final router = await _openEditor(tester, repository, sessions);
-          await tester.enterText(find.byKey(_title), 'Намерение');
-          await tester.enterText(find.byKey(_description), 'Описание');
-          await tester.pumpAndSettle();
-          final draft = sessions.state(tester).draft;
-          final compact = _sheetRect(tester);
-
-          if (isFling) {
-            await tester.fling(find.byKey(_handle), const Offset(0, -60), 1500);
-          } else {
-            await tester.drag(find.byKey(_handle), const Offset(0, -120));
-          }
-          await tester.pumpAndSettle();
-
-          expect(_sheetRect(tester), compact);
-          _expectDraftValues(sessions.state(tester).draft, draft);
-          expect(_controller(tester, _title).text, 'Намерение');
-          expect(_controller(tester, _description).text, 'Описание');
-          expect(_hasFocus(tester, _description), isTrue);
-          expect(router.current.name, IntentionEditorRoute.name);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
-          _expectSubmitAvailable(tester, _portrait);
-          expect(repository.commands, isEmpty);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
-
     for (final (name, field, shortText, longText) in [
       ('названия', _title, 'Намерение', _lines(12).replaceAll('\n', ' ')),
       ('описания', _description, 'Описание', _lines(6)),

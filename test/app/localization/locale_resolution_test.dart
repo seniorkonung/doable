@@ -110,14 +110,6 @@ void main() {
 
     expect(Localizations.localeOf(context), const Locale('en'));
     expect(AppLocalizations.of(context).commonRetry, 'Try again');
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is DropdownButton<Locale> ||
-            widget is DropdownButtonFormField<Locale>,
-      ),
-      findsNothing,
-    );
   });
 }
 

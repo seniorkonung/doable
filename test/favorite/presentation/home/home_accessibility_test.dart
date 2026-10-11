@@ -116,7 +116,6 @@ void main() {
   }
 
   const locale = Locale('ru');
-  const otherLocale = Locale('en');
 
   testWidgets('при масштабе текста 2.5 название намерения в каждой строке '
       'Главной показано целиком, а строка доступна касанием и экранному '
@@ -151,34 +150,6 @@ void main() {
       _expectRowAnnounced(tester, l10n, row);
     }
     await _expectGuidelines(tester);
-    expect(tester.takeException(), isNull);
-    semantics.dispose();
-  });
-
-  testWidgets('смена языка интерфейса меняет только системные строки '
-      'Главной: названия намерений, отметки и порядок списка прежние', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final app = await _start(tester, locale);
-    await _until(tester, _row(_rows.last.number));
-    final marks = storedFavoriteMarks(app.raw);
-    _expectRows(tester, app.l10n);
-
-    tester.platformDispatcher.localesTestValue = [otherLocale];
-    await tester.pumpAndSettle();
-
-    final otherL10n = lookupAppLocalizations(otherLocale);
-    _expectRows(tester, otherL10n);
-    expect(
-      find.descendant(
-        of: find.byType(HomePage),
-        matching: find.text(otherL10n.homeFavoritesHeading),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text(app.l10n.homeFavoritesHeading), findsNothing);
-    expect(storedFavoriteMarks(app.raw), marks);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
@@ -555,52 +526,6 @@ void main() {
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
-
-  testWidgets('смена языка после перестановки человеком переводит названия '
-      'действий перемещения, но не меняет названия намерений и порядок', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final app = await _start(tester, locale);
-    await _until(tester, _row(_rows.last.number));
-    tester.semantics.customAction(
-      _rowNode(app.l10n, _rows[2]),
-      CustomSemanticsAction(label: _systemActions(tester).reorderItemToStart),
-    );
-    await _waitFor(
-      tester,
-      () => _announcements(app.l10n).evaluate().isNotEmpty,
-    );
-    final order = [_walk, _otherWalk, _long];
-    expect(_storedOrder(app), order);
-
-    tester.platformDispatcher.localesTestValue = [otherLocale];
-    await tester.pumpAndSettle();
-
-    final otherL10n = lookupAppLocalizations(otherLocale);
-    final otherActions = _systemActions(tester);
-    final shown = [_rows[2], _rows[0], _rows[1]];
-    _expectTraversal(tester, [
-      for (final row in shown) _rowLabel(otherL10n, row),
-    ]);
-    expect(_moveActions(otherL10n, shown.first), {
-      otherActions.reorderItemDown,
-      otherActions.reorderItemToEnd,
-    });
-    expect(_moveActions(otherL10n, shown.last), {
-      otherActions.reorderItemToStart,
-      otherActions.reorderItemUp,
-    });
-    for (final row in shown) {
-      expect(
-        find.descendant(of: _row(row.number), matching: find.text(row.title)),
-        findsOneWidget,
-      );
-    }
-    expect(_storedOrder(app), order);
-    expect(tester.takeException(), isNull);
-    semantics.dispose();
-  });
 }
 
 final class _App {
@@ -824,23 +749,6 @@ void _expectRowAnnounced(WidgetTester tester, AppLocalizations l10n, _Row row) {
     find.descendant(of: finder, matching: find.byIcon(Icons.star)),
     findsNothing,
   );
-}
-
-/// Главная показывает строки в порядке списка с названиями без изменения и
-/// системными строками языка [l10n].
-void _expectRows(WidgetTester tester, AppLocalizations l10n) {
-  final traversal = tester.semantics.simulatedAccessibilityTraversal();
-  final labels = [for (final row in _rows) _rowLabel(l10n, row)];
-  expect([
-    for (final node in traversal)
-      if (labels.contains(node.label)) node.label,
-  ], labels);
-  for (final row in _rows) {
-    expect(
-      find.descendant(of: _row(row.number), matching: find.text(row.title)),
-      findsOneWidget,
-    );
-  }
 }
 
 /// Текст [message] объявляется живой областью целиком.

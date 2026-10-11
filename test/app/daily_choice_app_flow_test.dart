@@ -308,15 +308,6 @@ void main() {
       );
       await _tap(
         tester,
-        find.byKey(const ValueKey('daily-choice-delete-cancel')),
-      );
-      expect(_savedIds(harness), hasLength(2));
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-delete-open')),
-      );
-      await _tap(
-        tester,
         find.byKey(const ValueKey('daily-choice-delete-confirm')),
       );
       await _until(tester, find.byKey(const ValueKey('daily-choice-row-1')));

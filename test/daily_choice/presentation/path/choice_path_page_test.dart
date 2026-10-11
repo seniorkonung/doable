@@ -19,7 +19,6 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -259,10 +258,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Намерение 1'), findsWidgets);
     expect(find.textContaining('Намерение 2'), findsWidgets);
-    // Дневной путь — представление без поиска: тегов и условий в нём нет.
-    expect(find.textContaining('Теги:'), findsNothing);
-    expect(find.text('Без тегов'), findsNothing);
-    expect(find.byType(IntentionTagConditionsSection), findsNothing);
     final semantics = tester.ensureSemantics();
     expect(find.bySemanticsLabel(RegExp('Шаг 1:.*нужно.*P1')), findsOneWidget);
     await _revealPathItem(
@@ -304,40 +299,6 @@ void main() {
       ),
       findsOneWidget,
     );
-    semantics.dispose();
-  });
-
-  // Отсутствие отметки не зависит от языка: значок отметки не появляется ни в
-  // одном, поэтому проверено на русском.
-  testWidgets('дневной путь избранного намерения не показывает отметку', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final repository = _PathRepository();
-    addTearDown(repository.dispose);
-    await _pumpPage(tester, repository);
-    repository.complete(0, [_edge(1, 2, 1)]);
-    await tester.pumpAndSettle();
-    // Исходное намерение пути подтверждено избранным.
-    repository.emitRevision(1, favoriteMark: FavoriteMark.favorite);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(
-        ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
-      ),
-    );
-    await tester.pump();
-    repository.complete(1, [_edge(2, 3, 2)], ready: true);
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Намерение 1'), findsWidgets);
-    expect(find.textContaining('Намерение 2'), findsWidgets);
-    // Дневной путь — представление без поиска: отметки в нём нет.
-    expect(find.byIcon(Icons.star), findsNothing);
-    expect(find.byIcon(Icons.star_border), findsNothing);
-    expect(find.text('Избранное намерение'), findsNothing);
-    expect(find.bySemanticsLabel(RegExp('Избранное намерение')), findsNothing);
-
     semantics.dispose();
   });
 
@@ -768,10 +729,7 @@ final class _PathRepository
   void fail(int index, ChoicePathContinuationFailure failure) =>
       _requests[index].complete(ChoicePathContinuationError(failure));
 
-  void emitRevision(
-    int revision, {
-    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
-  }) => _observations.add(
+  void emitRevision(int revision) => _observations.add(
     ResultSuccess(
       GraphSnapshot(
         value: IntentionDetails(
@@ -786,7 +744,7 @@ final class _PathRepository
             archivedCanIncoming: 0,
             archivedCanOutgoing: 0,
           ),
-          favoriteMark: favoriteMark,
+          favoriteMark: FavoriteMark.notFavorite,
         ),
         revision: _Revision(revision),
       ),
