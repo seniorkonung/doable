@@ -451,41 +451,34 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart
   const GraphCommandCoordinatorDraining();
 }
 
-/// Исключительное право конкретного владельца предъявить terminal outcome.
-///
-/// Удержание claim само по себе не означает предъявления: подтверждать его
-/// может только компонент, получивший свидетельство первого доступного кадра.
-sealed class GraphPresentationClaim {
-  const GraphPresentationClaim._(this.completion, this._entry);
+/// Право открытой экранной сессии предъявить собственную ошибку.
+final class GraphInitiatorPresentationClaim {
+  const GraphInitiatorPresentationClaim._(
+    this.token,
+    this.completion,
+    this._entry,
+  );
 
-  GraphOperationToken get token;
+  final GraphOperationToken token;
   final GraphCommandCompletion completion;
   final _PresentationEntry _entry;
 }
 
-/// Право открытой экранной сессии предъявить собственную ошибку.
-final class GraphInitiatorPresentationClaim extends GraphPresentationClaim {
-  const GraphInitiatorPresentationClaim._(
-    this.token,
-    super.completion,
-    super._entry,
-  ) : super._();
-
-  @override
-  final GraphOperationToken token;
-}
-
-/// Право оболочки предъявить успех или переданный ей отказ.
-final class GraphAppPresentationClaim extends GraphPresentationClaim {
-  const GraphAppPresentationClaim._(
-    this.token,
-    super.completion,
-    super._entry,
+/// Право оболочки на зафиксированный набор ожидающих результатов.
+///
+/// Удержание права не означает предъявления: после доступного кадра
+/// подтверждаются только результаты, охваченные показанным сообщением.
+final class GraphAppPresentationClaim {
+  GraphAppPresentationClaim._(
+    List<_PresentationEntry> entries,
     this._registration,
-  ) : super._();
+  ) : _entries = List.unmodifiable(entries),
+      completions = List.unmodifiable(
+        entries.map((entry) => entry.completion!),
+      );
 
-  @override
-  final GraphOperationToken token;
+  final List<GraphCommandCompletion> completions;
+  final List<_PresentationEntry> _entries;
   final GraphAppPresentationRegistration _registration;
 }
 
@@ -502,7 +495,7 @@ final class GraphAppPresentationRegistration {
   GraphAppPresentationClaim? _issued;
   var _isReleased = false;
 
-  /// Запрашивает следующий доступный app-результат в порядке публикации.
+  /// Запрашивает все ожидающие app-результаты в порядке публикации.
   ///
   /// Возвращает `null`, если регистрация освобождена или coordinator завершил
   /// работу до выдачи.
@@ -954,28 +947,50 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// Атомарно подтверждает фактическое предъявление действующим владельцем.
   ///
   /// Claim освобождённого или сменившегося владельца бездействует.
-  void confirmPresentation(GraphPresentationClaim claim) {
+  void confirmPresentation(GraphInitiatorPresentationClaim claim) {
     final entry = _entries[claim.token];
-    if (entry == null || !identical(entry, claim._entry)) {
+    if (entry == null ||
+        !identical(entry, claim._entry) ||
+        !identical(entry.initiatorClaim, claim)) {
       return;
     }
+    _discardEntry(entry);
+  }
 
-    switch (claim) {
-      case GraphInitiatorPresentationClaim():
-        if (!identical(entry.initiatorClaim, claim)) {
-          return;
-        }
-        _discardEntry(entry);
-      case GraphAppPresentationClaim(:final _registration):
-        if (!identical(entry.appClaim, claim)) {
-          return;
-        }
-        if (identical(_registration._issued, claim)) {
-          _registration._issued = null;
-        }
-        _discardEntry(entry);
-        _dispatchAppPresentation();
+  /// Атомарно потребляет охваченные сообщением результаты действующего права.
+  ///
+  /// Остальные записи возвращаются в ожидание на прежних местах. Пустое или
+  /// чужое подмножество вызывает [ArgumentError] без изменения права и записей.
+  /// Подтверждение устаревшего права бездействует.
+  void confirmAppPresentation(
+    GraphAppPresentationClaim claim,
+    Iterable<GraphOperationToken> covered,
+  ) {
+    final registration = claim._registration;
+    if (!identical(registration._coordinator, this) ||
+        !identical(registration._issued, claim)) {
+      return;
     }
+    final coveredTokens = covered.toSet();
+    final claimTokens = claim.completions
+        .map((completion) => completion.token)
+        .toSet();
+    if (coveredTokens.isEmpty || !claimTokens.containsAll(coveredTokens)) {
+      throw ArgumentError.value(
+        covered,
+        'covered',
+        'Ожидается непустое подмножество результатов права',
+      );
+    }
+
+    for (final entry in claim._entries) {
+      entry.appClaim = null;
+      if (coveredTokens.contains(entry.token)) {
+        _discardEntry(entry);
+      }
+    }
+    registration._issued = null;
+    _dispatchAppPresentation();
   }
 
   Future<void> shutdown() {
@@ -1017,8 +1032,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
     final issued = registration._issued;
     registration._issued = null;
-    if (issued != null && identical(issued._entry.appClaim, issued)) {
-      issued._entry.appClaim = null;
+    if (issued != null) {
+      for (final entry in issued._entries) {
+        entry.appClaim = null;
+      }
     }
     final request = registration._request;
     registration._request = null;
@@ -1037,25 +1054,21 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     if (request == null || active._issued != null) {
       return;
     }
-    final entry = _nextAppPresentableEntry();
-    final completion = entry?.completion;
-    if (entry == null || completion == null) {
+    final entries = _appPresentableEntries().toList(growable: false);
+    if (entries.isEmpty) {
       return;
     }
 
-    final claim = GraphAppPresentationClaim._(
-      entry.token,
-      completion,
-      entry,
-      active,
-    );
-    entry.appClaim = claim;
+    final claim = GraphAppPresentationClaim._(entries, active);
+    for (final entry in entries) {
+      entry.appClaim = claim;
+    }
     active._issued = claim;
     active._request = null;
     request.complete(claim);
   }
 
-  _PresentationEntry? _nextAppPresentableEntry() {
+  Iterable<_PresentationEntry> _appPresentableEntries() sync* {
     for (final entry in _entries.values) {
       final completion = entry.completion;
       if (completion == null || entry.appClaim != null) {
@@ -1063,10 +1076,9 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       }
       final belongsToApp = !completion.isFailure || entry.initiatorReleased;
       if (belongsToApp) {
-        return entry;
+        yield entry;
       }
     }
-    return null;
   }
 
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>

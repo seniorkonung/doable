@@ -230,8 +230,11 @@ void main() {
       // Успех сразу принадлежит общей поверхности и предъявляется один раз.
       expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
       final claim = await registration.nextClaim();
-      expect(claim!.completion, same(completion));
-      coordinator.confirmPresentation(claim);
+      expect(claim!.completions.single, same(completion));
+      coordinator.confirmAppPresentation(
+        claim,
+        claim.completions.map((completion) => completion.token),
+      );
       GraphAppPresentationClaim? repeated;
       var repeatedIssued = false;
       unawaited(
@@ -308,7 +311,7 @@ void main() {
         // Форма закрыта до кадра: сообщение переходит общей поверхности.
         coordinator.releaseInitiatorPresentation(accepted.token);
         await fallbackRequest;
-        expect(fallback!.completion, same(completion));
+        expect(fallback!.completions.single, same(completion));
         expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
 
         // Запоздалые callbacks прежнего renderer не подтверждают и не
@@ -319,10 +322,13 @@ void main() {
         registration.release();
         final replacement = coordinator.registerAppPresentation();
         final reissued = await replacement.nextClaim();
-        expect(reissued!.token, same(accepted.token));
-        expect(reissued.completion, same(completion));
+        expect(reissued!.completions.single.token, same(accepted.token));
+        expect(reissued.completions.single, same(completion));
 
-        coordinator.confirmPresentation(reissued);
+        coordinator.confirmAppPresentation(
+          reissued,
+          reissued.completions.map((completion) => completion.token),
+        );
         await coordinator.shutdown();
         expect(await replacement.nextClaim(), isNull);
         expect(repository.commands, hasLength(1));
@@ -484,9 +490,12 @@ void main() {
         expect(coordinator.claimInitiatorFailure(completion.token), isNull);
         final claim = await registration.nextClaim();
         expect(claim, isA<GraphAppPresentationClaim>());
-        expect(claim!.completion, same(completion));
+        expect(claim!.completions.single, same(completion));
 
-        coordinator.confirmPresentation(claim);
+        coordinator.confirmAppPresentation(
+          claim,
+          claim.completions.map((completion) => completion.token),
+        );
         await coordinator.shutdown();
       },
     );
@@ -510,8 +519,11 @@ void main() {
       final succeededCompletion = await succeeded.future;
 
       final appClaim = await registration.nextClaim();
-      expect(appClaim!.completion, same(succeededCompletion));
-      coordinator.confirmPresentation(appClaim);
+      expect(appClaim!.completions.single, same(succeededCompletion));
+      coordinator.confirmAppPresentation(
+        appClaim,
+        appClaim.completions.map((completion) => completion.token),
+      );
 
       final initiatorClaim = coordinator.claimInitiatorFailure(
         failedCompletion.token,
@@ -567,22 +579,31 @@ void main() {
         failedCompletion.token,
       );
       final first = await registration.nextClaim();
-      expect(first!.token, same(firstSuccess.token));
+      expect(first!.completions.map((completion) => completion.token), [
+        firstSuccess.token,
+        secondSuccess.token,
+      ]);
 
       coordinator.releaseInitiatorPresentation(failedCompletion.token);
       coordinator.releaseInitiatorPresentation(failedCompletion.token);
-      coordinator.confirmPresentation(first);
+      coordinator.confirmAppPresentation(first, [firstSuccess.token]);
 
       final fallback = await registration.nextClaim();
-      expect(fallback!.token, same(failed.token));
+      expect(fallback!.completions.map((completion) => completion.token), [
+        failed.token,
+        secondSuccess.token,
+      ]);
       expect(coordinator.claimInitiatorFailure(failed.token), isNull);
       coordinator.confirmPresentation(staleInitiatorClaim!);
-      coordinator.confirmPresentation(fallback);
-      coordinator.confirmPresentation(fallback);
+      coordinator.confirmAppPresentation(fallback, [failed.token]);
+      coordinator.confirmAppPresentation(fallback, [failed.token]);
 
       final last = await registration.nextClaim();
-      expect(last!.token, same(secondSuccess.token));
-      coordinator.confirmPresentation(last);
+      expect(last!.completions.single.token, same(secondSuccess.token));
+      coordinator.confirmAppPresentation(
+        last,
+        last.completions.map((completion) => completion.token),
+      );
       await coordinator.shutdown();
     });
 
@@ -606,7 +627,10 @@ void main() {
         await second.future;
 
         final firstClaim = await registration.nextClaim();
-        expect(firstClaim!.token, same(first.token));
+        expect(firstClaim!.completions.map((completion) => completion.token), [
+          first.token,
+          second.token,
+        ]);
 
         GraphAppPresentationClaim? secondClaim;
         final pending = registration.nextClaim()
@@ -615,15 +639,68 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         expect(secondClaim, isNull);
 
-        coordinator.confirmPresentation(firstClaim);
+        coordinator.confirmAppPresentation(firstClaim, [first.token]);
         await pending;
-        expect(secondClaim!.token, same(second.token));
-        coordinator.confirmPresentation(secondClaim!);
+        expect(secondClaim!.completions.single.token, same(second.token));
+        coordinator.confirmAppPresentation(secondClaim!, [second.token]);
         await coordinator.shutdown();
       },
     );
 
-    test('освобождение presenter возвращает неподтверждённый claim без повторной публикации', () async {
+    test('право фиксирует набор до позднего завершения, а неверное подмножество не потребляет его часть', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final registration = coordinator.registerAppPresentation();
+      final first = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_firstUuid)),
+      ) as IntentionCommandAccepted;
+      final second = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_secondUuid)),
+      ) as IntentionCommandAccepted;
+      final late = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_thirdUuid)),
+      ) as IntentionCommandAccepted;
+      repository.complete(0, _deletedResult(_id(_firstUuid)));
+      repository.complete(1, _deletedResult(_id(_secondUuid)));
+      await second.future;
+
+      final claim = (await registration.nextClaim())!;
+      repository.complete(2, _deletedResult(_id(_thirdUuid)));
+      await late.future;
+      expect(claim.completions.map((completion) => completion.token), [
+        first.token,
+        second.token,
+      ]);
+
+      expect(
+        () => coordinator.confirmAppPresentation(claim, []),
+        throwsArgumentError,
+      );
+      expect(
+        () => coordinator.confirmAppPresentation(claim, [
+          first.token,
+          late.token,
+        ]),
+        throwsArgumentError,
+      );
+      coordinator.confirmAppPresentation(claim, [second.token]);
+      // Подтверждение уже заменённого права не затрагивает оставшиеся записи.
+      coordinator.confirmAppPresentation(claim, [first.token]);
+      final remaining = (await registration.nextClaim())!;
+      expect(remaining.completions.map((completion) => completion.token), [
+        first.token,
+        late.token,
+      ]);
+      await coordinator.shutdown();
+      // Завершённое вместе с координатором право также бездействует.
+      coordinator.confirmAppPresentation(remaining, []);
+      coordinator.confirmAppPresentation(remaining, [first.token, late.token]);
+    });
+
+    test('освобождение presenter возвращает весь неподтверждённый набор без повторной публикации', () async {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
       final completions = <IntentionCommandCompletion>[];
@@ -636,8 +713,13 @@ void main() {
         coordinator,
         DeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
+      final second = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_secondUuid)),
+      ) as IntentionCommandAccepted;
       repository.complete(0, _deletedResult(_id(_firstUuid)));
-      await accepted.future;
+      repository.complete(1, _deletedResult(_id(_secondUuid)));
+      await second.future;
 
       final staleClaim = await firstPresenter.nextClaim();
       firstPresenter
@@ -647,19 +729,35 @@ void main() {
 
       final secondPresenter = coordinator.registerAppPresentation();
       final reissued = await secondPresenter.nextClaim();
-      expect(reissued!.token, same(staleClaim!.token));
+      expect(reissued!.completions.map((completion) => completion.token), [
+        accepted.token,
+        second.token,
+      ]);
       expect(identical(reissued, staleClaim), isFalse);
 
-      coordinator.confirmPresentation(staleClaim);
+      coordinator.confirmAppPresentation(staleClaim!, []);
       secondPresenter.release();
       final thirdPresenter = coordinator.registerAppPresentation();
       final afterStaleConfirmation = await thirdPresenter.nextClaim();
-      expect(afterStaleConfirmation!.token, same(accepted.token));
+      expect(
+        afterStaleConfirmation!.completions.map(
+          (completion) => completion.token,
+        ),
+        [accepted.token, second.token],
+      );
 
-      coordinator.confirmPresentation(reissued);
-      coordinator.confirmPresentation(afterStaleConfirmation);
-      expect(completions, hasLength(1));
-      expect(repository.commands, hasLength(1));
+      coordinator.confirmAppPresentation(
+        reissued,
+        reissued.completions.map((completion) => completion.token),
+      );
+      coordinator.confirmAppPresentation(
+        afterStaleConfirmation,
+        afterStaleConfirmation.completions.map(
+          (completion) => completion.token,
+        ),
+      );
+      expect(completions, hasLength(2));
+      expect(repository.commands, hasLength(2));
 
       await subscription.cancel();
       await coordinator.shutdown();
@@ -690,11 +788,17 @@ void main() {
       await duringRegistration.future;
 
       final first = await firstRequest;
-      expect(first!.token, same(withoutSubscriber.token));
-      coordinator.confirmPresentation(first);
+      expect(first!.completions.single.token, same(withoutSubscriber.token));
+      coordinator.confirmAppPresentation(
+        first,
+        first.completions.map((completion) => completion.token),
+      );
       final second = await secondPresenter.nextClaim();
-      expect(second!.token, same(duringRegistration.token));
-      coordinator.confirmPresentation(second);
+      expect(second!.completions.single.token, same(duringRegistration.token));
+      coordinator.confirmAppPresentation(
+        second,
+        second.completions.map((completion) => completion.token),
+      );
       await coordinator.shutdown();
     });
 
@@ -717,8 +821,8 @@ void main() {
 
       previous.release();
       await request;
-      expect(issued!.token, same(accepted.token));
-      coordinator.confirmPresentation(issued!);
+      expect(issued!.completions.single.token, same(accepted.token));
+      coordinator.confirmAppPresentation(issued!, [accepted.token]);
       await coordinator.shutdown();
     });
 
@@ -743,9 +847,12 @@ void main() {
       final claim = await registration.nextClaim();
 
       expect(coordinator.isRunning(intentionId), isFalse);
-      expect(claim!.completion, same(completion));
+      expect(claim!.completions.single, same(completion));
       expect(coordinator.claimInitiatorFailure(completion.token), isNull);
-      coordinator.confirmPresentation(claim);
+      coordinator.confirmAppPresentation(
+        claim,
+        claim.completions.map((completion) => completion.token),
+      );
       await coordinator.shutdown();
     });
 
