@@ -15,10 +15,10 @@ library;
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -96,9 +96,8 @@ Future<void> tapWhenFound(WidgetTester tester, Finder finder) async {
 
 /// Возвращает на Главную с другой корневой страницы.
 ///
-/// Шаг выбирает пункт панели и завершается, когда Главная показана: она уже
-/// построена при запуске, поэтому её список сценарий проверяет сам. [waitFor]
-/// — ожидание сценария; по умолчанию [pumpUntilFound].
+/// Шаг выбирает пункт панели и завершается, когда Главная показана.
+/// [waitFor] — ожидание сценария; по умолчанию [pumpUntilFound].
 Future<void> openHome(
   WidgetTester tester, {
   RootPageWait waitFor = pumpUntilFound,

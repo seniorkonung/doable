@@ -1,11 +1,11 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:flutter/material.dart';
@@ -13,78 +13,53 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
-import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
-/// Намерение «Гулять»: в зависимости от состава графа оно активное или
-/// архивированное, с отметкой избранного или без неё.
+/// Активное намерение «Гулять».
 const _walk = 1;
 const _walkTitle = 'Гулять';
 
-/// Второе активное намерение без отметки.
+/// Архивированное намерение «Читать».
 const _read = 2;
 const _readTitle = 'Читать';
 
-const _favoriteControl = ValueKey('intention-details-favorite-mark');
-
 void main() {
   testWidgets('первый запуск в новой установке без намерений открывает '
-      'Главную с объяснением отсутствия избранных намерений', (tester) async {
+      'Главную с пустым содержимым', (tester) async {
     const locale = Locale('ru');
     final harness = await _harness(tester, locale);
-    final l10n = lookupAppLocalizations(locale);
     // Новая установка: хранилища ещё нет, его создаёт подготовка.
     expect(harness.databaseFile.existsSync(), isFalse);
 
     final app = await _launch(tester, harness);
-    await _until(tester, find.text(l10n.homeEmptyNoFavorites));
+    await _until(tester, find.byType(HomePage));
     await tester.pumpAndSettle();
 
     _expectStartPage(tester);
-    expect(
-      find.descendant(
-        of: find.byType(HomePage),
-        matching: find.text(l10n.homeEmptyNoFavorites),
-      ),
-      findsOneWidget,
-    );
+    _expectEmptyHome(tester);
     expect(_intentionCount(app.raw), 0);
     expect(tester.takeException(), isNull);
   });
 
-  group('начальная страница не зависит от намерений и избранных намерений', () {
-    testWidgets('активное избранное намерение', (tester) async {
+  group('начальная страница не зависит от намерений', () {
+    testWidgets('активное и архивированное намерения не заполняют Главную', (
+      tester,
+    ) async {
       final harness = await _harness(tester, const Locale('ru'));
       await _prepareStorage(tester, harness, (database) {
         _storeIntention(database, _walk, _walkTitle, archived: false);
-        _storeIntention(database, _read, _readTitle, archived: false);
-        storeFavoriteMark(
-          database,
-          intentionId: tagFixtureId(_walk),
-          position: 1,
-        );
+        _storeIntention(database, _read, _readTitle, archived: true);
       });
 
       await _launch(tester, harness);
-      final row = find.descendant(
-        of: find.byType(HomePage),
-        matching: find.text(_walkTitle),
-      );
-      await _until(tester, row);
+      await _until(tester, find.byType(HomePage));
       await tester.pumpAndSettle();
 
       _expectStartPage(tester);
-      expect(row, findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byType(HomePage),
-          matching: find.text(_readTitle),
-        ),
-        findsNothing,
-      );
+      _expectEmptyHome(tester);
       expect(tester.takeException(), isNull);
     });
   });
@@ -95,20 +70,11 @@ void main() {
       final harness = await _harness(tester, const Locale('ru'));
       await _prepareStorage(tester, harness, (database) {
         _storeIntention(database, _walk, _walkTitle, archived: false);
-        storeFavoriteMark(
-          database,
-          intentionId: tagFixtureId(_walk),
-          position: 1,
-        );
       });
-      final homeRow = find.descendant(
-        of: find.byType(HomePage),
-        matching: find.text(_walkTitle),
-      );
 
       // Первый запуск: граф намерений и страница намерения поверх него.
       final first = await _launch(tester, harness);
-      await _until(tester, homeRow);
+      await _until(tester, find.byType(HomePage));
       await openIntentionGraph(
         tester,
         waitFor: _until,
@@ -124,7 +90,13 @@ void main() {
           matching: find.text(_walkTitle),
         ),
       );
-      await _until(tester, find.byKey(_favoriteControl));
+      await _until(
+        tester,
+        find.descendant(
+          of: find.byType(IntentionDetailsPage),
+          matching: find.text(_walkTitle),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.byType(IntentionDetailsPage), findsOneWidget);
       expect(find.byType(AppNavigationBar), findsOneWidget);
@@ -134,12 +106,11 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.runAsync(first.runtime.shutdown);
       await _launch(tester, harness);
-      await _until(tester, homeRow);
+      await _until(tester, find.byType(HomePage));
       await tester.pumpAndSettle();
 
       _expectStartPage(tester);
-      // Список Главной прочитан из того же хранилища.
-      expect(homeRow, findsOneWidget);
+      _expectEmptyHome(tester);
       expect(tester.takeException(), isNull);
     });
   });
@@ -225,6 +196,23 @@ void _expectStartPage(WidgetTester tester) {
 /// Пункт, который панель показывает выбранным.
 AppDestination _selected(WidgetTester tester) =>
     tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected;
+
+void _expectEmptyHome(WidgetTester tester) {
+  final home = find.byType(HomePage);
+  final l10n = AppLocalizations.of(tester.element(home));
+  expect(
+    tester
+        .widgetList<Text>(
+          find.descendant(of: home, matching: find.byType(Text)),
+        )
+        .map((text) => text.data),
+    [AppDestination.home.title(l10n)],
+  );
+  expect(
+    find.descendant(of: home, matching: find.byType(Scrollable)),
+    findsNothing,
+  );
+}
 
 void _storeIntention(
   sqlite.Database database,

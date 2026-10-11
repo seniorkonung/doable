@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
@@ -12,7 +13,6 @@ import 'package:doable/src/data/local/app_database.dart'
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

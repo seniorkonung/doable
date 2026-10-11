@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -11,9 +12,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
-import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/favorite/presentation/home/home_state.dart';
-import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -153,12 +151,11 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// Записи видны через наблюдатель соединения, граф — по строкам хранилища и
 /// публичным чтениям модуля графа, результат — по завершениям координатора и
 /// сообщениям общей поверхности, согласование — по подтверждённым снимкам
-/// каталога, Главной и навигации по тегу и по видимой выдаче каталога.
+/// каталога и навигации по тегу и по видимой выдаче каталога.
 ///
 /// Навигация по тегу — страница поверх корневой: под модальной панелью,
 /// открытой из каталога, она существовать не может. Поэтому её проверка
-/// открывает навигацию после результата, а заранее загруженной и скрытой во
-/// время создания остаётся Главная.
+/// открывает навигацию после результата.
 void main() {
   // Проверки читают системные строки из локализаций: второй язык не меняет
   // создание, согласование и чтение результата.
@@ -170,7 +167,7 @@ void main() {
       'настоящий редактор тега, открывается по новому идентификатору при '
       'совпадении названия и сохраняется одним подтверждённым результатом, '
       'учитывается ровно один раз в выдаче с прежними условиями и позицией, '
-      'отражается скрытой Главной и навигацией по тегам и читается после '
+      'отражается навигацией по тегам и читается после '
       'повторного открытия хранилища вместе с минимальным созданием на $code',
       (tester) async {
         final install = await _install(tester, locale);
@@ -191,7 +188,6 @@ void main() {
           description: null,
           readiness: IntentionReadiness.notReady,
         );
-        expect(_home(app), isA<HomeList>());
         expect(app.completions, isEmpty);
 
         // Все пять полей черновика готовятся только через интерфейс панели,
@@ -275,23 +271,15 @@ void main() {
           (created.toCanonicalString(), 4),
         ]);
 
-        // Каталог и скрытая Главная согласуются с той же ревизией без нового
-        // чтения выдачи.
+        // Каталог согласуется с той же ревизией без нового чтения выдачи.
         await _waitFor(
           tester,
-          () => _currentAt(app, revision),
-          reason: () => '${_home(app)} ${_catalogState(app)}',
+          () => _catalogCurrentAt(app, revision),
+          reason: () => '${_catalogState(app)}',
         );
         await _closeCreatedPage(tester, app);
         expectIntentionGraphRootPage(app.router);
         expect(_selected(tester), AppDestination.intentionGraph);
-        final homeList = _home(app) as HomeList;
-        expect(
-          [for (final row in homeList.items) row.id],
-          [_intentionId(_walk), _intentionId(_swim), created],
-        );
-        expect(homeList.items.last.title, _title);
-        expect(homeList.items.last.readiness, IntentionReadiness.ready);
 
         await _acceptMessage(
           tester,
@@ -359,10 +347,8 @@ void main() {
         expectIntentionGraphRootPage(app.router);
 
         // Минимальное создание через ту же кнопку по-прежнему даёт пустой
-        // набор и выключенные отметки, не попадает в неподходящую выдачу и
-        // не затрагивает избранное Главной.
+        // набор и выключенные отметки, не попадает в неподходящую выдачу.
         final catalogAfterFull = _catalog(app);
-        final homeAfterFull = _home(app);
         await _openSheet(tester, app);
         await tester.enterText(
           find.byKey(const ValueKey('intention-editor-title')),
@@ -417,12 +403,10 @@ void main() {
         _expectSameSearch(_catalog(app), catalogBefore);
         expect(_ids(_catalog(app)), _ids(catalogAfterFull));
         expect(_catalog(app).totalCount, catalogAfterFull.totalCount);
-        expect(_homeIds(_home(app)), _homeIds(homeAfterFull));
 
-        // Ранее скрытая Главная показывает новое избранное в конце.
         await _closeCreatedPage(tester, app, systemBack: true);
         await _select(tester, AppDestination.home);
-        expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
+        expectHomeRootPage(app.router);
         expect(_message, findsNothing);
         expect(tester.takeException(), isNull);
 
@@ -430,7 +414,6 @@ void main() {
         // результаты читаются через публичную границу модуля графа.
         await app.shutdown(tester);
         final reopened = await _launch(tester, install);
-        expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
         await _expectDurableIntention(
           tester,
           reopened,
@@ -600,8 +583,7 @@ final class _Launch {
 }
 
 /// Запускает приложение на хранилище [install] через настроенное файловое
-/// соединение, засевает его [seed] и ждёт, пока Главная закончит
-/// первоначальное получение.
+/// соединение, засевает его [seed] и ждёт появления Главной.
 Future<_Launch> _launch(
   WidgetTester tester,
   _Install install, {
@@ -632,10 +614,6 @@ Future<_Launch> _launch(
   final router = ready.container.read(appRouterProvider);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
-  await _waitFor(
-    tester,
-    () => find.text(install.l10n.homeLoading).evaluate().isEmpty,
-  );
   await tester.pumpAndSettle();
   return _Launch(
     runtime: runtime,
@@ -1285,12 +1263,6 @@ Future<IntentionCatalogFirstPage> _catalogPage(
   };
 }
 
-HomeState _home(_Launch app) => app.container.read(homeViewModelProvider);
-
-List<IntentionId> _homeIds(HomeState state) => [
-  for (final row in (state as HomeList).items) row.id,
-];
-
 IntentionCatalogState? _catalogState(_Launch app) => app.container
     .read(intentionCatalogViewModelProvider(const BrowseIntentionCatalog()))
     .value;
@@ -1301,16 +1273,6 @@ IntentionCatalogLoaded _catalog(_Launch app) =>
 List<IntentionId> _ids(IntentionCatalogLoaded catalog) => [
   for (final item in catalog.items) item.id,
 ];
-
-/// Главная и каталог показывают актуальные данные ревизии [revision].
-bool _currentAt(_Launch app, GraphRevision revision) =>
-    switch (_home(app)) {
-      final HomeList home =>
-        home.revision.compareTo(revision) == GraphRevisionOrder.same &&
-            home.freshness is HomeFreshnessCurrent,
-      _ => false,
-    } &&
-    _catalogCurrentAt(app, revision);
 
 /// Каталог показывает актуальные данные ревизии [revision].
 bool _catalogCurrentAt(_Launch app, GraphRevision revision) =>
@@ -1403,18 +1365,6 @@ ScrollPosition _catalogPagePosition(WidgetTester tester) => tester
       find.ancestor(of: _catalogList, matching: find.byType(Scrollable)).first,
     )
     .position;
-
-final _homeRows = find.descendant(
-  of: find.byType(HomePage, skipOffstage: false),
-  matching: find.byType(HomeIntentionRow, skipOffstage: false),
-  skipOffstage: false,
-);
-
-/// Названия строк Главной в порядке списка.
-List<String> _shownHome(WidgetTester tester) => [
-  for (final row in tester.widgetList<HomeIntentionRow>(_homeRows))
-    row.row.title,
-];
 
 Finder _row(TagId id) =>
     find.byKey(ValueKey('tag-catalog-row-${id.toCanonicalString()}'));
