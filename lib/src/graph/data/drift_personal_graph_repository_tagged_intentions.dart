@@ -33,26 +33,9 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
                 readsFrom: {_database.tags},
               )
               .getSingleOrNull();
-          if (tagRow == null) {
-            final dangling = await _database
-                .customSelect(
-                  'SELECT 1 FROM tag_assignments WHERE tag_id = ? LIMIT 1',
-                  variables: [
-                    Variable<String>(query.tagId.toCanonicalString()),
-                  ],
-                  readsFrom: {_database.tagAssignments},
-                )
-                .getSingleOrNull();
-            if (dangling != null) throw const _StoredIntentionCorruption();
-            throw const _TaggedIntentionsTagMissing();
-          }
+          if (tagRow == null) throw const _TaggedIntentionsTagMissing();
           final tag = _decodeStoredTag(tagRow.data);
           if (tag.id != query.tagId) throw const _StoredIntentionCorruption();
-          if (cursor == null) {
-            // Курсор свидетельствует о проверке ссылок всего выбранного тега
-            // только для этой ревизии.
-            await _checkTaggedIntentionReferences(query.tagId);
-          }
 
           final boundary = cursor?.boundarySequence;
           final archiveFlag = query.scope == TaggedIntentionsScope.archived
@@ -126,24 +109,6 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
       );
       return TaggedIntentionsPageError(failure);
     }
-  }
-
-  Future<void> _checkTaggedIntentionReferences(TagId tagId) async {
-    final broken = await _database
-        .customSelect(
-          '''
-      SELECT 1 FROM tag_assignments a
-      LEFT JOIN intentions i ON i.id = a.intention_id
-      WHERE a.tag_id = ? AND (
-        i.id IS NULL
-        OR typeof(i.is_archived) <> 'integer' OR i.is_archived NOT IN (0, 1)
-      ) LIMIT 1
-    ''',
-          variables: [Variable<String>(tagId.toCanonicalString())],
-          readsFrom: {_database.tagAssignments, _database.intentions},
-        )
-        .getSingleOrNull();
-    if (broken != null) throw const _StoredIntentionCorruption();
   }
 }
 

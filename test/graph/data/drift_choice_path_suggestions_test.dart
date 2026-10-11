@@ -298,9 +298,9 @@ void main() {
     addRelation(101, 1, 2);
     addChoice(1001, 1, 2, 101);
     addChoice(1002, 1, 2, 101);
-    raw.execute('PRAGMA ignore_check_constraints = ON');
+    // Шаблон даты схема пропускает, а несуществующий день — нет в календаре.
     raw.execute('UPDATE daily_choices SET choice_date = ? WHERE id = ?', [
-      'некорректная дата',
+      '2026-02-30',
       _uuid(1001),
     ]);
     final result = await repository.getChoicePathSuggestions(
@@ -332,9 +332,9 @@ void main() {
         addRelation(100 + action, 1, action);
         addChoice(1000 + action, 1, action, 100 + action);
       }
-      raw.execute('PRAGMA ignore_check_constraints = ON');
+      // Шаблон даты схема пропускает, а несуществующий день — нет в календаре.
       raw.execute('UPDATE daily_choices SET choice_date = ? WHERE id = ?', [
-        'некорректная дата',
+        '2026-02-30',
         _uuid(1002),
       ]);
 

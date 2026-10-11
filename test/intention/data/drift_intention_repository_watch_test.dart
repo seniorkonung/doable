@@ -303,7 +303,6 @@ void main() {
           ),
         ];
 
-        await database.customStatement('PRAGMA ignore_check_constraints = ON');
         for (final fixture in fixtures) {
           await _insertIntention(
             database,
@@ -314,7 +313,6 @@ void main() {
             updatedAt: fixture.updatedAt,
           );
         }
-        await database.customStatement('PRAGMA ignore_check_constraints = OFF');
 
         for (final fixture in fixtures) {
           await expectLater(
@@ -329,16 +327,6 @@ void main() {
       'отклоняет недопустимые raw storage-значения до typed Drift mapping',
       () async {
         final fixtures = [
-          (
-            id: _id('018f0b5d-6b2e-7c80-8000-000000000306'),
-            isActionReady: 2 as Object,
-            isArchived: 0 as Object,
-            createdAt:
-                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
-            updatedAt:
-                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
-            description: null as Object?,
-          ),
           (
             id: _id('018f0b5d-6b2e-7c80-8000-000000000309'),
             isActionReady: 0 as Object,
@@ -359,7 +347,7 @@ void main() {
           ),
           (
             id: _id('018f0b5d-6b2e-7c80-8000-000000000311'),
-            isActionReady: Uint8List.fromList([1]) as Object,
+            isActionReady: 0 as Object,
             isArchived: 0 as Object,
             createdAt:
                 DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
@@ -369,7 +357,6 @@ void main() {
           ),
         ];
 
-        await database.customStatement('PRAGMA ignore_check_constraints = ON');
         for (final fixture in fixtures) {
           await _insertRawIntention(
             database,
@@ -381,7 +368,6 @@ void main() {
             updatedAt: fixture.updatedAt,
           );
         }
-        await database.customStatement('PRAGMA ignore_check_constraints = OFF');
 
         for (final fixture in fixtures) {
           await expectLater(

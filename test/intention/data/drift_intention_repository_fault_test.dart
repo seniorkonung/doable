@@ -78,63 +78,6 @@ void main() {
   });
 
   group('Порция каталога — отказы получения собственных тегов', () {
-    test('повреждённая ссылка отклоняет всю порцию и её продолжение', () async {
-      for (final id in [_id(_firstUuid), _id(_secondUuid)]) {
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Одноимённое намерение',
-          createdAt: DateTime.utc(2026, 9, 2, 10),
-        );
-      }
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtAscending,
-        pageSize: 1,
-      );
-      final first = (await repository.getCatalogPage(
-        query,
-      ) as ResultSuccess<IntentionCatalogPage>).value;
-      await database.customStatement('PRAGMA foreign_keys = OFF');
-      await database.customStatement(
-        'INSERT INTO tags (id, name) VALUES (?, ?)',
-        [_relationUuid, 'CANARY-тег'],
-      );
-      await database.customStatement(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_relationUuid, _secondUuid],
-      );
-      await database.customStatement('DELETE FROM tags WHERE id = ?', [
-        _relationUuid,
-      ]);
-
-      for (final request in [
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: null,
-          order: query.order,
-          pageSize: 2,
-        ),
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: null,
-          order: query.order,
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      ]) {
-        expect(
-          await repository.getCatalogPage(request),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-      }
-    });
-
     test(
       'ошибка после получения назначений не публикует частичный успех',
       () async {

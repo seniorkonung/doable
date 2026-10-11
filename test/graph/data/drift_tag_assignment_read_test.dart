@@ -21,23 +21,6 @@ import '../../support/tag_storage_fixture.dart';
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
-void _insertMissingTagReference(
-  sqlite.Database database,
-  String recipientColumn,
-  String recipientId,
-) {
-  final tagId = tagFixtureId(999);
-  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-    tagId,
-    'Временный тег',
-  ]);
-  database.execute(
-    'INSERT INTO tag_assignments (tag_id, $recipientColumn) VALUES (?, ?)',
-    [tagId, recipientId],
-  );
-  database.execute('DELETE FROM tags WHERE id = ?', [tagId]);
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
@@ -243,39 +226,6 @@ void main() {
   });
 
   test(
-    'точечное чтение не скрывает отсутствующую сторону сохранённой пары',
-    () async {
-      raw.execute('PRAGMA foreign_keys = OFF');
-      final tagId = (TagId.decode(
-        tagFixtureId(firstTagNumber),
-      ) as TagIdDecodingSuccess).id;
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(999)],
-      );
-      expect(
-        await graph.getTagAssignmentStatus(tagId, _intention(999)),
-        isA<TagAssignmentStatusError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentStatusCorruption>(),
-        ),
-      );
-      _insertMissingTagReference(raw, 'intention_id', tagFixtureId(1));
-      final missingTag =
-          (TagId.decode(tagFixtureId(999)) as TagIdDecodingSuccess).id;
-      expect(
-        await graph.getTagAssignmentStatus(missingTag, _intention(1)),
-        isA<TagAssignmentStatusError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentStatusCorruption>(),
-        ),
-      );
-    },
-  );
-
-  test(
     'ключ порядка назначения повторяет создание тега и остаётся неизменным',
     () {
       final tagId = tagFixtureId(firstTagNumber);
@@ -409,89 +359,6 @@ void main() {
     }
   });
 
-  test('повреждённая ссылка отклоняет оба полных чтения', () async {
-    raw.execute('PRAGMA foreign_keys = OFF');
-    for (final target in [_intention(1)]) {
-      final column = 'intention_id';
-      final id = target.toCanonicalString();
-      _insertMissingTagReference(raw, column, id);
-      expect(
-        await graph.getTagAssignments(target),
-        isA<TagAssignmentsError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentsCorruptionFailure>(),
-        ),
-      );
-      expect(
-        await graph.getTagCatalog(TagCatalogSelectionMode(target)),
-        isA<TagCatalogError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagCatalogCorruptionFailure>(),
-        ),
-      );
-      raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
-        tagFixtureId(999),
-      ]);
-    }
-  });
-
-  test(
-    'новое чтение замечает повреждение и восстанавливается после исправления',
-    () async {
-      raw.execute('PRAGMA foreign_keys = OFF');
-      for (final target in [_intention(1)]) {
-        final column = 'intention_id';
-        final id = target.toCanonicalString();
-        final firstAssignments = assignments(
-          await graph.getTagAssignments(target),
-        );
-        final firstSelection = selection(
-          await graph.getTagCatalog(TagCatalogSelectionMode(target)),
-        );
-        _insertMissingTagReference(raw, column, id);
-        expect(
-          await graph.getTagAssignments(target),
-          isA<TagAssignmentsError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TagAssignmentsCorruptionFailure>(),
-          ),
-        );
-        expect(
-          await graph.getTagCatalog(TagCatalogSelectionMode(target)),
-          isA<TagCatalogError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TagCatalogCorruptionFailure>(),
-          ),
-        );
-        raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
-          tagFixtureId(999),
-        ]);
-        final restoredAssignments = assignments(
-          await graph.getTagAssignments(target),
-        );
-        final restoredSelection = selection(
-          await graph.getTagCatalog(TagCatalogSelectionMode(target)),
-        );
-        expect(
-          restoredAssignments.items.map((tag) => tag.id),
-          firstAssignments.items.map((tag) => tag.id),
-        );
-        expect(
-          restoredSelection.rows.map((row) => row.tag.id),
-          firstSelection.rows.map((row) => row.tag.id),
-        );
-        expect(
-          restoredSelection.rows.map((row) => row.isAssigned),
-          firstSelection.rows.map((row) => row.isAssigned),
-        );
-      }
-    },
-  );
-
   test('полные снимки разных намерений и ревизий не смешиваются', () async {
     final target = _intention(1);
     raw.execute(
@@ -536,76 +403,44 @@ void main() {
     expect(first.items, hasLength(2));
   });
 
-  test(
-    'повреждение строки после сотой и отсутствующей ссылки отклоняет снимок',
-    () async {
-      for (var number = 303; number <= 439; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          tagFixtureId(number),
-          'Тег $number',
-        ]);
-        for (final (column, recipient) in [('intention_id', tagFixtureId(1))]) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-            [tagFixtureId(number), recipient],
-          );
-        }
-      }
-      raw.execute('PRAGMA foreign_keys = OFF');
-      for (final (target, column, recipient) in [
-        (_intention(1), 'intention_id', tagFixtureId(1)),
-      ]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          'некорректный-id',
-          'Повреждённый',
-        ]);
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-          ['некорректный-id', recipient],
-        );
-        expect(
-          await graph.getTagAssignments(target),
-          isA<TagAssignmentsError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TagAssignmentsCorruptionFailure>(),
-          ),
-        );
-        expect(
-          await graph.getTagCatalog(TagCatalogSelectionMode(target)),
-          isA<TagCatalogError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TagCatalogCorruptionFailure>(),
-          ),
-        );
-        raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
-          'некорректный-id',
-        ]);
-        raw.execute('DELETE FROM tags WHERE id = ?', ['некорректный-id']);
-        _insertMissingTagReference(raw, column, recipient);
-        expect(
-          await graph.getTagAssignments(target),
-          isA<TagAssignmentsError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TagAssignmentsCorruptionFailure>(),
-          ),
-        );
-        expect(
-          await graph.getTagCatalog(TagCatalogSelectionMode(target)),
-          isA<TagCatalogError>().having(
-            (error) => error.failure,
-            'причина',
-            isA<TagCatalogCorruptionFailure>(),
-          ),
-        );
-        raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
-          tagFixtureId(999),
-        ]);
-      }
-    },
-  );
+  test('повреждение строки после сотой отклоняет снимок', () async {
+    final target = _intention(1);
+    for (var number = 303; number <= 439; number++) {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        'Тег $number',
+      ]);
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(number), tagFixtureId(1)],
+      );
+    }
+    // Формат идентификатора тега схема не проверяет.
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      'некорректный-id',
+      'Повреждённый',
+    ]);
+    raw.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      ['некорректный-id', tagFixtureId(1)],
+    );
+    expect(
+      await graph.getTagAssignments(target),
+      isA<TagAssignmentsError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TagAssignmentsCorruptionFailure>(),
+      ),
+    );
+    expect(
+      await graph.getTagCatalog(TagCatalogSelectionMode(target)),
+      isA<TagCatalogError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TagCatalogCorruptionFailure>(),
+      ),
+    );
+  });
 
   test('пустой каталог проверяет существование намерения', () async {
     raw.execute('DELETE FROM tags');
@@ -633,30 +468,5 @@ void main() {
         ),
       );
     }
-  });
-
-  test('осиротевшее назначение не выглядит отсутствующим намерением', () async {
-    raw.execute('PRAGMA foreign_keys = OFF');
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(999)],
-    );
-    final target = _intention(999);
-    expect(
-      await graph.getTagAssignments(target),
-      isA<TagAssignmentsError>().having(
-        (error) => error.failure,
-        'причина',
-        isA<TagAssignmentsCorruptionFailure>(),
-      ),
-    );
-    expect(
-      await graph.getTagCatalog(TagCatalogSelectionMode(target)),
-      isA<TagCatalogError>().having(
-        (error) => error.failure,
-        'причина',
-        isA<TagCatalogCorruptionFailure>(),
-      ),
-    );
   });
 }

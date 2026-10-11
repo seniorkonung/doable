@@ -130,50 +130,6 @@ void main() {
     );
   }
 
-  test(
-    'отсутствующая связь помеченных намерений не влияет на результаты',
-    () async {
-      raw.execute('PRAGMA foreign_keys = OFF');
-      raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
-        tagFixtureId(102),
-      ]);
-      expect(
-        (await collect(
-          _tag(firstTagNumber),
-          TaggedIntentionsScope.active,
-          1,
-        )).map((item) => item.id),
-        [_intention(1), _intention(4)],
-      );
-      expect(
-        (await collect(
-          _tag(firstTagNumber),
-          TaggedIntentionsScope.archived,
-          1,
-        )).map((item) => item.id),
-        [_intention(2)],
-      );
-    },
-  );
-
-  test(
-    'оставшиеся назначения отсутствующего тега означают повреждение',
-    () async {
-      raw.execute('PRAGMA foreign_keys = OFF');
-      raw.execute('DELETE FROM tags WHERE id = ?', [
-        tagFixtureId(firstTagNumber),
-      ]);
-      await expectCorruption(TaggedIntentionsScope.active);
-    },
-  );
-
-  test('отсутствующее помеченное намерение не исчезает за охватом', () async {
-    raw.execute('PRAGMA foreign_keys = OFF');
-    raw.execute('DELETE FROM intentions WHERE id = ?', [tagFixtureId(2)]);
-    await expectCorruption(TaggedIntentionsScope.active);
-    await expectCorruption(TaggedIntentionsScope.archived);
-  });
-
   test('повреждение дополнительного намерения отклоняет всю порцию', () async {
     raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
       ' CANARY-название ',

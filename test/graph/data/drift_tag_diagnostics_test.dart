@@ -76,11 +76,12 @@ void main() {
     final graph = repository(sink);
     final id =
         (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
-    TaggedIntentionsQuery query() => TaggedIntentionsQuery(
+    TaggedIntentionsQuery query({int pageSize = 1}) => TaggedIntentionsQuery(
       tagId: id,
       scope: TaggedIntentionsScope.active,
-      pageSize: 1,
+      pageSize: pageSize,
     );
+    const damagedIntentionId = 'CANARY-повреждённое-намерение';
 
     expect(
       await graph.getTaggedIntentionsPage(query()),
@@ -127,13 +128,17 @@ void main() {
     );
 
     readFault.failure = null;
-    raw.execute('PRAGMA foreign_keys = OFF');
+    // Формат идентификатора намерения схема не проверяет.
+    raw.execute(
+      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+      [damagedIntentionId, 'Повреждённое'],
+    );
     raw.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(999)],
+      [tagFixtureId(firstTagNumber), damagedIntentionId],
     );
     expect(
-      await graph.getTaggedIntentionsPage(query()),
+      await graph.getTaggedIntentionsPage(query(pageSize: 10)),
       isA<TaggedIntentionsPageError>().having(
         (error) => error.failure,
         'причина',
@@ -153,7 +158,7 @@ void main() {
       'CANARY-запрос',
       'CANARY-неизвестная-причина',
       tagFixtureId(firstTagNumber),
-      tagFixtureId(999),
+      damagedIntentionId,
       tagFixtureId(101),
       tagFixtureId(1),
       'Дом',

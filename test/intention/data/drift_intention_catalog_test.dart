@@ -1055,9 +1055,8 @@ void main() {
       },
     );
 
-    // По одному случаю на проверку чтения: начальный BOM, разбор
-    // идентификатора и порядок назначения (выше нуля и совпадение с порядком
-    // тега). Прочие варианты проходят те же проверки.
+    // По одному случаю на проверку чтения: начальный BOM и разбор
+    // идентификатора. Прочие варианты проходят те же проверки.
     for (final (label, corrupt) in <(String, void Function(Database))>[
       (
         'начальный BOM в идентификаторе тега',
@@ -1096,19 +1095,6 @@ void main() {
           );
         },
       ),
-      for (final order in <Object>[0, 1000])
-        (
-          'несогласованный порядок назначения $order',
-          (connection) {
-            connection.execute(
-              'DROP TRIGGER tag_assignments_valid_tag_order_update',
-            );
-            connection.execute(
-              'UPDATE tag_assignments SET tag_creation_sequence = ? WHERE intention_id = ?',
-              [order, _uuid(1)],
-            );
-          },
-        ),
     ]) {
       test('отклоняет всю порцию: $label', () async {
         seedTagStorageFixture(raw);

@@ -40,11 +40,7 @@ final class DriftRelationCountAggregates {
             for (final serialized in requested.keys)
               Variable<String>(serialized),
           ],
-          readsFrom: {
-            _database.intentions,
-            _database.longTermRelations,
-            _database.dailyChoices,
-          },
+          readsFrom: {_database.longTermRelations, _database.dailyChoices},
         )
         .get();
     final bySerializedId = <String, RelationCountAggregate>{
@@ -138,16 +134,12 @@ String _aggregateSql(String requestedValues) =>
       1 AS is_outgoing,
       relation.type AS relation_type,
       relation.is_archived AS relation_is_archived,
-      CASE WHEN ${_validRelationPredicate('relation', 'source', 'related')}
+      CASE WHEN ${_validRelationPredicate('relation')}
         THEN 0 ELSE 1 END AS integrity_violation
     FROM requested
     JOIN long_term_relations AS relation
       INDEXED BY long_term_relations_source_group_order
       ON relation.source_intention_id = requested.owner_id
-    LEFT JOIN intentions AS source
-      ON source.id = relation.source_intention_id
-    LEFT JOIN intentions AS related
-      ON related.id = relation.related_intention_id
 
     UNION ALL
 
@@ -156,16 +148,12 @@ String _aggregateSql(String requestedValues) =>
       0 AS is_outgoing,
       relation.type AS relation_type,
       relation.is_archived AS relation_is_archived,
-      CASE WHEN ${_validRelationPredicate('relation', 'source', 'related')}
+      CASE WHEN ${_validRelationPredicate('relation')}
         THEN 0 ELSE 1 END AS integrity_violation
     FROM requested
     JOIN long_term_relations AS relation
       INDEXED BY long_term_relations_related_group_order
       ON relation.related_intention_id = requested.owner_id
-    LEFT JOIN intentions AS source
-      ON source.id = relation.source_intention_id
-    LEFT JOIN intentions AS related
-      ON related.id = relation.related_intention_id
   ),
   aggregated AS (
     SELECT
@@ -233,15 +221,14 @@ String _aggregateSql(String requestedValues) =>
   ORDER BY requested.owner_id
 ''';
 
-String _validRelationPredicate(
-  String relation,
-  String source,
-  String related,
-) =>
+/// Условие целостной строки связи только по тому, чего схема не гарантирует:
+/// хранимый тип и формат идентификаторов и допустимое описание. Тип, приоритет,
+/// архивное состояние, порядковый номер, различие участников, существование
+/// участников и активность участников активной связи гарантируют `CHECK`,
+/// внешние ключи и триггеры схемы.
+String _validRelationPredicate(String relation) =>
     '''
-  typeof($relation.creation_sequence) = 'integer'
-  AND $relation.creation_sequence > 0
-  AND typeof($relation.id) = 'text'
+  typeof($relation.id) = 'text'
   AND $relationIdIntegrityFunctionName(CAST($relation.id AS BLOB)) = 1
   AND typeof($relation.source_intention_id) = 'text'
   AND $intentionIdIntegrityFunctionName(
@@ -251,31 +238,10 @@ String _validRelationPredicate(
   AND $intentionIdIntegrityFunctionName(
     CAST($relation.related_intention_id AS BLOB)
   ) = 1
-  AND CAST($relation.source_intention_id AS BLOB)
-    <> CAST($relation.related_intention_id AS BLOB)
-  AND typeof($relation.type) = 'text'
-  AND CAST($relation.type AS BLOB) IN (x'6e656564', x'63616e')
-  AND typeof($relation.priority) = 'integer'
-  AND $relation.priority BETWEEN 1 AND 4
   AND (
-    $relation.description IS NULL OR (
-      typeof($relation.description) = 'text'
-      AND $relationDescriptionIntegrityFunctionName(
-        CAST($relation.description AS BLOB)
-      ) = 1
-    )
-  )
-  AND typeof($relation.is_archived) = 'integer'
-  AND $relation.is_archived IN (0, 1)
-  AND $source.id IS NOT NULL
-  AND typeof($source.is_archived) = 'integer'
-  AND $source.is_archived IN (0, 1)
-  AND $related.id IS NOT NULL
-  AND typeof($related.is_archived) = 'integer'
-  AND $related.is_archived IN (0, 1)
-  AND (
-    $relation.is_archived = 1 OR (
-      $source.is_archived = 0 AND $related.is_archived = 0
-    )
+    $relation.description IS NULL OR
+    $relationDescriptionIntegrityFunctionName(
+      CAST($relation.description AS BLOB)
+    ) = 1
   )
 ''';

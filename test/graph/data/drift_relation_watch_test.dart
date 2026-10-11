@@ -542,18 +542,6 @@ void main() {
     await cancelled.future;
   });
 
-  test('отсутствующий участник не даёт частично успешную модель', () async {
-    await database.customStatement('PRAGMA foreign_keys = OFF');
-    await (database.delete(
-      database.intentions,
-    )..where((row) => row.id.equals(relatedId.toCanonicalString()))).go();
-    await database.customStatement('PRAGMA foreign_keys = ON');
-
-    final result = await repository.watchRelation(relationId).first;
-
-    expect(_failure(result), isA<LongTermRelationReadCorruptionFailure>());
-  });
-
   test('сбой чтения не даёт частично успешную модель', () async {
     await database.close();
     databaseIsOpen = false;

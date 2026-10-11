@@ -468,12 +468,12 @@ void main() {
       fixture.intention(1);
       fixture.intention(2, ready: true);
       fixture.relation(101, 1, 2);
-      fixture.raw.execute('PRAGMA ignore_check_constraints = ON');
+      // Название с пробелами по краям приложение не сохраняет, а схема
+      // допускает.
       fixture.raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-        '',
+        ' Название ',
         _uuid(1),
       ]);
-      fixture.raw.execute('PRAGMA ignore_check_constraints = OFF');
       final corrupted = await fixture.repository.getChoicePathContinuations(
         ChoicePathContinuationQuery(
           draft: ChoicePathDraftBottomStart(_intention(2)),

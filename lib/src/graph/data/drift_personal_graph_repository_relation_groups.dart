@@ -418,9 +418,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
         for (final row in await query.get()) _validateCatalogRow(row),
       ]);
     }
-    if (validatedRows.length != ids.length) {
-      throw const _StoredIntentionCorruption();
-    }
     final idsWithoutKnownCount = ids.difference(knownActiveCounts.keys.toSet());
     final counts = await _readVerifiedRelationCountsFor(idsWithoutKnownCount);
     final activeCounts = <IntentionId, int>{
