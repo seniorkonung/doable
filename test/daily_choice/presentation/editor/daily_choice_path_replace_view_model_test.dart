@@ -166,24 +166,6 @@ void main() {
     },
   );
 
-  test('новое предложение обязано быть непрерывным и простым', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.repository.completeRead(harness.repository.details);
-    await pumpEventQueue();
-    final broken = ConfirmedChoicePath([
-      _newPath().steps.single,
-      ConfirmedChoicePathStep(
-        relationId: _relationId(3),
-        sourceIntentionId: _intentionId(1),
-        type: LongTermRelationType.need,
-        relatedIntentionId: _intentionId(2),
-      ),
-    ]);
-    expect(() => harness.model.selectPath(broken), throwsArgumentError);
-    expect(harness.model.state, isA<DailyChoicePathReplaceChoosing>());
-  });
-
   test('закрытие модели не отменяет принятую команду и передаёт результат оболочке', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);

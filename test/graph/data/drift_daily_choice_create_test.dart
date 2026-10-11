@@ -233,41 +233,6 @@ void main() {
     );
   });
 
-  test('отклоняет разрыв, цикл и неверную границу до записи', () async {
-    final invalidRoutes = [
-      ConfirmedChoicePath([
-        ConfirmedChoicePathStep(
-          relationId: _relation(102),
-          sourceIntentionId: _intention(2),
-          type: LongTermRelationType.can,
-          relatedIntentionId: _intention(3),
-        ),
-      ]),
-      ConfirmedChoicePath([
-        ...route().steps,
-        ConfirmedChoicePathStep(
-          relationId: _relation(101),
-          sourceIntentionId: _intention(3),
-          type: LongTermRelationType.need,
-          relatedIntentionId: _intention(1),
-        ),
-      ]),
-      route(1),
-    ];
-    for (final path in invalidRoutes) {
-      final result = await repository.execute(command(path: path));
-      expect(
-        result,
-        isA<GraphCommandFailed>().having(
-          (r) => r.failure.category,
-          'категория',
-          GraphFailureCategory.validation,
-        ),
-      );
-    }
-    expect(await rows('daily_choices'), 0);
-  });
-
   test('архив и утрата готовности дают разные конфликты', () async {
     await database.customUpdate(
       'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',

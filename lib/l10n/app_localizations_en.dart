@@ -1580,9 +1580,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Check the daily choice description.';
 
   @override
-  String get dailyChoicePathInvalid => 'Check the daily choice path.';
-
-  @override
   String get dailyChoiceOperationNotFound =>
       'This daily choice no longer exists.';
 

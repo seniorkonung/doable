@@ -491,7 +491,6 @@
   "dailyChoiceSelectedInvalid": "Проверьте выбранное намерение дневного выбора.",
   "dailyChoiceDateInvalid": "Проверьте дату дневного выбора.",
   "dailyChoiceDescriptionInvalid": "Проверьте описание дневного выбора.",
-  "dailyChoicePathInvalid": "Проверьте путь дневного выбора.",
   "dailyChoiceOperationNotFound": "Дневной выбор больше не существует.",
   "dailyChoiceOperationConflict": "Данные изменились. Обновите их и подтвердите снова.",
   "dailyChoiceOperationUnavailable": "Не удалось выполнить действие с дневным выбором. Повторите попытку.",

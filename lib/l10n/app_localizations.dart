@@ -2730,12 +2730,6 @@ abstract class AppLocalizations {
   /// **'Check the daily choice description.'**
   String get dailyChoiceDescriptionInvalid;
 
-  /// Ошибка пути дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Check the daily choice path.'**
-  String get dailyChoicePathInvalid;
-
   /// Дневной выбор отсутствует при выполнении команды
   ///
   /// In en, this message translates to:

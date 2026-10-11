@@ -1586,9 +1586,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Проверьте описание дневного выбора.';
 
   @override
-  String get dailyChoicePathInvalid => 'Проверьте путь дневного выбора.';
-
-  @override
   String get dailyChoiceOperationNotFound =>
       'Дневной выбор больше не существует.';
 

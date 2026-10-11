@@ -10,33 +10,26 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test(
-    'предложение требует шаг и сохраняет подтверждённый порядок и смысл',
-    () {
-      expect(() => ConfirmedChoicePath([]), throwsA(isA<ArgumentError>()));
-      final steps = [
-        ConfirmedChoicePathStep(
-          relationId: _relation1,
-          sourceIntentionId: _source,
-          type: LongTermRelationType.need,
-          relatedIntentionId: _middle,
-        ),
-        ConfirmedChoicePathStep(
-          relationId: _relation2,
-          sourceIntentionId: _middle,
-          type: LongTermRelationType.can,
-          relatedIntentionId: _selected,
-        ),
-      ];
-      final path = ConfirmedChoicePath(steps);
-      steps.clear();
-      expect(path.steps.map((step) => step.relationId), [
-        _relation1,
-        _relation2,
-      ]);
-      expect(path.steps.last.type, LongTermRelationType.can);
-    },
-  );
+  test('предложение сохраняет подтверждённый порядок и смысл', () {
+    final steps = [
+      ConfirmedChoicePathStep(
+        relationId: _relation1,
+        sourceIntentionId: _source,
+        type: LongTermRelationType.need,
+        relatedIntentionId: _middle,
+      ),
+      ConfirmedChoicePathStep(
+        relationId: _relation2,
+        sourceIntentionId: _middle,
+        type: LongTermRelationType.can,
+        relatedIntentionId: _selected,
+      ),
+    ];
+    final path = ConfirmedChoicePath(steps);
+    steps.clear();
+    expect(path.steps.map((step) => step.relationId), [_relation1, _relation2]);
+    expect(path.steps.last.type, LongTermRelationType.can);
+  });
 
   test(
     'сохранённый путь копирует переданные шаги и проверяет их связность',

@@ -745,10 +745,6 @@ void main() {
       field: DailyChoiceValidationField.description,
       ru: 'Проверьте описание дневного выбора.',
     ),
-    (
-      field: DailyChoiceValidationField.path,
-      ru: 'Проверьте путь дневного выбора.',
-    ),
   ]) {
     testWidgets('ошибка поля ${scenario.field.name} объяснена', (tester) async {
       final harness = await _pumpPresenterApp(

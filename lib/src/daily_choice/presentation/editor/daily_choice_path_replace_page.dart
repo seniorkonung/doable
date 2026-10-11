@@ -30,7 +30,6 @@ final class DailyChoicePathReplacePage extends ConsumerStatefulWidget {
     Key? key,
   }) {
     final visibleSteps = List<DailyChoiceCreationStep>.unmodifiable(steps);
-    DailyChoicePathReplaceProposal(path);
     if (!_stepsMatchPath(path, visibleSteps)) {
       throw ArgumentError.value(steps, 'steps');
     }

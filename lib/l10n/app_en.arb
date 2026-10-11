@@ -1500,10 +1500,6 @@
   "@dailyChoiceDescriptionInvalid": {
     "description": "Ошибка описания дневного выбора"
   },
-  "dailyChoicePathInvalid": "Check the daily choice path.",
-  "@dailyChoicePathInvalid": {
-    "description": "Ошибка пути дневного выбора"
-  },
   "dailyChoiceOperationNotFound": "This daily choice no longer exists.",
   "@dailyChoiceOperationNotFound": {
     "description": "Дневной выбор отсутствует при выполнении команды"

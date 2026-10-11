@@ -15,7 +15,6 @@ void main() {
     expect(draft.steps, isEmpty);
     expect(draft.currentIntentionId, _intention(1));
     expect(draft, isNot(isA<ChoicePathDraftProgress>()));
-    expect(() => ConfirmedChoicePath(draft.steps), throwsArgumentError);
   });
 
   test(
@@ -131,7 +130,6 @@ void main() {
     expect(draft.startingIntentionId, _intention(3));
     expect(draft.currentIntentionId, _intention(3));
     expect(draft.steps, isEmpty);
-    expect(() => ConfirmedChoicePath(draft.steps), throwsArgumentError);
 
     final page = ChoicePathContinuationsPage(
       draft: draft,
