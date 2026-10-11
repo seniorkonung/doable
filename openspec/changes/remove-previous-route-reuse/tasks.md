@@ -83,7 +83,7 @@
   - **Вероятные файлы:** `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/graph/data/drift_relation_count_aggregates.dart`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v1.json`.
   - **Объём:** M.
 
-- [ ] 1.10 Удалить диагностические события, принадлежавшие чтению подсказок
+- [x] 1.10 Удалить диагностические события, принадлежавшие чтению подсказок
   - **Критерии приёмки:**
     - Удалены `ChoicePathSuggestionReadStage`, `ChoicePathSuggestionReadDiagnosticsEvent` и их представление в диагностическом приёмнике.
     - Диагностика пошагового чтения, проверки и записи пути сохраняется; общие события и канал предъявления результатов по [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md) не изменены.
