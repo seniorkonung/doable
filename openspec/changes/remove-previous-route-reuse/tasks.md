@@ -2,11 +2,12 @@
 
 - [ ] 1.1 Перевести сохраняемые сквозные проверки создания, замены пути и выхода на пошаговый выбор
   - **Критерии приёмки:**
-    - Проверки создания и замены в обоих направлениях достигают подтверждения через шаги пути; обращения к подсказкам и проверки их предпросмотра удалены.
-    - Сохраняются проверки независимых полей, актуализации после конфликта, атомарной замены, исходной истории, чужого черновика и позднего результата принятой команды по [спецификации дневных выборов](specs/daily-choice-management/spec.md). Дублирующие сценарии после перевода объединены без потери самостоятельных гарантий.
-  - **Проверка:** `flutter test test/daily_choice/presentation/daily_choice_creation_flow_test.dart test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart test/daily_choice/presentation/daily_choice_creation_exit_test.dart`.
+    - Проверки создания и замены в обоих направлениях достигают подтверждения через шаги пути; обращения к подсказкам и проверки их предпросмотра удалены. Сценарий в `test/app/daily_choice_app_lifecycle_test.dart`, открывающий подтверждение через `choice-suggestion-select-0`, также переведён на пошаговый выбор снизу вверх.
+    - Сохраняются проверки независимых полей, актуализации после конфликта, атомарной замены, исходной истории, чужого черновика и позднего результата принятой команды по [спецификации дневных выборов](specs/daily-choice-management/spec.md). Сценарий жизненного цикла сохраняет проверки защиты от повторной отправки, завершения записи после ухода с подтверждения и потери фокуса, однократного предъявления результата после возвращения фокуса и просмотра созданного выбора. Дублирующие сценарии после перевода объединены без потери самостоятельных гарантий.
+    - Из `test/app/navigation/app_shell_unnamed_page_scenarios.dart` удалены только сценарии предпросмотра подсказок в обоих направлениях и вспомогательный код без оставшихся потребителей. Проверки построения пути, подтверждения замены и блокировки обычной страницы и панели открытым диалогом сохранены; смешанный набор запускается через `test/app/navigation/app_shell_pages_above_test.dart`.
+  - **Проверка:** `flutter test test/daily_choice/presentation/daily_choice_creation_flow_test.dart test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart test/daily_choice/presentation/daily_choice_creation_exit_test.dart test/app/daily_choice_app_lifecycle_test.dart test/app/navigation/app_shell_pages_above_test.dart`.
   - **Зависимости:** нет; существующий пошаговый контракт уже доступен.
-  - **Вероятные файлы:** три перечисленных файла проверок.
+  - **Вероятные файлы:** `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_exit_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/app/navigation/app_shell_unnamed_page_scenarios.dart`.
   - **Объём:** M.
 
 - [ ] 1.2 Оставить на странице пути только пошаговый выбор с явным подтверждением
@@ -14,7 +15,7 @@
     - Страница пути больше не создаёт и не обслуживает модель подсказок, не предлагает прежние маршруты и не открывает их предпросмотр; удалены представление подсказок, его отдельные тесты и конструктор шага подтверждения из подсказки по решениям 2 и 5 [дизайна](design.md).
     - Сценарий «Сохранённый маршрут не предлагается при новом выборе» проверяется с уже сохранённым допустимым путём: построение начинается от выбранного участника без предложения или подстановки шагов, а подтверждение требует пошагового прохода. Проверка выявляет прежнее поведение до изменения и проходит после него.
   - **Проверка:** `flutter test test/daily_choice/presentation/path/choice_path_page_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`; `flutter analyze`.
-  - **Зависимости:** 1.1.
+  - **Зависимости:** 1.1; сохраняемые сквозные проверки, включая жизненный цикл приложения и смешанный набор навигации, уже не используют интерфейс подсказок.
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/daily_choice/presentation/path/choice_path_suggestions_view.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `test/daily_choice/presentation/path/choice_path_suggestions_view_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
   - **Объём:** M.
 
@@ -31,7 +32,7 @@
   - **Критерии приёмки:**
     - Создание, актуализация и замена в обоих направлениях, отмена и завершение принятой команды работают через оставшиеся страницы; существующие проверки навигации и независимых полей проходят.
     - Поведение согласовано с delta-спецификациями [дневных выборов](specs/daily-choice-management/spec.md) и [навигации](specs/app-navigation/spec.md), что позволяет удалять оставшуюся внутреннюю поддержку подсказок.
-  - **Проверка:** `flutter test test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart`; `openspec validate remove-previous-route-reuse --strict`.
+  - **Проверка:** `flutter test test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart test/app/navigation/app_shell_pages_above_test.dart`; `openspec validate remove-previous-route-reuse --strict`.
   - **Зависимости:** 1.1, 1.2, 1.3.
   - **Вероятные файлы:** нет, только проверка; результаты сообщаются в сессии.
   - **Объём:** XS.
