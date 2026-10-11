@@ -102,7 +102,7 @@
   - **Вероятные файлы:** `lib/src/intention/application/intention_command.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_favorite_marks.dart` в той же папке; специализированные тесты отметки в `test/intention/data/` и `test/graph/presentation/favorite_mark_package_consumers_test.dart`.
   - **Объём:** M.
 
-- [ ] 1.12 Оставить один тип завершения для общего протокола предъявления результатов
+- [x] 1.12 Оставить один тип завершения для общего протокола предъявления результатов
   - **Критерии приёмки:**
     - `GraphPresentableCompletion` объединён с `GraphCommandCompletion`; очередь, claims и presenter работают с единой базой, без политики «только отказ» и отбрасывания успешной перестановки.
     - Существующие контрактные проверки ADR-0012 подтверждают последовательность сообщений, единственное предъявление, передачу неподтверждённого отказа общей поверхности после исчезновения инициатора и бездействие позднего callback прежнего claim. Протокол не дублируется в отдельных проверках каждого экрана.

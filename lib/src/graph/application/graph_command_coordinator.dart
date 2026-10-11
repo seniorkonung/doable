@@ -152,6 +152,10 @@ final class TagOperationToken extends GraphInitiatorOperationToken {
   String toString() => 'TagOperationToken';
 }
 
+/// Завершение, право предъявления которого выдаёт coordinator.
+///
+/// По протоколу ADR-0012 успех сразу принадлежит оболочке, а отказ — открытой
+/// экранной сессии инициатора.
 sealed class GraphCommandCompletion {
   const GraphCommandCompletion();
 
@@ -164,15 +168,7 @@ sealed class GraphCommandCompletion {
   bool get isFailure;
 }
 
-/// Завершение, право предъявления которого выдаёт coordinator.
-///
-/// По протоколу ADR-0012 успех сразу принадлежит оболочке, а отказ — открытой
-/// экранной сессии инициатора.
-sealed class GraphPresentableCompletion extends GraphCommandCompletion {
-  const GraphPresentableCompletion();
-}
-
-final class IntentionCommandCompletion extends GraphPresentableCompletion {
+final class IntentionCommandCompletion extends GraphCommandCompletion {
   const IntentionCommandCompletion._({
     required this.token,
     required this.kind,
@@ -215,8 +211,7 @@ final class IntentionCommandCompletion extends GraphPresentableCompletion {
 
 enum LongTermRelationCommandKind { create, update, archive, restore, delete }
 
-final class LongTermRelationCommandCompletion
-    extends GraphPresentableCompletion {
+final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
     required this.token,
     required this.kind,
@@ -249,8 +244,7 @@ final class LongTermRelationCommandCompletion
   };
 }
 
-final class BlockingRelationsDeleteCompletion
-    extends GraphPresentableCompletion {
+final class BlockingRelationsDeleteCompletion extends GraphCommandCompletion {
   const BlockingRelationsDeleteCompletion._({
     required this.token,
     required this.intentionId,
@@ -279,7 +273,7 @@ final class BlockingRelationsDeleteCompletion
 
 enum DailyChoiceCommandKind { create, update, replace, delete }
 
-final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
+final class DailyChoiceCommandCompletion extends GraphCommandCompletion {
   const DailyChoiceCommandCompletion._({
     required this.token,
     required this.kind,
@@ -309,7 +303,7 @@ final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
 
 enum TagCommandKind { create, rename, delete, assign, removeAssignment }
 
-final class TagCommandCompletion extends GraphPresentableCompletion {
+final class TagCommandCompletion extends GraphCommandCompletion {
   const TagCommandCompletion._({
     required this.token,
     required this.kind,
@@ -473,7 +467,7 @@ sealed class GraphPresentationClaim {
   const GraphPresentationClaim._(this.completion, this._entry);
 
   GraphOperationToken get token;
-  final GraphPresentableCompletion completion;
+  final GraphCommandCompletion completion;
   final _PresentationEntry _entry;
 }
 
@@ -489,8 +483,7 @@ final class GraphInitiatorPresentationClaim extends GraphPresentationClaim {
   final GraphInitiatorOperationToken token;
 }
 
-/// Право оболочки предъявить success, fallback-ошибку либо отказ операции с
-/// политикой «только отказ».
+/// Право оболочки предъявить успех или переданный ей отказ.
 final class GraphAppPresentationClaim extends GraphPresentationClaim {
   const GraphAppPresentationClaim._(
     this.token,
@@ -879,10 +872,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
       final completion = await operationFuture;
-      switch (completion) {
-        case GraphPresentableCompletion():
-          entry.completion = completion;
-      }
+      entry.completion = completion;
       for (final key in keys) {
         if (identical(_gates[key], entry)) {
           _gates.remove(key);
@@ -1178,7 +1168,7 @@ final class _PresentationEntry {
   _PresentationEntry(this.token);
 
   final GraphOperationToken token;
-  GraphPresentableCompletion? completion;
+  GraphCommandCompletion? completion;
   bool initiatorReleased = false;
   GraphInitiatorPresentationClaim? initiatorClaim;
   GraphAppPresentationClaim? appClaim;

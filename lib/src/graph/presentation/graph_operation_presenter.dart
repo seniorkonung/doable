@@ -186,7 +186,7 @@ final class _PresentationSurface {
 
 String _messageFor(
   AppLocalizations localizations,
-  GraphPresentableCompletion completion,
+  GraphCommandCompletion completion,
 ) => switch (completion) {
   IntentionCommandCompletion() => _intentionMessage(localizations, completion),
   LongTermRelationCommandCompletion() => _relationMessage(
