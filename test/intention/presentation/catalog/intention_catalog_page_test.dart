@@ -1225,71 +1225,7 @@ void main() {
 
       expect(find.text(message), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
-      expect(find.widgetWithText(FilledButton, 'Reload catalog'), findsNothing);
     }
-  });
-
-  testWidgets('восстанавливает validation продолжения с первой страницы', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    await tester.pumpWidget(
-      _testApp(repository, pageSize: 2, prefetchRemaining: 1),
-    );
-    repository.complete(
-      0,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [
-            testSummary(index: 1, title: 'Прежнее первое'),
-            testSummary(index: 2, title: 'Прежнее второе'),
-          ],
-          totalCount: 3,
-          nextCursor: const TestCatalogCursor(),
-          revision: const TestCatalogRevision(0),
-        ),
-      ),
-    );
-    await _pumpUntilQueries(tester, repository, 2);
-    repository.complete(
-      1,
-      const ResultFailure(IntentionGenericValidationFailure()),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('The saved catalog position is no longer valid.'),
-      findsOneWidget,
-    );
-    expect(find.text('Прежнее первое'), findsOneWidget);
-
-    final reloadButton = find.widgetWithText(FilledButton, 'Reload catalog');
-    await tester.ensureVisible(reloadButton);
-    await tester.pumpAndSettle();
-    await tester.tap(reloadButton);
-    await _pumpUntilQueries(tester, repository, 3);
-    expect(repository.queryAt(2).cursor, isNull);
-    // Прокрутка к действию продолжения оставляет первую строку сохранённой
-    // выдачи за верхним краем списка.
-    expect(find.text('Прежнее первое', skipOffstage: false), findsOneWidget);
-    expect(find.text('Reloading catalog…'), findsOneWidget);
-
-    repository.complete(
-      2,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testSummary(index: 3, title: 'Актуальное')],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(1),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Актуальное'), findsOneWidget);
-    expect(find.text('Прежнее первое'), findsNothing);
-    expect(find.text('Total intentions: 1'), findsOneWidget);
   });
 
   // Архивное состояние строки в охвате всех показывает тест архивного

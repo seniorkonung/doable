@@ -413,7 +413,7 @@ void main() {
         'участник архивной связи',
     };
     test(
-      'продолжение, его повтор и восстановление сохраняют совместный запрос: $context',
+      'продолжение и его повтор сохраняют совместный запрос: $context',
       () async {
         final repository = ControlledCatalogRepository();
         final container = reconciliationCatalogContainer(
@@ -463,18 +463,9 @@ void main() {
         final retry = notifier.retryNextPage();
         repository.complete(
           3,
-          const ResultFailure(IntentionGenericValidationFailure()),
+          const ResultFailure(IntentionUnexpectedFailure()),
         );
         await retry;
-        final recovery = notifier.recoverFromInvalidCursor();
-        repository.complete(
-          4,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        await recovery;
-        final recoveryRetry = notifier.retryRecovery();
-        _completeEmptyPage(repository, 5, revision: 1);
-        await recoveryRetry;
         for (final query in repository.queries.skip(2)) {
           expect(query.tagFilter, filter);
           expect(query.scope, first.query.scope);
@@ -491,8 +482,6 @@ void main() {
         }
         expect(repository.queryAt(2).cursor, same(cursor));
         expect(repository.queryAt(3).cursor, same(cursor));
-        expect(repository.queryAt(4).cursor, isNull);
-        expect(repository.queryAt(5).cursor, isNull);
         expect(
           container.read(provider).requireValue.selection.tagFilter,
           filter,

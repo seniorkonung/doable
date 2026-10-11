@@ -108,31 +108,6 @@ final class IntentionCatalogContinuationUnexpected
   const IntentionCatalogContinuationUnexpected();
 }
 
-final class IntentionCatalogContinuationValidation
-    extends IntentionCatalogContinuationState {
-  const IntentionCatalogContinuationValidation();
-}
-
-final class IntentionCatalogContinuationRecovering
-    extends IntentionCatalogContinuationState {
-  const IntentionCatalogContinuationRecovering();
-}
-
-final class IntentionCatalogRecoveryUnavailable
-    extends IntentionCatalogContinuationState {
-  const IntentionCatalogRecoveryUnavailable();
-}
-
-final class IntentionCatalogRecoveryCorruption
-    extends IntentionCatalogContinuationState {
-  const IntentionCatalogRecoveryCorruption();
-}
-
-final class IntentionCatalogRecoveryUnexpected
-    extends IntentionCatalogContinuationState {
-  const IntentionCatalogRecoveryUnexpected();
-}
-
 /// Отказ обновления сохраняет последнее целиком подтверждённое содержимое:
 /// до успешного повтора оно не отражает подтверждённые изменения, которые
 /// требуют чтения недостающей части выдачи.

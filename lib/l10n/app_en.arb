@@ -284,10 +284,6 @@
   "@catalogLoadMoreUnexpected": {
     "description": "Терминальная непредвиденная ошибка следующей порции"
   },
-  "catalogLoadMoreValidation": "The saved catalog position is no longer valid.",
-  "@catalogLoadMoreValidation": {
-    "description": "Недопустимый cursor следующей порции"
-  },
   "catalogRefreshUnavailable": "The intention list isn’t up to date: changes couldn’t be loaded.",
   "@catalogRefreshUnavailable": {
     "description": "Устранимый отказ обновления над сохранённой выдачей каталога"
@@ -299,14 +295,6 @@
   "catalogRefreshUnexpected": "The intention list isn’t up to date because of an unexpected error.",
   "@catalogRefreshUnexpected": {
     "description": "Отказ обновления сохранённой выдачи из-за непредвиденной ошибки"
-  },
-  "catalogReload": "Reload catalog",
-  "@catalogReload": {
-    "description": "Явное восстановление каталога с первой страницы"
-  },
-  "catalogReloading": "Reloading catalog…",
-  "@catalogReloading": {
-    "description": "Восстановление каталога с первой страницы"
   },
   "catalogReady": "Ready for action",
   "@catalogReady": {

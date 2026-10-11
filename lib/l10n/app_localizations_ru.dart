@@ -244,10 +244,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить следующие намерения из-за непредвиденной ошибки.';
 
   @override
-  String get catalogLoadMoreValidation =>
-      'Сохранённая позиция каталога больше недействительна.';
-
-  @override
   String get catalogRefreshUnavailable =>
       'Список намерений не обновлён: не удалось получить изменения.';
 
@@ -258,12 +254,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get catalogRefreshUnexpected =>
       'Список намерений не обновлён из-за непредвиденной ошибки.';
-
-  @override
-  String get catalogReload => 'Перезагрузить каталог';
-
-  @override
-  String get catalogReloading => 'Перезагружаем каталог…';
 
   @override
   String get catalogReady => 'Готово к действию';

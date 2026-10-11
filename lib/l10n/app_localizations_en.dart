@@ -241,10 +241,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'More intentions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get catalogLoadMoreValidation =>
-      'The saved catalog position is no longer valid.';
-
-  @override
   String get catalogRefreshUnavailable =>
       'The intention list isn’t up to date: changes couldn’t be loaded.';
 
@@ -255,12 +251,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get catalogRefreshUnexpected =>
       'The intention list isn’t up to date because of an unexpected error.';
-
-  @override
-  String get catalogReload => 'Reload catalog';
-
-  @override
-  String get catalogReloading => 'Reloading catalog…';
 
   @override
   String get catalogReady => 'Ready for action';

@@ -18,18 +18,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
-/// Чтение прежней выдачи, ответ на которое приходит после замены условий.
-///
-/// Поздняя первая порция проверена отдельно, повтор восстановления идёт тем
-/// же путём, что и восстановление.
-enum _PendingRead {
-  continuation('продолжение'),
-  recovery('восстановление');
-
-  const _PendingRead(this.description);
-  final String description;
-}
-
 void main() {
   test('поздняя первая порция не меняет границу новой выдачи', () async {
     final repository = ControlledCatalogRepository();
@@ -101,9 +89,10 @@ void main() {
     requiredTagIds: [_tag(3).id],
     excludedTagIds: [_tag(4).id],
   );
-  for (final read in _PendingRead.values) {
-    testWidgets('замена обязательного тега во время debounce отвергает поздний '
-        'ответ: ${read.description}', (tester) async {
+  testWidgets(
+    'замена обязательного тега во время debounce отвергает поздний ответ '
+    'продолжения',
+    (tester) async {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(
         repository,
@@ -135,31 +124,14 @@ void main() {
         title: 'Ходить раньше',
         tags: [_tag(1), _tag(2)],
       );
-      final Future<void> oldRequest;
       repository.complete(1, _firstPage(oldFirst, oldCursor));
       await tester.pump(Duration.zero);
-      final continuation = model.loadNextPageIfNeeded(visibleIndex: 0);
+      final oldRequest = model.loadNextPageIfNeeded(visibleIndex: 0);
       await tester.pump(Duration.zero);
       expect(repository.queries, hasLength(3));
-      if (read == _PendingRead.continuation) {
-        oldRequest = continuation;
-      } else {
-        repository.complete(
-          2,
-          const ResultFailure(IntentionGenericValidationFailure()),
-        );
-        await tester.pump(Duration.zero);
-        await continuation;
-        oldRequest = model.recoverFromInvalidCursor();
-        await tester.pump(Duration.zero);
-        expect(repository.queryAt(3).cursor, isNull);
-      }
       final oldIndex = repository.queries.length - 1;
       expect(repository.queryAt(oldIndex).tagFilter, original);
-      expect(
-        repository.queryAt(oldIndex).cursor,
-        read == _PendingRead.continuation ? same(oldCursor) : isNull,
-      );
+      expect(repository.queryAt(oldIndex).cursor, same(oldCursor));
 
       model.changeTitleFilter('ходить');
       await tester.pump(const Duration(milliseconds: 100));
@@ -207,12 +179,7 @@ void main() {
         ),
       );
       final requestCount = repository.queries.length;
-      repository.complete(
-        oldIndex,
-        read == _PendingRead.continuation
-            ? _continuationPage(oldSecond)
-            : _firstPage(oldFirst, oldCursor),
-      );
+      repository.complete(oldIndex, _continuationPage(oldSecond));
       await tester.pump(Duration.zero);
       await oldRequest;
       final afterOld =
@@ -236,8 +203,8 @@ void main() {
       expect(loaded.continuation, isA<IntentionCatalogContinuationIdle>());
       await tester.pump(const Duration(milliseconds: 300));
       expect(repository.queries, hasLength(requestCount));
-    });
-  }
+    },
+  );
 
   group('согласование после удаления исключённого тега', () {
     final health = _tag(1);

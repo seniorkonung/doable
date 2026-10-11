@@ -214,24 +214,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     return _loadNextPage(current);
   }
 
-  Future<void> recoverFromInvalidCursor() {
-    final current = state.value;
-    if (current is! IntentionCatalogLoaded ||
-        current.continuation is! IntentionCatalogContinuationValidation) {
-      return Future.value();
-    }
-    return _recoverFirstPage(current);
-  }
-
-  Future<void> retryRecovery() {
-    final current = state.value;
-    if (current is! IntentionCatalogLoaded ||
-        current.continuation is! IntentionCatalogRecoveryUnavailable) {
-      return Future.value();
-    }
-    return _recoverFirstPage(current);
-  }
-
   Future<IntentionCatalogState> _loadFirstPage(
     PersonalGraphRepository repository,
     IntentionCatalogQuery query,
@@ -425,69 +407,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
   }
 
-  Future<void> _recoverFirstPage(IntentionCatalogLoaded confirmed) async {
-    _invalidatePageRequest();
-    final request = Object();
-    final generation = _queryGeneration;
-    _activePageRequest = request;
-    state = AsyncData(
-      _withContinuation(
-        confirmed,
-        const IntentionCatalogContinuationRecovering(),
-      ),
-    );
-
-    try {
-      final repository = ref.read(personalGraphRepositoryProvider);
-      final query = _firstPageQuery(confirmed);
-      while (_ownsRequest(request, generation)) {
-        final result = await repository.getCatalogPage(query);
-        if (!_ownsRequest(request, generation)) {
-          return;
-        }
-        final current = state.value;
-        switch (result) {
-          case ResultSuccess(:final value):
-            final mapped = _mapPage(confirmed.selection, query, value);
-            if (mapped case final IntentionCatalogConfirmedState page) {
-              if (current
-                  case final IntentionCatalogConfirmedState currentConfirmed) {
-                if (page.revision.compareTo(currentConfirmed.revision) ==
-                    GraphRevisionOrder.older) {
-                  continue;
-                }
-              }
-              _cursorBoundary = _boundaryFromFirstPage(page);
-            }
-            state = AsyncData(mapped);
-          case ResultFailure(:final failure):
-            if (current is IntentionCatalogLoaded) {
-              state = AsyncData(
-                _withContinuation(current, _recoveryFailure(failure)),
-              );
-            }
-        }
-        return;
-      }
-    } on Object {
-      if (_ownsRequest(request, generation)) {
-        final current = state.value;
-        if (current is IntentionCatalogLoaded) {
-          state = AsyncData(
-            _withContinuation(
-              current,
-              const IntentionCatalogRecoveryUnexpected(),
-            ),
-          );
-        }
-      }
-    } finally {
-      if (identical(_activePageRequest, request)) {
-        _activePageRequest = null;
-      }
-    }
-  }
-
   IntentionCatalogState _appendPage(
     IntentionCatalogLoaded confirmed,
     IntentionCatalogPage page,
@@ -580,27 +499,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       const IntentionCatalogContinuationUnavailable(),
     IntentionCorruptionFailure() =>
       const IntentionCatalogContinuationCorruption(),
-    IntentionValidationFailure() =>
-      const IntentionCatalogContinuationValidation(),
-    IntentionUnexpectedFailure() ||
-    IntentionNotFoundFailure() ||
-    IntentionConflictFailure() ||
-    IntentionHasBlockingRelationsFailure() =>
-      const IntentionCatalogContinuationUnexpected(),
-  };
-
-  IntentionCatalogContinuationState _recoveryFailure(
-    IntentionFailure failure,
-  ) => switch (failure) {
-    IntentionUnavailableFailure() =>
-      const IntentionCatalogRecoveryUnavailable(),
-    IntentionCorruptionFailure() => const IntentionCatalogRecoveryCorruption(),
     IntentionValidationFailure() ||
     IntentionUnexpectedFailure() ||
     IntentionNotFoundFailure() ||
     IntentionConflictFailure() ||
     IntentionHasBlockingRelationsFailure() =>
-      const IntentionCatalogRecoveryUnexpected(),
+      const IntentionCatalogContinuationUnexpected(),
   };
 
   IntentionCatalogRefreshState _refreshFailure(
@@ -626,17 +530,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
         cursor: confirmed.nextCursor,
-      );
-
-  IntentionCatalogQuery _firstPageQuery(IntentionCatalogLoaded confirmed) =>
-      IntentionCatalogQuery(
-        scope: confirmed.query.scope,
-        readinessFilter: confirmed.query.readinessFilter,
-        titleFilter: confirmed.query.titleFilter?.map((value) => value),
-        tagFilter: confirmed.query.tagFilter,
-        excludedIntentionId: confirmed.query.excludedIntentionId,
-        order: confirmed.query.order,
-        pageSize: confirmed.query.pageSize,
       );
 
   IntentionCatalogLoaded _withContinuation(

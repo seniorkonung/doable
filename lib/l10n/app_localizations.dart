@@ -500,12 +500,6 @@ abstract class AppLocalizations {
   /// **'More intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogLoadMoreUnexpected;
 
-  /// Недопустимый cursor следующей порции
-  ///
-  /// In en, this message translates to:
-  /// **'The saved catalog position is no longer valid.'**
-  String get catalogLoadMoreValidation;
-
   /// Устранимый отказ обновления над сохранённой выдачей каталога
   ///
   /// In en, this message translates to:
@@ -523,18 +517,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention list isn’t up to date because of an unexpected error.'**
   String get catalogRefreshUnexpected;
-
-  /// Явное восстановление каталога с первой страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Reload catalog'**
-  String get catalogReload;
-
-  /// Восстановление каталога с первой страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Reloading catalog…'**
-  String get catalogReloading;
 
   /// Признак готовности намерения к действию
   ///
