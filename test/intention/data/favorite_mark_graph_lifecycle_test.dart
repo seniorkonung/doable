@@ -1,5 +1,4 @@
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -81,8 +80,6 @@ void main() {
       UuidV7IntentionIdGenerator(),
       () => now,
       InMemoryDiagnosticsSink(),
-      dailyChoiceIdGenerator: FixedChoiceIds(durabilityChoice(201)),
-      choicePathStepIdGenerator: SequentialStepIds(301),
     );
   });
 
@@ -92,20 +89,6 @@ void main() {
       .select('SELECT * FROM $table ORDER BY rowid')
       .map((row) => row.values.toList())
       .toList();
-
-  /// Строки таблиц графа, которые отметка и её снятие не меняют.
-  Map<String, List<List<Object?>>> graphWithoutMarks() => {
-    for (final table in [
-      'intentions',
-      'intention_titles_fts',
-      'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
-      'tags',
-      'tag_assignments',
-    ])
-      table: rows(table),
-  };
 
   Map<String, Object?> intentionRow(int number) => Map.of(
     raw.select('SELECT * FROM intentions WHERE id = ?', [
@@ -281,56 +264,6 @@ void main() {
       ]);
       expect(rows('long_term_relations'), relationsBefore);
       expect(rows('tag_assignments'), assignmentsBefore);
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    });
-  });
-
-  group('Отметка и её снятие', () {
-    test('не меняют намерение, теги, связи и дневные выборы, в том числе '
-        'архивированного действия из выполненного дневного выбора', () async {
-      expect(
-        await repository.execute(durabilityCreate()),
-        isA<GraphResultSuccess>(),
-      );
-      await intentionSucceeded(ArchiveIntention(durabilityIntention(3)));
-      final archivedAction = intentionRow(3);
-      expect(archivedAction['is_archived'], 1);
-      expect(archivedAction['is_action_ready'], 1);
-      expect(rows('daily_choices').single, contains(durabilityUuid(3)));
-      final graphBefore = graphWithoutMarks();
-
-      // Каждая команда выполняется при новом показании часов: запись времени
-      // намерения изменила бы его строку.
-      now = DateTime.utc(2026, 10, 3);
-      await intentionSucceeded(MarkIntentionFavorite(durabilityIntention(3)));
-      expect(graphWithoutMarks(), graphBefore);
-      expect(storedFavoriteMarks(raw), [
-        ..._seededMarks,
-        (durabilityUuid(3), 10),
-      ]);
-
-      now = DateTime.utc(2026, 10, 4);
-      await intentionSucceeded(MarkIntentionFavorite(durabilityIntention(4)));
-      expect(graphWithoutMarks(), graphBefore);
-      expect(storedFavoriteMarks(raw), [
-        ..._seededMarks,
-        (durabilityUuid(3), 10),
-        (durabilityUuid(4), 11),
-      ]);
-
-      now = DateTime.utc(2026, 10, 5);
-      for (final number in [1, 3]) {
-        await intentionSucceeded(
-          UnmarkIntentionFavorite(durabilityIntention(number)),
-        );
-        expect(graphWithoutMarks(), graphBefore);
-      }
-      expect(storedFavoriteMarks(raw), [
-        (durabilityUuid(2), 2),
-        (durabilityUuid(7), 7),
-        (durabilityUuid(8), 9),
-        (durabilityUuid(4), 11),
-      ]);
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
     });
   });

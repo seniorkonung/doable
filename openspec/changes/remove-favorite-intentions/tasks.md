@@ -92,7 +92,7 @@
   - **Вероятные файлы:** `lib/src/favorite/application/favorite_intentions.dart`, `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_favorite_list.dart` в той же папке, `test/support/favorite_read_contract_test_fallback.dart`; использующие fallback тестовые репозитории и специализированные тесты списка.
   - **Объём:** M.
 
-- [ ] 1.11 Удалить команды добавления и снятия отметки из графа
+- [x] 1.11 Удалить команды добавления и снятия отметки из графа
   - **Критерии приёмки:**
     - Удалены `MarkIntentionFavorite`, `UnmarkIntentionFavorite`, их виды в координаторе, выполнение и ветки сообщений; оставшиеся команды намерения сохраняют прежние результаты и классификацию отказов.
     - Из части `drift_personal_graph_repository_favorite_marks.dart` удалена запись отметки и места после исчезновения её последнего вызова из создания. Чтение отметок, ещё необходимое старым проекциям, удаляется вместе с ними в 1.13; заглушки вместо операций не вводятся.

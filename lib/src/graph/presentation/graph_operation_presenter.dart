@@ -315,10 +315,6 @@ String _intentionMessage(
     IntentionCommandKind.archive => localizations.graphOperationArchive,
     IntentionCommandKind.restore => localizations.graphOperationRestore,
     IntentionCommandKind.delete => localizations.graphOperationDelete,
-    IntentionCommandKind.markFavorite =>
-      localizations.graphOperationMarkFavorite,
-    IntentionCommandKind.unmarkFavorite =>
-      localizations.graphOperationUnmarkFavorite,
   };
   final target =
       completion.presentationTitle ??
@@ -439,10 +435,6 @@ String _successFor(
     localizations.detailsRestoredSuccess,
   (IntentionCommandKind.delete, IntentionDeleted()) =>
     localizations.detailsDeleted,
-  (IntentionCommandKind.markFavorite, IntentionSaved()) =>
-    localizations.detailsFavoriteMarked,
-  (IntentionCommandKind.unmarkFavorite, IntentionSaved()) =>
-    localizations.detailsFavoriteUnmarked,
   (IntentionCommandKind.create, IntentionDeleted()) =>
     localizations.editorCreateUnexpected,
   (IntentionCommandKind.update, IntentionDeleted()) =>
@@ -455,11 +447,6 @@ String _successFor(
     IntentionDeleted(),
   ) =>
     localizations.detailsStateChangeUnexpected,
-  (
-    IntentionCommandKind.markFavorite || IntentionCommandKind.unmarkFavorite,
-    IntentionDeleted(),
-  ) =>
-    localizations.detailsFavoriteMarkUnexpected,
   (IntentionCommandKind.delete, IntentionSaved()) =>
     localizations.detailsDeleteUnexpected,
 };
@@ -512,17 +499,5 @@ String _failureFor(
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
-  },
-  IntentionCommandKind.markFavorite ||
-  IntentionCommandKind.unmarkFavorite => switch (failure) {
-    IntentionValidationFailure() => localizations.detailsFavoriteMarkInvalid,
-    IntentionNotFoundFailure() => localizations.detailsFavoriteMarkNotFound,
-    IntentionConflictFailure() => localizations.detailsFavoriteMarkConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsFavoriteMarkUnexpected,
-    IntentionUnavailableFailure() =>
-      localizations.detailsFavoriteMarkUnavailable,
-    IntentionCorruptionFailure() => localizations.detailsFavoriteMarkCorruption,
-    IntentionUnexpectedFailure() => localizations.detailsFavoriteMarkUnexpected,
   },
 };

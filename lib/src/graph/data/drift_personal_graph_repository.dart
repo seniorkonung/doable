@@ -521,9 +521,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<GraphCommandResult<IntentionCommandSuccess, IntentionFailure>>
   _executeIntention(IntentionCommand command) async {
     final stopwatch = Stopwatch()..start();
-    var favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.validation;
-    void onFavoriteMarkWrite() =>
-        favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.write;
     var creationStage = IntentionCreationCommandDiagnosticsStage.validation;
 
     try {
@@ -553,14 +550,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
               domain.IntentionArchiveState.active,
             ),
             DeleteIntention() => _deleteIntention(command.id),
-            MarkIntentionFavorite() => _markFavorite(
-              command.id,
-              onWrite: onFavoriteMarkWrite,
-            ),
-            UnmarkIntentionFavorite() => _unmarkFavorite(
-              command.id,
-              onWrite: onFavoriteMarkWrite,
-            ),
           },
         );
         if (committed.didMutate) {
@@ -577,7 +566,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _recordDiagnostics(
         _commandDiagnosticsEvent(
           command,
-          favoriteMarkStage: favoriteMarkStage,
           creationStage: creationStage,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
@@ -588,7 +576,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _recordDiagnostics(
         _commandDiagnosticsEvent(
           command,
-          favoriteMarkStage: favoriteMarkStage,
           creationStage: creationStage,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
@@ -2097,19 +2084,15 @@ void _validateCommandText(IntentionCommand command) {
         DisableIntentionReadiness() ||
         ArchiveIntention() ||
         RestoreIntention() ||
-        DeleteIntention() ||
-        MarkIntentionFavorite() ||
-        UnmarkIntentionFavorite():
+        DeleteIntention():
       return;
   }
 }
 
-/// Событие диагностики команды намерения. Этап [favoriteMarkStage] несут
-/// только отметка избранного и её снятие, этап [creationStage] — только
-/// создание.
+/// Событие диагностики команды намерения. Этап [creationStage] несёт
+/// только создание.
 IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
   IntentionCommand command, {
-  required FavoriteMarkCommandDiagnosticsStage favoriteMarkStage,
   required IntentionCreationCommandDiagnosticsStage creationStage,
   required DiagnosticsStatus status,
 }) {
@@ -2135,15 +2118,6 @@ IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
     ArchiveIntention() => event(IntentionCommandDiagnosticsType.archive),
     RestoreIntention() => event(IntentionCommandDiagnosticsType.restore),
     DeleteIntention() => event(IntentionCommandDiagnosticsType.delete),
-    MarkIntentionFavorite() => IntentionCommandDiagnosticsEvent.markFavorite(
-      stage: favoriteMarkStage,
-      status: status,
-    ),
-    UnmarkIntentionFavorite() =>
-      IntentionCommandDiagnosticsEvent.unmarkFavorite(
-        stage: favoriteMarkStage,
-        status: status,
-      ),
   };
 }
 

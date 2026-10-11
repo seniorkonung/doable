@@ -19,7 +19,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -1232,121 +1231,6 @@ void main() {
       findsOneWidget,
     );
   });
-
-  // Язык не ветвит предъявление: берём русский.
-  for (final scenario
-      in <
-        ({
-          ExistingIntentionCommand Function(IntentionId) command,
-          String operation,
-          String success,
-        })
-      >[
-        (
-          command: MarkIntentionFavorite.new,
-          operation: 'Отметка избранного',
-          success: 'Намерение отмечено избранным.',
-        ),
-        (
-          command: UnmarkIntentionFavorite.new,
-          operation: 'Снятие отметки избранного',
-          success: 'Отметка избранного снята.',
-        ),
-      ]) {
-    testWidgets(
-      'успех отметки называет операцию, намерение и исход: ${scenario.operation}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(
-          tester,
-          locale: const Locale('ru'),
-        );
-        final accepted = harness.startExisting(
-          scenario.command,
-          index: 1,
-          title: 'Гулять',
-        );
-        harness.completeSaved(accepted);
-        await tester.pumpAndSettle();
-
-        expect(
-          find.text('${scenario.operation} — «Гулять»: ${scenario.success}'),
-          findsOneWidget,
-        );
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
-
-  // Исход отказа общий для отметки и снятия отметки, поэтому его достаточно
-  // показать на одной команде.
-  for (final failure in <({IntentionFailure failure, String ru})>[
-    (
-      failure: const IntentionGenericValidationFailure(),
-      ru: 'Не удалось изменить отметку избранного.',
-    ),
-    (
-      failure: const IntentionNotFoundFailure(),
-      ru:
-          'Намерение больше не существует. Отметка избранного не '
-          'изменена.',
-    ),
-    (
-      failure: const IntentionConflictFailure(),
-      ru:
-          'Намерение было изменено в другом месте. Отметка избранного '
-          'не изменена.',
-    ),
-    (
-      failure: IntentionHasBlockingRelationsFailure(testDetailsIntentionId(1)),
-      ru:
-          'Не удалось изменить отметку избранного из-за '
-          'непредвиденной ошибки.',
-    ),
-    (
-      failure: const IntentionUnavailableFailure(),
-      ru: 'Не удалось изменить отметку избранного. Повторите попытку.',
-    ),
-    (
-      failure: const IntentionCorruptionFailure(),
-      ru:
-          'Сохранённые данные повреждены. Отметка избранного не '
-          'изменена.',
-    ),
-    (
-      failure: const IntentionUnexpectedFailure(),
-      ru:
-          'Не удалось изменить отметку избранного из-за '
-          'непредвиденной ошибки.',
-    ),
-  ]) {
-    testWidgets(
-      'отказ отметки ${failure.failure.runtimeType} называет операцию, '
-      'намерение и безопасный исход',
-      (tester) async {
-        final harness = await _pumpPresenterApp(
-          tester,
-          locale: const Locale('ru'),
-        );
-        final accepted = harness.startExisting(
-          MarkIntentionFavorite.new,
-          index: 1,
-          title: 'Гулять',
-        );
-        harness.completeFailure(accepted, failure.failure);
-        await tester.pumpAndSettle();
-
-        final text = 'Отметка избранного — «Гулять»: ${failure.ru}';
-        expect(find.text(text), findsOneWidget);
-        expect(
-          text,
-          isNot(contains(testDetailsIntentionId(1).toCanonicalString())),
-        );
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
 }
 
 const _withoutPresenter = -1;
@@ -2014,31 +1898,6 @@ final class _PresenterHarness {
           ],
         ),
       ),
-    );
-  }
-
-  IntentionCommandAccepted startExisting(
-    ExistingIntentionCommand Function(IntentionId) command, {
-    required int index,
-    required String title,
-  }) {
-    final intention = testDetailsIntention(index: index, title: title);
-    final commandIndex = repository.commands.length;
-    final accepted = _coordinator.acceptExisting(
-      command(intention.id),
-      presentationTitle: title,
-    ) as IntentionCommandAccepted;
-    _coordinator.releaseInitiatorPresentation(accepted.token);
-    _commandIndexes[accepted] = commandIndex;
-    _titles[accepted] = (index, title);
-    return accepted;
-  }
-
-  void completeSaved(IntentionCommandAccepted accepted) {
-    final (index, title) = _titles[accepted]!;
-    repository.completeCommand(
-      _commandIndexes[accepted]!,
-      testDetailsSavedResult(testDetailsIntention(index: index, title: title)),
     );
   }
 
