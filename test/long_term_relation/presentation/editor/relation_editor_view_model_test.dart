@@ -453,9 +453,12 @@ void main() {
 
       final claim = await presenter.nextClaim();
       expect(claim, isNotNull);
-      expect(claim!.completion.isFailure, isTrue);
+      expect(claim!.completions.single.isFailure, isTrue);
       expect(harness.repository.commandCount, 1);
-      harness.coordinator.confirmPresentation(claim);
+      harness.coordinator.confirmAppPresentation(
+        claim,
+        claim.completions.map((completion) => completion.token),
+      );
     });
   });
 

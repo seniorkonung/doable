@@ -249,11 +249,14 @@ void main() {
       expect(completion.token, same(accepted.token));
       expect(completion.confirmedChange?.changes, hasLength(3));
       expect(completions, [same(completion)]);
-      expect(claim?.completion, same(completion));
+      expect(claim?.completions, [same(completion)]);
       expect(coordinator.claimInitiatorFailure(completion.token), isNull);
       expect(coordinator.isRunning(_intentionA), isFalse);
       expect(coordinator.isRelationRunning(_relationA), isFalse);
-      coordinator.confirmPresentation(claim!);
+      coordinator.confirmAppPresentation(
+        claim!,
+        claim.completions.map((completion) => completion.token),
+      );
       registration.release();
       await subscription.cancel();
       await coordinator.shutdown();
@@ -280,8 +283,11 @@ void main() {
       expect(initiatorClaim?.completion, same(completion));
       coordinator.releaseInitiatorClaim(initiatorClaim!);
       final appClaim = await appClaimFuture;
-      expect(appClaim?.completion, same(completion));
-      coordinator.confirmPresentation(appClaim!);
+      expect(appClaim?.completions, [same(completion)]);
+      coordinator.confirmAppPresentation(
+        appClaim!,
+        appClaim.completions.map((completion) => completion.token),
+      );
       registration.release();
       await coordinator.shutdown();
     },

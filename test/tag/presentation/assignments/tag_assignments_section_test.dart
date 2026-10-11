@@ -594,13 +594,8 @@ void main() {
         await tester.pumpAndSettle();
         final claim = await claimFuture;
         expect(claim, isNotNull);
-        expect(claim!.completion.isFailure, !succeeds);
+        expect(claim!.completions.single.isFailure, !succeeds);
         expect(coordinator.isRunning(_intentionId(1)), isFalse);
-        coordinator.confirmPresentation(claim);
-        var repeated = false;
-        final nextClaim = registration.nextClaim().then((value) {
-          repeated = value != null;
-        });
 
         await tester.pumpWidget(host());
         reads.page(
@@ -613,6 +608,16 @@ void main() {
           find.byKey(const ValueKey('tag-assignments-remove-failure')),
           findsNothing,
         );
+        expect(find.text('Дом'), succeeds ? findsNothing : findsOneWidget);
+        coordinator.confirmAppPresentation(
+          claim,
+          claim.completions.map((completion) => completion.token),
+        );
+        var repeated = false;
+        final nextClaim = registration.nextClaim().then((value) {
+          repeated = value != null;
+        });
+        await tester.pump();
         expect(pending.commands, hasLength(1));
         expect(repeated, isFalse);
         registration.release();

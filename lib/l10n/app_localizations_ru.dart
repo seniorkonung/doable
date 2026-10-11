@@ -918,6 +918,11 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String graphOperationMessageWithOthers(String message, int count) {
+    return '$message · ещё $count';
+  }
+
+  @override
   String get graphOperationNewRelation => 'новая связь';
 
   @override

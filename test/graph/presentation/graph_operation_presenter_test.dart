@@ -44,7 +44,7 @@ void main() {
   });
 
   testWidgets(
-    'показывает результаты по одному без вытеснения текущего сообщения',
+    'поздний результат ждёт закрытия текущего сообщения без вытеснения',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
       final first = harness.startDelete(index: 1, title: 'Первое');
@@ -74,6 +74,107 @@ void main() {
       expect(find.text(_deleted('Первое')), findsNothing);
       expect(find.text(_deleted('Второе')), findsOneWidget);
 
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      'серия успехов объединяется с доступным счётчиком и прежним сроком, ${locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester, locale: locale);
+        final current = harness.startDelete(index: 1, title: 'Текущее');
+        harness.completeDeleted(current);
+        await tester.pumpAndSettle();
+        final currentMessage = locale.languageCode == 'ru'
+            ? 'Удаление — «Текущее»: Намерение удалено.'
+            : _deleted('Текущее');
+
+        for (var index = 2; index <= 6; index += 1) {
+          final success = harness.startDelete(
+            index: index,
+            title: 'Намерение $index',
+          );
+          harness.completeDeleted(success);
+        }
+        await tester.pumpAndSettle();
+        expect(find.text(currentMessage), findsOneWidget);
+
+        await _closeMessage(tester);
+        final message = locale.languageCode == 'ru'
+            ? 'Удаление — «Намерение 6»: Намерение удалено. · ещё 4'
+            : '${_deleted('Намерение 6')} · 4 more';
+        expect(find.text(message), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: message,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+
+        final late = harness.startDelete(index: 7, title: 'Позднее');
+        harness.completeDeleted(late);
+        await tester.pumpAndSettle();
+        expect(find.text(message), findsOneWidget);
+        await tester.pump(const Duration(seconds: 3));
+        expect(find.text(message), findsOneWidget);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(find.text(message), findsNothing);
+        expect(
+          find.text(
+            locale.languageCode == 'ru'
+                ? 'Удаление — «Позднее»: Намерение удалено.'
+                : _deleted('Позднее'),
+          ),
+          findsOneWidget,
+        );
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
+    'сообщение смахивается в обе стороны, а вниз остаётся на поверхности',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final current = harness.startDelete(index: 1, title: 'Текущее');
+      harness.completeDeleted(current);
+      await tester.pumpAndSettle();
+      final second = harness.startDelete(index: 2, title: 'Второе');
+      final third = harness.startDelete(index: 3, title: 'Третье');
+      harness.completeDeleted(second);
+      harness.completeDeleted(third);
+      await tester.pumpAndSettle();
+
+      await tester.dragFrom(
+        tester.getCenter(find.byType(SnackBar)),
+        const Offset(0, 150),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Текущее')), findsOneWidget);
+      await tester.dragFrom(
+        tester.getCenter(find.byType(SnackBar)),
+        const Offset(600, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('${_deleted('Третье')} · 1 more'), findsOneWidget);
+
+      final late = harness.startDelete(index: 4, title: 'Позднее');
+      harness.completeDeleted(late);
+      await tester.pumpAndSettle();
+      await tester.dragFrom(
+        tester.getCenter(find.byType(SnackBar)),
+        const Offset(-600, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Позднее')), findsOneWidget);
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
     },
@@ -764,22 +865,36 @@ void main() {
   });
 
   testWidgets(
-    'потеря фокуса до кадра сохраняет результат, исчезнувший до возвращения',
+    'потеря фокуса до кадра сохраняет весь набор, а повторный показ использует текущую локализацию',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
-      final operation = harness.startDelete(index: 1, title: 'Отложенное');
-      harness.completeDeleted(operation);
-      await tester.idle();
+      harness.presenterGeneration.value = _withoutPresenter;
+      await tester.pumpAndSettle();
+      final first = harness.startDelete(index: 1, title: 'Первое');
+      final second = harness.startDelete(index: 2, title: 'Отложенное');
+      harness.completeDeleted(first);
+      harness.completeDeleted(second);
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      harness.presenterGeneration.value = 1;
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      // Сообщение подготовлено, но ни одного пригодного кадра ещё нет.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pumpAndSettle();
-      expect(find.text(_deleted('Отложенное')), findsOneWidget);
+      expect(find.text('${_deleted('Отложенное')} · 1 more'), findsOneWidget);
 
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
 
+      harness.locale.value = const Locale('ru');
+      await tester.pumpAndSettle();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
-      expect(find.text(_deleted('Отложенное')), findsOneWidget);
+      expect(
+        find.text('Удаление — «Отложенное»: Намерение удалено. · ещё 1'),
+        findsOneWidget,
+      );
 
       await _closeMessage(tester);
       await tester.pumpAndSettle();
@@ -792,7 +907,9 @@ void main() {
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
       final operation = harness.startDelete(index: 1, title: 'Пересоздание');
+      final second = harness.startDelete(index: 2, title: 'Второе');
       harness.completeDeleted(operation);
+      harness.completeDeleted(second);
       await tester.idle();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump();
@@ -804,7 +921,7 @@ void main() {
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
-      expect(find.text(_deleted('Пересоздание')), findsOneWidget);
+      expect(find.text('${_deleted('Второе')} · 1 more'), findsOneWidget);
 
       await _closeMessage(tester);
       await tester.pumpAndSettle();
@@ -835,7 +952,7 @@ void main() {
   );
 
   testWidgets(
-    'новый presenter получает завершения без подписчика в прежнем порядке',
+    'новый presenter получает накопленные результаты с приоритетом отказа',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
       harness.presenterGeneration.value = _withoutPresenter;
@@ -850,9 +967,9 @@ void main() {
 
       harness.presenterGeneration.value = 1;
       await tester.pumpAndSettle();
-      expect(find.text(_deleted('Первое')), findsOneWidget);
-      await _closeMessage(tester);
       expect(find.text(_notDeleted('Второе')), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.text(_deleted('Первое')), findsOneWidget);
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
     },
@@ -921,11 +1038,8 @@ void main() {
       expect(find.text(_relationRestored), findsNothing);
 
       await _closeMessage(tester);
-      expect(find.text(_relationArchived), findsOneWidget);
-      expect(find.text(_relationRestored), findsNothing);
-
-      await _closeMessage(tester);
-      expect(find.text(_relationRestored), findsOneWidget);
+      expect(find.text(_relationArchived), findsNothing);
+      expect(find.text('$_relationRestored · 1 more'), findsOneWidget);
 
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
@@ -1479,11 +1593,17 @@ Future<void> _closeMessage(WidgetTester tester) async {
 }
 
 final class _PresenterHarness {
-  _PresenterHarness(this.container, this.repository, this.presenterGeneration);
+  _PresenterHarness(
+    this.container,
+    this.repository,
+    this.presenterGeneration,
+    this.locale,
+  );
 
   final ProviderContainer container;
   final ControlledDetailsRepository repository;
   final ValueNotifier<int> presenterGeneration;
+  final ValueNotifier<Locale> locale;
   final _commandIndexes = <IntentionCommandAccepted, int>{};
   final _titles = <IntentionCommandAccepted, (int, String)>{};
   final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
@@ -2207,30 +2327,40 @@ Future<_PresenterHarness> _pumpPresenterApp(
   addTearDown(container.dispose);
   final presenterGeneration = ValueNotifier<int>(0);
   addTearDown(presenterGeneration.dispose);
+  final currentLocale = ValueNotifier<Locale>(locale);
+  addTearDown(currentLocale.dispose);
 
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
-        locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => ValueListenableBuilder<int>(
-          valueListenable: presenterGeneration,
-          builder: (context, generation, _) {
-            final content = child ?? const SizedBox.shrink();
-            return generation == _withoutPresenter
-                ? content
-                : GraphOperationPresenter(
-                    key: ValueKey(generation),
-                    child: content,
-                  );
-          },
+      child: ValueListenableBuilder<Locale>(
+        valueListenable: currentLocale,
+        builder: (context, locale, _) => MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => ValueListenableBuilder<int>(
+            valueListenable: presenterGeneration,
+            builder: (context, generation, _) {
+              final content = child ?? const SizedBox.shrink();
+              return generation == _withoutPresenter
+                  ? content
+                  : GraphOperationPresenter(
+                      key: ValueKey(generation),
+                      child: content,
+                    );
+            },
+          ),
+          home: const Scaffold(body: SizedBox.expand()),
         ),
-        home: const Scaffold(body: SizedBox.expand()),
       ),
     ),
   );
   await tester.pump();
-  return _PresenterHarness(container, repository, presenterGeneration);
+  return _PresenterHarness(
+    container,
+    repository,
+    presenterGeneration,
+    currentLocale,
+  );
 }

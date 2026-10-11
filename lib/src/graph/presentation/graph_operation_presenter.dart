@@ -17,6 +17,7 @@ import '../../tag/application/tag_result.dart';
 import '../../tag/presentation/tag_failure_message.dart';
 import '../application/graph_command_coordinator.dart';
 import '../application/graph_command_result.dart';
+import 'graph_operation_message_plan.dart';
 
 /// Единственный владелец общей поверхности сообщений результатов операций.
 ///
@@ -111,16 +112,25 @@ final class _GraphOperationPresenterState
       return;
     }
 
-    final message = _messageFor(
-      AppLocalizations.of(context),
-      surface.claim.completion,
+    final localizations = AppLocalizations.of(context);
+    final plan = planGraphOperationMessage(
+      surface.claim.completions,
+      (completion) => _messageFor(localizations, completion),
     );
+    final message = plan.otherCount == 0
+        ? plan.message
+        : localizations.graphOperationMessageWithOthers(
+            plan.message,
+            plan.otherCount,
+          );
+    surface.plan = plan;
     final controller = messenger.showSnackBar(
       SnackBar(
-        content: PresentationFrameEvidence<GraphAppPresentationClaim>(
-          subject: surface.claim,
+        dismissDirection: DismissDirection.horizontal,
+        content: PresentationFrameEvidence<GraphOperationMessagePlan>(
+          subject: plan,
           requiresCurrentRoute: false,
-          onPresented: (_) => _confirm(surface),
+          onPresented: (shownPlan) => _confirm(surface, shownPlan),
           child: Semantics(
             key: const ValueKey('graph-operation-message'),
             container: true,
@@ -137,12 +147,15 @@ final class _GraphOperationPresenterState
     unawaited(controller.closed.then((_) => _handleClosed(surface)));
   }
 
-  void _confirm(_PresentationSurface surface) {
-    if (_isDisposed || !identical(_surface, surface) || surface.isConfirmed) {
+  void _confirm(_PresentationSurface surface, GraphOperationMessagePlan plan) {
+    if (_isDisposed ||
+        !identical(_surface, surface) ||
+        !identical(surface.plan, plan) ||
+        surface.isConfirmed) {
       return;
     }
     surface.isConfirmed = true;
-    _coordinator.confirmPresentation(surface.claim);
+    _coordinator.confirmAppPresentation(surface.claim, plan.coveredTokens);
   }
 
   void _handleClosed(_PresentationSurface surface) {
@@ -150,6 +163,7 @@ final class _GraphOperationPresenterState
       return;
     }
     surface
+      ..plan = null
       ..messenger = null
       ..controller = null;
     if (surface.isConfirmed) {
@@ -168,6 +182,7 @@ final class _PresentationSurface {
   _PresentationSurface(this.claim);
 
   final GraphAppPresentationClaim claim;
+  GraphOperationMessagePlan? plan;
   ScaffoldMessengerState? messenger;
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller;
   var isConfirmed = false;
@@ -176,6 +191,7 @@ final class _PresentationSurface {
     final currentMessenger = messenger;
     messenger = null;
     controller = null;
+    plan = null;
     if (currentMessenger != null && currentMessenger.mounted) {
       // Presenter — единственный владелец поверхности и держит не больше одного
       // сообщения, поэтому текущее сообщение принадлежит этой регистрации.

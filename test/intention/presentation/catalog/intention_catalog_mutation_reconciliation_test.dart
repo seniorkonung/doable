@@ -638,11 +638,6 @@ void main() {
             as IntentionCatalogLoaded;
     expect(current.items.single.id, created.id);
     expect(current.totalCount, 1);
-    final createClaim = await presenter.nextClaim();
-    expect(createClaim, isNotNull);
-    coordinator.confirmPresentation(createClaim!);
-    expect(_loaded(container).items, current.items);
-
     final ready = testSummary(
       index: 30,
       title: 'Новое',
@@ -677,10 +672,19 @@ void main() {
                 .requireValue
             as IntentionCatalogLoaded;
     expect(current.items.single.readiness, IntentionReadiness.ready);
-    final readinessClaim = await presenter.nextClaim();
-    expect(readinessClaim, isNotNull);
-    coordinator.confirmPresentation(readinessClaim!);
+    expect(current.totalCount, 1);
+    final successClaim = await presenter.nextClaim();
+    expect(successClaim, isNotNull);
+    expect(successClaim!.completions.map((completion) => completion.token), [
+      create.token,
+      readiness.token,
+    ]);
+    coordinator.confirmAppPresentation(
+      successClaim,
+      successClaim.completions.map((completion) => completion.token),
+    );
     expect(_loaded(container).items, current.items);
+    expect(_loaded(container).totalCount, current.totalCount);
 
     final beforeFailure = current;
     final failed = coordinator.acceptExisting(
@@ -697,7 +701,11 @@ void main() {
     expect(_loaded(container).items, beforeFailure.items);
     final failureClaim = await presenter.nextClaim();
     expect(failureClaim, isNotNull);
-    coordinator.confirmPresentation(failureClaim!);
+    expect(failureClaim!.completions.single.token, failed.token);
+    coordinator.confirmAppPresentation(
+      failureClaim,
+      failureClaim.completions.map((completion) => completion.token),
+    );
     presenter.release();
     await Future<void>.delayed(Duration.zero);
 

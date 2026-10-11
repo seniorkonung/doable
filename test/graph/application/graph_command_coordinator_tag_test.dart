@@ -47,11 +47,14 @@ void main() {
       repository.complete(0, const TagCommandFailed(TagUnavailableFailure()));
       final completion = await accepted.future;
       final claim = await claimFuture;
-      expect(claim?.completion, same(completion));
+      expect(claim?.completions, [same(completion)]);
       expect(completion.isFailure, isTrue);
       expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
       expect(coordinator.isTagRunning(_tagId), isFalse);
-      coordinator.confirmPresentation(claim!);
+      coordinator.confirmAppPresentation(
+        claim!,
+        claim.completions.map((completion) => completion.token),
+      );
       registration.release();
       await coordinator.shutdown();
     },
@@ -203,11 +206,14 @@ void main() {
       expect(completion.token, same(accepted.token));
       expect(completion.confirmedChange?.revision, same(_revision));
       expect(completions, [same(completion)]);
-      expect(claim?.completion, same(completion));
+      expect(claim?.completions, [same(completion)]);
       expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
       expect(coordinator.isTagRunning(_tagId), isFalse);
       expect(coordinator.isRunning(_intentionId), isFalse);
-      coordinator.confirmPresentation(claim!);
+      coordinator.confirmAppPresentation(
+        claim!,
+        claim.completions.map((completion) => completion.token),
+      );
       registration.release();
       await subscription.cancel();
       await coordinator.shutdown();

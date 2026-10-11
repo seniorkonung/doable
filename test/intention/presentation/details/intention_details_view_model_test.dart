@@ -377,14 +377,17 @@ void main() {
 
     final successClaim = await presenter.nextClaim();
     expect(
-      successClaim!.completion,
+      successClaim!.completions.single,
       isA<IntentionCommandCompletion>().having(
         (completion) => completion.result,
         'результат повтора',
         isA<ResultSuccess<IntentionCommandSuccess>>(),
       ),
     );
-    coordinator.confirmPresentation(successClaim);
+    coordinator.confirmAppPresentation(
+      successClaim,
+      successClaim.completions.map((completion) => completion.token),
+    );
     GraphAppPresentationClaim? staleFailure;
     unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
     await pumpEventQueue();
@@ -939,14 +942,17 @@ void main() {
       );
       final deleteClaim = await presenter.nextClaim();
       expect(
-        deleteClaim!.completion,
+        deleteClaim!.completions.single,
         isA<IntentionCommandCompletion>().having(
           (completion) => completion.result,
           'результат',
           isA<ResultSuccess<IntentionCommandSuccess>>(),
         ),
       );
-      coordinator.confirmPresentation(deleteClaim);
+      coordinator.confirmAppPresentation(
+        deleteClaim,
+        deleteClaim.completions.map((completion) => completion.token),
+      );
       expect(repository.detailRequests[0].cancellationCount, 1);
 
       repository.detailRequests[0].add(ResultSuccess(intention));
