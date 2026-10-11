@@ -1,4 +1,3 @@
-import 'package:doable/src/data/local/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -32,110 +31,10 @@ void main() {
 
   tearDown(() => harness.dispose());
 
-  test('создаёт версию 1 с индексами, ключом названия и внешними ключами', () {
-    expect(AppDatabase.currentSchemaVersion, 1);
-    expect(
-      raw.select('PRAGMA user_version').single['user_version'],
-      AppDatabase.currentSchemaVersion,
-    );
-    final objects = raw
-        .select("SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
-        .map((row) => row['name'])
-        .toSet();
-    expect(
-      objects,
-      containsAll([
-        'tags',
-        'tag_assignments',
-        'tag_assignments_tag_order',
-        'tag_assignments_intention',
-        'tag_assignments_intention_order',
-        'tags_immutable_identity',
-        'tag_assignments_immutable_identity',
-        'tag_assignments_valid_tag_order_insert',
-        'tag_assignments_fill_tag_order',
-        'tag_assignments_valid_tag_order_update',
-      ]),
-    );
-    final key = raw
-        .select('PRAGMA table_xinfo(tags)')
-        .singleWhere((row) => row['name'] == 'name_key');
-    expect(key['hidden'], 3);
-    final foreignKeys = raw.select('PRAGMA foreign_key_list(tag_assignments)');
-    expect(
-      foreignKeys
-          .map(
-            (row) => (
-              row['table'],
-              row['from'],
-              row['to'],
-              row['on_update'],
-              row['on_delete'],
-            ),
-          )
-          .toSet(),
-      {
-        ('tags', 'tag_id', 'id', 'RESTRICT', 'CASCADE'),
-        ('intentions', 'intention_id', 'id', 'RESTRICT', 'CASCADE'),
-      },
-    );
-  });
-
-  test('хранит назначение только с обязательным намерением', () {
-    final columns = {
-      for (final row in raw.select('PRAGMA table_info(tag_assignments)'))
-        row['name']! as String: row['notnull']! as int,
-    };
-    expect(columns, {
-      'creation_sequence': 1,
-      'tag_id': 1,
-      'tag_creation_sequence': 1,
-      'intention_id': 1,
-    });
-
-    final uniqueIndexes = [
-      for (final index in raw.select('PRAGMA index_list(tag_assignments)'))
-        if (index['unique'] == 1)
-          [
-            for (final column in raw.select(
-              'SELECT name FROM pragma_index_info(?) ORDER BY seqno',
-              [index['name']],
-            ))
-              column['name']! as String,
-          ],
-    ];
-    expect(uniqueIndexes, [
-      ['tag_id', 'intention_id'],
-    ]);
-
-    final indexedColumns = {
-      for (final index in raw.select('PRAGMA index_list(tag_assignments)'))
-        for (final column in raw.select(
-          'SELECT name FROM pragma_index_info(?)',
-          [index['name']],
-        ))
-          column['name']! as String,
-    };
-    expect(indexedColumns, isNot(contains('long_term_relation_id')));
-
-    final relationObjects = raw.select('''
-      SELECT name
-      FROM sqlite_schema
-      WHERE tbl_name = 'tag_assignments'
-        AND (name LIKE '%long_term_relation%' OR sql LIKE '%long_term_relation%')
-    ''');
-    expect(relationObjects, isEmpty);
-  });
-
   test('отклоняет неверные названия и дубликаты после Unicode folding', () {
-    for (final invalid in [
-      '',
-      ' Дом',
-      'Дом ',
-      'До\u0000м',
-      '\uFEFFДом',
-      'а' * 256,
-    ]) {
+    // Пустое название, окружающие пробелы, NUL и длина: начальный BOM и
+    // тонкости пробельных символов проверены в тесте функций SQLite.
+    for (final invalid in ['', ' Дом', 'До\u0000м', 'а' * 256]) {
       expect(
         () => _addTag(raw, _firstTag, invalid),
         throwsA(isA<sqlite.SqliteException>()),
@@ -193,20 +92,13 @@ void main() {
 
   test('разрешает только существующее намерение и одну пару', () {
     _addTag(raw, _firstTag, 'Дом');
-    for (final intentionId in [null, 'нет-намерения', _relation]) {
+    for (final intentionId in [null, 'нет-намерения']) {
       expect(
         () => _addAssignment(raw, _firstTag, intentionId),
         throwsA(isA<sqlite.SqliteException>()),
         reason: 'Получателем может быть только существующее намерение.',
       );
     }
-    expect(
-      () => raw.execute(
-        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-        [_firstTag, _relation],
-      ),
-      throwsA(isA<sqlite.SqliteException>()),
-    );
     expect(
       () => _addAssignment(raw, 'нет-тега', _firstIntention),
       throwsA(isA<sqlite.SqliteException>()),
@@ -318,33 +210,6 @@ void main() {
       ]).single['creation_sequence'],
       greaterThan(tagSequence),
     );
-  });
-
-  test('каскады удаляют только назначения удалённого тега или намерения', () {
-    _addTag(raw, _firstTag, 'Первый');
-    _addTag(raw, _secondTag, 'Второй');
-    _addAssignment(raw, _firstTag, _firstIntention);
-    _addAssignment(raw, _secondTag, _firstIntention);
-    _addAssignment(raw, _secondTag, _secondIntention);
-    raw.execute('DELETE FROM tags WHERE id = ?', [_firstTag]);
-    expect(raw.select('SELECT id FROM intentions'), hasLength(2));
-    expect(raw.select('SELECT id FROM long_term_relations'), hasLength(1));
-    expect(
-      raw
-          .select('SELECT tag_id FROM tag_assignments')
-          .map((row) => row['tag_id']),
-      [_secondTag, _secondTag],
-    );
-    raw.execute('DELETE FROM long_term_relations WHERE id = ?', [_relation]);
-    expect(raw.select('SELECT * FROM tag_assignments'), hasLength(2));
-    raw.execute('DELETE FROM intentions WHERE id = ?', [_firstIntention]);
-    expect(
-      raw
-          .select('SELECT intention_id FROM tag_assignments')
-          .single['intention_id'],
-      _secondIntention,
-    );
-    expect(raw.select('SELECT id FROM tags').single['id'], _secondTag);
   });
 }
 

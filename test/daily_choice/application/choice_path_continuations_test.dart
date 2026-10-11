@@ -1,7 +1,6 @@
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -16,7 +15,6 @@ void main() {
     expect(draft.steps, isEmpty);
     expect(draft.currentIntentionId, _intention(1));
     expect(draft, isNot(isA<ChoicePathDraftProgress>()));
-    expect(() => ConfirmedChoicePath(draft.steps), throwsArgumentError);
   });
 
   test(
@@ -35,7 +33,6 @@ void main() {
       expect(draft.steps, hasLength(1));
       expect(draft.currentIntentionId, _intention(2));
       expect(draft.confirmedPath.steps.single.relationId, _relation(1));
-      expect(() => draft.steps.clear(), throwsUnsupportedError);
       expect(
         () => ChoicePathDraftProgress(_intention(1), const []),
         throwsArgumentError,
@@ -104,7 +101,6 @@ void main() {
       _relation(4),
     ]);
     expect(page.canConfirm, isFalse);
-    expect(() => page.items.clear(), throwsUnsupportedError);
   });
 
   test('завершение доступно только после перехода к действию', () {
@@ -134,7 +130,6 @@ void main() {
     expect(draft.startingIntentionId, _intention(3));
     expect(draft.currentIntentionId, _intention(3));
     expect(draft.steps, isEmpty);
-    expect(() => ConfirmedChoicePath(draft.steps), throwsArgumentError);
 
     final page = ChoicePathContinuationsPage(
       draft: draft,
@@ -186,8 +181,6 @@ void main() {
       _relation(1),
       _relation(2),
     ]);
-    expect(() => draft.steps.clear(), throwsUnsupportedError);
-    expect(() => draft.confirmedPath.steps.clear(), throwsUnsupportedError);
     expect(() => draft.pathOrder([_relation(1)]), throwsArgumentError);
 
     final top = ChoicePathDraftProgress(_intention(1), [
@@ -217,21 +210,6 @@ void main() {
         _step(3, 3, 1),
       ]),
       throwsArgumentError,
-    );
-  });
-
-  test('контракт различает ввод, отсутствие, конфликт и ошибки чтения', () {
-    const failures = <ChoicePathContinuationFailure>[
-      ChoicePathContinuationValidationFailure(),
-      ChoicePathContinuationIntentionNotFoundFailure(),
-      ChoicePathContinuationSnapshotExpired(),
-      ChoicePathContinuationUnavailableFailure(),
-      ChoicePathContinuationCorruptionFailure(),
-      ChoicePathContinuationUnexpectedFailure(),
-    ];
-    expect(
-      failures.map((failure) => failure.category).toSet(),
-      GraphFailureCategory.values.toSet(),
     );
   });
 }

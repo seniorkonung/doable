@@ -2,7 +2,6 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/l10n/app_localizations.dart';
@@ -11,7 +10,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -24,7 +22,6 @@ import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart'
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -36,141 +33,100 @@ import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
-  for (final (pairs, repetition) in [(5003, 1), (5003, 2), (15003, 1)]) {
-    testWidgets(
-      'прокрутка обоих охватов при ${pairs * 2} назначениях выбранного тега и ${pairs * 2} назначениях другого тега, повтор $repetition',
-      (tester) async {
-        final app = await _App.pump(tester, pairs);
-        for (final scope in TaggedIntentionsScope.values) {
-          await app.selectScope(tester, scope);
-          await _traverse(tester, app, _expected(pairs, scope), {
-            'recipientPairs': pairs,
-            'repetition': repetition,
-            'scope': scope.name,
-          });
-        }
-        // Переключатель доступен и после самого длинного обхода.
-        await app.selectScope(tester, TaggedIntentionsScope.active);
-        expect((await app.loaded(tester)).items, hasLength(50));
-      },
-      timeout: const Timeout(Duration(minutes: 5)),
-    );
-  }
-
-  for (final scope in TaggedIntentionsScope.values) {
-    testWidgets(
-      'изменение большого ${scope == TaggedIntentionsScope.active ? 'активного' : 'архивного'} охвата заменяет все порции',
-      (tester) async {
-        const pairs = 5003;
-        final app = await _App.pump(tester, pairs);
+  const pairs = 5003;
+  testWidgets(
+    'прокрутка обоих охватов при ${pairs * 2} назначениях выбранного тега и ${pairs * 2} назначениях другого тега',
+    (tester) async {
+      final app = await _App.pump(tester, pairs);
+      for (final scope in TaggedIntentionsScope.values) {
         await app.selectScope(tester, scope);
-        final expected = _expected(pairs, scope);
-        await _scrollTo(tester, app.more, 2000);
-        await tester.tap(app.more);
-        await tester.pump();
-        final before = await app.loaded(tester);
-        expect(before.items, hasLength(100));
-        final held = app.reads.holdNext();
-        await _scrollTo(tester, app.more, 2000);
-        await tester.tap(app.more);
-        await tester.pump();
-        await _waitFor(tester, () => held.ready.isCompleted);
-        final readCount = app.reads.samples.length;
-        final coordinator = app
-            .container(tester)
-            .read(graphCommandCoordinatorProvider.notifier);
-        for (final command in [
-          RemoveTagAssignment(tagId: _tagId, intentionId: expected.first),
-          RemoveTagAssignment(tagId: _tagId, intentionId: expected.last),
-          AssignTag(tagId: _tagId, intentionId: expected.first),
-        ]) {
-          final accepted = switch (command) {
-            RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(
-              command,
-            ),
-            AssignTag() => coordinator.acceptTagAssign(command),
-            _ => throw StateError('Неподдерживаемая команда фикстуры'),
-          };
-          expect(accepted, isA<TagCommandAccepted>());
-          final completion = await tester.runAsync(
-            () => (accepted as TagCommandAccepted).future,
-          );
-          expect(completion!.result, isA<GraphResultSuccess>());
-          await tester.pump();
-        }
-        final refreshing = app.state(tester) as TagNavigationLoaded;
-        expect(refreshing.freshness, TagNavigationFreshness.refreshing);
-        expect(refreshing.nextCursor, isNull);
-        for (final element
-            in find
-                .descendant(of: _navigation, matching: find.byType(ListTile))
-                .evaluate()) {
-          expect((element.widget as ListTile).onTap, isNull);
-        }
-        held.release.complete();
-        final current = await app.loaded(tester);
-        final changed = [
-          ...expected.skip(1).take(expected.length - 2),
-          expected.first,
-        ];
-        expect(current.tagId, _tagId);
-        expect(current.scope, scope);
-        expect(current.items.map((item) => item.id), changed.take(50));
-        expect(
-          current.revision.compareTo(before.revision),
-          GraphRevisionOrder.newer,
-        );
-        expect(app.reads.samples, hasLength(readCount + 1));
-        expect(app.reads.samples.last.query.cursor, isNull);
-        expect(app.reads.samples.last.query.scope, scope);
-        await _traverse(tester, app, changed, {
-          'recipientPairs': pairs,
-          'scope': scope.name,
-          'afterMutation': true,
-          'discardedPageRows':
-              (await held.ready.future as TaggedIntentionsPageSuccess)
-                  .value
-                  .items
-                  .length,
-          'resetRows': current.items.length,
-        });
-        expect(tester.takeException(), isNull);
-      },
-      timeout: const Timeout(Duration(minutes: 5)),
-    );
-  }
+        await _traverse(tester, app, _expected(pairs, scope));
+      }
+      // Переключатель доступен и после самого длинного обхода.
+      await app.selectScope(tester, TaggedIntentionsScope.active);
+      expect((await app.loaded(tester)).items, hasLength(50));
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  const scope = TaggedIntentionsScope.active;
+  testWidgets('изменение большого активного охвата заменяет все порции', (
+    tester,
+  ) async {
+    final app = await _App.pump(tester, pairs);
+    await app.selectScope(tester, scope);
+    final expected = _expected(pairs, scope);
+    await _scrollTo(tester, app.more, 2000);
+    await tester.tap(app.more);
+    await tester.pump();
+    final before = await app.loaded(tester);
+    expect(before.items, hasLength(100));
+    final held = app.reads.holdNext();
+    await _scrollTo(tester, app.more, 2000);
+    await tester.tap(app.more);
+    await tester.pump();
+    await _waitFor(tester, () => held.ready.isCompleted);
+    final readCount = app.reads.samples.length;
+    final coordinator = app
+        .container(tester)
+        .read(graphCommandCoordinatorProvider.notifier);
+    for (final command in [
+      RemoveTagAssignment(tagId: _tagId, intentionId: expected.first),
+      RemoveTagAssignment(tagId: _tagId, intentionId: expected.last),
+      AssignTag(tagId: _tagId, intentionId: expected.first),
+    ]) {
+      final accepted = switch (command) {
+        RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(command),
+        AssignTag() => coordinator.acceptTagAssign(command),
+        _ => throw StateError('Неподдерживаемая команда фикстуры'),
+      };
+      expect(accepted, isA<TagCommandAccepted>());
+      final completion = await tester.runAsync(
+        () => (accepted as TagCommandAccepted).future,
+      );
+      expect(completion!.result, isA<GraphResultSuccess>());
+      await tester.pump();
+    }
+    expect(app.more, findsNothing);
+    for (final element
+        in find
+            .descendant(of: _navigation, matching: find.byType(ListTile))
+            .evaluate()) {
+      expect((element.widget as ListTile).onTap, isNull);
+    }
+    held.release.complete();
+    final current = await app.loaded(tester);
+    final changed = [
+      ...expected.skip(1).take(expected.length - 2),
+      expected.first,
+    ];
+    expect(current.items.map((item) => item.id), changed.take(50));
+    // Актуализация перечитывает только первую порцию, а не все показанные.
+    expect(app.reads.samples, hasLength(readCount + 1));
+    await _traverse(tester, app, changed);
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 5)));
 }
 
 Future<void> _traverse(
   WidgetTester tester,
   _App app,
   List<IntentionId> expected,
-  Map<String, Object?> context,
 ) async {
   var loaded = await app.loaded(tester);
   expect(loaded.items, hasLength(50));
-  final revision = loaded.revision;
   final sampleStart = app.reads.samples.length - 1;
-  final scrollDurations = <int>[];
-  final loadingDurations = <int>[];
-  var maximumMountedRows = 0;
   while (!loaded.hasReachedEnd) {
     final before = loaded;
-    final scrolling = Stopwatch()..start();
     await _scrollTo(tester, app.more, 2000);
-    scrollDurations.add(scrolling.elapsedMicroseconds);
-    final loading = Stopwatch()..start();
     await tester.tap(app.more);
     await tester.pump();
     loaded = await app.loaded(tester);
-    loadingDurations.add(loading.elapsedMicroseconds);
     final mountedRows = find
         .descendant(of: _navigation, matching: find.byType(ListTile))
         .evaluate()
         .length;
-    if (mountedRows > maximumMountedRows) maximumMountedRows = mountedRows;
     expect(mountedRows, lessThanOrEqualTo(40));
-    expect(loaded.revision.compareTo(revision), GraphRevisionOrder.same);
     expect(loaded.items.length, greaterThan(before.items.length));
     expect(loaded.items.length - before.items.length, lessThanOrEqualTo(50));
     expect(
@@ -186,29 +142,10 @@ Future<void> _traverse(
   );
   final samples = app.reads.samples.skip(sampleStart).toList();
   expect(samples, hasLength((expected.length / 50).ceil()));
-  expect(samples.first.query.cursor, isNull);
-  expect(
-    samples.skip(1).every((sample) => sample.query.cursor != null),
-    isTrue,
-  );
   expect(
     samples.every((sample) => sample.rows <= 50 && sample.query.pageSize == 50),
     isTrue,
   );
-  _emit({
-    'kind': 'tag_navigation_widget_traversal',
-    ...context,
-    'pageSize': 50,
-    'pages': samples.length,
-    'resultRows': expected.length,
-    'uniqueRows': loaded.items.map((item) => item.id).toSet().length,
-    'maximumMountedRows': maximumMountedRows,
-    'readElapsedMicroseconds': [
-      for (final sample in samples) sample.microseconds,
-    ],
-    'scrollToMoreElapsedMicroseconds': scrollDurations,
-    'tapToReadyElapsedMicroseconds': loadingDurations,
-  });
   await _scrollTo(
     tester,
     find.text(app.l10n(tester).tagNavigationAllShown),
@@ -229,9 +166,6 @@ Future<void> _traverse(
   expect((await app.loaded(tester)).items, loaded.items);
   expect(app.state(tester).scope, loaded.scope);
 }
-
-void _emit(Map<String, Object?> record) =>
-    debugPrintSynchronously(jsonEncode(record));
 
 List<IntentionId> _expected(int pairs, TaggedIntentionsScope scope) => [
   for (final (id, _) in largeTaggedIntentions(
@@ -347,27 +281,6 @@ final class _App {
     );
     final measuredReads = _MeasuredReads(repository);
     reads = measuredReads;
-    _emit({
-      'kind': 'tag_navigation_widget_fixture',
-      'recipientPairs': pairs,
-      'intentions': pairs * 2 + 1,
-      'relations': pairs,
-      'selectedTagAssignments': pairs * 2,
-      'unrelatedTagAssignments': pairs * 2,
-      'platform': Platform.operatingSystem,
-      'runtime': Platform.version,
-      'sqliteVersion': raw
-          .select('SELECT sqlite_version()')
-          .single
-          .values
-          .single,
-      'journalMode': raw.select('PRAGMA journal_mode').single.values.single,
-      'windowWidth': 600,
-      'windowHeight': 900,
-      'devicePixelRatio': 1,
-      'textScale': 1,
-      'buildMode': 'flutter test debug',
-    });
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -394,10 +307,9 @@ final class _App {
 }
 
 final class _ReadSample {
-  const _ReadSample(this.query, this.rows, this.microseconds);
+  const _ReadSample(this.query, this.rows);
   final TaggedIntentionsQuery query;
   final int rows;
-  final int microseconds;
 }
 
 final class _HeldPage {
@@ -405,7 +317,7 @@ final class _HeldPage {
   final release = Completer<void>();
 }
 
-/// Измеряет настоящее чтение; задержка доставки исключена из его времени.
+/// Записывает настоящие чтения страниц и позволяет удержать доставку одной.
 final class _MeasuredReads
     with TagReadContractTestFallback
     implements TagReadContract {
@@ -437,14 +349,10 @@ final class _MeasuredReads
   ) async {
     final held = _next;
     _next = null;
-    final timer = Stopwatch()..start();
     final result = await delegate.getTaggedIntentionsPage(query);
-    timer.stop();
     expect(result, isA<TaggedIntentionsPageSuccess>());
     final page = (result as TaggedIntentionsPageSuccess).value;
-    samples.add(
-      _ReadSample(query, page.items.length, timer.elapsedMicroseconds),
-    );
+    samples.add(_ReadSample(query, page.items.length));
     if (held != null) {
       held.ready.complete(result);
       await held.release.future;

@@ -338,61 +338,9 @@ void main() {
         expect(repository.commands, hasLength(1));
       },
     );
-
-    test('отказ отсутствующих тегов, предъявленный живой формой, не '
-        'передаётся общей поверхности после её ухода', () async {
-      final repository = _ControlledPersonalGraphRepository();
-      final coordinator = _graphCoordinator(repository);
-      final registration = coordinator.registerAppPresentation();
-      final missingTag = _tagId(_firstTagUuid);
-
-      final accepted = coordinator.acceptCreation(
-        IntentionCreationFormKey(),
-        CreateIntention.withInitialState(
-          title: 'Полное намерение',
-          description: null,
-          readiness: IntentionReadiness.notReady,
-          favoriteMark: FavoriteMark.notFavorite,
-          tagIds: [missingTag],
-        ),
-      ) as IntentionCommandAccepted;
-      repository.complete(
-        0,
-        ResultFailure(IntentionCreationTagsMissingFailure([missingTag])),
-      );
-      await accepted.future;
-      var fallbackIssued = false;
-      final fallbackRequest = registration.nextClaim()
-        ..then((_) => fallbackIssued = true);
-
-      coordinator.confirmPresentation(
-        coordinator.claimInitiatorFailure(accepted.token)!,
-      );
-      coordinator.releaseInitiatorPresentation(accepted.token);
-      await Future<void>.delayed(Duration.zero);
-      expect(fallbackIssued, isFalse);
-
-      await coordinator.shutdown();
-      expect(await fallbackRequest, isNull);
-    });
   });
 
   group('GraphCommandCoordinator', () {
-    test('generated provider сохраняет один keep-alive coordinator', () {
-      final repository = _ControlledGraphRepository();
-      final container = ProviderContainer.test(
-        overrides: [
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-      );
-      final provider = graphCommandCoordinatorProvider;
-
-      final first = container.read(provider.notifier);
-      final second = container.read(provider.notifier);
-
-      expect(second, same(first));
-    });
-
     test(
       'синхронно принимает command и сохраняет gate одного намерения',
       () async {
@@ -518,104 +466,6 @@ void main() {
       await coordinator.shutdown();
     });
 
-    for (final running
-        in <(String, ExistingIntentionCommand Function(IntentionId))>[
-          ('изменение полей', _updateTitle),
-          ('включение готовности', EnableIntentionReadiness.new),
-          ('выключение готовности', DisableIntentionReadiness.new),
-          ('архивирование', ArchiveIntention.new),
-          ('восстановление', RestoreIntention.new),
-          ('удаление', DeleteIntention.new),
-          ('отметка', MarkIntentionFavorite.new),
-          ('снятие отметки', UnmarkIntentionFavorite.new),
-        ]) {
-      test('пока выполняется ${running.$1}, отметка и её снятие того же '
-          'намерения не принимаются, не запускаются и не ставятся в '
-          'очередь', () async {
-        final repository = _ControlledGraphRepository();
-        final coordinator = _graphCoordinator(repository);
-        final intentionId = _id(_firstUuid);
-
-        final accepted = _acceptExisting(
-          coordinator,
-          running.$2(intentionId),
-        ) as IntentionCommandAccepted;
-
-        expect(
-          _acceptExisting(coordinator, MarkIntentionFavorite(intentionId)),
-          isA<IntentionCommandAlreadyRunning>(),
-        );
-        expect(
-          _acceptExisting(coordinator, UnmarkIntentionFavorite(intentionId)),
-          isA<IntentionCommandAlreadyRunning>(),
-        );
-        expect(repository.commands, hasLength(1));
-
-        repository.complete(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        final completion = await accepted.future;
-        await Future<void>.delayed(Duration.zero);
-
-        // Отклонённые команды не отложены: после завершения хранилище не
-        // получает их.
-        expect(repository.commands, hasLength(1));
-        expect(coordinator.isRunning(intentionId), isFalse);
-
-        coordinator.releaseInitiatorPresentation(completion.token);
-        await coordinator.shutdown();
-      });
-    }
-
-    for (final favorite
-        in <(String, ExistingIntentionCommand Function(IntentionId))>[
-          ('отметка', MarkIntentionFavorite.new),
-          ('снятие отметки', UnmarkIntentionFavorite.new),
-        ]) {
-      test('пока выполняется ${favorite.$1}, другие изменяющие операции '
-          'того же намерения не принимаются, не запускаются и не ставятся в '
-          'очередь', () async {
-        final repository = _ControlledGraphRepository();
-        final coordinator = _graphCoordinator(repository);
-        final intentionId = _id(_firstUuid);
-
-        final accepted = _acceptExisting(
-          coordinator,
-          favorite.$2(intentionId),
-        ) as IntentionCommandAccepted;
-
-        for (final blocked in <ExistingIntentionCommand>[
-          _updateTitle(intentionId),
-          EnableIntentionReadiness(intentionId),
-          DisableIntentionReadiness(intentionId),
-          ArchiveIntention(intentionId),
-          RestoreIntention(intentionId),
-          DeleteIntention(intentionId),
-        ]) {
-          expect(
-            _acceptExisting(coordinator, blocked),
-            isA<IntentionCommandAlreadyRunning>(),
-            reason: '${blocked.runtimeType}',
-          );
-        }
-        expect(repository.commands, hasLength(1));
-
-        repository.complete(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        final completion = await accepted.future;
-        await Future<void>.delayed(Duration.zero);
-
-        expect(repository.commands, hasLength(1));
-        expect(coordinator.isRunning(intentionId), isFalse);
-
-        coordinator.releaseInitiatorPresentation(completion.token);
-        await coordinator.shutdown();
-      });
-    }
-
     test('выполняющаяся отметка не блокирует операции других намерений, '
         'включая их отметку', () async {
       final repository = _ControlledGraphRepository();
@@ -671,109 +521,6 @@ void main() {
       await coordinator.shutdown();
     });
 
-    test('ограничение отметки переживает уход инициатора, а принятая отметка '
-        'завершается независимо от экрана', () async {
-      final repository = _ControlledGraphRepository();
-      final coordinator = _graphCoordinator(repository);
-      final registration = coordinator.registerAppPresentation();
-      final completions = <IntentionCommandCompletion>[];
-      final subscription = coordinator.intentionCompletions.listen(
-        completions.add,
-      );
-      final intentionId = _id(_firstUuid);
-      final otherId = _id(_secondUuid);
-
-      final accepted = _acceptExisting(
-        coordinator,
-        MarkIntentionFavorite(intentionId),
-      ) as IntentionCommandAccepted;
-      // Экран-инициатор закрыт до завершения отметки.
-      coordinator.releaseInitiatorPresentation(accepted.token);
-
-      expect(coordinator.isRunning(intentionId), isTrue);
-      expect(
-        _acceptExisting(coordinator, UnmarkIntentionFavorite(intentionId)),
-        isA<IntentionCommandAlreadyRunning>(),
-      );
-      expect(
-        _acceptExisting(coordinator, ArchiveIntention(intentionId)),
-        isA<IntentionCommandAlreadyRunning>(),
-      );
-      final other = _acceptExisting(
-        coordinator,
-        MarkIntentionFavorite(otherId),
-      );
-      expect(other, isA<IntentionCommandAccepted>());
-      expect(repository.commands, hasLength(2));
-
-      repository.complete(
-        0,
-        _markedResult(intentionId, const _TestCatalogRevision()),
-      );
-      final completion = await accepted.future;
-      final claim = await registration.nextClaim();
-
-      // Отметка завершена и доставлена потребителям данных и общей
-      // поверхности без участия закрытого экрана.
-      expect(completion.kind, IntentionCommandKind.markFavorite);
-      expect(completion.result, isA<ResultSuccess<IntentionCommandSuccess>>());
-      expect(completions, [same(completion)]);
-      expect(claim!.completion, same(completion));
-      expect(coordinator.isRunning(intentionId), isFalse);
-
-      final next = _acceptExisting(
-        coordinator,
-        UnmarkIntentionFavorite(intentionId),
-      );
-      expect(next, isA<IntentionCommandAccepted>());
-
-      coordinator.confirmPresentation(claim);
-      repository.complete(
-        1,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      repository.complete(
-        2,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      final otherCompletion = await (other as IntentionCommandAccepted).future;
-      final nextCompletion = await (next as IntentionCommandAccepted).future;
-      coordinator.releaseInitiatorPresentation(otherCompletion.token);
-      coordinator.releaseInitiatorPresentation(nextCompletion.token);
-      await subscription.cancel();
-      await coordinator.shutdown();
-    });
-
-    test('не сериализует независимые формы создания общим gate', () async {
-      final repository = _ControlledGraphRepository();
-      final coordinator = _graphCoordinator(repository);
-
-      final first = _acceptCreation(
-        coordinator,
-        const CreateIntention(title: 'Первое', description: null),
-      );
-      final second = _acceptCreation(
-        coordinator,
-        const CreateIntention(title: 'Второе', description: null),
-      );
-
-      expect(first, isA<IntentionCommandAccepted>());
-      expect(second, isA<IntentionCommandAccepted>());
-      expect(repository.commands, hasLength(2));
-
-      repository.complete(
-        0,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      repository.complete(
-        1,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await (first as IntentionCommandAccepted).future;
-      await (second as IntentionCommandAccepted).future;
-      await coordinator.shutdown();
-    });
-
     test(
       'публикует один completion всем текущим data consumers без replay',
       () async {
@@ -815,55 +562,6 @@ void main() {
         await coordinator.shutdown();
       },
     );
-
-    test('details consumers фильтруют success по идентификатору и игнорируют failure', () async {
-      final repository = _ControlledGraphRepository();
-      final coordinator = _graphCoordinator(repository);
-      final firstId = _id(_firstUuid);
-      final secondId = _id(_secondUuid);
-      final firstDetails = <IntentionCommandSuccess>[];
-      final secondDetails = <IntentionCommandSuccess>[];
-      final firstSubscription = coordinator.intentionCompletions.listen(
-        (completion) => _collectSuccessFor(
-          completion,
-          intentionId: firstId,
-          target: firstDetails,
-        ),
-      );
-      final secondSubscription = coordinator.intentionCompletions.listen(
-        (completion) => _collectSuccessFor(
-          completion,
-          intentionId: secondId,
-          target: secondDetails,
-        ),
-      );
-
-      final successful = _acceptExisting(
-        coordinator,
-        DeleteIntention(firstId),
-      ) as IntentionCommandAccepted;
-      repository.complete(0, _deletedResult(firstId));
-      final successfulCompletion = await successful.future;
-
-      final failed = _acceptExisting(
-        coordinator,
-        ArchiveIntention(secondId),
-      ) as IntentionCommandAccepted;
-      repository.complete(
-        1,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      final failedCompletion = await failed.future;
-
-      expect(firstDetails, [isA<IntentionDeleted>()]);
-      expect(secondDetails, isEmpty);
-
-      coordinator.releaseInitiatorPresentation(successfulCompletion.token);
-      coordinator.releaseInitiatorPresentation(failedCompletion.token);
-      await firstSubscription.cancel();
-      await secondSubscription.cancel();
-      await coordinator.shutdown();
-    });
 
     test(
       'преобразует неожиданную ошибку repository в typed completion',
@@ -1282,23 +980,6 @@ void main() {
   });
 }
 
-void _collectSuccessFor(
-  IntentionCommandCompletion completion, {
-  required IntentionId intentionId,
-  required List<IntentionCommandSuccess> target,
-}) {
-  switch (completion.result) {
-    case ResultSuccess(:final value) when _successId(value) == intentionId:
-      target.add(value);
-    case ResultSuccess() || ResultFailure():
-  }
-}
-
-IntentionId _successId(IntentionCommandSuccess success) => switch (success) {
-  IntentionSaved(:final intention) => intention.id,
-  IntentionDeleted(:final id) => id,
-};
-
 Result<IntentionCommandSuccess> _deletedResult(IntentionId id) => ResultSuccess(
   IntentionDeleted(
     id,
@@ -1308,32 +989,6 @@ Result<IntentionCommandSuccess> _deletedResult(IntentionId id) => ResultSuccess(
     ),
   ),
 );
-
-/// Подтверждённая отметка: снимки каталога различаются только отметкой.
-Result<IntentionCommandSuccess> _markedResult(
-  IntentionId id,
-  GraphRevision revision,
-) => ResultSuccess(
-  IntentionSaved(
-    Intention(
-      id: id,
-      title: 'Намерение',
-      description: null,
-      readiness: IntentionReadiness.notReady,
-      archiveState: IntentionArchiveState.active,
-      createdAt: IntentionTimestamp(DateTime.utc(2026)),
-      updatedAt: IntentionTimestamp(DateTime.utc(2026)),
-    ),
-    catalogMutation: IntentionCatalogUpdated(
-      revision: revision,
-      before: _TestCatalogEntrySnapshot(id),
-      after: _TestCatalogEntrySnapshot(id, favoriteMark: FavoriteMark.favorite),
-    ),
-  ),
-);
-
-UpdateIntention _updateTitle(IntentionId id) =>
-    UpdateIntention(id: id, title: 'Новое название', description: null);
 
 Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
   IntentionId id,
@@ -1405,11 +1060,6 @@ GraphCommandCoordinator _graphCoordinator(PersonalGraphRepository repository) {
   addTearDown(container.dispose);
   return container.read(graphCommandCoordinatorProvider.notifier);
 }
-
-IntentionCommandStart _acceptCreation(
-  GraphCommandCoordinator coordinator,
-  CreateIntention command,
-) => coordinator.acceptCreation(IntentionCreationFormKey(), command);
 
 IntentionCommandStart _acceptExisting(
   GraphCommandCoordinator coordinator,

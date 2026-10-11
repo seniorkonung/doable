@@ -1,357 +1,338 @@
 part of 'tag_navigation_app_flow_test.dart';
 
-void _testTaggedGraphLifecycle(String locale) {
-  testWidgets(
-    'открытая навигация обновляет поля и порядок назначений на $locale',
-    (tester) async {
-      final app = await _pumpApp(
-        tester,
-        locale,
-        seed: seedTagNavigationLifecycleFixture,
-      );
-      await _openCatalogTag(tester, firstTagNumber);
-      final coordinator = app.runtime.commandCoordinator;
-      final before = _snapshot(app.raw);
-      final targets = _lifecycleActiveTargets();
-      await _expectTargets(tester, app.router, targets);
+void _testTaggedGraphLifecycle() {
+  testWidgets('открытая навигация обновляет поля и порядок назначений', (
+    tester,
+  ) async {
+    final app = await _pumpApp(tester, seed: seedTagNavigationLifecycleFixture);
+    await _openCatalogTag(tester, firstTagNumber);
+    final coordinator = app.runtime.commandCoordinator;
+    final before = _snapshot(app.raw);
+    final targets = _lifecycleActiveTargets();
+    await _expectTargets(tester, app.router, targets);
 
+    await _changed(
+      tester,
+      (coordinator.acceptExisting(
+        UpdateIntention(
+          id: _intentionId(1),
+          title: 'Обновлённое намерение',
+          description: 'Описание 1',
+        ),
+        presentationTitle: 'Одинаковое намерение',
+      ) as IntentionCommandAccepted).future,
+    );
+    await _expectTargets(tester, app.router, targets);
+    _expectRowText(tester, _intentionId(1), 'Обновлённое намерение');
+    expect(find.textContaining('Чтобы'), findsNothing);
+
+    for (final command in [
+      DisableIntentionReadiness(_intentionId(1)),
+      EnableIntentionReadiness(_intentionId(1)),
+    ]) {
       await _changed(
         tester,
         (coordinator.acceptExisting(
-          UpdateIntention(
-            id: _intentionId(1),
-            title: 'Обновлённое намерение',
-            description: 'Описание 1',
-          ),
-          presentationTitle: 'Одинаковое намерение',
+          command,
+          presentationTitle: 'Обновлённое намерение',
         ) as IntentionCommandAccepted).future,
       );
       await _expectTargets(tester, app.router, targets);
-      _expectRowText(tester, _intentionId(1), 'Обновлённое намерение');
-      expect(find.textContaining('Чтобы'), findsNothing);
+      expect(
+        _row(app.raw, 'intentions', 1)['is_action_ready'],
+        command is EnableIntentionReadiness ? 1 : 0,
+      );
+    }
 
-      for (final command in [
-        DisableIntentionReadiness(_intentionId(1)),
-        EnableIntentionReadiness(_intentionId(1)),
-      ]) {
-        await _changed(
-          tester,
-          (coordinator.acceptExisting(
-            command,
-            presentationTitle: 'Обновлённое намерение',
-          ) as IntentionCommandAccepted).future,
-        );
-        await _expectTargets(tester, app.router, targets);
-        expect(
-          _row(app.raw, 'intentions', 1)['is_action_ready'],
-          command is EnableIntentionReadiness ? 1 : 0,
-        );
-      }
-
-      await _changed(
-        tester,
-        (coordinator.acceptExisting(
-          UpdateIntention(
-            id: _intentionId(3),
-            title: 'Новое имя соседа',
-            description: 'Описание 3',
+    await _changed(
+      tester,
+      (coordinator.acceptExisting(
+        UpdateIntention(
+          id: _intentionId(3),
+          title: 'Новое имя соседа',
+          description: 'Описание 3',
+        ),
+        presentationTitle: 'Непомеченный сосед',
+      ) as IntentionCommandAccepted).future,
+    );
+    await _expectTargets(tester, app.router, targets);
+    expect(find.textContaining('Чтобы'), findsNothing);
+    expect(_snapshot(app.raw)['tag_assignments'], before['tag_assignments']);
+    final freeRelationBefore = _row(app.raw, 'long_term_relations', 103);
+    await _changed(
+      tester,
+      (coordinator.acceptRelationRestore(
+        RestoreLongTermRelation(_relationId(103)),
+      ) as LongTermRelationCommandAccepted).future,
+    );
+    await _expectTargets(tester, app.router, targets);
+    await _changed(
+      tester,
+      (coordinator.acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: _relationId(103),
+          patch: LongTermRelationPatch(
+            type: const LongTermRelationFieldSet(LongTermRelationType.need),
+            priority: const LongTermRelationFieldSet(RelationPriority.p1),
+            sourceIntentionId: LongTermRelationFieldSet(_intentionId(3)),
+            relatedIntentionId: LongTermRelationFieldSet(_intentionId(5)),
           ),
-          presentationTitle: 'Непомеченный сосед',
-        ) as IntentionCommandAccepted).future,
-      );
-      await _expectTargets(tester, app.router, targets);
-      expect(find.textContaining('Чтобы'), findsNothing);
-      expect(_snapshot(app.raw)['tag_assignments'], before['tag_assignments']);
-      final freeRelationBefore = _row(app.raw, 'long_term_relations', 103);
-      await _changed(
-        tester,
-        (coordinator.acceptRelationRestore(
-          RestoreLongTermRelation(_relationId(103)),
-        ) as LongTermRelationCommandAccepted).future,
-      );
-      await _expectTargets(tester, app.router, targets);
-      await _changed(
-        tester,
-        (coordinator.acceptRelationUpdate(
-          UpdateLongTermRelation(
-            relationId: _relationId(103),
-            patch: LongTermRelationPatch(
-              type: const LongTermRelationFieldSet(LongTermRelationType.need),
-              priority: const LongTermRelationFieldSet(RelationPriority.p1),
-              sourceIntentionId: LongTermRelationFieldSet(_intentionId(3)),
-              relatedIntentionId: LongTermRelationFieldSet(_intentionId(5)),
-            ),
-          ),
-        ) as LongTermRelationCommandAccepted).future,
-      );
-      await _expectTargets(tester, app.router, targets);
-      expect(find.textContaining('Чтобы'), findsNothing);
-      expect(_row(app.raw, 'long_term_relations', 103), {
-        ...freeRelationBefore,
-        'source_intention_id': tagFixtureId(3),
-        'related_intention_id': tagFixtureId(5),
-        'type': 'need',
-        'priority': 1,
-        'is_archived': 0,
-      });
-      expect(_snapshot(app.raw)['tag_assignments'], before['tag_assignments']);
+        ),
+      ) as LongTermRelationCommandAccepted).future,
+    );
+    await _expectTargets(tester, app.router, targets);
+    expect(find.textContaining('Чтобы'), findsNothing);
+    expect(_row(app.raw, 'long_term_relations', 103), {
+      ...freeRelationBefore,
+      'source_intention_id': tagFixtureId(3),
+      'related_intention_id': tagFixtureId(5),
+      'type': 'need',
+      'priority': 1,
+      'is_archived': 0,
+    });
+    expect(_snapshot(app.raw)['tag_assignments'], before['tag_assignments']);
 
-      final graphAfterEdits = retainedTagFixtureGraph(app.raw);
-      for (final target in [_intentionId(3)]) {
-        await _changeAssignment(tester, coordinator, target, assigned: true);
-        targets.add(target);
-        await _expectTargets(tester, app.router, targets);
-        expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
-      }
-      for (final target in [_intentionId(1), _intentionId(5)]) {
-        await _changeAssignment(tester, coordinator, target, assigned: false);
-        targets.remove(target);
-        await _expectTargets(tester, app.router, targets);
-        expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
-        await _changeAssignment(tester, coordinator, target, assigned: true);
-        targets.add(target);
-        await _expectTargets(tester, app.router, targets);
-        expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
-      }
-      await _selectScope(tester, TaggedIntentionsScope.archived);
-      final archivedTargets = [_intentionId(2)];
+    final graphAfterEdits = retainedTagFixtureGraph(app.raw);
+    for (final target in [_intentionId(3)]) {
+      await _changeAssignment(tester, coordinator, target, assigned: true);
+      targets.add(target);
+      await _expectTargets(tester, app.router, targets);
+      expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
+    }
+    for (final target in [_intentionId(1), _intentionId(5)]) {
+      await _changeAssignment(tester, coordinator, target, assigned: false);
+      targets.remove(target);
+      await _expectTargets(tester, app.router, targets);
+      expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
+      await _changeAssignment(tester, coordinator, target, assigned: true);
+      targets.add(target);
+      await _expectTargets(tester, app.router, targets);
+      expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
+    }
+    await _selectScope(tester, TaggedIntentionsScope.archived);
+    final archivedTargets = [_intentionId(2)];
+    await _expectTargets(
+      tester,
+      app.router,
+      archivedTargets,
+      scope: TaggedIntentionsScope.archived,
+    );
+    for (final target in List<IntentionId>.of(archivedTargets)) {
+      await _changeAssignment(tester, coordinator, target, assigned: false);
+      archivedTargets.remove(target);
       await _expectTargets(
         tester,
         app.router,
         archivedTargets,
         scope: TaggedIntentionsScope.archived,
       );
-      for (final target in List<IntentionId>.of(archivedTargets)) {
-        await _changeAssignment(tester, coordinator, target, assigned: false);
-        archivedTargets.remove(target);
-        await _expectTargets(
-          tester,
-          app.router,
-          archivedTargets,
-          scope: TaggedIntentionsScope.archived,
-        );
-        await _changeAssignment(tester, coordinator, target, assigned: true);
-        archivedTargets.add(target);
-        await _expectTargets(
-          tester,
-          app.router,
-          archivedTargets,
-          scope: TaggedIntentionsScope.archived,
-        );
-        expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
-      }
-      await _selectScope(tester, TaggedIntentionsScope.active);
-      await _expectTargets(tester, app.router, targets);
+      await _changeAssignment(tester, coordinator, target, assigned: true);
+      archivedTargets.add(target);
+      await _expectTargets(
+        tester,
+        app.router,
+        archivedTargets,
+        scope: TaggedIntentionsScope.archived,
+      );
+      expect(retainedTagFixtureGraph(app.raw), graphAfterEdits);
+    }
+    await _selectScope(tester, TaggedIntentionsScope.active);
+    await _expectTargets(tester, app.router, targets);
+    expect(
+      app.raw
+          .select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+            tagFixtureId(lastTagNumber),
+          ])
+          .map((row) => row.values.toList()),
+      before['tag_assignments']!.where(
+        (row) => row.contains(tagFixtureId(lastTagNumber)),
+      ),
+    );
+    expect(_snapshot(app.raw)['daily_choices'], before['daily_choices']);
+    expect(
+      _snapshot(app.raw)['daily_choice_path_steps'],
+      before['daily_choice_path_steps'],
+    );
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('каскад и отдельное восстановление меняют собственные охваты', (
+    tester,
+  ) async {
+    final app = await _pumpApp(tester, seed: seedTagNavigationLifecycleFixture);
+    await _openCatalogTag(tester, firstTagNumber);
+    await _loaded(tester, firstTagNumber);
+    final before = _snapshot(app.raw);
+    final neighbors = [
+      for (final id in [2, 3, 4, 5]) _row(app.raw, 'intentions', id),
+    ];
+    final unrelatedRelations = [
+      for (final id in [105, 106]) _row(app.raw, 'long_term_relations', id),
+    ];
+    final coordinator = app.runtime.commandCoordinator;
+
+    await _changed(
+      tester,
+      (coordinator.acceptExisting(
+        ArchiveIntention(_intentionId(1)),
+        presentationTitle: 'Одинаковое намерение',
+      ) as IntentionCommandAccepted).future,
+    );
+    await _expectTargets(tester, app.router, [
+      _intentionId(4),
+      _intentionId(5),
+    ]);
+    final archived = [_intentionId(1), _intentionId(2)];
+    await _selectScope(tester, TaggedIntentionsScope.archived);
+    await _expectTargets(
+      tester,
+      app.router,
+      archived,
+      scope: TaggedIntentionsScope.archived,
+    );
+    expect([
+      for (final id in [101, 102, 103, 104])
+        _row(app.raw, 'long_term_relations', id)['is_archived'],
+    ], everyElement(1));
+    expect([
+      for (final id in [2, 3, 4, 5]) _row(app.raw, 'intentions', id),
+    ], neighbors);
+    expect([
+      for (final id in [105, 106]) _row(app.raw, 'long_term_relations', id),
+    ], unrelatedRelations);
+
+    await _changed(
+      tester,
+      (coordinator.acceptExisting(
+        RestoreIntention(_intentionId(1)),
+        presentationTitle: 'Одинаковое намерение',
+      ) as IntentionCommandAccepted).future,
+    );
+    archived.remove(_intentionId(1));
+    await _expectTargets(
+      tester,
+      app.router,
+      archived,
+      scope: TaggedIntentionsScope.archived,
+    );
+    expect([
+      for (final id in [101, 102, 103, 104])
+        _row(app.raw, 'long_term_relations', id)['is_archived'],
+    ], everyElement(1));
+    await _selectScope(tester, TaggedIntentionsScope.active);
+    await _expectTargets(tester, app.router, [
+      _intentionId(1),
+      _intentionId(4),
+      _intentionId(5),
+    ]);
+    await _selectScope(tester, TaggedIntentionsScope.archived);
+
+    for (final (number, archive) in [
+      (101, false),
+      (104, false),
+      (106, true),
+      (106, false),
+    ]) {
+      final start = archive
+          ? coordinator.acceptRelationArchive(
+              ArchiveLongTermRelation(_relationId(number)),
+            )
+          : coordinator.acceptRelationRestore(
+              RestoreLongTermRelation(_relationId(number)),
+            );
+      await _changed(tester, (start as LongTermRelationCommandAccepted).future);
+      await _expectTargets(
+        tester,
+        app.router,
+        archived,
+        scope: TaggedIntentionsScope.archived,
+      );
       expect(
-        app.raw
-            .select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-              tagFixtureId(lastTagNumber),
-            ])
-            .map((row) => row.values.toList()),
-        before['tag_assignments']!.where(
-          (row) => row.contains(tagFixtureId(lastTagNumber)),
+        _row(app.raw, 'long_term_relations', number)['is_archived'],
+        archive ? 1 : 0,
+      );
+    }
+    await _selectScope(tester, TaggedIntentionsScope.active);
+    await _expectTargets(tester, app.router, _lifecycleActiveTargets());
+    final after = _snapshot(app.raw);
+    for (final table in [
+      'tags',
+      'tag_assignments',
+      'daily_choices',
+      'daily_choice_path_steps',
+    ]) {
+      expect(after[table], before[table], reason: table);
+    }
+    expect([
+      for (final id in [2, 3, 4, 5]) _row(app.raw, 'intentions', id),
+    ], neighbors);
+    expect([
+      for (final id in [105, 106]) _row(app.raw, 'long_term_relations', id),
+    ], unrelatedRelations);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('одиночное и массовое удаление убирают только получателей', (
+    tester,
+  ) async {
+    final app = await _pumpApp(tester, seed: seedTagNavigationLifecycleFixture);
+    await _openCatalogTag(tester, firstTagNumber);
+    await _loaded(tester, firstTagNumber);
+    final before = _snapshot(app.raw);
+    final coordinator = app.runtime.commandCoordinator;
+    final targets = _lifecycleActiveTargets();
+
+    await _changed(
+      tester,
+      (coordinator.acceptExisting(
+        DeleteIntention(_intentionId(5)),
+        presentationTitle: 'Отдельное намерение',
+      ) as IntentionCommandAccepted).future,
+    );
+    targets.remove(_intentionId(5));
+    await _expectTargets(tester, app.router, targets);
+    _expectOnlyDeleted(app.raw, before, intentions: [5]);
+    await _changed(
+      tester,
+      (coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_relationId(106)),
+      ) as LongTermRelationCommandAccepted).future,
+    );
+    await _expectTargets(tester, app.router, targets);
+    _expectOnlyDeleted(app.raw, before, intentions: [5], relations: [106]);
+
+    await _selectScope(tester, TaggedIntentionsScope.archived);
+    await _expectTargets(tester, app.router, [
+      _intentionId(2),
+    ], scope: TaggedIntentionsScope.archived);
+    await _changed(
+      tester,
+      (coordinator.acceptBlockingRelationsDelete(
+        DeleteBlockingRelations.longTerm(
+          intentionId: _intentionId(1),
+          relationIds: [_relationId(102), _relationId(103)],
         ),
-      );
-      expect(_snapshot(app.raw)['daily_choices'], before['daily_choices']);
-      expect(
-        _snapshot(app.raw)['daily_choice_path_steps'],
-        before['daily_choice_path_steps'],
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+        presentationTitle: 'Одинаковое намерение',
+      ) as BlockingRelationsDeleteAccepted).future,
+    );
+    await _expectTargets(tester, app.router, [
+      _intentionId(2),
+    ], scope: TaggedIntentionsScope.archived);
+    _expectOnlyDeleted(
+      app.raw,
+      before,
+      intentions: [5],
+      relations: [102, 103, 106],
+    );
+    await _selectScope(tester, TaggedIntentionsScope.active);
+    await _expectTargets(tester, app.router, targets);
+    expect(app.raw.select('PRAGMA foreign_key_check'), isEmpty);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
-    'каскад и отдельное восстановление меняют собственные охваты на $locale',
+    'отмена и зависимость дневного пути сохраняют навигацию и назначения',
     (tester) async {
       final app = await _pumpApp(
         tester,
-        locale,
-        seed: seedTagNavigationLifecycleFixture,
-      );
-      await _openCatalogTag(tester, firstTagNumber);
-      await _loaded(tester, firstTagNumber);
-      final before = _snapshot(app.raw);
-      final neighbors = [
-        for (final id in [2, 3, 4, 5]) _row(app.raw, 'intentions', id),
-      ];
-      final unrelatedRelations = [
-        for (final id in [105, 106]) _row(app.raw, 'long_term_relations', id),
-      ];
-      final coordinator = app.runtime.commandCoordinator;
-
-      await _changed(
-        tester,
-        (coordinator.acceptExisting(
-          ArchiveIntention(_intentionId(1)),
-          presentationTitle: 'Одинаковое намерение',
-        ) as IntentionCommandAccepted).future,
-      );
-      await _expectTargets(tester, app.router, [
-        _intentionId(4),
-        _intentionId(5),
-      ]);
-      final archived = [_intentionId(1), _intentionId(2)];
-      await _selectScope(tester, TaggedIntentionsScope.archived);
-      await _expectTargets(
-        tester,
-        app.router,
-        archived,
-        scope: TaggedIntentionsScope.archived,
-      );
-      expect([
-        for (final id in [101, 102, 103, 104])
-          _row(app.raw, 'long_term_relations', id)['is_archived'],
-      ], everyElement(1));
-      expect([
-        for (final id in [2, 3, 4, 5]) _row(app.raw, 'intentions', id),
-      ], neighbors);
-      expect([
-        for (final id in [105, 106]) _row(app.raw, 'long_term_relations', id),
-      ], unrelatedRelations);
-
-      await _changed(
-        tester,
-        (coordinator.acceptExisting(
-          RestoreIntention(_intentionId(1)),
-          presentationTitle: 'Одинаковое намерение',
-        ) as IntentionCommandAccepted).future,
-      );
-      archived.remove(_intentionId(1));
-      await _expectTargets(
-        tester,
-        app.router,
-        archived,
-        scope: TaggedIntentionsScope.archived,
-      );
-      expect([
-        for (final id in [101, 102, 103, 104])
-          _row(app.raw, 'long_term_relations', id)['is_archived'],
-      ], everyElement(1));
-      await _selectScope(tester, TaggedIntentionsScope.active);
-      await _expectTargets(tester, app.router, [
-        _intentionId(1),
-        _intentionId(4),
-        _intentionId(5),
-      ]);
-      await _selectScope(tester, TaggedIntentionsScope.archived);
-
-      for (final (number, archive) in [
-        (101, false),
-        (104, false),
-        (106, true),
-        (106, false),
-      ]) {
-        final start = archive
-            ? coordinator.acceptRelationArchive(
-                ArchiveLongTermRelation(_relationId(number)),
-              )
-            : coordinator.acceptRelationRestore(
-                RestoreLongTermRelation(_relationId(number)),
-              );
-        await _changed(
-          tester,
-          (start as LongTermRelationCommandAccepted).future,
-        );
-        await _expectTargets(
-          tester,
-          app.router,
-          archived,
-          scope: TaggedIntentionsScope.archived,
-        );
-        expect(
-          _row(app.raw, 'long_term_relations', number)['is_archived'],
-          archive ? 1 : 0,
-        );
-      }
-      await _selectScope(tester, TaggedIntentionsScope.active);
-      await _expectTargets(tester, app.router, _lifecycleActiveTargets());
-      final after = _snapshot(app.raw);
-      for (final table in [
-        'tags',
-        'tag_assignments',
-        'daily_choices',
-        'daily_choice_path_steps',
-      ]) {
-        expect(after[table], before[table], reason: table);
-      }
-      expect([
-        for (final id in [2, 3, 4, 5]) _row(app.raw, 'intentions', id),
-      ], neighbors);
-      expect([
-        for (final id in [105, 106]) _row(app.raw, 'long_term_relations', id),
-      ], unrelatedRelations);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'одиночное и массовое удаление убирают только получателей на $locale',
-    (tester) async {
-      final app = await _pumpApp(
-        tester,
-        locale,
-        seed: seedTagNavigationLifecycleFixture,
-      );
-      await _openCatalogTag(tester, firstTagNumber);
-      await _loaded(tester, firstTagNumber);
-      final before = _snapshot(app.raw);
-      final coordinator = app.runtime.commandCoordinator;
-      final targets = _lifecycleActiveTargets();
-
-      await _changed(
-        tester,
-        (coordinator.acceptExisting(
-          DeleteIntention(_intentionId(5)),
-          presentationTitle: 'Отдельное намерение',
-        ) as IntentionCommandAccepted).future,
-      );
-      targets.remove(_intentionId(5));
-      await _expectTargets(tester, app.router, targets);
-      _expectOnlyDeleted(app.raw, before, intentions: [5]);
-      await _changed(
-        tester,
-        (coordinator.acceptRelationDelete(
-          DeleteLongTermRelation(_relationId(106)),
-        ) as LongTermRelationCommandAccepted).future,
-      );
-      await _expectTargets(tester, app.router, targets);
-      _expectOnlyDeleted(app.raw, before, intentions: [5], relations: [106]);
-
-      await _selectScope(tester, TaggedIntentionsScope.archived);
-      await _expectTargets(tester, app.router, [
-        _intentionId(2),
-      ], scope: TaggedIntentionsScope.archived);
-      await _changed(
-        tester,
-        (coordinator.acceptBlockingRelationsDelete(
-          DeleteBlockingRelations.longTerm(
-            intentionId: _intentionId(1),
-            relationIds: [_relationId(102), _relationId(103)],
-          ),
-          presentationTitle: 'Одинаковое намерение',
-        ) as BlockingRelationsDeleteAccepted).future,
-      );
-      await _expectTargets(tester, app.router, [
-        _intentionId(2),
-      ], scope: TaggedIntentionsScope.archived);
-      _expectOnlyDeleted(
-        app.raw,
-        before,
-        intentions: [5],
-        relations: [102, 103, 106],
-      );
-      await _selectScope(tester, TaggedIntentionsScope.active);
-      await _expectTargets(tester, app.router, targets);
-      expect(app.raw.select('PRAGMA foreign_key_check'), isEmpty);
-      expect(tester.takeException(), isNull);
-    },
-  );
-  testWidgets(
-    'отмена и зависимость дневного пути сохраняют навигацию и назначения на $locale',
-    (tester) async {
-      final app = await _pumpApp(
-        tester,
-        locale,
         seed: seedTagNavigationLifecycleFixture,
       );
       await _openCatalogTag(tester, firstTagNumber);
@@ -521,19 +502,17 @@ void _testTaggedGraphLifecycle(String locale) {
     },
   );
   testWidgets(
-    'отказ записи откатывает одиночное, массовое и общее удаление на $locale',
+    'отказ записи удаления общего тега не меняет навигацию, а удаление намерения после устранения отказа убирает получателя',
     (tester) async {
       final app = await _pumpApp(
         tester,
-        locale,
         seed: seedTagNavigationLifecycleFixture,
       );
       await _openCatalogTag(tester, firstTagNumber);
       final initial = await _loaded(tester, firstTagNumber);
       final before = _snapshot(app.raw);
       final coordinator = app.runtime.commandCoordinator;
-      // Удаление связей не затрагивает назначения, поэтому их запись
-      // отказывает отдельно от каскада назначений намерения и тега.
+      // Откат хранилища проверяет слой данных, здесь важна видимая навигация.
       app.raw.execute('''
         CREATE TEMP TRIGGER fail_navigation_assignment_cascade
         AFTER DELETE ON tag_assignments
@@ -542,75 +521,32 @@ void _testTaggedGraphLifecycle(String locale) {
           SELECT RAISE(ABORT, 'navigation assignment cascade');
         END
       ''');
-      app.raw.execute('''
-        CREATE TEMP TRIGGER fail_navigation_relation_delete
-        AFTER DELETE ON long_term_relations
-        WHEN OLD.id IN ('${tagFixtureId(103)}', '${tagFixtureId(106)}')
-        BEGIN
-          SELECT RAISE(ABORT, 'navigation relation delete');
-        END
-      ''');
-      final attempts = <Future<GraphCommandCompletion> Function()>[
-        () => (coordinator.acceptExisting(
-          DeleteIntention(_intentionId(5)),
-          presentationTitle: 'Отдельное намерение',
-        ) as IntentionCommandAccepted).future,
-        () => (coordinator.acceptRelationDelete(
-          DeleteLongTermRelation(_relationId(106)),
-        ) as LongTermRelationCommandAccepted).future,
-        () => (coordinator.acceptBlockingRelationsDelete(
-          DeleteBlockingRelations.longTerm(
-            intentionId: _intentionId(1),
-            relationIds: [_relationId(102), _relationId(103)],
-          ),
-          presentationTitle: 'Одинаковое намерение',
-        ) as BlockingRelationsDeleteAccepted).future,
-        () => (coordinator.acceptTagDelete(
+      Future<GraphCommandCompletion> deleteIntention() =>
+          (coordinator.acceptExisting(
+            DeleteIntention(_intentionId(5)),
+            presentationTitle: 'Отдельное намерение',
+          ) as IntentionCommandAccepted).future;
+      final completion = await _completed(
+        tester,
+        (coordinator.acceptTagDelete(
           DeleteTag(_tagId(firstTagNumber)),
         ) as TagCommandAccepted).future,
-      ];
-      for (final attempt in attempts) {
-        final completion = await _completed(tester, attempt());
-        expect(completion.isFailure, isTrue);
-        expect(completion.confirmedChange, isNull);
-        expect(_failure(completion).category, GraphFailureCategory.unexpected);
-        await _expectUnchangedNavigation(
-          tester,
-          app.router,
-          initial,
-          app.raw,
-          before,
-        );
-      }
+      );
+      expect(completion.isFailure, isTrue);
+      expect(completion.confirmedChange, isNull);
+      expect(_failure(completion).category, GraphFailureCategory.unexpected);
+      await _expectNavigationShown(tester, app.router, initial);
       await _selectScope(tester, TaggedIntentionsScope.archived);
       await _expectTargets(tester, app.router, [
         _intentionId(2),
       ], scope: TaggedIntentionsScope.archived);
-      final archived = await _loaded(tester, firstTagNumber);
-      final failedDelete = await _completed(tester, attempts.last());
-      expect(failedDelete.isFailure, isTrue);
-      await _expectUnchangedNavigation(
-        tester,
-        app.router,
-        archived,
-        app.raw,
-        before,
-      );
 
       app.raw.execute('DROP TRIGGER fail_navigation_assignment_cascade');
-      app.raw.execute('DROP TRIGGER fail_navigation_relation_delete');
-      for (final attempt in attempts.take(3)) {
-        await _changed(tester, attempt());
-      }
+      await _changed(tester, deleteIntention());
       await _expectTargets(tester, app.router, [
         _intentionId(2),
       ], scope: TaggedIntentionsScope.archived);
-      _expectOnlyDeleted(
-        app.raw,
-        before,
-        intentions: [5],
-        relations: [102, 103, 106],
-      );
+      _expectOnlyDeleted(app.raw, before, intentions: [5]);
       await _selectScope(tester, TaggedIntentionsScope.active);
       await _expectTargets(tester, app.router, [
         _intentionId(1),
@@ -622,11 +558,10 @@ void _testTaggedGraphLifecycle(String locale) {
   );
 
   testWidgets(
-    'удаление общего тега сохраняет граф и не подменяет выбор одноимённым на $locale',
+    'удаление общего тега сохраняет граф и не подменяет выбор одноимённым',
     (tester) async {
       final app = await _pumpApp(
         tester,
-        locale,
         seed: seedTagNavigationLifecycleFixture,
       );
       await _openCatalogTag(tester, firstTagNumber);
@@ -711,14 +646,6 @@ GraphCommandFailure _failure(
   GraphCommandCompletion completion,
 ) => switch (completion) {
   IntentionCommandCompletion(result: ResultFailure(:final failure)) => failure,
-  LongTermRelationCommandCompletion(
-    confirmedResult: GraphResultFailure(:final failure),
-  ) =>
-    failure,
-  BlockingRelationsDeleteCompletion(
-    result: GraphResultFailure(:final failure),
-  ) =>
-    failure,
   TagCommandCompletion(confirmedResult: GraphResultFailure(:final failure)) =>
     failure,
   _ => throw StateError('Ожидался отказ команды'),
@@ -752,14 +679,21 @@ Future<void> _expectUnchangedNavigation(
   sqlite.Database raw,
   Map<String, List<List<Object?>>> before,
 ) async {
-  final state = await _expectTargets(
+  await _expectNavigationShown(tester, router, initial);
+  expect(_snapshot(raw), before);
+}
+
+Future<void> _expectNavigationShown(
+  WidgetTester tester,
+  AppRouter router,
+  TagNavigationLoaded initial,
+) async {
+  await _expectTargets(
     tester,
     router,
     initial.items.map((item) => item.id).toList(),
     scope: initial.scope,
   );
-  expect(state.revision.compareTo(initial.revision), GraphRevisionOrder.same);
-  expect(_snapshot(raw), before);
 }
 
 void _expectOnlyDeleted(

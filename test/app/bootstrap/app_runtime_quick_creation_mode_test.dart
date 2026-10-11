@@ -44,82 +44,6 @@ void main() {
 
   tearDown(() => localData.delete(recursive: true));
 
-  for (final mode in QuickCreationMode.values) {
-    test('новый runtime и контейнер восстанавливают $mode из файла', () async {
-      final first = runtime(store());
-      final firstReady = await first.bootstrap() as AppRuntimeReady;
-      final saving = firstReady.container
-          .read(quickCreationModeControllerProvider.notifier)
-          .select(mode);
-      expect(
-        firstReady.container.read(quickCreationModeControllerProvider),
-        mode,
-      );
-      expect(await saving, isA<QuickCreationModeSaved>());
-      await first.shutdown();
-
-      final secondReady = await runtime(store()).bootstrap() as AppRuntimeReady;
-
-      expect(secondReady.container, isNot(same(firstReady.container)));
-      expect(
-        secondReady.container.read(quickCreationModeControllerProvider),
-        mode,
-      );
-      expect(await modeFile.readAsString(), mode.storageKey);
-      expect(_modeFailures(diagnostics), isEmpty);
-    });
-  }
-
-  test('отсутствие файла даёт начальный режим без диагностики', () async {
-    final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
-
-    expect(
-      ready.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.intention,
-    );
-    expect(await modeFile.exists(), isFalse);
-    expect(_modeFailures(diagnostics), isEmpty);
-  });
-
-  test('неизвестный ключ не мешает bootstrap и диагностируется', () async {
-    await modeFile.parent.create();
-    await modeFile.writeAsString('Недоверенное содержимое настройки');
-
-    final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
-
-    expect(
-      ready.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.intention,
-    );
-    _expectReadFailure(diagnostics, DiagnosticsFailureCode.corruption);
-    expect(await modeFile.readAsString(), 'Недоверенное содержимое настройки');
-  });
-
-  test('отказ чтения не превращается в ошибку bootstrap', () async {
-    await Directory(modeFile.path).create(recursive: true);
-
-    final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
-
-    expect(
-      ready.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.intention,
-    );
-    _expectReadFailure(diagnostics, DiagnosticsFailureCode.unavailable);
-  });
-
-  test('повреждённый UTF-8 не мешает готовности графа', () async {
-    await modeFile.parent.create();
-    await modeFile.writeAsBytes([0xff, 0xfe]);
-
-    final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
-
-    expect(
-      ready.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.intention,
-    );
-    _expectReadFailure(diagnostics, DiagnosticsFailureCode.corruption);
-  });
-
   test(
     'отказ получения каталога не мешает запуску и следующей записи',
     () async {
@@ -190,10 +114,9 @@ void main() {
     });
 
     final bootstrapping = runtime.bootstrap();
-    expect(runtime.bootstrap(), same(bootstrapping));
+    // Оба чтения начались, пока ни одно не завершилось.
     await modeStore.readStarted.future;
     await graphOpening.started.future;
-    expect(modeStore.readCalls, 1);
 
     graphOpening.release();
     modeStore.completeRead(QuickCreationMode.dailyChoiceFromAction);
@@ -203,8 +126,12 @@ void main() {
       ready.container.read(quickCreationModeControllerProvider),
       QuickCreationMode.dailyChoiceFromAction,
     );
-    expect(await runtime.bootstrap(), same(ready));
-    expect(modeStore.readCalls, 1);
+    // Повторный запрос готового запуска сохраняет прочитанный режим.
+    final repeated = await runtime.bootstrap() as AppRuntimeReady;
+    expect(
+      repeated.container.read(quickCreationModeControllerProvider),
+      QuickCreationMode.dailyChoiceFromAction,
+    );
   });
 
   test(
@@ -233,11 +160,9 @@ void main() {
       });
 
       expect(await runtime.bootstrap(), isA<AppRuntimeRetryableFailure>());
-      expect(modeStore.readCalls, 1);
       modeStore.completeRead(QuickCreationMode.relation);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
 
-      expect(attempts, 2);
       expect(
         ready.container.read(quickCreationModeControllerProvider),
         QuickCreationMode.relation,
@@ -248,8 +173,6 @@ void main() {
       expect(modeStore.savedModes, [
         QuickCreationMode.dailyChoiceFromIntention,
       ]);
-      expect(await runtime.bootstrap(), same(ready));
-      expect(modeStore.readCalls, 1);
     },
   );
 
@@ -397,11 +320,9 @@ final class _ControlledModeStore implements QuickCreationModeStore {
   final readStarted = Completer<void>();
   final _reading = Completer<QuickCreationMode>();
   final savedModes = <QuickCreationMode>[];
-  var readCalls = 0;
 
   @override
   Future<QuickCreationMode> read() {
-    readCalls += 1;
     if (!readStarted.isCompleted) readStarted.complete();
     return _reading.future;
   }

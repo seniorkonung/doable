@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -18,11 +16,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'large_blocking_relations_fixture.dart';
-import 'daily_choice_durability_fixture.dart';
-import 'intention_creation_durability_fixture.dart';
-import 'tag_storage_fixture.dart';
-
 const _operationEnvironment = 'DOABLE_GRAPH_OPERATION';
 const _stopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
 const _databasePathEnvironment = 'DOABLE_GRAPH_DATABASE_PATH';
@@ -34,10 +27,6 @@ const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
 const _secondNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000903';
 const _unrelatedIdValue = '018f0b5d-6b2e-7c80-8000-000000000904';
 const _workerRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000954';
-
-/// Намерение фикстуры тегов, которое отмечает и с которого снимает отметку
-/// процесс.
-const _favoriteIntentionNumber = 3;
 
 void main() {
   test(
@@ -75,29 +64,6 @@ void main() {
           ),
         );
         final result = switch (operation) {
-          _GraphOperation.dailyCreate => await durabilityRepository(
-            database,
-            choiceNumber: 203,
-            firstStepNumber: 311,
-          ).execute(durabilityCreate()),
-          _GraphOperation.dailyBottomCreate => await durabilityRepository(
-            database,
-            choiceNumber: 203,
-            firstStepNumber: 311,
-          ).execute(durabilityBottomCreate()),
-          _GraphOperation.dailyUpdate => await repository.execute(
-            durabilityUpdate(201),
-          ),
-          _GraphOperation.dailyReplace => await durabilityRepository(
-            database,
-            firstStepNumber: 313,
-          ).execute(durabilityReplace(201)),
-          _GraphOperation.dailyDelete => await repository.execute(
-            DeleteDailyChoice(durabilityChoice(201)),
-          ),
-          _GraphOperation.dailyMixedDelete => await repository.execute(
-            durabilityMixedDelete(201),
-          ),
           _GraphOperation.create => await repository.execute(
             CreateLongTermRelation(
               sourceIntentionId: _intentionId(_sourceIdValue),
@@ -141,25 +107,6 @@ void main() {
           _GraphOperation.delete => await repository.execute(
             DeleteLongTermRelation(_relationId(_workerRelationIdValue)),
           ),
-          _GraphOperation.bulkDelete => await repository.execute(
-            DeleteBlockingRelations.longTerm(
-              intentionId: _intentionId(_sourceIdValue),
-              relationIds: LargeBlockingRelationsFixture.selectedIds,
-            ),
-          ),
-          _GraphOperation.favoriteMark => await repository.execute(
-            MarkIntentionFavorite(
-              _intentionId(tagFixtureId(_favoriteIntentionNumber)),
-            ),
-          ),
-          _GraphOperation.favoriteUnmark => await repository.execute(
-            UnmarkIntentionFavorite(
-              _intentionId(tagFixtureId(_favoriteIntentionNumber)),
-            ),
-          ),
-          _GraphOperation.intentionFullCreate =>
-            await creationDurabilityRepository(database)
-                .execute(creationDurabilityCommand()),
         };
         final succeeded = switch (operation) {
           _GraphOperation.create ||
@@ -167,17 +114,7 @@ void main() {
           _GraphOperation.archive ||
           _GraphOperation.restore ||
           _GraphOperation.delete => result is GraphCommandSucceeded,
-          _GraphOperation.bulkDelete => result is GraphCommandSucceeded,
-          _GraphOperation.dailyCreate ||
-          _GraphOperation.dailyBottomCreate ||
-          _GraphOperation.dailyUpdate ||
-          _GraphOperation.dailyReplace ||
-          _GraphOperation.dailyDelete ||
-          _GraphOperation.dailyMixedDelete => result is GraphCommandSucceeded,
-          _GraphOperation.cascade ||
-          _GraphOperation.favoriteMark ||
-          _GraphOperation.favoriteUnmark ||
-          _GraphOperation.intentionFullCreate => result is ResultSuccess,
+          _GraphOperation.cascade => result is ResultSuccess,
         };
         if (!succeeded) {
           throw StateError(
@@ -201,57 +138,11 @@ final class _GraphOperationStopObserver
 
   final _GraphOperation operation;
   final _GraphStopPoint stopPoint;
-  var _stepInserts = 0;
-
-  /// Таблицы вставок полного создания намерения в порядке выполнения.
-  final _creationInserts = <String>[];
-
-  @override
-  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
-    if (operation == _GraphOperation.bulkDelete &&
-        stopPoint == _GraphStopPoint.beforeDelete &&
-        _isBulkDelete(statement)) {
-      await _reportReadyAndWait();
-    }
-  }
 
   @override
   Future<void> afterStatement(LocalDatabaseSqlStatement statement) async {
-    if (operation == _GraphOperation.bulkDelete &&
-        stopPoint == _GraphStopPoint.duringDelete &&
-        _isBulkDelete(statement)) {
-      await _reportReadyAndWait();
-    }
     if (stopPoint != _GraphStopPoint.beforeCommit) return;
-    if (statement.operation == LocalDatabaseSqlOperation.insert &&
-        statement.statements.any(
-          (sql) => sql.contains('INSERT INTO daily_choice_path_steps'),
-        )) {
-      _stepInserts++;
-    }
-    if (operation == _GraphOperation.intentionFullCreate &&
-        statement.operation == LocalDatabaseSqlOperation.insert) {
-      _creationInserts.add(_insertedTable(statement));
-    }
     final matches = switch (operation) {
-      _GraphOperation.dailyCreate || _GraphOperation.dailyBottomCreate =>
-        _stepInserts == 2 &&
-            statement.operation == LocalDatabaseSqlOperation.insert &&
-            statement.statements.any(
-              (sql) => sql.contains('INSERT INTO daily_choice_path_steps'),
-            ),
-      _GraphOperation.dailyUpdate =>
-        statement.operation == LocalDatabaseSqlOperation.update &&
-            statement.statements.any((sql) => sql.contains('daily_choices')),
-      _GraphOperation.dailyReplace =>
-        _stepInserts == 1 &&
-            statement.operation == LocalDatabaseSqlOperation.insert &&
-            statement.statements.any(
-              (sql) => sql.contains('INSERT INTO daily_choice_path_steps'),
-            ),
-      _GraphOperation.dailyDelete || _GraphOperation.dailyMixedDelete =>
-        statement.operation == LocalDatabaseSqlOperation.delete &&
-            statement.statements.any((sql) => sql.contains('daily_choices')),
       _GraphOperation.create =>
         statement.operation == LocalDatabaseSqlOperation.insert &&
             statement.statements.any(
@@ -274,52 +165,10 @@ final class _GraphOperationStopObserver
             statement.statements.any(
               (sql) => sql.contains('long_term_relations'),
             ),
-      _GraphOperation.bulkDelete => false,
-      _GraphOperation.favoriteMark => statement.statements.any(
-        (sql) => sql.contains('INSERT INTO favorite_intentions'),
-      ),
-      _GraphOperation.favoriteUnmark => statement.statements.any(
-        (sql) => sql.contains('DELETE FROM favorite_intentions'),
-      ),
-      _GraphOperation.intentionFullCreate => _wroteWholeCreation(),
     };
     if (matches) await _reportReadyAndWait();
   }
-
-  /// Транзакция полного создания уже содержит намерение, назначение каждого
-  /// выбранного тега и место избранного, но ещё не подтверждена. Иной
-  /// состав записей к месту избранного прерывает операцию без сигнала
-  /// готовности.
-  bool _wroteWholeCreation() {
-    if (_creationInserts.lastOrNull != 'favorite_intentions') return false;
-    final expected = [
-      'intentions',
-      for (final _ in creationDurabilityCommand().tagIds) 'tag_assignments',
-      'favorite_intentions',
-    ];
-    if (_creationInserts.join(',') != expected.join(',')) {
-      throw StateError(
-        'Записи полного создания до места избранного: $_creationInserts.',
-      );
-    }
-    return true;
-  }
 }
-
-String _insertedTable(LocalDatabaseSqlStatement statement) {
-  final match = RegExp(
-    r'^\s*INSERT\s+INTO\s+"?(\w+)"?',
-    caseSensitive: false,
-  ).firstMatch(statement.statements.single);
-  return match?.group(1) ??
-      (throw StateError('Не удалось определить таблицу вставки.'));
-}
-
-bool _isBulkDelete(LocalDatabaseSqlStatement statement) =>
-    statement.operation == LocalDatabaseSqlOperation.update &&
-    statement.statements.any(
-      (sql) => sql.startsWith('DELETE FROM long_term_relations WHERE id IN'),
-    );
 
 Future<Never> _reportReadyAndWait() async {
   stdout.writeln('$_readyMarker:$pid');
@@ -329,54 +178,30 @@ Future<Never> _reportReadyAndWait() async {
 }
 
 enum _GraphOperation {
-  dailyCreate,
-  dailyBottomCreate,
-  dailyUpdate,
-  dailyReplace,
-  dailyDelete,
-  dailyMixedDelete,
   create,
   cascade,
   update,
   archive,
   restore,
-  delete,
-  bulkDelete,
-  favoriteMark,
-  favoriteUnmark,
-  intentionFullCreate;
+  delete;
 
   static _GraphOperation parse(String? value) => switch (value) {
-    'daily_create' => dailyCreate,
-    'daily_bottom_create' => dailyBottomCreate,
-    'daily_update' => dailyUpdate,
-    'daily_replace' => dailyReplace,
-    'daily_delete' => dailyDelete,
-    'daily_mixed_delete' => dailyMixedDelete,
     'create' => create,
     'cascade' => cascade,
     'update' => update,
     'archive' => archive,
     'restore' => restore,
     'delete' => delete,
-    'bulk_delete' => bulkDelete,
-    'favorite_mark' => favoriteMark,
-    'favorite_unmark' => favoriteUnmark,
-    'intention_full_create' => intentionFullCreate,
     _ => throw StateError('Неизвестная операция графа: $value.'),
   };
 }
 
 enum _GraphStopPoint {
   beforeCommit,
-  beforeDelete,
-  duringDelete,
   afterCommit;
 
   static _GraphStopPoint parse(String? value) => switch (value) {
     'before_commit' => beforeCommit,
-    'before_delete' => beforeDelete,
-    'during_delete' => duringDelete,
     'after_commit' => afterCommit,
     _ => throw StateError('Неизвестная точка остановки операции: $value.'),
   };

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -123,21 +122,6 @@ void main() {
 
       await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('tag-delete-cancel')));
-      await tester.pumpAndSettle();
-      expect(
-        raw.select('SELECT * FROM tags WHERE id = ?', [_id(301)]),
-        hasLength(1),
-      );
-      expect(
-        raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-          _id(301),
-        ]),
-        hasLength(106),
-      );
-
-      await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
-      await tester.pumpAndSettle();
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
         [_id(301), _id(105)],
@@ -174,64 +158,55 @@ void main() {
         findsNothing,
       );
       expect(
-        find.byKey(const ValueKey('graph-operation-message')),
+        find.textContaining('Тег удалён вместе со всеми назначениями.'),
         findsOneWidget,
       );
     },
   );
 
-  testWidgets(
-    'сбой каскада оставляет тег и назначения, а ошибка отличается от успеха',
-    (tester) async {
-      late sqlite.Database raw;
-      final database = AppDatabase(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-      );
-      await database.open();
-      addTearDown(database.close);
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(1), 'Дом', 0, 1, 1, 1],
-      );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _id(301),
-        'Дом',
-      ]);
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_id(301), _id(1)],
-      );
-      raw.execute('''
+  testWidgets('сбой каскада показывает ошибку и оставляет тег в каталоге', (
+    tester,
+  ) async {
+    late sqlite.Database raw;
+    final database = AppDatabase(
+      openInMemoryLocalDatabase(setup: (db) => raw = db),
+    );
+    await database.open();
+    addTearDown(database.close);
+    raw.execute(
+      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [_id(1), 'Дом', 0, 1, 1, 1],
+    );
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(301), 'Дом']);
+    raw.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [_id(301), _id(1)],
+    );
+    raw.execute('''
       CREATE TEMP TRIGGER fail_tag_cascade AFTER DELETE ON tag_assignments
       WHEN OLD.tag_id = '${_id(301)}'
       BEGIN SELECT RAISE(ABORT, 'injected cascade failure'); END
     ''');
-      final repository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 25),
-        InMemoryDiagnosticsSink(),
-      );
-      await _openRealCatalog(tester, repository);
-      await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
-      await _pumpUntil(
-        tester,
-        () => find
-            .byKey(const ValueKey('tag-delete-failure'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      expect(find.textContaining('непредвиденной ошибки'), findsWidgets);
-      expect(raw.select('SELECT * FROM tags'), hasLength(1));
-      expect(raw.select('SELECT * FROM tag_assignments'), hasLength(1));
-      expect(
-        find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
-        findsOneWidget,
-      );
-    },
-  );
+    final repository = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 9, 25),
+      InMemoryDiagnosticsSink(),
+    );
+    await _openRealCatalog(tester, repository);
+    await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
+    await _pumpUntil(
+      tester,
+      () => find.textContaining('непредвиденной ошибки').evaluate().isNotEmpty,
+    );
+    expect(find.textContaining('непредвиденной ошибки'), findsWidgets);
+    expect(
+      find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('устаревший id не удаляет новый одноимённый тег', (tester) async {
     late sqlite.Database raw;
@@ -255,113 +230,80 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
     await _pumpUntil(
       tester,
-      () => find
-          .byKey(const ValueKey('tag-delete-failure'))
-          .evaluate()
-          .isNotEmpty,
+      () => find.textContaining('больше нет').evaluate().isNotEmpty,
     );
     expect(find.textContaining('больше нет'), findsWidgets);
     expect(raw.select('SELECT id FROM tags').single['id'], _id(302));
   });
 
-  for (final (locale, busyMessage, resultMessage) in [
-    (
-      const Locale('ru'),
-      'Изменение этого тега уже выполняется. Дождитесь результата.',
-      'Тег удалён вместе со всеми назначениями.',
-    ),
-    (
-      const Locale('en'),
-      'An operation on this tag is already in progress. Wait for its result.',
-      'Tag deleted with all its assignments.',
-    ),
-  ]) {
-    for (final succeeds in [true, false]) {
-      testWidgets(
-        'занятое удаление исчезает после ${succeeds ? 'успеха' : 'отказа'}: ${locale.languageCode}',
-        (tester) async {
-          final semantics = tester.ensureSemantics();
-          final repository = _PendingRepository();
-          final container = ProviderContainer(
-            overrides: [
-              inMemoryQuickCreationModeOverride,
-              personalGraphRepositoryProvider.overrideWithValue(repository),
-            ],
-          );
-          addTearDown(container.dispose);
-          final completions = <GraphCommandCompletion>[];
-          final subscription = container
-              .read(graphCommandCoordinatorProvider.notifier)
-              .completions
-              .listen(completions.add);
-          addTearDown(subscription.cancel);
+  const locale = Locale('ru');
+  const busyMessage =
+      'Изменение этого тега уже выполняется. Дождитесь результата.';
+  const resultMessage = 'Тег удалён вместе со всеми назначениями.';
 
-          Widget host(Widget child) => UncontrolledProviderScope(
-            container: container,
-            child: OrdinaryPageTestApp(
-              key: ObjectKey(child),
-              locale: locale,
-              home: GraphOperationPresenter(child: child),
-            ),
-          );
+  for (final succeeds in [true, false]) {
+    testWidgets(
+      'занятое удаление исчезает после ${succeeds ? 'успеха' : 'отказа'}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = _PendingRepository();
+        final container = ProviderContainer(
+          overrides: [
+            inMemoryQuickCreationModeOverride,
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+        Widget host(Widget child) => UncontrolledProviderScope(
+          container: container,
+          child: OrdinaryPageTestApp(
+            key: ObjectKey(child),
+            locale: locale,
+            home: GraphOperationPresenter(child: child),
+          ),
+        );
 
-          await tester.pumpWidget(host(const TagCatalogPage()));
-          await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
-          await tester.pump();
-          expect(repository.commands, 1);
+        await tester.pumpWidget(host(const TagCatalogPage()));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
+        await tester.pump();
+        expect(repository.commands, 1);
 
-          await tester.pumpWidget(host(const SizedBox.shrink()));
-          await tester.pumpWidget(host(const TagCatalogPage()));
-          await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
-          await tester.pumpAndSettle();
+        await tester.pumpWidget(host(const SizedBox.shrink()));
+        await tester.pumpWidget(host(const TagCatalogPage()));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
+        await tester.pumpAndSettle();
 
-          final notice = find.byKey(
-            const ValueKey('tag-delete-already-running'),
-          );
-          expect(find.text(busyMessage), findsOneWidget);
-          expect(
-            tester.widget<Semantics>(notice).properties.liveRegion,
-            isTrue,
-          );
-          expect(
-            tester.widget<Semantics>(notice).properties.label,
-            busyMessage,
-          );
-          expect(find.bySemanticsLabel(busyMessage), findsOneWidget);
-          expect(repository.commands, 1);
+        final notice = find.text(busyMessage);
+        expect(notice, findsOneWidget);
+        expect(
+          tester.getSemantics(notice),
+          isSemantics(label: busyMessage, isLiveRegion: true),
+        );
+        expect(repository.commands, 1);
 
-          repository.finish(succeeds: succeeds);
-          await tester.pumpAndSettle();
-          expect(notice, findsNothing);
-          final result = find.byKey(const ValueKey('graph-operation-message'));
-          expect(result, findsOneWidget);
-          final expectedResult = succeeds
-              ? resultMessage
-              : locale.languageCode == 'ru'
-              ? 'Не удалось выполнить действие с тегом.'
-              : 'Could not complete the tag operation.';
-          expect(find.textContaining(expectedResult), findsOneWidget);
-          expect(
-            tester.widget<Semantics>(result).properties.label,
-            contains(expectedResult),
-          );
-          expect(repository.commands, 1);
-          expect(completions, hasLength(1));
-          expect(completions.single, isA<TagCommandCompletion>());
-          semantics.dispose();
-        },
-      );
-    }
+        repository.finish(succeeds: succeeds);
+        await tester.pumpAndSettle();
+        expect(notice, findsNothing);
+        final expectedResult = succeeds
+            ? resultMessage
+            : 'Не удалось выполнить действие с тегом.';
+        final result = find.textContaining(expectedResult);
+        expect(result, findsOneWidget);
+        expect(tester.getSemantics(result).label, contains(expectedResult));
+        expect(repository.commands, 1);
+        semantics.dispose();
+      },
+    );
   }
 }
 

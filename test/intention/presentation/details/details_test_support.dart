@@ -129,7 +129,6 @@ final class ControlledDetailsRepository
   /// Страница подробностей и соседство наблюдают одно намерение параллельно.
   bool shareSecondWatch;
 
-  final detailIds = <IntentionId>[];
   final detailRequests = <ControlledDetailRequest>[];
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
@@ -240,7 +239,6 @@ final class ControlledDetailsRepository
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) {
-    detailIds.add(id);
     _watchCallCount += 1;
     if (shareSecondWatch && _watchCallCount == 2 && detailRequests.isNotEmpty) {
       return detailRequests.first.controller.stream;

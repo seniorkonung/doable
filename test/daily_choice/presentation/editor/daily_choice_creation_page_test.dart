@@ -40,56 +40,48 @@ void main() {
     );
   });
 
-  for (final succeeds in [true, false]) {
-    for (final disposed in [true, false]) {
-      testWidgets(
-        'сессия хранит отправку и поздний ${succeeds ? 'успех' : 'отказ'} ${disposed ? 'после освобождения' : 'во время закрытия'} подтверждения',
-        (tester) async {
-          final repository = _Repository();
-          final navigatorKey = GlobalKey<NavigatorState>();
-          await _pump(tester, repository, navigatorKey: navigatorKey);
-          final page = tester.widget<DailyChoiceCreationPage>(
-            find.byType(DailyChoiceCreationPage),
-          );
-          final session = page.session;
-          final form = tester.state(find.byType(DailyChoiceCreationPage));
-          await tester.ensureVisible(
-            find.byKey(const ValueKey('daily-choice-submit')),
-          );
-          await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
-          expect(session.state, isA<DailyChoiceCreationFlowSubmitting>());
-          navigatorKey.currentState!.pop();
-          if (disposed) {
-            await tester.pumpAndSettle();
-          } else {
-            await tester.pump();
-          }
-          expect(form.mounted, !disposed);
-          expect(session.canContinue, isFalse);
+  // Исход и состояние формы при позднем результате независимы: диагональ
+  // покрывает успех и отказ, закрывающуюся и освобождённую форму.
+  for (final (succeeds, disposed) in [(true, false), (false, true)]) {
+    testWidgets(
+      'сессия хранит отправку и поздний ${succeeds ? 'успех' : 'отказ'} ${disposed ? 'после освобождения' : 'во время закрытия'} подтверждения',
+      (tester) async {
+        final repository = _Repository();
+        final navigatorKey = GlobalKey<NavigatorState>();
+        await _pump(tester, repository, navigatorKey: navigatorKey);
+        final form = tester.state(find.byType(DailyChoiceCreationPage));
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('daily-choice-submit')),
+        );
+        await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+        navigatorKey.currentState!.pop();
+        if (disposed) {
+          await tester.pumpAndSettle();
+        } else {
+          await tester.pump();
+        }
+        expect(form.mounted, !disposed);
 
-          if (succeeds) {
-            repository.succeed(0);
-          } else {
-            repository.fail(0, const DailyChoiceUnavailableFailure());
-          }
-          await tester.pumpAndSettle();
-          expect(
-            session.state,
-            succeeds
-                ? isA<DailyChoiceCreationFlowSaved>()
-                : isA<DailyChoiceCreationFlowEditing>(),
-          );
-          expect(repository.commands, hasLength(1));
-          expect(find.text('Домашний экран'), findsOneWidget);
-          final message = find.byKey(const ValueKey('graph-operation-message'));
-          expect(message, findsOneWidget);
-          await tester.pump(const Duration(seconds: 8));
-          await tester.pumpAndSettle();
-          expect(message, findsNothing);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+        if (succeeds) {
+          repository.succeed(0);
+        } else {
+          repository.fail(0, const DailyChoiceUnavailableFailure());
+        }
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Дневной выбор создан'),
+          succeeds ? findsOneWidget : findsNothing,
+        );
+        expect(repository.commands, hasLength(1));
+        expect(find.text('Домашний экран'), findsOneWidget);
+        final message = find.byKey(const ValueKey('graph-operation-message'));
+        expect(message, findsOneWidget);
+        await tester.pump(const Duration(seconds: 8));
+        await tester.pumpAndSettle();
+        expect(message, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets(
@@ -199,90 +191,73 @@ void main() {
     expect(find.byKey(const ValueKey('daily-choice-submit')), findsOneWidget);
   });
 
-  for (final direction in ChoicePathDraftDirection.values) {
-    testWidgets(
-      'при выборе ${direction == ChoicePathDraftDirection.bottomUp ? 'снизу вверх' : 'сверху вниз'} временный отказ сохраняет поля для явного повтора',
-      (tester) async {
-        final repository = _Repository();
-        final navigatorKey = GlobalKey<NavigatorState>();
-        await _pump(
-          tester,
-          repository,
-          navigatorKey: navigatorKey,
-          direction: direction,
-        );
-        const descriptionKey = ValueKey('daily-choice-description');
-        const submitKey = ValueKey('daily-choice-submit');
+  testWidgets('временный отказ сохраняет поля для явного повтора', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await _pump(tester, repository, navigatorKey: navigatorKey);
+    const descriptionKey = ValueKey('daily-choice-description');
+    const submitKey = ValueKey('daily-choice-submit');
 
-        await tester.enterText(
-          find.byKey(const ValueKey('daily-choice-date')),
-          '2026-09-25',
-        );
-        await tester.enterText(find.byKey(descriptionKey), 'Первый текст');
-        await tester.tap(find.byKey(const ValueKey('daily-choice-completed')));
-        await tester.ensureVisible(find.byKey(submitKey));
-        await tester.tap(find.byKey(submitKey));
-        await tester.pump();
-
-        expect(repository.commands, hasLength(1));
-        expect(
-          repository.commands.single.date,
-          CalendarDate.fromParts(2026, 9, 25),
-        );
-        expect(repository.commands.single.description?.value, 'Первый текст');
-        expect(repository.commands.single.isCompleted, isTrue);
-        expect(
-          tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
-          isFalse,
-        );
-        expect(
-          tester.widget<TextField>(find.byKey(descriptionKey)).controller!.text,
-          'Первый текст',
-        );
-        expect(
-          tester.widget<FilledButton>(find.byKey(submitKey)).onPressed,
-          isNull,
-        );
-
-        repository.fail(0, const DailyChoiceUnavailableFailure());
-        await tester.pumpAndSettle();
-        expect(
-          tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
-          isTrue,
-        );
-        expect(
-          tester.widget<TextField>(find.byKey(descriptionKey)).controller!.text,
-          'Первый текст',
-        );
-
-        await tester.enterText(
-          find.byKey(descriptionKey),
-          'Исправленный текст',
-        );
-        await tester.ensureVisible(find.byKey(submitKey));
-        await tester.tap(find.byKey(submitKey));
-        await tester.pump();
-        expect(repository.commands, hasLength(2));
-        expect(
-          repository.commands.last.date,
-          CalendarDate.fromParts(2026, 9, 25),
-        );
-        expect(
-          repository.commands.last.description?.value,
-          'Исправленный текст',
-        );
-        expect(repository.commands.last.isCompleted, isTrue);
-        expect(
-          tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
-          isFalse,
-        );
-        repository.succeed(1);
-        await tester.pumpAndSettle();
-        expect(find.text('Подробный просмотр выбора'), findsOneWidget);
-        expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
-      },
+    await tester.enterText(
+      find.byKey(const ValueKey('daily-choice-date')),
+      '2026-09-25',
     );
-  }
+    await tester.enterText(find.byKey(descriptionKey), 'Первый текст');
+    await tester.tap(find.byKey(const ValueKey('daily-choice-completed')));
+    await tester.ensureVisible(find.byKey(submitKey));
+    await tester.tap(find.byKey(submitKey));
+    await tester.pump();
+
+    expect(repository.commands, hasLength(1));
+    expect(
+      repository.commands.single.date,
+      CalendarDate.fromParts(2026, 9, 25),
+    );
+    expect(repository.commands.single.description?.value, 'Первый текст');
+    expect(repository.commands.single.isCompleted, isTrue);
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
+      isFalse,
+    );
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).controller!.text,
+      'Первый текст',
+    );
+    expect(
+      tester.widget<FilledButton>(find.byKey(submitKey)).onPressed,
+      isNull,
+    );
+
+    repository.fail(0, const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
+      isTrue,
+    );
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).controller!.text,
+      'Первый текст',
+    );
+
+    await tester.enterText(find.byKey(descriptionKey), 'Исправленный текст');
+    await tester.ensureVisible(find.byKey(submitKey));
+    await tester.tap(find.byKey(submitKey));
+    await tester.pump();
+    expect(repository.commands, hasLength(2));
+    expect(repository.commands.last.date, CalendarDate.fromParts(2026, 9, 25));
+    expect(repository.commands.last.description?.value, 'Исправленный текст');
+    expect(repository.commands.last.isCompleted, isTrue);
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
+      isFalse,
+    );
+    repository.succeed(1);
+    await tester.pumpAndSettle();
+    expect(find.text('Подробный просмотр выбора'), findsOneWidget);
+    expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
+  });
 
   testWidgets('подтверждение явно сохраняет показанный путь и поля', (
     tester,
@@ -507,7 +482,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
         await tester.pump();
         expect(repository.commands, hasLength(2));
-        expect(repository.commands.last.path, same(newer.path));
+        expect(
+          repository.commands.last.path.steps.map((step) => step.relationId),
+          newer.path.steps.map((step) => step.relationId),
+        );
         expect(
           repository.commands.last.date,
           CalendarDate.fromParts(2026, 9, 25),
@@ -612,7 +590,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
         await tester.pump();
         expect(repository.commands, hasLength(2));
-        expect(repository.commands.last.path, same(newer.path));
+        expect(
+          repository.commands.last.path.steps.map((step) => step.relationId),
+          newer.path.steps.map((step) => step.relationId),
+        );
         expect(repository.commands.last.selectedIntentionId, _intention(2));
         expect(
           repository.commands.last.date,

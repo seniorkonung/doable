@@ -63,7 +63,6 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
     required this.itemBuilder,
     this.totalCountLabel,
     this.viewAnchor = IntentionSearchResultsViewAnchor.scrollOffset,
-    this.trailingInset = 0,
     super.key,
   });
 
@@ -88,10 +87,6 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
   final String Function(int totalCount)? totalCountLabel;
 
   final IntentionSearchResultsViewAnchor viewAnchor;
-
-  /// Место после конца выдачи под элемент страницы, лежащий поверх списка:
-  /// конец выдачи и состояние продолжения прокручиваются выше него.
-  final double trailingInset;
 
   /// Показывает ли выдача [catalog] загруженный список, а не состояние вместо
   /// него: загрузку, отказ или пустую выдачу.
@@ -238,7 +233,7 @@ final class _IntentionSearchResultsState
           ListView.builder(
             key: widget.listKey,
             controller: _scrollController,
-            padding: EdgeInsets.only(bottom: widget.trailingInset),
+            padding: EdgeInsets.zero,
             itemCount: results.items.length + (hasContinuationStatus ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == results.items.length) {

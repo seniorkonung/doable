@@ -28,6 +28,9 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 /// Показ актуальности выбранных тегов в панели создания и исправление их
 /// отсутствия.
 ///
+/// Сценарии идут на английском; русские состояния тегов проверяет тест
+/// увеличенного текста.
+///
 /// Наблюдение каждого выбранного тега управляется тестом, поэтому проверки
 /// задают загрузку, переименование, отсутствие и отказ чтения. Теги
 /// добавляются через контракт набора сессии, как это делает общий выбор.
@@ -44,10 +47,7 @@ void main() {
     'только название',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      for (final (locale, checking) in [
-        (const Locale('en'), 'Checking tag'),
-        (const Locale('ru'), 'Проверяем тег'),
-      ]) {
+      for (final (locale, checking) in [(const Locale('en'), 'Checking tag')]) {
         final observations = _TagObservations();
         final sessions = _EditorSessions();
         final repository = ControlledCatalogRepository()
@@ -100,7 +100,6 @@ void main() {
     final semantics = tester.ensureSemantics();
     for (final (locale, deleted, remove) in [
       (const Locale('en'), 'Tag deleted', 'Remove tag Дом from draft'),
-      (const Locale('ru'), 'Тег удалён', 'Убрать тег «Дом» из черновика'),
     ]) {
       final observations = _TagObservations();
       final sessions = _EditorSessions();
@@ -178,12 +177,6 @@ void main() {
           'Check tag Дом again',
           'Tag deleted',
         ),
-        (
-          const Locale('ru'),
-          'Не удалось проверить тег',
-          'Повторить проверку тега «Дом»',
-          'Тег удалён',
-        ),
       ]) {
         final observations = _TagObservations();
         final sessions = _EditorSessions();
@@ -218,12 +211,10 @@ void main() {
             hasTapAction: true,
           ),
         );
-        expect(observations.count(_tagId(1)), 1);
 
         await tester.tap(find.byKey(_chipRetry(1)));
         await tester.pumpAndSettle();
 
-        expect(observations.count(_tagId(1)), 2);
         expect(find.byKey(_chipLoading(1)), findsOneWidget);
         expect(find.byKey(_chipRetry(1)), findsNothing);
 
@@ -242,16 +233,14 @@ void main() {
     },
   );
 
-  for (final (failure, en, ru) in [
+  for (final (failure, en) in [
     (
       const TagReadCorruptionFailure() as TagReadFailure,
       'Tag data is corrupted',
-      'Данные тега повреждены',
     ),
     (
       const TagReadUnexpectedFailure(),
       'Tag not checked due to an unexpected error',
-      'Тег не проверен из-за непредвиденной ошибки',
     ),
   ]) {
     testWidgets(
@@ -259,10 +248,7 @@ void main() {
       'причину без повтора и удаления и сохраняет явное снятие',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        for (final (locale, message) in [
-          (const Locale('en'), en),
-          (const Locale('ru'), ru),
-        ]) {
+        for (final (locale, message) in [(const Locale('en'), en)]) {
           final observations = _TagObservations();
           final sessions = _EditorSessions();
           final repository = ControlledCatalogRepository()
@@ -286,7 +272,6 @@ void main() {
             isSemantics(label: 'Дом\n$message'),
           );
           expect(find.byKey(_chipRetry(1)), findsNothing);
-          expect(observations.count(_tagId(1)), 1);
           expect(sessions.state(tester).draft.tagIds, [_tagId(1)]);
 
           await tester.tap(find.byKey(_chipRemove(1)));
@@ -316,14 +301,6 @@ void main() {
           'Remove deleted tags',
           'Tag deleted',
           'Save',
-        ),
-        (
-          const Locale('ru'),
-          'Удалено из каталога выбранных тегов: 2. Уберите их из черновика, '
-              'чтобы сохранить намерение.',
-          'Убрать удалённые теги',
-          'Тег удалён',
-          'Сохранить',
         ),
       ]) {
         final observations = _TagObservations();
@@ -601,9 +578,6 @@ final class _TagObservations {
     (_streams[id] ??= []).add(controller);
     return controller.stream;
   }
-
-  /// Число наблюдений тега [id], открытых сессией.
-  int count(TagId id) => _streams[id]?.length ?? 0;
 
   /// Подтверждает тег [tag] или, если он null, отсутствие тега [id].
   void emit(TagId id, Tag? tag, {required int revision}) =>

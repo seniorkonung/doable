@@ -259,7 +259,6 @@ String _readFailure(
   TaggedIntentionsReadFailure failure,
 ) => switch (failure) {
   TaggedIntentionsTagNotFound() => l10n.tagNotFound,
-  TaggedIntentionsInvalidCursor() => l10n.tagNavigationInvalidCursor,
   TaggedIntentionsSnapshotExpired() => l10n.tagNavigationSnapshotExpired,
   TaggedIntentionsUnavailableFailure() => l10n.tagNavigationUnavailable,
   TaggedIntentionsCorruptionFailure() => l10n.tagNavigationCorruption,

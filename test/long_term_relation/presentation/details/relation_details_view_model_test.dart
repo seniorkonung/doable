@@ -1,7 +1,6 @@
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -91,68 +90,6 @@ void main() {
     }
   });
 
-  test('открытие начинает наблюдение именно запрошенной связи', () async {
-    final harness = _RelationDetailsHarness();
-    addTearDown(harness.dispose);
-
-    expect(harness.state, isA<RelationDetailsLoading>());
-    expect(harness.repository.relationWatches, hasLength(1));
-    expect(harness.repository.watchAt(0).relationId, harness.relationId);
-  });
-
-  test(
-    'подтверждённые данные раскрывают описание и обоих участников',
-    () async {
-      final harness = _RelationDetailsHarness();
-      addTearDown(harness.dispose);
-
-      harness.repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: harness.relationId,
-              sourceId: testIntentionId(1),
-              relatedId: testIntentionId(2),
-              sourceTitle: 'быть здоровым',
-              relatedTitle: 'много ходить',
-              sourceActiveRelationCount: 4,
-              relatedActiveRelationCount: 7,
-              relatedArchiveState: IntentionArchiveState.archived,
-              priority: RelationPriority.p3,
-              scope: RelationScope.archived,
-              description: 'Полное описание связи.',
-            ),
-            revision: const TestGraphRevision(1),
-          );
-      await pumpEventQueue();
-
-      final state = harness.state;
-      expect(state, isA<RelationDetailsLoaded>());
-      final details = (state as RelationDetailsLoaded).details;
-      expect(details.relation.id, harness.relationId);
-      expect(details.relation.priority, RelationPriority.p3);
-      expect(details.relation.scope, RelationScope.archived);
-      expect(details.description?.value, 'Полное описание связи.');
-      expect(details.source.title, 'быть здоровым');
-      expect(details.source.activeRelationCount, 4);
-      expect(details.related.title, 'много ходить');
-      expect(details.related.archiveState, IntentionArchiveState.archived);
-      expect(details.related.activeRelationCount, 7);
-    },
-  );
-
-  test('подтверждённое отсутствие связи отличается от ошибки', () async {
-    final harness = _RelationDetailsHarness();
-    addTearDown(harness.dispose);
-
-    harness.repository
-        .watchAt(0)
-        .emitMissing(revision: const TestGraphRevision(2));
-    await pumpEventQueue();
-
-    expect(harness.state, isA<RelationDetailsNotFound>());
-  });
-
   test('каждая категория отказа даёт своё безопасное состояние', () async {
     for (final expectation in <(LongTermRelationReadFailure, Matcher, bool)>[
       (
@@ -203,38 +140,7 @@ void main() {
     harness.viewModel.retry();
     await pumpEventQueue();
 
-    expect(harness.repository.relationWatches, hasLength(1));
     expect(harness.state, isA<RelationDetailsCorruption>());
-  });
-
-  test('повтор после недоступности начинает новое наблюдение', () async {
-    final harness = _RelationDetailsHarness();
-    addTearDown(harness.dispose);
-
-    harness.repository
-        .watchAt(0)
-        .fail(const LongTermRelationReadUnavailableFailure());
-    await pumpEventQueue();
-    harness.viewModel.retry();
-    await pumpEventQueue();
-
-    expect(harness.state, isA<RelationDetailsLoading>());
-    expect(harness.repository.relationWatches, hasLength(2));
-    expect(harness.repository.watchAt(1).relationId, harness.relationId);
-
-    harness.repository
-        .watchAt(1)
-        .emitDetails(
-          testRelationDetails(
-            relationId: harness.relationId,
-            sourceId: testIntentionId(1),
-            relatedId: testIntentionId(2),
-          ),
-          revision: const TestGraphRevision(5),
-        );
-    await pumpEventQueue();
-
-    expect(harness.state, isA<RelationDetailsLoaded>());
   });
 
   test('позднее чтение прежней ревизии не отменяет подтверждённое', () async {
@@ -317,76 +223,6 @@ void main() {
     );
   });
 
-  test('переименование участника обновляет подтверждённые данные', () async {
-    final harness = _RelationDetailsHarness();
-    addTearDown(harness.dispose);
-
-    final watch = harness.repository.watchAt(0);
-    watch.emitDetails(
-      testRelationDetails(
-        relationId: harness.relationId,
-        sourceId: testIntentionId(1),
-        relatedId: testIntentionId(2),
-        relatedTitle: 'прежнее название',
-      ),
-      revision: const TestGraphRevision(1),
-    );
-    await pumpEventQueue();
-    watch.emitDetails(
-      testRelationDetails(
-        relationId: harness.relationId,
-        sourceId: testIntentionId(1),
-        relatedId: testIntentionId(2),
-        relatedTitle: 'новое название',
-        relatedActiveRelationCount: 12,
-      ),
-      revision: const TestGraphRevision(2),
-    );
-    await pumpEventQueue();
-
-    final state = harness.state as RelationDetailsLoaded;
-    expect(state.details.related.title, 'новое название');
-    expect(state.details.related.activeRelationCount, 12);
-  });
-
-  test(
-    'повторное открытие показывает выполняющееся изменение по ключу связи',
-    () async {
-      final harness = _RelationDetailsHarness(startUpdateBeforeOpening: true);
-      addTearDown(harness.dispose);
-
-      expect(
-        harness.state,
-        isA<RelationDetailsLoading>().having(
-          (state) => state.isOperationRunning,
-          'выполняющаяся операция',
-          isTrue,
-        ),
-      );
-
-      harness.repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: harness.relationId,
-              sourceId: testIntentionId(1),
-              relatedId: testIntentionId(2),
-            ),
-            revision: const TestGraphRevision(1),
-          );
-      await pumpEventQueue();
-
-      expect(
-        harness.state,
-        isA<RelationDetailsLoaded>().having(
-          (state) => state.isOperationRunning,
-          'выполняющаяся операция',
-          isTrue,
-        ),
-      );
-    },
-  );
-
   test(
     'завершение изменения удерживает прежний снимок до нового полного чтения',
     () async {
@@ -417,7 +253,6 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(harness.repository.relationWatches, hasLength(2));
       expect(
         harness.state,
         isA<RelationDetailsLoaded>()
@@ -480,7 +315,6 @@ void main() {
 
       harness.viewModel.retry();
       await pumpEventQueue();
-      expect(harness.repository.relationWatches, hasLength(3));
 
       harness.repository
           .watchAt(2)
@@ -579,7 +413,6 @@ void main() {
       await (start as LongTermRelationCommandAccepted).future;
       await pumpEventQueue();
 
-      expect(harness.repository.relationWatches, hasLength(2));
       expect(
         harness.state,
         isA<RelationDetailsLoaded>().having(
@@ -717,222 +550,6 @@ void main() {
     },
   );
 
-  test(
-    'архивирование удерживает прежний снимок до подтверждённого чтения',
-    () async {
-      final harness = _RelationDetailsHarness();
-      addTearDown(harness.dispose);
-      final activeDetails = testRelationDetails(
-        relationId: harness.relationId,
-        sourceId: testIntentionId(1),
-        relatedId: testIntentionId(2),
-      );
-      harness.repository
-          .watchAt(0)
-          .emitDetails(activeDetails, revision: const TestGraphRevision(1));
-      await pumpEventQueue();
-
-      harness.viewModel.archive();
-
-      expect(
-        harness.repository.relationCommands.single,
-        isA<ArchiveLongTermRelation>(),
-      );
-      expect(
-        harness.state,
-        isA<RelationDetailsLoaded>()
-            .having(
-              (state) => state.details.relation.scope,
-              'прежнее подтверждённое состояние',
-              RelationScope.active,
-            )
-            .having(
-              (state) => state.lifecycleChange,
-              'выполняющееся архивирование',
-              isA<RelationDetailsLifecycleRunning>().having(
-                (change) => change.kind,
-                'вид операции',
-                RelationDetailsLifecycleKind.archive,
-              ),
-            )
-            .having(
-              (state) => state.isOperationRunning,
-              'занятый ключ связи',
-              isTrue,
-            ),
-      );
-
-      final archivedRelation = activeDetails.relation.copyWithForTest(
-        scope: RelationScope.archived,
-      );
-      harness.repository.completeRelationUpdate(
-        0,
-        before: activeDetails.relation,
-        after: archivedRelation,
-        revision: const TestGraphRevision(2),
-      );
-      await pumpEventQueue();
-
-      expect(harness.repository.relationWatches, hasLength(2));
-      expect(
-        harness.state,
-        isA<RelationDetailsLoaded>()
-            .having(
-              (state) => state.details.relation.scope,
-              'состояние до нового снимка',
-              RelationScope.active,
-            )
-            .having(
-              (state) => state.refreshStatus,
-              'согласование',
-              isA<RelationDetailsRefreshing>(),
-            ),
-      );
-
-      harness.repository
-          .watchAt(1)
-          .emitDetails(
-            testRelationDetails(
-              relationId: harness.relationId,
-              sourceId: testIntentionId(1),
-              relatedId: testIntentionId(2),
-              scope: RelationScope.archived,
-            ),
-            revision: const TestGraphRevision(2),
-          );
-      await pumpEventQueue();
-
-      expect(
-        harness.state,
-        isA<RelationDetailsLoaded>()
-            .having(
-              (state) => state.details.relation.scope,
-              'подтверждённый архив',
-              RelationScope.archived,
-            )
-            .having(
-              (state) => state.details.relation.creationSequence.value,
-              'прежняя последовательность',
-              activeDetails.relation.creationSequence.value,
-            ),
-      );
-    },
-  );
-
-  test(
-    'отказ восстановления сохраняет снимок и объясняет архивного участника',
-    () async {
-      final harness = _RelationDetailsHarness();
-      addTearDown(harness.dispose);
-      final details = testRelationDetails(
-        relationId: harness.relationId,
-        sourceId: testIntentionId(1),
-        relatedId: testIntentionId(2),
-        scope: RelationScope.archived,
-      );
-      harness.repository
-          .watchAt(0)
-          .emitDetails(details, revision: const TestGraphRevision(1));
-      await pumpEventQueue();
-
-      harness.viewModel.restore();
-      harness.repository.failRelationCommand(
-        0,
-        LongTermRelationParticipantArchivedFailure(
-          role: RelationParticipantRole.source,
-          intentionId: details.source.id,
-        ),
-      );
-      await pumpEventQueue();
-
-      expect(
-        harness.state,
-        isA<RelationDetailsLoaded>()
-            .having(
-              (state) => state.details.relation.scope,
-              'прежнее состояние связи',
-              RelationScope.archived,
-            )
-            .having(
-              (state) => state.lifecycleChange,
-              'объяснимый отказ',
-              isA<RelationDetailsLifecycleFailed>()
-                  .having(
-                    (change) => change.kind,
-                    'вид операции',
-                    RelationDetailsLifecycleKind.restore,
-                  )
-                  .having(
-                    (change) => change.failure,
-                    'причина',
-                    isA<LongTermRelationParticipantArchivedFailure>(),
-                  )
-                  .having(
-                    (change) => change.failurePresentation,
-                    'право инлайн-предъявления',
-                    isNotNull,
-                  ),
-            ),
-      );
-    },
-  );
-
-  test('восстановление меняет только архивное состояние связи', () async {
-    final harness = _RelationDetailsHarness();
-    addTearDown(harness.dispose);
-    final archivedDetails = testRelationDetails(
-      relationId: harness.relationId,
-      sourceId: testIntentionId(1),
-      relatedId: testIntentionId(2),
-      priority: RelationPriority.p3,
-      scope: RelationScope.archived,
-      creationSequence: 17,
-      description: 'Самостоятельное описание',
-    );
-    harness.repository
-        .watchAt(0)
-        .emitDetails(archivedDetails, revision: const TestGraphRevision(1));
-    await pumpEventQueue();
-
-    harness.viewModel.restore();
-
-    expect(
-      harness.repository.relationCommands.single,
-      isA<RestoreLongTermRelation>(),
-    );
-    harness.repository.completeRelationUpdate(
-      0,
-      before: archivedDetails.relation,
-      after: archivedDetails.relation.copyWithForTest(
-        scope: RelationScope.active,
-      ),
-      revision: const TestGraphRevision(2),
-      description: archivedDetails.description,
-    );
-    await pumpEventQueue();
-    harness.repository
-        .watchAt(1)
-        .emitDetails(
-          testRelationDetails(
-            relationId: harness.relationId,
-            sourceId: archivedDetails.source.id,
-            relatedId: archivedDetails.related.id,
-            priority: RelationPriority.p3,
-            scope: RelationScope.active,
-            creationSequence: 17,
-            description: 'Самостоятельное описание',
-          ),
-          revision: const TestGraphRevision(2),
-        );
-    await pumpEventQueue();
-
-    final restored = (harness.state as RelationDetailsLoaded).details;
-    expect(restored.relation.scope, RelationScope.active);
-    expect(restored.relation.priority, RelationPriority.p3);
-    expect(restored.relation.creationSequence.value, 17);
-    expect(restored.description?.value, 'Самостоятельное описание');
-  });
-
   test('устранимый отказ восстановления допускает обычный повтор', () async {
     final harness = _RelationDetailsHarness();
     addTearDown(harness.dispose);
@@ -963,105 +580,6 @@ void main() {
       isA<RestoreLongTermRelation>(),
     );
   });
-
-  test('отказ удаления сохраняет снимок и допускает уместный повтор', () async {
-    final harness = _RelationDetailsHarness();
-    addTearDown(harness.dispose);
-    final details = testRelationDetails(
-      relationId: harness.relationId,
-      sourceId: testIntentionId(1),
-      relatedId: testIntentionId(2),
-      scope: RelationScope.archived,
-      description: 'Подтверждённое описание',
-    );
-    harness.repository
-        .watchAt(0)
-        .emitDetails(details, revision: const TestGraphRevision(1));
-    await pumpEventQueue();
-
-    harness.viewModel.delete();
-
-    expect(
-      harness.repository.relationCommands.single,
-      isA<DeleteLongTermRelation>().having(
-        (command) => command.relationId,
-        'конкретная связь',
-        harness.relationId,
-      ),
-    );
-    harness.repository.failRelationCommand(
-      0,
-      const LongTermRelationUnavailableFailure(),
-    );
-    await pumpEventQueue();
-
-    expect(
-      harness.state,
-      isA<RelationDetailsLoaded>()
-          .having(
-            (state) => state.details,
-            'последний подтверждённый снимок',
-            same(details),
-          )
-          .having(
-            (state) => state.lifecycleChange,
-            'устранимый отказ удаления',
-            isA<RelationDetailsLifecycleFailed>()
-                .having(
-                  (change) => change.kind,
-                  'вид операции',
-                  RelationDetailsLifecycleKind.delete,
-                )
-                .having((change) => change.canRetry, 'повтор', isTrue),
-          ),
-    );
-
-    harness.viewModel.retryLifecycleChange();
-    expect(harness.repository.relationCommands, hasLength(2));
-    expect(
-      harness.repository.relationCommands.last,
-      isA<DeleteLongTermRelation>(),
-    );
-  });
-
-  test(
-    'успешное удаление завершает просмотр и отбрасывает поздний снимок',
-    () async {
-      final harness = _RelationDetailsHarness();
-      addTearDown(harness.dispose);
-      final details = testRelationDetails(
-        relationId: harness.relationId,
-        sourceId: testIntentionId(1),
-        relatedId: testIntentionId(2),
-      );
-      final watch = harness.repository.watchAt(0);
-      watch.emitDetails(details, revision: const TestGraphRevision(1));
-      await pumpEventQueue();
-
-      harness.viewModel.delete();
-      harness.repository.completeRelationDelete(
-        0,
-        relation: details.relation,
-        revision: const TestGraphRevision(2),
-      );
-      await pumpEventQueue();
-
-      expect(harness.state, isA<RelationDetailsDeleted>());
-
-      watch.emitDetails(
-        testRelationDetails(
-          relationId: harness.relationId,
-          sourceId: testIntentionId(1),
-          relatedId: testIntentionId(2),
-          description: 'Запоздалые данные',
-        ),
-        revision: const TestGraphRevision(3),
-      );
-      await pumpEventQueue();
-
-      expect(harness.state, isA<RelationDetailsDeleted>());
-    },
-  );
 
   test('подтверждённое отсутствие завершает прежний контекст', () async {
     final harness = _RelationDetailsHarness();

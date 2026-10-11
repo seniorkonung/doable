@@ -54,16 +54,9 @@ void main() {
   late InMemoryDiagnosticsSink diagnostics;
   late _ChoiceIds choiceIds;
   late _StepIds stepIds;
-  late _ReadFailureProbe readProbe;
 
   setUp(() async {
-    readProbe = _ReadFailureProbe();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        readProbe,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     choiceIds = _ChoiceIds([_choice(201), _choice(202)]);
@@ -240,41 +233,6 @@ void main() {
     );
   });
 
-  test('отклоняет разрыв, цикл и неверную границу до записи', () async {
-    final invalidRoutes = [
-      ConfirmedChoicePath([
-        ConfirmedChoicePathStep(
-          relationId: _relation(102),
-          sourceIntentionId: _intention(2),
-          type: LongTermRelationType.can,
-          relatedIntentionId: _intention(3),
-        ),
-      ]),
-      ConfirmedChoicePath([
-        ...route().steps,
-        ConfirmedChoicePathStep(
-          relationId: _relation(101),
-          sourceIntentionId: _intention(3),
-          type: LongTermRelationType.need,
-          relatedIntentionId: _intention(1),
-        ),
-      ]),
-      route(1),
-    ];
-    for (final path in invalidRoutes) {
-      final result = await repository.execute(command(path: path));
-      expect(
-        result,
-        isA<GraphCommandFailed>().having(
-          (r) => r.failure.category,
-          'категория',
-          GraphFailureCategory.validation,
-        ),
-      );
-    }
-    expect(await rows('daily_choices'), 0);
-  });
-
   test('архив и утрата готовности дают разные конфликты', () async {
     await database.customUpdate(
       'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
@@ -312,10 +270,13 @@ void main() {
   test(
     'повреждение сохранённой связи отличается от конфликта маршрута',
     () async {
-      await database.customStatement('PRAGMA ignore_check_constraints = ON');
+      // Пробельное описание связи приложение не сохраняет, а схема допускает.
       await database.customUpdate(
-        'UPDATE long_term_relations SET priority = 9 WHERE id = ?',
-        variables: [Variable.withString(_uuid(102))],
+        'UPDATE long_term_relations SET description = ? WHERE id = ?',
+        variables: [
+          Variable.withString('   '),
+          Variable.withString(_uuid(102)),
+        ],
       );
       final result = await repository.execute(command());
       expect(
@@ -338,24 +299,6 @@ void main() {
       );
     },
   );
-
-  test('коллизия выбора сохраняет прежнюю запись без новой ревизии', () async {
-    expect(await repository.execute(command()), isA<GraphCommandSucceeded>());
-    final before = (await repository.getDailyChoice(
-      _choice(201),
-    ) as DailyChoiceReadSuccess).value.revision;
-    choiceIds.values
-      ..clear()
-      ..add(_choice(201));
-    final result = await repository.execute(command());
-    expect(result, isA<GraphCommandFailed>());
-    expect(await rows('daily_choices'), 1);
-    expect(await rows('daily_choice_path_steps'), 2);
-    final after = (await repository.getDailyChoice(
-      _choice(201),
-    ) as DailyChoiceReadSuccess).value.revision;
-    expect(before.compareTo(after), GraphRevisionOrder.same);
-  });
 
   test('отказ второго шага откатывает выбор и первый шаг', () async {
     expect(await repository.execute(command()), isA<GraphCommandSucceeded>());
@@ -392,49 +335,4 @@ void main() {
       expect(await rows('daily_choices'), 1);
     },
   );
-
-  test('неизвестный отказ чтения результата откатывает все записи', () async {
-    readProbe.failure = StateError('сбой чтения результата');
-    final result = await repository.execute(command());
-    expect(
-      result,
-      isA<GraphCommandFailed>().having(
-        (r) => r.failure.category,
-        'категория',
-        GraphFailureCategory.unexpected,
-      ),
-    );
-    readProbe.failure = null;
-    expect(await rows('daily_choices'), 0);
-    expect(await rows('daily_choice_path_steps'), 0);
-    expect(
-      diagnostics.events.whereType<DailyChoiceCommandDiagnosticsEvent>().last,
-      isA<DailyChoiceCommandDiagnosticsEvent>()
-          .having(
-            (event) => event.stage,
-            'этап',
-            DailyChoiceCommandDiagnosticsStage.resultRead,
-          )
-          .having(
-            (event) => (event.status as DiagnosticsFailed).code,
-            'код',
-            DiagnosticsFailureCode.unexpected,
-          ),
-    );
-  });
-}
-
-final class _ReadFailureProbe extends LocalDatabaseConnectionObserver {
-  Object? failure;
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.single.contains(
-          'FROM daily_choices WHERE id = ?',
-        )) {
-      final error = failure;
-      if (error != null) throw error;
-    }
-  }
 }

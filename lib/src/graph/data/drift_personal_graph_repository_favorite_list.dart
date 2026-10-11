@@ -6,9 +6,8 @@ extension _FavoriteListReading on DriftPersonalGraphRepository {
   /// существующим пакетным агрегатом на той же ревизии.
   ///
   /// Архивированные избранные намерения в список не входят и учитываются
-  /// числом. Место без существующего намерения, неоднозначный порядок и
-  /// недопустимые сохранённые значения дают повреждение без частичного
-  /// списка, пропуска или исправления.
+  /// числом. Недопустимые сохранённые значения намерения и его связей дают
+  /// повреждение без частичного списка, пропуска или исправления.
   ///
   /// Диагностика различает чтение строк и проверку сохранённых данных
   /// избранного и не несёт данных личного графа.
@@ -26,32 +25,19 @@ extension _FavoriteListReading on DriftPersonalGraphRepository {
           stage = FavoriteIntentionsReadDiagnosticsStage.read;
           final rows = await _database
               .customSelect(
-                '''SELECT f.intention_id, f.position, i.id, i.title,
-                 i.description, i.is_action_ready, i.is_archived,
-                 i.created_at, i.updated_at
+                '''SELECT i.id, i.title, i.description, i.is_action_ready,
+                 i.is_archived, i.created_at, i.updated_at
                FROM favorite_intentions f
-               LEFT JOIN intentions i ON i.id = f.intention_id
+               JOIN intentions i ON i.id = f.intention_id
                ORDER BY f.position ASC''',
                 readsFrom: {_database.favoriteIntentions, _database.intentions},
               )
               .get();
           stage = FavoriteIntentionsReadDiagnosticsStage.validation;
-          var previousPosition = 0;
           var archivedCount = 0;
-          final seen = <IntentionId>{};
           final active = <domain.Intention>[];
           for (final row in rows) {
-            final position = _requiredStoredInteger(row.data, 'position');
-            if (position <= previousPosition) {
-              throw const _StoredIntentionCorruption();
-            }
-            previousPosition = position;
             final intention = _rehydrateDetailRow(row);
-            if (_requiredStoredString(row.data, 'intention_id') !=
-                    intention.id.toCanonicalString() ||
-                !seen.add(intention.id)) {
-              throw const _StoredIntentionCorruption();
-            }
             switch (intention.archiveState) {
               case domain.IntentionArchiveState.active:
                 active.add(intention);

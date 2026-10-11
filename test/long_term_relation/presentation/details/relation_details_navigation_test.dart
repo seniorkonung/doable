@@ -12,7 +12,7 @@ import 'relation_details_test_support.dart';
 
 void main() {
   testWidgets(
-    'панель связи доступна при загрузке, чтении, отсутствии и отказах',
+    'панель связи доступна при загрузке, чтении, отсутствии и отказе',
     (tester) async {
       final repository = ControlledRelationDetailsRepository();
       addTearDown(repository.dispose);
@@ -47,15 +47,10 @@ void main() {
       await tester.pumpAndSettle();
       _expectNavigation(tester);
 
-      for (final failure in [
-        const LongTermRelationReadUnavailableFailure(),
-        const LongTermRelationReadCorruptionFailure(),
-        const LongTermRelationReadUnexpectedFailure(),
-      ]) {
-        watch.fail(failure);
-        await tester.pumpAndSettle();
-        _expectNavigation(tester);
-      }
+      // Панель вне ветвления по состояниям: хватает одного отказа.
+      watch.fail(const LongTermRelationReadUnavailableFailure());
+      await tester.pumpAndSettle();
+      _expectNavigation(tester);
       expect(tester.takeException(), isNull);
     },
   );

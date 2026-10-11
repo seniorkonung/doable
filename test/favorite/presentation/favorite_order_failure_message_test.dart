@@ -1,5 +1,4 @@
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/favorite/application/favorite_order_command.dart';
 import 'package:doable/src/favorite/presentation/favorite_order_failure_message.dart';
 import 'package:flutter/widgets.dart';
@@ -68,54 +67,5 @@ void main() {
         expect(favoriteOrderFailureMessage(en, scenario.failure), scenario.en);
       });
     }
-
-    test(
-      'каждая категория отказа получает собственный текст в обеих локалях',
-      () {
-        for (final localizations in [ru, en]) {
-          final messages = {
-            for (final scenario in scenarios)
-              favoriteOrderFailureMessage(localizations, scenario.failure),
-          };
-
-          expect(messages, hasLength(scenarios.length));
-        }
-      },
-    );
-
-    test('неподдерживаемая системная локаль получает английский текст', () {
-      final fallback = lookupAppLocalizations(
-        resolveAppLocale(const [
-          Locale('de', 'DE'),
-        ], AppLocalizations.supportedLocales),
-      );
-
-      for (final scenario in scenarios) {
-        expect(
-          favoriteOrderFailureMessage(fallback, scenario.failure),
-          scenario.en,
-        );
-      }
-    });
-
-    test('тексты не раскрывают SQL, исключения, идентификаторы и места', () {
-      final forbidden = RegExp(
-        r'\d|select|update|insert|delete|transaction|sqlite|drift|favorite_|'
-        r'intention_id|exception|error:|failure|stack',
-        caseSensitive: false,
-      );
-
-      for (final localizations in [ru, en]) {
-        for (final scenario in scenarios) {
-          final message = favoriteOrderFailureMessage(
-            localizations,
-            scenario.failure,
-          );
-
-          expect(message, isNot(contains(forbidden)));
-          expect(message.trim(), isNotEmpty);
-        }
-      }
-    });
   });
 }

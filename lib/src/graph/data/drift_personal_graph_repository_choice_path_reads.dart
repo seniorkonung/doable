@@ -45,14 +45,12 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     ChoicePathContinuationQuery query,
     void Function() onValidated,
   ) async {
-    final cursor = query.cursor;
+    final _DriftChoicePathCursor? cursor = switch (query.cursor) {
+      null => null,
+      final _DriftChoicePathCursor own => own,
+      _ => throw StateError('Недопустимый курсор продолжений пути.'),
+    };
     if (cursor != null &&
-        (cursor is! _DriftChoicePathCursor ||
-            !identical(cursor.epoch, _epoch) ||
-            !cursor.matches(query))) {
-      throw const _InvalidChoicePathCursor();
-    }
-    if (cursor is _DriftChoicePathCursor &&
         cursor.revision.compareTo(_currentRevision) !=
             GraphRevisionOrder.same) {
       throw const _ChoicePathSnapshotHasExpired();
@@ -142,7 +140,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
 
     // Рекурсивный набор верхнего обхода хранит только вершины: UNION
     // завершает циклы без перечисления путей.
-    final boundary = cursor is _DriftChoicePathCursor
+    final boundary = cursor != null
         ? '''AND (CASE WHEN r.type = 'need' THEN 0 ELSE 1 END,
                    r.priority, r.creation_sequence) > (?, ?, ?)'''
         : '';
@@ -186,7 +184,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
           variables: [
             Variable<String>(visitedJson),
             Variable<String>(draft.currentIntentionId.toCanonicalString()),
-            if (cursor is _DriftChoicePathCursor) ...[
+            if (cursor != null) ...[
               Variable<int>(cursor.boundaryGroup),
               Variable<int>(cursor.boundaryPriority),
               Variable<int>(cursor.boundaryCreationSequence),
@@ -245,9 +243,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
       items: items,
       nextCursor: stored.length > query.pageSize
           ? _DriftChoicePathCursor.fromBoundary(
-              epoch: _epoch,
               revision: revision,
-              query: query,
               boundary: pageRows.last,
             )
           : null,
@@ -258,48 +254,17 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
 
 final class _DriftChoicePathCursor implements ChoicePathContinuationCursor {
   _DriftChoicePathCursor.fromBoundary({
-    required this.epoch,
     required this.revision,
-    required ChoicePathContinuationQuery query,
     required _StoredRelationGroupRow boundary,
-  }) : draft = query.draft,
-       pageSize = query.pageSize,
-       boundaryGroup =
+  }) : boundaryGroup =
            boundary.type == relation_domain.LongTermRelationType.need ? 0 : 1,
        boundaryPriority = boundary.priority.index + 1,
        boundaryCreationSequence = boundary.creationSequence;
 
-  final _GraphEpoch epoch;
   final GraphRevision revision;
-  final ChoicePathDraft draft;
-  final int pageSize;
   final int boundaryGroup;
   final int boundaryPriority;
   final int boundaryCreationSequence;
-
-  bool matches(ChoicePathContinuationQuery query) {
-    if (pageSize != query.pageSize ||
-        draft.direction != query.draft.direction ||
-        draft.startingIntentionId != query.draft.startingIntentionId ||
-        draft.steps.length != query.draft.steps.length) {
-      return false;
-    }
-    for (var index = 0; index < draft.steps.length; index++) {
-      final old = draft.steps[index];
-      final now = query.draft.steps[index];
-      if (old.relationId != now.relationId ||
-          old.sourceIntentionId != now.sourceIntentionId ||
-          old.relatedIntentionId != now.relatedIntentionId ||
-          old.type != now.type) {
-        return false;
-      }
-    }
-    return true;
-  }
-}
-
-final class _InvalidChoicePathCursor implements Exception {
-  const _InvalidChoicePathCursor();
 }
 
 final class _ChoicePathSnapshotHasExpired implements Exception {
@@ -311,9 +276,6 @@ final class _ChoicePathIntentionNotFound implements Exception {
 }
 
 ChoicePathContinuationFailure _classifyChoicePathReadFailure(Object error) {
-  if (error is _InvalidChoicePathCursor) {
-    return const ChoicePathContinuationValidationFailure();
-  }
   if (error is _ChoicePathSnapshotHasExpired) {
     return const ChoicePathContinuationSnapshotExpired();
   }

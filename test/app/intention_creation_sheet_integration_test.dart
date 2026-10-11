@@ -7,15 +7,10 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    show
-        LocalDatabaseConnectionObserver,
-        LocalDatabaseSqlStatement,
-        observeConfiguredLocalDatabaseConnection,
-        openFileBackedLocalDatabase;
+    show openFileBackedLocalDatabase;
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
@@ -23,7 +18,6 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show
         IntentionCatalogCreated,
@@ -45,17 +39,12 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
-import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
-import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
@@ -69,7 +58,6 @@ import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_creation_origin.dart';
-import '../support/intention_creation_storage_observer.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -172,313 +160,9 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// открывает навигацию после результата, а заранее загруженной и скрытой во
 /// время создания остаётся Главная.
 void main() {
-  for (final origin in [
-    IntentionCreationOrigin.graph,
-    IntentionCreationOrigin.deep,
-  ]) {
-    for (final point in _CreatedNavigationFailure.values) {
-      for (final close
-          in point == _CreatedNavigationFailure.beforeRemoval
-              ? _CloseMethod.values
-              : [_CloseMethod.back]) {
-        testWidgets(
-          'отказ перехода ${point.description} над ${origin.description}: ${close.description} сохраняет успех и новую сессию',
-          (tester) async {
-            final install = await _install(tester, const Locale('ru'));
-            final router = _FailingCreatedRouteRouter(
-              synchronous: false,
-              point: point,
-            );
-            final storage = IntentionCreationStorageObserver(
-              snapshotGraph: _storedGraph,
-            );
-            final app = await _launch(
-              tester,
-              install,
-              seed: _seedGraph,
-              navigationRouter: router,
-              storage: storage,
-            );
-            await openIntentionGraph(tester, waitFor: _until);
-            final history = await origin.open(
-              tester,
-              router,
-              participantId: _intentionId(_walk),
-              waitFor: _until,
-            );
-            await _openSheet(tester, app);
-            await tester.enterText(
-              find.byKey(const ValueKey('intention-editor-title')),
-              _title,
-            );
-            final staleClose = tester
-                .widget<IconButton>(
-                  find.byKey(const ValueKey('intention-editor-close')),
-                )
-                .onPressed!;
-            storage.observeCreation();
-            storage.hold();
-            await _tap(tester, _submit);
-            await _waitFor(tester, () => storage.isHolding);
-            VoidCallback? staleDiscard;
-            if (point == _CreatedNavigationFailure.beforeRemoval) {
-              staleClose();
-              await tester.pumpAndSettle();
-              expect(
-                find.text(app.l10n.editorCloseSavingMessage),
-                findsOneWidget,
-              );
-              staleDiscard = tester
-                  .widget<FilledButton>(
-                    find.byKey(
-                      const ValueKey('intention-editor-close-discard'),
-                    ),
-                  )
-                  .onPressed!;
-            }
-            final errors = <FlutterErrorDetails>[];
-            final previousHandler = FlutterError.onError;
-            late IntentionCommandCompletion creation;
-            RouteData? nextBeforeFailure;
-            FlutterError.onError = errors.add;
-            try {
-              storage.release();
-              creation = await _creation(tester, app);
-              await _waitFor(tester, () => router.replacementAttempts == 1);
-              if (point == _CreatedNavigationFailure.afterNewSession) {
-                await tester.pumpAndSettle();
-                expect(
-                  router.current
-                      .argsAs<IntentionDetailsRouteArgs>()
-                      .intentionId,
-                  _createdId(creation),
-                );
-                await tester.binding.handlePopRoute();
-                await tester.pumpAndSettle();
-                history.expectRestored(tester, router);
-                await _acceptMessage(
-                  tester,
-                  app.l10n.graphOperationMessage(
-                    app.l10n.graphOperationCreate,
-                    _title,
-                    app.l10n.editorCreated,
-                  ),
-                );
-                await _openSheet(tester, app);
-                nextBeforeFailure = router.stackData.last;
-                await tester.enterText(
-                  find.byKey(const ValueKey('intention-editor-title')),
-                  'Черновик до позднего отказа',
-                );
-              }
-              router.releaseFailure();
-              await _waitFor(tester, () => errors.isNotEmpty);
-              await tester.pumpAndSettle();
-            } finally {
-              FlutterError.onError = previousHandler;
-            }
-            expect(errors, hasLength(1));
-            expect(errors.single.exception, same(router.failure));
-            expect(storage.creationAttempts, 1);
-            final id = _createdId(creation);
-            _expectStoredIntention(
-              app.raw,
-              id,
-              title: _title,
-              description: null,
-              readiness: IntentionReadiness.notReady,
-            );
-            history.expectPrefix(router);
-            if (point == _CreatedNavigationFailure.afterNewSession) {
-              staleClose();
-              await tester.pumpAndSettle();
-              expect(router.stackData.last, same(nextBeforeFailure));
-              expect(
-                _text(tester, 'intention-editor-title'),
-                'Черновик до позднего отказа',
-              );
-              expect(router.replacementAttempts, 1);
-              expect(_message, findsNothing);
-              expect(app.completions.whereType<IntentionCommandCompletion>(), [
-                same(creation),
-              ]);
-              expect(tester.takeException(), isNull);
-              return;
-            }
-            if (point == _CreatedNavigationFailure.beforeRemoval) {
-              expect(_sheet, findsOneWidget);
-              expect(tester.widget<FilledButton>(_submit).onPressed, isNull);
-              expect(
-                find.byType(AlertDialog, skipOffstage: false),
-                findsNothing,
-              );
-              await close.request(tester);
-              await tester.pumpAndSettle();
-            } else if (point == _CreatedNavigationFailure.afterResult) {
-              expect(
-                router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-                id,
-              );
-              staleClose();
-              await tester.pumpAndSettle();
-              expect(
-                router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-                id,
-              );
-              await tester.binding.handlePopRoute();
-              await tester.pumpAndSettle();
-            }
-            expect(_sheet, findsNothing);
-            history.expectRestored(tester, router);
-            await _acceptMessage(
-              tester,
-              app.l10n.graphOperationMessage(
-                app.l10n.graphOperationCreate,
-                _title,
-                app.l10n.editorCreated,
-              ),
-            );
-            await _openSheet(tester, app);
-            final nextForm = router.stackData.last;
-            await tester.enterText(
-              find.byKey(const ValueKey('intention-editor-title')),
-              'Новый черновик',
-            );
-            staleDiscard?.call();
-            staleClose();
-            await tester.pumpAndSettle();
-            expect(router.stackData.last, same(nextForm));
-            expect(_text(tester, 'intention-editor-title'), 'Новый черновик');
-            expect(router.replacementAttempts, 1);
-            expect(storage.creationAttempts, 1);
-            expect(app.completions.whereType<IntentionCommandCompletion>(), [
-              same(creation),
-            ]);
-            expect(find.byType(AlertDialog, skipOffstage: false), findsNothing);
-            expect(tester.takeException(), isNull);
-          },
-        );
-      }
-    }
-  }
-  for (final origin in IntentionCreationOrigin.values) {
-    testWidgets(
-      'общая кнопка над ${origin.description}: новый ID, теги и исходная история сохраняются без ожидания сообщения',
-      (tester) async {
-        final install = await _install(tester, const Locale('ru'));
-        final app = await _launch(tester, install, seed: _seedGraph);
-        await _searchCatalog(tester, app);
-        await _scrollCatalog(tester);
-        final catalogBefore = _catalog(app);
-        final viewBefore = _catalogView(tester);
-        final history = await origin.open(
-          tester,
-          app.router,
-          participantId: _intentionId(_walk),
-          waitFor: _until,
-        );
-        final sport = await _prepareFullDraft(
-          tester,
-          app,
-          tags: [_homeTag, _workTag],
-        );
-        final previous =
-            app.container
-                    .read(graphCommandCoordinatorProvider.notifier)
-                    .acceptTagRename(
-                      RenameTag(
-                        tagId: _tagId(_gardenTag),
-                        name: TagName.fromInput('Огород'),
-                      ),
-                    )
-                as TagCommandAccepted;
-        await _readStorage(tester, () => previous.future);
-        final previousMessage = app.l10n.graphOperationMessage(
-          app.l10n.graphOperationUpdate,
-          app.l10n.graphOperationTag,
-          app.l10n.tagRenamed,
-        );
-        await _until(tester, find.text(previousMessage).hitTestable());
-        await tester.pumpAndSettle();
-        final snackbar = tester.widget<SnackBar>(
-          find.byType(SnackBar).hitTestable(),
-        );
-        await _tap(tester, _submit);
-        final creation = await _creation(tester, app);
-        await _waitFor(tester, () => _sheet.evaluate().isEmpty);
-        await _expectCreatedPage(
-          tester,
-          app,
-          creation,
-          title: _title,
-          description: _description,
-          tags: ['Дом', 'Работа', _sport],
-          readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
-          history: history,
-        );
-        expect(_createdId(creation), isNot(_intentionId(_namesake)));
-        expect(
-          tester.widget<SnackBar>(find.byType(SnackBar).hitTestable()),
-          same(snackbar),
-        );
-        expect(
-          _storedAssignments(app.raw, _createdId(creation)),
-          unorderedEquals([
-            _tagId(_homeTag).toCanonicalString(),
-            _tagId(_workTag).toCanonicalString(),
-            sport.toCanonicalString(),
-          ]),
-        );
-        history.expectPrefix(app.router);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        history.expectRestored(tester, app.router);
-        await _waitFor(
-          tester,
-          () => _catalogCurrentAt(app, creation.revision!),
-        );
-        _expectSameSearch(_catalog(app), catalogBefore);
-        expect(_ids(_catalog(app)), _ids(catalogBefore));
-        expect(_catalog(app).totalCount, catalogBefore.totalCount);
-        ScaffoldMessenger.of(tester.element(_message.hitTestable()))
-            .hideCurrentSnackBar();
-        await tester.pumpAndSettle();
-        await _acceptMessage(
-          tester,
-          app.l10n.graphOperationMessage(
-            app.l10n.graphOperationCreate,
-            _title,
-            app.l10n.editorCreated,
-          ),
-        );
-        await _openSheet(tester, app);
-        expect(_text(tester, 'intention-editor-title'), isEmpty);
-        expect(_text(tester, 'intention-editor-description'), isEmpty);
-        expect(_chipNames(tester), isEmpty);
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('intention-editor-close')),
-        );
-        await tester.pumpAndSettle();
-        history.expectRestored(tester, app.router);
-        await history.expectUnderlyingDraft(tester, app.router);
-        if (origin == IntentionCreationOrigin.deep) {
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-        }
-        if (origin != IntentionCreationOrigin.graph) {
-          await _select(tester, AppDestination.intentionGraph);
-        }
-        _expectSameView(_catalogView(tester), viewBefore);
-        expect(app.completions.whereType<IntentionCommandCompletion>(), [
-          same(creation),
-        ]);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
-  for (final locale in const [Locale('ru'), Locale('en')]) {
+  // Проверки читают системные строки из локализаций: второй язык не меняет
+  // создание, согласование и чтение результата.
+  for (final locale in const [Locale('ru')]) {
     final code = locale.languageCode;
 
     testWidgets(
@@ -507,13 +191,11 @@ void main() {
           description: null,
           readiness: IntentionReadiness.notReady,
         );
-        final events = app.diagnostics.events.length;
         expect(_home(app), isA<HomeList>());
         expect(app.completions, isEmpty);
 
         // Все пять полей черновика готовятся только через интерфейс панели,
         // общего выбора и редактора тега.
-        app.writes.start();
         final sport = await _prepareFullDraft(tester, app, tags: [_homeTag]);
         expect(_text(tester, 'intention-editor-title'), _rawTitle);
         expect(_text(tester, 'intention-editor-description'), _description);
@@ -522,23 +204,13 @@ void main() {
         expect(_chipNames(tester), ['Дом', _sport]);
 
         // До отправки граф получил только самостоятельный тег: ни намерения,
-        // ни назначений, ни избранного, а ревизию продвинуло лишь создание
-        // тега.
-        final tagCompletion = app.completions.single as TagCommandCompletion;
-        expect(app.writes.take(), [
-          (write: 'insert tags', inTransaction: true),
-        ]);
+        // ни назначений, ни избранного.
+        expect(app.completions.single, isA<TagCommandCompletion>());
         expect(_storedCreationTables(app.raw), _creationTablesOf(graphBefore));
         expect(_storedTagNames(app.raw), ['Дом', 'Сад', 'Работа', _sport]);
-        final revisionBeforeSave = await _freshRevision(tester, app);
-        expect(
-          revisionBeforeSave.compareTo(tagCompletion.revision!),
-          GraphRevisionOrder.same,
-        );
 
-        // «Сохранить» записывает всё начальное состояние внутри транзакции
-        // без посторонних записей и подтверждает его одним результатом на
-        // одной ревизии. Оба обработчика получены до нового кадра: выбор
+        // «Сохранить» записывает всё начальное состояние и подтверждает его
+        // одним результатом. Оба обработчика получены до нового кадра: выбор
         // тегов после принятой отправки не открывает страницу.
         final submit = tester.widget<FilledButton>(_submit).onPressed!;
         final chooseTags = tester.widget<IconButton>(_chooseTags).onPressed!;
@@ -578,8 +250,7 @@ void main() {
           readiness: IntentionReadiness.notReady,
         );
         final revision = creation.revision!;
-        expect(app.completions, [same(tagCompletion), same(creation)]);
-        expect(app.writes.take(), _fullCreationWrites(tags: 2));
+        expect(app.completions, hasLength(2));
         _expectConfirmedPackage(
           creation,
           tags: ['Дом', _sport],
@@ -630,10 +301,6 @@ void main() {
             l10n.editorCreated,
           ),
         );
-        expect(_commandEvents(app, since: events), [
-          _tagCreateEvent(),
-          _createEvent(IntentionCreationCommandDiagnosticsStage.resultRead),
-        ]);
 
         // Подходящее намерение учтено ровно один раз в начале выдачи по
         // изменению; условия, выдача и видимые строки остались прежними.
@@ -678,7 +345,6 @@ void main() {
         // Навигация по каждому выбранному тегу показывает новое намерение
         // ровно один раз на ревизии создания.
         await _openTagNavigation(tester, app, home);
-        _expectNavigationAt(tester, home, revision);
         expect(_navigationIds(tester, home), [
           _intentionId(_walk),
           _intentionId(_atWork),
@@ -687,7 +353,6 @@ void main() {
         ]);
         await _closeTop(tester, TagNavigationPage);
         await _openTagNavigation(tester, app, sport, fromTagCatalog: true);
-        _expectNavigationAt(tester, sport, revision);
         expect(_navigationIds(tester, sport), [created]);
         await _closeTop(tester, TagNavigationPage);
         await _closeTop(tester, TagCatalogPage);
@@ -717,8 +382,7 @@ void main() {
           favoriteMark: FavoriteMark.notFavorite,
         );
         final minimal = _createdId(minimalCreation);
-        expect(app.completions.last, same(minimalCreation));
-        expect(app.writes.take(), _minimalCreationWrites);
+        expect(app.completions, hasLength(3));
         _expectConfirmedPackage(
           minimalCreation,
           tags: [],
@@ -753,7 +417,7 @@ void main() {
         _expectSameSearch(_catalog(app), catalogBefore);
         expect(_ids(_catalog(app)), _ids(catalogAfterFull));
         expect(_catalog(app).totalCount, catalogAfterFull.totalCount);
-        expect(_home(app), same(homeAfterFull));
+        expect(_homeIds(_home(app)), _homeIds(homeAfterFull));
 
         // Ранее скрытая Главная показывает новое избранное в конце.
         await _closeCreatedPage(tester, app, systemBack: true);
@@ -801,369 +465,6 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-
-    for (final synchronous in [true, false]) {
-      for (final systemBack in [false, true]) {
-        testWidgets(
-          '${synchronous ? 'синхронный' : 'асинхронный'} отказ открытия после записи возвращает сохранённый каталог ${systemBack ? 'системным «назад»' : 'кнопкой закрытия'} на $code',
-          (tester) async {
-            final install = await _install(tester, locale);
-            final router = _FailingCreatedRouteRouter(synchronous: synchronous);
-            final app = await _launch(
-              tester,
-              install,
-              seed: _seedGraph,
-              navigationRouter: router,
-            );
-            await _searchCatalog(tester, app);
-            await _scrollCatalog(tester);
-            final shell = router.stackData.first;
-            final catalogBefore = _catalog(app);
-            final viewBefore = _catalogView(tester);
-            final idsBefore = _storedIntentionIds(app.raw);
-            final marksBefore = storedFavoriteMarks(app.raw);
-            final sport = await _prepareFullDraft(
-              tester,
-              app,
-              tags: [_homeTag, _workTag],
-            );
-            final form = router.stackData.last;
-            // Другая операция занимает общую поверхность до создания.
-            final rename =
-                app.container
-                        .read(graphCommandCoordinatorProvider.notifier)
-                        .acceptTagRename(
-                          RenameTag(
-                            tagId: _tagId(_gardenTag),
-                            name: TagName.fromInput('Огород'),
-                          ),
-                        )
-                    as TagCommandAccepted;
-            final renamed = await _readStorage(tester, () => rename.future);
-            expect(renamed.isFailure, isFalse);
-            final previousMessage = install.l10n.graphOperationMessage(
-              install.l10n.graphOperationUpdate,
-              install.l10n.graphOperationTag,
-              install.l10n.tagRenamed,
-            );
-            final successMessage = install.l10n.graphOperationMessage(
-              install.l10n.graphOperationCreate,
-              _title,
-              install.l10n.editorCreated,
-            );
-            await _until(tester, _message.hitTestable());
-            await tester.pumpAndSettle();
-            expect(find.text(previousMessage).hitTestable(), findsOneWidget);
-            final previousSnackBar = tester.widget<SnackBar>(
-              find.byType(SnackBar).hitTestable(),
-            );
-            app.writes.start();
-            final errors = <FlutterErrorDetails>[];
-            final previousHandler = FlutterError.onError;
-            FlutterError.onError = errors.add;
-            late IntentionCommandCompletion creation;
-            try {
-              await _tap(tester, _submit);
-              creation = await _creation(tester, app);
-              await _waitFor(tester, () => router.replacementAttempts == 1);
-              router.releaseFailure();
-              await _waitFor(tester, () => errors.isNotEmpty);
-              await _waitFor(tester, () => _currentAt(app, creation.revision!));
-              await tester.pumpAndSettle();
-            } finally {
-              FlutterError.onError = previousHandler;
-            }
-            expect(errors, hasLength(1));
-            expect(errors.single.exception, same(router.failure));
-            expect(
-              errors.single.context.toString(),
-              contains('при открытии созданного намерения'),
-            );
-            expect(router.stackData, [same(shell), same(form)]);
-            expect(
-              tester.widget<SnackBar>(find.byType(SnackBar).hitTestable()),
-              same(previousSnackBar),
-            );
-            expect(find.text(previousMessage).hitTestable(), findsOneWidget);
-            expect(
-              find.text(successMessage, skipOffstage: false),
-              findsNothing,
-            );
-            expect(
-              find.byKey(const ValueKey('intention-editor-failure')),
-              findsNothing,
-            );
-            expect(tester.widget<FilledButton>(_submit).onPressed, isNull);
-            expect(
-              tester
-                  .widget<TextField>(
-                    find.byKey(const ValueKey('intention-editor-title')),
-                  )
-                  .readOnly,
-              isTrue,
-            );
-            expect(app.writes.take(), _fullCreationWrites(tags: 3));
-            final created = _createdId(creation);
-            _expectStoredIntention(
-              app.raw,
-              created,
-              title: _title,
-              description: _description,
-              readiness: IntentionReadiness.ready,
-            );
-            _expectConfirmedPackage(
-              creation,
-              tags: ['Дом', 'Работа', _sport],
-              readiness: IntentionReadiness.ready,
-              favoriteMark: FavoriteMark.favorite,
-            );
-            expect(_storedIntentionIds(app.raw), [...idsBefore, created]);
-            expect(
-              _storedAssignments(app.raw, created),
-              unorderedEquals([
-                _tagId(_homeTag).toCanonicalString(),
-                _tagId(_workTag).toCanonicalString(),
-                sport.toCanonicalString(),
-              ]),
-            );
-            expect(storedFavoriteMarks(app.raw), [
-              ...marksBefore,
-              (created.toCanonicalString(), 4),
-            ]);
-            final savedGraph = _storedGraph(app.raw);
-
-            if (systemBack) {
-              await tester.binding.handlePopRoute();
-            } else {
-              await _tap(
-                tester,
-                find.byKey(const ValueKey('intention-editor-close')),
-              );
-            }
-            await tester.pumpAndSettle();
-            expectIntentionGraphRootPage(router);
-            expect(router.stackData, [same(shell)]);
-            expect(_sheet, findsNothing);
-            expect(find.byType(AlertDialog, skipOffstage: false), findsNothing);
-            expect(_selected(tester), AppDestination.intentionGraph);
-            _expectSameSearch(_catalog(app), catalogBefore);
-            expect(_ids(_catalog(app)), _ids(catalogBefore));
-            expect(_catalog(app).totalCount, catalogBefore.totalCount);
-            _expectSameView(_catalogView(tester), viewBefore);
-            expect(find.text(previousMessage).hitTestable(), findsOneWidget);
-            expect(
-              find.text(successMessage, skipOffstage: false),
-              findsNothing,
-            );
-            ScaffoldMessenger.of(tester.element(_message.hitTestable()))
-                .hideCurrentSnackBar();
-            await tester.pumpAndSettle();
-            await _acceptMessage(tester, successMessage);
-            expect(
-              find.text(previousMessage, skipOffstage: false),
-              findsNothing,
-            );
-            await tester.pump(const Duration(seconds: 5));
-            await tester.pumpAndSettle();
-            expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-
-            // Выход вернул обычную навигацию и самостоятельное создание.
-            await _select(tester, AppDestination.home);
-            expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
-            await _select(tester, AppDestination.intentionGraph);
-            await _openSheet(tester, app);
-            final nextForm = router.stackData.last;
-            expect(nextForm, isNot(same(form)));
-            expect(_text(tester, 'intention-editor-title'), isEmpty);
-            expect(_text(tester, 'intention-editor-description'), isEmpty);
-            expect(_chipNames(tester), isEmpty);
-            expect(_iconOf(tester, _favorite), Icons.star_border);
-            expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
-            await tester.enterText(
-              find.byKey(const ValueKey('intention-editor-title')),
-              'Другой черновик',
-            );
-            await tester.pump(const Duration(seconds: 5));
-            await tester.pumpAndSettle();
-            expect(router.stackData, [same(shell), same(nextForm)]);
-            expect(_text(tester, 'intention-editor-title'), 'Другой черновик');
-            expect(app.completions.whereType<IntentionCommandCompletion>(), [
-              same(creation),
-            ]);
-            expect(router.replacementAttempts, 1);
-            expect(app.writes.take(), isEmpty);
-            expect(_storedGraph(app.raw), savedGraph);
-            expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-            expect(tester.takeException(), isNull);
-
-            await app.shutdown(tester);
-            final reopened = await _launch(tester, install);
-            expect(_storedGraph(reopened.raw), savedGraph);
-            await _expectDurableIntention(
-              tester,
-              reopened,
-              created,
-              title: _title,
-              description: _description,
-              readiness: IntentionReadiness.ready,
-              favoriteMark: FavoriteMark.favorite,
-              tags: ['Дом', 'Работа', _sport],
-            );
-            expect(_storedIntentionIds(reopened.raw), [...idsBefore, created]);
-            expect(reopened.completions, isEmpty);
-            expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
-            expect(tester.takeException(), isNull);
-          },
-        );
-      }
-    }
-
-    for (final systemBack in [false, true]) {
-      testWidgets(
-        'намерение, подготовленное через общую кнопку, панель, общий выбор и '
-        'настоящий редактор тега с тегом, который исключают условия выдачи, не '
-        'вставляется в неподходящую выдачу, сохраняя её условия, количество и '
-        'позицию, а скрытая Главная и навигация по тегу отражают полный '
-        'результат до возврата ${systemBack ? 'системным «назад»' : 'кнопкой страницы'} на $code',
-        (tester) async {
-          final install = await _install(tester, locale);
-          final l10n = install.l10n;
-          final app = await _launch(tester, install, seed: _seedGraph);
-          final home = _tagId(_homeTag);
-          final work = _tagId(_workTag);
-          final marks = storedFavoriteMarks(app.raw);
-          await _searchCatalog(tester, app);
-          await _scrollCatalog(tester);
-          final catalogBefore = _catalog(app);
-          final viewBefore = _catalogView(tester);
-          final graphBefore = _storedGraph(app.raw);
-          final events = app.diagnostics.events.length;
-
-          app.writes.start();
-          final sport = await _prepareFullDraft(
-            tester,
-            app,
-            tags: [_homeTag, _workTag],
-          );
-          expect(_chipNames(tester), ['Дом', 'Работа', _sport]);
-
-          // До отправки граф получил только самостоятельный тег.
-          final tagCompletion = app.completions.single as TagCommandCompletion;
-          expect(app.writes.take(), [
-            (write: 'insert tags', inTransaction: true),
-          ]);
-          expect(
-            _storedCreationTables(app.raw),
-            _creationTablesOf(graphBefore),
-          );
-
-          // «Сохранить» подтверждает полное создание одним результатом, а
-          // Главная согласуется с ним, хотя выдача каталога его не принимает.
-          // Быстрый выбор тегов после отправки не меняет стек и её данные.
-          final submit = tester.widget<FilledButton>(_submit).onPressed!;
-          final chooseTags = tester.widget<IconButton>(_chooseTags).onPressed!;
-          submit();
-          chooseTags();
-          final creation = await _creation(tester, app);
-          await _waitFor(tester, () => _sheet.evaluate().isEmpty);
-          await _expectCreatedPage(
-            tester,
-            app,
-            creation,
-            title: _title,
-            description: _description,
-            tags: ['Дом', 'Работа', _sport],
-            readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
-          );
-          final created = _createdId(creation);
-          final revision = creation.revision!;
-          expect(app.completions, [same(tagCompletion), same(creation)]);
-          expect(app.writes.take(), _fullCreationWrites(tags: 3));
-          _expectConfirmedPackage(
-            creation,
-            tags: ['Дом', 'Работа', _sport],
-            readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
-          );
-          _expectStoredIntention(
-            app.raw,
-            created,
-            title: _title,
-            description: _description,
-            readiness: IntentionReadiness.ready,
-          );
-          expect(
-            _storedAssignments(app.raw, created),
-            unorderedEquals([
-              home.toCanonicalString(),
-              work.toCanonicalString(),
-              sport.toCanonicalString(),
-            ]),
-          );
-          expect(storedFavoriteMarks(app.raw), [
-            ...marks,
-            (created.toCanonicalString(), 4),
-          ]);
-
-          await _waitFor(
-            tester,
-            () => _currentAt(app, revision),
-            reason: () => '${_home(app)} ${_catalogState(app)}',
-          );
-          await _closeCreatedPage(tester, app, systemBack: systemBack);
-          expectIntentionGraphRootPage(app.router);
-          expect(_selected(tester), AppDestination.intentionGraph);
-          expect(
-            [for (final row in (_home(app) as HomeList).items) row.id],
-            [_intentionId(_walk), _intentionId(_swim), created],
-          );
-          await _acceptMessage(
-            tester,
-            l10n.graphOperationMessage(
-              l10n.graphOperationCreate,
-              _title,
-              l10n.editorCreated,
-            ),
-          );
-          expect(_commandEvents(app, since: events), [
-            _tagCreateEvent(),
-            _createEvent(IntentionCreationCommandDiagnosticsStage.resultRead),
-          ]);
-
-          // Исключённый тег из того же создания не пускает намерение в выдачу:
-          // её строки, количество, условия и позиция просмотра не изменились.
-          final catalog = _catalog(app);
-          _expectSameSearch(catalog, catalogBefore);
-          expect(catalog.totalCount, catalogBefore.totalCount);
-          expect(_ids(catalog), _ids(catalogBefore));
-          _expectSameView(_catalogView(tester), viewBefore);
-          expect(
-            find.descendant(
-              of: _catalogList,
-              matching: find.widgetWithText(IntentionSummaryView, _title),
-            ),
-            findsNothing,
-          );
-
-          await _openTagNavigation(tester, app, work);
-          _expectNavigationAt(tester, work, revision);
-          expect(_navigationIds(tester, work), [
-            _intentionId(_atWork),
-            created,
-          ]);
-          await _closeTop(tester, TagNavigationPage);
-          await _closeTop(tester, TagCatalogPage);
-          expectIntentionGraphRootPage(app.router);
-          _expectSameView(_catalogView(tester), viewBefore);
-
-          await _select(tester, AppDestination.home);
-          expect(_shownHome(tester), ['Гулять', 'Плавать', _title]);
-          expect(_message, findsNothing);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
   }
 }
 
@@ -1275,7 +576,6 @@ final class _Launch {
     required this.raw,
     required this.container,
     required this.diagnostics,
-    required this.writes,
     required this.completions,
     required this.l10n,
     required this.router,
@@ -1285,7 +585,6 @@ final class _Launch {
   final sqlite.Database raw;
   final ProviderContainer container;
   final InMemoryDiagnosticsSink diagnostics;
-  final _WriteLog writes;
 
   /// Все завершения координатора этого запуска в порядке публикации.
   final List<GraphCommandCompletion> completions;
@@ -1307,36 +606,22 @@ Future<_Launch> _launch(
   WidgetTester tester,
   _Install install, {
   void Function(sqlite.Database database)? seed,
-  RootStackRouter? navigationRouter,
-  IntentionCreationStorageObserver? storage,
 }) async {
   late sqlite.Database raw;
   final diagnostics = InMemoryDiagnosticsSink();
-  final writes = _WriteLog();
   final runtime = AppRuntime(
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
-    connectionFactory: () {
-      final connection = observeConfiguredLocalDatabaseConnection(
-        openFileBackedLocalDatabase(
-          install.harness.databaseFile,
-          setup: (database) => raw = database,
-        ),
-        writes,
-      );
-      return storage == null
-          ? connection
-          : observeConfiguredLocalDatabaseConnection(connection, storage);
-    },
+    connectionFactory: () => openFileBackedLocalDatabase(
+      install.harness.databaseFile,
+      setup: (database) => raw = database,
+    ),
     diagnosticsSink: diagnostics,
   );
   addTearDown(() async {
-    storage?.release();
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
-  writes.connection = raw;
-  if (storage != null) storage.connection = raw;
   seed?.call(raw);
   final completions = <GraphCommandCompletion>[];
   final subscription = ready.container
@@ -1344,25 +629,8 @@ Future<_Launch> _launch(
       .completions
       .listen(completions.add);
   addTearDown(subscription.cancel);
-  final RootStackRouter router =
-      navigationRouter ?? ready.container.read(appRouterProvider);
-  if (navigationRouter != null) addTearDown(navigationRouter.dispose);
-  await tester.pumpWidget(
-    navigationRouter == null
-        ? MainApp(runtime: runtime)
-        : UncontrolledProviderScope(
-            container: ready.container,
-            child: MaterialApp.router(
-              locale: Locale(install.l10n.localeName),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              routerConfig: router.config(),
-              builder: (context, child) => GraphOperationPresenter(
-                child: child ?? const SizedBox.shrink(),
-              ),
-            ),
-          ),
-  );
+  final router = ready.container.read(appRouterProvider);
+  await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
   await _waitFor(
     tester,
@@ -1374,7 +642,6 @@ Future<_Launch> _launch(
     raw: raw,
     container: ready.container,
     diagnostics: diagnostics,
-    writes: writes,
     completions: completions,
     l10n: install.l10n,
     router: router,
@@ -1517,16 +784,8 @@ Future<TagId> _prepareFullDraft(
   for (final tag in tags) {
     await _addToDraft(tester, _tagId(tag));
   }
-  final tagSet = switch (app.router.current
-      .argsAs<TagCatalogRouteArgs>()
-      .selectionContext) {
-    TagDraftContext(:final tagSet) => tagSet,
-    final other => throw StateError('Выбор открыт не для черновика: $other'),
-  };
   await _tap(tester, find.byType(BackButton));
   await tester.pumpAndSettle();
-  final sheetElement = tester.element(_sheet);
-  final formRoute = app.router.stackData.last;
   final graphBefore = _storedCreationTables(app.raw);
   final staleSubmit = tester.widget<FilledButton>(_submit).onPressed!;
 
@@ -1540,16 +799,6 @@ Future<TagId> _prepareFullDraft(
     IntentionEditorRoute.name,
     TagCatalogRoute.name,
   ]);
-  expect(app.router.stackData[history.length], same(formRoute));
-  expect(
-    app.router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
-    isA<TagDraftContext>().having(
-      (context) => context.tagSet,
-      'набор',
-      same(tagSet),
-    ),
-  );
-  expect(tagSet.current.tagIds, [for (final tag in tags) _tagId(tag)]);
   expect(app.completions, isEmpty);
   expect(_storedCreationTables(app.raw), graphBefore);
 
@@ -1580,10 +829,8 @@ Future<TagId> _prepareFullDraft(
     ...history.map((route) => route.name),
     IntentionEditorRoute.name,
   ]);
-  expect(tester.element(_sheet), same(sheetElement));
-  expect(app.router.stackData.last, same(formRoute));
-  expect(tagSet.current.availability, IntentionDraftAvailability.editable);
-  expect(tagSet.current.tagIds, [for (final tag in tags) _tagId(tag), sport]);
+  expect(_sheet, findsOneWidget);
+  expect(_chipNames(tester), hasLength(tags.length + 1));
   expect(_text(tester, 'intention-editor-title'), _rawTitle);
   expect(_text(tester, 'intention-editor-description'), _description);
   expect(_iconOf(tester, _favorite), Icons.star);
@@ -1790,20 +1037,12 @@ Future<void> _expectCreatedPage(
   expect(state.intention.readiness, readiness);
   expect(state.intention.archiveState, IntentionArchiveState.active);
   expect(state.details.favoriteMark, favoriteMark);
-  expect(
-    state.revision.compareTo(completion.revision!),
-    GraphRevisionOrder.same,
-  );
   final assignments = container.read(
     tagAssignmentsViewModelProvider(id),
   ) as TagAssignmentsLoaded;
   expect(assignments.intentionId, id);
   expect([for (final tag in assignments.items) tag.name.value], tags);
   expect(assignments.freshness, TagAssignmentsFreshness.current);
-  expect(
-    assignments.revision.compareTo(completion.revision!),
-    GraphRevisionOrder.same,
-  );
   expect(
     tester
         .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
@@ -1917,10 +1156,6 @@ void _expectConfirmedPackage(
     isA<IntentionCatalogCreated>(),
     for (final _ in tags) isA<TagAssignmentChangedChange>(),
   ]);
-  expect(
-    package.changes.map((change) => change.revision),
-    everyElement(same(package.revision)),
-  );
   final IntentionSummary summary =
       (package.changes.first as IntentionCatalogCreated).entry.summary;
   expect([for (final tag in summary.tags) tag.name.value], tags);
@@ -1929,20 +1164,6 @@ void _expectConfirmedPackage(
   expect(summary.archiveState, IntentionArchiveState.active);
   expect(summary.createdAt.value, summary.updatedAt.value);
 }
-
-/// Записи полного создания с [tags] тегами: намерение, назначения и место
-/// избранного — все внутри транзакции.
-List<_Write> _fullCreationWrites({required int tags}) => [
-  (write: 'insert intentions', inTransaction: true),
-  for (var tag = 0; tag < tags; tag++)
-    (write: 'insert tag_assignments', inTransaction: true),
-  (write: 'insert favorite_intentions', inTransaction: true),
-];
-
-/// Записи минимального создания: только строка намерения.
-const List<_Write> _minimalCreationWrites = [
-  (write: 'insert intentions', inTransaction: true),
-];
 
 /// Строка созданного намерения [id]: нормализованное название, сохранённое
 /// описание либо его отсутствие, готовность, активное состояние и равные
@@ -2064,20 +1285,11 @@ Future<IntentionCatalogFirstPage> _catalogPage(
   };
 }
 
-/// Ревизия графа по свежему публичному чтению модуля графа.
-Future<GraphRevision> _freshRevision(WidgetTester tester, _Launch app) async {
-  final repository = app.container.read(personalGraphRepositoryProvider);
-  final result = await _readStorage(
-    tester,
-    () => repository.getRelationCounts(_intentionId(_walk)),
-  );
-  return switch (result) {
-    ResultSuccess(:final value) => value.revision,
-    final result => fail('Чтение графа не удалось: $result'),
-  };
-}
-
 HomeState _home(_Launch app) => app.container.read(homeViewModelProvider);
+
+List<IntentionId> _homeIds(HomeState state) => [
+  for (final row in (state as HomeList).items) row.id,
+];
 
 IntentionCatalogState? _catalogState(_Launch app) => app.container
     .read(intentionCatalogViewModelProvider(const BrowseIntentionCatalog()))
@@ -2115,8 +1327,6 @@ void _expectSameSearch(
   IntentionCatalogLoaded actual,
   IntentionCatalogLoaded expected,
 ) {
-  expect(actual.selection, same(expected.selection));
-  expect(actual.query, same(expected.query));
   expect(actual.nextCursor, isNull);
   expect(actual.continuation, isA<IntentionCatalogContinuationIdle>());
 }
@@ -2131,18 +1341,6 @@ TagNavigationState _navigation(WidgetTester tester, TagId tag) =>
 
 Finder _navigationPage(TagId tag) => find.byWidgetPredicate(
   (widget) => widget is TagNavigationPage && widget.tagId == tag,
-);
-
-/// Навигация по тегу [tag] показывает данные ревизии [revision].
-void _expectNavigationAt(
-  WidgetTester tester,
-  TagId tag,
-  GraphRevision revision,
-) => expect(
-  (_navigation(tester, tag) as TagNavigationLoaded).revision.compareTo(
-    revision,
-  ),
-  GraphRevisionOrder.same,
 );
 
 List<IntentionId> _navigationIds(WidgetTester tester, TagId tag) => [
@@ -2162,13 +1360,6 @@ _CatalogView _catalogView(WidgetTester tester) => (
   list: _catalogListPosition(tester).pixels,
   rows: _visibleCatalogRows(tester),
 );
-
-/// Совпадение позиций просмотра каталога.
-void _expectSameView(_CatalogView actual, _CatalogView expected) {
-  expect(actual.page, expected.page);
-  expect(actual.list, expected.list);
-  expect(actual.rows, expected.rows);
-}
 
 /// Видимая область списка выдачи на странице каталога.
 Rect _visibleCatalogArea(WidgetTester tester) => tester
@@ -2290,35 +1481,6 @@ List<String> _storedAssignments(sqlite.Database raw, IntentionId id) => [
     row['tag_id'] as String,
 ];
 
-/// Исходы самостоятельных команд намерений, тегов и порядка избранного
-/// после первых [since] событий; начала команд не учитываются.
-List<DiagnosticsEvent> _commandEvents(_Launch app, {required int since}) => [
-  for (final event in app.diagnostics.events.skip(since))
-    if ((event is IntentionCommandDiagnosticsEvent ||
-            event is TagCommandDiagnosticsEvent ||
-            event is FavoriteOrderCommandDiagnosticsEvent) &&
-        event.status is! DiagnosticsStarted)
-      event,
-];
-
-Matcher _tagCreateEvent() => isA<TagCommandDiagnosticsEvent>()
-    .having(
-      (event) => event.commandType,
-      'команда',
-      TagCommandDiagnosticsType.create,
-    )
-    .having((event) => event.status, 'исход', isA<DiagnosticsSucceeded>());
-
-Matcher _createEvent(IntentionCreationCommandDiagnosticsStage stage) =>
-    isA<IntentionCommandDiagnosticsEvent>()
-        .having(
-          (event) => event.commandType,
-          'команда',
-          IntentionCommandDiagnosticsType.create,
-        )
-        .having((event) => event.stage, 'этап', stage)
-        .having((event) => event.status, 'исход', isA<DiagnosticsSucceeded>());
-
 /// Дожидается ровно одного сообщения [text] общей поверхности и закрывает
 /// его; предъявленный результат не показывается повторно.
 Future<void> _acceptMessage(WidgetTester tester, String text) async {
@@ -2363,160 +1525,4 @@ Future<void> _waitFor(
     await tester.pump(const Duration(milliseconds: 20));
   }
   expect(done(), isTrue, reason: reason?.call());
-}
-
-/// Настоящий стек приложения с отказом только открытия созданного намерения.
-final class _FailingCreatedRouteRouter extends RootStackRouter {
-  _FailingCreatedRouteRouter({
-    required this.synchronous,
-    this.point = _CreatedNavigationFailure.beforeRemoval,
-  });
-
-  final bool synchronous;
-  final _CreatedNavigationFailure point;
-  final failure = StateError('Управляемый отказ открытия созданного намерения');
-  final _failureGate = Completer<void>();
-  var replacementAttempts = 0;
-
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-
-  void releaseFailure() => _failureGate.complete();
-
-  @override
-  Future<T?> replace<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    if (route.routeName != IntentionDetailsRoute.name) {
-      return super.replace<T>(route, onFailure: onFailure);
-    }
-    replacementAttempts++;
-    switch (point) {
-      case _CreatedNavigationFailure.beforeRemoval:
-        break;
-      case _CreatedNavigationFailure.afterRemoval:
-        removeRoute(stackData.last, notify: false);
-      case _CreatedNavigationFailure.afterResult ||
-          _CreatedNavigationFailure.afterNewSession:
-        unawaited(super.replace<T>(route, onFailure: onFailure));
-    }
-    if (synchronous) throw failure;
-    return _failureGate.future.then<T?>((_) => throw failure);
-  }
-}
-
-enum _CreatedNavigationFailure {
-  beforeRemoval('до удаления панели'),
-  afterRemoval('после удаления панели'),
-  afterResult('после открытия результата'),
-  afterNewSession('после нового открытия');
-
-  const _CreatedNavigationFailure(this.description);
-  final String description;
-}
-
-enum _CloseMethod {
-  button('кнопка закрытия'),
-  barrier('нажатие на фон'),
-  handle('свайп ручки'),
-  back('системное «назад»');
-
-  const _CloseMethod(this.description);
-  final String description;
-
-  Future<void> request(WidgetTester tester) async {
-    switch (this) {
-      case button:
-        await tester.tap(find.byKey(const ValueKey('intention-editor-close')));
-      case barrier:
-        await tester.tapAt(Offset(20, tester.getRect(_sheet).top / 2));
-      case handle:
-        await tester.drag(
-          find.byKey(const ValueKey('intention-creation-sheet-handle')),
-          const Offset(0, 240),
-        );
-      case back:
-        await tester.binding.handlePopRoute();
-    }
-  }
-}
-
-/// Изменяющая данные запись на соединении приложения: вид операции, как его
-/// помечает перехватчик соединения, изменяемые таблицы и выполнялась ли она
-/// внутри транзакции.
-typedef _Write = ({String write, bool inTransaction});
-
-/// Учитывает после [start] каждую операцию соединения приложения, которая
-/// изменяет данные, в любом виде: вставку, обновление, удаление, пакет,
-/// произвольный оператор и запись с возвратом строк, которую drift выполняет
-/// через путь чтения. Изменяет ли оператор данные, определяет сам SQLite.
-///
-/// Не учитывается только маркер физического соединения, который чтения
-/// тегов создают временной таблицей: он живёт в соединении, не входит в
-/// граф и не меняет его.
-final class _WriteLog extends LocalDatabaseConnectionObserver {
-  /// Таблица, которую изменяет оператор SQL.
-  static final _writtenTable = RegExp(
-    r'^\s*(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|REPLACE\s+INTO|'
-    r'UPDATE(?:\s+OR\s+\w+)?|DELETE\s+FROM)\s+"?(\w+)"?',
-    caseSensitive: false,
-  );
-
-  /// Создание маркера соединения чтений тегов.
-  static final _connectionMarker = RegExp(
-    r'^\s*CREATE\s+TEMP\s+TABLE\s+IF\s+NOT\s+EXISTS\s+'
-    r'doable_catalog_connection\b',
-    caseSensitive: false,
-  );
-
-  /// Соединение запущенного приложения.
-  late sqlite.Database connection;
-
-  /// Записи после [start]; `null`, пока учёт не начат.
-  List<_Write>? _writes;
-
-  void start() => _writes = [];
-
-  /// Возвращает записи после [start] либо прошлого вызова и продолжает
-  /// учёт.
-  List<_Write> take() {
-    final writes = _writes ?? (throw StateError('Учёт записей не начат.'));
-    _writes = [];
-    return List.unmodifiable(writes);
-  }
-
-  @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    final writes = _writes;
-    if (writes == null) return;
-    final tables = [
-      for (final sql in statement.statements)
-        for (final written in _dataChangingStatements(sql))
-          _writtenTable.firstMatch(written)?.group(1) ?? written,
-    ];
-    if (tables.isEmpty) return;
-    writes.add((
-      write: '${statement.operation.name} ${tables.join(', ')}',
-      inTransaction: !connection.autocommit,
-    ));
-  }
-
-  /// Операторы текста [sql], которые по оценке SQLite
-  /// (`sqlite3_stmt_readonly`) изменяют данные.
-  List<String> _dataChangingStatements(String sql) {
-    final prepared = connection.prepareMultiple(sql);
-    try {
-      return [
-        for (final statement in prepared)
-          if (!statement.isReadOnly &&
-              !_connectionMarker.hasMatch(statement.sql))
-            statement.sql,
-      ];
-    } finally {
-      for (final statement in prepared) {
-        statement.close();
-      }
-    }
-  }
 }

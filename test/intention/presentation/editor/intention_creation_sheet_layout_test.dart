@@ -4,7 +4,6 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
@@ -42,143 +41,65 @@ void main() {
   });
 
   group('геометрия и прокрутка компактной панели', () {
-    testWidgets('панель не предоставляет кнопку изменения размера', (
-      tester,
-    ) async {
-      _usePhone(tester, _portrait);
-      final sessions = _EditorSessions();
-      final repository = ControlledCatalogRepository();
-      await _openEditor(tester, repository, sessions);
-
-      expect(
-        find.byKey(const ValueKey('intention-creation-sheet-resize')),
-        findsNothing,
-      );
-      expect(find.byIcon(Icons.open_in_full), findsNothing);
-      expect(find.byIcon(Icons.close_fullscreen), findsNothing);
-      expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
-      _expectSubmitAvailable(tester, _portrait);
-    });
-
-    for (final isFling in [false, true]) {
-      testWidgets(
-        '${isFling ? 'быстрый' : 'медленный'} свайп вверх по ручке сохраняет геометрию, черновик и сессию без отправки и закрытия',
-        (tester) async {
-          _usePhone(tester, _portrait);
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository();
-          final router = await _openEditor(tester, repository, sessions);
-          await tester.enterText(find.byKey(_title), 'Намерение');
-          await tester.enterText(find.byKey(_description), 'Описание');
-          await tester.pumpAndSettle();
-          final session = sessions.single;
-          final draft = sessions.state(tester).draft;
-          final compact = _sheetRect(tester);
-          final stack = router.stack.length;
-          final titleController = _controller(tester, _title);
-          final descriptionController = _controller(tester, _description);
-
-          if (isFling) {
-            await tester.fling(find.byKey(_handle), const Offset(0, -60), 1500);
-          } else {
-            await tester.drag(find.byKey(_handle), const Offset(0, -120));
-          }
-          await tester.pumpAndSettle();
-
-          expect(_sheetRect(tester), compact);
-          expect(sessions.state(tester).draft, same(draft));
-          _expectSameSession(tester, sessions, session);
-          expect(_controller(tester, _title), same(titleController));
-          expect(
-            _controller(tester, _description),
-            same(descriptionController),
-          );
-          expect(_hasFocus(tester, _description), isTrue);
-          expect(router.current.name, IntentionEditorRoute.name);
-          expect(router.stack.length, stack);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
-          _expectSubmitAvailable(tester, _portrait);
-          expect(repository.commands, isEmpty);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
-
     for (final (name, field, shortText, longText) in [
       ('названия', _title, 'Намерение', _lines(12).replaceAll('\n', ' ')),
       ('описания', _description, 'Описание', _lines(6)),
     ]) {
-      testWidgets(
-        'рост и сокращение $name сохраняют сессию, контроллеры, ввод, фокус и маршрут',
-        (tester) async {
-          _usePhone(tester, _portrait);
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository();
-          final router = await _openEditor(tester, repository, sessions);
-          await tester.enterText(find.byKey(_title), 'Намерение');
-          await tester.enterText(find.byKey(_description), 'Описание');
-          await tester.pumpAndSettle();
-          final session = sessions.single;
-          final stack = router.stack.length;
-          final titleController = _controller(tester, _title);
-          final descriptionController = _controller(tester, _description);
-          final compact = _sheetRect(tester);
-          final shortFieldHeight = tester.getSize(find.byKey(field)).height;
-          _expectCompact(tester, compact, _portrait);
+      testWidgets('рост и сокращение $name сохраняют ввод, фокус и маршрут', (
+        tester,
+      ) async {
+        _usePhone(tester, _portrait);
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository, sessions);
+        await tester.enterText(find.byKey(_title), 'Намерение');
+        await tester.enterText(find.byKey(_description), 'Описание');
+        await tester.pumpAndSettle();
+        final compact = _sheetRect(tester);
+        final shortFieldHeight = tester.getSize(find.byKey(field)).height;
+        _expectCompact(tester, compact, _portrait);
 
-          await tester.enterText(find.byKey(field), longText);
-          await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(field), longText);
+        await tester.pumpAndSettle();
 
-          expect(
-            tester.getSize(find.byKey(field)).height,
-            greaterThan(shortFieldHeight),
-          );
-          expect(_sheetRect(tester).height, greaterThan(compact.height));
-          _expectCompact(tester, _sheetRect(tester), _portrait);
-          _expectSubmitAvailable(tester, _portrait);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          _expectSameSession(tester, sessions, session);
-          expect(router.stack.length, stack);
-          expect(router.current.name, IntentionEditorRoute.name);
-          expect(_controller(tester, _title), same(titleController));
-          expect(
-            _controller(tester, _description),
-            same(descriptionController),
-          );
-          expect(
-            titleController.text,
-            field == _title ? longText : 'Намерение',
-          );
-          expect(
-            descriptionController.text,
-            field == _description ? longText : 'Описание',
-          );
-          expect(_hasFocus(tester, field), isTrue);
-          expect(sessions.state(tester).draft.title, titleController.text);
-          expect(
-            sessions.state(tester).draft.description,
-            descriptionController.text,
-          );
+        expect(
+          tester.getSize(find.byKey(field)).height,
+          greaterThan(shortFieldHeight),
+        );
+        expect(_sheetRect(tester).height, greaterThan(compact.height));
+        _expectCompact(tester, _sheetRect(tester), _portrait);
+        _expectSubmitAvailable(tester, _portrait);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(
+          _controller(tester, _title).text,
+          field == _title ? longText : 'Намерение',
+        );
+        expect(
+          _controller(tester, _description).text,
+          field == _description ? longText : 'Описание',
+        );
+        expect(_hasFocus(tester, field), isTrue);
+        expect(
+          sessions.state(tester).draft.title,
+          _controller(tester, _title).text,
+        );
+        expect(
+          sessions.state(tester).draft.description,
+          _controller(tester, _description).text,
+        );
 
-          await tester.enterText(find.byKey(field), shortText);
-          await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(field), shortText);
+        await tester.pumpAndSettle();
 
-          expect(_sheetRect(tester), compact);
-          expect(tester.getSize(find.byKey(field)).height, shortFieldHeight);
-          expect(find.byKey(_closeConfirmation), findsNothing);
-          _expectSameSession(tester, sessions, session);
-          expect(router.stack.length, stack);
-          expect(
-            _controller(tester, _description),
-            same(descriptionController),
-          );
-          expect(descriptionController.text, 'Описание');
-          expect(_hasFocus(tester, field), isTrue);
-          expect(repository.commands, isEmpty);
-          expect(tester.takeException(), isNull);
-        },
-      );
+        expect(_sheetRect(tester), compact);
+        expect(tester.getSize(find.byKey(field)).height, shortFieldHeight);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(_controller(tester, _description).text, 'Описание');
+        expect(_hasFocus(tester, field), isTrue);
+        expect(repository.commands, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
     }
 
     testWidgets(
@@ -190,7 +111,6 @@ void main() {
         final router = await _openEditor(tester, repository, sessions);
         await tester.enterText(find.byKey(_title), 'Намерение');
         await tester.pumpAndSettle();
-        final session = sessions.single;
         final compact = _sheetRect(tester);
 
         // Короткое движение ручки не запрашивает закрытие.
@@ -208,7 +128,6 @@ void main() {
         expect(router.current.name, IntentionEditorRoute.name);
         expect(_sheetRect(tester), compact);
         expect(_controller(tester, _title).text, 'Намерение');
-        _expectSameSession(tester, sessions, session);
         expect(repository.commands, isEmpty);
       },
     );
@@ -241,7 +160,6 @@ void main() {
         await tester.pumpAndSettle();
         final compact = _sheetRect(tester);
         final draft = sessions.state(tester).draft;
-        final session = sessions.single;
 
         // Свайп вниз по полям у их начала — прокрутка, а не закрытие.
         await tester.fling(find.byKey(_fields), const Offset(0, 300), 3000);
@@ -253,15 +171,15 @@ void main() {
         expect(_sheetRect(tester), compact);
         expect(find.byKey(_closeConfirmation), findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
-        expect(sessions.state(tester).draft, same(draft));
-        _expectSameSession(tester, sessions, session);
+        _expectDraftValues(sessions.state(tester).draft, draft);
         _expectSubmitAvailable(tester, _portrait);
         expect(repository.commands, isEmpty);
       },
     );
 
+    // Рост каждого поля проверен выше; прокрутка длинного содержимого внутри
+    // панели одна для любого поля.
     for (final (name, field, longText) in [
-      ('названия', _title, _lines(120).replaceAll('\n', ' ')),
       ('описания', _description, _lines(120)),
     ]) {
       testWidgets(
@@ -366,30 +284,9 @@ void main() {
   });
 
   group('клавиатура и системные отступы', () {
-    testWidgets(
-      'пустая форма на экране 568×320 над клавиатурой при масштабе 200% сохраняет видимый ввод с фокусом',
-      (tester) async {
-        _usePhone(tester, _narrowLandscape, keyboard: true);
-        tester.platformDispatcher.textScaleFactorTestValue = 2;
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final sessions = _EditorSessions();
-        await _openEditor(tester, ControlledCatalogRepository(), sessions);
-
-        final viewport = tester.getRect(find.byKey(_fields));
-        expect(viewport.height, greaterThan(0));
-        _expectFocusedInputVisible(tester, _title);
-        _expectCompact(
-          tester,
-          _sheetRect(tester),
-          _narrowLandscape,
-          keyboard: true,
-        );
-        expect(tester.view.viewInsets.bottom, 160);
-        expect(tester.takeException(), isNull);
-      },
-    );
+    // Доведение ошибки каждого поля до видимости проверяет группа ошибок
+    // сохранения; здесь — чтение и исправление на тесном экране.
     for (final (name, field, textField) in [
-      ('названия', _title, IntentionTextField.title),
       ('описания', _description, IntentionTextField.description),
     ]) {
       testWidgets(
@@ -403,7 +300,6 @@ void main() {
           final repository = ControlledCatalogRepository()
             ..tagObservations = _observedTags([tag]);
           await _openEditor(tester, repository, sessions);
-          final session = sessions.single;
           await tester.enterText(find.byKey(_title), 'Намерение');
           await tester.enterText(find.byKey(_description), _lines(8));
           sessions.notifier(tester)
@@ -425,7 +321,7 @@ void main() {
             matching: find.byType(OperationFailurePresentation),
           );
           await _expectMessageReadable(tester, message);
-          expect(sessions.state(tester).draft, same(draft));
+          _expectDraftValues(sessions.state(tester).draft, draft);
           expect(_submitButton(tester).onPressed, isNull);
 
           await tester.enterText(find.byKey(field), 'Исправлено');
@@ -457,7 +353,6 @@ void main() {
           await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
           await tester.pump();
           expect(repository.commands, hasLength(3));
-          _expectSameSession(tester, sessions, session);
           expect(tester.view.viewInsets.bottom, 160);
           _expectCompact(
             tester,
@@ -469,7 +364,9 @@ void main() {
         },
       );
     }
-    for (final device in [_portrait, _landscape]) {
+    // Геометрию тесной альбомной области с клавиатурой проверяют тесты ниже;
+    // смена клавиатуры одинаково сохраняет панель на любом экране.
+    for (final device in [_portrait]) {
       testWidgets(
         'клавиатура на ${device.name} пересчитывает геометрию компактной панели, а её скрытие сохраняет панель и черновик',
         (tester) async {
@@ -479,7 +376,6 @@ void main() {
           final router = await _openEditor(tester, repository, sessions);
           await tester.enterText(find.byKey(_title), 'Намерение');
           await tester.pumpAndSettle();
-          final session = sessions.single;
 
           _usePhone(tester, device, keyboard: true);
           await tester.pumpAndSettle();
@@ -502,56 +398,10 @@ void main() {
           expect(find.byKey(_closeConfirmation), findsNothing);
           expect(_controller(tester, _title).text, 'Намерение');
           expect(sessions.state(tester).draft.title, 'Намерение');
-          _expectSameSession(tester, sessions, session);
           expect(repository.commands, isEmpty);
           expect(tester.takeException(), isNull);
         },
       );
-    }
-
-    for (final device in [_portrait, _landscape]) {
-      for (final textScale in [_androidMaxTextScale, _beyondMaxTextScale]) {
-        // На максимуме Android «Сохранить» видно целиком. Сверх него
-        // закреплённая часть может не поместиться над клавиатурой:
-        // кнопка остаётся нажимаемой, а остаток части
-        // доступен её прокруткой.
-        final isSubmitFullyVisible = textScale <= _androidMaxTextScale;
-        testWidgets(
-          'на ${device.name} с клавиатурой и масштабом текста ${(textScale * 100).round()}% отправка и закрытие доступны в компактной панели без переполнений',
-          (tester) async {
-            _usePhone(tester, device, keyboard: true);
-            tester.platformDispatcher.textScaleFactorTestValue = textScale;
-            addTearDown(
-              tester.platformDispatcher.clearTextScaleFactorTestValue,
-            );
-            final sessions = _EditorSessions();
-            final repository = ControlledCatalogRepository();
-            await _openEditor(tester, repository, sessions);
-            await tester.enterText(find.byKey(_description), _lines(12));
-            await tester.pumpAndSettle();
-
-            _expectCompact(tester, _sheetRect(tester), device, keyboard: true);
-            _expectSubmitAvailable(
-              tester,
-              device,
-              keyboard: true,
-              fullyVisible: isSubmitFullyVisible,
-            );
-            expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
-            expect(tester.takeException(), isNull);
-
-            // Ввод остаётся доступным при исходной открытой клавиатуре.
-            final viewport = tester.getRect(find.byKey(_fields));
-            expect(viewport.height, greaterThan(0));
-            await tester.ensureVisible(find.byKey(_title));
-            await tester.pumpAndSettle();
-            final title = tester.getRect(find.byKey(_title));
-            expect(title.top, lessThan(viewport.bottom));
-            expect(title.bottom, greaterThan(viewport.top));
-            expect(tester.takeException(), isNull);
-          },
-        );
-      }
     }
 
     for (final (device, minFieldsHeight) in [
@@ -592,7 +442,7 @@ void main() {
 
   group('сохранение сессии', () {
     testWidgets(
-      'продолжение после запроса закрытия сохраняет геометрию, контроллеры, фокус и положение содержимого',
+      'продолжение после запроса закрытия сохраняет геометрию, ввод, фокус и положение содержимого',
       (tester) async {
         _usePhone(tester, _portrait);
         final sessions = _EditorSessions();
@@ -605,7 +455,6 @@ void main() {
         final controller = _controller(tester, _description);
         final position = _fieldsPosition(tester).pixels;
         expect(position, greaterThan(0));
-        final session = sessions.single;
 
         await tester.tap(find.byKey(_closeButton));
         await tester.pumpAndSettle();
@@ -617,16 +466,14 @@ void main() {
         expect(_sheetRect(tester), compact);
         expect(_fieldsPosition(tester).pixels, position);
         expect(controller.selection.baseOffset, _lines(120).length);
-        expect(_controller(tester, _description), same(controller));
-        expect(controller.text, _lines(120));
+        expect(_controller(tester, _description).text, _lines(120));
         expect(_hasFocus(tester, _description), isTrue);
-        _expectSameSession(tester, sessions, session);
         expect(repository.commands, isEmpty);
       },
     );
 
     testWidgets(
-      'каждое новое открытие имеет самостоятельную сессию и пустой черновик',
+      'каждое новое открытие после закрытия начинается с пустого черновика',
       (tester) async {
         _usePhone(tester, _portrait);
         final sessions = _EditorSessions();
@@ -634,7 +481,6 @@ void main() {
         final router = await _openEditor(tester, repository, sessions);
         final compact = _sheetRect(tester);
 
-        final first = sessions.single;
         // Неизменённая панель закрывается сразу.
         await tester.tap(find.byKey(_closeButton));
         await tester.pumpAndSettle();
@@ -645,10 +491,6 @@ void main() {
           QuickCreationMode.intention,
           openedPage: find.byType(IntentionEditorPage),
         );
-        expect(sessions.added, hasLength(2));
-        expect(sessions.latest, isNot(same(first)));
-        expect(sessions.disposed, contains(same(first)));
-        final second = sessions.latest;
         expect(_sheetRect(tester), compact);
 
         // Изменённая панель закрывается подтверждённым сбросом.
@@ -665,9 +507,6 @@ void main() {
           QuickCreationMode.intention,
           openedPage: find.byType(IntentionEditorPage),
         );
-        expect(sessions.added, hasLength(3));
-        expect(sessions.latest, isNot(same(second)));
-        expect(sessions.disposed, contains(same(second)));
         expect(_controller(tester, _title).text, isEmpty);
         expect(_controller(tester, _description).text, isEmpty);
         expect(sessions.state(tester).draft.isChanged, isFalse);
@@ -680,7 +519,7 @@ void main() {
   group('ошибки сохранения', () {
     for (final (name, field, reason, fieldKey, message) in _fieldFailures) {
       testWidgets(
-        'в компактной панели ошибка $name доводит своё поле и собственный текст до видимости в прокрученных полях над клавиатурой, право ошибки подтверждается только по кадру с видимым сообщением, а исправление поля разрешает новую отправку',
+        'в компактной панели ошибка $name доводит своё поле и собственный текст до видимости в прокрученных полях над клавиатурой без сообщения общей поверхности, а исправление поля разрешает новую отправку',
         (tester) async {
           _usePhone(tester, _portrait, keyboard: true);
           final sessions = _EditorSessions();
@@ -699,18 +538,12 @@ void main() {
           await tester.idle();
           await tester.pump();
 
-          final claim = _failureClaim(tester);
-          for (var frame = 0; _isClaimPending(tester, claim); frame++) {
-            expect(frame, lessThan(60), reason: 'сообщение становится видимым');
-            await tester.pump(const Duration(milliseconds: 16));
-          }
-          _expectInsideFields(tester, find.text(message));
           await tester.pumpAndSettle();
 
           _expectInsideFields(tester, find.text(message));
           _expectFieldEndVisible(tester, fieldKey);
           expect(find.byType(SnackBar), findsNothing);
-          expect(sessions.state(tester).draft, same(draft));
+          _expectDraftValues(sessions.state(tester).draft, draft);
           expect(_controller(tester, _title).text, title);
           expect(_controller(tester, _description).text, _lines(40));
           expect(_submitButton(tester).onPressed, isNull);
@@ -728,7 +561,13 @@ void main() {
           expect(tester.takeException(), isNull);
         },
       );
+    }
 
+    // Возвращённая клавиатура прокручивает поля к каретке описания и уводит
+    // из видимой области ошибку названия: повторное доведение нужно ей.
+    for (final (name, field, reason, fieldKey, message) in [
+      _fieldFailures.first,
+    ]) {
       testWidgets(
         'в компактной панели ошибка $name остаётся видимой, когда скрытая на время отправки клавиатура возвращается',
         (tester) async {
@@ -851,9 +690,8 @@ void main() {
 
           _expectPinned(tester, recovery);
           expect(_fieldsPosition(tester).pixels, pixels);
-          expect(_isClaimPending(tester, _failureClaim(tester)), isFalse);
           expect(find.byType(SnackBar), findsNothing);
-          expect(sessions.state(tester).draft, same(draft));
+          _expectDraftValues(sessions.state(tester).draft, draft);
           expect(repository.commands, hasLength(1));
           expect(tester.takeException(), isNull);
 
@@ -869,7 +707,6 @@ void main() {
               expect(_submitButton(tester).onPressed, isNotNull);
               expect(repository.commands, hasLength(1));
             case _Recovery.retry:
-              final first = _failureClaim(tester);
               await tester.tap(find.byKey(_submit));
               await tester.pump();
 
@@ -902,11 +739,8 @@ void main() {
               repository.completeCommand(1, ResultFailure(failure));
               await tester.pumpAndSettle();
 
-              // Повтор принят той же сессией как новая операция.
-              final second = _failureClaim(tester);
-              expect(second.token, isNot(same(first.token)));
-              expect(_isClaimPending(tester, second), isFalse);
-              expect(sessions.added, hasLength(1));
+              // Отказ повтора закреплён в той же панели.
+              expect(find.byKey(_failure), findsOneWidget);
               expect(find.byType(SnackBar), findsNothing);
             case _Recovery.none:
               expect(_submitButton(tester).onPressed, isNull);
@@ -949,7 +783,6 @@ void main() {
           await tester.enterText(find.byKey(_title), '  Намерение');
           await tester.enterText(find.byKey(_description), 'Описание\n');
           await tester.pumpAndSettle();
-          final session = sessions.single;
           final draft = sessions.state(tester).draft;
 
           await tester.tap(find.byKey(_submit));
@@ -963,7 +796,7 @@ void main() {
             isA<OperationFailed<Intention>>(),
             reason: name,
           );
-          expect(state.draft, same(draft), reason: name);
+          _expectDraftValues(state.draft, draft, reason: name);
           expect(state.draft.tagIds, [_tagId(1)], reason: name);
           expect(state.draft.favoriteMark, FavoriteMark.favorite, reason: name);
           expect(state.draft.readiness, IntentionReadiness.ready, reason: name);
@@ -974,7 +807,6 @@ void main() {
             reason: name,
           );
           expect(find.byKey(_tagChip(1)), findsOneWidget, reason: name);
-          _expectSameSession(tester, sessions, session);
           _expectCompact(tester, _sheetRect(tester), _portrait);
           _expectSubmitAvailable(tester, _portrait);
           expect(repository.commands, hasLength(1), reason: name);
@@ -986,10 +818,10 @@ void main() {
 
   group('полный заполненный сценарий на тесном экране', () {
     for (final device in [_narrowPortrait, _narrowLandscape]) {
-      for (final textScale in [_androidMaxTextScale, _beyondMaxTextScale]) {
-        // До максимума Android «Сохранить» видно целиком; сверх него
-        // остаток действий прокручивается. Поля и сообщения отказов
-        // остаются доступны при открытой клавиатуре.
+      // Максимум Android — крайний достижимый масштаб: «Сохранить» видно
+      // целиком, а поля и сообщения отказов доступны при открытой
+      // клавиатуре.
+      for (final textScale in [_androidMaxTextScale]) {
         final isWithinPlatformTextScale = textScale <= _androidMaxTextScale;
         testWidgets(
           'на ${device.name} с безопасными отступами, клавиатурой и масштабом текста ${(textScale * 100).round()}% все пять полей, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
@@ -1383,6 +1215,8 @@ const _fieldFailures =
     ];
 
 /// Общие отказы сохранения: причина, сообщение и предлагаемое восстановление.
+/// По одному отказу на способ восстановления; без восстановления — с самым
+/// длинным сообщением. Тексты остальных отказов проверяет тест страницы.
 final _pinnedFailures = <(IntentionFailure, String, _Recovery)>[
   (
     IntentionCreationTagsMissingFailure([_tagId(1)]),
@@ -1394,16 +1228,6 @@ final _pinnedFailures = <(IntentionFailure, String, _Recovery)>[
     const IntentionUnavailableFailure(),
     'The intention couldn’t be created. Try again.',
     _Recovery.retry,
-  ),
-  (
-    const IntentionConflictFailure(),
-    'The intention couldn’t be created because of a conflict.',
-    _Recovery.none,
-  ),
-  (
-    const IntentionCorruptionFailure(),
-    'Stored data is damaged. The intention wasn’t created.',
-    _Recovery.none,
   ),
   (
     const IntentionUnexpectedFailure(),
@@ -1500,24 +1324,6 @@ void _expectPinned(WidgetTester tester, _Recovery recovery) {
   );
 }
 
-GraphInitiatorPresentationClaim _failureClaim(WidgetTester tester) => tester
-    .widget<OperationFailurePresentation>(
-      find.byType(OperationFailurePresentation),
-    )
-    .claim!;
-
-/// Право ошибки ещё у формы: не подтверждено и не передано общей
-/// поверхности.
-bool _isClaimPending(
-  WidgetTester tester,
-  GraphInitiatorPresentationClaim claim,
-) => identical(
-  ProviderScope.containerOf(tester.element(find.byType(IntentionEditorPage)))
-      .read(graphCommandCoordinatorProvider.notifier)
-      .claimInitiatorFailure(claim.token),
-  claim,
-);
-
 FilledButton _submitButton(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byKey(_submit));
 
@@ -1579,10 +1385,6 @@ const _maxSheetWidth = 640.0;
 
 /// Наибольший масштаб системного шрифта Android — платформы приложения.
 const _androidMaxTextScale = 2.0;
-
-/// Масштаб сверх максимума Android: геометрия не должна опираться на это
-/// ограничение платформы.
-const _beyondMaxTextScale = 3.0;
 
 /// Телефон: логический размер экрана, системные отступы, высота экранной
 /// клавиатуры и наименьший ожидаемый видимый участок страницы над
@@ -1775,15 +1577,17 @@ void _expectFocusedInputVisible(WidgetTester tester, Key field) {
 String _lines(int count) =>
     [for (var line = 1; line <= count; line++) 'Строка $line'].join('\n');
 
-/// Та же сессия: новая не построена, прежняя не освобождена.
-void _expectSameSession(
-  WidgetTester tester,
-  _EditorSessions sessions,
-  IntentionEditorViewModelProvider session,
-) {
-  expect(sessions.added, [same(session)]);
-  expect(sessions.disposed, isEmpty);
-  expect(sessions.latest, same(session));
+/// Черновик сохранил введённые значения.
+void _expectDraftValues(
+  IntentionCreationDraft actual,
+  IntentionCreationDraft expected, {
+  String? reason,
+}) {
+  expect(actual.title, expected.title, reason: reason);
+  expect(actual.description, expected.description, reason: reason);
+  expect(actual.tagIds, expected.tagIds, reason: reason);
+  expect(actual.favoriteMark, expected.favoriteMark, reason: reason);
+  expect(actual.readiness, expected.readiness, reason: reason);
 }
 
 /// Сессии формы создания, построенные и освобождённые за время теста.

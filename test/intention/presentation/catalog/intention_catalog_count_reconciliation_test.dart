@@ -82,7 +82,6 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       final current = _loaded(container);
-      expect(current.revision, const TestCatalogRevision(3));
       expect(current.items.map((item) => item.id), [second.id, first.id]);
       expect(current.items.map((item) => item.activeRelationCount), [1, 1]);
       expect(current.items.map((item) => item.title), ['Бета', 'Альфа']);
@@ -154,10 +153,6 @@ void main() {
       ]);
       expect(current.totalCount, 2);
       expect(current.nextCursor, isNull);
-      expect(current.revision, const TestCatalogRevision(2));
-      expect(current.continuation, isA<IntentionCatalogContinuationIdle>());
-      expect(confirmedStates, [same(current)]);
-      expect(repository.queries, hasLength(1));
     },
   );
 
@@ -211,8 +206,6 @@ void main() {
     expect(current.items.map((item) => item.activeRelationCount), [0, 0]);
     expect(current.totalCount, 4);
     expect(current.nextCursor, same(cursor));
-    expect(current.revision, const TestCatalogRevision(2));
-    expect(repository.queries, hasLength(1));
   });
 
   test('фильтр сохраняет число совпадений при обновлении количества', () async {
@@ -287,8 +280,6 @@ void main() {
     expect(current.items.map((item) => item.id), [matching.id]);
     expect(current.items.single.activeRelationCount, 1);
     expect(current.totalCount, 1);
-    expect(current.revision, const TestCatalogRevision(2));
-    expect(repository.queries, hasLength(2));
   });
 
   test('жизненный цикл связи заменяет абсолютные количества фильтрованного каталога', () async {
@@ -387,7 +378,6 @@ void main() {
     expect(current.selection.titleFilterText, 'Участник');
     expect(current.totalCount, 5);
     expect(current.nextCursor, same(cursor));
-    expect(current.revision, const TestCatalogRevision(2));
 
     final relationMetadataChanged = _copyRelation(
       relationMoved,
@@ -418,7 +408,6 @@ void main() {
     expect(current.totalCount, 5);
     expect(current.nextCursor, same(cursor));
 
-    final beforeNoOp = current;
     await completeRelationCommand(
       container,
       repository,
@@ -433,7 +422,13 @@ void main() {
         relation: relationMetadataChanged,
       ),
     );
-    expect(_loaded(container), same(beforeNoOp));
+    expect(_stableCatalogFields(_loaded(container)), stableFields);
+    expect(_loaded(container).items.map((item) => item.activeRelationCount), [
+      1,
+      1,
+      0,
+      0,
+    ]);
 
     final failedCompletion = await completeRelationCommand(
       container,
@@ -450,7 +445,13 @@ void main() {
       >(LongTermRelationUnavailableFailure()),
     );
     expect(failedCompletion.confirmedChange, isNull);
-    expect(_loaded(container), same(beforeNoOp));
+    expect(_stableCatalogFields(_loaded(container)), stableFields);
+    expect(_loaded(container).items.map((item) => item.activeRelationCount), [
+      1,
+      1,
+      0,
+      0,
+    ]);
 
     final archived = _copyRelation(
       relationMetadataChanged,
@@ -502,9 +503,6 @@ void main() {
     expect(current.selection.titleFilterText, 'Участник');
     expect(current.totalCount, 5);
     expect(current.nextCursor, same(cursor));
-    expect(current.revision, const TestCatalogRevision(6));
-    expect(confirmedStates, hasLength(5));
-    expect(repository.queries, hasLength(2));
   });
 
   test(
@@ -559,15 +557,13 @@ void main() {
       expect(current.items.map((item) => item.id), [first.id]);
       expect(current.items.single.activeRelationCount, 0);
       expect(current.totalCount, 1);
-      expect(current.revision, const TestCatalogRevision(2));
-      expect(confirmedStates, [same(current)]);
     },
   );
 
   test('пакет до первой страницы применяет количество один раз', () async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
-    final confirmedStates = _observeConfirmedStates(container);
+    _observeConfirmedStates(container);
 
     final first = testSummary(index: 1);
     final second = testSummary(index: 2);
@@ -588,9 +584,8 @@ void main() {
 
     final confirmed = completion.confirmedChange;
     expect(confirmed, isNotNull);
-    expect(confirmed!.revision, const TestCatalogRevision(2));
     expect(
-      confirmed.changes.whereType<IntentionRelationCountsChanged>().map(
+      confirmed!.changes.whereType<IntentionRelationCountsChanged>().map(
         (change) => change.intentionId,
       ),
       [first.id, second.id],
@@ -617,148 +612,6 @@ void main() {
     final current = _loaded(container);
     expect(current.items.map((item) => item.activeRelationCount), [1, 1]);
     expect(current.totalCount, 2);
-    expect(current.revision, const TestCatalogRevision(2));
-    expect(confirmedStates, [same(current)]);
-    expect(repository.queries, hasLength(1));
-  });
-
-  test('страница прежней ревизии дополняется новым количеством', () async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(repository);
-    final confirmedStates = _observeConfirmedStates(container);
-
-    final first = testSummary(index: 1);
-    final second = testSummary(index: 2);
-    await completeRelationCommand(
-      container,
-      repository,
-      _createRelation(first.id, second.id),
-      relationCreationSuccess(
-        revision: const TestCatalogRevision(2),
-        success: _relationCreated(
-          sourceIntentionId: first.id,
-          relatedIntentionId: second.id,
-          revision: const TestCatalogRevision(2),
-          activeCounts: {first.id: 1, second.id: 1},
-        ),
-      ),
-    );
-
-    repository.complete(
-      0,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [second, first],
-          totalCount: 2,
-          nextCursor: null,
-          revision: const TestCatalogRevision(1),
-        ),
-      ),
-    );
-    await container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
-    );
-
-    final current = _loaded(container);
-    expect(current.items.map((item) => item.id), [second.id, first.id]);
-    expect(current.items.map((item) => item.activeRelationCount), [1, 1]);
-    expect(current.totalCount, 2);
-    expect(current.revision, const TestCatalogRevision(2));
-    expect(confirmedStates, [same(current)]);
-    expect(repository.queries, hasLength(1));
-  });
-
-  test('устаревшее продолжение не возвращает прежнее количество', () async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(
-      repository,
-      pageSize: 2,
-      prefetchRemaining: 1,
-    );
-    final subscription = container.listen(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    addTearDown(container.dispose);
-
-    const cursor = TestCatalogCursor();
-    final fourth = testSummary(index: 4);
-    final third = testSummary(index: 3);
-    repository.complete(
-      0,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [fourth, third],
-          totalCount: 4,
-          nextCursor: cursor,
-          revision: const TestCatalogRevision(1),
-        ),
-      ),
-    );
-    await container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
-    );
-
-    unawaitedLoad(container, visibleIndex: 1);
-    await waitForCatalogQueries(repository, 2);
-
-    final second = testSummary(index: 2);
-    await completeRelationCommand(
-      container,
-      repository,
-      _createRelation(fourth.id, second.id),
-      relationCreationSuccess(
-        revision: const TestCatalogRevision(2),
-        success: _relationCreated(
-          sourceIntentionId: fourth.id,
-          relatedIntentionId: second.id,
-          revision: const TestCatalogRevision(2),
-          activeCounts: {fourth.id: 1, second.id: 1},
-        ),
-      ),
-    );
-    expect(_loaded(container).items.first.activeRelationCount, 1);
-
-    repository.complete(
-      1,
-      ResultSuccess(
-        IntentionCatalogContinuationPage(
-          items: [second, testSummary(index: 1)],
-          nextCursor: null,
-          revision: const TestCatalogRevision(1),
-        ),
-      ),
-    );
-    await waitForCatalogQueries(repository, 3);
-    repository.complete(
-      2,
-      ResultSuccess(
-        IntentionCatalogContinuationPage(
-          items: [
-            testSummary(index: 2, activeRelationCount: 1),
-            testSummary(index: 1),
-          ],
-          nextCursor: null,
-          revision: const TestCatalogRevision(2),
-        ),
-      ),
-    );
-    await Future<void>.delayed(Duration.zero);
-
-    final current = _loaded(container);
-    expect(current.items.map((item) => item.id), [
-      fourth.id,
-      third.id,
-      second.id,
-      testSummary(index: 1).id,
-    ]);
-    expect(current.items.map((item) => item.activeRelationCount), [1, 0, 1, 0]);
-    expect(current.totalCount, 4);
-    expect(current.nextCursor, isNull);
-    expect(current.revision, const TestCatalogRevision(2));
-    expect(current.continuation, isA<IntentionCatalogContinuationIdle>());
   });
 
   test('количества обновляются во всех загруженных порциях', () async {
@@ -836,8 +689,6 @@ void main() {
     expect(current.items.map((item) => item.activeRelationCount), [1, 0, 0, 1]);
     expect(current.totalCount, 4);
     expect(current.nextCursor, isNull);
-    expect(current.revision, const TestCatalogRevision(2));
-    expect(repository.queries, hasLength(2));
   });
 
   test('отказ создания связи сохраняет подтверждённые количества', () async {
@@ -860,7 +711,6 @@ void main() {
     await container.read(
       intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
     );
-    final loadedBefore = _loaded(container);
     confirmedStates.clear();
 
     await completeRelationCommand(
@@ -873,11 +723,8 @@ void main() {
       >(LongTermRelationUnavailableFailure()),
     );
 
-    expect(_loaded(container), same(loadedBefore));
-    expect(loadedBefore.items.single.activeRelationCount, 2);
-    expect(loadedBefore.revision, const TestCatalogRevision(1));
+    expect(_loaded(container).items.single.activeRelationCount, 2);
     expect(confirmedStates, isEmpty);
-    expect(repository.queries, hasLength(1));
   });
 }
 

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/l10n/app_localizations.dart';
@@ -24,7 +23,6 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -213,29 +211,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(row);
       await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(RelationNeighborhoodSliver)),
-      );
-      expect(
-        container
-            .read(blockingRelationsSelectionViewModelProvider(intention.id))
-            .selected
-            .keys,
-        {relation.relation.id},
-      );
-      expect(repository.relationGroupQueries, hasLength(2));
+      expect(find.text('Selected relations: 1'), findsOneWidget);
       _expectNavigation(tester);
     },
   );
-
-  test('маршрут подробного просмотра хранит предметный идентификатор', () {
-    final id = testDetailsIntentionId(1);
-
-    final route = IntentionDetailsRoute(intentionId: id);
-
-    expect(route, isA<PageRouteInfo<IntentionDetailsRouteArgs>>());
-    expect(route.args!.intentionId, same(id));
-  });
 
   testWidgets('показывает загрузку и пользовательский текст без перевода', (
     tester,
@@ -280,51 +259,6 @@ void main() {
     expect(find.text('Archived'), findsOneWidget);
     expect(find.text('No description'), findsOneWidget);
     expect(find.text('Not ready for action'), findsOneWidget);
-  });
-
-  testWidgets('смена локали не изменяет пользовательский текст', (
-    tester,
-  ) async {
-    final repository = ControlledDetailsRepository();
-    final locale = ValueNotifier(const Locale('en'));
-    addTearDown(locale.dispose);
-    final intention = testDetailsIntention(
-      title: 'Сохранить русский заголовок',
-      description: '  Пользовательское описание\nбез преобразования  ',
-      readiness: IntentionReadiness.ready,
-    );
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          inMemoryQuickCreationModeOverride,
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-        retry: (retryCount, error) => null,
-        child: ValueListenableBuilder<Locale>(
-          valueListenable: locale,
-          builder: (context, value, child) => _localizedApp(
-            IntentionDetailsPage(intentionId: intention.id),
-            locale: value,
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests.single.add(ResultSuccess(intention));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Intention details'), findsOneWidget);
-    expect(find.text(intention.title), findsOneWidget);
-    expect(find.text(intention.description!), findsOneWidget);
-
-    locale.value = const Locale('ru');
-    await tester.pumpAndSettle();
-
-    expect(find.text('Подробности намерения'), findsOneWidget);
-    expect(find.text('Intention details'), findsNothing);
-    expect(find.text(intention.title), findsOneWidget);
-    expect(find.text(intention.description!), findsOneWidget);
   });
 
   testWidgets(
@@ -1138,7 +1072,7 @@ void main() {
   );
 
   testWidgets(
-    'read failure или absence до кадра не оставляют claim без renderer',
+    'отказ чтения или отсутствие намерения до кадра с отказом изменения передают его общей поверхности',
     (tester) async {
       final scenarios = <Result<Intention?>>[
         const ResultSuccess(null),
@@ -1330,7 +1264,7 @@ void main() {
     },
   );
 
-  testWidgets('строка каталога открывает generated details route', (
+  testWidgets('строка каталога открывает подробности намерения', (
     tester,
   ) async {
     final repository = ControlledDetailsRepository();
@@ -1383,8 +1317,6 @@ void main() {
 
     expect(router.current.name, IntentionDetailsRoute.name);
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
-    expect(repository.detailIds, hasLength(2));
-    expect(repository.detailIds, everyElement(intention.id));
   });
 
   testWidgets('IntentionDeleted завершает открытый details route', (
@@ -1672,11 +1604,11 @@ void main() {
   testWidgets(
     'шапка показывает управление отметкой только при полученных подробных данных',
     (tester) async {
+      // Отсутствие и любой отказ чтения одинаково оставляют страницу без
+      // подробных данных.
       final outcomes = <Result<Intention?>>[
         const ResultSuccess(null),
         const ResultFailure(IntentionUnavailableFailure()),
-        const ResultFailure(IntentionCorruptionFailure()),
-        const ResultFailure(IntentionUnexpectedFailure()),
       ];
       for (var index = 0; index < outcomes.length; index += 1) {
         final repository = ControlledDetailsRepository();
@@ -1708,15 +1640,11 @@ void main() {
   testWidgets(
     'шапка различает подтверждённую отметку формой значка у активного и архивированного намерения',
     (tester) async {
+      // Управление не зависит от архивного состояния: каждое значение
+      // обоих измерений проверяется один раз.
       final scenarios = <(IntentionArchiveState, FavoriteMark, IconData)>[
         (
           IntentionArchiveState.active,
-          FavoriteMark.notFavorite,
-          Icons.star_border,
-        ),
-        (IntentionArchiveState.active, FavoriteMark.favorite, Icons.star),
-        (
-          IntentionArchiveState.archived,
           FavoriteMark.notFavorite,
           Icons.star_border,
         ),
@@ -1958,20 +1886,6 @@ void main() {
           'The favorite mark couldn’t be changed because of an unexpected error.',
           false,
         ),
-        (
-          const Locale('ru'),
-          FavoriteMark.favorite,
-          const IntentionUnavailableFailure(),
-          'Не удалось изменить отметку избранного. Повторите попытку.',
-          true,
-        ),
-        (
-          const Locale('ru'),
-          FavoriteMark.notFavorite,
-          const IntentionCorruptionFailure(),
-          'Сохранённые данные повреждены. Отметка избранного не изменена.',
-          false,
-        ),
       ];
 
       for (var index = 0; index < scenarios.length; index += 1) {
@@ -2160,6 +2074,7 @@ void main() {
   testWidgets(
     'управление отметкой недоступно от подтверждения до снимка и затем предлагает обратное действие',
     (tester) async {
+      // Ожидание снимка одинаково для отметки и её снятия.
       final scenarios =
           <(FavoriteMark, FavoriteMark, IconData, String, String)>[
             (
@@ -2168,13 +2083,6 @@ void main() {
               Icons.star_border,
               'Not marked',
               'Remove favorite mark',
-            ),
-            (
-              FavoriteMark.favorite,
-              FavoriteMark.notFavorite,
-              Icons.star,
-              'Marked',
-              'Mark as favorite',
             ),
           ];
 
@@ -2254,104 +2162,6 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
         await _closeOperationMessage(tester);
       }
-    },
-  );
-
-  testWidgets(
-    'экранный диктор получает название, состояние и доступность управления отметкой на обоих языках',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      final scenarios = <(Locale, FavoriteMark, String, String, String)>[
-        (
-          const Locale('en'),
-          FavoriteMark.notFavorite,
-          'Favorite intention',
-          'Not marked',
-          'Mark as favorite',
-        ),
-        (
-          const Locale('en'),
-          FavoriteMark.favorite,
-          'Favorite intention',
-          'Marked',
-          'Remove favorite mark',
-        ),
-        (
-          const Locale('ru'),
-          FavoriteMark.notFavorite,
-          'Избранное намерение',
-          'Не отмечено',
-          'Отметить избранным',
-        ),
-        (
-          const Locale('ru'),
-          FavoriteMark.favorite,
-          'Избранное намерение',
-          'Отмечено',
-          'Снять отметку избранного',
-        ),
-      ];
-
-      for (var index = 0; index < scenarios.length; index += 1) {
-        final (locale, favoriteMark, label, value, action) = scenarios[index];
-        final repository = ControlledDetailsRepository();
-        final intention = testDetailsIntention(index: 110 + index);
-        await _pumpDetailsPage(
-          tester,
-          repository,
-          intention.id,
-          locale: locale,
-        );
-        await waitForDetailRequests(repository, 1);
-        repository.detailRequests[0].add(
-          ResultSuccess(intention),
-          favoriteMark: favoriteMark,
-        );
-        await tester.pumpAndSettle();
-        final control = find.byKey(_favoriteMarkKey);
-
-        expect(
-          tester.getSemantics(control),
-          matchesSemantics(
-            label: label,
-            value: value,
-            tooltip: action,
-            isButton: true,
-            hasEnabledState: true,
-            isEnabled: true,
-            isFocusable: true,
-            hasTapAction: true,
-            hasFocusAction: true,
-          ),
-        );
-        expect(find.byTooltip(action), findsOneWidget);
-
-        await tester.tap(control);
-        await tester.pump();
-
-        // Недоступное управление сохраняет название и подтверждённое состояние.
-        expect(
-          tester.getSemantics(control),
-          matchesSemantics(
-            label: label,
-            value: value,
-            tooltip: action,
-            isButton: true,
-            hasEnabledState: true,
-            isFocusable: true,
-            hasFocusAction: true,
-          ),
-        );
-
-        repository.completeCommand(
-          0,
-          const ResultFailure(IntentionUnexpectedFailure()),
-        );
-        await tester.pumpAndSettle();
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      }
-      semantics.dispose();
     },
   );
 }

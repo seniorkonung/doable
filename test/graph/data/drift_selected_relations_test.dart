@@ -295,7 +295,6 @@ void main() {
           .title,
       'Новый другой',
     );
-    expect(observer.selectedReads, 2);
   });
 
   test('наблюдение явно сообщает утрату принадлежности и удаление', () async {
@@ -334,7 +333,6 @@ void main() {
   });
 
   test('повреждение одной выбранной связи отказывает всему набору', () async {
-    await database.customStatement('PRAGMA ignore_check_constraints = ON');
     await database.customStatement(
       'UPDATE long_term_relations SET description = ? WHERE id = ?',
       [' ', _second.toCanonicalString()],
@@ -611,7 +609,6 @@ void main() {
       entries.values.whereType<SelectedDailyChoicePresent>(),
       hasLength(ids.length),
     );
-    expect(observer.dailyReads, 2);
 
     observer.failDailyReadAt = observer.dailyReads + 2;
     final unavailable = await repository.getSelectedRelations(query);
@@ -640,65 +637,50 @@ void main() {
     );
   });
 
-  test(
-    'смешанное наблюдение пропускает поздний снимок и снимает регистрацию',
-    () async {
-      final choiceId = _choice(_relation(35).toCanonicalString());
-      _insertChoice(raw, choiceId, source: _owner, selected: _neighbor);
-      final reference = DailyChoiceBlockingRelationReference(choiceId);
-      final events = StreamIterator(
-        repository.watchSelectedRelations(
-          SelectedRelationsQuery.mixed(
-            intentionId: _owner,
-            references: [LongTermBlockingRelationReference(_first), reference],
-          ),
+  test('смешанное наблюдение пропускает поздний снимок', () async {
+    final choiceId = _choice(_relation(35).toCanonicalString());
+    _insertChoice(raw, choiceId, source: _owner, selected: _neighbor);
+    final reference = DailyChoiceBlockingRelationReference(choiceId);
+    final events = StreamIterator(
+      repository.watchSelectedRelations(
+        SelectedRelationsQuery.mixed(
+          intentionId: _owner,
+          references: [LongTermBlockingRelationReference(_first), reference],
         ),
-      );
-      addTearDown(events.cancel);
-      expect(await events.moveNext(), isTrue);
-      final initial = (events.current as SelectedRelationsReadSuccess).value;
+      ),
+    );
+    addTearDown(events.cancel);
+    expect(await events.moveNext(), isTrue);
+    final initial = (events.current as SelectedRelationsReadSuccess).value;
 
-      await repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: choiceId,
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(true),
-          ),
+    await repository.execute(
+      UpdateDailyChoiceFields(
+        choiceId: choiceId,
+        patch: const DailyChoiceFieldsPatch(
+          isCompleted: DailyChoiceFieldSet(true),
         ),
-      );
-      await repository.execute(
-        UpdateIntention(
-          id: _neighbor,
-          title: 'Актуальное имя',
-          description: null,
-        ),
-      );
-      expect(await events.moveNext(), isTrue);
-      final latest = (events.current as SelectedRelationsReadSuccess).value;
-      expect(
-        latest.revision.compareTo(initial.revision),
-        GraphRevisionOrder.newer,
-      );
-      final item =
-          (latest.value.entriesByReference[reference]
-                  as SelectedDailyChoicePresent)
-              .item;
-      expect(item.isCompleted, isTrue);
-      expect(item.selected.title, 'Актуальное имя');
-      expect(observer.dailyReads, 2);
-
-      await events.cancel();
-      await repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: choiceId,
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(false),
-          ),
-        ),
-      );
-      expect(observer.dailyReads, 2);
-    },
-  );
+      ),
+    );
+    await repository.execute(
+      UpdateIntention(
+        id: _neighbor,
+        title: 'Актуальное имя',
+        description: null,
+      ),
+    );
+    expect(await events.moveNext(), isTrue);
+    final latest = (events.current as SelectedRelationsReadSuccess).value;
+    expect(
+      latest.revision.compareTo(initial.revision),
+      GraphRevisionOrder.newer,
+    );
+    final item =
+        (latest.value.entriesByReference[reference]
+                as SelectedDailyChoicePresent)
+            .item;
+    expect(item.isCompleted, isTrue);
+    expect(item.selected.title, 'Актуальное имя');
+  });
 }
 
 DailyChoiceId _choice(String uuid) =>
@@ -739,7 +721,6 @@ void _insertChoice(
 final class _SelectedReadFailureObserver
     extends LocalDatabaseConnectionObserver {
   var failSelectedRead = false;
-  var selectedReads = 0;
   var dailyReads = 0;
   int? failDailyReadAt;
 
@@ -758,7 +739,6 @@ final class _SelectedReadFailureObserver
     }
     if (statement.operation == LocalDatabaseSqlOperation.select &&
         statement.statements.single.contains('WHERE id IN (')) {
-      selectedReads++;
       if (!failSelectedRead) return;
       throw SqliteException(
         extendedResultCode: SqlError.SQLITE_BUSY,

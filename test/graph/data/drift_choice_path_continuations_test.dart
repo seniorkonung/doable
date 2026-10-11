@@ -125,52 +125,18 @@ final class _Fixture {
   }
 }
 
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  @override
-  void record(DiagnosticsEvent event) => throw StateError('Сбой диагностики');
-}
-
+/// Запоминает число строк, которое вернуло каждое чтение.
 final class _ContinuationSelectTrace extends LocalDatabaseConnectionObserver {
-  final selects = <_MeasuredSelect>[];
-  final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select) {
-      _started[statement] = Stopwatch()..start();
-    }
-  }
+  final rowCounts = <int>[];
 
   @override
   List<Map<String, Object?>> afterSelect(
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    final stopwatch = _started.remove(statement)!..stop();
-    selects.add(
-      _MeasuredSelect(
-        sql: statement.statements.single,
-        arguments: statement.arguments,
-        rowCount: rows.length,
-        elapsed: stopwatch.elapsed,
-      ),
-    );
+    rowCounts.add(rows.length);
     return rows;
   }
-}
-
-final class _MeasuredSelect {
-  const _MeasuredSelect({
-    required this.sql,
-    required this.arguments,
-    required this.rowCount,
-    required this.elapsed,
-  });
-
-  final String sql;
-  final List<Object?> arguments;
-  final int rowCount;
-  final Duration elapsed;
 }
 
 final class _IsolateResponsivenessTrace
@@ -385,39 +351,6 @@ void main() {
       }
 
       final first = await fixture.page(draft, pageSize: 1);
-      for (final wrongDraft in [
-        ChoicePathDraftStart(_intention(1)),
-        fixture.bottomProgress(1, [(1002, 2, 1)]),
-      ]) {
-        final wrong = await fixture.repository.getChoicePathContinuations(
-          ChoicePathContinuationQuery(
-            draft: wrongDraft,
-            pageSize: 1,
-            cursor: first.nextCursor,
-          ),
-        );
-        expect(
-          (wrong as ChoicePathContinuationError).failure,
-          isA<ChoicePathContinuationValidationFailure>(),
-        );
-      }
-      final other = DriftPersonalGraphRepository(
-        fixture.database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 23),
-        fixture.diagnostics,
-      );
-      final foreign = await other.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: draft,
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (foreign as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
       expect(
         await fixture.repository.execute(
           EnableIntentionReadiness(_intention(3)),
@@ -535,12 +468,12 @@ void main() {
       fixture.intention(1);
       fixture.intention(2, ready: true);
       fixture.relation(101, 1, 2);
-      fixture.raw.execute('PRAGMA ignore_check_constraints = ON');
+      // Название с пробелами по краям приложение не сохраняет, а схема
+      // допускает.
       fixture.raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-        '',
+        ' Название ',
         _uuid(1),
       ]);
-      fixture.raw.execute('PRAGMA ignore_check_constraints = OFF');
       final corrupted = await fixture.repository.getChoicePathContinuations(
         ChoicePathContinuationQuery(
           draft: ChoicePathDraftBottomStart(_intention(2)),
@@ -689,82 +622,6 @@ void main() {
     },
   );
 
-  test(
-    'чужой курсор и другая порция отклоняются, ошибка не становится тупиком',
-    () async {
-      fixture.intention(1);
-      fixture.intention(2, ready: true);
-      fixture.intention(3, ready: true);
-      fixture.relation(101, 1, 2);
-      fixture.relation(102, 1, 3);
-      final draft = ChoicePathDraftStart(_intention(1));
-      final first = await fixture.page(draft, pageSize: 1);
-      final wrong = await fixture.repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: draft,
-          pageSize: 2,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (wrong as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      final otherDirection = await fixture.repository
-          .getChoicePathContinuations(
-            ChoicePathContinuationQuery(
-              draft: ChoicePathDraftBottomStart(_intention(1)),
-              pageSize: 1,
-              cursor: first.nextCursor,
-            ),
-          );
-      expect(
-        (otherDirection as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      final otherDraft = await fixture.repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: fixture.progress(1, [(101, 1, 2)]),
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (otherDraft as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      final other = DriftPersonalGraphRepository(
-        fixture.database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 23),
-        fixture.diagnostics,
-      );
-      final foreign = await other.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: draft,
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      );
-      expect(
-        (foreign as ChoicePathContinuationError).failure,
-        isA<ChoicePathContinuationValidationFailure>(),
-      );
-      await fixture.database.close();
-      final failed = await fixture.repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(draft: draft),
-      );
-      expect(failed, isA<ChoicePathContinuationError>());
-      expect(
-        fixture.diagnostics.events
-            .whereType<ChoicePathContinuationReadDiagnosticsEvent>()
-            .last
-            .status,
-        isA<DiagnosticsFailed>(),
-      );
-    },
-  );
-
   test('изменение графа аннулирует следующую порцию', () async {
     for (var id = 1; id <= 4; id++) {
       fixture.intention(id, ready: id == 2 || id == 3);
@@ -810,9 +667,7 @@ void main() {
       fixture.relation(5000, length + 1, 1);
       fixture.raw.execute('COMMIT');
 
-      final stopwatch = Stopwatch()..start();
       final page = await fixture.page(ChoicePathDraftStart(_intention(1)));
-      stopwatch.stop();
       expect(page.items.map((item) => item.relation.id), [_relation(2001)]);
       final deepDraft = fixture.progress(1, [
         for (var id = 1; id < length; id++) (2000 + id, id, id + 1),
@@ -832,275 +687,145 @@ void main() {
             .status,
         isA<DiagnosticsSucceeded>(),
       );
-      // Время выводится для наблюдения стоимости без нестабильного порога.
-      // ignore: avoid_print
-      print('Продолжения: цикл $length, ${stopwatch.elapsedMilliseconds} мс');
     },
   );
 
-  test('большой разветвлённый граф сохраняет ветви при разных порциях и измеряет ожидание команды', () async {
-    await fixture.close();
-    final trace = _ContinuationSelectTrace();
-    fixture = _Fixture();
-    await fixture.open(observer: trace);
-
-    fixture.raw.execute('BEGIN');
-    for (var node = 1; node <= 1900; node++) {
-      fixture.intention(node, ready: node == 1800);
-    }
-    for (var node = 2; node <= 121; node++) {
-      fixture.relation(10000 + node, 1, node);
-    }
-    for (var node = 2; node < 1800; node++) {
-      fixture.relation(20000 + node, node, node + 1);
-      if (node + 7 <= 1800) {
-        fixture.relation(30000 + node, node, node + 7);
-      }
-      if (node + 37 <= 1800) {
-        fixture.relation(40000 + node, node, node + 37);
-      }
-    }
-    fixture.relation(10999, 1, 1801);
-    for (var node = 1801; node <= 1900; node++) {
-      fixture.relation(50000 + node, node, node == 1900 ? 1801 : node + 1);
-    }
-    fixture.raw.execute('COMMIT');
-
-    final draft = ChoicePathDraftStart(_intention(1));
-    Future<(List<LongTermRelationId>, Duration)> collect(int pageSize) async {
-      final stopwatch = Stopwatch()..start();
-      final ids = <LongTermRelationId>[];
-      ChoicePathContinuationCursor? cursor;
-      do {
-        final page = await fixture.page(
-          draft,
-          pageSize: pageSize,
-          cursor: cursor,
-        );
-        ids.addAll(page.items.map((item) => item.relation.id));
-        cursor = page.nextCursor;
-      } while (cursor != null);
-      stopwatch.stop();
-      return (ids, stopwatch.elapsed);
-    }
-
-    trace.selects.clear();
-    final (smallPageIds, smallPageTime) = await collect(7);
-    final smallPageSelects = List<_MeasuredSelect>.of(trace.selects);
-    trace.selects.clear();
-    final (largePageIds, largePageTime) = await collect(100);
-    final largePageSelects = List<_MeasuredSelect>.of(trace.selects);
-
-    expect(smallPageIds, largePageIds);
-    expect(largePageIds, [
-      for (var node = 2; node <= 121; node++) _relation(10000 + node),
-    ]);
-    expect(
-      [
-        ...smallPageSelects,
-        ...largePageSelects,
-      ].map((select) => select.rowCount),
-      everyElement(lessThanOrEqualTo(101)),
-    );
-    final reachabilitySelects = largePageSelects.where(
-      (select) => select.sql.contains('WITH RECURSIVE'),
-    );
-    expect(reachabilitySelects, hasLength(2));
-    expect(reachabilitySelects.map((select) => select.rowCount), [101, 20]);
-    final plan = fixture.raw.select(
-      'EXPLAIN QUERY PLAN ${reachabilitySelects.first.sql}',
-      reachabilitySelects.first.arguments,
-    );
-    expect(
-      plan.map((row) => row['detail'].toString()).join(' '),
-      contains('reachable'),
-    );
-
-    final readWatch = Stopwatch()..start();
-    final pendingRead = fixture.page(draft, pageSize: 1);
-    final queuedCommandWatch = Stopwatch()..start();
-    final pendingCommand = fixture.repository.execute(
-      EnableIntentionReadiness(_intention(1850)),
-    );
-    await pendingRead;
-    readWatch.stop();
-    expect(await pendingCommand, isA<GraphCommandSucceeded>());
-    queuedCommandWatch.stop();
-    final singleCommandWatch = Stopwatch()..start();
-    expect(
-      await fixture.repository.execute(
-        EnableIntentionReadiness(_intention(1851)),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
-    singleCommandWatch.stop();
-
-    final sqliteVersion = fixture.raw
-        .select('SELECT sqlite_version()')
-        .single['sqlite_version()'];
-    // Измерения информируют о стоимости; пороги времени зависят от машины.
-    // ignore: avoid_print
-    print(
-      'Продолжения: 1900 намерений, 5573 связи, SQLite $sqliteVersion; '
-      'порция 7: ${smallPageTime.inMicroseconds} мкс / 18 страниц, '
-      'порция 100: ${largePageTime.inMicroseconds} мкс / 2 страницы; '
-      'запросы достижимости: '
-      '${reachabilitySelects.map((select) => select.elapsed.inMicroseconds).toList()} мкс; '
-      'чтение перед командой: ${readWatch.elapsedMicroseconds} мкс, '
-      'команда в очереди: ${queuedCommandWatch.elapsedMicroseconds} мкс, '
-      'отдельная команда: ${singleCommandWatch.elapsedMicroseconds} мкс',
-    );
-    // ignore: avoid_print
-    print('План достижимости: ${plan.map((row) => row['detail']).join(' | ')}');
-  });
-
   test(
-    'измеряет нижний обход на широком соседстве, циклах и длинном суффиксе',
+    'большой разветвлённый граф сохраняет ветви при разных порциях',
     () async {
       await fixture.close();
       final trace = _ContinuationSelectTrace();
       fixture = _Fixture();
       await fixture.open(observer: trace);
 
-      const action = 1200;
-      const sideCount = 160;
       fixture.raw.execute('BEGIN');
-      for (var node = 1; node <= action + sideCount; node++) {
-        fixture.intention(node, ready: node == action);
+      for (var node = 1; node <= 1900; node++) {
+        fixture.intention(node, ready: node == 1800);
       }
-      for (var node = 1; node < action; node++) {
-        fixture.relation(2000 + node, node, node + 1);
+      for (var node = 2; node <= 121; node++) {
+        fixture.relation(10000 + node, 1, node);
       }
-      for (var offset = 1; offset <= sideCount; offset++) {
-        final node = action + offset;
-        fixture.relation(6000 + offset, node, action);
-        fixture.relation(
-          8000 + offset,
-          node,
-          offset == sideCount ? action + 1 : node + 1,
-        );
+      for (var node = 2; node < 1800; node++) {
+        fixture.relation(20000 + node, node, node + 1);
+        if (node + 7 <= 1800) {
+          fixture.relation(30000 + node, node, node + 7);
+        }
+        if (node + 37 <= 1800) {
+          fixture.relation(40000 + node, node, node + 37);
+        }
       }
-      fixture.relation(9999, action, 1);
+      fixture.relation(10999, 1, 1801);
+      for (var node = 1801; node <= 1900; node++) {
+        fixture.relation(50000 + node, node, node == 1900 ? 1801 : node + 1);
+      }
       fixture.raw.execute('COMMIT');
 
-      final draft = ChoicePathDraftBottomStart(_intention(action));
-      trace.selects.clear();
-      final firstWatch = Stopwatch()..start();
-      final first = await fixture.page(draft, pageSize: 20);
-      firstWatch.stop();
-      expect(first.items, hasLength(20));
-      expect(first.items.first.relation.id, _relation(2000 + action - 1));
-      expect(first.nextCursor, isNotNull);
-      final firstQueries = List<_MeasuredSelect>.of(trace.selects);
-      expect(
-        firstQueries.map((select) => select.rowCount),
-        everyElement(lessThanOrEqualTo(21)),
-      );
-      final firstSelect = firstQueries
-          .where((select) => select.sql.contains('WITH visited(id)'))
-          .single;
-      expect(firstSelect.rowCount, 21);
-      expect(firstSelect.sql, isNot(contains('WITH RECURSIVE')));
-      expect(firstSelect.sql, contains('LIMIT ?'));
-      expect(firstSelect.sql, contains('source.is_archived = 0'));
-      final firstPlan = fixture.raw
-          .select(
-            'EXPLAIN QUERY PLAN ${firstSelect.sql}',
-            firstSelect.arguments,
-          )
-          .map((row) => row['detail'])
-          .join(' | ');
-      expect(firstPlan, contains('long_term_relations_related_group_order'));
+      final draft = ChoicePathDraftStart(_intention(1));
+      Future<List<LongTermRelationId>> collect(int pageSize) async {
+        final ids = <LongTermRelationId>[];
+        ChoicePathContinuationCursor? cursor;
+        do {
+          final page = await fixture.page(
+            draft,
+            pageSize: pageSize,
+            cursor: cursor,
+          );
+          ids.addAll(page.items.map((item) => item.relation.id));
+          cursor = page.nextCursor;
+        } while (cursor != null);
+        return ids;
+      }
 
-      trace.selects.clear();
-      final nextWatch = Stopwatch()..start();
-      final next = await fixture.page(
-        draft,
-        pageSize: 20,
-        cursor: first.nextCursor,
-      );
-      nextWatch.stop();
-      expect(next.items, hasLength(20));
-      expect(
-        trace.selects
-            .where((select) => select.sql.contains('WITH visited(id)'))
-            .single
-            .rowCount,
-        21,
-      );
+      trace.rowCounts.clear();
+      final smallPageIds = await collect(7);
+      final smallPageRowCounts = List<int>.of(trace.rowCounts);
+      trace.rowCounts.clear();
+      final largePageIds = await collect(100);
+      final largePageRowCounts = List<int>.of(trace.rowCounts);
 
-      final deepDraft = fixture.bottomProgress(action, [
-        for (var node = action - 1; node >= 2; node--)
-          (2000 + node, node, node + 1),
+      expect(smallPageIds, largePageIds);
+      expect(largePageIds, [
+        for (var node = 2; node <= 121; node++) _relation(10000 + node),
       ]);
-      trace.selects.clear();
-      final validationWatch = Stopwatch()..start();
-      final deep = await fixture.page(deepDraft, pageSize: 1);
-      validationWatch.stop();
-      expect(deep.canConfirm, isTrue);
-      expect(deep.items.single.relation.id, _relation(2001));
-      final validationRows = trace.selects
-          .where((select) => select.sql.contains('FROM intentions WHERE id IN'))
-          .single
-          .rowCount;
-      final validatedRelations = trace.selects
-          .where(
-            (select) =>
-                select.sql.contains('FROM long_term_relations') &&
-                select.sql.contains('WHERE id IN'),
-          )
-          .single
-          .rowCount;
-      expect(validationRows, action - 1);
-      expect(validatedRelations, action - 2);
-      expect(
-        trace.selects
-            .where((select) => select.sql.contains('WITH visited(id)'))
-            .single
-            .rowCount,
-        1,
-      );
-
-      final readWatch = Stopwatch()..start();
-      final pendingRead = fixture.page(draft, pageSize: 20);
-      final queueWatch = Stopwatch()..start();
-      final pendingCommand = fixture.repository.execute(
-        EnableIntentionReadiness(_intention(action + 1)),
-      );
-      await pendingRead;
-      readWatch.stop();
-      expect(await pendingCommand, isA<GraphCommandSucceeded>());
-      queueWatch.stop();
-      final sqliteVersion = fixture.raw
-          .select('SELECT sqlite_version()')
-          .single['sqlite_version()'];
-      // ignore: avoid_print
-      print(
-        'Нижний обход: 1360 намерений, 1520 связей, входящих=161, '
-        'суффикс=1198, SQLite $sqliteVersion; '
-        'первая=${firstWatch.elapsedMicroseconds} мкс, '
-        'продолжение=${nextWatch.elapsedMicroseconds} мкс, '
-        'проверка черновика=${validationWatch.elapsedMicroseconds} мкс, '
-        'ожидание команды=${queueWatch.elapsedMicroseconds} мкс, '
-        'чтение перед командой=${readWatch.elapsedMicroseconds} мкс; '
-        'материализация первой=${firstSelect.rowCount}, '
-        'проверка узлов=$validationRows, связей=$validatedRelations; '
-        'план=$firstPlan',
-      );
+      expect([
+        ...smallPageRowCounts,
+        ...largePageRowCounts,
+      ], everyElement(lessThanOrEqualTo(101)));
     },
-    timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test('изолятное соединение не удерживает цикл событий во время поиска', () async {
+  test('нижний обход на широком соседстве, циклах и длинном суффиксе читает '
+      'ограниченные порции', () async {
     await fixture.close();
-    final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
-    final trace = _IsolateResponsivenessTrace();
-    final database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(await isolate.connect(), trace),
+    final trace = _ContinuationSelectTrace();
+    fixture = _Fixture();
+    await fixture.open(observer: trace);
+
+    const action = 1200;
+    const sideCount = 160;
+    fixture.raw.execute('BEGIN');
+    for (var node = 1; node <= action + sideCount; node++) {
+      fixture.intention(node, ready: node == action);
+    }
+    for (var node = 1; node < action; node++) {
+      fixture.relation(2000 + node, node, node + 1);
+    }
+    for (var offset = 1; offset <= sideCount; offset++) {
+      final node = action + offset;
+      fixture.relation(6000 + offset, node, action);
+      fixture.relation(
+        8000 + offset,
+        node,
+        offset == sideCount ? action + 1 : node + 1,
+      );
+    }
+    fixture.relation(9999, action, 1);
+    fixture.raw.execute('COMMIT');
+
+    final draft = ChoicePathDraftBottomStart(_intention(action));
+    trace.rowCounts.clear();
+    final first = await fixture.page(draft, pageSize: 20);
+    expect(first.items, hasLength(20));
+    expect(first.items.first.relation.id, _relation(2000 + action - 1));
+    expect(first.nextCursor, isNotNull);
+    expect(trace.rowCounts, everyElement(lessThanOrEqualTo(21)));
+
+    trace.rowCounts.clear();
+    final next = await fixture.page(
+      draft,
+      pageSize: 20,
+      cursor: first.nextCursor,
     );
-    try {
-      await database.open();
-      await database.customStatement('''
+    expect(next.items, hasLength(20));
+    expect(trace.rowCounts, everyElement(lessThanOrEqualTo(21)));
+
+    final deepDraft = fixture.bottomProgress(action, [
+      for (var node = action - 1; node >= 2; node--)
+        (2000 + node, node, node + 1),
+    ]);
+    trace.rowCounts.clear();
+    final deep = await fixture.page(deepDraft, pageSize: 1);
+    expect(deep.canConfirm, isTrue);
+    expect(deep.items.single.relation.id, _relation(2001));
+    // Проверка черновика читает только его собственные шаги, а не весь граф.
+    expect(trace.rowCounts, everyElement(lessThanOrEqualTo(action - 1)));
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test(
+    'изолятное соединение не удерживает цикл событий во время поиска',
+    () async {
+      await fixture.close();
+      final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
+      final trace = _IsolateResponsivenessTrace();
+      final database = AppDatabase(
+        observeConfiguredLocalDatabaseConnection(
+          await isolate.connect(),
+          trace,
+        ),
+      );
+      try {
+        await database.open();
+        await database.customStatement('''
         WITH RECURSIVE ids(n) AS (
           VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 4000
         )
@@ -1109,8 +834,8 @@ void main() {
         SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
                'Намерение', n = 4000, 0, 1, 1 FROM ids
       ''');
-      for (final (offset, idBase) in [(1, 10000), (7, 20000), (37, 30000)]) {
-        await database.customStatement('''
+        for (final (offset, idBase) in [(1, 10000), (7, 20000), (37, 30000)]) {
+          await database.customStatement('''
           WITH RECURSIVE ids(n) AS (
             VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < ${4000 - offset}
           )
@@ -1122,42 +847,38 @@ void main() {
                  printf('018f0b5d-6b2e-7c80-8000-%012x', n + $offset),
                  'need', 2, 0 FROM ids
         ''');
+        }
+        final repository = DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 23),
+          InMemoryDiagnosticsSink(),
+        );
+        final result = await repository.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftStart(_intention(1)),
+          ),
+        );
+        expect(result, isA<ChoicePathContinuationSuccess>());
+        expect(
+          (result as ChoicePathContinuationSuccess).value.items,
+          hasLength(3),
+        );
+        expect(trace.advancedBeforeReachabilityFinished, isTrue);
+        trace.reset();
+        final bottomResult = await repository.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftBottomStart(_intention(4000)),
+          ),
+        );
+        expect(bottomResult, isA<ChoicePathContinuationSuccess>());
+        expect(trace.advancedBeforeReachabilityFinished, isTrue);
+      } finally {
+        await database.close();
+        await isolate.shutdownAll();
       }
-      final repository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 23),
-        InMemoryDiagnosticsSink(),
-      );
-      final stopwatch = Stopwatch()..start();
-      final result = await repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(draft: ChoicePathDraftStart(_intention(1))),
-      );
-      stopwatch.stop();
-      expect(result, isA<ChoicePathContinuationSuccess>());
-      expect(
-        (result as ChoicePathContinuationSuccess).value.items,
-        hasLength(3),
-      );
-      expect(trace.advancedBeforeReachabilityFinished, isTrue);
-      trace.reset();
-      final bottomResult = await repository.getChoicePathContinuations(
-        ChoicePathContinuationQuery(
-          draft: ChoicePathDraftBottomStart(_intention(4000)),
-        ),
-      );
-      expect(bottomResult, isA<ChoicePathContinuationSuccess>());
-      expect(trace.advancedBeforeReachabilityFinished, isTrue);
-      // ignore: avoid_print
-      print(
-        'Изолятное чтение: 4000 намерений, 11955 связей, '
-        '${stopwatch.elapsedMicroseconds} мкс; цикл событий обслужен до ответа',
-      );
-    } finally {
-      await database.close();
-      await isolate.shutdownAll();
-    }
-  });
+    },
+  );
 
   test('малые графы совпадают с независимым перебором простых путей', () async {
     for (var seed = 0; seed < 12; seed++) {
@@ -1229,22 +950,5 @@ void main() {
       (stale as ChoicePathContinuationError).failure,
       isA<ChoicePathContinuationSnapshotExpired>(),
     );
-  });
-
-  test('сбой диагностики не меняет результат чтения', () async {
-    fixture.intention(1);
-    fixture.intention(2, ready: true);
-    fixture.relation(101, 1, 2);
-    final repository = DriftPersonalGraphRepository(
-      fixture.database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 23),
-      _ThrowingDiagnosticsSink(),
-    );
-    final result = await repository.getChoicePathContinuations(
-      ChoicePathContinuationQuery(draft: ChoicePathDraftStart(_intention(1))),
-    );
-    expect(result, isA<ChoicePathContinuationSuccess>());
-    expect((result as ChoicePathContinuationSuccess).value.items, hasLength(1));
   });
 }

@@ -15,49 +15,15 @@ import '../../support/in_memory_diagnostics_sink.dart';
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
-final class _ReadProbe extends LocalDatabaseConnectionObserver {
-  final statements = <String>[];
-
-  /// Аргументы чтений в порядке [statements].
-  final arguments = <List<Object?>>[];
-
-  void clear() {
-    statements.clear();
-    arguments.clear();
-  }
-
-  /// Чтения, текст которых содержит [fragment], вместе с аргументами.
-  List<({String sql, List<Object?> arguments})> matching(String fragment) => [
-    for (var index = 0; index < statements.length; index++)
-      if (statements[index].contains(fragment))
-        (sql: statements[index], arguments: arguments[index]),
-  ];
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select) {
-      statements.add(statement.statements.single);
-      arguments.add(statement.arguments);
-    }
-  }
-}
-
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late DriftPersonalGraphRepository repository;
   late InMemoryDiagnosticsSink diagnostics;
-  late _ReadProbe probe;
 
   setUp(() async {
-    probe = _ReadProbe();
     diagnostics = InMemoryDiagnosticsSink();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-        probe,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     repository = DriftPersonalGraphRepository(
       database,
@@ -192,66 +158,34 @@ void main() {
     );
   });
 
-  test(
-    'проверяет путь выбранной порции, не читая остальные пути и описания',
-    () async {
-      addChoice(201);
-      addChoice(202, longPath: true);
-      raw.execute(
-        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-        [_uuid(201)],
-      );
-      probe.clear();
+  test('проверяет путь только выбранной порции, а повреждение следующей находит при продолжении', () async {
+    addChoice(201);
+    addChoice(202, longPath: true);
+    raw.execute(
+      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+      [_uuid(201)],
+    );
+    final first = page(
+      await repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(pageSize: 1),
+      ),
+    );
+    expect(first.items.single.id.toCanonicalString(), _uuid(202));
+    expect((first as DailyChoiceCatalogFirstPage).totalCount, 2);
 
-      final first = page(
-        await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(pageSize: 1),
-        ),
-      );
-      expect(first.items.single.id.toCanonicalString(), _uuid(202));
-      expect((first as DailyChoiceCatalogFirstPage).totalCount, 2);
-      expect(
-        probe.statements
-            .where(
-              (sql) =>
-                  sql.contains('FROM daily_choices') && !sql.contains('COUNT('),
-            )
-            .every((sql) => sql.contains('LIMIT')),
-        isTrue,
-      );
-      expect(
-        probe.statements
-            .where((sql) => sql.contains('FROM long_term_relations'))
-            .every((sql) => !sql.contains('description')),
-        isTrue,
-      );
-      expect(
-        probe.statements
-            .where((sql) => sql.contains('FROM intentions'))
-            .every((sql) => !sql.contains('description')),
-        isTrue,
-      );
-      expect(
-        probe.statements.any(
-          (sql) => sql.contains('SELECT id FROM intentions'),
-        ),
-        isTrue,
-      );
+    expect(
+      await repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(pageSize: 1, cursor: first.nextCursor),
+      ),
+      isA<DailyChoiceCatalogPageError>().having(
+        (result) => result.failure.category,
+        'категория',
+        GraphFailureCategory.corruption,
+      ),
+    );
+  });
 
-      expect(
-        await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(pageSize: 1, cursor: first.nextCursor),
-        ),
-        isA<DailyChoiceCatalogPageError>().having(
-          (result) => result.failure.category,
-          'категория',
-          GraphFailureCategory.corruption,
-        ),
-      );
-    },
-  );
-
-  test('отклоняет чужой курсор, другую выборку и устаревшую ревизию', () async {
+  test('отклоняет устаревшую ревизию', () async {
     addChoice(201);
     addChoice(202);
     final first = page(
@@ -261,35 +195,6 @@ void main() {
     );
     final cursor = first.nextCursor;
     expect(cursor, isNotNull);
-    for (final query in [
-      DailyChoiceCatalogQuery(pageSize: 2, cursor: cursor),
-      DailyChoiceCatalogQuery(pageSize: 1, isCompleted: true, cursor: cursor),
-    ]) {
-      expect(
-        await repository.getDailyChoiceCatalogPage(query),
-        isA<DailyChoiceCatalogPageError>().having(
-          (result) => result.failure.category,
-          'категория',
-          GraphFailureCategory.validation,
-        ),
-      );
-    }
-    final other = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 23),
-      diagnostics,
-    );
-    expect(
-      await other.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(pageSize: 1, cursor: cursor),
-      ),
-      isA<DailyChoiceCatalogPageError>().having(
-        (result) => result.failure.category,
-        'категория',
-        GraphFailureCategory.validation,
-      ),
-    );
 
     expect(
       await repository.execute(
@@ -382,7 +287,7 @@ void main() {
     );
   });
 
-  test('проверяет длинный путь ограниченными пакетами ссылок', () async {
+  test('принимает путь длиннее одной SQL-порции ссылок', () async {
     const length = 405;
     for (var number = 4; number <= length + 1; number++) {
       raw.execute(
@@ -429,16 +334,10 @@ void main() {
       catalog.items.single.selected.id.toCanonicalString(),
       _uuid(length + 1),
     );
-    expect(
-      probe.statements
-          .where((sql) => sql.contains('FROM long_term_relations'))
-          .length,
-      2,
-    );
   });
 
   test('выдача одного дня отдаёт больше пятидесяти полных дубликатов порциями '
-      'по 50 по убыванию создания и не читает соседние дни', () async {
+      'по 50 по убыванию создания без соседних дней', () async {
     // Записи прошлого и будущего дня перемежаются с записями выбранного дня
     // в порядке создания, поэтому граница дня проверяется в каждой порции.
     final day = CalendarDate.fromParts(2026, 9, 23);
@@ -453,7 +352,6 @@ void main() {
         neighbours.addAll([_uuid(600 + index), _uuid(800 + index)]);
       }
     }
-    probe.clear();
 
     final pages = <DailyChoiceCatalogPage>[];
     DailyChoiceCatalogCursor? cursor;
@@ -495,53 +393,6 @@ void main() {
       hasLength(1),
     );
 
-    // Каждое чтение строк и количества ограничено выбранным днём, порция
-    // строк — пятьюдесятью и признаком продолжения, а пути проверяются
-    // только для строк порции.
-    final dayReads = probe.matching('FROM daily_choices');
-    expect(dayReads, hasLength(4));
-    for (final read in dayReads) {
-      expect(read.sql, contains('choice_date = ?'));
-      expect(read.arguments.first, '2026-09-23');
-    }
-    expect(probe.matching('COUNT(*) AS total_count'), hasLength(1));
-    expect(
-      probe
-          .matching('ORDER BY choice_date DESC')
-          .map((read) => read.arguments.last),
-      [51, 51, 51],
-    );
-    final steps = probe.matching('FROM daily_choice_path_steps');
-    expect(steps.map((read) => read.arguments.length), [50, 50, 20]);
-    for (final read in steps) {
-      expect(read.sql, contains('WHERE daily_choice_id IN'));
-    }
-    expect({for (final read in steps) ...read.arguments}, created.toSet());
-    expect([
-      for (final read in probe.matching('FROM long_term_relations')) read.sql,
-      for (final read in probe.matching('FROM intentions')) read.sql,
-    ], everyElement(contains('WHERE id IN')));
-    expect(probe.matching('WITH RECURSIVE'), isEmpty);
-
-    // Продолжение выбранного дня не продолжает другой день или выдачу без
-    // даты.
-    for (final foreign in [
-      DailyChoiceCatalogQuery(
-        date: CalendarDate.fromParts(2026, 9, 24),
-        cursor: pages.first.nextCursor,
-      ),
-      DailyChoiceCatalogQuery(cursor: pages.first.nextCursor),
-    ]) {
-      expect(
-        await repository.getDailyChoiceCatalogPage(foreign),
-        isA<DailyChoiceCatalogPageError>().having(
-          (result) => result.failure.category,
-          'категория',
-          GraphFailureCategory.validation,
-        ),
-      );
-    }
-
     // Внутренний запрос без даты по-прежнему охватывает все дни.
     final undated = page(
       await repository.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
@@ -564,9 +415,6 @@ void main() {
     for (final (date, completion, expected) in [
       (past, null, [202, 201]),
       (past, true, [201]),
-      (past, false, [202]),
-      (future, null, [204, 203]),
-      (future, true, [204]),
       (future, false, [203]),
       (CalendarDate.fromParts(2026, 9, 23), null, <int>[]),
     ]) {

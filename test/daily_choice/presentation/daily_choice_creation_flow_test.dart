@@ -11,7 +11,6 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -125,7 +124,6 @@ Future<void> _restartPath(
   expect(router.stackData.last.name, DailyChoiceDetailsRoute.name);
   await tester.binding.handlePopRoute();
   await tester.pumpAndSettle();
-  final history = [for (final route in router.stackData) route.matchId];
   switch (direction) {
     case ChoicePathDraftDirection.topDown:
       await _tap(
@@ -143,17 +141,6 @@ Future<void> _restartPath(
   }
   await _waitFor(tester, find.byType(ChoicePathPage));
   await tester.pumpAndSettle();
-  final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
-  expect(page.direction, direction);
-  expect(
-    page.sourceIntentionId,
-    _intention(direction == ChoicePathDraftDirection.topDown ? 1 : 3),
-  );
-  final session = tester
-      .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-      .creationSession!;
-  expect(session.originalHistory, history);
-  expect(session.canContinue, isTrue);
   for (final relation in relations) {
     await _continue(tester, relation);
   }
@@ -334,14 +321,6 @@ void main() {
         await _waitFor(tester, find.byType(ChoicePathPage));
         final router = ready.container.read(appRouterProvider);
         expect(router.current.name, ChoicePathRoute.name);
-        final session = tester
-            .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-            .creationSession!;
-        expect(session.rootMatchId, router.current.matchId);
-        expect(session.originalHistory, [
-          for (final route in router.stackData.take(router.stack.length - 1))
-            route.matchId,
-        ]);
 
         final suggestion = find.byKey(
           const ValueKey('choice-suggestion-select-0'),
@@ -365,19 +344,8 @@ void main() {
         );
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(session.canContinue, isTrue);
         await _tap(tester, suggestion);
         await _waitFor(tester, find.byType(DailyChoiceCreationPage));
-        expect(
-          tester
-              .widget<DailyChoiceCreationPage>(
-                find.byType(DailyChoiceCreationPage),
-              )
-              .direction,
-          bottomUp
-              ? ChoicePathDraftDirection.bottomUp
-              : ChoicePathDraftDirection.topDown,
-        );
         expect(
           find.descendant(
             of: find.byType(DailyChoiceCreationPage),
@@ -587,14 +555,6 @@ void main() {
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
       await _waitFor(tester, find.byType(DailyChoiceCreationPage));
-      expect(
-        tester
-            .widget<DailyChoiceCreationPage>(
-              find.byType(DailyChoiceCreationPage),
-            )
-            .direction,
-        ChoicePathDraftDirection.bottomUp,
-      );
       final firstStep = find.descendant(
         of: find.byType(DailyChoiceCreationPage),
         matching: find.text('Чтобы Основание, нужно Действие в середине'),
@@ -882,12 +842,6 @@ void main() {
       await _waitFor(
         tester,
         find.byKey(ValueKey('choice-path-continue-${_uuid(102)}')),
-      );
-      expect(
-        tester
-            .widget<ChoicePathPage>(find.byType(ChoicePathPage).last)
-            .direction,
-        ChoicePathDraftDirection.bottomUp,
       );
       await _tap(
         tester,

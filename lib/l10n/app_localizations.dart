@@ -500,12 +500,6 @@ abstract class AppLocalizations {
   /// **'More intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogLoadMoreUnexpected;
 
-  /// Недопустимый cursor следующей порции
-  ///
-  /// In en, this message translates to:
-  /// **'The saved catalog position is no longer valid.'**
-  String get catalogLoadMoreValidation;
-
   /// Устранимый отказ обновления над сохранённой выдачей каталога
   ///
   /// In en, this message translates to:
@@ -523,18 +517,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention list isn’t up to date because of an unexpected error.'**
   String get catalogRefreshUnexpected;
-
-  /// Явное восстановление каталога с первой страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Reload catalog'**
-  String get catalogReload;
-
-  /// Восстановление каталога с первой страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Reloading catalog…'**
-  String get catalogReloading;
 
   /// Признак готовности намерения к действию
   ///
@@ -2006,12 +1988,6 @@ abstract class AppLocalizations {
   /// **'Could not load tagged intentions because of an unexpected error.'**
   String get tagNavigationUnexpected;
 
-  /// Недопустимое продолжение навигации
-  ///
-  /// In en, this message translates to:
-  /// **'This result continuation is invalid. Reopen tag navigation.'**
-  String get tagNavigationInvalidCursor;
-
   /// Истёкший снимок навигации
   ///
   /// In en, this message translates to:
@@ -2753,12 +2729,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check the daily choice description.'**
   String get dailyChoiceDescriptionInvalid;
-
-  /// Ошибка пути дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Check the daily choice path.'**
-  String get dailyChoicePathInvalid;
 
   /// Дневной выбор отсутствует при выполнении команды
   ///
@@ -3737,12 +3707,6 @@ abstract class AppLocalizations {
   /// **'An intention on this path no longer exists.'**
   String get choicePathNotFound;
 
-  /// Недопустимый запрос продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Continuations could not be checked because of an invalid request.'**
-  String get choicePathInvalid;
-
   /// Временная недоступность продолжений
   ///
   /// In en, this message translates to:
@@ -3928,12 +3892,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The catalog changed. Refresh it to continue.'**
   String get dailyChoiceCatalogExpired;
-
-  /// Недопустимая позиция каталога
-  ///
-  /// In en, this message translates to:
-  /// **'The catalog position is no longer valid.'**
-  String get dailyChoiceCatalogInvalid;
 
   /// Непредвиденная ошибка чтения дневного каталога
   ///

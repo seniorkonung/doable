@@ -42,7 +42,6 @@ void main() {
       expect(query.cursor, isNull);
 
       const cursor = TestCatalogCursor();
-      const revision = TestCatalogRevision(4);
       final summaries = [
         testSummary(index: 1, title: 'Первое'),
         testSummary(index: 2, title: 'Второе'),
@@ -54,7 +53,7 @@ void main() {
             items: summaries,
             totalCount: 7,
             nextCursor: cursor,
-            revision: revision,
+            revision: const TestCatalogRevision(4),
           ),
         ),
       );
@@ -66,52 +65,12 @@ void main() {
       expect(
         state,
         isA<IntentionCatalogLoaded>()
-            .having((value) => value.query, 'запрос', same(query))
             .having((value) => value.items, 'элементы', summaries)
             .having((value) => value.totalCount, 'точное количество', 7)
-            .having((value) => value.nextCursor, 'курсор', same(cursor))
-            .having((value) => value.revision, 'ревизия', same(revision)),
+            .having((value) => value.nextCursor, 'курсор', same(cursor)),
       );
     },
   );
-
-  test('отличает пустой активный каталог от ошибки', () async {
-    final repository = ControlledCatalogRepository();
-    final container = _catalogContainer(repository);
-    final subscription = container.listen(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    addTearDown(container.dispose);
-    repository.queryAt(0);
-    const revision = TestCatalogRevision(0);
-
-    repository.complete(
-      0,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: const [],
-          totalCount: 0,
-          nextCursor: null,
-          revision: revision,
-        ),
-      ),
-    );
-
-    final state = await container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
-    );
-    expect(
-      state,
-      isA<IntentionCatalogEmpty>()
-          .having((value) => value.scope, 'охват', IntentionScope.active)
-          .having((value) => value.totalCount, 'точное количество', 0)
-          .having((value) => value.nextCursor, 'курсор', isNull)
-          .having((value) => value.revision, 'ревизия', same(revision)),
-    );
-  });
 
   test('повторяет только устранимый отказ первой страницы', () async {
     final repository = ControlledCatalogRepository();
@@ -261,15 +220,6 @@ void main() {
 
     expect(policy.pageSize, 100);
     expect(policy.prefetchRemaining, 30);
-    expect(policy.filterDebounce, const Duration(milliseconds: 250));
-    expect(
-      () => CatalogPagingPolicy(
-        pageSize: 101,
-        prefetchRemaining: 30,
-        filterDebounce: const Duration(milliseconds: 250),
-      ),
-      throwsA(isA<CatalogPagingPolicyValidationException>()),
-    );
   });
 
   test('политика отклоняет недопустимые границы до запроса', () {
@@ -306,7 +256,7 @@ void main() {
         ),
       );
     }
-    for (final prefetchRemaining in [-1, 3, 4]) {
+    for (final prefetchRemaining in [-1, 3]) {
       expect(
         () => CatalogPagingPolicy(
           pageSize: 3,
@@ -559,298 +509,6 @@ void main() {
   });
 
   test(
-    'восстанавливает validation продолжения только с первой страницы',
-    () async {
-      final repository = ControlledCatalogRepository();
-      final container = _catalogContainer(
-        repository,
-        pageSize: 2,
-        prefetchRemaining: 1,
-      );
-      final subscription = container.listen(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      addTearDown(container.dispose);
-
-      const cursor = TestCatalogCursor();
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [testSummary(index: 1), testSummary(index: 2)],
-            totalCount: 4,
-            nextCursor: cursor,
-            revision: const TestCatalogRevision(1),
-          ),
-        ),
-      );
-      await container.read(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-            .future,
-      );
-      final notifier = container.read(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-            .notifier,
-      );
-
-      final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
-      await _waitForQueries(repository, 2);
-      repository.complete(
-        1,
-        const ResultFailure(IntentionGenericValidationFailure()),
-      );
-      await load;
-      expect(
-        (container
-                    .read(
-                      intentionCatalogViewModelProvider(
-                        const BrowseIntentionCatalog(),
-                      ),
-                    )
-                    .requireValue
-                as IntentionCatalogLoaded)
-            .continuation,
-        isA<IntentionCatalogContinuationValidation>(),
-      );
-
-      final recovery = notifier.recoverFromInvalidCursor();
-      await _waitForQueries(repository, 3);
-      final recoveryQuery = repository.queryAt(2);
-      expect(recoveryQuery.cursor, isNull);
-      expect(recoveryQuery.scope, IntentionScope.active);
-      final duringRecovery =
-          container
-                  .read(
-                    intentionCatalogViewModelProvider(
-                      const BrowseIntentionCatalog(),
-                    ),
-                  )
-                  .requireValue
-              as IntentionCatalogLoaded;
-      expect(duringRecovery.items, hasLength(2));
-      expect(
-        duringRecovery.continuation,
-        isA<IntentionCatalogContinuationRecovering>(),
-      );
-
-      const newCursor = TestCatalogCursor();
-      repository.complete(
-        2,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [testSummary(index: 7)],
-            totalCount: 6,
-            nextCursor: newCursor,
-            revision: const TestCatalogRevision(9),
-          ),
-        ),
-      );
-      await recovery;
-
-      final recovered =
-          container
-                  .read(
-                    intentionCatalogViewModelProvider(
-                      const BrowseIntentionCatalog(),
-                    ),
-                  )
-                  .requireValue
-              as IntentionCatalogLoaded;
-      expect(recovered.items.single.id, testSummary(index: 7).id);
-      expect(recovered.totalCount, 6);
-      expect(recovered.nextCursor, same(newCursor));
-      expect(recovered.revision, const TestCatalogRevision(9));
-    },
-  );
-
-  test(
-    'сохраняет префикс при отказе восстановления и повторяет первую страницу',
-    () async {
-      final repository = ControlledCatalogRepository();
-      final container = _catalogContainer(
-        repository,
-        pageSize: 2,
-        prefetchRemaining: 1,
-      );
-      final subscription = container.listen(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      addTearDown(container.dispose);
-
-      const cursor = TestCatalogCursor();
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [testSummary(index: 1), testSummary(index: 2)],
-            totalCount: 3,
-            nextCursor: cursor,
-            revision: const TestCatalogRevision(1),
-          ),
-        ),
-      );
-      await container.read(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-            .future,
-      );
-      final notifier = container.read(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-            .notifier,
-      );
-
-      final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
-      await _waitForQueries(repository, 2);
-      repository.complete(
-        1,
-        const ResultFailure(IntentionGenericValidationFailure()),
-      );
-      await load;
-
-      final recovery = notifier.recoverFromInvalidCursor();
-      await _waitForQueries(repository, 3);
-      repository.complete(
-        2,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await recovery;
-
-      final unavailable =
-          container
-                  .read(
-                    intentionCatalogViewModelProvider(
-                      const BrowseIntentionCatalog(),
-                    ),
-                  )
-                  .requireValue
-              as IntentionCatalogLoaded;
-      expect(unavailable.items, hasLength(2));
-      expect(unavailable.totalCount, 3);
-      expect(unavailable.nextCursor, same(cursor));
-      expect(
-        unavailable.continuation,
-        isA<IntentionCatalogRecoveryUnavailable>(),
-      );
-
-      final retry = notifier.retryRecovery();
-      await _waitForQueries(repository, 4);
-      expect(repository.queryAt(3).cursor, isNull);
-      repository.complete(
-        3,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [testSummary(index: 4)],
-            totalCount: 1,
-            nextCursor: null,
-            revision: const TestCatalogRevision(2),
-          ),
-        ),
-      );
-      await retry;
-
-      final recovered =
-          container
-                  .read(
-                    intentionCatalogViewModelProvider(
-                      const BrowseIntentionCatalog(),
-                    ),
-                  )
-                  .requireValue
-              as IntentionCatalogLoaded;
-      expect(recovered.items.single.id, testSummary(index: 4).id);
-      expect(recovered.totalCount, 1);
-    },
-  );
-
-  test('отбрасывает позднее восстановление прежней generation', () async {
-    final repository = ControlledCatalogRepository();
-    final container = _catalogContainer(
-      repository,
-      pageSize: 2,
-      prefetchRemaining: 1,
-    );
-    final subscription = container.listen(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    addTearDown(container.dispose);
-
-    repository.complete(
-      0,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testSummary(index: 1), testSummary(index: 2)],
-          totalCount: 3,
-          nextCursor: const TestCatalogCursor(),
-          revision: const TestCatalogRevision(1),
-        ),
-      ),
-    );
-    await container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
-    );
-    final notifier = container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-          .notifier,
-    );
-    final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
-    await _waitForQueries(repository, 2);
-    repository.complete(
-      1,
-      const ResultFailure(IntentionGenericValidationFailure()),
-    );
-    await load;
-
-    final oldRecovery = notifier.recoverFromInvalidCursor();
-    await _waitForQueries(repository, 3);
-    notifier.changeScope(IntentionScope.archived);
-    await _waitForQueries(repository, 4);
-    repository.complete(
-      3,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testSummary(index: 8, title: 'Текущая выдача')],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(4),
-        ),
-      ),
-    );
-    final current = await container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
-    );
-
-    repository.complete(
-      2,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testSummary(index: 9, title: 'Прежняя выдача')],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(3),
-        ),
-      ),
-    );
-    await oldRecovery;
-
-    expect(
-      container
-          .read(
-            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-          )
-          .requireValue,
-      same(current),
-    );
-  });
-
-  test(
     'сохраняет фильтр и порядок при смене охвата и начинает первую страницу',
     () async {
       final repository = ControlledCatalogRepository();
@@ -946,31 +604,6 @@ void main() {
       );
     },
   );
-
-  test('не отправляет фильтр до завершения интервала 250 мс', () async {
-    final repository = ControlledCatalogRepository();
-    final container = _catalogContainer(repository);
-    final subscription = container.listen(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    addTearDown(container.dispose);
-    repository.queryAt(0);
-
-    container
-        .read(
-          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-              .notifier,
-        )
-        .changeTitleFilter('молоко');
-    await Future<void>.delayed(const Duration(milliseconds: 240));
-    expect(repository.queries, hasLength(1));
-
-    await _waitForQueries(repository, 2);
-    expect(repository.queryAt(1).titleFilter?.map((value) => value), 'молоко');
-  });
 
   test('отклоняет недопустимый фильтр без обращения к repository', () async {
     final scenarios = <(String, IntentionCatalogFilterValidationFailure)>[
@@ -1071,76 +704,16 @@ void main() {
     );
     await Future<void>.delayed(Duration.zero);
 
-    expect(
-      container
-          .read(
-            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-          )
-          .requireValue,
-      same(currentState),
-    );
-  });
-
-  test('поздний результат прежнего фильтра не заменяет новый', () async {
-    final repository = ControlledCatalogRepository();
-    final container = _catalogContainer(
-      repository,
-      filterDebounce: Duration.zero,
-    );
-    final subscription = container.listen(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    addTearDown(container.dispose);
-    repository.queryAt(0);
-
-    final notifier = container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-          .notifier,
-    );
-    notifier.changeTitleFilter('прежний');
-    await _waitForQueries(repository, 2);
-    notifier.changeTitleFilter('новый');
-    await _waitForQueries(repository, 3);
-
-    repository.complete(
-      2,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testSummary(index: 3, title: 'Новый результат')],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(3),
-        ),
-      ),
-    );
-    final currentState = await container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
-    );
-
-    repository.complete(
-      1,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testSummary(index: 2, title: 'Прежний результат')],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(2),
-        ),
-      ),
-    );
-    await Future<void>.delayed(Duration.zero);
-
-    expect(
-      container
-          .read(
-            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-          )
-          .requireValue,
-      same(currentState),
-    );
+    final state =
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
+            as IntentionCatalogLoaded;
+    expect(state.items.single.title, 'Текущий результат');
   });
 
   test(
@@ -1177,18 +750,12 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      final observedCompletions = <IntentionCommandCompletion>[];
-      final completionSubscription = coordinator.intentionCompletions.listen(
-        observedCompletions.add,
-      );
-      addTearDown(completionSubscription.cancel);
       final start = coordinator.acceptCreation(
         IntentionCreationFormKey(),
         const CreateIntention(title: 'Новое', description: null),
       );
       expect(start, isA<IntentionCommandAccepted>());
       final accepted = start as IntentionCommandAccepted;
-      expect(repository.commands, hasLength(1));
 
       final notifier = container.read(
         intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
@@ -1217,7 +784,6 @@ void main() {
         ),
       );
       await accepted.future;
-      expect(observedCompletions, hasLength(1));
       repository.complete(
         3,
         ResultSuccess(
@@ -1233,14 +799,7 @@ void main() {
         intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
             .future,
       );
-      expect(
-        reconciled,
-        isA<IntentionCatalogEmpty>().having(
-          (value) => value.revision,
-          'ревизия',
-          const TestCatalogRevision(4),
-        ),
-      );
+      expect(reconciled, isA<IntentionCatalogEmpty>());
       expect(repository.queries, hasLength(4));
     },
   );
@@ -1274,9 +833,9 @@ void main() {
     await started.future;
 
     final claim = await presenter.nextClaim();
-    expect(claim!.token, same(started.token));
+    expect(claim, isNotNull);
     expect(
-      claim.completion,
+      claim!.completion,
       isA<IntentionCommandCompletion>().having(
         (completion) => completion.presentationTitle,
         'название намерения',

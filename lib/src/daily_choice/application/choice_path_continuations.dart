@@ -13,8 +13,8 @@ final class ChoicePathContinuationQueryValidationException
   final ChoicePathContinuationQueryValidationFailure failure;
 }
 
-/// Непрозрачное продолжение одной порции. Репозиторий привязывает его к своему
-/// экземпляру, направлению, полному черновику, размеру порции, ревизии и ключу.
+/// Непрозрачное продолжение одной порции. Репозиторий привязывает его к
+/// ревизии и ключу порядка.
 abstract interface class ChoicePathContinuationCursor {}
 
 final class ChoicePathContinuationQuery {
@@ -99,15 +99,6 @@ int _compareContinuations(
 
 sealed class ChoicePathContinuationFailure implements GraphCommandFailure {
   const ChoicePathContinuationFailure();
-}
-
-/// Некорректный запрос или курсор от другого запроса либо репозитория.
-final class ChoicePathContinuationValidationFailure
-    extends ChoicePathContinuationFailure {
-  const ChoicePathContinuationValidationFailure();
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.validation;
 }
 
 /// Отсутствует исходное или достигнутое намерение.

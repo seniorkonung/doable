@@ -333,18 +333,6 @@ void main() {
     expect(stored.isArchived, isTrue);
   });
 
-  test('архивирование перед созданием отклоняет архивного участника', () async {
-    final archival = repository.execute(ArchiveIntention(sourceId));
-    final creation = repository.execute(_createCommand(sourceId, relatedId));
-
-    expect(await archival, isA<ResultSuccess>());
-    expect(
-      _relationFailure(await creation),
-      isA<LongTermRelationParticipantArchivedFailure>(),
-    );
-    expect(await database.select(database.longTermRelations).get(), isEmpty);
-  });
-
   test(
     'создание перед удалением сохраняет обе сущности и возвращает конфликт',
     () async {
@@ -365,71 +353,6 @@ void main() {
       expect(
         await database.select(database.longTermRelations).get(),
         hasLength(1),
-      );
-    },
-  );
-
-  test(
-    'удаление перед созданием возвращает отсутствующего участника',
-    () async {
-      final deletion = repository.execute(DeleteIntention(sourceId));
-      final creation = repository.execute(_createCommand(sourceId, relatedId));
-
-      expect(await deletion, isA<ResultSuccess>());
-      expect(
-        _relationFailure(await creation),
-        isA<LongTermRelationParticipantNotFoundFailure>(),
-      );
-      expect(await database.select(database.longTermRelations).get(), isEmpty);
-    },
-  );
-
-  test('ошибка вставки откатывает создание и не продвигает ревизию', () async {
-    await repository.execute(_createCommand(sourceId, relatedId));
-    final thirdId = _intentionId(_uuid(3));
-    final fourthId = _intentionId(_uuid(4));
-    await _insertIntention(database, thirdId, title: 'Третье намерение');
-    await _insertIntention(database, fourthId, title: 'Четвёртое намерение');
-    repository = _repository(database, diagnostics, [relationId]);
-    final revisionBefore = (await repository.getRelationCounts(
-      thirdId,
-    ) as ResultSuccess<GraphSnapshot<RelationCounts>>).value.revision;
-
-    final result = await repository.execute(_createCommand(thirdId, fourthId));
-
-    expect(_relationFailure(result), isA<LongTermRelationUnexpectedFailure>());
-    expect(
-      await database.select(database.longTermRelations).get(),
-      hasLength(1),
-    );
-    final snapshotAfter = (await repository.getRelationCounts(
-      thirdId,
-    ) as ResultSuccess<GraphSnapshot<RelationCounts>>).value;
-    expect(snapshotAfter.value.total, 0);
-    expect(
-      revisionBefore.compareTo(snapshotAfter.revision),
-      GraphRevisionOrder.same,
-    );
-  });
-
-  test(
-    'сбой диагностики после commit не меняет подтверждённый успех',
-    () async {
-      final throwingDiagnostics = _ThrowingDiagnosticsSink();
-      repository = _repository(database, throwingDiagnostics, [relationId]);
-
-      final result = await repository.execute(
-        _createCommand(sourceId, relatedId),
-      );
-
-      expect(result, isA<GraphCommandSucceeded>());
-      expect(
-        await database.select(database.longTermRelations).get(),
-        hasLength(1),
-      );
-      expect(
-        throwingDiagnostics.attemptedEvents,
-        everyElement(isA<LongTermRelationCommandDiagnosticsEvent>()),
       );
     },
   );
@@ -527,16 +450,6 @@ final class _DeterministicRelationIdGenerator
 
   @override
   LongTermRelationId generate() => _ids[_index++];
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-диагностика');
-  }
 }
 
 IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {

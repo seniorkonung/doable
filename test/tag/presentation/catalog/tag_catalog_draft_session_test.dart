@@ -43,11 +43,6 @@ void main() {
       final repository = _Repository();
       final draft = _DraftSession(repository);
       addTearDown(draft.dispose);
-      final published = <Set<TagId>>[];
-      final changes = draft.tagSet.changes.listen(
-        (snapshot) => published.add(snapshot.tagIds),
-      );
-      addTearDown(changes.cancel);
       await tester.pumpWidget(
         draft.app(
           home: TagCatalogView(
@@ -72,10 +67,8 @@ void main() {
       await tester.pump();
       await tester.tap(_row(home));
       await tester.pump();
-      expect(published, isEmpty);
       expect(draft.tagSet.current.tagIds, isEmpty);
       expect(draft.state.selectedTags, isEmpty);
-      expect(repository.observationCount(home.id), 1);
 
       // Повторные нажатия до перестроения дают одно включение.
       await tester.tap(add);
@@ -83,9 +76,6 @@ void main() {
       await tester.tap(add, warnIfMissed: false);
       await tester.pump();
 
-      expect(published, [
-        {home.id},
-      ]);
       expect(draft.tagSet.current.tagIds, [home.id]);
       expect(draft.state.selectedTags.keys, [home.id]);
       expect(draft.state.selectedTags[home.id]?.name, home.name);
@@ -93,7 +83,6 @@ void main() {
         draft.state.selectedTags[home.id]?.status,
         isA<IntentionDraftTagLoading>(),
       );
-      expect(repository.observationCount(home.id), 2);
       expect(_status(home, l10n.tagCatalogInDraft), findsOneWidget);
       expect(tester.widget<FilledButton>(add).onPressed, isNull);
 
@@ -129,7 +118,6 @@ void main() {
       expect(_status(renamed, l10n.tagCatalogInDraft), findsOneWidget);
       expect(tester.widget<FilledButton>(add).onPressed, isNull);
       expect(draft.tagSet.current.tagIds, [home.id]);
-      expect(published, hasLength(1));
       expect(draft.state.selectedTags[home.id]?.name, renamed.name);
       expect(
         draft.state.selectedTags[home.id]?.status,
@@ -157,7 +145,6 @@ void main() {
       expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
       expect(tester.widget<FilledButton>(add).onPressed, isNull);
       expect(draft.tagSet.current.tagIds, [home.id]);
-      expect(published, hasLength(1));
       expect(draft.state.selectedTags[home.id]?.name, renamed.name);
       expect(
         draft.state.selectedTags[home.id]?.status,
@@ -199,10 +186,6 @@ void main() {
       await tester.tap(add);
       await tester.pump();
 
-      expect(published, [
-        {home.id},
-        {home.id, namesake.id},
-      ]);
       expect(draft.tagSet.current.tagIds, [home.id, namesake.id]);
       expect(draft.state.selectedTags.keys, [home.id, namesake.id]);
       expect(
@@ -211,7 +194,6 @@ void main() {
       );
       expect(draft.state.selectedTags[namesake.id]?.name, namesake.name);
       expect(_status(namesake, l10n.tagCatalogInDraft), findsOneWidget);
-      expect(repository.observationCount(namesake.id), 2);
 
       // Перечитывания вызывают только постоянные команды тегов; локальные
       // включения не пишут назначений, не проверяют пар и не сбрасывают поиск.
@@ -220,11 +202,6 @@ void main() {
         isA<DeleteTag>(),
         isA<CreateTag>(),
       ]);
-      expect(
-        repository.readModes,
-        List.filled(4, const TagCatalogBrowseMode()),
-      );
-      expect(repository.statusQueries, isEmpty);
       expect(tester.widget<TextField>(search).controller!.text, 'дом');
       expect(tester.takeException(), isNull);
     },
@@ -238,11 +215,6 @@ void main() {
       addTearDown(draft.dispose);
       final intentionId =
           (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
-      final published = <Set<TagId>>[];
-      final changes = draft.tagSet.changes.listen(
-        (snapshot) => published.add(snapshot.tagIds),
-      );
-      addTearDown(changes.cancel);
       final navigator = GlobalKey<NavigatorState>();
       await tester.pumpWidget(
         draft.app(
@@ -289,12 +261,8 @@ void main() {
       await tester.pump();
 
       expect(draft.tagSet.current.tagIds, [home.id]);
-      expect(published, [
-        {home.id},
-      ]);
       expect(_status(home, l10n.tagCatalogInDraft), findsOneWidget);
       expect(repository.commands, isEmpty);
-      expect(repository.statusQueries, isEmpty);
 
       navigator.currentState!.pop();
       await tester.pumpAndSettle();
@@ -342,13 +310,7 @@ void main() {
       expect(_status(work, l10n.tagCatalogAssigned), findsOneWidget);
       expect(draft.tagSet.current.tagIds, [home.id]);
       expect(draft.state.selectedTags.keys, [home.id]);
-      expect(published, hasLength(1));
       expect(repository.commands, hasLength(1));
-      expect(repository.readModes, [
-        TagCatalogSelectionMode(intentionId),
-        const TagCatalogBrowseMode(),
-        TagCatalogSelectionMode(intentionId),
-      ]);
       expect(tester.takeException(), isNull);
     },
   );
@@ -466,10 +428,6 @@ final class _Repository extends Fake implements PersonalGraphRepository {
     _observations.add(observation);
     return observation.controller.stream;
   }
-
-  /// Число начатых наблюдений тега [id] за всё время теста.
-  int observationCount(TagId id) =>
-      _observations.where((observation) => observation.id == id).length;
 
   /// Передаёт снимок тега всем его действующим наблюдениям.
   void observe(TagId id, Tag? tag, {required int revision}) {

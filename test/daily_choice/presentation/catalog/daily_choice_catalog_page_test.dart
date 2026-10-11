@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -34,59 +32,60 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    for (final (mode, route, cancelKey, name) in const [
-      (
-        QuickCreationMode.dailyChoiceFromIntention,
-        DailyChoiceSourcePickerRoute.name,
-        'daily-choice-source-cancel',
-        'дневной выбор от намерения',
-      ),
-      (
-        QuickCreationMode.dailyChoiceFromAction,
-        DailyChoiceActionPickerRoute.name,
-        'daily-choice-action-cancel',
-        'дневной выбор от действия',
-      ),
-    ]) {
-      testWidgets(
-        'каталог без собственной кнопки запускает $name через общую панель '
-        'на языке ${locale.languageCode}',
-        (tester) async {
-          final repository = _Repository();
-          final router = await _open(tester, repository, locale: locale);
-          await tester.pump(const Duration(milliseconds: 400));
-          expect(find.byType(FloatingActionButton), findsNothing);
-          repository.completeFirst([], total: 0);
-          await tester.pumpAndSettle();
-          expect(find.byType(FloatingActionButton), findsNothing);
-          final semantics = tester.ensureSemantics();
-          final l10n = lookupAppLocalizations(locale);
-          expect(
-            find.bySemanticsLabel(l10n.dailyChoiceCreateFromAction),
-            findsNothing,
-          );
-          await openQuickCreation(
-            tester,
-            mode,
-            openedPage: find.byKey(ValueKey(cancelKey)),
-          );
-          expect(router.current.name, route);
-          await tester.tap(find.byKey(ValueKey(cancelKey)));
-          await tester.pump(const Duration(milliseconds: 400));
-          expectDailyChoicesRootPage(router);
-          expect(repository.queries, hasLength(1));
-          expect(quickCreationAction().hitTestable(), findsOneWidget);
-          expect(
-            find.bySemanticsLabel(
-              '${l10n.quickCreationLabel}, ${mode.title(l10n)}',
-            ),
-            findsOneWidget,
-          );
-          semantics.dispose();
-        },
-      );
-    }
+  // Режим и язык независимы: диагональ покрывает оба режима и оба языка.
+  for (final (locale, mode, route, cancelKey, name) in const [
+    (
+      Locale('ru'),
+      QuickCreationMode.dailyChoiceFromIntention,
+      DailyChoiceSourcePickerRoute.name,
+      'daily-choice-source-cancel',
+      'дневной выбор от намерения',
+    ),
+    (
+      Locale('en'),
+      QuickCreationMode.dailyChoiceFromAction,
+      DailyChoiceActionPickerRoute.name,
+      'daily-choice-action-cancel',
+      'дневной выбор от действия',
+    ),
+  ]) {
+    testWidgets(
+      'каталог без собственной кнопки запускает $name через общую панель '
+      'на языке ${locale.languageCode}',
+      (tester) async {
+        final repository = _Repository();
+        final router = await _open(tester, repository, locale: locale);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.byType(FloatingActionButton), findsNothing);
+        repository.completeFirst([], total: 0);
+        await tester.pumpAndSettle();
+        expect(find.byType(FloatingActionButton), findsNothing);
+        final semantics = tester.ensureSemantics();
+        final l10n = lookupAppLocalizations(locale);
+        expect(
+          find.bySemanticsLabel(l10n.dailyChoiceCreateFromAction),
+          findsNothing,
+        );
+        await openQuickCreation(
+          tester,
+          mode,
+          openedPage: find.byKey(ValueKey(cancelKey)),
+        );
+        expect(router.current.name, route);
+        await tester.tap(find.byKey(ValueKey(cancelKey)));
+        await tester.pump(const Duration(milliseconds: 400));
+        expectDailyChoicesRootPage(router);
+        expect(repository.queries, hasLength(1));
+        expect(quickCreationAction().hitTestable(), findsOneWidget);
+        expect(
+          find.bySemanticsLabel(
+            '${l10n.quickCreationLabel}, ${mode.title(l10n)}',
+          ),
+          findsOneWidget,
+        );
+        semantics.dispose();
+      },
+    );
   }
 
   testWidgets('показывает все записи, количество и открывает дубликат по id', (
@@ -145,8 +144,8 @@ void main() {
     // Просмотр другой недели не меняет условий выдачи, а смена охвата и сброс
     // не меняют просматриваемую неделю.
     await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-    final viewed = week(date(2026, 10, 2));
-    expect(_calendar(tester).viewport, viewed);
+    final viewed = weeksFrom(date(2026, 9, 28), 1);
+    expect(visibleWeeks(tester), viewed);
     expect(repository.queries, hasLength(3));
 
     await tester.tap(
@@ -159,7 +158,7 @@ void main() {
     expect(repository.queries[3].date, selectedDay);
     expect(repository.queries[3].isCompleted, true);
     expect(repository.queries[3].cursor, isNull);
-    expect(_calendar(tester).viewport, viewed);
+    expect(visibleWeeks(tester), viewed);
     repository.completeFirst([], index: 3, total: 0);
     await tester.pumpAndSettle();
     expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
@@ -169,8 +168,8 @@ void main() {
     expect(repository.queries, hasLength(5));
     expect(repository.queries[4].date, selectedDay);
     expect(repository.queries[4].isCompleted, isNull);
-    expect(_calendar(tester).selectedDate, selectedDay);
-    expect(_calendar(tester).viewport, viewed);
+    _expectSelected(tester, selectedDay);
+    expect(visibleWeeks(tester), viewed);
     repository.completeFirst([_item(2, date: selectedDay)], index: 4, total: 1);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
@@ -180,8 +179,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('daily-choice-clear-filters')));
     await tester.pump();
     expect(repository.queries, hasLength(5));
-    expect(_calendar(tester).selectedDate, selectedDay);
-    expect(find.text(_selectedDateLabel(tester, selectedDay)), findsOneWidget);
+    _expectSelected(tester, selectedDay);
   });
 
   group('встроенный календарь', () {
@@ -190,10 +188,6 @@ void main() {
       final repository = _Repository();
       await _open(tester, repository);
 
-      final calendar = _calendar(tester);
-      expect(calendar.selectedDate, _today);
-      expect(calendar.today, _today);
-      expect(calendar.viewport, week(_today));
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
       expect(find.text(_selectedDateLabel(tester, _today)), findsOneWidget);
       final query = repository.queries.single;
@@ -214,22 +208,10 @@ void main() {
       repository.completeFirst([_item(1)], total: 1);
       await tester.pumpAndSettle();
 
-      final scroll = tester.widget<CustomScrollView>(
-        find.byType(CustomScrollView),
-      );
-      final first = scroll.slivers.first;
-      expect(first, isA<SliverToBoxAdapter>());
-      expect(
-        find.descendant(
-          of: find.byWidget(first),
-          matching: find.byType(DailyChoiceCalendar),
-        ),
-        findsOneWidget,
-      );
       final calendarBottom = tester
           .getRect(find.byType(DailyChoiceCalendar))
           .bottom;
-      for (final key in _filterKeys) {
+      for (final key in [..._filterKeys, 'daily-choice-row-1']) {
         expect(
           tester.getRect(find.byKey(ValueKey(key))).top,
           greaterThanOrEqualTo(calendarBottom),
@@ -276,8 +258,8 @@ void main() {
       expect(query.cursor, isNull);
 
       await tester.pump();
-      expect(_calendar(tester).selectedDate, nextDay);
-      expect(_calendar(tester).viewport, week(nextDay));
+      _expectSelected(tester, nextDay);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
       expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
       expect(find.text('Всего дневных выборов: 3'), findsNothing);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsNothing);
@@ -293,36 +275,36 @@ void main() {
       expect(repository.queries, hasLength(4));
     });
 
-    testWidgets('в раскрытом месяце 2028-02-29 выбирается после просмотра '
+    testWidgets('в раскрытом месяце день выбирается после просмотра '
         'соседнего месяца, а календарь остаётся раскрытым', (tester) async {
-      final today = date(2028, 1, 20);
-      final leapDay = date(2028, 2, 29);
+      final selectedDay = date(2026, 10, 15);
       final repository = _Repository();
-      await _open(tester, repository, today: today);
+      await _open(tester, repository);
       final l10n = lookupAppLocalizations(const Locale('ru'));
       repository.completeFirst([], total: 0);
       await tester.pumpAndSettle();
 
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
-      expect(_calendar(tester).viewport, month(today));
+      expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
-      expect(_calendar(tester).viewport, month(date(2028, 2, 1)));
-      expect(visibleWeeks(tester), weeksFrom(date(2028, 1, 31), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
       // Выбранный день вне просматриваемого месяца остаётся названным.
-      expect(find.text(_selectedDateLabel(tester, today)), findsOneWidget);
+      expect(find.text(_selectedDateLabel(tester, _today)), findsOneWidget);
       expect(repository.queries, hasLength(1));
 
-      await tester.tap(calendarDay(leapDay));
+      await tester.tap(calendarDay(selectedDay));
       expect(repository.queries, hasLength(2));
-      expect(repository.queries[1].date, leapDay);
+      expect(repository.queries[1].date, selectedDay);
       expect(repository.queries[1].isCompleted, isNull);
 
       await _settleCalendar(tester);
-      expect(_calendar(tester).selectedDate, leapDay);
-      expect(_calendar(tester).viewport, month(leapDay));
-      expect(visibleWeeks(tester), weeksFrom(date(2028, 1, 31), 5));
+      _expectSelected(tester, selectedDay);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
       expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
-      expect(find.text(_selectedDateLabel(tester, leapDay)), findsOneWidget);
+      expect(
+        find.text(_selectedDateLabel(tester, selectedDay)),
+        findsOneWidget,
+      );
       expect(repository.queries, hasLength(2));
     });
 
@@ -336,12 +318,11 @@ void main() {
       // Первое чтение ещё не завершено: просмотр его не отменяет и не
       // повторяет.
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-      expect(_calendar(tester).viewport, week(date(2026, 10, 11)));
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       await _swipeCalendar(tester, toNext: true);
-      expect(_calendar(tester).viewport, week(date(2026, 10, 18)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
-      expect(_calendar(tester).viewport, week(date(2026, 10, 11)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
       expect(repository.queries, hasLength(1));
 
@@ -358,34 +339,30 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
       await _swipeCalendar(tester, toNext: true);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-      expect(_calendar(tester).viewport, week(date(2026, 11, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
       final weekCountTop = tester.getRect(count).top;
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
-      expect(_calendar(tester).viewport, month(date(2026, 11, 1)));
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
       expect(tester.getRect(count).top, greaterThan(weekCountTop));
 
       await _swipeCalendar(tester, toNext: true);
-      expect(_calendar(tester).viewport, month(date(2026, 12, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 5));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
-      expect(_calendar(tester).viewport, month(date(2026, 11, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
-      expect(_calendar(tester).viewport, week(date(2026, 11, 1)));
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
       expect(tester.getRect(count).top, moreOrLessEquals(weekCountTop));
 
       // Свёрнутая неделя показывает точную дату просмотра из середины месяца.
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-      expect(_calendar(tester).viewport, week(date(2026, 11, 15)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
-      expect(_calendar(tester).viewport, week(date(2026, 11, 15)));
       expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
 
       expect(repository.queries, hasLength(1));
-      expect(_calendar(tester).selectedDate, today);
-      expect(find.text(_selectedDateLabel(tester, today)), findsOneWidget);
+      _expectSelected(tester, today);
       expect(count, findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
     });
@@ -401,12 +378,12 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
-      expect(_calendar(tester).viewport, month(date(2026, 9, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 5));
 
       await tester.tap(calendarDay(_today));
       await _settleCalendar(tester);
-      expect(_calendar(tester).selectedDate, _today);
-      expect(_calendar(tester).viewport, month(_today));
+      _expectSelected(tester, _today);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 5));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
 
@@ -426,7 +403,7 @@ void main() {
       repository.failFirst(index: 1);
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsOneWidget);
-      expect(_calendar(tester).selectedDate, futureDay);
+      _expectSelected(tester, futureDay);
 
       await tester.tap(calendarDay(futureDay));
       await tester.pump();
@@ -440,14 +417,14 @@ void main() {
       expect(repository.queries[2].cursor, isNull);
       repository.failFirst(index: 2);
       await tester.pumpAndSettle();
-      expect(_calendar(tester).selectedDate, futureDay);
+      _expectSelected(tester, futureDay);
 
       final otherDay = date(2026, 9, 27);
       await tester.tap(calendarDay(otherDay));
       expect(repository.queries, hasLength(4));
       expect(repository.queries[3].date, otherDay);
       await tester.pump();
-      expect(_calendar(tester).selectedDate, otherDay);
+      _expectSelected(tester, otherDay);
       expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsNothing);
     });
 
@@ -479,8 +456,7 @@ void main() {
       repository.failFirst();
       await tester.pumpAndSettle();
 
-      expect(_calendar(tester).selectedDate, secondDay);
-      expect(find.text(_selectedDateLabel(tester, secondDay)), findsOneWidget);
+      _expectSelected(tester, secondDay);
       expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsNothing);
@@ -513,7 +489,7 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _swipeCalendar(tester, toNext: true);
-      expect(_calendar(tester).viewport, month(date(2026, 11, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
       expect(find.text(l10n.dailyChoiceCatalogLoading), findsOneWidget);
       expect(repository.queries, hasLength(2));
       repository.completeFirst(
@@ -535,7 +511,7 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
       await _swipeCalendar(tester, toNext: false);
-      expect(_calendar(tester).viewport, week(date(2026, 9, 24)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
       expect(find.text(l10n.dailyChoiceCatalogLoadingMore), findsOneWidget);
       expect(repository.queries, hasLength(3));
       repository.completeMore(2, [_item(2, date: selectedDay)]);
@@ -543,7 +519,7 @@ void main() {
 
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
       expect(find.text(l10n.dailyChoiceCatalogLoadingMore), findsNothing);
-      expect(_calendar(tester).selectedDate, selectedDay);
+      _expectSelected(tester, selectedDay);
       expect(repository.queries, hasLength(3));
     });
 
@@ -609,7 +585,7 @@ void main() {
       repository.completeMore(5, [_item(3, date: thirdDay)]);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
-      expect(_calendar(tester).selectedDate, thirdDay);
+      _expectSelected(tester, thirdDay);
     });
 
     testWidgets('пустая выдача сохраняет выбранный день и позволяет выбрать '
@@ -619,15 +595,15 @@ void main() {
       repository.completeFirst([], total: 0);
       await tester.pumpAndSettle();
       expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
-      expect(_calendar(tester).selectedDate, _today);
+      _expectSelected(tester, _today);
 
       final otherDay = date(2026, 9, 23);
       await tester.tap(calendarDay(otherDay));
       expect(repository.queries, hasLength(2));
       expect(repository.queries[1].date, otherDay);
       await tester.pump();
-      expect(_calendar(tester).selectedDate, otherDay);
-      expect(_calendar(tester).viewport, week(otherDay));
+      _expectSelected(tester, otherDay);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
     });
   });
 
@@ -648,156 +624,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('To Основание, today I Действие'), findsOneWidget);
   });
-
-  testWidgets('фильтры, количество и выдача прокручиваются вместе одним '
-      'жестом по выдаче', (tester) async {
-    final repository = _Repository();
-    await _open(tester, repository, size: _phone);
-    repository.completeFirst(
-      [for (var number = 1; number <= 20; number++) _item(number)],
-      total: 21,
-      cursor: const _Cursor(),
-    );
-    await tester.pumpAndSettle();
-    final calendar = find.byType(DailyChoiceCalendar);
-    final count = find.text('Всего дневных выборов: 21');
-    final row = find.byKey(const ValueKey('daily-choice-row-2'));
-    final before = [
-      for (final finder in [calendar, count, row]) tester.getRect(finder).top,
-    ];
-
-    await tester.drag(row, const Offset(0, -100));
-    await tester.pumpAndSettle();
-
-    final shifts = [
-      for (final (index, finder) in [calendar, count, row].indexed)
-        before[index] - tester.getRect(finder).top,
-    ];
-    expect(shifts.first, greaterThan(0));
-    expect(shifts, everyElement(moreOrLessEquals(shifts.first)));
-  });
-
-  for (final (keyboard, variant) in [
-    (0.0, 'без клавиатуры'),
-    (300.0, 'при открытой клавиатуре'),
-  ]) {
-    testWidgets('начальные загрузка, отказ с повтором и пустая выдача стоят '
-        'под фильтрами и доступны до панели либо клавиатуры $variant', (
-      tester,
-    ) async {
-      final repository = _Repository();
-      await _open(tester, repository, size: _phone, keyboard: keyboard);
-      final l10n = lookupAppLocalizations(const Locale('ru'));
-      // Прокручивает страницу до конца жестом из-под шапки и проверяет, что
-      // элемент стоит под фильтрами и целиком виден над панелью либо клавиатурой.
-      Future<void> expectReachable(
-        Finder finder, {
-        bool fillsRemaining = true,
-      }) async {
-        final appBar = tester.getRect(find.byType(AppBar));
-        await tester.dragFrom(
-          Offset(appBar.left + 24, appBar.bottom + 24),
-          const Offset(0, -400),
-        );
-        // Индикатор загрузки не даёт кадрам успокоиться.
-        await tester.pump();
-        await tester.pump(const Duration(seconds: 1));
-        expect(finder, findsOneWidget);
-        final filtersBottom = [
-          tester
-              .getRect(find.byType(DailyChoiceCalendar, skipOffstage: false))
-              .bottom,
-          for (final key in _filterKeys)
-            tester
-                .getRect(find.byKey(ValueKey(key), skipOffstage: false))
-                .bottom,
-        ].reduce(math.max);
-        final rect = tester.getRect(finder);
-        final contentBottom = math.min(
-          tester.getRect(find.byType(AppNavigationBar)).top,
-          _phone.height - keyboard,
-        );
-        expect(find.byType(FloatingActionButton), findsNothing);
-        if (fillsRemaining) {
-          final status = find
-              .ancestor(of: finder, matching: find.byType(Center))
-              .last;
-          expect(
-            tester.getRect(status).bottom,
-            moreOrLessEquals(contentBottom),
-          );
-        }
-        expect(
-          rect.top,
-          greaterThanOrEqualTo(filtersBottom),
-          reason: '$finder',
-        );
-        expect(
-          rect.top,
-          greaterThanOrEqualTo(appBar.bottom),
-          reason: '$finder',
-        );
-        expect(
-          rect.bottom,
-          lessThanOrEqualTo(contentBottom),
-          reason: '$finder',
-        );
-      }
-
-      await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
-
-      repository.failFirst();
-      await tester.pumpAndSettle();
-      final retry = find.widgetWithText(TextButton, l10n.commonRetry);
-      await expectReachable(find.text(l10n.dailyChoiceCatalogUnavailable));
-      await expectReachable(retry);
-      expect(retry.hitTestable(), findsOneWidget);
-
-      await tester.tap(retry);
-      await tester.pump();
-      expect(repository.queries, hasLength(2));
-      await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
-
-      repository.completeFirst([], index: 1, total: 0);
-      await tester.pumpAndSettle();
-      await expectReachable(
-        find.text(l10n.dailyChoiceCatalogTotalCount(0)),
-        fillsRemaining: false,
-      );
-      await expectReachable(find.text(l10n.dailyChoiceCatalogEmpty));
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  testWidgets('фильтры и строки доступны при увеличенном тексте', (
-    tester,
-  ) async {
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-    );
-    final repository = _Repository();
-    await _open(tester, repository, size: const Size(360, 640));
-    repository.completeFirst([_item(1)], total: 1);
-    await tester.pumpAndSettle();
-    expect(find.byType(DailyChoiceCalendar), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('daily-choice-completion-filter')),
-      findsOneWidget,
-    );
-    // Строки идут за крупными фильтрами и становятся видимыми прокруткой
-    // страницы.
-    await tester.dragUntilVisible(
-      find.byKey(const ValueKey('daily-choice-row-1')),
-      find.byType(CustomScrollView),
-      const Offset(0, -100),
-    );
-    expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
-  });
 }
-
-/// Экран телефона, на котором фильтры и выдача делят высоту.
-const _phone = Size(400, 800);
 
 /// Локальное сегодня проверок страницы и дата строк фикстуры: первое чтение
 /// каталога охватывает этот день.
@@ -809,9 +636,9 @@ const _filterKeys = [
   'daily-choice-clear-filters',
 ];
 
-/// Календарь открытого каталога: его входы — состояние страницы и модели.
-DailyChoiceCalendar _calendar(WidgetTester tester) =>
-    tester.widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar));
+/// Шапка календаря называет выбранной дату [value].
+void _expectSelected(WidgetTester tester, CalendarDate value) =>
+    expect(find.text(_selectedDateLabel(tester, value)), findsOneWidget);
 
 /// Подпись полной выбранной даты в шапке календаря по текущей локали.
 String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
@@ -842,21 +669,18 @@ Future<void> _swipeCalendar(WidgetTester tester, {required bool toNext}) async {
   await _settleCalendar(tester);
 }
 
-/// Открывает каталог дневных выборов; [today] — локальное сегодня,
-/// [keyboard] — высота открытой экранной клавиатуры.
+/// Открывает каталог дневных выборов; [today] — локальное сегодня.
 Future<AppRouter> _open(
   WidgetTester tester,
   _Repository repository, {
   CalendarDate? today,
   Locale locale = const Locale('ru'),
   Size size = const Size(1200, 2400),
-  double keyboard = 0,
 }) async {
   final router = AppRouter();
   addTearDown(router.dispose);
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
-  tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(

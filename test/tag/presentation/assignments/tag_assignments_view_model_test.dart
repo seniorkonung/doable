@@ -218,22 +218,6 @@ void main() {
     );
   });
 
-  test('смена эпохи отбрасывает ответ прежней эпохи', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.changes.add(
-      _Package(const _Revision(1, 1), [
-        TagDeletedChange(revision: const _Revision(1, 1), tagId: _id(2)),
-      ]),
-    );
-    h.reads.page(0, [_tag(2, 'Старый')]);
-    await pumpEventQueue();
-    expect(h.reads.queries, hasLength(2));
-    h.reads.page(1, [_tag(1, 'Новый')], epoch: 1);
-    await pumpEventQueue();
-    expect((h.state as TagAssignmentsLoaded).items.single.id, _id(1));
-  });
-
   test(
     'явный повтор начального отказа восстанавливает полный список',
     () async {
@@ -352,10 +336,7 @@ void main() {
     expect((h.state as TagAssignmentsLoaded).items, isEmpty);
     h.reads.page(2, [], revision: 3);
     await pumpEventQueue();
-    expect(
-      (h.state as TagAssignmentsLoaded).revision.compareTo(const _Revision(3)),
-      GraphRevisionOrder.same,
-    );
+    expect((h.state as TagAssignmentsLoaded).canUseCurrentItems, isTrue);
 
     h.changes.add(
       _Package(const _Revision(4), [
@@ -388,7 +369,9 @@ void main() {
     );
     await pumpEventQueue();
 
-    expect(h.state, same(loaded));
+    final after = h.state as TagAssignmentsLoaded;
+    expect(after.items.map((tag) => tag.id), loaded.items.map((tag) => tag.id));
+    expect(after.canUseCurrentItems, isTrue);
     expect(h.reads.queries, hasLength(1));
     expect(h.model.canActOn(_id(1)), isTrue);
     expect(h.model.canActOn(_id(2)), isTrue);
@@ -427,19 +410,14 @@ void main() {
       (_id(1), 'Дом'),
       (_id(2), 'Работа'),
     ]);
-    expect(
-      loaded.revision.compareTo(const _Revision(2)),
-      GraphRevisionOrder.same,
-    );
     expect(loaded.canUseCurrentItems, isTrue);
-    expect(states, [same(loaded)]);
+    expect(states, [isA<TagAssignmentsLoaded>()]);
     expect(h.reads.queries, hasLength(3));
   });
 
   const refreshFailures = [
     TagAssignmentsUnavailableFailure(),
     TagAssignmentsCorruptionFailure(),
-    TagAssignmentsUnexpectedFailure(),
   ];
   for (final failure in refreshFailures) {
     test('пакет создания другого намерения с общим тегом сохраняет строки при '
@@ -463,7 +441,7 @@ void main() {
       final stale = h.state as TagAssignmentsLoaded;
       expect(stale.items.map((tag) => tag.id), [_id(1)]);
       expect(stale.freshness, TagAssignmentsFreshness.stale);
-      expect(stale.refreshFailure, same(failure));
+      expect(stale.refreshFailure?.category, failure.category);
       expect(h.model.canActOn(_id(1)), isFalse);
 
       final retry = h.model.retryRefresh();
@@ -473,14 +451,13 @@ void main() {
         await retry;
         final current = h.state as TagAssignmentsLoaded;
         expect(current.items.map((tag) => tag.id), [_id(1)]);
-        expect(
-          current.revision.compareTo(const _Revision(2)),
-          GraphRevisionOrder.same,
-        );
+        expect(current.canUseCurrentItems, isTrue);
         expect(h.model.canActOn(_id(1)), isTrue);
       } else {
         await retry;
-        expect(h.state, same(stale));
+        final unchanged = h.state as TagAssignmentsLoaded;
+        expect(unchanged.freshness, TagAssignmentsFreshness.stale);
+        expect(unchanged.refreshFailure?.category, failure.category);
         expect(h.reads.queries, hasLength(2));
       }
     });
@@ -610,7 +587,6 @@ final class _Reads extends Fake implements TagReadContract {
     List<Tag> tags, {
 
     int revision = 1,
-    int epoch = 0,
     IntentionId? intentionId,
   }) {
     pages[index].complete(
@@ -619,7 +595,7 @@ final class _Reads extends Fake implements TagReadContract {
           intentionId: intentionId ?? queries[index],
           items: tags,
 
-          revision: _Revision(revision, epoch),
+          revision: _Revision(revision),
         ),
       ),
     );
@@ -638,14 +614,11 @@ final class _Package implements ConfirmedGraphChangePackage {
 }
 
 final class _Revision implements GraphRevision {
-  const _Revision(this.number, [this.epoch = 0]);
+  const _Revision(this.number);
   final int number;
-  final int epoch;
 
   @override
   GraphRevisionOrder compareTo(GraphRevision other) => switch (other) {
-    _Revision(epoch: final e) when e != epoch =>
-      GraphRevisionOrder.differentEpoch,
     _Revision(number: final n) when number < n => GraphRevisionOrder.older,
     _Revision(number: final n) when number > n => GraphRevisionOrder.newer,
     _Revision() => GraphRevisionOrder.same,

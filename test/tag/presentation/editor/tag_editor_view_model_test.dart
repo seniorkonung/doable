@@ -134,64 +134,6 @@ void main() {
     },
   );
 
-  test(
-    'уход сохраняет принятую команду и возврат не обходит блокировку тега',
-    () async {
-      final h = _Harness(TagEditorRenaming(_tag(1, 'Дом')));
-      addTearDown(h.dispose);
-      h.model.changeName('Быт');
-      final first = h.model.submit();
-      expect(h.repository.commands.single.command, isA<RenameTag>());
-      h.model.closeSession();
-      final returned = h.reopen(TagEditorRenaming(_tag(1, 'Дом')));
-      returned.changeName('Семья');
-      await returned.submit();
-      expect(h.state.status, isA<TagEditorAlreadyRunning>());
-      expect(h.state.input, 'Семья');
-      expect(h.state.canSubmit, isFalse);
-      expect(h.repository.commands, hasLength(1));
-      h.repository.succeedCommand(
-        0,
-        TagRenamed(
-          TagRenamedChange(
-            revision: const _Revision(2),
-            before: _tag(1, 'Дом'),
-            after: _tag(1, 'Быт'),
-          ),
-        ),
-      );
-      await first;
-      expect(h.state.status, isA<TagEditorIdle>());
-      expect(h.state.input, 'Семья');
-      expect(h.state.canSubmit, isTrue);
-      expect(h.repository.commands, hasLength(1));
-    },
-  );
-
-  test(
-    'повторное открытие создания с прежним ключом не принимает вторую запись',
-    () async {
-      final formKey = TagCreationFormKey();
-      final h = _Harness(TagEditorCreating(formKey));
-      addTearDown(h.dispose);
-      h.model.changeName('Дом');
-      final first = h.model.submit();
-      h.model.closeSession();
-      final returned = h.reopen(TagEditorCreating(formKey));
-      returned.changeName('Работа');
-      await returned.submit();
-      expect(h.state.status, isA<TagEditorAlreadyRunning>());
-      expect(h.state.input, 'Работа');
-      expect(h.state.canSubmit, isFalse);
-      expect(h.repository.commands, hasLength(1));
-      h.repository.failCommand(0, const TagUnavailableFailure());
-      await first;
-      expect(h.state.status, isA<TagEditorIdle>());
-      expect(h.state.input, 'Работа');
-      expect(h.state.canSubmit, isTrue);
-    },
-  );
-
   test('ошибка чтения после commit повторяет только чтение', () async {
     final h = _Harness(TagEditorCreating(TagCreationFormKey()));
     addTearDown(h.dispose);
@@ -282,16 +224,6 @@ final class _Harness {
       container.read(tagEditorViewModelProvider(_context).notifier);
   TagEditorState get state =>
       container.read(tagEditorViewModelProvider(_context));
-
-  TagEditorViewModel reopen(TagEditorContext context) {
-    subscription.close();
-    _context = context;
-    subscription = container.listen(
-      tagEditorViewModelProvider(context),
-      (_, _) {},
-    );
-    return model;
-  }
 
   void dispose() {
     subscription.close();

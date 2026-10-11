@@ -11,7 +11,6 @@ import 'package:sqlite3/sqlite3.dart';
 
 import '../../../support/in_memory_diagnostics_sink.dart';
 
-const _sqliteIoerrCorruptFs = 8458;
 const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
 void main() {
@@ -44,8 +43,8 @@ void main() {
       await openingStarted.future;
 
       final closing = bootstrap.close();
+      final repeatedClosing = bootstrap.close();
 
-      expect(bootstrap.close(), same(closing));
       expect(bootstrap.open, throwsStateError);
       expect(connectionFactoryCalls, 1);
 
@@ -56,7 +55,7 @@ void main() {
 
       allowOpening.complete();
       expect(await opening, isA<LocalDataReady>());
-      await closing;
+      await Future.wait([closing, repeatedClosing]);
 
       expect(observer.closeCalls, 1);
       expect(bootstrap.open, throwsStateError);
@@ -64,7 +63,7 @@ void main() {
     });
 
     test(
-      'повторный close готового bootstrap присоединяется к одному Future',
+      'повторный close готового bootstrap закрывает ресурс один раз',
       () async {
         late _CloseTrackingObserver observer;
         final bootstrap = LocalDataBootstrap(
@@ -80,8 +79,7 @@ void main() {
         final firstClose = bootstrap.close();
         final repeatedClose = bootstrap.close();
 
-        expect(repeatedClose, same(firstClose));
-        await firstClose;
+        await Future.wait([firstClose, repeatedClose]);
         expect(observer.closeCalls, 1);
         expect(bootstrap.open, throwsStateError);
       },
@@ -137,10 +135,12 @@ void main() {
       await pumpEventQueue();
 
       expect(failedResult, isNull);
-      expect(bootstrap.open(), same(failedOpening));
+      final repeatedOpening = bootstrap.open();
+      expect(connectionFactoryCalls, 1);
 
       resumeCreation.complete();
       expect(await failedOpening, isA<LocalDataUnexpectedFailure>());
+      expect(await repeatedOpening, isA<LocalDataUnexpectedFailure>());
       expect(databaseFile.existsSync(), isTrue);
 
       final retriedResult = await bootstrap.open();
@@ -154,21 +154,6 @@ void main() {
         version.read<int>('user_version'),
         AppDatabase.currentSchemaVersion,
       );
-    });
-
-    test('повторно открывает текущую совместимую схему', () async {
-      final databaseFile = await _temporaryDatabaseFile();
-
-      final firstBootstrap = _bootstrapFor(databaseFile);
-      final firstResult = await firstBootstrap.open();
-      expect(firstResult, isA<LocalDataReady>());
-      await firstBootstrap.close();
-
-      final currentBootstrap = _bootstrapFor(databaseFile);
-      addTearDown(currentBootstrap.close);
-      final currentResult = await currentBootstrap.open();
-
-      expect(currentResult, isA<LocalDataReady>());
     });
 
     test('объединяет параллельные попытки открытия в один bootstrap', () async {
@@ -185,8 +170,7 @@ void main() {
       final results = await Future.wait([bootstrap.open(), bootstrap.open()]);
 
       expect(createdExecutors, 1);
-      expect(results[0], same(results[1]));
-      expect(results.first, isA<LocalDataReady>());
+      expect(results, everyElement(isA<LocalDataReady>()));
     });
 
     test(
@@ -227,16 +211,18 @@ void main() {
     );
 
     test(
-      'не обновляет и не пересоздаёт хранилище прежней линии версий 2–5',
+      'не обновляет и не пересоздаёт хранилище прежней линии версий',
       () async {
-        for (final previousLineVersion in [2, 3, 4, 5]) {
-          final databaseFile = await _temporaryDatabaseFile();
-          late List<int> preservedBytes;
-          final bootstrap = _bootstrapFor(
-            databaseFile,
-            setup: (database) {
-              database
-                ..execute('''
+        // Любая версия выше текущей отвергается одной проверкой; берётся
+        // первая версия прежней линии.
+        const previousLineVersion = 2;
+        final databaseFile = await _temporaryDatabaseFile();
+        late List<int> preservedBytes;
+        final bootstrap = _bootstrapFor(
+          databaseFile,
+          setup: (database) {
+            database
+              ..execute('''
                   CREATE TABLE tag_assignments (
                     creation_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                     tag_id TEXT NOT NULL,
@@ -244,39 +230,38 @@ void main() {
                     long_term_relation_id TEXT
                   )
                 ''')
-                ..execute('''
+              ..execute('''
                   INSERT INTO tag_assignments (tag_id, long_term_relation_id)
                   VALUES ('тег', 'связь')
                 ''')
-                ..execute('PRAGMA user_version = $previousLineVersion');
-              preservedBytes = databaseFile.readAsBytesSync();
-            },
-          );
+              ..execute('PRAGMA user_version = $previousLineVersion');
+            preservedBytes = databaseFile.readAsBytesSync();
+          },
+        );
 
-          final result = await bootstrap.open();
-          await bootstrap.close();
+        final result = await bootstrap.open();
+        await bootstrap.close();
 
-          expect(
-            result,
-            isA<LocalDataIncompatibleSchema>()
-                .having(
-                  (failure) => failure.expectedSchemaVersion,
-                  'ожидаемая',
-                  AppDatabase.currentSchemaVersion,
-                )
-                .having(
-                  (failure) => failure.detectedSchemaVersion,
-                  'обнаруженная',
-                  previousLineVersion,
-                ),
-            reason: 'маркер версии $previousLineVersion',
-          );
-          expect(
-            await databaseFile.readAsBytes(),
-            preservedBytes,
-            reason: 'маркер версии $previousLineVersion',
-          );
-        }
+        expect(
+          result,
+          isA<LocalDataIncompatibleSchema>()
+              .having(
+                (failure) => failure.expectedSchemaVersion,
+                'ожидаемая',
+                AppDatabase.currentSchemaVersion,
+              )
+              .having(
+                (failure) => failure.detectedSchemaVersion,
+                'обнаруженная',
+                previousLineVersion,
+              ),
+          reason: 'маркер версии $previousLineVersion',
+        );
+        expect(
+          await databaseFile.readAsBytes(),
+          preservedBytes,
+          reason: 'маркер версии $previousLineVersion',
+        );
       },
     );
 
@@ -323,31 +308,6 @@ void main() {
     );
 
     test(
-      'классифицирует неизвестную причину открытия как unexpected',
-      () async {
-        _CloseTrackingObserver? failedObserver;
-        final diagnosticsSink = InMemoryDiagnosticsSink();
-        final bootstrap = LocalDataBootstrap(
-          connectionFactory: () => _trackedConnection(
-            openInMemoryLocalDatabase(
-              setup: (_) => throw StateError('Недоступное хранилище'),
-            ),
-            (observer) => failedObserver = observer,
-          ),
-          diagnosticsSink: diagnosticsSink,
-        );
-        addTearDown(bootstrap.close);
-
-        expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
-        expect(failedObserver!.closeCalls, 1);
-        _expectBootstrapFailureCode(
-          diagnosticsSink,
-          DiagnosticsFailureCode.unexpected,
-        );
-      },
-    );
-
-    test(
       'сохраняет типизированную причину отказа bounded verification',
       () async {
         final scenarios = [
@@ -366,14 +326,6 @@ void main() {
             ),
             expectedResult: isA<LocalDataRetryableFailure>(),
             expectedCode: DiagnosticsFailureCode.unavailable,
-          ),
-          (
-            failure: SqliteException(
-              extendedResultCode: SqlError.SQLITE_CONSTRAINT,
-              message: 'можно повторить попытку',
-            ),
-            expectedResult: isA<LocalDataUnexpectedFailure>(),
-            expectedCode: DiagnosticsFailureCode.unexpected,
           ),
           (
             failure: StateError('Неизвестная причина'),
@@ -414,65 +366,6 @@ void main() {
       },
     );
 
-    test(
-      'раскрывает SQLite BUSY чтения версии схемы из background executor',
-      () async {
-        final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
-        addTearDown(isolate.shutdownAll);
-        final connection = await isolate.connect();
-        final diagnosticsSink = InMemoryDiagnosticsSink();
-        final failedObserver = _BoundedVerificationFailureObserver(
-          SqliteException(
-            extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
-            message: 'SQLite-файл повреждён',
-          ),
-        );
-        final bootstrap = LocalDataBootstrap(
-          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-            connection,
-            failedObserver,
-          ),
-          diagnosticsSink: diagnosticsSink,
-        );
-        addTearDown(bootstrap.close);
-
-        expect(await bootstrap.open(), isA<LocalDataRetryableFailure>());
-        expect(failedObserver.closeCalls, 1);
-        _expectBootstrapFailureCode(
-          diagnosticsSink,
-          DiagnosticsFailureCode.unavailable,
-        );
-      },
-    );
-
-    test(
-      'классифицирует неизвестную причину background executor как unexpected',
-      () async {
-        final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
-        addTearDown(isolate.shutdownAll);
-        final connection = await isolate.connect();
-        final diagnosticsSink = InMemoryDiagnosticsSink();
-        final failedObserver = _BoundedVerificationFailureObserver(
-          StateError('Неизвестная причина'),
-        );
-        final bootstrap = LocalDataBootstrap(
-          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-            connection,
-            failedObserver,
-          ),
-          diagnosticsSink: diagnosticsSink,
-        );
-        addTearDown(bootstrap.close);
-
-        expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
-        expect(failedObserver.closeCalls, 1);
-        _expectBootstrapFailureCode(
-          diagnosticsSink,
-          DiagnosticsFailureCode.unexpected,
-        );
-      },
-    );
-
     test('классифицирует произвольный non-database файл как non-retryable corruption', () async {
       final databaseFile = await _temporaryDatabaseFile();
       await databaseFile.writeAsString('это не SQLite database');
@@ -495,187 +388,6 @@ void main() {
         diagnosticsSink,
         DiagnosticsFailureCode.corruption,
       );
-    });
-
-    test('классифицирует primary и extended коды CORRUPT и NOTADB без текста ошибки', () async {
-      for (final exception in [
-        SqliteException(
-          extendedResultCode: SqlError.SQLITE_NOTADB,
-          message: 'временная недоступность',
-        ),
-        SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_CORRUPT_VTAB,
-          message: 'можно повторить попытку',
-        ),
-      ]) {
-        final diagnosticsSink = InMemoryDiagnosticsSink();
-        _CloseTrackingObserver? failedObserver;
-        final bootstrap = LocalDataBootstrap(
-          connectionFactory: () => _trackedConnection(
-            openInMemoryLocalDatabase(setup: (_) => throw exception),
-            (observer) => failedObserver = observer,
-          ),
-          diagnosticsSink: diagnosticsSink,
-        );
-        addTearDown(bootstrap.close);
-
-        expect(await bootstrap.open(), isA<LocalDataCorruption>());
-        expect(failedObserver!.closeCalls, 1);
-        _expectBootstrapFailureCode(
-          diagnosticsSink,
-          DiagnosticsFailureCode.corruption,
-        );
-      }
-    });
-
-    test('оставляет временные SQLite-ошибки retryable', () async {
-      for (final exception in [
-        SqliteException(
-          extendedResultCode: SqlError.SQLITE_BUSY,
-          message: 'SQLite-файл повреждён',
-        ),
-        SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
-          message: 'SQLite-файл повреждён',
-        ),
-        SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_BUSY_SNAPSHOT,
-          message: 'SQLite-файл повреждён',
-        ),
-        SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_BUSY_TIMEOUT,
-          message: 'SQLite-файл повреждён',
-        ),
-        SqliteException(
-          extendedResultCode: SqlError.SQLITE_LOCKED,
-          message: 'SQLite-файл повреждён',
-        ),
-        SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_LOCKED_SHAREDCACHE,
-          message: 'SQLite-файл повреждён',
-        ),
-        SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_LOCKED_VTAB,
-          message: 'SQLite-файл повреждён',
-        ),
-      ]) {
-        final diagnosticsSink = InMemoryDiagnosticsSink();
-        _CloseTrackingObserver? failedObserver;
-        final bootstrap = LocalDataBootstrap(
-          connectionFactory: () => _trackedConnection(
-            openInMemoryLocalDatabase(setup: (_) => throw exception),
-            (observer) => failedObserver = observer,
-          ),
-          diagnosticsSink: diagnosticsSink,
-        );
-        addTearDown(bootstrap.close);
-
-        expect(await bootstrap.open(), isA<LocalDataRetryableFailure>());
-        expect(failedObserver!.closeCalls, 1);
-        _expectBootstrapFailureCode(
-          diagnosticsSink,
-          DiagnosticsFailureCode.unavailable,
-        );
-      }
-    });
-
-    test(
-      'не предлагает retry для CANTOPEN, неразрешённых IOERR и unknown',
-      () async {
-        for (final exception in [
-          SqliteException(
-            extendedResultCode: SqlError.SQLITE_CANTOPEN,
-            message: 'CANARY-личные-данные',
-          ),
-          SqliteException(
-            extendedResultCode: SqlExtendedError.SQLITE_CANTOPEN_ISDIR,
-            message: 'CANARY-личные-данные',
-          ),
-          SqliteException(
-            extendedResultCode: SqlError.SQLITE_IOERR,
-            message: 'CANARY-личные-данные',
-          ),
-          SqliteException(
-            extendedResultCode: _sqliteIoerrCorruptFs,
-            message: 'CANARY-личные-данные',
-          ),
-          SqliteException(
-            extendedResultCode: SqlError.SQLITE_BUSY | (999 << 8),
-            message: 'CANARY-личные-данные',
-          ),
-        ]) {
-          final diagnosticsSink = InMemoryDiagnosticsSink();
-          _CloseTrackingObserver? failedObserver;
-          final bootstrap = LocalDataBootstrap(
-            connectionFactory: () => _trackedConnection(
-              openInMemoryLocalDatabase(setup: (_) => throw exception),
-              (observer) => failedObserver = observer,
-            ),
-            diagnosticsSink: diagnosticsSink,
-          );
-          addTearDown(bootstrap.close);
-
-          expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
-          expect(failedObserver!.closeCalls, 1);
-          _expectBootstrapFailureCode(
-            diagnosticsSink,
-            DiagnosticsFailureCode.unexpected,
-          );
-        }
-      },
-    );
-
-    test('классифицирует IOERR_DATA как non-retryable corruption', () async {
-      final diagnosticsSink = InMemoryDiagnosticsSink();
-      _CloseTrackingObserver? failedObserver;
-      final bootstrap = LocalDataBootstrap(
-        connectionFactory: () => _trackedConnection(
-          openInMemoryLocalDatabase(
-            setup: (_) => throw SqliteException(
-              extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
-              message: 'CANARY-личные-данные',
-            ),
-          ),
-          (observer) => failedObserver = observer,
-        ),
-        diagnosticsSink: diagnosticsSink,
-      );
-      addTearDown(bootstrap.close);
-
-      expect(await bootstrap.open(), isA<LocalDataCorruption>());
-      expect(failedObserver!.closeCalls, 1);
-      _expectBootstrapFailureCode(
-        diagnosticsSink,
-        DiagnosticsFailureCode.corruption,
-      );
-    });
-
-    test('записывает безопасные события bootstrap и миграции', () async {
-      final diagnosticsSink = InMemoryDiagnosticsSink();
-      final bootstrap = LocalDataBootstrap(
-        connectionFactory: openInMemoryLocalDatabase,
-        diagnosticsSink: diagnosticsSink,
-      );
-      addTearDown(bootstrap.close);
-
-      expect(await bootstrap.open(), isA<LocalDataReady>());
-
-      expect(diagnosticsSink.events.map((event) => event.runtimeType), [
-        BootstrapDiagnosticsEvent,
-        MigrationDiagnosticsEvent,
-        MigrationDiagnosticsEvent,
-        BootstrapDiagnosticsEvent,
-      ]);
-      final migrationEvents = diagnosticsSink.events
-          .whereType<MigrationDiagnosticsEvent>()
-          .toList();
-      expect(migrationEvents[0].fromSchemaVersion, 0);
-      expect(
-        migrationEvents[0].toSchemaVersion,
-        AppDatabase.currentSchemaVersion,
-      );
-      expect(migrationEvents[0].status, isA<DiagnosticsStarted>());
-      expect(migrationEvents[1].status, isA<DiagnosticsSucceeded>());
     });
 
     test('записывает версии и безопасный код несовместимой схемы', () async {

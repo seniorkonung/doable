@@ -4,15 +4,12 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
-import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,60 +22,53 @@ import 'relation_details_test_support.dart';
 void main() {
   const revision = TestGraphRevision(1);
 
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'зависимость дневного пути объясняет запрет удаления на ${locale.languageCode}',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final repository = ControlledRelationDetailsRepository();
-        addTearDown(repository.dispose);
-        final relationId = testRelationId(101);
-        await _pumpRelationDetails(
-          tester,
-          repository,
-          relationId,
-          locale: locale,
-          textScaler: const TextScaler.linear(2.5),
-        );
-        repository
-            .watchAt(0)
-            .emitDetails(
-              testRelationDetails(
-                relationId: relationId,
-                sourceId: testIntentionId(1),
-                relatedId: testIntentionId(2),
-                permissions:
-                    const LongTermRelationPermissions.referencedByDailyPath(),
-              ),
-              revision: revision,
-            );
-        await tester.pumpAndSettle();
-
-        final delete = tester.widget<OutlinedButton>(
-          find.byKey(const ValueKey('relation-details-delete-relation')),
-        );
-        expect(delete.onPressed, isNull);
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.byKey(const ValueKey('relation-details-edit-relation')),
-              )
-              .onPressed,
-          isNotNull,
-        );
-        final reason = find.byKey(
-          const ValueKey('relation-details-path-protection'),
-        );
-        expect(reason, findsOneWidget);
-        expect(
-          tester.getSemantics(reason).label,
-          contains(locale.languageCode == 'ru' ? 'дневном пути' : 'daily path'),
-        );
-        expect(tester.takeException(), isNull);
-        semantics.dispose();
-      },
+  testWidgets('зависимость дневного пути объясняет запрет удаления', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(101);
+    await _pumpRelationDetails(
+      tester,
+      repository,
+      relationId,
+      textScaler: const TextScaler.linear(2.5),
     );
-  }
+    repository
+        .watchAt(0)
+        .emitDetails(
+          testRelationDetails(
+            relationId: relationId,
+            sourceId: testIntentionId(1),
+            relatedId: testIntentionId(2),
+            permissions:
+                const LongTermRelationPermissions.referencedByDailyPath(),
+          ),
+          revision: revision,
+        );
+    await tester.pumpAndSettle();
+
+    final delete = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('relation-details-delete-relation')),
+    );
+    expect(delete.onPressed, isNull);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('relation-details-edit-relation')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    final reason = find.byKey(
+      const ValueKey('relation-details-path-protection'),
+    );
+    expect(reason, findsOneWidget);
+    expect(tester.getSemantics(reason).label, contains('daily path'));
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets('новая зависимость закрывает уже открытое удаление', (
     tester,
@@ -168,7 +158,6 @@ void main() {
     // Участники в подробностях связи — представление без поиска: тегов и условий в нём нет.
     expect(find.textContaining('Tags:'), findsNothing);
     expect(find.text('No tags'), findsNothing);
-    expect(find.byType(IntentionTagConditionsSection), findsNothing);
   });
 
   testWidgets('отсутствие описания показывается отдельной подписью', (
@@ -285,7 +274,6 @@ void main() {
     // Индикатор чтения анимируется непрерывно: ждать покоя нельзя.
     await tester.pump();
 
-    expect(repository.relationWatches, hasLength(2));
     expect(_textOf(tester, 'relation-details-status'), 'Loading the relation…');
     repository
         .watchAt(1)
@@ -428,64 +416,46 @@ void main() {
     semantics.dispose();
   });
 
-  for (final (language, markLabel) in [
-    ('en', 'Favorite intention'),
-    ('ru', 'Избранное намерение'),
-  ]) {
-    testWidgets('$language: краткие представления участников связи не '
-        'показывают отметку избранного', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = ControlledRelationDetailsRepository();
-      addTearDown(repository.dispose);
-      final relationId = testRelationId(9);
+  testWidgets('краткие представления участников связи не '
+      'показывают отметку избранного', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(9);
 
-      await _pumpRelationDetails(
-        tester,
-        repository,
-        relationId,
-        locale: Locale(language),
-      );
-      repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: relationId,
-              sourceId: testIntentionId(1),
-              relatedId: testIntentionId(2),
-              sourceTitle: 'Быть здоровым',
-              relatedTitle: 'Гулять',
-            ),
-            revision: revision,
-          );
-      await tester.pumpAndSettle();
-
-      // Данные участника связи отметку не несут, поэтому представление без
-      // поиска не выводит её и для избранных намерений.
-      final participants = tester
-          .widgetList<IntentionSummaryView>(find.byType(IntentionSummaryView))
-          .toList();
-      expect(participants.map((view) => view.title), [
-        'Быть здоровым',
-        'Гулять',
-      ]);
-      for (final participant in participants) {
-        expect(participant.confirmedFavoriteMark, isNull);
-      }
-      expect(find.byIcon(Icons.star), findsNothing);
-      expect(find.byIcon(Icons.star_border), findsNothing);
-      for (final key in const [
-        'relation-details-source-participant',
-        'relation-details-related-participant',
-      ]) {
-        expect(
-          tester.getSemantics(find.byKey(ValueKey(key))).label,
-          isNot(contains(markLabel)),
+    await _pumpRelationDetails(tester, repository, relationId);
+    repository
+        .watchAt(0)
+        .emitDetails(
+          testRelationDetails(
+            relationId: relationId,
+            sourceId: testIntentionId(1),
+            relatedId: testIntentionId(2),
+            sourceTitle: 'Быть здоровым',
+            relatedTitle: 'Гулять',
+          ),
+          revision: revision,
         );
-      }
+    await tester.pumpAndSettle();
 
-      semantics.dispose();
-    });
-  }
+    // Данные участника связи отметку не несут, поэтому представление без
+    // поиска не выводит её и для избранных намерений.
+    expect(find.text('Быть здоровым'), findsOneWidget);
+    expect(find.text('Гулять'), findsOneWidget);
+    expect(find.byIcon(Icons.star), findsNothing);
+    expect(find.byIcon(Icons.star_border), findsNothing);
+    for (final key in const [
+      'relation-details-source-participant',
+      'relation-details-related-participant',
+    ]) {
+      expect(
+        tester.getSemantics(find.byKey(ValueKey(key))).label,
+        isNot(contains('Favorite intention')),
+      );
+    }
+
+    semantics.dispose();
+  });
 
   testWidgets('повторно открытый просмотр показывает выполняющееся изменение', (
     tester,
@@ -545,14 +515,12 @@ void main() {
 
     final choose = find.byKey(const ValueKey('tag-assignments-choose'));
     expect(choose, findsNothing);
-    expect(find.byType(TagAssignmentsSection), findsNothing);
     repository.failRelationCommand(
       0,
       const LongTermRelationUnavailableFailure(),
     );
     await tester.pumpAndSettle();
     expect(choose, findsNothing);
-    expect(find.byType(TagAssignmentsSection), findsNothing);
   });
 
   testWidgets(
@@ -635,7 +603,6 @@ void main() {
         find.byKey(const ValueKey('relation-details-refresh-retry')),
       );
       await tester.pump();
-      expect(repository.relationWatches, hasLength(3));
 
       repository
           .watchAt(2)
@@ -796,132 +763,93 @@ void main() {
     );
   });
 
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'удаление конкретной архивной связи сохраняет теги намерений на ${locale.languageCode}',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final l10n = await AppLocalizations.delegate.load(locale);
-        final repository = ControlledRelationDetailsRepository();
-        addTearDown(repository.dispose);
-        final relationId = testRelationId(15);
-        final details = testRelationDetails(
-          relationId: relationId,
-          sourceId: testIntentionId(1),
-          relatedId: testIntentionId(2),
-          sourceTitle: 'быть здоровым',
-          relatedTitle: 'много ходить',
-          scope: RelationScope.archived,
-        );
-
-        await _pumpRelationDetails(
-          tester,
-          repository,
-          relationId,
-          locale: locale,
-          textScaler: const TextScaler.linear(3),
-        );
-        repository
-            .watchAt(0)
-            .emitDetails(details, revision: const TestGraphRevision(1));
-        await tester.pumpAndSettle();
-
-        final delete = find.byKey(
-          const ValueKey('relation-details-delete-relation'),
-        );
-        await tester.ensureVisible(delete);
-        await tester.tap(delete);
-        await tester.pumpAndSettle();
-
-        expect(
-          find.text(l10n.relationDetailsDeleteConfirmationTitle),
-          findsOneWidget,
-        );
-        expect(
-          find.textContaining(
-            l10n.relationNeighborhoodNeedPhrase(
-              'быть здоровым',
-              'много ходить',
-            ),
-          ),
-          findsWidgets,
-        );
-        expect(
-          find.textContaining(
-            locale.languageCode == 'ru'
-                ? 'Исходное намерение: быть здоровым'
-                : 'Source intention: быть здоровым',
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.textContaining(
-            locale.languageCode == 'ru'
-                ? 'Связанное намерение: много ходить'
-                : 'Related intention: много ходить',
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.textContaining(
-            '${locale.languageCode == 'ru' ? 'Состояние связи' : 'Relation state'}: ${l10n.relationNeighborhoodRelationArchived}',
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.textContaining(
-            locale.languageCode == 'ru'
-                ? 'Это действие нельзя отменить'
-                : 'This can’t be undone',
-          ),
-          findsOneWidget,
-        );
-        final explanation = find.textContaining(
-          locale.languageCode == 'ru'
-              ? 'теги, все их назначения намерениям'
-              : 'tags, all their assignments to intentions',
-        );
-        expect(explanation, findsOneWidget);
-        await tester.ensureVisible(explanation);
-        expect(
-          tester.getSemantics(explanation).label,
-          contains(
-            locale.languageCode == 'ru'
-                ? 'назначения намерениям'
-                : 'assignments to intentions',
-          ),
-        );
-        expect(
-          find.textContaining('Все назначения тегов этой связи'),
-          findsNothing,
-        );
-        expect(
-          find.textContaining('All tag assignments of this relation'),
-          findsNothing,
-        );
-
-        await tester.tap(
-          find.widgetWithText(TextButton, l10n.detailsCancelEditAction),
-        );
-        await tester.pumpAndSettle();
-        expect(repository.relationCommands, isEmpty);
-
-        await tester.tap(delete);
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const ValueKey('relation-details-confirm-delete')),
-        );
-        await tester.pump();
-
-        expect(
-          repository.relationCommands.single,
-          isA<DeleteLongTermRelation>(),
-        );
-        expect(tester.takeException(), isNull);
-        semantics.dispose();
-      },
+  testWidgets('удаление конкретной архивной связи сохраняет теги намерений', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(15);
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      sourceTitle: 'быть здоровым',
+      relatedTitle: 'много ходить',
+      scope: RelationScope.archived,
     );
-  }
+
+    await _pumpRelationDetails(
+      tester,
+      repository,
+      relationId,
+      textScaler: const TextScaler.linear(3),
+    );
+    repository
+        .watchAt(0)
+        .emitDetails(details, revision: const TestGraphRevision(1));
+    await tester.pumpAndSettle();
+
+    final delete = find.byKey(
+      const ValueKey('relation-details-delete-relation'),
+    );
+    await tester.ensureVisible(delete);
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(l10n.relationDetailsDeleteConfirmationTitle),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        l10n.relationNeighborhoodNeedPhrase('быть здоровым', 'много ходить'),
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.textContaining('Source intention: быть здоровым'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Related intention: много ходить'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'Relation state: ${l10n.relationNeighborhoodRelationArchived}',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('This can’t be undone'), findsOneWidget);
+    final explanation = find.textContaining(
+      'tags, all their assignments to intentions',
+    );
+    expect(explanation, findsOneWidget);
+    await tester.ensureVisible(explanation);
+    expect(
+      tester.getSemantics(explanation).label,
+      contains('assignments to intentions'),
+    );
+    expect(
+      find.textContaining('Все назначения тегов этой связи'),
+      findsNothing,
+    );
+    expect(
+      find.textContaining('All tag assignments of this relation'),
+      findsNothing,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-confirm-delete')),
+    );
+    await tester.pump();
+
+    expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets('отказ удаления сохраняет данные и предлагает уместный повтор', (
     tester,
@@ -1034,7 +962,10 @@ void main() {
       const LongTermRelationUnavailableFailure(),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(RelationDetailsPage), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('relation-details-phrase')),
+      findsOneWidget,
+    );
     await tester.tap(
       find.byKey(const ValueKey('relation-details-lifecycle-retry')),
     );

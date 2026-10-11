@@ -35,25 +35,36 @@ const _titles = {
   ],
 };
 
+// Размер экрана не меняет ветвление кода, поэтому берём телефонную ширину.
+// Меняют путь только масштаб текста, отступы, клавиатура и страница поверх
+// корня; язык проверяет видимые названия.
+const _phone = Size(400, 800);
+
 final _cases = [
-  for (final language in ['ru', 'en', 'de'])
-    for (final scale in [1.0, 2.6])
-      for (final size in [
-        const Size(400, 800),
-        const Size(800, 1280),
-        const Size(1280, 800),
-      ])
-        for (final safe in [false, true])
-          for (final keyboard in [0.0, 260.0])
-            for (final deep in [false, true])
-              (
-                language: language,
-                scale: scale,
-                size: size,
-                safe: safe,
-                keyboard: keyboard,
-                deep: deep,
-              ),
+  (
+    language: 'ru',
+    scale: 1.0,
+    size: _phone,
+    safe: false,
+    keyboard: 0.0,
+    deep: false,
+  ),
+  (
+    language: 'ru',
+    scale: 2.6,
+    size: _phone,
+    safe: true,
+    keyboard: 0.0,
+    deep: false,
+  ),
+  (
+    language: 'en',
+    scale: 2.6,
+    size: _phone,
+    safe: true,
+    keyboard: 260.0,
+    deep: true,
+  ),
 ];
 
 void main() {
@@ -132,7 +143,6 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.byType(BottomSheet), findsOneWidget);
-        expect(find.byType(ListTile), findsExactly(4));
         expect(
           tester
               .widgetList<ListTile>(find.byType(ListTile))

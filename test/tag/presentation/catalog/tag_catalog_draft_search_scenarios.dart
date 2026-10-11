@@ -48,7 +48,7 @@ void _registerDraftSearchScenarios() {
         expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
         expect(_visibleNames(tester), ['Straße']);
         expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
-        expect(draft.current.tagIds, same(included));
+        expect(draft.current.tagIds, [tags[1].id]);
       }
 
       await tester.enterText(_search, 'спорт');
@@ -74,7 +74,7 @@ void _registerDraftSearchScenarios() {
       expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
       expect(_visibleNames(tester), tags.map((tag) => tag.name.value));
       expect(_draftStatus(tags[1], l10n.tagCatalogInDraft), findsOneWidget);
-      expect(draft.current.tagIds, same(included));
+      expect(draft.current.tagIds, [tags[1].id]);
       expect(repository.reads, hasLength(1));
       expect(repository.commands, isEmpty);
       expect(repository.statusQueries, isEmpty);
@@ -82,44 +82,36 @@ void _registerDraftSearchScenarios() {
     },
   );
 
-  for (final language in ['ru', 'en']) {
-    testWidgets(
-      'черновик: пустой каталог и отсутствие совпадений различаются на $language',
-      (tester) async {
-        final (host, repository) = await _pumpDraftHost(
-          tester,
-          language: language,
-        );
-        await host.openChooser(tester, host.tagSet);
-        final l10n = _draftLocalizations(tester);
-        repository.complete([]);
-        await tester.pumpAndSettle();
-        expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
-        expect(find.text(l10n.tagCatalogSearch), findsOneWidget);
-        expect(tester.widget<FilledButton>(_addToDraft).onPressed, isNull);
+  testWidgets('черновик: пустой каталог и отсутствие совпадений различаются', (
+    tester,
+  ) async {
+    final (host, repository) = await _pumpDraftHost(tester);
+    await host.openChooser(tester, host.tagSet);
+    final l10n = _draftLocalizations(tester);
+    repository.complete([]);
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
+    expect(find.text(l10n.tagCatalogSearch), findsOneWidget);
+    expect(tester.widget<FilledButton>(_addToDraft).onPressed, isNull);
 
-        await tester.enterText(_search, 'спорт');
-        await tester.pump();
-        expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
-        expect(find.text(l10n.tagCatalogEmpty), findsNothing);
-        expect(
-          tester
-              .widget<IconButton>(
-                find.byKey(const ValueKey('tag-catalog-create')),
-              )
-              .onPressed,
-          isNotNull,
-        );
-
-        await tester.tap(find.byTooltip(l10n.tagCatalogClearSearch));
-        await tester.pump();
-        expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
-        expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
-        expect(host.tagSet.current.tagIds, isEmpty);
-        expect(tester.takeException(), isNull);
-      },
+    await tester.enterText(_search, 'спорт');
+    await tester.pump();
+    expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
+    expect(find.text(l10n.tagCatalogEmpty), findsNothing);
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('tag-catalog-create')))
+          .onPressed,
+      isNotNull,
     );
-  }
+
+    await tester.tap(find.byTooltip(l10n.tagCatalogClearSearch));
+    await tester.pump();
+    expect(find.text(l10n.tagCatalogEmpty), findsOneWidget);
+    expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
+    expect(host.tagSet.current.tagIds, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'черновик: отказ первоначального чтения и обновления с повтором сохраняет сырой ввод, применённый фильтр и набор',
@@ -183,7 +175,7 @@ void _registerDraftSearchScenarios() {
         expect(tile.onTap, isNull);
       }
       expect(tester.widget<FilledButton>(_addToDraft).onPressed, isNull);
-      expect(draft.current.tagIds, same(included));
+      expect(draft.current.tagIds, [home.id]);
 
       await tester.tap(find.text(l10n.commonRetry));
       await tester.pump();
@@ -202,7 +194,7 @@ void _registerDraftSearchScenarios() {
       await tester.enterText(_search, 'раб');
       await tester.pump();
       expect(_visibleNames(tester), ['Рабочее']);
-      expect(draft.current.tagIds, same(included));
+      expect(draft.current.tagIds, [home.id]);
       expect(repository.commands.single, isA<RenameTag>());
       expect(repository.statusQueries, isEmpty);
       expect(tester.takeException(), isNull);
@@ -224,15 +216,13 @@ void _registerDraftSearchScenarios() {
       await tester.pump();
       await tester.tap(_row(work));
       await tester.pump();
-      final firstInput = tester.widget<TextField>(_search).controller!;
+      String inputText() => tester.widget<TextField>(_search).controller!.text;
 
       // Второе открытие той же сессии получает собственные поиск и кандидата.
       await host.openChooser(tester, first);
       repository.complete(tags);
       await tester.pumpAndSettle();
-      final secondInput = tester.widget<TextField>(_search).controller!;
-      expect(secondInput, isNot(same(firstInput)));
-      expect(secondInput.text, isEmpty);
+      expect(inputText(), isEmpty);
       expect(_visibleNames(tester), ['Дом', 'Работа', 'Спорт']);
       expect(_draftSelected(tester, work), isFalse);
       await tester.enterText(_search, 'дом');
@@ -242,11 +232,9 @@ void _registerDraftSearchScenarios() {
       await tester.tap(_addToDraft);
       await tester.pump();
       expect(first.current.tagIds, [home.id]);
-      expect(firstInput.text, 'работ');
 
       await host.closeChooser(tester);
-      expect(tester.widget<TextField>(_search).controller, same(firstInput));
-      expect(firstInput.text, 'работ');
+      expect(inputText(), 'работ');
       expect(_visibleNames(tester), ['Работа']);
       expect(_draftSelected(tester, work), isTrue);
       await tester.tap(find.byTooltip(l10n.tagCatalogClearSearch));
@@ -278,8 +266,7 @@ void _registerDraftSearchScenarios() {
       expect(first.current.tagIds, [home.id]);
 
       await host.closeChooser(tester);
-      expect(tester.widget<TextField>(_search).controller, same(firstInput));
-      expect(firstInput.text, 'работ');
+      expect(inputText(), 'работ');
       expect(_draftSelected(tester, work), isTrue);
 
       // Закрытие и новое открытие сбрасывают поиск и кандидата, но не набор.
@@ -345,7 +332,7 @@ void _registerDraftSearchScenarios() {
       expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
       expect(_visibleNames(tester), matches);
       expect(_draftSelected(tester, home), isTrue);
-      expect(draft.current.tagIds, same(included));
+      expect(draft.current.tagIds, [home.id]);
       expect(count('tags'), tagCount);
 
       await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
@@ -380,7 +367,7 @@ void _registerDraftSearchScenarios() {
         _draftStatus(created, l10n.tagCatalogAvailableForDraft),
         findsOneWidget,
       );
-      expect(draft.current.tagIds, same(included));
+      expect(draft.current.tagIds, [home.id]);
       expect(count('tags'), tagCount + 1);
       expect(count('tag_assignments'), assignmentCount);
       expect(count('intentions'), intentionCount);

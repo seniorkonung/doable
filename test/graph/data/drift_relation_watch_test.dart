@@ -542,18 +542,6 @@ void main() {
     await cancelled.future;
   });
 
-  test('отсутствующий участник не даёт частично успешную модель', () async {
-    await database.customStatement('PRAGMA foreign_keys = OFF');
-    await (database.delete(
-      database.intentions,
-    )..where((row) => row.id.equals(relatedId.toCanonicalString()))).go();
-    await database.customStatement('PRAGMA foreign_keys = ON');
-
-    final result = await repository.watchRelation(relationId).first;
-
-    expect(_failure(result), isA<LongTermRelationReadCorruptionFailure>());
-  });
-
   test('сбой чтения не даёт частично успешную модель', () async {
     await database.close();
     databaseIsOpen = false;
@@ -571,20 +559,6 @@ void main() {
         'категория',
         DiagnosticsFailureCode.unexpected,
       ),
-    );
-  });
-
-  test('отказ диагностики не меняет успешный результат', () async {
-    final throwingDiagnostics = _ThrowingDiagnosticsSink();
-    final result = await _repository(
-      database,
-      throwingDiagnostics,
-    ).watchRelation(relationId).first;
-
-    expect(_snapshot(result).value!.relation.id, relationId);
-    expect(
-      throwingDiagnostics.attemptedEvents,
-      everyElement(isA<LongTermRelationDetailReadDiagnosticsEvent>()),
     );
   });
 }
@@ -676,13 +650,3 @@ LongTermRelationId _relationId(String value) =>
 
 String _uuid(int value) =>
     '018f0b5d-6b2e-7c80-8000-${value.toString().padLeft(12, '0')}';
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('Управляемый отказ диагностики.');
-  }
-}

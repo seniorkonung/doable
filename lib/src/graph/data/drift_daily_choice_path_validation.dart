@@ -33,6 +33,13 @@ List<DailyChoicePathStepDetails> _validateStoredChoicePath({
 }
 
 /// Общая проверка цепочки; для каталога достаточно только ссылок её порции.
+///
+/// Единственность шага, корня и преемника каждого шага гарантируют первичный
+/// ключ и уникальные индексы схемы, предшественника из того же выбора —
+/// составной внешний ключ, а шаги читаются по идентификатору выбора.
+/// Проверяется то, чего схема не выражает: путь не пуст, непрерывен от
+/// источника до выбранного намерения, не повторяет намерения и не содержит
+/// шагов вне цепочки от корня.
 List<ChoicePathStep> _validateStoredChoicePathLinks({
   required DailyChoice choice,
   required List<ChoicePathStep> steps,
@@ -46,20 +53,12 @@ List<ChoicePathStep> _validateStoredChoicePathLinks({
     throw const _StoredIntentionCorruption();
   }
 
-  final byId = <ChoicePathStepId, ChoicePathStep>{};
   final successors = <ChoicePathStepId, ChoicePathStep>{};
   ChoicePathStep? root;
   for (final step in steps) {
-    if (step.dailyChoiceId != choice.id || byId.containsKey(step.id)) {
-      throw const _StoredIntentionCorruption();
-    }
-    byId[step.id] = step;
     final previous = step.previousStepId;
     if (previous == null) {
-      if (root != null) throw const _StoredIntentionCorruption();
       root = step;
-    } else if (successors.containsKey(previous)) {
-      throw const _StoredIntentionCorruption();
     } else {
       successors[previous] = step;
     }

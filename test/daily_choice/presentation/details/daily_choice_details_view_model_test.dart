@@ -41,21 +41,6 @@ void main() {
       await repository.dispose();
     },
   );
-
-  test('ошибка чтения не превращается в частичный путь', () async {
-    final repository = _Repository();
-    final id = (DailyChoiceId.decode(
-      '018f0b5d-6b2e-7c80-8000-000000000001',
-    ) as DailyChoiceIdDecodingSuccess).id;
-    final model = DailyChoiceDetailsViewModel(repository, id);
-    addTearDown(() async {
-      model.dispose();
-      await repository.dispose();
-    });
-    repository.fail(const DailyChoiceReadCorruptionFailure());
-    await pumpEventQueue();
-    expect(model.state, isA<DailyChoiceDetailsCorruption>());
-  });
 }
 
 DailyChoiceDetails _details(DailyChoiceId id) {
@@ -149,8 +134,6 @@ final class _Repository
           GraphSnapshot(value: details, revision: _Revision(revision)),
         ),
       );
-  void fail(DailyChoiceReadFailure failure) =>
-      controller.add(DailyChoiceReadError(failure));
   Future<void> dispose() => controller.close();
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

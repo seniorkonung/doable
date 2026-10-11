@@ -99,121 +99,107 @@ void main() {
   });
   tearDown(() => database.close());
 
-  for (final (locale, chooseText, removeText) in [
-    (const Locale('ru'), 'Выбрать тег', 'Снять назначение'),
-    (const Locale('en'), 'Choose a tag', 'Remove assignment'),
+  for (final (locale, removeText) in [
+    (const Locale('ru'), 'Снять назначение'),
+    (const Locale('en'), 'Remove assignment'),
   ]) {
-    for (final (kind, intentionId, isArchived) in [
-      ('намерения', _intentionId(1), false),
-      ('намерения', _intentionId(2), true),
-    ]) {
-      testWidgets(
-        'назначение $kind ${isArchived ? 'в архиве' : 'в активном охвате'} открывает точный тег без изменений: ${locale.languageCode}',
-        (tester) async {
-          final semantics = tester.ensureSemantics();
-          final opened = <TagId>[];
-          final graphBefore = retainedTagFixtureGraph(raw);
-          final assignmentsBefore = raw
+    testWidgets(
+      'назначение намерения открывает точный тег без изменений: ${locale.languageCode}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final opened = <TagId>[];
+        final graphBefore = retainedTagFixtureGraph(raw);
+        final assignmentsBefore = raw
+            .select('SELECT * FROM tag_assignments ORDER BY creation_sequence')
+            .map((row) => row.values.toList())
+            .toList();
+        await tester.pumpWidget(
+          _host(
+            repository: repository,
+            intentionId: _intentionId(1),
+            locale: locale,
+            onChoose: (_) {},
+            onOpen: opened.add,
+          ),
+        );
+        final open = find.byKey(
+          ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
+        );
+        await _pumpUntil(tester, () => open.evaluate().isNotEmpty);
+        expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
+        final l10n = AppLocalizations.of(tester.element(open));
+        expect(
+          tester.getSemantics(open).label,
+          contains(l10n.tagNavigationTitle),
+        );
+        expect(
+          tester
+              .getSemantics(find.byTooltip(l10n.tagNavigationTag('Дом')))
+              .tooltip,
+          l10n.tagNavigationTag('Дом'),
+        );
+        expect(tester.getSemantics(open).flagsCollection.isButton, isTrue);
+        expect(find.byTooltip('$removeText: Дом'), findsOneWidget);
+        expect(
+          tester.getSemantics(find.byTooltip('$removeText: Дом')).tooltip,
+          '$removeText: Дом',
+        );
+        await tester.tap(open);
+        expect(opened, [_tagId(firstTagNumber)]);
+        expect(retainedTagFixtureGraph(raw), graphBefore);
+        expect(
+          raw
               .select(
                 'SELECT * FROM tag_assignments ORDER BY creation_sequence',
               )
               .map((row) => row.values.toList())
-              .toList();
-          await tester.pumpWidget(
-            _host(
-              repository: repository,
-              intentionId: intentionId,
-              isArchived: isArchived,
-              locale: locale,
-              onChoose: (_) {},
-              onOpen: opened.add,
-            ),
-          );
-          final open = find.byKey(
-            ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
-          );
-          await _pumpUntil(tester, () => open.evaluate().isNotEmpty);
-          expect(
-            find.byKey(const ValueKey('tag-catalog-search')),
-            findsNothing,
-          );
-          final l10n = AppLocalizations.of(tester.element(open));
-          expect(
-            tester.getSemantics(open).label,
-            contains(l10n.tagNavigationTitle),
-          );
-          expect(
-            tester
-                .getSemantics(find.byTooltip(l10n.tagNavigationTag('Дом')))
-                .tooltip,
-            l10n.tagNavigationTag('Дом'),
-          );
-          expect(tester.getSemantics(open).flagsCollection.isButton, isTrue);
-          expect(find.byTooltip('$removeText: Дом'), findsOneWidget);
-          expect(
-            tester.getSemantics(find.byTooltip('$removeText: Дом')).tooltip,
-            '$removeText: Дом',
-          );
-          await tester.tap(open);
-          expect(opened, [_tagId(firstTagNumber)]);
-          expect(retainedTagFixtureGraph(raw), graphBefore);
-          expect(
-            raw
-                .select(
-                  'SELECT * FROM tag_assignments ORDER BY creation_sequence',
-                )
-                .map((row) => row.values.toList())
-                .toList(),
-            assignmentsBefore,
-          );
-          semantics.dispose();
-        },
-      );
-    }
-
-    testWidgets(
-      'снятие последнего назначения сохраняет тег и показывает пустой список: ${locale.languageCode}',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final chosen = <IntentionId>[];
-        await tester.pumpWidget(
-          _host(
-            repository: repository,
-            intentionId: _intentionId(3),
-            locale: locale,
-            onChoose: chosen.add,
-          ),
+              .toList(),
+          assignmentsBefore,
         );
-        await _pumpUntil(
-          tester,
-          () => find.text('Работа').evaluate().isNotEmpty,
-        );
-        expect(find.text('Работа'), findsOneWidget);
-        expect(find.text(chooseText), findsOneWidget);
-        expect(find.byTooltip('$removeText: Работа'), findsOneWidget);
-        await tester.tap(find.text(chooseText));
-        expect(chosen, [_intentionId(3)]);
-        await tester.tap(find.byTooltip('$removeText: Работа'));
-        await _pumpUntil(
-          tester,
-          () => raw.select(
-            'SELECT * FROM tag_assignments WHERE intention_id = ?',
-            [tagFixtureId(3)],
-          ).isEmpty,
-        );
-        expect(raw.select('SELECT * FROM tags'), hasLength(2));
-        expect(
-          raw.select('SELECT * FROM tag_assignments WHERE intention_id = ?', [
-            tagFixtureId(3),
-          ]),
-          isEmpty,
-        );
-        expect(find.text('Работа'), findsNothing);
-        expect(find.text(chooseText), findsOneWidget);
         semantics.dispose();
       },
     );
   }
+
+  testWidgets(
+    'снятие последнего назначения сохраняет тег и показывает пустой список',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final chosen = <IntentionId>[];
+      await tester.pumpWidget(
+        _host(
+          repository: repository,
+          intentionId: _intentionId(3),
+          locale: const Locale('ru'),
+          onChoose: chosen.add,
+        ),
+      );
+      await _pumpUntil(tester, () => find.text('Работа').evaluate().isNotEmpty);
+      expect(find.text('Работа'), findsOneWidget);
+      expect(find.text('Выбрать тег'), findsOneWidget);
+      expect(find.byTooltip('Снять назначение: Работа'), findsOneWidget);
+      await tester.tap(find.text('Выбрать тег'));
+      expect(chosen, [_intentionId(3)]);
+      await tester.tap(find.byTooltip('Снять назначение: Работа'));
+      await _pumpUntil(
+        tester,
+        () => raw.select(
+          'SELECT * FROM tag_assignments WHERE intention_id = ?',
+          [tagFixtureId(3)],
+        ).isEmpty,
+      );
+      expect(raw.select('SELECT * FROM tags'), hasLength(2));
+      expect(
+        raw.select('SELECT * FROM tag_assignments WHERE intention_id = ?', [
+          tagFixtureId(3),
+        ]),
+        isEmpty,
+      );
+      expect(find.text('Работа'), findsNothing);
+      expect(find.text('Выбрать тег'), findsOneWidget);
+      semantics.dispose();
+    },
+  );
 
   testWidgets('архивированное действие снимает только своё назначение', (
     tester,

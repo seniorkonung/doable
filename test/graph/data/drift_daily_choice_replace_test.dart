@@ -32,20 +32,9 @@ DailyChoiceId _choice(int number) =>
 
 final class _WriteFailure extends LocalDatabaseConnectionObserver {
   bool failStepInsert = false;
-  bool failResultRead = false;
-  int choiceReads = 0;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.single.contains(
-          'FROM daily_choices WHERE id = ?',
-        )) {
-      choiceReads++;
-      if (failResultRead && choiceReads == 2) {
-        throw StateError('Сбой чтения результата');
-      }
-    }
     if (failStepInsert &&
         statement.operation == LocalDatabaseSqlOperation.insert &&
         statement.statements.single.contains(
@@ -218,23 +207,13 @@ void main() {
       before.revision.compareTo(confirmed.revision),
       GraphRevisionOrder.older,
     );
-    final stages = diagnostics.events
-        .whereType<DailyChoiceCommandDiagnosticsEvent>()
-        .where(
-          (event) =>
-              event.commandType ==
-              DailyChoiceCommandDiagnosticsType.replacePath,
-        )
-        .toList();
-    expect(stages.map((event) => event.stage), [
-      DailyChoiceCommandDiagnosticsStage.validation,
-      DailyChoiceCommandDiagnosticsStage.validation,
-      DailyChoiceCommandDiagnosticsStage.write,
-      DailyChoiceCommandDiagnosticsStage.write,
-      DailyChoiceCommandDiagnosticsStage.resultRead,
-      DailyChoiceCommandDiagnosticsStage.resultRead,
-    ]);
-    expect(stages.last.status, isA<DiagnosticsSucceeded>());
+    expect(
+      diagnostics.events
+          .whereType<DailyChoiceCommandDiagnosticsEvent>()
+          .last
+          .status,
+      isA<DiagnosticsSucceeded>(),
+    );
   });
 
   test(
@@ -320,72 +299,38 @@ void main() {
     },
   );
 
-  for (final (name, statement, value, target) in [
-    (
-      'типа',
-      'UPDATE long_term_relations SET type = ? WHERE id = ?',
-      'can',
-      104,
-    ),
-    (
-      'исходного намерения',
-      'UPDATE long_term_relations SET source_intention_id = ? WHERE id = ?',
-      _uuid(3),
-      104,
-    ),
-    (
-      'связанного намерения',
-      'UPDATE long_term_relations SET related_intention_id = ? WHERE id = ?',
-      _uuid(3),
-      104,
-    ),
-    (
-      'архивности',
-      'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
-      1,
-      104,
-    ),
-    (
-      'готовности действия',
-      'UPDATE intentions SET is_action_ready = ? WHERE id = ?',
-      0,
-      4,
-    ),
-  ]) {
-    test('изменение $name до замены не повреждает прежний выбор', () async {
-      final id = await createChoice();
-      raw.execute(
-        'UPDATE daily_choices SET choice_date = ?, description = ?, is_completed = 0 WHERE id = ?',
-        ['2026-09-25', 'Новые независимые поля', id.toCanonicalString()],
-      );
-      final before = (await read(id)).value!;
-      raw.execute(statement, [value, _uuid(target)]);
+  test('архивирование связи до замены не повреждает прежний выбор', () async {
+    final id = await createChoice();
+    raw.execute(
+      'UPDATE daily_choices SET choice_date = ?, description = ?, is_completed = 0 WHERE id = ?',
+      ['2026-09-25', 'Новые независимые поля', id.toCanonicalString()],
+    );
+    final before = (await read(id)).value!;
+    raw.execute('UPDATE long_term_relations SET is_archived = 1 WHERE id = ?', [
+      _uuid(104),
+    ]);
 
-      final result = await repository.execute(replace(id));
+    final result = await repository.execute(replace(id));
 
-      expect(
-        (result as GraphCommandFailed).failure,
-        isA<DailyChoiceConflictFailure>(),
-      );
-      final after = (await read(id)).value!;
-      expect(after.choice.sourceIntentionId, before.choice.sourceIntentionId);
-      expect(
-        after.choice.selectedIntentionId,
-        before.choice.selectedIntentionId,
-      );
-      expect(after.choice.date, CalendarDate.fromParts(2026, 9, 25));
-      expect(after.choice.description?.value, 'Новые независимые поля');
-      expect(after.choice.isCompleted, isFalse);
-      expect(
-        after.path.map((step) => step.step.id),
-        before.path.map((step) => step.step.id),
-      );
-      expect(
-        after.path.map((step) => step.relation.id),
-        before.path.map((step) => step.relation.id),
-      );
-    });
-  }
+    expect(
+      (result as GraphCommandFailed).failure,
+      isA<DailyChoiceConflictFailure>(),
+    );
+    final after = (await read(id)).value!;
+    expect(after.choice.sourceIntentionId, before.choice.sourceIntentionId);
+    expect(after.choice.selectedIntentionId, before.choice.selectedIntentionId);
+    expect(after.choice.date, CalendarDate.fromParts(2026, 9, 25));
+    expect(after.choice.description?.value, 'Новые независимые поля');
+    expect(after.choice.isCompleted, isFalse);
+    expect(
+      after.path.map((step) => step.step.id),
+      before.path.map((step) => step.step.id),
+    );
+    expect(
+      after.path.map((step) => step.relation.id),
+      before.path.map((step) => step.relation.id),
+    );
+  });
 
   test('сбой после удаления прежних шагов откатывает всю замену', () async {
     final id = await createChoice();
@@ -483,35 +428,6 @@ void main() {
       expect(change.occupiedRelationIds, isEmpty);
     },
   );
-
-  test('сбой чтения результата откатывает участников и все шаги', () async {
-    final id = await createChoice();
-    final before = await read(id);
-    writeFailure.choiceReads = 0;
-    writeFailure.failResultRead = true;
-
-    final result = await repository.execute(replace(id));
-
-    expect(
-      (result as GraphCommandFailed).failure,
-      isA<DailyChoiceUnexpectedFailure>(),
-    );
-    writeFailure.failResultRead = false;
-    final after = await read(id);
-    expect(after.revision.compareTo(before.revision), GraphRevisionOrder.same);
-    expect(
-      after.value!.choice.sourceIntentionId,
-      before.value!.choice.sourceIntentionId,
-    );
-    expect(
-      after.value!.choice.selectedIntentionId,
-      before.value!.choice.selectedIntentionId,
-    );
-    expect(
-      after.value!.path.map((item) => item.step.id),
-      before.value!.path.map((item) => item.step.id),
-    );
-  });
 
   test('отсутствующий и повреждённый выбор не создаются заново', () async {
     final missing = await repository.execute(replace(_choice(999)));

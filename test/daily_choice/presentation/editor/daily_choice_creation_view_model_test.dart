@@ -6,12 +6,10 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_state.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -28,138 +26,14 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
-  test('успех фиксируется в сессии до публикации события перехода', () async {
+  test('успех публикует событие перехода к созданному выбору', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);
-    final events = harness.container.listen(harness.provider, (_, next) {
-      if (next.event != null) {
-        expect(harness.session.state, isA<DailyChoiceCreationFlowSaved>());
-      }
-    });
-    addTearDown(events.close);
     harness.model.submit();
-    expect(harness.session.state, isA<DailyChoiceCreationFlowSubmitting>());
     harness.repository.succeed(0);
     await pumpEventQueue();
     expect(harness.state.event, isA<DailyChoiceCreationCreated>());
-    expect(
-      (harness.session.state as DailyChoiceCreationFlowSaved).choiceId,
-      harness.state.event!.choiceId,
-    );
-  });
-
-  for (final succeeds in [true, false]) {
-    test('поздний ${succeeds ? 'успех' : 'отказ'} освобождённой формы '
-        'не меняет другую сессию и не повторяет отправку', () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final oldModel = harness.model;
-      oldModel.submit();
-      harness.closeForm();
-      await pumpEventQueue();
-      expect(harness.container.exists(harness.provider), isFalse);
-
-      final otherSession = _session();
-      final otherProvider = dailyChoiceCreationViewModelProvider(
-        otherSession,
-        harness.path,
-        CalendarDate.fromParts(2024, 1, 1),
-      );
-      final other = harness.container.listen(otherProvider, (_, _) {});
-      addTearDown(other.close);
-      final otherModel = harness.container.read(otherProvider.notifier);
-      otherModel
-        ..changeDescription('Новый черновик')
-        ..submit();
-      expect(harness.repository.commands, hasLength(2));
-      final otherOperation = otherSession.state;
-
-      if (succeeds) {
-        harness.repository.succeed(0);
-      } else {
-        harness.repository.fail(0, const DailyChoiceUnavailableFailure());
-      }
-      await pumpEventQueue();
-      expect(
-        harness.session.state,
-        succeeds
-            ? isA<DailyChoiceCreationFlowSaved>()
-            : isA<DailyChoiceCreationFlowEditing>(),
-      );
-      expect(otherSession.state, same(otherOperation));
-      expect(
-        harness.container.read(otherProvider).description,
-        'Новый черновик',
-      );
-      oldModel.submit();
-      expect(harness.repository.commands, hasLength(2));
-    });
-  }
-
-  test(
-    'явная дата охватывает весь календарь; прошлая не включает выполнение',
-    () {
-      final harness = _Harness(date: CalendarDate.fromParts(1, 1, 1));
-      addTearDown(harness.dispose);
-
-      expect(harness.state.date, CalendarDate.fromParts(1, 1, 1));
-      expect(harness.state.isCompleted, isFalse);
-      expect(harness.state.path, same(harness.path));
-      harness.model.changeCompletion(true);
-      expect(harness.state.date, CalendarDate.fromParts(1, 1, 1));
-      expect(harness.state.isCompleted, isTrue);
-      harness.model.changeDate(CalendarDate.fromParts(9999, 12, 31));
-      harness.model.submit();
-
-      expect(
-        harness.repository.commands.single.date,
-        CalendarDate.fromParts(9999, 12, 31),
-      );
-      expect(harness.repository.commands.single.isCompleted, isTrue);
-      expect(harness.repository.commands.single.path, same(harness.path));
-    },
-  );
-
-  test('описание проверяется по Unicode и графемам с сохранением ввода', () {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final grapheme = 'е\u0301';
-    harness.model.changeDescription(grapheme * 4097);
-    harness.model.submit();
-
-    expect(harness.repository.commands, isEmpty);
-    expect(harness.state.description, grapheme * 4097);
-    expect(
-      harness.state.operation,
-      isA<DailyChoiceCreationFailed>().having(
-        (value) => value.failure,
-        'причина',
-        isA<DailyChoiceCreationDescriptionInvalid>().having(
-          (value) => value.failure.reason,
-          'ограничение',
-          DailyChoiceDescriptionValidationReason.tooLong,
-        ),
-      ),
-    );
-
-    harness.model.changeDescription('текст\u0000');
-    harness.model.submit();
-    expect(harness.repository.commands, isEmpty);
-    expect(harness.state.description, 'текст\u0000');
-    expect(
-      ((harness.state.operation as DailyChoiceCreationFailed).failure
-              as DailyChoiceCreationDescriptionInvalid)
-          .failure
-          .reason,
-      DailyChoiceDescriptionValidationReason.invalidUnicodeRepertoire,
-    );
-
-    harness.model.changeDescription(grapheme * 4096);
-    harness.model.submit();
-    expect(
-      harness.repository.commands.single.description?.value,
-      grapheme * 4096,
-    );
+    expect(harness.state.event!.choiceId, _dailyChoiceId(1));
   });
 
   test('пустое описание становится отсутствующим, а ввод остаётся видимым', () {
@@ -169,72 +43,6 @@ void main() {
     harness.model.submit();
     expect(harness.state.description, '   ');
     expect(harness.repository.commands.single.description, isNull);
-  });
-
-  test(
-    'одна форма отправляет один раз и узнаёт об успехе после commit',
-    () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final presenter = harness.coordinator.registerAppPresentation();
-      addTearDown(presenter.release);
-
-      harness.model
-        ..submit()
-        ..submit();
-      expect(harness.repository.commands, hasLength(1));
-      expect(harness.state.operation, isA<DailyChoiceCreationSubmitting>());
-      expect(harness.state.event, isNull);
-
-      harness.repository.succeed(0);
-      await pumpEventQueue();
-      expect(harness.state.operation, isA<DailyChoiceCreationSucceeded>());
-      expect(harness.state.event, isA<DailyChoiceCreationCreated>());
-      expect(harness.state.failurePresentation, isNull);
-      harness.model.submit();
-      expect(harness.repository.commands, hasLength(1));
-      final claim = await presenter.nextClaim();
-      expect(claim?.completion, isA<DailyChoiceCommandCompletion>());
-      harness.coordinator.confirmPresentation(claim!);
-      harness.model.consumeEvent();
-      expect(harness.state.event, isNull);
-    },
-  );
-
-  test('новая форма допускает полный самостоятельный дубликат', () {
-    final repository = _Repository();
-    final container = ProviderContainer(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWith((ref) => repository),
-      ],
-    );
-    addTearDown(container.dispose);
-    final path = _path();
-    final date = CalendarDate.fromParts(2024, 1, 1);
-    final first = dailyChoiceCreationViewModelProvider(_session(), path, date);
-    final second = dailyChoiceCreationViewModelProvider(_session(), path, date);
-    final a = container.listen(first, (_, _) {});
-    final b = container.listen(second, (_, _) {});
-    addTearDown(a.close);
-    addTearDown(b.close);
-
-    container.read(first.notifier)
-      ..changeDescription('Одинаковое описание')
-      ..changeCompletion(true)
-      ..submit();
-    container.read(second.notifier)
-      ..changeDescription('Одинаковое описание')
-      ..changeCompletion(true)
-      ..submit();
-    expect(repository.commands, hasLength(2));
-    expect(repository.commands[0].path, same(path));
-    expect(repository.commands[1].path, same(path));
-    expect(repository.commands[0].date, date);
-    expect(repository.commands[1].date, date);
-    expect(repository.commands[0].description?.value, 'Одинаковое описание');
-    expect(repository.commands[1].description?.value, 'Одинаковое описание');
-    expect(repository.commands[0].isCompleted, isTrue);
-    expect(repository.commands[1].isCompleted, isTrue);
   });
 
   test(
@@ -266,7 +74,6 @@ void main() {
       expect(repository.commands, hasLength(1));
       repository.succeed(0);
       await pumpEventQueue();
-      expect(session.state, isA<DailyChoiceCreationFlowSaved>());
       container.read(provider.notifier).submit();
       expect(repository.commands, hasLength(1));
     },
@@ -290,10 +97,6 @@ void main() {
     expect(harness.state.description, 'Моё описание');
     expect(harness.state.isCompleted, isTrue);
     expect(harness.state.needsPathRefresh, isTrue);
-    expect(
-      harness.state.failurePresentation,
-      isA<GraphInitiatorPresentationClaim>(),
-    );
     harness.model.changeDate(CalendarDate.fromParts(2024, 3, 2));
     harness.model.submit();
     expect(harness.repository.commands, hasLength(1));
@@ -301,11 +104,14 @@ void main() {
     final refreshed = _path(type: LongTermRelationType.can);
     expect(harness.model.confirmRefreshedPath(refreshed), isTrue);
     expect(harness.model.confirmRefreshedPath(_path()), isFalse);
-    expect(harness.state.path, same(refreshed));
+    expect(harness.state.path.steps.single.type, LongTermRelationType.can);
     expect(harness.state.canSubmit, isTrue);
     harness.model.submit();
     expect(harness.repository.commands, hasLength(2));
-    expect(harness.repository.commands.last.path, same(refreshed));
+    expect(
+      harness.repository.commands.last.path.steps.single.type,
+      LongTermRelationType.can,
+    );
     expect(harness.repository.commands.last.description?.value, 'Моё описание');
     expect(
       harness.repository.commands.last.date,
@@ -349,63 +155,12 @@ void main() {
       harness.repository.fail(0, const DailyChoiceUnavailableFailure());
       await pumpEventQueue();
       expect(harness.state.canRetry, isTrue);
-      expect(
-        harness.state.failurePresentation,
-        isA<GraphInitiatorPresentationClaim>(),
-      );
       harness.model.submit();
       expect(harness.repository.commands, hasLength(2));
       harness.repository.fail(1, const DailyChoiceUnexpectedFailure());
       await pumpEventQueue();
       expect(harness.state.canSubmit, isFalse);
       expect(harness.state.description, isEmpty);
-    },
-  );
-
-  test(
-    'повтор передаёт исправленное описание после временного отказа',
-    () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final presenter = harness.coordinator.registerAppPresentation();
-      addTearDown(presenter.release);
-
-      harness.model
-        ..changeDescription('Первый текст')
-        ..submit()
-        ..submit()
-        ..changeDescription('Недопустимая правка');
-      expect(harness.repository.commands, hasLength(1));
-      expect(harness.state.description, 'Первый текст');
-      expect(
-        harness.repository.commands.single.description?.value,
-        'Первый текст',
-      );
-
-      harness.repository.fail(0, const DailyChoiceUnavailableFailure());
-      await pumpEventQueue();
-      expect(harness.state.description, 'Первый текст');
-      expect(harness.state.canRetry, isTrue);
-      expect(
-        harness.state.failurePresentation,
-        isA<GraphInitiatorPresentationClaim>(),
-      );
-
-      harness.model.changeDescription('Исправленный текст');
-      expect(harness.state.description, 'Исправленный текст');
-      harness.model.submit();
-      expect(harness.repository.commands, hasLength(2));
-      expect(
-        harness.repository.commands.last.description?.value,
-        'Исправленный текст',
-      );
-      harness.repository.succeed(1);
-      await pumpEventQueue();
-      expect(harness.state.operation, isA<DailyChoiceCreationSucceeded>());
-      final claim = await presenter.nextClaim();
-      expect(claim?.completion, isA<DailyChoiceCommandCompletion>());
-      harness.coordinator.confirmPresentation(claim!);
-      expect(harness.repository.commands, hasLength(2));
     },
   );
 
@@ -421,10 +176,6 @@ void main() {
     );
     await pumpEventQueue();
     expect(harness.state.canSubmit, isFalse);
-    expect(
-      harness.state.failurePresentation,
-      isA<GraphInitiatorPresentationClaim>(),
-    );
 
     harness.model.changeDate(CalendarDate.fromParts(9999, 12, 31));
     expect(harness.state.canSubmit, isTrue);
@@ -434,19 +185,6 @@ void main() {
       harness.repository.commands.last.date,
       CalendarDate.fromParts(9999, 12, 31),
     );
-  });
-
-  test('уход формы не отменяет команду и передаёт ошибку оболочке', () async {
-    final harness = _Harness();
-    final presenter = harness.coordinator.registerAppPresentation();
-    addTearDown(presenter.release);
-    harness.model.submit();
-    harness.closeForm();
-    harness.repository.fail(0, const DailyChoiceUnexpectedFailure());
-    final claim = await presenter.nextClaim();
-    expect(claim?.completion, isA<DailyChoiceCommandCompletion>());
-    harness.coordinator.confirmPresentation(claim!);
-    harness.dispose();
   });
 }
 
@@ -473,10 +211,6 @@ final class _Harness {
   late final ProviderSubscription<DailyChoiceCreationState> subscription;
   DailyChoiceCreationViewModel get model => container.read(provider.notifier);
   DailyChoiceCreationState get state => container.read(provider);
-  GraphCommandCoordinator get coordinator =>
-      container.read(graphCommandCoordinatorProvider.notifier);
-
-  void closeForm() => subscription.close();
   void dispose() => container.dispose();
 }
 

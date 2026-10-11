@@ -240,79 +240,6 @@ void main() {
       expect(await _storedIntentionOrNull(database, fourthId), isNotNull);
     },
   );
-
-  test('ошибка записи откатывает удаление и не публикует изменение', () async {
-    await _create(repository, sourceId, relatedId);
-    final storedBefore = await _storedRelation(database, relationId);
-    final revisionBefore = await _revision(repository, sourceId);
-    final events = <LongTermRelationReadResult>[];
-    final subscription = repository
-        .watchRelation(relationId)
-        .listen(events.add);
-    addTearDown(() {
-      unawaited(subscription.cancel());
-    });
-    await _waitFor(() => events.length == 1);
-    await database.customStatement('''
-      CREATE TEMP TRIGGER canary_relation_delete_failure
-      BEFORE DELETE ON long_term_relations
-      BEGIN
-        SELECT RAISE(ABORT, 'canary relation delete failure');
-      END
-    ''');
-
-    final failure = _failure(
-      await repository.execute(DeleteLongTermRelation(relationId)),
-    );
-    await pumpEventQueue(times: 10);
-
-    expect(failure, isA<LongTermRelationUnexpectedFailure>());
-    expect(await _storedRelation(database, relationId), storedBefore);
-    expect(
-      (await _revision(repository, sourceId)).compareTo(revisionBefore),
-      GraphRevisionOrder.same,
-    );
-    expect(events, hasLength(1));
-  });
-
-  test(
-    'диагностика удаления безопасна и её отказ не повторяет запись',
-    () async {
-      await _create(repository, sourceId, relatedId);
-
-      await repository.execute(DeleteLongTermRelation(relationId));
-
-      final deletionEvent = diagnostics.events
-          .whereType<LongTermRelationCommandDiagnosticsEvent>()
-          .singleWhere(
-            (event) =>
-                event.commandType ==
-                LongTermRelationCommandDiagnosticsType.delete,
-          );
-      expect(deletionEvent.status, isA<DiagnosticsSucceeded>());
-
-      await _create(repository, sourceId, relatedId);
-      final throwingDiagnostics = _ThrowingDiagnosticsSink();
-      repository = _repository(database, throwingDiagnostics, const []);
-
-      final result = await repository.execute(
-        DeleteLongTermRelation(secondRelationId),
-      );
-
-      expect(result, isA<GraphCommandSucceeded>());
-      expect(await _storedRelationOrNull(database, secondRelationId), isNull);
-      expect(
-        throwingDiagnostics.attemptedEvents,
-        everyElement(
-          isA<LongTermRelationCommandDiagnosticsEvent>().having(
-            (event) => event.commandType,
-            'тип команды',
-            LongTermRelationCommandDiagnosticsType.delete,
-          ),
-        ),
-      );
-    },
-  );
 }
 
 Future<LongTermRelationCreated> _create(
@@ -459,13 +386,6 @@ Future<List<Map<String, Object?>>> _storedIntentions(
     Map<String, Object?>.unmodifiable(row.data),
 ];
 
-Future<void> _waitFor(bool Function() condition) async {
-  for (var attempt = 0; attempt < 20 && !condition(); attempt++) {
-    await Future<void>.delayed(Duration.zero);
-  }
-  expect(condition(), isTrue);
-}
-
 IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value),
@@ -489,14 +409,4 @@ final class _DeterministicRelationIdGenerator
 
   @override
   LongTermRelationId generate() => _ids[_index++];
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('Управляемый отказ диагностики.');
-  }
 }

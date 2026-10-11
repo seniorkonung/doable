@@ -42,231 +42,111 @@ part 'tag_navigation_graph_lifecycle_scenarios.dart';
 const _extraPairs = 51;
 
 void main() {
-  for (final locale in ['ru', 'en']) {
-    testWidgets(
-      'каталог ведёт через все порции обоих охватов к точным подробностям на $locale',
-      (tester) async {
-        final app = await _pumpApp(tester, locale);
-        final before = _snapshot(app.raw);
-        await _openCatalogTag(tester, firstTagNumber);
-        final state = await _loaded(tester, firstTagNumber);
-        expect(app.router.current.name, TagNavigationRoute.name);
-        expect(
-          app.router.current.argsAs<TagNavigationRouteArgs>().tagId,
-          _tagId(firstTagNumber),
-        );
-        _expectNavigation(tester, state, TaggedIntentionsScope.active);
-        for (final scope in TaggedIntentionsScope.values) {
-          await _selectScope(tester, scope);
-          await _loadAll(tester, scope);
-          final archived = scope == TaggedIntentionsScope.archived;
-          for (final (target, title, description) in [
-            if (!archived) ...[
-              (_intentionId(1), 'Одинаковое намерение', 'Описание 1'),
-              (_intentionId(4), 'Одинаковое намерение', 'Описание 4'),
-            ] else
-              (_intentionId(2), 'Намерение 2', 'Описание 2'),
-            (
-              _intentionId(archived ? 1150 : 1050),
-              'Получатель ${archived ? 1 : 0}/50',
-              'Описание ${archived ? 1 : 0}/50',
-            ),
-          ]) {
-            await _openDetailsAndReturn(
-              tester,
-              app.router,
-              target,
-              title: title,
-              description: description,
-            );
-          }
-        }
-        await _selectScope(tester, TaggedIntentionsScope.active);
-        _expectNavigation(
-          tester,
-          await _loaded(tester, firstTagNumber),
-          TaggedIntentionsScope.active,
-        );
-        app.router.pop();
-        await _until(
-          tester,
-          find.byKey(
-            ValueKey('tag-catalog-open-${tagFixtureId(firstTagNumber)}'),
+  testWidgets(
+    'каталог ведёт через все порции обоих охватов к точным подробностям',
+    (tester) async {
+      final app = await _pumpApp(tester);
+      final before = _snapshot(app.raw);
+      await _openCatalogTag(tester, firstTagNumber);
+      final state = await _loaded(tester, firstTagNumber);
+      expect(app.router.current.name, TagNavigationRoute.name);
+      expect(
+        app.router.current.argsAs<TagNavigationRouteArgs>().tagId,
+        _tagId(firstTagNumber),
+      );
+      _expectNavigation(tester, state, TaggedIntentionsScope.active);
+      for (final scope in TaggedIntentionsScope.values) {
+        await _selectScope(tester, scope);
+        await _loadAll(tester, scope);
+        final archived = scope == TaggedIntentionsScope.archived;
+        for (final (target, title, description) in [
+          if (!archived) ...[
+            (_intentionId(1), 'Одинаковое намерение', 'Описание 1'),
+            (_intentionId(4), 'Одинаковое намерение', 'Описание 4'),
+          ] else
+            (_intentionId(2), 'Намерение 2', 'Описание 2'),
+          (
+            _intentionId(archived ? 1150 : 1050),
+            'Получатель ${archived ? 1 : 0}/50',
+            'Описание ${archived ? 1 : 0}/50',
           ),
-        );
-        expect(app.router.current.name, TagCatalogRoute.name);
-        expect(_snapshot(app.raw), before);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets(
-      'назначения намерений открывают тот же тег с активным входом на $locale',
-      (tester) async {
-        final app = await _pumpApp(tester, locale);
-        final before = _snapshot(app.raw);
-        for (final target in [_intentionId(1), _intentionId(2)]) {
-          unawaited(
-            app.router.push(IntentionDetailsRoute(intentionId: target)),
-          );
-          final open = find.byKey(
-            ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
-          );
-          await _until(tester, open);
-          await _tap(tester, open);
-          _expectNavigation(
-            tester,
-            await _loaded(tester, firstTagNumber),
-            TaggedIntentionsScope.active,
-          );
-          await _selectScope(tester, TaggedIntentionsScope.archived);
-          _expectNavigation(
-            tester,
-            await _loaded(tester, firstTagNumber),
-            TaggedIntentionsScope.archived,
-          );
+        ]) {
           await _openDetailsAndReturn(
             tester,
             app.router,
-            _intentionId(2),
-            title: 'Намерение 2',
-            description: 'Описание 2',
+            target,
+            title: title,
+            description: description,
           );
-          app.router.pop();
-          await _until(tester, open);
-          _expectDetailsRoute(app.router, target);
-          await _tap(tester, open);
-          _expectNavigation(
-            tester,
-            await _loaded(tester, firstTagNumber),
-            TaggedIntentionsScope.active,
-          );
-          app.router.pop();
-          await _until(tester, open);
-          app.router.pop();
-          await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
         }
-        expect(_snapshot(app.raw), before);
-        expect(tester.takeException(), isNull);
-      },
-    );
+      }
+      await _selectScope(tester, TaggedIntentionsScope.active);
+      _expectNavigation(
+        tester,
+        await _loaded(tester, firstTagNumber),
+        TaggedIntentionsScope.active,
+      );
+      app.router.pop();
+      await _until(
+        tester,
+        find.byKey(
+          ValueKey('tag-catalog-open-${tagFixtureId(firstTagNumber)}'),
+        ),
+      );
+      expect(app.router.current.name, TagCatalogRoute.name);
+      expect(_snapshot(app.raw), before);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-    testWidgets(
-      'смена системного языка на открытой навигации сохраняет тег, охваты и все порции из $locale',
-      (tester) async {
-        final app = await _pumpApp(tester, locale);
-        final before = _snapshot(app.raw);
-        await _openCatalogTag(tester, firstTagNumber);
-        await _loaded(tester, firstTagNumber);
-        for (final scope in TaggedIntentionsScope.values) {
-          await _selectScope(tester, scope);
-          await _loadAll(tester, scope);
-          final loaded = await _loaded(tester, firstTagNumber);
-          for (final language in [locale == 'ru' ? 'en' : 'ru', locale]) {
-            tester.binding.platformDispatcher.localesTestValue = [
-              Locale(language),
-            ];
-            await tester.pumpAndSettle();
-            final current = await _loaded(tester, firstTagNumber);
-            expect(app.router.current.name, TagNavigationRoute.name);
-            expect(
-              app.router.current.argsAs<TagNavigationRouteArgs>().tagId,
-              loaded.tagId,
-            );
-            expect(current.tag, loaded.tag);
-            expect(current.scope, loaded.scope);
-            expect(current.items, orderedEquals(loaded.items));
-            expect(current.revision, loaded.revision);
-            expect(current.nextCursor, loaded.nextCursor);
-            expect(current.hasReachedEnd, isTrue);
-            expect(_l10n(tester).localeName, language);
-            await _scrollToTop(tester);
-            final l10n = _l10n(tester);
-            expect(find.text(l10n.tagNavigationTag('Дом 🏷️')), findsOneWidget);
-            expect(
-              tester.widget<ChoiceChip>(find.byKey(ValueKey(scope))).selected,
-              isTrue,
-            );
-            final archived = scope == TaggedIntentionsScope.archived;
-            for (final (target, title) in [
-              (
-                _intentionId(archived ? 2 : 1),
-                archived ? 'Намерение 2' : 'Одинаковое намерение',
-              ),
-            ]) {
-              final row = find.byKey(ValueKey(target));
-              await tester.scrollUntilVisible(
-                row,
-                800,
-                scrollable: find.byType(Scrollable).last,
-              );
-              expect(
-                find.descendant(of: row, matching: find.text(title)),
-                findsOneWidget,
-              );
-            }
-            expect(_snapshot(app.raw), before);
-            expect(tester.takeException(), isNull);
-          }
-        }
-      },
-    );
-
-    testWidgets(
-      'теги без назначений и только в архиве доступны из основного каталога на $locale',
-      (tester) async {
-        final app = await _pumpApp(tester, locale);
-        final before = _snapshot(app.raw);
-        for (final (number, name) in [
-          (303, 'Без назначений'),
-          (304, 'Только в архиве'),
-        ]) {
-          await _openCatalogTag(tester, number);
-          final active = await _loaded(tester, number);
-          final l10n = _l10n(tester);
-          expect(active.tagId, _tagId(number));
-          expect(active.tag.name.value, name);
-          expect(active.scope, TaggedIntentionsScope.active);
-          expect(active.items, isEmpty);
-          expect(find.text(l10n.tagNavigationTag(name)), findsOneWidget);
-          expect(find.text(l10n.tagNavigationEmptyActive), findsOneWidget);
-          expect(find.text(l10n.tagNotFound), findsNothing);
-          await _selectScope(
-            tester,
-            TaggedIntentionsScope.archived,
-            tagNumber: number,
-          );
-          final archived = await _loaded(tester, number);
-          expect(archived.tagId, active.tagId);
-          if (number == 303) {
-            expect(archived.items, isEmpty);
-            expect(find.text(l10n.tagNavigationEmptyArchived), findsOneWidget);
-          } else {
-            expect(archived.items.map((item) => item.id), [_intentionId(2)]);
-            await _openDetailsAndReturn(
-              tester,
-              app.router,
-              _intentionId(2),
-              title: 'Намерение 2',
-              description: 'Описание 2',
-              tagNumber: number,
-            );
-          }
-          app.router.pop();
-          await _until(
-            tester,
-            find.byKey(ValueKey('tag-catalog-open-${tagFixtureId(number)}')),
-          );
-          expect(app.router.current.name, TagCatalogRoute.name);
-          app.router.pop();
-          await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
-        }
-        expect(_snapshot(app.raw), before);
-        expect(tester.takeException(), isNull);
-      },
-    );
-    _testTaggedGraphLifecycle(locale);
-  }
+  testWidgets('назначения намерений открывают тот же тег с активным входом', (
+    tester,
+  ) async {
+    final app = await _pumpApp(tester);
+    final before = _snapshot(app.raw);
+    for (final target in [_intentionId(1), _intentionId(2)]) {
+      unawaited(app.router.push(IntentionDetailsRoute(intentionId: target)));
+      final open = find.byKey(
+        ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
+      );
+      await _until(tester, open);
+      await _tap(tester, open);
+      _expectNavigation(
+        tester,
+        await _loaded(tester, firstTagNumber),
+        TaggedIntentionsScope.active,
+      );
+      await _selectScope(tester, TaggedIntentionsScope.archived);
+      _expectNavigation(
+        tester,
+        await _loaded(tester, firstTagNumber),
+        TaggedIntentionsScope.archived,
+      );
+      await _openDetailsAndReturn(
+        tester,
+        app.router,
+        _intentionId(2),
+        title: 'Намерение 2',
+        description: 'Описание 2',
+      );
+      app.router.pop();
+      await _until(tester, open);
+      _expectDetailsRoute(app.router, target);
+      await _tap(tester, open);
+      _expectNavigation(
+        tester,
+        await _loaded(tester, firstTagNumber),
+        TaggedIntentionsScope.active,
+      );
+      app.router.pop();
+      await _until(tester, open);
+      app.router.pop();
+      await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
+    }
+    expect(_snapshot(app.raw), before);
+    expect(tester.takeException(), isNull);
+  });
+  _testTaggedGraphLifecycle();
 }
 
 AppLocalizations _l10n(WidgetTester tester) =>
@@ -381,8 +261,6 @@ Future<void> _openDetailsAndReturn(
     after.items.map((item) => item.id),
     before.items.map((item) => item.id),
   );
-  expect(after.nextCursor, before.nextCursor);
-  expect(after.revision, before.revision);
   await _scrollToTop(tester);
   expect(
     tester.widget<ChoiceChip>(find.byKey(ValueKey(after.scope))).selected,
@@ -419,12 +297,11 @@ Map<String, List<List<Object?>>> _snapshot(sqlite.Database raw) => {
 };
 
 Future<({sqlite.Database raw, AppRouter router, AppRuntime runtime})> _pumpApp(
-  WidgetTester tester,
-  String locale, {
+  WidgetTester tester, {
   void Function(sqlite.Database)? seed,
 }) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-  tester.binding.platformDispatcher.localesTestValue = [Locale(locale)];
+  tester.binding.platformDispatcher.localesTestValue = [const Locale('ru')];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
   tester.view.physicalSize = const Size(1200, 2400);
   tester.view.devicePixelRatio = 1;

@@ -27,7 +27,6 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -35,7 +34,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/daily_choice_local_date.dart';
-import '../../support/in_memory_diagnostics_sink.dart';
 
 /// Локальное сегодня потребителей пакетов: день дневного выбора фикстуры.
 /// Подставляется в контейнер до первого открытия каталога дневных выборов.
@@ -45,34 +43,14 @@ Override packageConsumersLocalDate() =>
 /// Номер объекта фикстуры по его UUID.
 int _label(String uuid) => int.parse(uuid.split('-').last, radix: 16);
 
-/// Число успешных чтений каждого вида с события [from]; события команд
-/// тегов и намерений чтениями не считаются.
-Map<Type, int> successfulReadCounts(
-  InMemoryDiagnosticsSink diagnostics, {
-  required int from,
-}) {
-  final counts = <Type, int>{};
-  for (final event in diagnostics.events.skip(from)) {
-    if (event
-        case TagCommandDiagnosticsEvent() ||
-            IntentionCommandDiagnosticsEvent()) {
-      continue;
-    }
-    if (event.status is! DiagnosticsSucceeded) continue;
-    counts.update(event.runtimeType, (count) => count + 1, ifAbsent: () => 1);
-  }
-  return counts;
-}
-
 /// Наблюдение одного потребителя с момента последнего сброса: число
-/// опубликованных новых ревизий, всех публикаций и запрещённых состояний.
+/// опубликованных новых ревизий и запрещённых состояний.
 final class PackageConsumerProbe {
   PackageConsumerProbe(this.name, {required this.observes});
 
   final String name;
   final bool observes;
   var updates = 0;
-  var emissions = 0;
   final forbiddenStates = <Object>[];
   GraphRevision? revision;
   bool loaded = false;
@@ -80,7 +58,6 @@ final class PackageConsumerProbe {
 
   void reset() {
     updates = 0;
-    emissions = 0;
     forbiddenStates.clear();
   }
 }
@@ -113,7 +90,6 @@ final class PackageConsumerProbes {
       _repository.watchIntention(id).listen((result) {
         probe
           ..updates += 1
-          ..emissions += 1
           ..loaded = true;
         switch (result) {
           case ResultSuccess(:final value):
@@ -134,7 +110,6 @@ final class PackageConsumerProbes {
       _repository.watchDailyChoice(id).listen((result) {
         probe
           ..updates += 1
-          ..emissions += 1
           ..loaded = true;
         switch (result) {
           case GraphResultSuccess(:final value) when value.value != null:
@@ -157,7 +132,6 @@ final class PackageConsumerProbes {
       _repository.watchRelation(id).listen((result) {
         probe
           ..updates += 1
-          ..emissions += 1
           ..loaded = true;
         switch (result) {
           case GraphResultSuccess(:final value) when value.value != null:
@@ -183,7 +157,6 @@ final class PackageConsumerProbes {
       _repository.watchSelectedRelations(query).listen((result) {
         probe
           ..updates += 1
-          ..emissions += 1
           ..loaded = true;
         switch (result) {
           case SelectedRelationsReadSuccess(:final value):
@@ -230,13 +203,11 @@ final class PackageConsumerProbes {
       _container.listen<IntentionDetailsState>(
         intentionDetailsViewModelProvider(id),
         (_, next) {
-          probe.emissions += 1;
           observe(next);
         },
         fireImmediately: true,
       ),
     );
-    probe.emissions = 0;
   }
 
   void neighborhood(IntentionId id, {required bool observes}) {
@@ -272,13 +243,11 @@ final class PackageConsumerProbes {
       _container.listen<RelationNeighborhoodState>(
         relationNeighborhoodViewModelProvider(id),
         (_, next) {
-          probe.emissions += 1;
           observe(next);
         },
         fireImmediately: true,
       ),
     );
-    probe.emissions = 0;
   }
 
   void relationDetails(LongTermRelationId id, {required bool observes}) {
@@ -320,13 +289,11 @@ final class PackageConsumerProbes {
       _container.listen<RelationDetailsState>(
         relationDetailsViewModelProvider(id),
         (_, next) {
-          probe.emissions += 1;
           observe(next);
         },
         fireImmediately: true,
       ),
     );
-    probe.emissions = 0;
   }
 
   void dailyChoiceCatalog() {
@@ -359,13 +326,11 @@ final class PackageConsumerProbes {
       _container.listen<DailyChoiceCatalogState>(
         dailyChoiceCatalogViewModelProvider,
         (_, next) {
-          probe.emissions += 1;
           observe(next);
         },
         fireImmediately: true,
       ),
     );
-    probe.emissions = 0;
   }
 
   void dailyChoiceDetails(DailyChoiceId id) {
@@ -373,7 +338,6 @@ final class PackageConsumerProbes {
     final model = DailyChoiceDetailsViewModel(_repository, id);
     _notifiers.add(model);
     model.addListener(() {
-      probe.emissions += 1;
       final state = model.state;
       switch (state) {
         case DailyChoiceDetailsLoaded():
@@ -407,7 +371,6 @@ final class PackageConsumerProbes {
     );
     _notifiers.add(model);
     model.addListener(() {
-      probe.emissions += 1;
       final state = model.state;
       switch (state) {
         case ChoicePathSuggestionsCurrent():
@@ -479,10 +442,6 @@ final class PackageConsumerProbes {
       probe.reset();
     }
   }
-
-  List<(String, int)> get emissions => [
-    for (final probe in all) (probe.name, probe.emissions),
-  ];
 
   String describe() => [
     for (final probe in all)

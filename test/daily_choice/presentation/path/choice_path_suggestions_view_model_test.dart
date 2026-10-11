@@ -238,19 +238,6 @@ void main() {
     expect(fixture.repository.queries, hasLength(1));
     expect(fixture.model.confirmable(_choiceId(1)), isNotNull);
   });
-
-  test('смена эпохи исключает прежнюю выдачу', () async {
-    final fixture = _Fixture();
-    addTearDown(fixture.dispose);
-    fixture.complete(0, [_suggestion(1)]);
-    await pumpEventQueue();
-    fixture.repository.revision(1, epoch: 2);
-    expect(fixture.model.state, isA<ChoicePathSuggestionsUpdating>());
-    fixture.repository.complete(1, [_suggestion(1)], epoch: 2);
-    await pumpEventQueue();
-    expect(fixture.model.state, isA<ChoicePathSuggestionsReady>());
-    expect(fixture.model.confirmable(_choiceId(1)), isNotNull);
-  });
 }
 
 final class _Fixture {
@@ -367,7 +354,6 @@ final class _Repository
     int index,
     List<AvailableChoicePathSuggestion> items, {
     int revision = 1,
-    int epoch = 1,
     Set<LongTermRelationId> observedRelationIds = const {},
   }) {
     requests[index].complete(
@@ -375,7 +361,7 @@ final class _Repository
         ChoicePathSuggestionsSnapshot(
           query: queries[index],
           items: items,
-          revision: _Revision(revision, epoch: epoch),
+          revision: _Revision(revision),
           observedRelationIds: observedRelationIds,
         ),
       ),
@@ -385,7 +371,7 @@ final class _Repository
   void fail(int index, ChoicePathSuggestionsFailure failure) =>
       requests[index].complete(ChoicePathSuggestionsError(failure));
 
-  void revision(int value, {int epoch = 1}) => observations.add(
+  void revision(int value) => observations.add(
     intention_result.ResultSuccess(
       GraphSnapshot(
         value: IntentionDetails(
@@ -402,7 +388,7 @@ final class _Repository
           ),
           favoriteMark: FavoriteMark.notFavorite,
         ),
-        revision: _Revision(value, epoch: epoch),
+        revision: _Revision(value),
       ),
     ),
   );
@@ -459,13 +445,11 @@ RelationCounts _counts() => RelationCounts(
 );
 
 final class _Revision implements GraphRevision {
-  const _Revision(this.value, {this.epoch = 1});
+  const _Revision(this.value);
   final int value;
-  final int epoch;
 
   @override
-  GraphRevisionOrder compareTo(GraphRevision other) =>
-      other is! _Revision || other.epoch != epoch
+  GraphRevisionOrder compareTo(GraphRevision other) => other is! _Revision
       ? GraphRevisionOrder.differentEpoch
       : switch (value.compareTo(other.value)) {
           < 0 => GraphRevisionOrder.older,

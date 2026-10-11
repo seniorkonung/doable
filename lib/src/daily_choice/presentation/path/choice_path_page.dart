@@ -678,7 +678,6 @@ String _failureMessage(
   AppLocalizations l10n,
   ChoicePathContinuationFailure failure,
 ) => switch (failure) {
-  ChoicePathContinuationValidationFailure() => l10n.choicePathInvalid,
   ChoicePathContinuationIntentionNotFoundFailure() => l10n.choicePathNotFound,
   ChoicePathContinuationSnapshotExpired() => l10n.choicePathConflict,
   ChoicePathContinuationUnavailableFailure() => l10n.choicePathUnavailable,

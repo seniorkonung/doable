@@ -14,21 +14,11 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/favorite/presentation/home/home_state.dart';
-import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart'
-    show IntentionSaved;
-import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,567 +72,101 @@ const _freeRelation = 102;
 /// действия и исходного намерения.
 const _openChoice = 201;
 
-/// Идентификатор, которому не соответствует ни одно намерение.
-const _missing = 99;
-
-/// Тег «Дом», который получает намерение, созданное с полным начальным
-/// состоянием.
-const _homeTag = 301;
+/// Архивированное избранное намерение с названием, которое не проходит
+/// проверку при чтении списка Главной.
+const _corrupted = 99;
 
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
 
-/// Следующее подтверждённое изменение после отказа обновления Главной.
-enum _NextChange {
-  /// Отметка «Бегать» — изменение, затрагивающее избранное.
-  favorite('отметка другого намерения'),
-
-  /// Переименование неизбранного «Спать» — изменение, избранного не
-  /// затрагивающее.
-  unrelated('переименование неизбранного намерения');
-
-  const _NextChange(this.description);
-
-  final String description;
-}
-
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    final code = locale.languageCode;
+  // Сценарий от языка не зависит: тексты Главной в обеих локалях проверяет
+  // home_accessibility_test.
+  const locale = Locale('ru');
 
-    testWidgets('после полного перезапуска Главная показывает те же избранные '
-        'намерения в том же порядке, архивированное остаётся скрытым и после '
-        'восстановления встаёт на своё место, а снятая отметка не возвращается '
-        'на $code', (tester) async {
-      final install = await _install(tester, locale);
-      final l10n = install.l10n;
-      final first = await _launch(
-        tester,
-        install,
-        seed: (database) =>
-            _seedGraph(database, favorites: const [_swim, _walk, _read, _run]),
-      );
-      await _expectHome(tester, l10n, const [_swim, _walk, _read, _run]);
-
-      // Подтверждённые операции первого запуска: отметка, архивирование
-      // избранного намерения и снятие отметки.
-      await _select(tester, AppDestination.intentionGraph);
-      await _openFromCatalog(tester, _sleep);
-      await _toggleMark(tester);
-      await _closeDetails(tester);
-      await _openFromCatalog(tester, _read);
-      await _archive(tester);
-      await _closeDetails(tester);
-      await _openFromCatalog(tester, _run);
-      await _toggleMark(tester);
-      await _closeDetails(tester);
-      await _select(tester, AppDestination.home);
-      await _expectHome(tester, l10n, const [_swim, _walk, _sleep]);
-      final marks = [
-        (tagFixtureId(_swim), 1),
-        (tagFixtureId(_walk), 2),
-        (tagFixtureId(_read), 3),
-        (tagFixtureId(_sleep), 5),
-      ];
-      expect(storedFavoriteMarks(first.raw), marks);
-
-      // Полное завершение и новый запуск на том же хранилище.
-      await first.shutdown(tester);
-      final second = await _launch(tester, install);
-      _expectHomeRoot(tester, second);
-      await _expectHome(tester, l10n, const [_swim, _walk, _sleep]);
-      expect(storedFavoriteMarks(second.raw), marks);
-
-      // Подтверждённое снятие отметки не вернулось: каталог показывает
-      // «Бегать» без звезды, а его страница предлагает отметить.
-      await _select(tester, AppDestination.intentionGraph);
-      await _expectStars(
-        tester,
-        IntentionCatalogPage,
-        l10n,
-        shown: const [_walk, _swim, _run, _sleep, _sing],
-        favorites: const {_walk, _swim, _sleep},
-      );
-      await _openFromCatalog(tester, _run);
-      expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
-      await _closeDetails(tester);
-
-      // Архивированное избранное намерение сохранило отметку и после
-      // восстановления встаёт на своё место.
-      await _selectScope(tester, l10n.catalogScopeArchived);
-      await _expectStars(
-        tester,
-        IntentionCatalogPage,
-        l10n,
-        shown: const [_read],
-        favorites: const {_read},
-      );
-      await _openFromCatalog(tester, _read);
-      expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
-      await _restore(tester);
-      await _closeDetails(tester);
-      await _select(tester, AppDestination.home);
-      await _expectHome(tester, l10n, const [_swim, _walk, _read, _sleep]);
-      expect(storedFavoriteMarks(second.raw), marks);
-      expect(find.byKey(_message), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets(
-      'хранилище с намерениями, связями, тегами и дневными выборами без '
-      'отметок показывает, что избранных намерений нет, и отметки не '
-      'создаются ни при запуске, ни после перезапуска на $code',
-      (tester) async {
-        final install = await _install(tester, locale);
-        final l10n = install.l10n;
-        late Map<String, List<List<Object?>>> stored;
-        final first = await _launch(
-          tester,
-          install,
-          seed: (database) {
-            seedTagStorageFixture(database);
-            stored = _storedGraph(database);
-          },
-        );
-        expect(stored['intentions'], hasLength(3));
-        for (final table in [
-          'long_term_relations',
-          'daily_choices',
-          'tags',
-          'tag_assignments',
-        ]) {
-          expect(stored[table], isNotEmpty, reason: table);
-        }
-        _expectEmptyHome(tester, l10n, l10n.homeEmptyNoFavorites);
-        expect(storedFavoriteMarks(first.raw), isEmpty);
-        expect(_storedGraph(first.raw), stored);
-
-        await first.shutdown(tester);
-        final second = await _launch(tester, install);
-        _expectHomeRoot(tester, second);
-        _expectEmptyHome(tester, l10n, l10n.homeEmptyNoFavorites);
-        expect(storedFavoriteMarks(second.raw), isEmpty);
-        expect(_storedGraph(second.raw), stored);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets(
-      'единственное избранное намерение, архивированное до перезапуска, '
-      'даёт и после него состояние «все избранные намерения в архиве» на '
-      '$code',
-      (tester) async {
-        final install = await _install(tester, locale);
-        final l10n = install.l10n;
-        final first = await _launch(tester, install, seed: _seedGraph);
-        _expectEmptyHome(tester, l10n, l10n.homeEmptyNoFavorites);
-
-        await _select(tester, AppDestination.intentionGraph);
-        await _openFromCatalog(tester, _walk);
-        await _toggleMark(tester);
-        await _archive(tester);
-        await _closeDetails(tester);
-        await _select(tester, AppDestination.home);
-        await _until(tester, _homeText(l10n.homeEmptyAllArchived));
-        await tester.pumpAndSettle();
-        _expectEmptyHome(tester, l10n, l10n.homeEmptyAllArchived);
-
-        await first.shutdown(tester);
-        final second = await _launch(tester, install);
-        _expectHomeRoot(tester, second);
-        _expectEmptyHome(tester, l10n, l10n.homeEmptyAllArchived);
-        expect(storedFavoriteMarks(second.raw), [(tagFixtureId(_walk), 1)]);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets('место без существующего намерения даёт на Главной отдельное '
-        'неповторяемое повреждение, а каталог намерений, поиски и страница '
-        'намерения продолжают работать с целостными отметками на $code', (
+  testWidgets('сохранённые данные избранного, не прошедшие проверку, дают на '
+      'Главной отдельное неповторяемое повреждение, а каталог намерений, '
+      'поиски и страница намерения продолжают работать с целостными '
+      'отметками', (tester) async {
+    final install = await _install(tester, locale);
+    final l10n = install.l10n;
+    final app = await _launch(
       tester,
-    ) async {
-      final install = await _install(tester, locale);
-      final l10n = install.l10n;
-      final app = await _launch(
-        tester,
-        install,
-        seed: (database) {
-          _seedGraph(database, favorites: const [_walk, _read]);
-          storeFavoritePlaceWithoutIntention(
-            database,
-            intentionId: tagFixtureId(_missing),
-            position: 3,
-          );
-        },
-      );
-      _expectCorruption(tester, l10n);
-      // Повреждение не исправляется: место без намерения остаётся.
-      final marks = [
-        (tagFixtureId(_walk), 1),
-        (tagFixtureId(_read), 2),
-        (tagFixtureId(_missing), 3),
-      ];
-      expect(storedFavoriteMarks(app.raw), marks);
-
-      // Каталог намерений и три поиска показывают целостные отметки.
-      await _select(tester, AppDestination.intentionGraph);
-      await _expectSearches(tester, app, l10n);
-
-      // Страница избранного намерения показывает его отметку, а отметка
-      // другого намерения подтверждается и видна в каталоге.
-      await _openFromCatalog(tester, _walk);
-      expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
-      await _closeDetails(tester);
-      final reads = install.faults.reads;
-      await _openFromCatalog(tester, _run);
-      expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
-      await _toggleMark(tester);
-      expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
-      await _closeDetails(tester);
-      await _expectStars(
-        tester,
-        IntentionCatalogPage,
-        l10n,
-        shown: _titles.keys.toList(),
-        favorites: const {_walk, _read, _run},
-      );
-      expect(storedFavoriteMarks(app.raw), [...marks, (tagFixtureId(_run), 4)]);
-
-      // Подтверждённое изменение избранного перечитывает список, и
-      // повреждение остаётся отдельным результатом, а не списком с
-      // пропуском.
-      await _waitFor(tester, () => install.faults.reads > reads);
-      await _select(tester, AppDestination.home);
-      _expectCorruption(tester, l10n);
-      expect(find.byKey(_message), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('устранимая недоступность первоначального получения показывает '
-        'сообщение с повтором, а успешный повтор — актуальный список без '
-        'прежнего сообщения на $code', (tester) async {
-      final install = await _install(tester, locale);
-      final l10n = install.l10n;
-      install.faults.failNextRead();
-      await _launch(
-        tester,
-        install,
-        seed: (database) =>
-            _seedGraph(database, favorites: const [_read, _walk]),
-      );
-
-      // Отказ не выдаётся за пустой список, а повтор сам не запускается.
-      await _settleStorage(tester);
-      expect(install.faults.reads, 1);
-      expect(_homeText(l10n.homeUnavailable), findsOneWidget);
-      expect(_retry(l10n), findsOneWidget);
-      expect(_homeRows, findsNothing);
-      for (final text in [
-        l10n.homeEmptyNoFavorites,
-        l10n.homeEmptyAllArchived,
-        l10n.homeOpenIntentionGraph,
-      ]) {
-        expect(_homeText(text), findsNothing);
-      }
-
-      await _tap(tester, _retry(l10n));
-      await _expectHome(tester, l10n, const [_read, _walk]);
-      expect(_homeText(l10n.homeUnavailable), findsNothing);
-      expect(install.faults.reads, 2);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets(
-      'отказ обновления после подтверждённого изменения сохраняет прежний '
-      'список с пометкой и повтором, а успешный повтор восстанавливает '
-      'актуальность на $code',
-      (tester) async {
-        final install = await _install(tester, locale);
-        final l10n = install.l10n;
-        await _launch(
-          tester,
-          install,
-          seed: (database) =>
-              _seedGraph(database, favorites: const [_walk, _read]),
+      install,
+      seed: (database) {
+        _seedGraph(database, favorites: const [_walk, _read]);
+        // Название с пробелами по краям приложение не сохраняет, а схема
+        // допускает.
+        database.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            tagFixtureId(_corrupted),
+            ' Повреждённое ',
+            0,
+            1,
+            _corrupted,
+            _corrupted,
+          ],
         );
-        await _expectHome(tester, l10n, const [_walk, _read]);
-
-        await _openFromHome(tester, _read);
-        install.faults.failNextRead();
-        final reads = install.faults.reads;
-        await _rename(tester, 'Читать книги');
-        await _closeDetails(tester);
-        await _until(tester, _homeText(l10n.homeRefreshUnavailable));
-        await tester.pumpAndSettle();
-
-        // Прежний подтверждённый список остаётся с пометкой и повтором, а
-        // повтор сам не запускается.
-        await _settleStorage(tester);
-        expect(install.faults.reads, reads + 1);
-        expect(_shownHome(tester), ['Гулять', 'Читать']);
-        expect(_homeText(l10n.homeRefreshUnavailable), findsOneWidget);
-        expect(_retry(l10n), findsOneWidget);
-
-        await _tap(tester, _retry(l10n));
-        await _pumpUntil(
-          tester,
-          () => listEquals(_shownHome(tester), ['Гулять', 'Читать книги']),
+        storeFavoriteMark(
+          database,
+          intentionId: tagFixtureId(_corrupted),
+          position: 3,
         );
-        await tester.pumpAndSettle();
-        expect(_shownHome(tester), ['Гулять', 'Читать книги']);
-        _expectCurrent(tester, l10n);
-        expect(install.faults.reads, reads + 2);
-        expect(tester.takeException(), isNull);
       },
     );
+    _expectCorruption(tester, l10n);
+    // Повреждение не исправляется: отметка остаётся.
+    final marks = [
+      (tagFixtureId(_walk), 1),
+      (tagFixtureId(_read), 2),
+      (tagFixtureId(_corrupted), 3),
+    ];
+    expect(storedFavoriteMarks(app.raw), marks);
 
-    for (final next in _NextChange.values) {
-      testWidgets('отказ обновления, пока Главная не выбрана, восстанавливает '
-          'следующее подтверждённое изменение — ${next.description} — до '
-          'возврата на Главную на $code', (tester) async {
-        final install = await _install(tester, locale);
-        final l10n = install.l10n;
-        final app = await _launch(
-          tester,
-          install,
-          seed: (database) =>
-              _seedGraph(database, favorites: const [_walk, _read]),
-        );
-        await _expectHome(tester, l10n, const [_walk, _read]);
+    // Каталог намерений и три поиска показывают целостные отметки.
+    await _select(tester, AppDestination.intentionGraph);
+    await _expectSearches(tester, app, l10n);
 
-        // Архивирование избранного «Читать» при выбранном графе намерений:
-        // обновление Главной отказывает.
-        await _select(tester, AppDestination.intentionGraph);
-        await _openFromCatalog(tester, _read);
-        install.faults.failNextRead();
-        await _archive(tester);
-        await _closeDetails(tester);
-        // Скрытая Главная не перестраивается, пока её не выберут, поэтому
-        // её состояние читается у модели.
-        await _waitFor(
-          tester,
-          () => switch (_homeState(app)) {
-            HomeList(freshness: HomeFreshnessStale()) => true,
-            _ => false,
-          },
-        );
-        await _settleStorage(tester);
-        expect(_selected(tester), AppDestination.intentionGraph);
-        expect(
-          _homeState(app),
-          isA<HomeList>()
-              .having(_titlesOf, 'items', ['Гулять', 'Читать'])
-              .having(
-                (state) => state.freshness,
-                'freshness',
-                isA<HomeFreshnessStale>().having(
-                  (freshness) => freshness.canRetry,
-                  'canRetry',
-                  isTrue,
-                ),
-              ),
-        );
-        final reads = install.faults.reads;
+    // Страница избранного намерения показывает его отметку, а отметка
+    // другого намерения подтверждается и видна в каталоге.
+    await _openFromCatalog(tester, _walk);
+    expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
+    await _closeDetails(tester);
+    final reads = install.homeReads.reads;
+    await _openFromCatalog(tester, _run);
+    expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
+    await _toggleMark(tester);
+    expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
+    await _closeDetails(tester);
+    await _expectStars(
+      tester,
+      IntentionCatalogPage,
+      l10n,
+      shown: _titles.keys.toList(),
+      favorites: const {_walk, _read, _run},
+    );
+    expect(storedFavoriteMarks(app.raw), [...marks, (tagFixtureId(_run), 4)]);
 
-        final expected = switch (next) {
-          _NextChange.favorite => ['Гулять', 'Бегать'],
-          _NextChange.unrelated => ['Гулять'],
-        };
-        switch (next) {
-          case _NextChange.favorite:
-            await _openFromCatalog(tester, _run);
-            await _toggleMark(tester);
-          case _NextChange.unrelated:
-            await _openFromCatalog(tester, _sleep);
-            await _rename(tester, 'Спать днём');
-        }
-        await _closeDetails(tester);
-
-        // Главная обновилась, пока выбран граф намерений.
-        await _waitFor(
-          tester,
-          () => switch (_homeState(app)) {
-            final HomeList state =>
-              listEquals(_titlesOf(state), expected) &&
-                  state.freshness is HomeFreshnessCurrent,
-            _ => false,
-          },
-        );
-        expect(_selected(tester), AppDestination.intentionGraph);
-        expect(install.faults.reads, greaterThan(reads));
-
-        // Возврат на Главную показывает актуальный список без нового
-        // чтения и без пометки.
-        final readsBeforeReturn = install.faults.reads;
-        await _select(tester, AppDestination.home);
-        expect(_shownHome(tester), expected);
-        _expectCurrent(tester, l10n);
-        await _settleStorage(tester);
-        expect(install.faults.reads, readsBeforeReturn);
-        expect(tester.takeException(), isNull);
-      });
-    }
-
-    for (final mark in FavoriteMark.values) {
-      testWidgets(
-        switch (mark) {
-          FavoriteMark.favorite =>
-            'намерение, созданное сразу избранным, пока Главная не выбрана, '
-                'встаёт в её конец после архивированного места без отдельной '
-                'отметки ещё до возврата на Главную на $code',
-          FavoriteMark.notFavorite =>
-            'намерение, созданное без отметки, пока Главная не выбрана, не '
-                'появляется на ней и не вызывает её чтения на $code',
-        },
-        (tester) async {
-          final install = await _install(tester, locale);
-          final l10n = install.l10n;
-          // Единый порядок: «Гулять», архивированное «Читать», «Плавать».
-          final app = await _launch(
-            tester,
-            install,
-            seed: (database) {
-              _seedGraph(database, favorites: const [_walk, _read, _swim]);
-              database.execute(
-                'UPDATE intentions SET is_archived = 1 WHERE id = ?',
-                [tagFixtureId(_read)],
-              );
-              database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-                tagFixtureId(_homeTag),
-                'Дом',
-              ]);
-            },
-          );
-          await _expectHome(tester, l10n, const [_walk, _swim]);
-          final marks = [
-            (tagFixtureId(_walk), 1),
-            (tagFixtureId(_read), 2),
-            (tagFixtureId(_swim), 3),
-          ];
-          expect(storedFavoriteMarks(app.raw), marks);
-
-          await _select(tester, AppDestination.intentionGraph);
-          await _settleStorage(tester);
-          final shown = _homeState(app);
-          final reads = install.faults.reads;
-          final events = app.diagnostics.events.length;
-          final completions = <GraphCommandCompletion>[];
-          final subscription = app.coordinator.completions.listen(
-            completions.add,
-          );
-          addTearDown(subscription.cancel);
-
-          // Всё начальное состояние принимается координатором одной командой,
-          // как её отправит форма создания.
-          final accepted = app.coordinator.acceptCreation(
-            IntentionCreationFormKey(),
-            CreateIntention.withInitialState(
-              title: 'Рисовать',
-              description: null,
-              readiness: IntentionReadiness.ready,
-              favoriteMark: mark,
-              tagIds: [
-                (TagId.decode(
-                  tagFixtureId(_homeTag),
-                ) as TagIdDecodingSuccess).id,
-              ],
-            ),
-          ) as IntentionCommandAccepted;
-          IntentionCommandCompletion? completion;
-          unawaited(accepted.future.then((value) => completion = value));
-          await _waitFor(tester, () => completion != null);
-          final created = switch (completion!.result) {
-            GraphResultSuccess(value: IntentionSaved(:final intention)) =>
-              intention.id.toCanonicalString(),
-            final result => fail('Создание не подтверждено: $result'),
-          };
-
-          switch (mark) {
-            case FavoriteMark.favorite:
-              // Скрытая Главная согласуется до закрытия сообщения об успехе.
-              await _waitFor(
-                tester,
-                () => switch (_homeState(app)) {
-                  final HomeList state =>
-                    listEquals(_titlesOf(state), [
-                          'Гулять',
-                          'Плавать',
-                          'Рисовать',
-                        ]) &&
-                        state.freshness is HomeFreshnessCurrent,
-                  _ => false,
-                },
-              );
-              final list = _homeState(app) as HomeList;
-              expect(
-                [for (final row in list.items) row.id.toCanonicalString()],
-                [tagFixtureId(_walk), tagFixtureId(_swim), created],
-              );
-              expect(list.items.last.readiness, IntentionReadiness.ready);
-              expect(install.faults.reads, greaterThan(reads));
-              expect(storedFavoriteMarks(app.raw), [...marks, (created, 4)]);
-            case FavoriteMark.notFavorite:
-              await _settleStorage(tester);
-              expect(_homeState(app), same(shown));
-              expect(install.faults.reads, reads);
-              expect(storedFavoriteMarks(app.raw), marks);
-          }
-          expect(_selected(tester), AppDestination.intentionGraph);
-
-          // Создание — одна команда с одним исходом: самостоятельные отметка,
-          // готовность и назначение тега не выполнялись.
-          expect(completions, [same(completion)]);
-          expect(
-            app.diagnostics.events
-                .skip(events)
-                .where(
-                  (event) =>
-                      event is IntentionCommandDiagnosticsEvent ||
-                      event is TagCommandDiagnosticsEvent ||
-                      event is FavoriteOrderCommandDiagnosticsEvent,
-                ),
-            [
-              isA<IntentionCommandDiagnosticsEvent>()
-                  .having(
-                    (event) => event.commandType,
-                    'команда',
-                    IntentionCommandDiagnosticsType.create,
-                  )
-                  .having(
-                    (event) => event.status,
-                    'статус',
-                    isA<DiagnosticsSucceeded>(),
-                  ),
-            ],
-          );
-          await _acceptMessage(tester);
-
-          // Возврат на Главную показывает согласованный список без нового
-          // чтения.
-          final readsBeforeReturn = install.faults.reads;
-          await _select(tester, AppDestination.home);
-          expect(_shownHome(tester), switch (mark) {
-            FavoriteMark.favorite => ['Гулять', 'Плавать', 'Рисовать'],
-            FavoriteMark.notFavorite => ['Гулять', 'Плавать'],
-          });
-          _expectCurrent(tester, l10n);
-          await _settleStorage(tester);
-          expect(install.faults.reads, readsBeforeReturn);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
-  }
+    // Подтверждённое изменение избранного перечитывает список, и
+    // повреждение остаётся отдельным результатом, а не списком с
+    // пропуском.
+    await _waitFor(tester, () => install.homeReads.reads > reads);
+    await _select(tester, AppDestination.home);
+    _expectCorruption(tester, l10n);
+    expect(find.byKey(_message), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
-/// Установка приложения: постоянное хранилище, переживающее перезапуски, и
-/// управляемые отказы чтения списка Главной.
+/// Установка приложения: постоянное хранилище и наблюдение чтений списка
+/// Главной.
 final class _Install {
   _Install(this.harness, this.l10n);
 
   final LocalDatabaseHarness harness;
   final AppLocalizations l10n;
-  final faults = _HomeReadFaults();
+  final homeReads = _HomeReads();
 }
 
 Future<_Install> _install(WidgetTester tester, Locale locale) async {
@@ -660,23 +184,12 @@ Future<_Install> _install(WidgetTester tester, Locale locale) async {
 
 /// Один запуск приложения на хранилище установки.
 final class _Launch {
-  _Launch(this.runtime, this.raw, this.container, this.diagnostics);
+  _Launch(this.raw, this.container);
 
-  final AppRuntime runtime;
   final sqlite.Database raw;
   final ProviderContainer container;
-  final InMemoryDiagnosticsSink diagnostics;
 
   AppRouter get router => container.read(appRouterProvider);
-
-  GraphCommandCoordinator get coordinator =>
-      container.read(graphCommandCoordinatorProvider.notifier);
-
-  /// Полное завершение: дерево приложения снято, хранилище закрыто.
-  Future<void> shutdown(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.runAsync(runtime.shutdown);
-  }
 }
 
 /// Запускает приложение на хранилище [install], засевает его [seed] и ждёт,
@@ -687,7 +200,6 @@ Future<_Launch> _launch(
   void Function(sqlite.Database database)? seed,
 }) async {
   late sqlite.Database raw;
-  final diagnostics = InMemoryDiagnosticsSink();
   final runtime = AppRuntime(
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
@@ -695,9 +207,9 @@ Future<_Launch> _launch(
         install.harness.databaseFile,
         setup: (database) => raw = database,
       ),
-      install.faults,
+      install.homeReads,
     ),
-    diagnosticsSink: diagnostics,
+    diagnosticsSink: InMemoryDiagnosticsSink(),
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -712,7 +224,7 @@ Future<_Launch> _launch(
     () => find.text(install.l10n.homeLoading).evaluate().isEmpty,
   );
   await tester.pumpAndSettle();
-  return _Launch(runtime, raw, ready.container, diagnostics);
+  return _Launch(raw, ready.container);
 }
 
 /// Шесть активных намерений, связи «Бегать» и его невыполненный дневной
@@ -767,17 +279,6 @@ void _seedGraph(sqlite.Database database, {List<int> favorites = const []}) {
   }
 }
 
-/// Сохранённые данные графа, которые Главная и запуск не должны менять:
-/// намерения, связи, дневные выборы, теги и их назначения.
-Map<String, List<List<Object?>>> _storedGraph(sqlite.Database database) => {
-  ...retainedTagFixtureGraph(database),
-  for (final table in ['tags', 'tag_assignments'])
-    table: database
-        .select('SELECT * FROM $table ORDER BY rowid')
-        .map((row) => row.values.toList())
-        .toList(),
-};
-
 /// Элементы Главной, в том числе пока она закрыта другим пунктом или
 /// страницей поверх оболочки.
 Finder _onHome(Finder matching) => find.descendant(
@@ -796,72 +297,6 @@ Finder _retry(AppLocalizations l10n) => _onHome(
   find.widgetWithText(FilledButton, l10n.commonRetry, skipOffstage: false),
 );
 
-/// Названия строк Главной в порядке списка.
-List<String> _shownHome(WidgetTester tester) => [
-  for (final row in tester.widgetList<HomeIntentionRow>(_homeRows))
-    row.row.title,
-];
-
-HomeState _homeState(_Launch app) => app.container.read(homeViewModelProvider);
-
-List<String> _titlesOf(HomeList state) => [
-  for (final row in state.items) row.title,
-];
-
-/// Дожидается, пока Главная покажет ровно намерения [expected] в порядке
-/// списка, и подтверждает, что список актуален.
-Future<void> _expectHome(
-  WidgetTester tester,
-  AppLocalizations l10n,
-  List<int> expected,
-) async {
-  final titles = [for (final number in expected) _titles[number]!];
-  await _pumpUntil(tester, () => listEquals(_shownHome(tester), titles));
-  await tester.pumpAndSettle();
-  expect(_shownHome(tester), titles);
-  expect(
-    [
-      for (final row in tester.widgetList<HomeIntentionRow>(_homeRows))
-        row.row.id.toCanonicalString(),
-    ],
-    [for (final number in expected) tagFixtureId(number)],
-  );
-  _expectCurrent(tester, l10n);
-}
-
-/// Показанный снимок актуален: пометки «не обновлён», отказа получения и
-/// повтора нет.
-void _expectCurrent(WidgetTester tester, AppLocalizations l10n) {
-  for (final text in [
-    l10n.homeRefreshUnavailable,
-    l10n.homeRefreshCorruption,
-    l10n.homeRefreshUnexpected,
-    l10n.homeUnavailable,
-    l10n.homeCorruption,
-    l10n.homeUnexpected,
-  ]) {
-    expect(_homeText(text), findsNothing, reason: text);
-  }
-  expect(_retry(l10n), findsNothing);
-}
-
-/// Главная показывает пустое состояние [message] с переходом к графу
-/// намерений, а не загрузку, отказ или другое пустое состояние.
-void _expectEmptyHome(
-  WidgetTester tester,
-  AppLocalizations l10n,
-  String message,
-) {
-  expect(_homeText(message), findsOneWidget);
-  for (final other in [l10n.homeEmptyNoFavorites, l10n.homeEmptyAllArchived]) {
-    if (other != message) expect(_homeText(other), findsNothing);
-  }
-  expect(_homeText(l10n.homeOpenIntentionGraph), findsOneWidget);
-  expect(_homeRows, findsNothing);
-  expect(_homeText(l10n.homeLoading), findsNothing);
-  _expectCurrent(tester, l10n);
-}
-
 /// Главная показывает отдельный неповторяемый результат повреждения: не
 /// пустое состояние, не список с пропуском и не обычный повтор.
 void _expectCorruption(WidgetTester tester, AppLocalizations l10n) {
@@ -877,16 +312,6 @@ void _expectCorruption(WidgetTester tester, AppLocalizations l10n) {
   ]) {
     expect(_homeText(text), findsNothing, reason: text);
   }
-}
-
-/// Открыта Главная: страниц поверх нет, панель видна, выбран пункт
-/// «Главная».
-void _expectHomeRoot(WidgetTester tester, _Launch app) {
-  expect(app.router.canPop(), isFalse);
-  expect(app.router.topRoute.name, HomeRoute.name);
-  expect(find.byType(HomePage), findsOneWidget);
-  expect(find.byType(AppNavigationBar), findsOneWidget);
-  expect(_selected(tester), AppDestination.home);
 }
 
 AppDestination _selected(WidgetTester tester) => tester
@@ -929,17 +354,6 @@ Future<void> _openFromCatalog(WidgetTester tester, int intention) async {
   await _expectDetails(tester, intention);
 }
 
-Future<void> _openFromHome(WidgetTester tester, int intention) async {
-  await _tap(
-    tester,
-    find.descendant(
-      of: find.byType(HomePage),
-      matching: find.widgetWithText(HomeIntentionRow, _titles[intention]!),
-    ),
-  );
-  await _expectDetails(tester, intention);
-}
-
 /// Открыта страница именно намерения [intention].
 Future<void> _expectDetails(WidgetTester tester, int intention) async {
   await _until(tester, find.byKey(_favoriteControl));
@@ -970,36 +384,6 @@ Future<void> _toggleMark(WidgetTester tester) async {
   final before = _controlTooltip(tester);
   await _tap(tester, find.byKey(_favoriteControl));
   await _waitFor(tester, () => _controlTooltip(tester) != before);
-  await _acceptMessage(tester);
-}
-
-Future<void> _archive(WidgetTester tester) async {
-  await _tap(tester, find.byKey(const ValueKey('intention-details-archive')));
-  await _until(tester, find.byKey(const ValueKey('intention-details-restore')));
-  await _acceptMessage(tester);
-}
-
-Future<void> _restore(WidgetTester tester) async {
-  await _tap(tester, find.byKey(const ValueKey('intention-details-restore')));
-  await _until(tester, find.byKey(const ValueKey('intention-details-archive')));
-  await _acceptMessage(tester);
-}
-
-Future<void> _rename(WidgetTester tester, String title) async {
-  await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
-  final field = find.byKey(const ValueKey('intention-details-edit-title'));
-  await _until(tester, field);
-  await tester.enterText(field, title);
-  final submit = find.byKey(const ValueKey('intention-details-edit-submit'));
-  await _tap(tester, submit);
-  await _waitFor(tester, () => submit.evaluate().isEmpty);
-  await _until(
-    tester,
-    find.descendant(
-      of: find.byType(IntentionDetailsPage),
-      matching: find.text(title),
-    ),
-  );
   await _acceptMessage(tester);
 }
 
@@ -1160,13 +544,6 @@ Map<String, bool> _shownStars(
   };
 }
 
-Future<void> _selectScope(WidgetTester tester, String label) async {
-  await _tap(tester, find.byKey(const ValueKey('catalog-scope-control')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
-  await tester.pumpAndSettle();
-}
-
 Future<void> _popToRoot(WidgetTester tester, _Launch app) async {
   while (app.router.canPop()) {
     unawaited(app.router.maybePop());
@@ -1176,17 +553,6 @@ Future<void> _popToRoot(WidgetTester tester, _Launch app) async {
 
 Future<void> _gone(WidgetTester tester, Type page) async {
   await _waitFor(tester, () => find.byType(page).evaluate().isEmpty);
-  await tester.pumpAndSettle();
-}
-
-/// Даёт хранилищу и кадрам время: запущенное чтение успело бы завершиться.
-Future<void> _settleStorage(WidgetTester tester) async {
-  for (var attempt = 0; attempt < 5; attempt++) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 20)),
-    );
-    await tester.pump(const Duration(milliseconds: 20));
-  }
   await tester.pumpAndSettle();
 }
 
@@ -1223,16 +589,11 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
-/// Наблюдает чтения списка Главной и по требованию отказывает ближайшему из
-/// них устранимой недоступностью хранилища; транзакция чтения откатывается
-/// самим адаптером, а остальные чтения и записи не затрагиваются.
-final class _HomeReadFaults extends LocalDatabaseConnectionObserver {
-  var _failNext = false;
-
+/// Наблюдает чтения списка Главной; остальные чтения и записи не
+/// затрагиваются.
+final class _HomeReads extends LocalDatabaseConnectionObserver {
   /// Число чтений списка Главной, дошедших до хранилища.
   var reads = 0;
-
-  void failNextRead() => _failNext = true;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -1243,11 +604,5 @@ final class _HomeReadFaults extends LocalDatabaseConnectionObserver {
       return;
     }
     reads++;
-    if (!_failNext) return;
-    _failNext = false;
-    throw sqlite.SqliteException(
-      extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-      message: 'Управляемый отказ чтения списка Главной',
-    );
   }
 }

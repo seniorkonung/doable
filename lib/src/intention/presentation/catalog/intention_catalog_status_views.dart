@@ -98,8 +98,7 @@ final class IntentionCatalogInlineStatus extends StatelessWidget {
 
 /// Локализованное состояние подгрузки выбранного каталога.
 ///
-/// Конец, ожидание, устранимый отказ и утративший силу cursor остаются
-/// отдельными состояниями: восстановление не изображается повтором порции.
+/// Конец, ожидание и отказ остаются отдельными состояниями.
 final class IntentionCatalogContinuationStatusView extends ConsumerWidget {
   const IntentionCatalogContinuationStatusView({
     required this.purpose,
@@ -131,25 +130,6 @@ final class IntentionCatalogContinuationStatusView extends ConsumerWidget {
       ),
       IntentionCatalogContinuationUnexpected() => IntentionCatalogInlineStatus(
         message: localizations.catalogLoadMoreUnexpected,
-      ),
-      IntentionCatalogContinuationValidation() => IntentionCatalogInlineStatus(
-        message: localizations.catalogLoadMoreValidation,
-        actionLabel: localizations.catalogReload,
-        onAction: notifier.recoverFromInvalidCursor,
-      ),
-      IntentionCatalogContinuationRecovering() => IntentionCatalogInlineStatus(
-        message: localizations.catalogReloading,
-      ),
-      IntentionCatalogRecoveryUnavailable() => IntentionCatalogInlineStatus(
-        message: localizations.catalogUnavailable,
-        actionLabel: localizations.commonRetry,
-        onAction: notifier.retryRecovery,
-      ),
-      IntentionCatalogRecoveryCorruption() => IntentionCatalogInlineStatus(
-        message: localizations.catalogCorruption,
-      ),
-      IntentionCatalogRecoveryUnexpected() => IntentionCatalogInlineStatus(
-        message: localizations.catalogUnexpectedFailure,
       ),
     };
   }

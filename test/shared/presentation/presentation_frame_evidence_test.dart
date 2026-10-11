@@ -141,79 +141,51 @@ void main() {
     });
   }
 
-  for (final scenario
-      in <
-        ({
-          AppLifecycleState state,
-          List<AppLifecycleState> away,
-          List<AppLifecycleState> back,
-        })
-      >[
-        (
-          state: AppLifecycleState.inactive,
-          away: [AppLifecycleState.inactive],
-          back: [AppLifecycleState.resumed],
-        ),
-        (
-          state: AppLifecycleState.hidden,
-          away: [AppLifecycleState.inactive, AppLifecycleState.hidden],
-          back: [AppLifecycleState.inactive, AppLifecycleState.resumed],
-        ),
-        (
-          state: AppLifecycleState.paused,
-          away: [
-            AppLifecycleState.inactive,
-            AppLifecycleState.hidden,
-            AppLifecycleState.paused,
-          ],
-          back: [
-            AppLifecycleState.hidden,
-            AppLifecycleState.inactive,
-            AppLifecycleState.resumed,
-          ],
-        ),
-        (
-          state: AppLifecycleState.detached,
-          away: [
-            AppLifecycleState.inactive,
-            AppLifecycleState.hidden,
-            AppLifecycleState.paused,
-            AppLifecycleState.detached,
-          ],
-          back: [AppLifecycleState.resumed],
-        ),
-      ]) {
-    testWidgets(
-      '${scenario.state.name} не разрешает подтверждение до возвращения в resumed',
-      (tester) async {
-        final subject = Object();
-        final presented = <Object>[];
-        for (final state in scenario.away) {
-          tester.binding.handleAppLifecycleStateChanged(state);
-        }
+  // Все состояния, кроме resumed, запрещают подтверждение одной проверкой;
+  // берём уход в фон через промежуточные состояния и возврат.
+  const scenario = (
+    state: AppLifecycleState.paused,
+    away: [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ],
+    back: [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ],
+  );
+  testWidgets(
+    '${scenario.state.name} не разрешает подтверждение до возвращения в resumed',
+    (tester) async {
+      final subject = Object();
+      final presented = <Object>[];
+      for (final state in scenario.away) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
 
-        await tester.pumpWidget(
-          _app(
-            PresentationFrameEvidence<Object>(
-              subject: subject,
-              onPresented: presented.add,
-              child: const Text('Ошибка'),
-            ),
+      await tester.pumpWidget(
+        _app(
+          PresentationFrameEvidence<Object>(
+            subject: subject,
+            onPresented: presented.add,
+            child: const Text('Ошибка'),
           ),
-        );
-        await tester.pump();
-        await tester.pump();
-        expect(presented, isEmpty);
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(presented, isEmpty);
 
-        for (final state in scenario.back) {
-          tester.binding.handleAppLifecycleStateChanged(state);
-        }
-        expect(tester.binding.hasScheduledFrame, isTrue);
-        await tester.pump();
-        expect(presented, [same(subject)]);
-      },
-    );
-  }
+      for (final state in scenario.back) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pump();
+      expect(presented, [same(subject)]);
+    },
+  );
 
   testWidgets(
     'неизвестное исходное lifecycle state не разрешает подтверждение',

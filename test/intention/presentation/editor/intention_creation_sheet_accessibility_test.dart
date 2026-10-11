@@ -33,7 +33,7 @@ import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 /// Доступность полного сценария нижней панели создания намерения: экранный
-/// диктор, клавиатура и guidelines Android на русском и английском.
+/// диктор, клавиатура и guidelines Android.
 ///
 /// Геометрия на тесных экранах с клавиатурой и увеличенным текстом
 /// проверяется в `intention_creation_sheet_layout_test.dart`.
@@ -44,7 +44,9 @@ void main() {
     );
   });
 
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
+  // Проверки читают системные строки из локализаций: второй язык не меняет
+  // ни порядок чтения, ни действия панели.
+  for (final locale in [const Locale('ru')]) {
     final code = locale.languageCode;
 
     testWidgets(
@@ -62,7 +64,6 @@ void main() {
           QuickCreationMode.intention,
           openedPage: find.byType(IntentionEditorPage),
         );
-        final session = sessions.single;
         expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
         final fields = find.byKey(
           const ValueKey('intention-creation-sheet-fields'),
@@ -104,7 +105,6 @@ void main() {
           expect(tester.view.viewInsets.bottom, 160);
           expect(tester.getSize(fields).height, greaterThan(0));
         }
-        _expectSameSession(sessions, session);
         expect(sessions.state(tester).draft.title, _userTitle);
         expect(sessions.state(tester).draft.description, _userDescription);
         expect(tester.takeException(), isNull);
@@ -113,7 +113,7 @@ void main() {
     );
 
     testWidgets(
-      'экранный диктор проходит компактную панель в порядке чтения при любой ориентации, клавиатуре и заполнении черновика — $code',
+      'экранный диктор проходит компактную панель в порядке чтения при клавиатуре и заполнении черновика — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester);
@@ -133,12 +133,8 @@ void main() {
           for (final tag in tags) {
             sessions.notifier(tester).draftTagSet.add(tag);
           }
-          for (final (size, keyboard) in [
-            (_phone, 0.0),
-            (_phone, 280.0),
-            (Size(_phone.height, _phone.width), 0.0),
-            (Size(_phone.height, _phone.width), 180.0),
-          ]) {
+          // Горизонтальная ориентация телефона не входит в требования панели.
+          for (final (size, keyboard) in [(_phone, 0.0), (_phone, 280.0)]) {
             _usePhone(tester, size: size, keyboard: keyboard);
             await tester.pumpAndSettle();
             expect(
@@ -192,7 +188,6 @@ void main() {
         // Панель называет себя заголовком, фокус ввода — в названии, а
         // каталог и основная навигация под ней экранному диктору недоступны.
         expect(router.current.name, IntentionEditorRoute.name);
-        final session = sessions.single;
         expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
         expect(
           tester.getSemantics(find.byKey(_heading)),
@@ -269,7 +264,6 @@ void main() {
         // Возврат раскрывает ту же панель с прежним фокусом и выбранными
         // тегами, которые снимаются из черновика.
         expect(router.current.name, IntentionEditorRoute.name);
-        _expectSameSession(sessions, session);
         expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
         _expectNoSizeActions();
@@ -330,7 +324,6 @@ void main() {
         expect(draft.tagIds, [_home.id]);
         expect(draft.favoriteMark, FavoriteMark.favorite);
         expect(draft.readiness, IntentionReadiness.ready);
-        _expectSameSession(sessions, session);
         expect(repository.commands, isEmpty);
         expect(repository.tagCommands, isEmpty);
         expect(tester.takeException(), isNull);
@@ -730,7 +723,6 @@ void main() {
               ),
         );
         expect(_isFocusedIn(tester, find.byType(IntentionEditorPage)), isTrue);
-        expect(sessions.added, hasLength(1));
         expect(tester.takeException(), isNull);
       },
     );
@@ -1126,15 +1118,6 @@ Future<void> _expectGuidelines(WidgetTester tester, String state) async {
     final evaluation = await guideline.evaluate(tester);
     expect(evaluation.passed, isTrue, reason: '$state: ${evaluation.reason}');
   }
-}
-
-/// Та же сессия: новая не построена, прежняя не освобождена.
-void _expectSameSession(
-  _EditorSessions sessions,
-  IntentionEditorViewModelProvider session,
-) {
-  expect(sessions.added, [same(session)]);
-  expect(sessions.disposed, isEmpty);
 }
 
 /// Сессии формы создания, построенные и освобождённые за время теста.

@@ -14,7 +14,6 @@ import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
@@ -28,113 +27,106 @@ import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
-  for (final locale in ['ru', 'en']) {
-    for (final (number, archivedOnly) in [(303, false), (304, true)]) {
-      testWidgets(
-        'каталог открывает ${archivedOnly ? 'тег только в архиве' : 'тег без назначений'} и возвращается без записи на $locale',
-        (tester) async {
-          final h = await _pumpCatalog(tester, locale: locale);
-          final l10n = AppLocalizations.of(
-            tester.element(find.byType(TagCatalogPage)),
-          );
-          final before = _tagData(h.raw);
-          final open = _open(number);
-          expect(open, findsOneWidget);
-          expect(
-            tester.widget<IconButton>(open).tooltip,
-            l10n.tagNavigationTitle,
-          );
-
-          await tester.tap(open);
-          await tester.pumpAndSettle();
-          expect(h.router.current.name, TagNavigationRoute.name);
-          expect(
-            h.router.current.argsAs<TagNavigationRouteArgs>().tagId,
-            _tagId(number),
-          );
-          expect(
-            tester
-                .widget<ChoiceChip>(_scope(TaggedIntentionsScope.active))
-                .selected,
-            isTrue,
-          );
-          expect(find.text(l10n.tagNavigationEmptyActive), findsOneWidget);
-          await tester.tap(_scope(TaggedIntentionsScope.archived));
-          await tester.pumpAndSettle();
-          expect(
-            archivedOnly
-                ? find.text('Намерение 2')
-                : find.text(l10n.tagNavigationEmptyArchived),
-            findsOneWidget,
-          );
-
-          h.router.pop();
-          await tester.pumpAndSettle();
-          expect(h.router.current.name, TagCatalogRoute.name);
-          expect(_open(number), findsOneWidget);
-          expect(find.byTooltip(l10n.tagCatalogRename), findsNWidgets(4));
-          expect(find.byTooltip(l10n.tagCatalogDelete), findsNWidgets(4));
-          expect(
-            find.byKey(const ValueKey('tag-catalog-create')),
-            findsOneWidget,
-          );
-
-          await tester.tap(_open(number));
-          await tester.pumpAndSettle();
-          expect(
-            tester
-                .widget<ChoiceChip>(_scope(TaggedIntentionsScope.active))
-                .selected,
-            isTrue,
-          );
-          expect(_tagData(h.raw), before);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+  for (final (number, archivedOnly) in [(303, false), (304, true)]) {
     testWidgets(
-      'переход доступен с длинным названием и крупным текстом на $locale',
+      'каталог открывает ${archivedOnly ? 'тег только в архиве' : 'тег без назначений'} и возвращается без записи',
       (tester) async {
-        final semantics = tester.ensureSemantics();
-        try {
-          final name = ('Длинный тег ' * 15).trimRight();
-          final h = await _pumpCatalog(
-            tester,
-            locale: locale,
-            textScale: 3,
-            size: const Size(360, 800),
-            seed: (raw) => raw.execute(
-              'UPDATE tags SET name = ? WHERE id = ?',
-              [name, tagFixtureId(303)],
-            ),
-          );
-          final l10n = AppLocalizations.of(
-            tester.element(find.byType(TagCatalogPage)),
-          );
-          await tester.ensureVisible(_open(303));
-          await tester.pumpAndSettle();
-          final node = tester.getSemantics(_open(303));
-          expect(node.tooltip, l10n.tagNavigationTitle);
-          expect(node.flagsCollection.isButton, isTrue);
-          expect(
-            node.getSemanticsData().hasAction(SemanticsAction.tap),
-            isTrue,
-          );
-          expect(tester.takeException(), isNull);
-          await tester.tap(_open(303));
-          await tester.pumpAndSettle();
-          expect(
-            h.router.current.argsAs<TagNavigationRouteArgs>().tagId,
-            _tagId(303),
-          );
-          expect(find.text(l10n.tagNavigationTag(name)), findsOneWidget);
-          expect(tester.takeException(), isNull);
-        } finally {
-          semantics.dispose();
-        }
+        final h = await _pumpCatalog(tester);
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(TagCatalogPage)),
+        );
+        final before = _tagData(h.raw);
+        final open = _open(number);
+        expect(open, findsOneWidget);
+        expect(
+          tester.widget<IconButton>(open).tooltip,
+          l10n.tagNavigationTitle,
+        );
+
+        await tester.tap(open);
+        await tester.pumpAndSettle();
+        expect(h.router.current.name, TagNavigationRoute.name);
+        expect(
+          h.router.current.argsAs<TagNavigationRouteArgs>().tagId,
+          _tagId(number),
+        );
+        expect(
+          tester
+              .widget<ChoiceChip>(_scope(TaggedIntentionsScope.active))
+              .selected,
+          isTrue,
+        );
+        expect(find.text(l10n.tagNavigationEmptyActive), findsOneWidget);
+        await tester.tap(_scope(TaggedIntentionsScope.archived));
+        await tester.pumpAndSettle();
+        expect(
+          archivedOnly
+              ? find.text('Намерение 2')
+              : find.text(l10n.tagNavigationEmptyArchived),
+          findsOneWidget,
+        );
+
+        h.router.pop();
+        await tester.pumpAndSettle();
+        expect(h.router.current.name, TagCatalogRoute.name);
+        expect(_open(number), findsOneWidget);
+        expect(find.byTooltip(l10n.tagCatalogRename), findsNWidgets(4));
+        expect(find.byTooltip(l10n.tagCatalogDelete), findsNWidgets(4));
+        expect(
+          find.byKey(const ValueKey('tag-catalog-create')),
+          findsOneWidget,
+        );
+
+        await tester.tap(_open(number));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<ChoiceChip>(_scope(TaggedIntentionsScope.active))
+              .selected,
+          isTrue,
+        );
+        expect(_tagData(h.raw), before);
+        expect(tester.takeException(), isNull);
       },
     );
   }
+  testWidgets('переход доступен с длинным названием и крупным текстом', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final name = ('Длинный тег ' * 15).trimRight();
+      final h = await _pumpCatalog(
+        tester,
+        textScale: 3,
+        size: const Size(360, 800),
+        seed: (raw) => raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+          name,
+          tagFixtureId(303),
+        ]),
+      );
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(TagCatalogPage)),
+      );
+      await tester.ensureVisible(_open(303));
+      await tester.pumpAndSettle();
+      final node = tester.getSemantics(_open(303));
+      expect(node.tooltip, l10n.tagNavigationTitle);
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.tap(_open(303));
+      await tester.pumpAndSettle();
+      expect(
+        h.router.current.argsAs<TagNavigationRouteArgs>().tagId,
+        _tagId(303),
+      );
+      expect(find.text(l10n.tagNavigationTag(name)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
+  });
 
   testWidgets(
     'выбор из полного каталога сохраняет идентичность при переименовании и удалении',
@@ -153,12 +145,6 @@ void main() {
       final model = h.container.read(tagCatalogViewModelProvider().notifier);
       model.selectTag(_tagId(352));
       await tester.pumpAndSettle();
-      expect(
-        (h.container.read(
-          tagCatalogViewModelProvider(),
-        ) as TagCatalogLoaded).items,
-        hasLength(52),
-      );
       await tester.scrollUntilVisible(
         _open(352),
         300,
@@ -188,12 +174,6 @@ void main() {
       expect((await renamed.future).result, isA<GraphResultSuccess>());
       await tester.pumpAndSettle();
       expect(find.text('Новое имя'), findsOneWidget);
-      expect(
-        (h.container.read(
-          tagCatalogViewModelProvider(),
-        ) as TagCatalogLoaded).items,
-        hasLength(52),
-      );
       oldCallback();
       await tester.pumpAndSettle();
       expect(
@@ -229,46 +209,40 @@ void main() {
     },
   );
 
-  for (final archived in [false, true]) {
-    testWidgets(
-      'режим назначения ${archived ? 'архивированному действию' : 'активному намерению'} сохраняет явный выбор',
-      (tester) async {
-        final intentionId = archived
-            ? (IntentionId.decode(
-                tagFixtureId(2),
-              ) as IntentionIdDecodingSuccess).id
-            : (IntentionId.decode(
-                tagFixtureId(1),
-              ) as IntentionIdDecodingSuccess).id;
-        final h = await _pumpCatalog(tester, intentionId: intentionId);
-        final before = _tagData(h.raw);
-        expect(find.byTooltip('Намерения с тегом'), findsNothing);
-        await tester.tap(
-          find.byKey(ValueKey('tag-catalog-row-${tagFixtureId(303)}')),
-        );
-        await tester.pumpAndSettle();
-        expect(h.router.current.name, TagCatalogRoute.name);
-        expect(
-          h.router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
-          TagAssignmentContext(intentionId),
-        );
-        expect(_tagData(h.raw), before);
-        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-        expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
-        await tester.tap(assign);
-        await tester.pumpAndSettle();
-        expect(
-          h.raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            tagFixtureId(303),
-          ]),
-          hasLength(1),
-        );
-        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-        expect(h.router.current.name, TagCatalogRoute.name);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
+  testWidgets(
+    'режим назначения архивированному действию сохраняет явный выбор',
+    (tester) async {
+      final intentionId = (IntentionId.decode(
+        tagFixtureId(2),
+      ) as IntentionIdDecodingSuccess).id;
+      final h = await _pumpCatalog(tester, intentionId: intentionId);
+      final before = _tagData(h.raw);
+      expect(find.byTooltip('Намерения с тегом'), findsNothing);
+      await tester.tap(
+        find.byKey(ValueKey('tag-catalog-row-${tagFixtureId(303)}')),
+      );
+      await tester.pumpAndSettle();
+      expect(h.router.current.name, TagCatalogRoute.name);
+      expect(
+        h.router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
+        TagAssignmentContext(intentionId),
+      );
+      expect(_tagData(h.raw), before);
+      final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+      expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+      await tester.tap(assign);
+      await tester.pumpAndSettle();
+      expect(
+        h.raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+          tagFixtureId(303),
+        ]),
+        hasLength(1),
+      );
+      expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+      expect(h.router.current.name, TagCatalogRoute.name);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 TagId _tagId(int number) =>

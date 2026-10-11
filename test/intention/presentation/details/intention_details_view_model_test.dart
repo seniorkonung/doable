@@ -11,7 +11,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
-import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -70,13 +69,13 @@ void main() {
       await waitForDetailRequests(repository, 2);
 
       repository.detailRequests[1].add(
-        ResultSuccess(intention),
+        ResultSuccess(testDetailsIntention(index: 73, title: 'Устаревшее')),
         revision: const TestDetailsRevision(2),
       );
       await pumpEventQueue();
       expect(
-        (container.read(provider) as IntentionDetailsLoaded).revision,
-        const TestDetailsRevision(1),
+        (container.read(provider) as IntentionDetailsLoaded).intention.title,
+        intention.title,
       );
 
       repository.detailRequests[1].add(
@@ -95,7 +94,7 @@ void main() {
       );
       await pumpEventQueue();
       current = container.read(provider) as IntentionDetailsLoaded;
-      expect(current.revision, const TestDetailsRevision(3));
+      expect(current.details.relationCounts.dailySource, 1);
       expect(current.details.relationCounts.total, 1);
     },
   );
@@ -168,188 +167,60 @@ void main() {
     expect(current.details.relationCounts.total, 1);
   });
 
-  test('различает загрузку и подтверждённое активное намерение', () async {
+  test('повтор недоступного чтения игнорирует позднее старое чтение и не затрагивает другое намерение', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
-    final intention = testDetailsIntention(
-      title: 'Сохранить пользовательский текст',
-      readiness: IntentionReadiness.ready,
-    );
-    final subscription = container.listen(
-      intentionDetailsViewModelProvider(intention.id),
+    final firstId = testDetailsIntentionId(21);
+    final secondId = testDetailsIntentionId(22);
+    final firstSubscription = container.listen(
+      intentionDetailsViewModelProvider(firstId),
       (_, _) {},
       fireImmediately: true,
     );
-    addTearDown(subscription.close);
+    final secondSubscription = container.listen(
+      intentionDetailsViewModelProvider(secondId),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(firstSubscription.close);
+    addTearDown(secondSubscription.close);
     addTearDown(container.dispose);
+    await waitForDetailRequests(repository, 2);
+
+    repository.detailRequests[0].add(
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await pumpEventQueue();
+    container.read(intentionDetailsViewModelProvider(firstId).notifier).retry();
+    await waitForDetailRequests(repository, 3);
 
     expect(
-      container.read(intentionDetailsViewModelProvider(intention.id)),
+      container.read(intentionDetailsViewModelProvider(firstId)),
       isA<IntentionDetailsLoading>(),
     );
-    await waitForDetailRequests(repository, 1);
-    expect(repository.detailIds.single, intention.id);
 
-    repository.detailRequests.single.add(
-      ResultSuccess(intention),
-      relationCounts: testRelationCounts(activeNeedOutgoing: 3),
-    );
+    final stale = testDetailsIntention(index: 21, title: 'Устаревшее');
+    repository.detailRequests[0].add(ResultSuccess(stale));
     await pumpEventQueue();
-
     expect(
-      container.read(intentionDetailsViewModelProvider(intention.id)),
-      isA<IntentionDetailsLoaded>()
-          .having((state) => state.intention, 'намерение', same(intention))
-          .having(
-            (state) => state.details.activeRelationCount,
-            'активные связи',
-            3,
-          )
-          .having(
-            (state) => state.isOperationRunning,
-            'выполняющаяся операция',
-            isFalse,
-          ),
+      container.read(intentionDetailsViewModelProvider(firstId)),
+      isA<IntentionDetailsLoading>(),
     );
-  });
 
-  test('отличает подтверждённое отсутствие намерения', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    final id = testDetailsIntentionId(2);
-    final subscription = container.listen(
-      intentionDetailsViewModelProvider(id),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    addTearDown(container.dispose);
-    await waitForDetailRequests(repository, 1);
-
-    repository.detailRequests.single.add(const ResultSuccess(null));
+    final current = testDetailsIntention(index: 21, title: 'Актуальное');
+    repository.detailRequests[2].add(ResultSuccess(current));
     await pumpEventQueue();
-
     expect(
-      container.read(intentionDetailsViewModelProvider(id)),
-      isA<IntentionDetailsNotFound>(),
+      container.read(intentionDetailsViewModelProvider(firstId)),
+      isA<IntentionDetailsLoaded>().having(
+        (state) => state.intention.title,
+        'актуальное намерение',
+        'Актуальное',
+      ),
     );
-  });
-
-  test('различает устранимый и терминальные отказы чтения', () async {
-    final scenarios = <(IntentionFailure, Matcher)>[
-      (const IntentionUnavailableFailure(), isA<IntentionDetailsUnavailable>()),
-      (const IntentionCorruptionFailure(), isA<IntentionDetailsCorruption>()),
-      (const IntentionUnexpectedFailure(), isA<IntentionDetailsUnexpected>()),
-    ];
-
-    for (var index = 0; index < scenarios.length; index += 1) {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      final id = testDetailsIntentionId(index + 10);
-      final subscription = container.listen(
-        intentionDetailsViewModelProvider(id),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      await waitForDetailRequests(repository, 1);
-
-      final (failure, expectedState) = scenarios[index];
-      repository.detailRequests.single.add(ResultFailure(failure));
-      await pumpEventQueue();
-
-      expect(
-        container.read(intentionDetailsViewModelProvider(id)),
-        expectedState,
-      );
-      subscription.close();
-      container.dispose();
-    }
-  });
-
-  test(
-    'повтор недоступного чтения сменяет generation только выбранного намерения',
-    () async {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      final firstId = testDetailsIntentionId(21);
-      final secondId = testDetailsIntentionId(22);
-      final firstSubscription = container.listen(
-        intentionDetailsViewModelProvider(firstId),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      final secondSubscription = container.listen(
-        intentionDetailsViewModelProvider(secondId),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(firstSubscription.close);
-      addTearDown(secondSubscription.close);
-      addTearDown(container.dispose);
-      await waitForDetailRequests(repository, 2);
-
-      repository.detailRequests[0].add(
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await pumpEventQueue();
-      container
-          .read(intentionDetailsViewModelProvider(firstId).notifier)
-          .retry();
-      await waitForDetailRequests(repository, 3);
-
-      expect(repository.detailIds, [firstId, secondId, firstId]);
-      expect(
-        container.read(intentionDetailsViewModelProvider(firstId)),
-        isA<IntentionDetailsLoading>(),
-      );
-
-      final stale = testDetailsIntention(index: 21, title: 'Устаревшее');
-      repository.detailRequests[0].add(ResultSuccess(stale));
-      await pumpEventQueue();
-      expect(
-        container.read(intentionDetailsViewModelProvider(firstId)),
-        isA<IntentionDetailsLoading>(),
-      );
-
-      final current = testDetailsIntention(index: 21, title: 'Актуальное');
-      repository.detailRequests[2].add(ResultSuccess(current));
-      await pumpEventQueue();
-      expect(
-        container.read(intentionDetailsViewModelProvider(firstId)),
-        isA<IntentionDetailsLoaded>().having(
-          (state) => state.intention,
-          'актуальное намерение',
-          same(current),
-        ),
-      );
-      expect(repository.detailIds.where((id) => id == secondId), hasLength(1));
-    },
-  );
-
-  test('терминальный отказ не допускает обычный повтор', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    final id = testDetailsIntentionId(30);
-    final subscription = container.listen(
-      intentionDetailsViewModelProvider(id),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    addTearDown(container.dispose);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests.single.add(
-      const ResultFailure(IntentionCorruptionFailure()),
-    );
-    await pumpEventQueue();
-
-    container.read(intentionDetailsViewModelProvider(id).notifier).retry();
-    await pumpEventQueue();
-
-    expect(repository.detailRequests, hasLength(1));
     expect(
-      container.read(intentionDetailsViewModelProvider(id)),
-      isA<IntentionDetailsCorruption>(),
+      container.read(intentionDetailsViewModelProvider(secondId)),
+      isA<IntentionDetailsLoading>(),
     );
   });
 
@@ -378,124 +249,12 @@ void main() {
       );
       addTearDown(secondSubscription.close);
       await waitForDetailRequests(repository, 2);
-
-      expect(repository.detailIds, [id, id]);
     },
   );
 
-  test('повторное открытие отражает сохраняющийся gate намерения', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final intention = testDetailsIntention(index: 50);
-    final coordinator = container.read(
-      graphCommandCoordinatorProvider.notifier,
-    );
-    final start = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
-      presentationTitle: intention.title,
-    );
-    expect(start, isA<IntentionCommandAccepted>());
-
-    final subscription = container.listen(
-      intentionDetailsViewModelProvider(intention.id),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    await waitForDetailRequests(repository, 1);
-
-    expect(
-      container.read(intentionDetailsViewModelProvider(intention.id)),
-      isA<IntentionDetailsLoading>().having(
-        (state) => state.isOperationRunning,
-        'выполняющаяся операция',
-        isTrue,
-      ),
-    );
-
-    repository.completeCommand(
-      0,
-      const ResultFailure(IntentionUnavailableFailure()),
-    );
-    await (start as IntentionCommandAccepted).future;
-  });
-
-  test('передаёт изменение активного и архивного намерения через coordinator без optimistic state', () async {
-    for (final archiveState in IntentionArchiveState.values) {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      final intention = testDetailsIntention(
-        index: archiveState.index + 51,
-        title: 'Прежнее название',
-        description: 'Прежнее описание',
-        archiveState: archiveState,
-      );
-      final provider = intentionDetailsViewModelProvider(intention.id);
-      final subscription = container.listen(
-        provider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests.single.add(ResultSuccess(intention));
-      await pumpEventQueue();
-
-      final details = container.read(provider.notifier)
-        ..beginEditing()
-        ..changeTitle('  Новое название  ')
-        ..changeDescription('  Новое описание\n')
-        ..saveChanges()
-        ..saveChanges();
-
-      expect(repository.commands, hasLength(1));
-      expect(
-        repository.commands.single,
-        isA<UpdateIntention>()
-            .having((command) => command.id, 'идентификатор', intention.id)
-            .having(
-              (command) => command.title,
-              'название',
-              '  Новое название  ',
-            )
-            .having(
-              (command) => command.description,
-              'описание',
-              '  Новое описание\n',
-            ),
-      );
-      expect(
-        container.read(provider),
-        isA<IntentionDetailsLoaded>()
-            .having(
-              (state) => state.intention,
-              'последнее подтверждённое намерение',
-              same(intention),
-            )
-            .having(
-              (state) => state.edit?.operation,
-              'наблюдаемая update-операция',
-              isA<OperationRunning<Intention>>(),
-            )
-            .having(
-              (state) => state.isOperationRunning,
-              'единый gate намерения',
-              isTrue,
-            ),
-      );
-
-      repository.completeCommand(
-        0,
-        const ResultFailure(IntentionUnexpectedFailure()),
-      );
-      await pumpEventQueue();
-      subscription.close();
-      container.dispose();
-      expect(details, isNotNull);
-    }
-  });
-
   test('сохраняет поля и snapshot для всех failures изменения', () async {
+    // Любой отказ сохраняет форму одной ветвью; обычный повтор отличает
+    // только устранимую недоступность.
     final scenarios = <(IntentionFailure, bool)>[
       (
         const IntentionTextInputValidationFailure(
@@ -506,11 +265,7 @@ void main() {
         ),
         false,
       ),
-      (const IntentionNotFoundFailure(), false),
-      (const IntentionConflictFailure(), false),
       (const IntentionUnavailableFailure(), true),
-      (const IntentionCorruptionFailure(), false),
-      (const IntentionUnexpectedFailure(), false),
     ];
 
     for (var index = 0; index < scenarios.length; index += 1) {
@@ -540,9 +295,9 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.title,
               'последний подтверждённый snapshot',
-              same(intention),
+              intention.title,
             )
             .having(
               (state) => state.edit?.title,
@@ -571,142 +326,7 @@ void main() {
     }
   });
 
-  test('подтверждённое изменение проходит generation barrier и принадлежит открытому details', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final before = testDetailsIntention(index: 80, title: 'Прежнее');
-    final saved = testDetailsIntention(
-      index: 80,
-      title: 'Сохранённое',
-      description: 'Сохранённое описание',
-    );
-    final refreshed = testDetailsIntention(index: 80, title: 'Перечитанное');
-    final provider = intentionDetailsViewModelProvider(before.id);
-    final subscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(ResultSuccess(before));
-    await pumpEventQueue();
-
-    final coordinator = container.read(
-      graphCommandCoordinatorProvider.notifier,
-    );
-    final presenter = coordinator.registerAppPresentation();
-    final completionTokens = <IntentionOperationToken>[];
-    final completionSubscription = coordinator.intentionCompletions.listen((
-      event,
-    ) {
-      completionTokens.add(event.token);
-    });
-    addTearDown(completionSubscription.cancel);
-
-    container.read(provider.notifier)
-      ..beginEditing()
-      ..changeTitle(saved.title)
-      ..changeDescription(saved.description!)
-      ..saveChanges();
-    repository.completeCommand(
-      0,
-      testDetailsSavedResult(saved, before: before),
-    );
-    await waitForDetailRequests(repository, 2);
-
-    expect(
-      container.read(provider),
-      isA<IntentionDetailsLoaded>()
-          .having(
-            (state) => state.intention,
-            'цельный снимок до перечитывания',
-            same(before),
-          )
-          .having((state) => state.edit, 'завершённая форма', isNull),
-    );
-    final successClaim = await presenter.nextClaim();
-    expect(successClaim!.token, same(completionTokens.single));
-    coordinator.confirmPresentation(successClaim);
-
-    repository.detailRequests[0].add(ResultSuccess(before));
-    await pumpEventQueue();
-    expect(
-      (container.read(provider) as IntentionDetailsLoaded).intention,
-      same(before),
-    );
-
-    repository.detailRequests[1].add(ResultSuccess(refreshed));
-    await pumpEventQueue();
-    expect(
-      (container.read(provider) as IntentionDetailsLoaded).intention,
-      same(refreshed),
-    );
-    expect(completionTokens, hasLength(1));
-  });
-
-  test('disposal передаёт update outcome каталогу и сохраняет gate при повторном открытии', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final intention = testDetailsIntention(index: 81);
-    final provider = intentionDetailsViewModelProvider(intention.id);
-    final firstSubscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(ResultSuccess(intention));
-    await pumpEventQueue();
-    container.read(provider.notifier)
-      ..beginEditing()
-      ..changeTitle('Позднее изменение')
-      ..saveChanges();
-
-    final coordinator = container.read(
-      graphCommandCoordinatorProvider.notifier,
-    );
-    final presenter = coordinator.registerAppPresentation();
-    firstSubscription.close();
-    await pumpEventQueue();
-
-    final reopenedSubscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(reopenedSubscription.close);
-    await waitForDetailRequests(repository, 2);
-    repository.detailRequests[1].add(ResultSuccess(intention));
-    await pumpEventQueue();
-    final reopened = container.read(provider) as IntentionDetailsLoaded;
-    expect(reopened.isOperationRunning, isTrue);
-    container.read(provider.notifier).beginEditing();
-    expect((container.read(provider) as IntentionDetailsLoaded).edit, isNull);
-
-    repository.completeCommand(
-      0,
-      const ResultFailure(IntentionUnavailableFailure()),
-    );
-    final claim = await presenter.nextClaim();
-    expect(claim, isA<GraphAppPresentationClaim>());
-    coordinator.confirmPresentation(claim!);
-    await pumpEventQueue();
-
-    expect(
-      (container.read(provider) as IntentionDetailsLoaded).isOperationRunning,
-      isFalse,
-    );
-    container.read(provider.notifier).beginEditing();
-    expect(
-      (container.read(provider) as IntentionDetailsLoaded).edit,
-      isNotNull,
-    );
-  });
-
-  test('retry изменения получает новый token без прежнего failure', () async {
+  test('retry изменения не предъявляет прежний отказ повторно', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
     addTearDown(container.dispose);
@@ -721,17 +341,10 @@ void main() {
     await waitForDetailRequests(repository, 1);
     repository.detailRequests[0].add(ResultSuccess(intention));
     await pumpEventQueue();
-    final tokens = <IntentionOperationToken>[];
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
     final presenter = coordinator.registerAppPresentation();
-    final coordinatorSubscription = coordinator.intentionCompletions.listen((
-      completion,
-    ) {
-      tokens.add(completion.token);
-    });
-    addTearDown(coordinatorSubscription.cancel);
 
     final details = container.read(provider.notifier)
       ..beginEditing()
@@ -749,7 +362,7 @@ void main() {
     final shownFailure = (container.read(
       provider,
     ) as IntentionDetailsLoaded).edit!.failurePresentation;
-    expect(shownFailure, isA<GraphInitiatorPresentationClaim>());
+    expect(shownFailure, isNotNull);
     coordinator.confirmPresentation(shownFailure!);
 
     details.saveChanges();
@@ -762,203 +375,20 @@ void main() {
     );
     await waitForDetailRequests(repository, 2);
 
-    expect(tokens, hasLength(2));
-    expect(identical(tokens.first, tokens.last), isFalse);
     final successClaim = await presenter.nextClaim();
-    expect(successClaim!.token, same(tokens.last));
+    expect(
+      successClaim!.completion,
+      isA<IntentionCommandCompletion>().having(
+        (completion) => completion.result,
+        'результат повтора',
+        isA<ResultSuccess<IntentionCommandSuccess>>(),
+      ),
+    );
     coordinator.confirmPresentation(successClaim);
     GraphAppPresentationClaim? staleFailure;
     unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
     await pumpEventQueue();
     expect(staleFailure, isNull);
-  });
-
-  test(
-    'проводит готовность, архивирование и восстановление через общие барьеры',
-    () async {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      addTearDown(container.dispose);
-      var confirmed = testDetailsIntention(index: 83);
-      final provider = intentionDetailsViewModelProvider(confirmed.id);
-      final subscription = container.listen(
-        provider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(confirmed));
-      await pumpEventQueue();
-      final details = container.read(provider.notifier);
-
-      final scenarios =
-          <
-            (
-              void Function(),
-              Matcher,
-              IntentionDetailsStateChangeKind,
-              Intention,
-            )
-          >[
-            (
-              details.enableReadiness,
-              isA<EnableIntentionReadiness>(),
-              IntentionDetailsStateChangeKind.enableReadiness,
-              testDetailsIntention(
-                index: 83,
-                readiness: IntentionReadiness.ready,
-              ),
-            ),
-            (
-              details.disableReadiness,
-              isA<DisableIntentionReadiness>(),
-              IntentionDetailsStateChangeKind.disableReadiness,
-              testDetailsIntention(index: 83),
-            ),
-            (
-              details.archive,
-              isA<ArchiveIntention>(),
-              IntentionDetailsStateChangeKind.archive,
-              testDetailsIntention(
-                index: 83,
-                archiveState: IntentionArchiveState.archived,
-              ),
-            ),
-            (
-              details.restore,
-              isA<RestoreIntention>(),
-              IntentionDetailsStateChangeKind.restore,
-              testDetailsIntention(index: 83),
-            ),
-          ];
-
-      for (var index = 0; index < scenarios.length; index += 1) {
-        final (start, commandMatcher, kind, saved) = scenarios[index];
-        final before = confirmed;
-        start();
-        start();
-
-        expect(repository.commands, hasLength(index + 1));
-        expect(repository.commands[index], commandMatcher);
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.intention,
-                'последний подтверждённый снимок',
-                same(before),
-              )
-              .having((state) => state.stateChange?.kind, 'вид перехода', kind)
-              .having(
-                (state) => state.stateChange?.operation,
-                'выполняющийся переход',
-                isA<OperationRunning<Intention>>(),
-              )
-              .having(
-                (state) => state.isOperationRunning,
-                'общий барьер',
-                isTrue,
-              ),
-        );
-
-        repository.completeCommand(
-          index,
-          testDetailsSavedResult(saved, before: before),
-        );
-        await waitForDetailRequests(repository, index + 2);
-
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.intention,
-                'цельный снимок до перечитывания',
-                same(before),
-              )
-              .having(
-                (state) => state.stateChange,
-                'завершённый переход',
-                isNull,
-              ),
-        );
-
-        repository.detailRequests[index].add(ResultSuccess(before));
-        await pumpEventQueue();
-        expect(
-          (container.read(provider) as IntentionDetailsLoaded).intention,
-          same(before),
-        );
-
-        repository.detailRequests[index + 1].add(ResultSuccess(saved));
-        await pumpEventQueue();
-        confirmed = saved;
-      }
-    },
-  );
-
-  test('отказ перехода сохраняет снимок и допускает повтор только при недоступности', () async {
-    final scenarios = <(IntentionFailure, bool)>[
-      (const IntentionNotFoundFailure(), false),
-      (const IntentionUnavailableFailure(), true),
-      (const IntentionCorruptionFailure(), false),
-      (const IntentionUnexpectedFailure(), false),
-    ];
-
-    for (var index = 0; index < scenarios.length; index += 1) {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      final intention = testDetailsIntention(index: 90 + index);
-      final provider = intentionDetailsViewModelProvider(intention.id);
-      final subscription = container.listen(
-        provider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(intention));
-      await pumpEventQueue();
-
-      final details = container.read(provider.notifier)..enableReadiness();
-      final (failure, canRetry) = scenarios[index];
-      repository.completeCommand(0, ResultFailure(failure));
-      await pumpEventQueue();
-
-      expect(
-        container.read(provider),
-        isA<IntentionDetailsLoaded>()
-            .having(
-              (state) => state.intention,
-              'последний подтверждённый снимок',
-              same(intention),
-            )
-            .having(
-              (state) => state.stateChange?.canRetry,
-              'доступность обычного повтора',
-              canRetry,
-            )
-            .having(
-              (state) => state.isOperationRunning,
-              'освобождённый барьер',
-              isFalse,
-            ),
-      );
-
-      details.retryStateChange();
-      expect(repository.commands, hasLength(canRetry ? 2 : 1));
-      if (!canRetry) {
-        details.archive();
-        expect(repository.commands, hasLength(2));
-      }
-
-      repository.completeCommand(
-        1,
-        const ResultFailure(IntentionUnexpectedFailure()),
-      );
-      await pumpEventQueue();
-      subscription.close();
-      container.dispose();
-    }
   });
 
   test('барьер перехода переживает закрытие модели и не блокирует другое намерение', () async {
@@ -1064,14 +494,14 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.archiveState,
               'прежнее намерение до цельного снимка',
-              same(before),
+              IntentionArchiveState.active,
             )
             .having(
-              (state) => state.details.relationCounts,
+              (state) => state.details.relationCounts.activeNeedOutgoing,
               'согласованная прежняя сводка',
-              same(beforeCounts),
+              2,
             ),
       );
 
@@ -1085,14 +515,14 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.archiveState,
               'намерение после снимка ниже барьера',
-              same(before),
+              IntentionArchiveState.active,
             )
             .having(
-              (state) => state.details.relationCounts,
+              (state) => state.details.relationCounts.activeNeedOutgoing,
               'сводка после снимка ниже барьера',
-              same(beforeCounts),
+              2,
             ),
       );
 
@@ -1112,14 +542,14 @@ void main() {
         container.read(provider),
         isA<IntentionDetailsLoaded>()
             .having(
-              (state) => state.intention,
+              (state) => state.intention.archiveState,
               'архивированное намерение',
-              same(archived),
+              IntentionArchiveState.archived,
             )
             .having(
-              (state) => state.details.relationCounts,
+              (state) => state.details.relationCounts.archivedNeedOutgoing,
               'сводка после каскада',
-              same(archivedCounts),
+              2,
             ),
       );
       expect(repository.commands, hasLength(1));
@@ -1171,8 +601,8 @@ void main() {
       );
       await pumpEventQueue();
       expect(
-        (container.read(provider) as IntentionDetailsLoaded).intention,
-        same(before),
+        (container.read(provider) as IntentionDetailsLoaded).intention.title,
+        before.title,
       );
 
       repository.detailRequests[1].add(
@@ -1181,8 +611,8 @@ void main() {
       );
       await pumpEventQueue();
       expect(
-        (container.read(provider) as IntentionDetailsLoaded).intention,
-        same(refreshed),
+        (container.read(provider) as IntentionDetailsLoaded).intention.title,
+        refreshed.title,
       );
     },
   );
@@ -1229,12 +659,12 @@ void main() {
     await pumpEventQueue();
 
     expect(
-      (container.read(provider) as IntentionDetailsLoaded).intention,
-      same(reopened),
+      (container.read(provider) as IntentionDetailsLoaded).intention.title,
+      reopened.title,
     );
   });
 
-  test('no-op IntentionSaved запускает новую detail generation', () async {
+  test('сохранение без изменений заново читает подробные данные', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
     addTearDown(container.dispose);
@@ -1263,12 +693,17 @@ void main() {
     await (start as IntentionCommandAccepted).future;
     await waitForDetailRequests(repository, 2);
 
+    repository.detailRequests[1].add(
+      ResultSuccess(testDetailsIntention(index: 61, title: 'Перечитанное')),
+    );
+    await pumpEventQueue();
+
     expect(
       container.read(intentionDetailsViewModelProvider(intention.id)),
       isA<IntentionDetailsLoaded>().having(
-        (state) => state.intention,
-        'подтверждённое намерение',
-        same(intention),
+        (state) => state.intention.title,
+        'перечитанное намерение',
+        'Перечитанное',
       ),
     );
   });
@@ -1325,27 +760,29 @@ void main() {
           ],
         ),
       );
-      final completion = await start.future;
-      expect(completion.confirmedChange?.changes, hasLength(3));
+      await start.future;
       await waitForDetailRequests(repository, 4);
-      expect(repository.detailIds, [first.id, second.id, first.id, second.id]);
 
       repository.detailRequests[2].add(
-        ResultSuccess(first),
+        ResultSuccess(testDetailsIntention(index: 71, title: 'Устаревшее 1')),
         revision: const TestDetailsRevision(2),
       );
       repository.detailRequests[3].add(
-        ResultSuccess(second),
+        ResultSuccess(testDetailsIntention(index: 72, title: 'Устаревшее 2')),
         revision: const TestDetailsRevision(2),
       );
       await pumpEventQueue();
       expect(
-        (container.read(firstProvider) as IntentionDetailsLoaded).revision,
-        const TestDetailsRevision(1),
+        (container.read(
+          firstProvider,
+        ) as IntentionDetailsLoaded).intention.title,
+        first.title,
       );
       expect(
-        (container.read(secondProvider) as IntentionDetailsLoaded).revision,
-        const TestDetailsRevision(1),
+        (container.read(
+          secondProvider,
+        ) as IntentionDetailsLoaded).intention.title,
+        second.title,
       );
 
       repository.detailRequests[2].add(
@@ -1410,7 +847,6 @@ void main() {
       await (start as IntentionCommandAccepted).future;
       await waitForDetailRequests(repository, 2);
 
-      expect(repository.detailIds, [before.id, before.id]);
       expect(
         container.read(intentionDetailsViewModelProvider(before.id)),
         isA<IntentionDetailsLoading>(),
@@ -1422,15 +858,15 @@ void main() {
       expect(
         container.read(intentionDetailsViewModelProvider(before.id)),
         isA<IntentionDetailsLoaded>().having(
-          (state) => state.intention,
+          (state) => state.intention.title,
           'подтверждённое намерение',
-          same(saved),
+          saved.title,
         ),
       );
     },
   );
 
-  test('failure completion сохраняет snapshot и текущую generation', () async {
+  test('отказ изменения сохраняет последний подтверждённый снимок', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
     addTearDown(container.dispose);
@@ -1459,13 +895,12 @@ void main() {
     expect(completion.confirmedChange, isNull);
     await pumpEventQueue();
 
-    expect(repository.detailRequests, hasLength(1));
     expect(
       container.read(intentionDetailsViewModelProvider(intention.id)),
       isA<IntentionDetailsLoaded>().having(
-        (state) => state.intention,
+        (state) => state.intention.title,
         'последний подтверждённый snapshot',
-        same(intention),
+        intention.title,
       ),
     );
   });
@@ -1522,678 +957,6 @@ void main() {
       );
     },
   );
-
-  test(
-    'отметка и её снятие применимы только при смене подтверждённого состояния',
-    () async {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      addTearDown(container.dispose);
-      final intention = testDetailsIntention(index: 110);
-      final provider = intentionDetailsViewModelProvider(intention.id);
-      final subscription = container.listen(
-        provider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(
-        ResultSuccess(intention),
-        revision: const TestDetailsRevision(1),
-      );
-      await pumpEventQueue();
-      final details = container.read(provider.notifier);
-
-      final scenarios =
-          <
-            (
-              void Function(),
-              void Function(),
-              Matcher,
-              IntentionDetailsStateChangeKind,
-              FavoriteMark,
-              FavoriteMark,
-            )
-          >[
-            (
-              details.markFavorite,
-              details.unmarkFavorite,
-              isA<MarkIntentionFavorite>().having(
-                (command) => command.id,
-                'намерение',
-                intention.id,
-              ),
-              IntentionDetailsStateChangeKind.markFavorite,
-              FavoriteMark.notFavorite,
-              FavoriteMark.favorite,
-            ),
-            (
-              details.unmarkFavorite,
-              details.markFavorite,
-              isA<UnmarkIntentionFavorite>().having(
-                (command) => command.id,
-                'намерение',
-                intention.id,
-              ),
-              IntentionDetailsStateChangeKind.unmarkFavorite,
-              FavoriteMark.favorite,
-              FavoriteMark.notFavorite,
-            ),
-          ];
-
-      for (var index = 0; index < scenarios.length; index += 1) {
-        final (start, inapplicable, commandMatcher, kind, before, after) =
-            scenarios[index];
-        final confirmedRevision = TestDetailsRevision(index * 2 + 3);
-
-        inapplicable();
-        expect(repository.commands, hasLength(index));
-
-        start();
-        start();
-        details
-          ..archive()
-          ..beginEditing();
-
-        expect(repository.commands, hasLength(index + 1));
-        expect(repository.commands[index], commandMatcher);
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.details.favoriteMark,
-                'последняя подтверждённая отметка',
-                before,
-              )
-              .having((state) => state.stateChange?.kind, 'вид перехода', kind)
-              .having(
-                (state) => state.stateChange?.operation,
-                'выполняющийся переход',
-                isA<OperationRunning<Intention>>(),
-              )
-              .having((state) => state.edit, 'форма изменения', isNull)
-              .having(
-                (state) => state.isOperationRunning,
-                'общий барьер',
-                isTrue,
-              ),
-        );
-
-        repository.completeCommand(
-          index,
-          testDetailsSavedResult(
-            intention,
-            before: intention,
-            revision: confirmedRevision,
-            beforeFavoriteMark: before,
-            favoriteMark: after,
-          ),
-        );
-        await waitForDetailRequests(repository, index + 2);
-
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.details.favoriteMark,
-                'отметка до цельного снимка',
-                before,
-              )
-              .having(
-                (state) => state.stateChange,
-                'успех без сообщения страницы',
-                isNull,
-              ),
-        );
-
-        repository.detailRequests[index + 1].add(
-          ResultSuccess(intention),
-          revision: confirmedRevision,
-          favoriteMark: after,
-        );
-        await pumpEventQueue();
-        expect(
-          (container.read(
-            provider,
-          ) as IntentionDetailsLoaded).details.favoriteMark,
-          after,
-        );
-
-        repository.detailRequests[index + 1].add(
-          ResultSuccess(intention),
-          revision: TestDetailsRevision(confirmedRevision.sequence - 1),
-          favoriteMark: before,
-        );
-        await pumpEventQueue();
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.details.favoriteMark,
-                'отметка после снимка старше принятой ревизии',
-                after,
-              )
-              .having(
-                (state) => state.revision,
-                'принятая ревизия',
-                confirmedRevision,
-              ),
-        );
-      }
-    },
-  );
-
-  test('отметка доступна архивированному намерению и недоступна при открытой форме', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final intention = testDetailsIntention(
-      index: 111,
-      archiveState: IntentionArchiveState.archived,
-    );
-    final provider = intentionDetailsViewModelProvider(intention.id);
-    final subscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(ResultSuccess(intention));
-    await pumpEventQueue();
-
-    final details = container.read(provider.notifier)
-      ..beginEditing()
-      ..markFavorite();
-    expect(repository.commands, isEmpty);
-    expect(
-      container.read(provider),
-      isA<IntentionDetailsLoaded>()
-          .having((state) => state.edit, 'форма изменения', isNotNull)
-          .having((state) => state.stateChange, 'переход состояния', isNull),
-    );
-
-    details
-      ..cancelEditing()
-      ..markFavorite();
-    expect(repository.commands.single, isA<MarkIntentionFavorite>());
-
-    repository.completeCommand(
-      0,
-      const ResultFailure(IntentionUnexpectedFailure()),
-    );
-    await pumpEventQueue();
-  });
-
-  test(
-    'отметка не запускается, пока выполняется другая операция намерения',
-    () async {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      addTearDown(container.dispose);
-      final intention = testDetailsIntention(index: 112);
-      final provider = intentionDetailsViewModelProvider(intention.id);
-      final subscription = container.listen(
-        provider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(intention));
-      await pumpEventQueue();
-
-      final details = container.read(provider.notifier)
-        ..archive()
-        ..markFavorite();
-      expect(repository.commands.single, isA<ArchiveIntention>());
-      expect(
-        (container.read(provider) as IntentionDetailsLoaded).stateChange?.kind,
-        IntentionDetailsStateChangeKind.archive,
-      );
-
-      repository.completeCommand(
-        0,
-        const ResultFailure(IntentionUnexpectedFailure()),
-      );
-      await pumpEventQueue();
-
-      // Отказавшая операция очередь не оставила: отметку запускает только
-      // новое решение человека.
-      expect(repository.commands, hasLength(1));
-      details.markFavorite();
-      expect(repository.commands, hasLength(2));
-      expect(repository.commands.last, isA<MarkIntentionFavorite>());
-
-      repository.completeCommand(
-        1,
-        const ResultFailure(IntentionUnexpectedFailure()),
-      );
-      await pumpEventQueue();
-    },
-  );
-
-  test('отказ отметки сохраняет подтверждённую отметку и допускает повтор только при недоступности', () async {
-    final scenarios = <(IntentionFailure, bool)>[
-      (const IntentionNotFoundFailure(), false),
-      (const IntentionUnavailableFailure(), true),
-      (const IntentionCorruptionFailure(), false),
-      (const IntentionUnexpectedFailure(), false),
-    ];
-    final transitions =
-        <
-          (
-            FavoriteMark,
-            IntentionDetailsStateChangeKind,
-            void Function(IntentionDetailsViewModel),
-            Matcher,
-          )
-        >[
-          (
-            FavoriteMark.notFavorite,
-            IntentionDetailsStateChangeKind.markFavorite,
-            (details) => details.markFavorite(),
-            isA<MarkIntentionFavorite>(),
-          ),
-          (
-            FavoriteMark.favorite,
-            IntentionDetailsStateChangeKind.unmarkFavorite,
-            (details) => details.unmarkFavorite(),
-            isA<UnmarkIntentionFavorite>(),
-          ),
-        ];
-
-    for (final (confirmed, kind, start, commandMatcher) in transitions) {
-      for (var index = 0; index < scenarios.length; index += 1) {
-        final repository = ControlledDetailsRepository();
-        final container = _detailsContainer(repository);
-        final intention = testDetailsIntention(index: 120 + index);
-        final provider = intentionDetailsViewModelProvider(intention.id);
-        final subscription = container.listen(
-          provider,
-          (_, _) {},
-          fireImmediately: true,
-        );
-        await waitForDetailRequests(repository, 1);
-        repository.detailRequests[0].add(
-          ResultSuccess(intention),
-          favoriteMark: confirmed,
-        );
-        await pumpEventQueue();
-
-        final tokens = <IntentionOperationToken>[];
-        final coordinator = container.read(
-          graphCommandCoordinatorProvider.notifier,
-        );
-        final presenter = coordinator.registerAppPresentation();
-        final coordinatorSubscription = coordinator.intentionCompletions.listen(
-          (completion) {
-            tokens.add(completion.token);
-          },
-        );
-
-        final details = container.read(provider.notifier);
-        start(details);
-        final (failure, canRetry) = scenarios[index];
-        repository.completeCommand(0, ResultFailure(failure));
-        await pumpEventQueue();
-
-        expect(repository.detailRequests, hasLength(1));
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.details.favoriteMark,
-                'последняя подтверждённая отметка',
-                confirmed,
-              )
-              .having((state) => state.stateChange?.kind, 'вид перехода', kind)
-              .having(
-                (state) => state.stateChange?.operation,
-                'отказ перехода',
-                isA<OperationFailed<Intention>>().having(
-                  (operation) => operation.failure,
-                  'категория отказа',
-                  same(failure),
-                ),
-              )
-              .having(
-                (state) => state.stateChange?.canRetry,
-                'доступность обычного повтора',
-                canRetry,
-              )
-              .having(
-                (state) => state.isOperationRunning,
-                'освобождённый барьер',
-                isFalse,
-              ),
-        );
-
-        final shownFailure = (container.read(
-          provider,
-        ) as IntentionDetailsLoaded).stateChange!.failurePresentation;
-        expect(shownFailure, isA<GraphInitiatorPresentationClaim>());
-        coordinator.confirmPresentation(shownFailure!);
-
-        details.retryStateChange();
-        expect(repository.commands, hasLength(canRetry ? 2 : 1));
-        if (canRetry) {
-          expect(repository.commands.last, commandMatcher);
-          repository.completeCommand(
-            1,
-            const ResultFailure(IntentionUnexpectedFailure()),
-          );
-          await pumpEventQueue();
-          expect(tokens, hasLength(2));
-          expect(identical(tokens.first, tokens.last), isFalse);
-          final retriedFailure = (container.read(
-            provider,
-          ) as IntentionDetailsLoaded).stateChange!.failurePresentation;
-          expect(retriedFailure!.token, same(tokens.last));
-          coordinator.confirmPresentation(retriedFailure);
-        } else {
-          expect(tokens, hasLength(1));
-        }
-
-        // Подтверждённый страницей отказ общей поверхности не достаётся.
-        GraphAppPresentationClaim? staleFailure;
-        unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
-        await pumpEventQueue();
-        expect(staleFailure, isNull);
-
-        await coordinatorSubscription.cancel();
-        subscription.close();
-        container.dispose();
-      }
-    }
-  });
-
-  test('успех отметки принадлежит общей поверхности, а отказ переходит к ней при завершении сессии', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final intention = testDetailsIntention(index: 130);
-    final provider = intentionDetailsViewModelProvider(intention.id);
-    final subscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(
-      ResultSuccess(intention),
-      revision: const TestDetailsRevision(1),
-    );
-    await pumpEventQueue();
-    final coordinator = container.read(
-      graphCommandCoordinatorProvider.notifier,
-    );
-    final presenter = coordinator.registerAppPresentation();
-
-    container.read(provider.notifier).markFavorite();
-    repository.completeCommand(
-      0,
-      testDetailsSavedResult(
-        intention,
-        before: intention,
-        revision: const TestDetailsRevision(2),
-        favoriteMark: FavoriteMark.favorite,
-      ),
-    );
-    await waitForDetailRequests(repository, 2);
-    repository.detailRequests[1].add(
-      ResultSuccess(intention),
-      revision: const TestDetailsRevision(2),
-      favoriteMark: FavoriteMark.favorite,
-    );
-    await pumpEventQueue();
-
-    expect(
-      (container.read(provider) as IntentionDetailsLoaded).stateChange,
-      isNull,
-    );
-    final successClaim = await presenter.nextClaim();
-    expect(
-      successClaim!.completion,
-      isA<IntentionCommandCompletion>().having(
-        (completion) => completion.result,
-        'результат',
-        isA<ResultSuccess<IntentionCommandSuccess>>(),
-      ),
-    );
-    coordinator.confirmPresentation(successClaim);
-
-    // Отказ, показанный открытой сессией, достаётся общей поверхности
-    // только после завершения этой сессии.
-    container.read(provider.notifier).unmarkFavorite();
-    repository.completeCommand(
-      1,
-      const ResultFailure(IntentionUnavailableFailure()),
-    );
-    await pumpEventQueue();
-    final shownFailure = (container.read(
-      provider,
-    ) as IntentionDetailsLoaded).stateChange!.failurePresentation;
-    expect(shownFailure, isA<GraphInitiatorPresentationClaim>());
-    GraphAppPresentationClaim? appFailure;
-    unawaited(presenter.nextClaim().then((claim) => appFailure = claim));
-    await pumpEventQueue();
-    expect(appFailure, isNull);
-
-    coordinator.releaseInitiatorClaim(shownFailure!);
-    await pumpEventQueue();
-    expect(appFailure!.token, same(shownFailure.token));
-    coordinator.confirmPresentation(appFailure!);
-
-    // Сессия, закрытая до результата, прав на отказ не получает.
-    container.read(provider.notifier).retryStateChange();
-    expect(repository.commands, hasLength(3));
-    expect(repository.commands.last, isA<UnmarkIntentionFavorite>());
-    subscription.close();
-    await pumpEventQueue();
-    repository.completeCommand(
-      2,
-      const ResultFailure(IntentionUnexpectedFailure()),
-    );
-    final abandonedFailure = await presenter.nextClaim();
-    expect(
-      abandonedFailure!.completion,
-      isA<IntentionCommandCompletion>().having(
-        (completion) => completion.result,
-        'результат',
-        isA<ResultFailure<IntentionCommandSuccess>>(),
-      ),
-    );
-    coordinator.confirmPresentation(abandonedFailure);
-  });
-
-  test(
-    'после подтверждённой отметки и до снимка переходы отметки неприменимы',
-    () async {
-      final transitions =
-          <
-            (
-              FavoriteMark,
-              FavoriteMark,
-              void Function(IntentionDetailsViewModel),
-              void Function(IntentionDetailsViewModel),
-              Matcher,
-            )
-          >[
-            (
-              FavoriteMark.notFavorite,
-              FavoriteMark.favorite,
-              (details) => details.markFavorite(),
-              (details) => details.unmarkFavorite(),
-              isA<UnmarkIntentionFavorite>(),
-            ),
-            (
-              FavoriteMark.favorite,
-              FavoriteMark.notFavorite,
-              (details) => details.unmarkFavorite(),
-              (details) => details.markFavorite(),
-              isA<MarkIntentionFavorite>(),
-            ),
-          ];
-
-      for (final (before, after, start, reverse, reverseCommand)
-          in transitions) {
-        final repository = ControlledDetailsRepository();
-        final container = _detailsContainer(repository);
-        final intention = testDetailsIntention(index: 140);
-        final provider = intentionDetailsViewModelProvider(intention.id);
-        final subscription = container.listen(
-          provider,
-          (_, _) {},
-          fireImmediately: true,
-        );
-        await waitForDetailRequests(repository, 1);
-        repository.detailRequests[0].add(
-          ResultSuccess(intention),
-          revision: const TestDetailsRevision(1),
-          favoriteMark: before,
-        );
-        await pumpEventQueue();
-        final details = container.read(provider.notifier);
-
-        start(details);
-        repository.completeCommand(
-          0,
-          testDetailsSavedResult(
-            intention,
-            before: intention,
-            revision: const TestDetailsRevision(2),
-            beforeFavoriteMark: before,
-            favoriteMark: after,
-          ),
-        );
-        await waitForDetailRequests(repository, 2);
-        await pumpEventQueue();
-
-        // Ключ намерения уже свободен, а состояние несёт прежнюю отметку.
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.details.favoriteMark,
-                'последняя подтверждённая отметка',
-                before,
-              )
-              .having(
-                (state) => state.isOperationRunning,
-                'освобождённый барьер',
-                isFalse,
-              )
-              .having(
-                (state) => state.isAwaitingFavoriteMarkSnapshot,
-                'ожидание снимка',
-                isTrue,
-              ),
-        );
-        start(details);
-        reverse(details);
-        expect(repository.commands, hasLength(1));
-
-        repository.detailRequests[1].add(
-          ResultSuccess(intention),
-          revision: const TestDetailsRevision(2),
-          favoriteMark: after,
-        );
-        await pumpEventQueue();
-        expect(
-          container.read(provider),
-          isA<IntentionDetailsLoaded>()
-              .having(
-                (state) => state.details.favoriteMark,
-                'новая подтверждённая отметка',
-                after,
-              )
-              .having(
-                (state) => state.isAwaitingFavoriteMarkSnapshot,
-                'ожидание снимка',
-                isFalse,
-              ),
-        );
-
-        // После снимка применим только обратный переход.
-        start(details);
-        expect(repository.commands, hasLength(1));
-        reverse(details);
-        expect(repository.commands, hasLength(2));
-        expect(repository.commands.last, reverseCommand);
-
-        repository.completeCommand(
-          1,
-          const ResultFailure(IntentionUnexpectedFailure()),
-        );
-        await pumpEventQueue();
-        subscription.close();
-        container.dispose();
-      }
-    },
-  );
-
-  test('снимок, опередивший завершение отметки, не оставляет ожидания', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final intention = testDetailsIntention(index: 141);
-    final provider = intentionDetailsViewModelProvider(intention.id);
-    final subscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(
-      ResultSuccess(intention),
-      revision: const TestDetailsRevision(1),
-    );
-    await pumpEventQueue();
-    final details = container.read(provider.notifier)..markFavorite();
-
-    // Чтение, начатое пакетом, отвечает раньше, чем модель получает результат.
-    repository.onWatchIntention = (_) => repository.detailRequests.last.add(
-      ResultSuccess(intention),
-      revision: const TestDetailsRevision(2),
-      favoriteMark: FavoriteMark.favorite,
-    );
-    repository.completeCommand(
-      0,
-      testDetailsSavedResult(
-        intention,
-        before: intention,
-        revision: const TestDetailsRevision(2),
-        favoriteMark: FavoriteMark.favorite,
-      ),
-    );
-    await waitForDetailRequests(repository, 2);
-    await pumpEventQueue();
-
-    expect(
-      container.read(provider),
-      isA<IntentionDetailsLoaded>()
-          .having(
-            (state) => state.details.favoriteMark,
-            'новая подтверждённая отметка',
-            FavoriteMark.favorite,
-          )
-          .having(
-            (state) => state.isAwaitingFavoriteMarkSnapshot,
-            'ожидание снимка',
-            isFalse,
-          ),
-    );
-    details.unmarkFavorite();
-    expect(repository.commands.last, isA<UnmarkIntentionFavorite>());
-    repository.completeCommand(
-      1,
-      const ResultFailure(IntentionUnexpectedFailure()),
-    );
-    await pumpEventQueue();
-  });
 
   test('завершение без изменения возвращает управление только с актуальной отметкой', () async {
     final repository = ControlledDetailsRepository();

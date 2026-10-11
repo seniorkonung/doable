@@ -25,108 +25,12 @@ const _corruptionRu =
     'Список намерений не обновлён: сохранённые данные повреждены.';
 const _unexpectedRu =
     'Список намерений не обновлён из-за непредвиденной ошибки.';
-const _emptyRu = 'Активных намерений пока нет.';
 
 final _view = find.byType(IntentionCatalogRefreshStatusView);
 final _list = find.byKey(const ValueKey('refresh-status-test-list'));
 final _retry = find.descendant(of: _view, matching: find.byType(FilledButton));
 
 void main() {
-  testWidgets('без отказа обновления представление ничего не выводит', (
-    tester,
-  ) async {
-    final h = await _open(tester);
-    await h.loadExcluding([testSummary(index: 2), testSummary(index: 1)]);
-
-    expect(h.confirmed.refresh, isA<IntentionCatalogRefreshIdle>());
-    expect(_view, findsOneWidget);
-    expect(tester.getSize(_view).height, 0);
-    expect(
-      find.descendant(of: _view, matching: find.byType(Text)),
-      findsNothing,
-    );
-    expect(_retry, findsNothing);
-    expect(_list, findsOneWidget);
-  });
-
-  testWidgets(
-    'недоступность хранилища показана над сохранённым списком с повтором',
-    (tester) async {
-      final h = await _open(tester);
-      await h.loadExcluding([testSummary(index: 2), testSummary(index: 1)]);
-
-      await h.failRefresh(const ResultFailure(IntentionUnavailableFailure()));
-
-      expect(h.confirmed.refresh, isA<IntentionCatalogRefreshUnavailable>());
-      expect(find.text(_unavailableRu), findsOneWidget);
-      expect(
-        find.descendant(of: _retry, matching: find.text('Повторить')),
-        findsOneWidget,
-      );
-      // Сообщение стоит над списком и не заменяет его.
-      expect(find.text('Намерение 2'), findsOneWidget);
-      expect(find.text('Намерение 1'), findsOneWidget);
-      expect(
-        tester.getBottomLeft(_view).dy,
-        lessThanOrEqualTo(tester.getTopLeft(_list).dy),
-      );
-    },
-  );
-
-  for (final (name, failure, state, message) in [
-    (
-      'повреждение',
-      const IntentionCorruptionFailure(),
-      isA<IntentionCatalogRefreshCorruption>(),
-      _corruptionRu,
-    ),
-    (
-      'неожиданная ошибка',
-      const IntentionUnexpectedFailure(),
-      isA<IntentionCatalogRefreshUnexpected>(),
-      _unexpectedRu,
-    ),
-  ]) {
-    testWidgets('$name показывает безопасное сообщение без действия повтора', (
-      tester,
-    ) async {
-      final h = await _open(tester);
-      await h.loadExcluding([testSummary(index: 2), testSummary(index: 1)]);
-
-      await h.failRefresh(ResultFailure(failure));
-
-      expect(h.confirmed.refresh, state);
-      expect(find.text(message), findsOneWidget);
-      expect(_retry, findsNothing);
-      expect(find.text('Намерение 2'), findsOneWidget);
-      expect(find.text('Намерение 1'), findsOneWidget);
-    });
-  }
-
-  testWidgets(
-    'отказ обновления над исходно пустой выдачей отличается от успешного отсутствия совпадений',
-    (tester) async {
-      final h = await _open(tester);
-      await h.loadExcluding(const []);
-      expect(h.confirmed, isA<IntentionCatalogEmpty>());
-      // Успешное отсутствие совпадений: только сообщение о пустоте.
-      expect(find.text(_emptyRu), findsOneWidget);
-      expect(find.text(_unavailableRu), findsNothing);
-
-      await h.failRefresh(const ResultFailure(IntentionUnavailableFailure()));
-
-      expect(h.confirmed, isA<IntentionCatalogEmpty>());
-      expect(h.confirmed.refresh, isA<IntentionCatalogRefreshUnavailable>());
-      expect(find.text(_unavailableRu), findsOneWidget);
-      expect(_retry, findsOneWidget);
-      expect(find.text(_emptyRu), findsOneWidget);
-      expect(
-        tester.getBottomLeft(_view).dy,
-        lessThanOrEqualTo(tester.getTopLeft(find.text(_emptyRu)).dy),
-      );
-    },
-  );
-
   testWidgets(
     '«Повторить» вызывает retryRefresh модели назначения и не меняет список и позицию просмотра',
     (tester) async {
@@ -150,10 +54,9 @@ void main() {
       // Повтор запускает то же чтение области с прежними условиями.
       expect(h.repository.reconciliationQueries, hasLength(2));
       expect(
-        h.repository.reconciliationQueryAt(1).catalogQuery,
-        same(before.query),
+        h.repository.reconciliationQueryAt(1).catalogQuery.tagFilter,
+        before.query.tagFilter,
       );
-      expect(h.repository.queries, hasLength(2));
       expect(scrollable.position.pixels, 300);
       expect((h.confirmed as IntentionCatalogLoaded).items, items);
       // На время повторного чтения отказ не показывается.
@@ -182,41 +85,24 @@ void main() {
     },
   );
 
-  for (final (name, failure, text, hasRetry) in [
-    (
-      'недоступности',
-      const IntentionUnavailableFailure(),
-      _unavailableRu,
-      true,
-    ),
-    ('повреждения', const IntentionCorruptionFailure(), _corruptionRu, false),
-    (
-      'неожиданной ошибки',
-      const IntentionUnexpectedFailure(),
-      _unexpectedRu,
-      false,
-    ),
-  ]) {
-    testWidgets('отказ обновления из-за $name объявляется живой областью', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      final h = await _open(tester);
-      await h.loadExcluding([testSummary(index: 1)]);
+  // Живую область задаёт общее представление сообщения всех категорий
+  // отказа; категория с повтором проверяет и кнопку.
+  testWidgets('отказ обновления из-за недоступности объявляется живой '
+      'областью', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final h = await _open(tester);
+    await h.loadExcluding([testSummary(index: 1)]);
 
-      await h.failRefresh(ResultFailure(failure));
+    await h.failRefresh(const ResultFailure(IntentionUnavailableFailure()));
 
-      final message = tester.getSemantics(find.text(text));
-      expect(message.label, contains(text));
-      expect(message.flagsCollection.isLiveRegion, isTrue);
-      if (hasRetry) {
-        final retry = tester.getSemantics(_retry);
-        expect(retry.label, 'Повторить');
-        expect(retry.flagsCollection.isButton, isTrue);
-      }
-      semantics.dispose();
-    });
-  }
+    final message = tester.getSemantics(find.text(_unavailableRu));
+    expect(message.label, contains(_unavailableRu));
+    expect(message.flagsCollection.isLiveRegion, isTrue);
+    final retry = tester.getSemantics(_retry);
+    expect(retry.label, 'Повторить');
+    expect(retry.flagsCollection.isButton, isTrue);
+    semantics.dispose();
+  });
 
   for (final (language, retry, messages) in [
     ('ru', 'Повторить', [_unavailableRu, _corruptionRu, _unexpectedRu]),

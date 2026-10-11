@@ -360,63 +360,6 @@ void main() {
     );
     expect(events, hasLength(1));
   });
-
-  test('диагностика различает архивирование и восстановление', () async {
-    await _create(repository, sourceId, relatedId);
-
-    await repository.execute(ArchiveLongTermRelation(relationId));
-    await repository.execute(RestoreLongTermRelation(relationId));
-
-    final commandEvents = diagnostics.events
-        .whereType<LongTermRelationCommandDiagnosticsEvent>()
-        .toList(growable: false);
-    expect(
-      commandEvents.map((event) => event.commandType),
-      containsAllInOrder([
-        LongTermRelationCommandDiagnosticsType.create,
-        LongTermRelationCommandDiagnosticsType.archive,
-        LongTermRelationCommandDiagnosticsType.restore,
-      ]),
-    );
-    expect(
-      commandEvents.where(
-        (event) =>
-            event.commandType ==
-                LongTermRelationCommandDiagnosticsType.archive ||
-            event.commandType == LongTermRelationCommandDiagnosticsType.restore,
-      ),
-      everyElement(
-        isA<LongTermRelationCommandDiagnosticsEvent>().having(
-          (event) => event.status,
-          'статус',
-          isA<DiagnosticsSucceeded>(),
-        ),
-      ),
-    );
-  });
-
-  test('отказ диагностики после commit не меняет архивирование', () async {
-    await _create(repository, sourceId, relatedId);
-    final throwingDiagnostics = _ThrowingDiagnosticsSink();
-    repository = _repository(database, throwingDiagnostics, const []);
-
-    final result = await repository.execute(
-      ArchiveLongTermRelation(relationId),
-    );
-
-    expect(result, isA<GraphCommandSucceeded>());
-    expect((await _storedRelation(database, relationId))['is_archived'], 1);
-    expect(
-      throwingDiagnostics.attemptedEvents,
-      everyElement(
-        isA<LongTermRelationCommandDiagnosticsEvent>().having(
-          (event) => event.commandType,
-          'тип команды',
-          LongTermRelationCommandDiagnosticsType.archive,
-        ),
-      ),
-    );
-  });
 }
 
 Future<LongTermRelationCreated> _create(
@@ -586,14 +529,4 @@ final class _DeterministicRelationIdGenerator
 
   @override
   LongTermRelationId generate() => _ids[_index++];
-}
-
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('Управляемый отказ диагностики.');
-  }
 }

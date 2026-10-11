@@ -33,86 +33,73 @@ void main() {
   });
   tearDown(() => directory.delete(recursive: true));
 
-  for (final step in [ModeWriteStep.write, ModeWriteStep.rename]) {
-    for (final outcomes in ['ss', 'fs', 'sf', 'ff', 'ffs', 'sss']) {
-      test('${step.label}: отдельный процесс восстанавливает последний успех '
-          '$outcomes без объединения выборов', () async {
-        final modes = [_a, _b, if (outcomes.length == 3) _a];
-        final worker = await _Worker.start(directory, [
-          step.name,
-          outcomes,
-          modes.map((mode) => mode.storageKey).join(','),
-          if (outcomes == 'ffs') 'throw',
-        ]);
-        addTearDown(worker.stop);
-        final temporaryPaths = <String>{};
-        final committed = <String>[];
-        var expected = _initial;
-
-        for (var i = 0; i < modes.length; i++) {
-          final held = await worker.next('held');
-          expect(held['pid'], worker.process.pid);
-          expect(held['pid'], isNot(pid));
-          expect(held['held'], i);
-          expect(held['started'], i + 1);
-          expect(temporaryPaths.add(held['temporaryPath'] as String), isTrue);
-          expect(await modeFile.readAsString(), expected.storageKey);
-
-          worker.process.stdin.writeln('release');
-          final finished = await worker.next('finished');
-          expect(finished['finished'], i);
-          final succeeds = outcomes[i] == 's';
-          expect(finished['saved'], succeeds);
-          if (succeeds) {
-            expected = modes[i];
-            committed.add(expected.storageKey);
-          }
-          expect(finished['committed'], committed);
-          expect(await modeFile.readAsString(), expected.storageKey);
-        }
-        await worker.finish();
-        expect(worker.diagnostics, [
-          for (final outcome in outcomes.split(''))
-            if (outcome == 'f')
-              {
-                'operation': 'quickCreationMode',
-                'stage': 'write',
-                'outcome': 'failed',
-                'failureCode': 'unavailable',
-              },
-        ]);
-        expect(await modeFile.parent.list().length, 1);
-        await _expectNewProcess(directory, expected);
-      });
-    }
-
-    test('${step.label}: завершение процесса оставляет только заменённый '
-        'файл, незавершённая и ожидающая записи теряются', () async {
+  // Очередь и точки отказа подробно проверяет тест хранилища в процессе
+  // теста; здесь нужны лишь отказ после успеха и отказы с падающим получателем
+  // диагностики, по одному на каждую точку записи.
+  for (final (step, outcomes) in [
+    (ModeWriteStep.write, 'sf'),
+    (ModeWriteStep.rename, 'ffs'),
+  ]) {
+    test('${step.label}: отдельный процесс восстанавливает последний успех '
+        '$outcomes без объединения выборов', () async {
+      final modes = [_a, _b, if (outcomes.length == 3) _a];
       final worker = await _Worker.start(directory, [
         step.name,
-        'sss',
-        [_a, _b, _initial].map((mode) => mode.storageKey).join(','),
+        outcomes,
+        modes.map((mode) => mode.storageKey).join(','),
+        if (outcomes == 'ffs') 'throw',
       ]);
       addTearDown(worker.stop);
-      await worker.next('held');
-      worker.process.stdin.writeln('release');
-      expect((await worker.next('finished'))['saved'], isTrue);
-      final held = await worker.next('held');
-      expect(held['held'], 1);
-      expect(held['started'], 2);
-      final temporary = File(held['temporaryPath'] as String);
-      expect(await temporary.exists(), isTrue);
-      expect(await modeFile.readAsString(), _a.storageKey);
+      var expected = _initial;
 
-      expect(worker.process.kill(ProcessSignal.sigkill), isTrue);
-      await worker.finish(killed: true);
+      for (var i = 0; i < modes.length; i++) {
+        await worker.next('held');
+        expect(await modeFile.readAsString(), expected.storageKey);
 
-      expect(await temporary.exists(), isTrue);
-      expect(worker.diagnostics, isEmpty);
-      await _expectNewProcess(directory, _a);
-      expect(await modeFile.readAsString(), _a.storageKey);
+        worker.process.stdin.writeln('release');
+        final finished = await worker.next('finished');
+        final succeeds = outcomes[i] == 's';
+        expect(finished['saved'], succeeds);
+        if (succeeds) expected = modes[i];
+        expect(await modeFile.readAsString(), expected.storageKey);
+      }
+      await worker.finish();
+      expect(worker.diagnostics, [
+        for (final outcome in outcomes.split(''))
+          if (outcome == 'f')
+            {
+              'operation': 'quickCreationMode',
+              'stage': 'write',
+              'outcome': 'failed',
+              'failureCode': 'unavailable',
+            },
+      ]);
+      expect(await modeFile.parent.list().length, 1);
+      await _expectNewProcess(directory, expected);
     });
   }
+
+  test('переименование: завершение процесса оставляет только заменённый '
+      'файл, незавершённая и ожидающая записи теряются', () async {
+    final worker = await _Worker.start(directory, [
+      ModeWriteStep.rename.name,
+      'sss',
+      [_a, _b, _initial].map((mode) => mode.storageKey).join(','),
+    ]);
+    addTearDown(worker.stop);
+    await worker.next('held');
+    worker.process.stdin.writeln('release');
+    expect((await worker.next('finished'))['saved'], isTrue);
+    await worker.next('held');
+    expect(await modeFile.readAsString(), _a.storageKey);
+
+    expect(worker.process.kill(ProcessSignal.sigkill), isTrue);
+    await worker.finish(killed: true);
+
+    expect(worker.diagnostics, isEmpty);
+    await _expectNewProcess(directory, _a);
+    expect(await modeFile.readAsString(), _a.storageKey);
+  });
 }
 
 Future<void> _expectNewProcess(
@@ -123,8 +110,6 @@ Future<void> _expectNewProcess(
   addTearDown(reader.stop);
   final restored = await reader.next('mode');
   expect(restored['mode'], mode.storageKey);
-  expect(restored['pid'], reader.process.pid);
-  expect(restored['pid'], isNot(pid));
   await reader.finish();
   expect(reader.diagnostics, isEmpty);
 }

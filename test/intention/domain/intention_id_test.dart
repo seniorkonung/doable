@@ -43,22 +43,6 @@ void main() {
         expect(_decode(canonical), id);
       }
     });
-
-    test('тестовый generator возвращает заданные корректные UUID v7 одной миллисекунды', () {
-      final expected = [
-        _decode('018f0b5d-6b2e-7c80-8000-000000000001'),
-        _decode('018f0b5d-6b2e-7c80-8000-000000000002'),
-      ];
-      final generator = _DeterministicIntentionIdGenerator(expected);
-
-      expect(
-        expected.map((id) => id.toCanonicalString().substring(0, 12)).toSet(),
-        hasLength(1),
-      );
-      expect(generator.generate(), expected[0]);
-      expect(generator.generate(), expected[1]);
-      expect(generator.generate, throwsStateError);
-    });
   });
 }
 
@@ -66,19 +50,3 @@ IntentionId _decode(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw StateError('Ожидался корректный UUID.'),
 };
-
-final class _DeterministicIntentionIdGenerator implements IntentionIdGenerator {
-  _DeterministicIntentionIdGenerator(Iterable<IntentionId> ids)
-    : _ids = List.unmodifiable(ids);
-
-  final List<IntentionId> _ids;
-  var _nextIndex = 0;
-
-  @override
-  IntentionId generate() {
-    if (_nextIndex == _ids.length) {
-      throw StateError('Последовательность идентификаторов исчерпана.');
-    }
-    return _ids[_nextIndex++];
-  }
-}

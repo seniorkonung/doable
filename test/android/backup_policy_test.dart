@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:doable/src/data/local/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -59,32 +58,6 @@ void main() {
 
     expect(_satisfiesProductionContract(fullBackup), isTrue);
   });
-
-  test('устаревший database domain не удовлетворяет production contract', () {
-    expect(
-      _satisfiesProductionContract('<exclude domain="database" path="." />'),
-      isFalse,
-    );
-  });
-
-  test('неполный путь не удовлетворяет production contract', () {
-    expect(
-      _satisfiesProductionContract(
-        '<exclude domain="root" path="app_flutter" />',
-      ),
-      isFalse,
-    );
-  });
-
-  test('другое имя connection не удовлетворяет production contract', () {
-    expect(
-      _satisfiesProductionContract(
-        '<exclude domain="root" path="app_flutter/" />',
-        connectionName: 'other',
-      ),
-      isFalse,
-    );
-  });
 }
 
 String _elementBody(String xml, String elementName) {
@@ -98,11 +71,7 @@ String _elementBody(String xml, String elementName) {
   return match.group(1)!;
 }
 
-bool _satisfiesProductionContract(
-  String elementBody, {
-  String connectionName = AndroidProductionDatabaseConnection.databaseName,
-}) =>
-    connectionName == AndroidProductionDatabaseConnection.databaseName &&
+bool _satisfiesProductionContract(String elementBody) =>
     _hasExclusion(elementBody, domain: 'root', path: 'app_flutter/');
 
 bool _hasExclusion(

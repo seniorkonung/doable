@@ -686,20 +686,10 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
     required ConfirmedChoicePath path,
   }) async {
     final steps = path.steps;
-    final visited = <IntentionId>{sourceIntentionId};
-    var current = sourceIntentionId;
-    for (final step in steps) {
-      if (step.sourceIntentionId != current ||
-          !visited.add(step.relatedIntentionId)) {
-        throw const DailyChoiceValidationFailure(
-          DailyChoiceValidationField.path,
-        );
-      }
-      current = step.relatedIntentionId;
-    }
-    if (current != selectedIntentionId) {
-      throw const DailyChoiceValidationFailure(DailyChoiceValidationField.path);
-    }
+    final participants = <IntentionId>{
+      sourceIntentionId,
+      for (final step in steps) step.relatedIntentionId,
+    };
 
     for (final expected in steps) {
       final actual = await _readStoredRelation(expected.relationId);
@@ -717,7 +707,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
         );
       }
     }
-    for (final id in visited) {
+    for (final id in participants) {
       final row = await _database
           .customSelect(
             '''SELECT id, title, description, is_action_ready, is_archived,

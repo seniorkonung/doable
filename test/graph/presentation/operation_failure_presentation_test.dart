@@ -1,31 +1,19 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_command_failure_message.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/intention/presentation/operation/operation_state.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
@@ -44,7 +32,7 @@ void main() {
   });
 
   testWidgets(
-    'рисует конкретное сообщение с live-region семантикой и подтверждает его кадр',
+    'рисует конкретное сообщение с live-region семантикой и не повторяет его на общей поверхности',
     (tester) async {
       final harness = _FailureHarness();
       addTearDown(harness.dispose);
@@ -59,6 +47,7 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
 
       expect(find.text('Ошибка сохранения'), findsOneWidget);
       expect(
@@ -71,22 +60,18 @@ void main() {
           textDirection: TextDirection.ltr,
         ),
       );
-      expect(harness.claimAgain(claim), isNull);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 
   testWidgets(
-    'не подменяет область ошибки видимым полем и освобождает исчезнувший renderer',
+    'не подменяет область ошибки видимым полем, а исчезнувший скрытый renderer передаёт отказ общей поверхности',
     (tester) async {
       final harness = _FailureHarness();
       addTearDown(harness.dispose);
       final claim = await harness.createClaim(index: 2);
       final showError = ValueNotifier(true);
       addTearDown(showError.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
 
       await tester.pumpWidget(
         harness.app(
@@ -111,88 +96,30 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
+      // Невидимая ошибка не считается предъявленной, но и общая поверхность
+      // её ещё не показывает.
       expect(find.text('Поле'), findsOneWidget);
-      expect(harness.claimAgain(claim), same(claim));
-      expect(fallback, isNull);
+      expect(find.byType(SnackBar), findsNothing);
 
       showError.value = false;
-      await tester.pump();
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(fallback?.token, same(claim.token));
+      expect(find.text(_notDeleted('Намерение')), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 
-  testWidgets('удерживает claim при временной прозрачности renderer', (
-    tester,
-  ) async {
-    final harness = _FailureHarness();
-    addTearDown(harness.dispose);
-    final claim = await harness.createClaim(index: 3);
-    final opacity = ValueNotifier(0.0);
-    addTearDown(opacity.dispose);
-
-    await tester.pumpWidget(
-      harness.app(
-        ValueListenableBuilder<double>(
-          valueListenable: opacity,
-          builder: (context, value, _) => Opacity(
-            opacity: value,
-            child: OperationFailurePresentation(
-              claim: claim,
-              message: 'Временно скрытая ошибка',
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    expect(harness.claimAgain(claim), same(claim));
-
-    opacity.value = 1;
-    await tester.pump();
-
-    expect(harness.claimAgain(claim), isNull);
-  });
-
-  testWidgets('не подтверждает claim без фокуса до возвращения в resumed', (
-    tester,
-  ) async {
-    final harness = _FailureHarness();
-    addTearDown(harness.dispose);
-    final claim = await harness.createClaim(index: 4);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-
-    await tester.pumpWidget(
-      harness.app(
-        OperationFailurePresentation(claim: claim, message: 'Ошибка'),
-      ),
-    );
-    await tester.pump();
-
-    expect(harness.claimAgain(claim), same(claim));
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-
-    expect(harness.claimAgain(claim), isNull);
-  });
-
   testWidgets(
-    'смена локализованного сообщения сохраняет renderer и его claim',
+    'смена локализованного сообщения не отдаёт отказ общей поверхности',
     (tester) async {
       final harness = _FailureHarness();
       addTearDown(harness.dispose);
       final claim = await harness.createClaim(index: 9);
       final message = ValueNotifier('The operation failed.');
       addTearDown(message.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
 
       await tester.pumpWidget(
@@ -212,63 +139,14 @@ void main() {
 
       expect(find.text('The operation failed.'), findsNothing);
       expect(find.text('Операцию выполнить не удалось.'), findsOneWidget);
-      expect(harness.claimAgain(claim), same(claim));
-      expect(fallback, isNull);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(harness.claimAgain(claim), isNull);
-      expect(fallback, isNull);
+      expect(find.text('Операцию выполнить не удалось.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
-
-  testWidgets('удерживает renderer на скрытом маршруте до его возвращения', (
-    tester,
-  ) async {
-    final harness = _FailureHarness();
-    addTearDown(harness.dispose);
-    final claim = await harness.createClaim(index: 7);
-    final currentClaim = ValueNotifier<GraphInitiatorPresentationClaim?>(null);
-    addTearDown(currentClaim.dispose);
-
-    await tester.pumpWidget(
-      harness.app(
-        Builder(
-          builder: (context) => Column(
-            children: [
-              TextButton(
-                onPressed: () => showDialog<void>(
-                  context: context,
-                  builder: (_) => const AlertDialog(content: Text('Диалог')),
-                ),
-                child: const Text('Открыть диалог'),
-              ),
-              ValueListenableBuilder<GraphInitiatorPresentationClaim?>(
-                valueListenable: currentClaim,
-                builder: (context, value, _) => OperationFailurePresentation(
-                  claim: value,
-                  message: 'Ошибка под диалогом',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    await tester.tap(find.text('Открыть диалог'));
-    await tester.pumpAndSettle();
-
-    currentClaim.value = claim;
-    await tester.pumpAndSettle();
-    expect(harness.claimAgain(claim), same(claim));
-
-    await tester.tapAt(const Offset(8, 8));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Диалог'), findsNothing);
-    expect(harness.claimAgain(claim), isNull);
-  });
 
   testWidgets('исчезновение после подтверждения не возвращает результат', (
     tester,
@@ -278,10 +156,6 @@ void main() {
     final claim = await harness.createClaim(index: 8);
     final showError = ValueNotifier(true);
     addTearDown(showError.dispose);
-    GraphAppPresentationClaim? fallback;
-    unawaited(
-      harness.registration.nextClaim().then((value) => fallback = value),
-    );
 
     await tester.pumpWidget(
       harness.app(
@@ -296,28 +170,25 @@ void main() {
         ),
       ),
     );
-    expect(harness.claimAgain(claim), isNull);
+    await tester.pumpAndSettle();
+    expect(find.text('Предъявленная ошибка'), findsOneWidget);
 
     showError.value = false;
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    expect(fallback, isNull);
+    expect(find.text('Предъявленная ошибка'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
   });
 
   testWidgets(
-    'замена renderer освобождает прежний claim и не даёт старому callback подтвердить новый',
+    'замена renderer передаёт общей поверхности только прежний отказ, а новый остаётся в renderer',
     (tester) async {
       final harness = _FailureHarness();
       addTearDown(harness.dispose);
-      final first = await harness.createClaim(index: 5);
-      final second = await harness.createClaim(index: 6);
+      final first = await harness.createClaim(index: 5, title: 'Первое');
+      final second = await harness.createClaim(index: 6, title: 'Второе');
       final current = ValueNotifier((claim: first, message: 'Первая ошибка'));
       addTearDown(current.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
 
       await tester.pumpWidget(
@@ -339,304 +210,85 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(fallback?.token, same(first.token));
-      expect(harness.claimAgain(second), same(second));
-
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(harness.claimAgain(second), isNull);
+      expect(find.text('Вторая ошибка'), findsOneWidget);
+      expect(find.text(_notDeleted('Первое')), findsOneWidget);
+      expect(find.text(_notDeleted('Второе')), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 
+  // Тексты по языкам проверяют тесты сообщений об отказе; здесь важна проводка
+  // инлайн-отображения, поэтому достаточно русского.
+  const scenario = (
+    locale: Locale('ru'),
+    failure: 'Этого намерения больше нет. Обновите подробности.',
+    busy: 'Изменение назначения тега уже выполняется. Дождитесь результата.',
+  );
   testWidgets(
-    'ошибка создания связи подтверждается кадром своего инлайн-renderer',
+    'инлайн-отказ назначения и занятость доступны для ${scenario.locale.languageCode}',
     (tester) async {
       final harness = _FailureHarness();
       addTearDown(harness.dispose);
-      final claim = await harness.createRelationClaim();
+      final claim = await harness.createAssignmentClaim();
 
       await tester.pumpWidget(
         harness.app(
-          OperationFailurePresentation(
-            claim: claim,
-            message: 'Не удалось создать связь',
-            messageKey: const ValueKey('relation-failure-message'),
+          Builder(
+            builder: (context) => Column(
+              children: [
+                OperationFailurePresentation(
+                  claim: claim,
+                  message: tagAssignmentFailureMessage(
+                    AppLocalizations.of(context),
+                    TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
+                  ),
+                  messageKey: const ValueKey('assignment-failure-message'),
+                ),
+                OperationFailurePresentation(
+                  claim: null,
+                  message: tagAssignmentStartMessage(
+                    AppLocalizations.of(context),
+                    const TagCommandAlreadyRunning(),
+                  )!,
+                  messageKey: const ValueKey('assignment-busy-message'),
+                ),
+              ],
+            ),
           ),
+          locale: scenario.locale,
         ),
       );
+      await tester.pumpAndSettle();
 
+      expect(find.text(scenario.failure), findsOneWidget);
+      expect(find.text(scenario.busy), findsOneWidget);
       expect(
         tester.getSemantics(
-          find.byKey(const ValueKey('relation-failure-message')),
+          find.byKey(const ValueKey('assignment-failure-message')),
         ),
         matchesSemantics(
-          label: 'Не удалось создать связь',
+          label: scenario.failure,
           isLiveRegion: true,
           textDirection: TextDirection.ltr,
         ),
       );
-      expect(harness.claimAgain(claim), isNull);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 
   testWidgets(
-    'исчезновение renderer связи до кадра передаёт результат оболочке',
-    (tester) async {
-      final harness = _FailureHarness();
-      addTearDown(harness.dispose);
-      final claim = await harness.createRelationClaim();
-      final showError = ValueNotifier(true);
-      addTearDown(showError.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-
-      await tester.pumpWidget(
-        harness.app(
-          ValueListenableBuilder<bool>(
-            valueListenable: showError,
-            builder: (context, visible, _) => visible
-                ? OperationFailurePresentation(
-                    claim: claim,
-                    message: 'Не удалось создать связь',
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(harness.claimAgain(claim), same(claim));
-      expect(fallback, isNull);
-
-      showError.value = false;
-      await tester.pump();
-      await tester.pump();
-
-      expect(fallback?.token, same(claim.token));
-      expect(
-        fallback?.completion,
-        isA<LongTermRelationCommandCompletion>().having(
-          (completion) => completion.kind,
-          'вид операции',
-          LongTermRelationCommandKind.create,
-        ),
-      );
-    },
-  );
-
-  for (final scenario in <({Locale locale, String message})>[
-    (locale: const Locale('en'), message: 'Enter a tag name.'),
-    (locale: const Locale('ru'), message: 'Введите название тега.'),
-  ]) {
-    testWidgets(
-      'ошибка тега предъявляется своим инлайн-сообщением для ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = _FailureHarness();
-        addTearDown(harness.dispose);
-        final claim = await harness.createTagClaim();
-
-        await tester.pumpWidget(
-          harness.app(
-            Builder(
-              builder: (context) => OperationFailurePresentation(
-                claim: claim,
-                message: tagFailureMessage(
-                  AppLocalizations.of(context),
-                  const TagNameInputFailure(TagNameFailureReason.empty),
-                ),
-                messageKey: const ValueKey('tag-failure-message'),
-              ),
-            ),
-            locale: scenario.locale,
-          ),
-        );
-
-        expect(find.text(scenario.message), findsOneWidget);
-        expect(
-          tester.getSemantics(
-            find.byKey(const ValueKey('tag-failure-message')),
-          ),
-          matchesSemantics(
-            label: scenario.message,
-            isLiveRegion: true,
-            textDirection: TextDirection.ltr,
-          ),
-        );
-        expect(harness.claimAgain(claim), isNull);
-      },
-    );
-  }
-
-  for (final scenario in <({Locale locale, String failure, String busy})>[
-    (
-      locale: const Locale('en'),
-      failure: 'This intention no longer exists. Refresh its details.',
-      busy: 'A tag assignment change is already in progress. Wait for its result.',
-    ),
-    (
-      locale: const Locale('ru'),
-      failure: 'Этого намерения больше нет. Обновите подробности.',
-      busy: 'Изменение назначения тега уже выполняется. Дождитесь результата.',
-    ),
-  ]) {
-    testWidgets(
-      'инлайн-отказ назначения и занятость доступны для ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = _FailureHarness();
-        addTearDown(harness.dispose);
-        final claim = await harness.createAssignmentClaim();
-
-        await tester.pumpWidget(
-          harness.app(
-            Builder(
-              builder: (context) => Column(
-                children: [
-                  OperationFailurePresentation(
-                    claim: claim,
-                    message: tagAssignmentFailureMessage(
-                      AppLocalizations.of(context),
-                      TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
-                    ),
-                    messageKey: const ValueKey('assignment-failure-message'),
-                  ),
-                  OperationFailurePresentation(
-                    claim: null,
-                    message: tagAssignmentStartMessage(
-                      AppLocalizations.of(context),
-                      const TagCommandAlreadyRunning(),
-                    )!,
-                    messageKey: const ValueKey('assignment-busy-message'),
-                  ),
-                ],
-              ),
-            ),
-            locale: scenario.locale,
-          ),
-        );
-
-        expect(find.text(scenario.failure), findsOneWidget);
-        expect(find.text(scenario.busy), findsOneWidget);
-        expect(
-          tester.getSemantics(
-            find.byKey(const ValueKey('assignment-failure-message')),
-          ),
-          matchesSemantics(
-            label: scenario.failure,
-            isLiveRegion: true,
-            textDirection: TextDirection.ltr,
-          ),
-        );
-        expect(harness.claimAgain(claim), isNull);
-      },
-    );
-  }
-
-  testWidgets(
-    'исчезнувшая до кадра ошибка тега передаёт право общей поверхности',
-    (tester) async {
-      final harness = _FailureHarness();
-      addTearDown(harness.dispose);
-      final claim = await harness.createTagClaim();
-      final showError = ValueNotifier(true);
-      addTearDown(showError.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-
-      await tester.pumpWidget(
-        harness.app(
-          ValueListenableBuilder<bool>(
-            valueListenable: showError,
-            builder: (context, visible, _) => visible
-                ? OperationFailurePresentation(
-                    claim: claim,
-                    message: 'Введите название тега.',
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
-      );
-      await tester.pump();
-      expect(harness.claimAgain(claim), same(claim));
-      expect(fallback, isNull);
-
-      showError.value = false;
-      await tester.pump();
-      await tester.pump();
-      expect(fallback?.token, same(claim.token));
-      expect(fallback?.completion, isA<TagCommandCompletion>());
-    },
-  );
-
-  for (final scenario in <({Locale locale, String message})>[
-    (locale: const Locale('en'), message: 'Check the entered data.'),
-    (locale: const Locale('ru'), message: 'Проверьте введённые данные.'),
-  ]) {
-    testWidgets(
-      'отказ отсутствующих тегов полного создания подтверждается кадром живой формы для ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = _FailureHarness();
-        addTearDown(harness.dispose);
-        final claim = await harness.createFullCreationTagsMissingClaim();
-        GraphAppPresentationClaim? fallback;
-        unawaited(
-          harness.registration.nextClaim().then((value) => fallback = value),
-        );
-
-        await tester.pumpWidget(
-          harness.app(
-            Builder(
-              builder: (context) => OperationFailurePresentation(
-                claim: claim,
-                message: AppLocalizations.of(context).editorInvalidInput,
-                messageKey: const ValueKey('creation-failure-message'),
-              ),
-            ),
-            locale: scenario.locale,
-          ),
-        );
-
-        expect(find.text(scenario.message), findsOneWidget);
-        expect(
-          tester.getSemantics(
-            find.byKey(const ValueKey('creation-failure-message')),
-          ),
-          matchesSemantics(
-            label: scenario.message,
-            isLiveRegion: true,
-            textDirection: TextDirection.ltr,
-          ),
-        );
-        expect(harness.claimAgain(claim), isNull);
-
-        // Предъявленная формой ошибка не повторяется общей поверхностью
-        // после закрытия формы.
-        harness.coordinator.releaseInitiatorPresentation(claim.token);
-        await tester.pumpWidget(harness.app(const SizedBox.shrink()));
-        await tester.pump();
-        expect(fallback, isNull);
-      },
-    );
-  }
-
-  testWidgets(
-    'исчезнувшая до кадра форма передаёт отказ отсутствующих тегов общей поверхности тем же token',
+    'исчезнувшая до кадра форма передаёт отказ отсутствующих тегов общей поверхности один раз',
     (tester) async {
       final harness = _FailureHarness();
       addTearDown(harness.dispose);
       final claim = await harness.createFullCreationTagsMissingClaim();
       final showError = ValueNotifier(true);
       addTearDown(showError.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
 
       await tester.pumpWidget(
@@ -653,246 +305,20 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(harness.claimAgain(claim), same(claim));
-      expect(fallback, isNull);
 
       showError.value = false;
       await tester.pump();
       await tester.pump();
-      expect(fallback?.token, same(claim.token));
-      expect(
-        fallback?.completion,
-        isA<IntentionCommandCompletion>()
-            .having(
-              (completion) => completion.kind,
-              'вид операции',
-              IntentionCommandKind.create,
-            )
-            .having(
-              (completion) => completion.result,
-              'исход',
-              isA<ResultFailure<IntentionCommandSuccess>>().having(
-                (result) => result.failure,
-                'отказ',
-                isA<IntentionCreationTagsMissingFailure>(),
-              ),
-            ),
-      );
 
       // Возвращение фокуса не даёт кадру исчезнувшей формы подтвердить
-      // право общей поверхности.
+      // предъявление: общая поверхность показывает отказ сама, один раз.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pump();
-      expect(harness.claimAgain(claim), isNull);
-      harness.registration.release();
-      final replacement = harness.coordinator.registerAppPresentation();
-      addTearDown(replacement.release);
-      expect((await replacement.nextClaim())?.token, same(claim.token));
-    },
-  );
+      await tester.pumpAndSettle();
+      expect(find.text(_tagsMissingMessage), findsOneWidget);
+      expect(find.text('Проверьте введённые данные.'), findsNothing);
 
-  testWidgets('массовый отказ подтверждается кадром инлайн-renderer', (
-    tester,
-  ) async {
-    final harness = _FailureHarness();
-    addTearDown(harness.dispose);
-    final claim = await harness.createBlockingRelationsClaim();
-
-    await tester.pumpWidget(
-      harness.app(
-        OperationFailurePresentation(
-          claim: claim,
-          message: 'Выбранные связи не удалены',
-          messageKey: const ValueKey('blocking-relations-failure-message'),
-        ),
-      ),
-    );
-
-    expect(
-      tester.getSemantics(
-        find.byKey(const ValueKey('blocking-relations-failure-message')),
-      ),
-      matchesSemantics(
-        label: 'Выбранные связи не удалены',
-        isLiveRegion: true,
-        textDirection: TextDirection.ltr,
-      ),
-    );
-    expect(harness.claimAgain(claim), isNull);
-  });
-
-  testWidgets(
-    'исчезновение массовой инлайн-ошибки до кадра передаёт тот же token оболочке',
-    (tester) async {
-      final harness = _FailureHarness();
-      addTearDown(harness.dispose);
-      final claim = await harness.createBlockingRelationsClaim();
-      final showError = ValueNotifier(true);
-      addTearDown(showError.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-
-      await tester.pumpWidget(
-        harness.app(
-          ValueListenableBuilder<bool>(
-            valueListenable: showError,
-            builder: (context, visible, _) => visible
-                ? OperationFailurePresentation(
-                    claim: claim,
-                    message: 'Выбранные связи не удалены',
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
-      );
-      await tester.pump();
-      expect(harness.claimAgain(claim), same(claim));
-      expect(fallback, isNull);
-
-      showError.value = false;
-      await tester.pump();
-      await tester.pump();
-      expect(fallback?.token, same(claim.token));
-      expect(fallback?.completion, isA<BlockingRelationsDeleteCompletion>());
-    },
-  );
-
-  for (final scenario in <({Locale locale, String message})>[
-    (locale: const Locale('en'), message: 'Check the daily choice date.'),
-    (locale: const Locale('ru'), message: 'Проверьте дату дневного выбора.'),
-  ]) {
-    testWidgets(
-      'дневная ошибка поля доступна локально для ${scenario.locale.languageCode}',
-      (tester) async {
-        final harness = _FailureHarness();
-        addTearDown(harness.dispose);
-        final claim = await harness.createDailyChoiceClaim();
-
-        await tester.pumpWidget(
-          harness.app(
-            Builder(
-              builder: (context) => OperationFailurePresentation(
-                claim: claim,
-                message: dailyChoiceCommandFailureMessage(
-                  AppLocalizations.of(context),
-                  const DailyChoiceValidationFailure(
-                    DailyChoiceValidationField.date,
-                  ),
-                ),
-                messageKey: const ValueKey('daily-choice-failure-message'),
-              ),
-            ),
-            locale: scenario.locale,
-          ),
-        );
-
-        expect(find.text(scenario.message), findsOneWidget);
-        expect(
-          tester.getSemantics(
-            find.byKey(const ValueKey('daily-choice-failure-message')),
-          ),
-          matchesSemantics(
-            label: scenario.message,
-            isLiveRegion: true,
-            textDirection: TextDirection.ltr,
-          ),
-        );
-        expect(harness.claimAgain(claim), isNull);
-      },
-    );
-  }
-
-  testWidgets(
-    'исчезнувшая дневная ошибка передаётся оболочке после потери фокуса',
-    (tester) async {
-      final harness = _FailureHarness();
-      addTearDown(harness.dispose);
-      final claim = await harness.createDailyChoiceClaim();
-      final showError = ValueNotifier(true);
-      addTearDown(showError.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-
-      await tester.pumpWidget(
-        harness.app(
-          ValueListenableBuilder<bool>(
-            valueListenable: showError,
-            builder: (context, visible, _) => visible
-                ? OperationFailurePresentation(
-                    claim: claim,
-                    message: 'Проверьте дату дневного выбора.',
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
-      );
-      await tester.pump();
-      expect(harness.claimAgain(claim), same(claim));
-      expect(fallback, isNull);
-
-      showError.value = false;
-      await tester.pump();
-      await tester.pump();
-      expect(fallback?.token, same(claim.token));
-      expect(fallback?.completion, isA<DailyChoiceCommandCompletion>());
-    },
-  );
-
-  testWidgets(
-    'запоздалый кадр ошибки повтора не подтверждает заменившую её ошибку замены',
-    (tester) async {
-      final harness = _FailureHarness();
-      addTearDown(harness.dispose);
-      final repeatClaim = await harness.createDailyPathClaim(replace: false);
-      final replacementClaim = await harness.createDailyPathClaim(
-        replace: true,
-      );
-      final current = ValueNotifier((
-        claim: repeatClaim,
-        message: 'Не удалось повторить маршрут',
-      ));
-      addTearDown(current.dispose);
-      GraphAppPresentationClaim? fallback;
-      unawaited(
-        harness.registration.nextClaim().then((value) => fallback = value),
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-
-      await tester.pumpWidget(
-        harness.app(
-          ValueListenableBuilder<
-            ({GraphInitiatorPresentationClaim claim, String message})
-          >(
-            valueListenable: current,
-            builder: (context, value, _) => OperationFailurePresentation(
-              claim: value.claim,
-              message: value.message,
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      expect(harness.claimAgain(repeatClaim), same(repeatClaim));
-
-      current.value = (
-        claim: replacementClaim,
-        message: 'Не удалось заменить путь',
-      );
-      await tester.pump();
-      await tester.pump();
-      expect(fallback?.token, same(repeatClaim.token));
-      expect(harness.claimAgain(replacementClaim), same(replacementClaim));
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pump();
-      expect(harness.claimAgain(replacementClaim), isNull);
-      expect(fallback?.token, same(repeatClaim.token));
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 
@@ -904,10 +330,6 @@ void main() {
         addTearDown(harness.dispose);
         final provider = intentionEditorViewModelProvider(
           IntentionCreationFormKey(),
-        );
-        GraphAppPresentationClaim? fallback;
-        unawaited(
-          harness.registration.nextClaim().then((value) => fallback = value),
         );
         await _openCreationSession(tester, harness, provider);
         harness.container.read(provider.notifier)
@@ -924,34 +346,27 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Временное перекрытие подтверждением сохраняет право renderer.
-        final claim = harness.container.read(provider).failurePresentation!;
+        // Временное перекрытие подтверждением сохраняет отказ у формы.
         expect(find.text(_creationFailureMessage), findsOneWidget);
-        expect(harness.claimAgain(claim), same(claim));
-        expect(fallback, isNull);
+        expect(find.byType(SnackBar), findsNothing);
 
         await tester.tap(find.text('Сбросить'));
         await tester.pumpAndSettle();
 
         expect(find.text(_savingContinuesWarning), findsNothing);
         expect(find.text('Закрыть'), findsOneWidget);
-        expect(harness.claimAgain(claim), isNull);
-        expect(fallback, isNull);
-        expect(harness.container.read(provider).draft.title, 'Намерение');
+        expect(find.text(_creationFailureMessage), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
       },
     );
 
     testWidgets(
-      'сброс сессии до предъявления отказа передаёт его право общей поверхности тем же token',
+      'сброс сессии до предъявления отказа передаёт его общей поверхности один раз',
       (tester) async {
         final harness = _FailureHarness();
         addTearDown(harness.dispose);
         final provider = intentionEditorViewModelProvider(
           IntentionCreationFormKey(),
-        );
-        GraphAppPresentationClaim? fallback;
-        unawaited(
-          harness.registration.nextClaim().then((value) => fallback = value),
         );
         await _openCreationSession(tester, harness, provider);
         harness.container.read(provider.notifier)
@@ -965,8 +380,6 @@ void main() {
           const ResultFailure(IntentionUnavailableFailure()),
         );
         await tester.pumpAndSettle();
-        final claim = harness.container.read(provider).failurePresentation!;
-        expect(harness.claimAgain(claim), same(claim));
 
         await tester.tap(find.text('Закрыть'));
         await tester.pumpAndSettle();
@@ -976,30 +389,17 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Подтверждение перекрывает живой renderer: право остаётся у него.
-        expect(harness.claimAgain(claim), same(claim));
-        expect(fallback, isNull);
+        // Подтверждение перекрывает живую форму: отказ остаётся у неё.
+        expect(find.byType(SnackBar), findsNothing);
 
         await tester.tap(find.text('Сбросить'));
         await tester.pumpAndSettle();
 
         expect(find.text('Закрыть'), findsNothing);
         expect(find.text(_creationFailureMessage), findsNothing);
-        expect(fallback?.token, same(claim.token));
-        expect(
-          fallback?.completion,
-          isA<IntentionCommandCompletion>().having(
-            (completion) => completion.result,
-            'исход',
-            isA<ResultFailure<IntentionCommandSuccess>>().having(
-              (result) => result.failure,
-              'отказ',
-              isA<IntentionUnavailableFailure>(),
-            ),
-          ),
-        );
-        expect(harness.claimAgain(claim), isNull);
-        harness.coordinator.confirmPresentation(fallback!);
+        expect(find.text(_creationShellMessage), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
       },
     );
   });
@@ -1013,7 +413,6 @@ void main() {
         final provider = intentionEditorViewModelProvider(
           IntentionCreationFormKey(),
         );
-        final appSurface = _presentOnAppSurface(harness);
         await _openCreationSession(tester, harness, provider);
         harness.container.read(provider.notifier)
           ..changeTitle('Намерение')
@@ -1026,25 +425,17 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Перекрытая форма не построила отказ и не предъявила его, а общая
-        // поверхность его не получила.
-        final claim = harness.container.read(provider).failurePresentation!;
+        // Перекрытая форма отказ не показывает, и общая поверхность тоже.
         expect(find.byType(TagCatalogView), findsOneWidget);
-        expect(
-          find.text(_creationFailureMessage, skipOffstage: false),
-          findsNothing,
-        );
-        expect(harness.claimAgain(claim), same(claim));
-        expect(appSurface, isEmpty);
+        expect(find.text(_creationFailureMessage), findsNothing);
+        expect(find.byType(SnackBar), findsNothing);
 
         await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
 
         expect(find.byType(TagCatalogView), findsNothing);
         expect(find.text(_creationFailureMessage), findsOneWidget);
-        expect(harness.claimAgain(claim), isNull);
-        expect(appSurface, isEmpty);
-        expect(harness.repository.commands, hasLength(1));
+        expect(find.byType(SnackBar), findsNothing);
       },
     );
 
@@ -1054,9 +445,9 @@ void main() {
         (tester) async {
           final harness = _FailureHarness();
           addTearDown(harness.dispose);
-          final formKey = IntentionCreationFormKey();
-          final provider = intentionEditorViewModelProvider(formKey);
-          final appSurface = _presentOnAppSurface(harness);
+          final provider = intentionEditorViewModelProvider(
+            IntentionCreationFormKey(),
+          );
           await _openCreationSession(tester, harness, provider);
           harness.container.read(provider.notifier)
             ..changeTitle('Намерение')
@@ -1068,14 +459,8 @@ void main() {
             const ResultFailure(IntentionUnavailableFailure()),
           );
           await tester.pumpAndSettle();
-          // Renderer перекрытого хоста право не получал.
-          final claim = harness.container.read(provider).failurePresentation!;
-          expect(
-            find.text(_creationFailureMessage, skipOffstage: false),
-            findsNothing,
-          );
-          expect(harness.claimAgain(claim), same(claim));
-          expect(appSurface, isEmpty);
+          expect(find.text(_creationFailureMessage), findsNothing);
+          expect(find.byType(SnackBar), findsNothing);
 
           removal.apply(
             Navigator.of(tester.element(find.byType(TagCatalogView))),
@@ -1083,29 +468,10 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(find.byType(TagCatalogView), findsNothing);
-          expect(find.text('Закрыть'), findsNothing);
           expect(find.text(_creationFailureMessage), findsNothing);
-          expect(appSurface.map((claim) => claim.completion), [
-            isA<IntentionCommandCompletion>()
-                .having(
-                  (completion) => completion.token,
-                  'token',
-                  same(claim.token),
-                )
-                .having(
-                  (completion) => completion.result,
-                  'исход',
-                  isA<ResultFailure<IntentionCommandSuccess>>().having(
-                    (result) => result.failure,
-                    'отказ',
-                    isA<IntentionUnavailableFailure>(),
-                  ),
-                ),
-          ]);
-          // Запись координатора не остаётся: право больше никому не выдаётся.
-          expect(harness.claimAgain(claim), isNull);
-          expect(harness.coordinator.isKeyRunning(formKey), isFalse);
-          expect(harness.repository.commands, hasLength(1));
+          expect(find.text(_creationShellMessage), findsOneWidget);
+          await _closeMessage(tester);
+          expect(find.byType(SnackBar), findsNothing);
         },
       );
     }
@@ -1140,23 +506,13 @@ enum _HostRemoval {
   };
 }
 
-/// Общая поверхность приложения: получает права по очереди и сразу
-/// подтверждает каждое предъявление; возвращает предъявленные права.
-List<GraphAppPresentationClaim> _presentOnAppSurface(_FailureHarness harness) {
-  final presented = <GraphAppPresentationClaim>[];
-  void requestNext() => unawaited(
-    harness.registration.nextClaim().then((claim) {
-      if (claim == null) {
-        return;
-      }
-      presented.add(claim);
-      harness.coordinator.confirmPresentation(claim);
-      requestNext();
-    }),
-  );
-  requestNext();
-  return presented;
+Future<void> _closeMessage(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
 }
+
+String _notDeleted(String title) =>
+    'Delete — “$title”: The intention couldn’t be deleted. Try again.';
 
 /// Открывает существующую страницу выбора тегов с контекстом черновика
 /// сессии непрозрачным маршрутом поверх её хоста.
@@ -1166,6 +522,12 @@ Future<void> _openTagChooser(WidgetTester tester) async {
 }
 
 const _creationFailureMessage = 'Не удалось создать намерение';
+
+/// Сообщение общей поверхности об отказе создания (английский язык по
+/// умолчанию).
+const _creationShellMessage =
+    'Create — “new intention”: The intention couldn’t be created. Try again.';
+const _tagsMissingMessage = 'Create — “new intention”: Check the entered data.';
 const _draftLossWarning = 'Несохранённый черновик будет потерян';
 const _savingContinuesWarning =
     'Несохранённый черновик будет потерян, сохранение продолжится';
@@ -1293,9 +655,7 @@ final class _CreationSessionRoute extends ConsumerWidget {
 }
 
 final class _FailureHarness {
-  _FailureHarness._(this.repository, this.container) {
-    registration = coordinator.registerAppPresentation();
-  }
+  _FailureHarness._(this.repository, this.container);
 
   factory _FailureHarness() {
     final repository = ControlledDetailsRepository();
@@ -1312,15 +672,15 @@ final class _FailureHarness {
 
   final ControlledDetailsRepository repository;
   final ProviderContainer container;
-  late final GraphAppPresentationRegistration registration;
 
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
 
   Future<GraphInitiatorPresentationClaim> createClaim({
     required int index,
+    String title = 'Намерение',
   }) async {
-    final intention = testDetailsIntention(index: index);
+    final intention = testDetailsIntention(index: index, title: title);
     final accepted = coordinator.acceptExisting(
       DeleteIntention(intention.id),
       presentationTitle: intention.title,
@@ -1361,41 +721,6 @@ final class _FailureHarness {
     return coordinator.claimInitiatorFailure(accepted.token)!;
   }
 
-  Future<GraphInitiatorPresentationClaim> createRelationClaim() async {
-    final accepted = coordinator.acceptRelationCreation(
-      LongTermRelationCreationFormKey(),
-      CreateLongTermRelation(
-        sourceIntentionId: testDetailsIntentionId(1),
-        relatedIntentionId: testDetailsIntentionId(2),
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p1,
-        description: null,
-      ),
-    ) as LongTermRelationCommandAccepted;
-    repository.completeRelationCommand(
-      repository.relationCommands.length - 1,
-      const GraphCommandFailed<
-        LongTermRelationCommandSuccess,
-        LongTermRelationCommandFailure
-      >(LongTermRelationUnavailableFailure()),
-    );
-    await accepted.future;
-    return coordinator.claimInitiatorFailure(accepted.token)!;
-  }
-
-  Future<GraphInitiatorPresentationClaim> createTagClaim() async {
-    final accepted = coordinator.acceptTagCreation(
-      TagCreationFormKey(),
-      CreateTag(TagName.fromInput('Планы')),
-    ) as TagCommandAccepted;
-    repository.completeTagCommand(
-      repository.tagCommands.length - 1,
-      const TagCommandFailed(TagNameInputFailure(TagNameFailureReason.empty)),
-    );
-    await accepted.future;
-    return coordinator.claimInitiatorFailure(accepted.token)!;
-  }
-
   Future<GraphInitiatorPresentationClaim> createAssignmentClaim() async {
     final tagId = switch (TagId.decode(
       '018f1400-0000-7000-8000-000000000003',
@@ -1415,127 +740,6 @@ final class _FailureHarness {
     return coordinator.claimInitiatorFailure(accepted.token)!;
   }
 
-  Future<GraphInitiatorPresentationClaim> createBlockingRelationsClaim() async {
-    final relationId = switch (LongTermRelationId.decode(
-      '018f47c2-6b7d-7abc-8def-0123456789ab',
-    )) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() => throw StateError(
-        'Некорректный fixture связи.',
-      ),
-    };
-    final accepted = coordinator.acceptBlockingRelationsDelete(
-      DeleteBlockingRelations.longTerm(
-        intentionId: testDetailsIntentionId(1),
-        relationIds: {relationId},
-      ),
-      presentationTitle: 'Намерение',
-    ) as BlockingRelationsDeleteAccepted;
-    repository.completeBlockingRelationsCommand(
-      repository.blockingRelationsCommands.length - 1,
-      const GraphCommandFailed<
-        BlockingRelationsDeleted,
-        DeleteBlockingRelationsFailure
-      >(DeleteBlockingRelationsUnavailableFailure()),
-    );
-    await accepted.future;
-    return coordinator.claimInitiatorFailure(accepted.token)!;
-  }
-
-  Future<GraphInitiatorPresentationClaim> createDailyChoiceClaim() async {
-    final choiceId = switch (DailyChoiceId.decode(
-      '018f1400-0000-7000-8000-000000000001',
-    )) {
-      DailyChoiceIdDecodingSuccess(:final id) => id,
-      InvalidDailyChoiceIdDecoding() => throw StateError(
-        'Некорректный ID дневного выбора.',
-      ),
-    };
-    final accepted = coordinator.acceptDailyChoiceUpdate(
-      UpdateDailyChoiceFields(
-        choiceId: choiceId,
-        patch: const DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet(true),
-        ),
-      ),
-    ) as DailyChoiceCommandAccepted;
-    repository.completeDailyChoiceCommand(
-      repository.dailyChoiceCommands.length - 1,
-      const GraphCommandFailed<
-        DailyChoiceCommandSuccess,
-        DailyChoiceCommandFailure
-      >(DailyChoiceValidationFailure(DailyChoiceValidationField.date)),
-    );
-    await accepted.future;
-    return coordinator.claimInitiatorFailure(accepted.token)!;
-  }
-
-  Future<GraphInitiatorPresentationClaim> createDailyPathClaim({
-    required bool replace,
-  }) async {
-    final relationId = switch (LongTermRelationId.decode(
-      '018f47c2-6b7d-7abc-8def-0123456789ab',
-    )) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() => throw StateError(
-        'Некорректный ID связи.',
-      ),
-    };
-    final choiceId = switch (DailyChoiceId.decode(
-      '018f1400-0000-7000-8000-000000000001',
-    )) {
-      DailyChoiceIdDecodingSuccess(:final id) => id,
-      InvalidDailyChoiceIdDecoding() => throw StateError(
-        'Некорректный ID дневного выбора.',
-      ),
-    };
-    final path = ConfirmedChoicePath([
-      ConfirmedChoicePathStep(
-        relationId: relationId,
-        sourceIntentionId: testDetailsIntentionId(1),
-        type: LongTermRelationType.need,
-        relatedIntentionId: testDetailsIntentionId(2),
-      ),
-    ]);
-    final accepted = replace
-        ? coordinator.acceptDailyChoiceReplace(
-            ReplaceDailyChoicePath(
-              choiceId: choiceId,
-              sourceIntentionId: testDetailsIntentionId(1),
-              selectedIntentionId: testDetailsIntentionId(2),
-              path: path,
-            ),
-          )
-        : coordinator.acceptDailyChoiceCreation(
-            DailyChoiceCreationFormKey(),
-            CreateDailyChoice(
-              sourceIntentionId: testDetailsIntentionId(1),
-              selectedIntentionId: testDetailsIntentionId(2),
-              path: path,
-              date: CalendarDate.fromParts(2026, 9, 25),
-              description: null,
-              isCompleted: false,
-            ),
-          );
-    final token = (accepted as DailyChoiceCommandAccepted).token;
-    repository.completeDailyChoiceCommand(
-      repository.dailyChoiceCommands.length - 1,
-      GraphCommandFailed<DailyChoiceCommandSuccess, DailyChoiceCommandFailure>(
-        replace
-            ? const DailyChoiceConflictFailure(
-                DailyChoiceConflictReason.dependencyChanged,
-              )
-            : const DailyChoiceUnavailableFailure(),
-      ),
-    );
-    await accepted.future;
-    return coordinator.claimInitiatorFailure(token)!;
-  }
-
-  GraphInitiatorPresentationClaim? claimAgain(
-    GraphInitiatorPresentationClaim claim,
-  ) => coordinator.claimInitiatorFailure(claim.token);
-
   Widget app(Widget body, {Locale locale = const Locale('en')}) =>
       UncontrolledProviderScope(
         container: container,
@@ -1543,12 +747,12 @@ final class _FailureHarness {
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => GraphOperationPresenter(child: child!),
           home: Scaffold(body: body),
         ),
       );
 
   void dispose() {
-    registration.release();
     container.dispose();
   }
 }

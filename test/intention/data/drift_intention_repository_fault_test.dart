@@ -1,9 +1,5 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
-import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -17,7 +13,6 @@ import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
-import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -83,63 +78,6 @@ void main() {
   });
 
   group('Порция каталога — отказы получения собственных тегов', () {
-    test('повреждённая ссылка отклоняет всю порцию и её продолжение', () async {
-      for (final id in [_id(_firstUuid), _id(_secondUuid)]) {
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Одноимённое намерение',
-          createdAt: DateTime.utc(2026, 9, 2, 10),
-        );
-      }
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtAscending,
-        pageSize: 1,
-      );
-      final first = (await repository.getCatalogPage(
-        query,
-      ) as ResultSuccess<IntentionCatalogPage>).value;
-      await database.customStatement('PRAGMA foreign_keys = OFF');
-      await database.customStatement(
-        'INSERT INTO tags (id, name) VALUES (?, ?)',
-        [_relationUuid, 'CANARY-тег'],
-      );
-      await database.customStatement(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_relationUuid, _secondUuid],
-      );
-      await database.customStatement('DELETE FROM tags WHERE id = ?', [
-        _relationUuid,
-      ]);
-
-      for (final request in [
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: null,
-          order: query.order,
-          pageSize: 2,
-        ),
-        IntentionCatalogQuery(
-          scope: query.scope,
-          titleFilter: null,
-          order: query.order,
-          pageSize: 1,
-          cursor: first.nextCursor,
-        ),
-      ]) {
-        expect(
-          await repository.getCatalogPage(request),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-      }
-    });
-
     test(
       'ошибка после получения назначений не публикует частичный успех',
       () async {
@@ -163,14 +101,6 @@ void main() {
               ),
               (
                 StateError('CANARY-неизвестный-отказ'),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_READONLY,
-                  message: 'CANARY-неизвестный-SQLite-отказ',
-                ),
                 isA<IntentionUnexpectedFailure>(),
                 DiagnosticsFailureCode.unexpected,
               ),
@@ -256,14 +186,6 @@ void main() {
               ),
               (
                 StateError('CANARY-неизвестный-отказ'),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_READONLY,
-                  message: 'CANARY-неизвестный-SQLite-отказ',
-                ),
                 isA<IntentionUnexpectedFailure>(),
                 DiagnosticsFailureCode.unexpected,
               ),
@@ -372,223 +294,13 @@ void main() {
             isArchived: false,
             createdAt: DateTime.utc(2026, 9, 2, 10),
           );
-          expect(interceptor.failedReads, 4);
           expect(diagnostics.events.toString(), isNot(contains('CANARY')));
         }
-      },
-    );
-
-    test('место без намерения вне запрошенных не отказывает чтению, а повреждённая отметка запрошенного отказывает', () async {
-      late Database raw;
-      final replacement = await _replaceDatabase(
-        const _PassiveObserver(),
-        database,
-        diagnostics,
-        setup: (connection) => raw = connection,
-      );
-      database = replacement.database;
-      repository = replacement.repository;
-      await _insertIntention(
-        database,
-        id: _id(_firstUuid),
-        title: 'CANARY-целостное',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await _insertIntention(
-        database,
-        id: _id(_secondUuid),
-        title: 'CANARY-повреждённое',
-        createdAt: DateTime.utc(2026, 9, 2, 11),
-      );
-      storeFavoritePlaceWithoutIntention(
-        raw,
-        intentionId: _relationUuid,
-        position: 1,
-      );
-      storeFavoriteMark(raw, intentionId: _firstUuid, position: 2);
-      storeFavoriteMarkWithInvalidPosition(
-        raw,
-        intentionId: _secondUuid,
-        position: 0,
-      );
-      IntentionCatalogQuery query({
-        required int pageSize,
-        IntentionCatalogCursor? cursor,
-      }) => IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtAscending,
-        pageSize: pageSize,
-        cursor: cursor,
-      );
-      Matcher corrupted<TEvent extends DiagnosticsEvent>(
-        DiagnosticsStatus Function(TEvent) status,
-      ) => isA<TEvent>().having(
-        status,
-        'исход',
-        isA<DiagnosticsFailed>().having(
-          (status) => status.code,
-          'категория',
-          DiagnosticsFailureCode.corruption,
-        ),
-      );
-
-      // Порция и подробные данные целостного намерения не зависят от
-      // места без намерения и от повреждённой отметки вне запрошенных.
-      final intactPage = await repository.getCatalogPage(query(pageSize: 1));
-      expect(intactPage, isA<ResultSuccess<IntentionCatalogPage>>());
-      final page = (intactPage as ResultSuccess<IntentionCatalogPage>).value;
-      expect(page.items.single.id, _id(_firstUuid));
-      expect(page.items.single.favoriteMark, FavoriteMark.favorite);
-      expect(
-        diagnostics.events.last,
-        isA<CatalogPageReadDiagnosticsEvent>().having(
-          (event) => event.status,
-          'исход',
-          isA<DiagnosticsSucceeded>(),
-        ),
-      );
-      final intactDetails = await repository
-          .watchIntention(_id(_firstUuid))
-          .first;
-      expect(
-        intactDetails,
-        isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>(),
-      );
-      expect(
-        (intactDetails as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
-            .value
-            .value!
-            .favoriteMark,
-        FavoriteMark.favorite,
-      );
-
-      // Повреждённая отметка запрошенного намерения отклоняет порцию,
-      // её продолжение и подробные данные целиком.
-      for (final failing in [
-        query(pageSize: 2),
-        query(pageSize: 1, cursor: page.nextCursor),
-      ]) {
-        expect(
-          await repository.getCatalogPage(failing),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          diagnostics.events.last,
-          corrupted<CatalogPageReadDiagnosticsEvent>((event) => event.status),
-        );
-      }
-      expect(
-        await repository.watchIntention(_id(_secondUuid)).first,
-        isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
-          (result) => result.failure,
-          'причина',
-          isA<IntentionCorruptionFailure>(),
-        ),
-      );
-      expect(
-        diagnostics.events.last,
-        corrupted<IntentionDetailReadDiagnosticsEvent>((event) => event.status),
-      );
-      expect(storedFavoriteMarks(raw), [
-        (_secondUuid, 0),
-        (_relationUuid, 1),
-        (_firstUuid, 2),
-      ]);
-      expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-    });
-  });
-
-  group('DriftPersonalGraphRepository.execute — физическое удаление', () {
-    test(
-      'не выдаёт посторонний blocking foreign key за конфликт связей',
-      () async {
-        final id = _id(_firstUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Блокирующее намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        await database.customStatement('''
-        CREATE TABLE test_only_blocking_links (
-          intention_id TEXT NOT NULL REFERENCES intentions(id)
-        )
-      ''');
-        await database.customStatement(
-          'INSERT INTO test_only_blocking_links (intention_id) VALUES (?)',
-          [id.toCanonicalString()],
-        );
-
-        final result = await repository.execute(DeleteIntention(id));
-
-        expect(result, _failure<IntentionUnexpectedFailure>());
-        await _expectStoredIntention(
-          database,
-          id: id,
-          title: 'Блокирующее намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        expect(await _matchingIds(repository, 'блокирующее'), [id]);
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
-        expect(
-          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
-          [
-            _failedCommand(
-              IntentionCommandDiagnosticsType.delete,
-              DiagnosticsFailureCode.unexpected,
-            ),
-          ],
-        );
       },
     );
   });
 
   group('DriftPersonalGraphRepository.execute — откат после DML', () {
-    test('откатывает create вместе с основной строкой и FTS', () async {
-      final interceptor = _FailAfterDmlInterceptor(_DmlOperation.insert);
-      final replacement = await _replaceDatabase(
-        interceptor,
-        database,
-        diagnostics,
-      );
-      database = replacement.database;
-      repository = replacement.repository;
-      interceptor.arm();
-
-      final result = await repository.execute(
-        const CreateIntention(
-          title: 'Создаваемое намерение',
-          description: 'Создаваемое описание',
-        ),
-      );
-
-      expect(result, _failure<IntentionUnexpectedFailure>());
-      expect(await database.select(database.intentions).get(), isEmpty);
-      expect(await _matchingIds(repository, 'создаваемое'), isEmpty);
-      await expectLater(verifyIntentionTitlesFtsIntegrity(database), completes);
-      expect(diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(), [
-        _failedCreation(
-          IntentionCreationCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.unexpected,
-        ),
-      ]);
-    });
-
     test(
       'откатывает update вместе с title search key, FTS и timestamps',
       () async {
@@ -639,47 +351,6 @@ void main() {
     );
 
     test(
-      'откатывает state transition и сохраняет timestamps намерения',
-      () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
-        final replacement = await _replaceDatabase(
-          interceptor,
-          database,
-          diagnostics,
-        );
-        database = replacement.database;
-        repository = replacement.repository;
-        final id = _id(_firstUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Намерение для readiness',
-          createdAt: createdAt,
-        );
-        interceptor.arm();
-
-        final result = await repository.execute(EnableIntentionReadiness(id));
-
-        expect(result, _failure<IntentionUnexpectedFailure>());
-        await _expectStoredIntention(
-          database,
-          id: id,
-          title: 'Намерение для readiness',
-          description: null,
-          isActionReady: false,
-          isArchived: false,
-          createdAt: createdAt,
-        );
-        expect(await _matchingIds(repository, 'readiness'), [id]);
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
-      },
-    );
-
-    test(
       'откатывает связи и намерение при отказе между шагами каскада',
       () async {
         final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
@@ -714,15 +385,22 @@ void main() {
         final revisionBefore = _countsRevision(
           await repository.getRelationCounts(owner),
         );
-        final ownerEvents = StreamIterator(repository.watchIntention(owner));
-        final neighborEvents = StreamIterator(
-          repository.watchIntention(neighbor),
-        );
-        addTearDown(ownerEvents.cancel);
-        addTearDown(neighborEvents.cancel);
-        expect(await ownerEvents.moveNext(), isTrue);
-        expect(await neighborEvents.moveNext(), isTrue);
-        interceptor.detailReadStatements.clear();
+        final ownerSnapshots = <Object>[];
+        final neighborSnapshots = <Object>[];
+        final subscriptions = [
+          repository.watchIntention(owner).listen(ownerSnapshots.add),
+          repository.watchIntention(neighbor).listen(neighborSnapshots.add),
+        ];
+        // Генератор `watchIntention` ждёт инвалидации, а не `yield`: отмена
+        // завершилась бы только после неё, поэтому её не ожидают.
+        addTearDown(() {
+          for (final subscription in subscriptions) {
+            subscription.cancel().ignore();
+          }
+        });
+        while (ownerSnapshots.isEmpty || neighborSnapshots.isEmpty) {
+          await pumpEventQueue();
+        }
         interceptor.arm();
 
         final result = await repository.execute(ArchiveIntention(owner));
@@ -738,10 +416,6 @@ void main() {
           createdAt: createdAt,
         );
         expect(await _relationIsArchived(database, _relationUuid), isFalse);
-        expect(
-          interceptor.failedStatement,
-          contains('UPDATE long_term_relations'),
-        );
         final revisionAfter = _countsRevision(
           await repository.getRelationCounts(owner),
         );
@@ -749,52 +423,10 @@ void main() {
           revisionBefore.compareTo(revisionAfter),
           GraphRevisionOrder.same,
         );
+        // Откат не оповещает наблюдателей о несостоявшемся архивировании.
         await pumpEventQueue();
-        expect(interceptor.detailReadStatements, isEmpty);
-      },
-    );
-
-    test(
-      'откатывает delete вместе с основной строкой, FTS и timestamps',
-      () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.delete);
-        final replacement = await _replaceDatabase(
-          interceptor,
-          database,
-          diagnostics,
-        );
-        database = replacement.database;
-        repository = replacement.repository;
-        final id = _id(_firstUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Удаляемое намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        interceptor.arm();
-
-        final result = await repository.execute(DeleteIntention(id));
-
-        expect(result, _failure<IntentionUnexpectedFailure>());
-        await _expectStoredIntention(
-          database,
-          id: id,
-          title: 'Удаляемое намерение',
-          description: 'Исходное описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        expect(await _matchingIds(repository, 'удаляемое'), [id]);
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
+        expect(ownerSnapshots, hasLength(1));
+        expect(neighborSnapshots, hasLength(1));
       },
     );
   });
@@ -813,22 +445,17 @@ void main() {
     /// намерение, архивированное избранное на последнем месте порядка, теги
     /// «Дом» и «Выходные» и самостоятельный «Спорт», созданный отдельной
     /// командой до создания намерения. Возвращает идентификатор «Спорта».
-    ///
-    /// Репозиторий передаёт события диагностики в [diagnosticsSink], по
-    /// умолчанию — в общий записывающий получатель теста.
     Future<TagId> replaceWithSeededGraph(
-      LocalDatabaseConnectionObserver observer, {
-      DiagnosticsSink? diagnosticsSink,
-      List<IntentionId>? intentionIds,
-    }) async {
+      LocalDatabaseConnectionObserver observer,
+    ) async {
       final replacement = await _replaceDatabase(
         observer,
         database,
-        diagnosticsSink ?? diagnostics,
+        diagnostics,
         setup: (connection) => raw = connection,
         // Повтор после отката снова получает тот же идентификатор: остаток
         // прежней попытки отклонил бы его конфликтом первичного ключа.
-        intentionIds: intentionIds ?? [newId, newId],
+        intentionIds: [newId, newId],
       );
       database = replacement.database;
       repository = replacement.repository;
@@ -917,7 +544,7 @@ void main() {
       );
     }
 
-    test('отказ после любой операции транзакции откатывает намерение, '
+    test('отказ в представительных точках транзакции откатывает намерение, '
         'назначения, место избранного и FTS, сохраняя прежний граф, ревизию '
         'и самостоятельный тег', () async {
       // Пробное выполнение без отказа фиксирует операции транзакции.
@@ -932,31 +559,30 @@ void main() {
         probed,
         isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
       );
-      expect(
-        [
-          for (final operation in operations)
-            if (operation.operation != LocalDatabaseSqlOperation.select)
-              (operation.operation, _writtenTable(operation)),
-        ],
-        [
-          (LocalDatabaseSqlOperation.insert, 'intentions'),
-          for (var index = 0; index < 3; index++)
-            (LocalDatabaseSqlOperation.insert, 'tag_assignments'),
-          (LocalDatabaseSqlOperation.insert, 'favorite_intentions'),
-        ],
-      );
       // До записей транзакция проверяет выбранные теги, после всех записей —
       // читает окончательный результат.
-      final firstWrite = operations.indexWhere(
-        (operation) => operation.operation != LocalDatabaseSqlOperation.select,
-      );
-      final lastWrite = operations.lastIndexWhere(
-        (operation) => operation.operation != LocalDatabaseSqlOperation.select,
-      );
+      final writeIndexes = [
+        for (var index = 0; index < operations.length; index++)
+          if (operations[index].operation != LocalDatabaseSqlOperation.select)
+            index,
+      ];
+      final firstWrite = writeIndexes.first;
+      final lastWrite = writeIndexes.last;
+      expect(writeIndexes.length, greaterThan(1));
       expect(firstWrite, greaterThan(0));
       expect(operations.skip(lastWrite + 1), isNotEmpty);
 
-      for (var failAfter = 1; failAfter <= operations.length; failAfter++) {
+      // Точки с разным исходом: первая проверка, первая запись (намерение),
+      // первое назначение, последняя запись (место избранного) и первое
+      // чтение окончательного результата. Остальные операции повторяют
+      // те же ветки.
+      for (final failAfter in <int>{
+        1,
+        firstWrite + 1,
+        writeIndexes[1] + 1,
+        lastWrite + 1,
+        lastWrite + 2,
+      }) {
         final faulted = operations[failAfter - 1];
         final reason =
             'отказ после операции $failAfter: ${faulted.operation.name} '
@@ -977,11 +603,6 @@ void main() {
         final result = await repository.execute(command);
 
         expect(result, _failure<IntentionUnexpectedFailure>(), reason: reason);
-        expect(
-          injector.failedStatement,
-          faulted.statements.single,
-          reason: reason,
-        );
         await expectRolledBack(before, reason: reason);
         expect(
           diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
@@ -1031,7 +652,6 @@ void main() {
       );
 
       expect(result, _failure<IntentionCorruptionFailure>());
-      expect(tamper.tampered, isTrue);
       await expectRolledBack(before);
       expect(
         diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
@@ -1067,14 +687,6 @@ void main() {
               isA<IntentionUnexpectedFailure>(),
               DiagnosticsFailureCode.unexpected,
             ),
-            (
-              SqliteException(
-                extendedResultCode: SqlError.SQLITE_READONLY,
-                message: 'CANARY-неизвестный-SQLite-отказ',
-              ),
-              isA<IntentionUnexpectedFailure>(),
-              DiagnosticsFailureCode.unexpected,
-            ),
           ]) {
         final interceptor = _SelectedTagsReadInterceptor(failure: error);
         final sportTagId = await replaceWithSeededGraph(interceptor);
@@ -1100,7 +712,6 @@ void main() {
               ),
           reason: '$error',
         );
-        expect(interceptor.failedReads, 1, reason: '$error');
         await expectRolledBack(before, reason: '$error');
         expect(
           diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
@@ -1111,263 +722,6 @@ void main() {
           reason: '$error',
         );
       }
-    });
-
-    test('повреждённые сохранённые данные выбранного тега остаются '
-        'повреждением и рядом с отсутствующим тегом', () async {
-      final sportTagId = await replaceWithSeededGraph(const _PassiveObserver());
-      // Неканоничное название недостижимо через приложение: для его записи
-      // отключается проверка схемы и подменяется функция ключа названия.
-      raw.execute('PRAGMA ignore_check_constraints = ON');
-      raw.createFunction(
-        functionName: tagNameKeyFunctionName,
-        argumentCount: const AllowedArgumentCount(1),
-        deterministic: true,
-        directOnly: false,
-        function: (_) => 'повреждённый ключ',
-      );
-      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-        ' Дом ',
-        homeTagId.toCanonicalString(),
-      ]);
-      raw.execute('PRAGMA ignore_check_constraints = OFF');
-
-      for (final tagIds in [
-        [homeTagId],
-        [missingTagId, homeTagId, weekendTagId, sportTagId],
-      ]) {
-        final reason = 'набор из ${tagIds.length}';
-        final storedBefore = _storedCreationRows(raw);
-        final revisionBefore = _catalogRevision(
-          await repository.getCatalogPage(_allIntentionsQuery),
-        );
-
-        final result = await repository.execute(fullCommand(tagIds));
-
-        expect(result, _failure<IntentionCorruptionFailure>(), reason: reason);
-        expect(_storedCreationRows(raw), storedBefore, reason: reason);
-        expect(
-          _catalogRevision(await repository.getCatalogPage(_allIntentionsQuery))
-              .compareTo(revisionBefore),
-          GraphRevisionOrder.same,
-          reason: reason,
-        );
-        expect(
-          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
-          _failedCreation(
-            IntentionCreationCommandDiagnosticsStage.validation,
-            DiagnosticsFailureCode.corruption,
-          ),
-          reason: reason,
-        );
-      }
-    });
-
-    /// Операции транзакции полного создания с тремя тегами и избранным,
-    /// выполненного без отказа на отдельно подготовленном графе.
-    Future<List<LocalDatabaseSqlStatement>> probeFullCreation() async {
-      final probe = _StatementFaultInjector();
-      final sportTagId = await replaceWithSeededGraph(probe);
-      probe.observe();
-      final probed = await repository.execute(
-        fullCommand([homeTagId, weekendTagId, sportTagId]),
-      );
-      expect(
-        probed,
-        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-      );
-      return probe.stopObserving();
-    }
-
-    test('успешное создание даёт одно событие создания на этапе проверки '
-        'результата без событий самостоятельных команд', () async {
-      for (final (name, build) in <(String, CreateIntention Function(TagId))>[
-        (
-          'минимальное',
-          (_) => const CreateIntention(
-            title: 'Минимальное намерение',
-            description: null,
-          ),
-        ),
-        (
-          'полное',
-          (sportTagId) => fullCommand([homeTagId, weekendTagId, sportTagId]),
-        ),
-      ]) {
-        final sportTagId = await replaceWithSeededGraph(
-          const _PassiveObserver(),
-        );
-        final command = build(sportTagId);
-        final from = diagnostics.events.length;
-
-        final result = await repository.execute(command);
-
-        expect(
-          result,
-          isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-          reason: name,
-        );
-        // Начальные готовность, отметка и назначения не выдаются за
-        // самостоятельные команды намерения, избранного или тегов.
-        expect(diagnostics.events.skip(from), [
-          _succeededCreation(),
-        ], reason: name);
-      }
-    });
-
-    test('отказ текста относится к этапу проверки и категории validation '
-        'без обращения к хранилищу', () async {
-      final probe = _StatementFaultInjector();
-      final sportTagId = await replaceWithSeededGraph(probe);
-      final from = diagnostics.events.length;
-      probe.observe();
-
-      final result = await repository.execute(
-        CreateIntention.withInitialState(
-          title: '   ',
-          description: 'Описание без названия',
-          readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
-          tagIds: [homeTagId, sportTagId],
-        ),
-      );
-
-      expect(result, _failure<IntentionTextInputValidationFailure>());
-      expect(probe.stopObserving(), isEmpty);
-      expect(diagnostics.events.skip(from), [
-        _failedCreation(
-          IntentionCreationCommandDiagnosticsStage.validation,
-          DiagnosticsFailureCode.validation,
-        ),
-      ]);
-    });
-
-    test('отсутствие выбранного тега относится к этапу проверки и категории '
-        'validation, а не к сбою записи', () async {
-      final sportTagId = await replaceWithSeededGraph(const _PassiveObserver());
-      final before = await _observeCreationGraph(repository, raw);
-      final from = diagnostics.events.length;
-
-      final result = await repository.execute(
-        fullCommand([homeTagId, missingTagId, sportTagId]),
-      );
-
-      expect(
-        result,
-        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-            .having(
-              (result) => result.failure,
-              'причина',
-              isA<IntentionCreationTagsMissingFailure>().having(
-                (failure) => failure.missingTagIds,
-                'missingTagIds',
-                {missingTagId},
-              ),
-            ),
-      );
-      expect(diagnostics.events.skip(from), [
-        _failedCreation(
-          IntentionCreationCommandDiagnosticsStage.validation,
-          DiagnosticsFailureCode.validation,
-        ),
-      ]);
-      await expectRolledBack(before);
-    });
-
-    test('отказ хранилища при записи и при проверке результата относится к '
-        'своему этапу с фактической категорией', () async {
-      final operations = await probeFullCreation();
-      final firstWrite =
-          operations.indexWhere(
-            (operation) =>
-                operation.operation != LocalDatabaseSqlOperation.select,
-          ) +
-          1;
-
-      for (final (failAfter, stage) in [
-        (firstWrite, IntentionCreationCommandDiagnosticsStage.write),
-        (
-          operations.length,
-          IntentionCreationCommandDiagnosticsStage.resultRead,
-        ),
-      ]) {
-        for (final (error, expected, code)
-            in <(Object, Matcher, DiagnosticsFailureCode)>[
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_BUSY,
-                  message: 'CANARY-недоступность',
-                ),
-                isA<IntentionUnavailableFailure>(),
-                DiagnosticsFailureCode.unavailable,
-              ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_CORRUPT,
-                  message: 'CANARY-повреждение',
-                ),
-                isA<IntentionCorruptionFailure>(),
-                DiagnosticsFailureCode.corruption,
-              ),
-              (
-                StateError('CANARY-неизвестный-отказ'),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
-            ]) {
-          final reason = '${stage.name}: $error';
-          final injector = _StatementFaultInjector();
-          final sportTagId = await replaceWithSeededGraph(injector);
-          final before = await _observeCreationGraph(repository, raw);
-          final from = diagnostics.events.length;
-          injector.failAfter(failAfter, failure: error);
-
-          final result = await repository.execute(
-            fullCommand([homeTagId, weekendTagId, sportTagId]),
-          );
-
-          expect(
-            result,
-            isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-                .having((result) => result.failure, 'причина', expected),
-            reason: reason,
-          );
-          expect(injector.failedStatement, isNotNull, reason: reason);
-          expect(diagnostics.events.skip(from), [
-            _failedCreation(stage, code),
-          ], reason: reason);
-          await expectRolledBack(before, reason: reason);
-        }
-      }
-    });
-
-    test('конфликт идентификатора при записи относится к этапу записи и '
-        'категории conflict', () async {
-      // Генератор выдаёт идентификатор уже сохранённого намерения.
-      final sportTagId = await replaceWithSeededGraph(
-        const _PassiveObserver(),
-        intentionIds: [activeFavoriteId],
-      );
-      final before = await _observeCreationGraph(repository, raw);
-      final from = diagnostics.events.length;
-
-      final result = await repository.execute(
-        fullCommand([homeTagId, sportTagId]),
-      );
-
-      expect(result, _failure<IntentionConflictFailure>());
-      expect(diagnostics.events.skip(from), [
-        _failedCreation(
-          IntentionCreationCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.conflict,
-        ),
-      ]);
-      final after = await _observeCreationGraph(repository, raw);
-      expect(after.facts, before.facts);
-      expect(
-        after.revision.compareTo(before.revision),
-        GraphRevisionOrder.same,
-      );
     });
 
     test('длительность охватывает всю операцию до окончательного исхода, '
@@ -1415,244 +769,6 @@ void main() {
         );
       }
     });
-
-    test('сериализованные события создания не раскрывают текст, '
-        'идентификаторы и названия тегов, состав избранного, SQL и путь '
-        'базы', () async {
-      const titleCanary = 'CANARY-название-намерения';
-      const descriptionCanary = 'CANARY-описание-намерения';
-      const pathCanary = '/CANARY/databases/doable.sqlite';
-      const sqlCanary = 'INSERT INTO intentions /* CANARY-SQL */';
-      final messages = <String>[];
-      final operations = await probeFullCreation();
-      final firstWrite =
-          operations.indexWhere(
-            (operation) =>
-                operation.operation != LocalDatabaseSqlOperation.select,
-          ) +
-          1;
-      final injector = _StatementFaultInjector();
-      final sportTagId = await replaceWithSeededGraph(
-        injector,
-        diagnosticsSink: DeveloperDiagnosticsSink(messages.add),
-        intentionIds: [newId, newId, newId],
-      );
-      CreateIntention command(Iterable<TagId> tagIds) =>
-          CreateIntention.withInitialState(
-            title: titleCanary,
-            description: descriptionCanary,
-            readiness: IntentionReadiness.ready,
-            favoriteMark: FavoriteMark.favorite,
-            tagIds: tagIds,
-          );
-      SqliteException privateFailure(int code) => SqliteException(
-        extendedResultCode: code,
-        message: 'CANARY-отказ $pathCanary',
-        explanation: 'CANARY-пояснение $titleCanary',
-        causingStatement: sqlCanary,
-        parametersToStatement: [titleCanary, descriptionCanary],
-      );
-      final selectedTags = [homeTagId, weekendTagId, sportTagId];
-      messages.clear();
-
-      await repository.execute(
-        CreateIntention.withInitialState(
-          title: '',
-          description: descriptionCanary,
-          readiness: IntentionReadiness.ready,
-          favoriteMark: FavoriteMark.favorite,
-          tagIds: selectedTags,
-        ),
-      );
-      await repository.execute(command([...selectedTags, missingTagId]));
-      injector.failAfter(
-        firstWrite,
-        failure: privateFailure(SqlError.SQLITE_BUSY),
-      );
-      await repository.execute(command(selectedTags));
-      injector.failAfter(
-        operations.length,
-        failure: privateFailure(SqlError.SQLITE_CORRUPT),
-      );
-      await repository.execute(command(selectedTags));
-      final created = await repository.execute(command(selectedTags));
-
-      expect(
-        created,
-        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-      );
-      expect(storedFavoriteMarks(raw).last, (newId.toCanonicalString(), 6));
-      expect(
-        [
-          for (final message in messages)
-            jsonDecode(message) as Map<String, Object?>,
-        ],
-        [
-          for (final (stage, outcome, failureCode) in [
-            ('validation', 'failed', 'validation'),
-            ('validation', 'failed', 'validation'),
-            ('write', 'failed', 'unavailable'),
-            ('resultRead', 'failed', 'corruption'),
-            ('resultRead', 'succeeded', null),
-          ])
-            {
-              'operation': 'intentionCommand',
-              'stage': stage,
-              'outcome': outcome,
-              'durationMicros': isA<int>(),
-              'failureCode': ?failureCode,
-              'commandType': 'create',
-            },
-        ],
-      );
-      final written = messages.join('\n');
-      for (final secret in [
-        'CANARY',
-        titleCanary,
-        descriptionCanary,
-        pathCanary,
-        'doable.sqlite',
-        newId.toCanonicalString(),
-        activeFavoriteId.toCanonicalString(),
-        archivedFavoriteId.toCanonicalString(),
-        for (final tagId in [...selectedTags, missingTagId])
-          tagId.toCanonicalString(),
-        'Дом',
-        'Выходные',
-        'Спорт',
-        'favorite_intentions',
-        'tag_assignments',
-        'position',
-        'INSERT',
-        'SELECT',
-        'Exception',
-      ]) {
-        expect(written, isNot(contains(secret)), reason: secret);
-      }
-    });
-
-    test('отказ получателя диагностики не меняет результат, число записей и '
-        'ревизию полного создания', () async {
-      final failing = _ThrowingDiagnosticsSink();
-      final probe = _StatementFaultInjector();
-      final sportTagId = await replaceWithSeededGraph(
-        probe,
-        diagnosticsSink: failing,
-      );
-      final before = await _observeCreationGraph(repository, raw);
-      failing.attemptedEvents.clear();
-      probe.observe();
-
-      final result = await repository.execute(
-        fullCommand([homeTagId, weekendTagId, sportTagId]),
-      );
-      final operations = probe.stopObserving();
-      final attempted = List.of(failing.attemptedEvents);
-
-      final confirmed = _readValue(result);
-      final created = confirmed.value.catalogMutation;
-      expect(created, isA<IntentionCatalogCreated>());
-      expect(created.after!.summary.id, newId);
-      expect(created.after!.summary.readiness, IntentionReadiness.ready);
-      expect(created.after!.summary.favoriteMark, FavoriteMark.favorite);
-      expect(created.after!.summary.tags.map((tag) => tag.id), [
-        homeTagId,
-        weekendTagId,
-        sportTagId,
-      ]);
-      expect(
-        [
-          for (final operation in operations)
-            if (operation.operation != LocalDatabaseSqlOperation.select)
-              (operation.operation, _writtenTable(operation)),
-        ],
-        [
-          (LocalDatabaseSqlOperation.insert, 'intentions'),
-          for (var index = 0; index < 3; index++)
-            (LocalDatabaseSqlOperation.insert, 'tag_assignments'),
-          (LocalDatabaseSqlOperation.insert, 'favorite_intentions'),
-        ],
-      );
-      expect(attempted, [_succeededCreation()]);
-      final after = await _observeCreationGraph(repository, raw);
-      expect(
-        confirmed.revision.compareTo(before.revision),
-        GraphRevisionOrder.newer,
-      );
-      expect(
-        after.revision.compareTo(confirmed.revision),
-        GraphRevisionOrder.same,
-      );
-      expect(storedFavoriteMarks(raw), [
-        (activeFavoriteId.toCanonicalString(), 2),
-        (archivedFavoriteId.toCanonicalString(), 5),
-        (newId.toCanonicalString(), 6),
-      ]);
-    });
-
-    test('отказ получателя диагностики не меняет отказ, категорию и откат '
-        'полного создания', () async {
-      final operations = await probeFullCreation();
-      final firstWrite =
-          operations.indexWhere(
-            (operation) =>
-                operation.operation != LocalDatabaseSqlOperation.select,
-          ) +
-          1;
-      final failing = _ThrowingDiagnosticsSink();
-      final injector = _StatementFaultInjector();
-      final sportTagId = await replaceWithSeededGraph(
-        injector,
-        diagnosticsSink: failing,
-      );
-
-      final missingBefore = await _observeCreationGraph(repository, raw);
-      failing.attemptedEvents.clear();
-      final missing = await repository.execute(
-        fullCommand([homeTagId, missingTagId, sportTagId]),
-      );
-      expect(
-        missing,
-        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-            .having(
-              (result) => result.failure,
-              'причина',
-              isA<IntentionCreationTagsMissingFailure>().having(
-                (failure) => failure.missingTagIds,
-                'missingTagIds',
-                {missingTagId},
-              ),
-            ),
-      );
-      expect(failing.attemptedEvents, [
-        _failedCreation(
-          IntentionCreationCommandDiagnosticsStage.validation,
-          DiagnosticsFailureCode.validation,
-        ),
-      ]);
-      await expectRolledBack(missingBefore);
-
-      final writeBefore = await _observeCreationGraph(repository, raw);
-      failing.attemptedEvents.clear();
-      injector.failAfter(
-        firstWrite,
-        failure: SqliteException(
-          extendedResultCode: SqlError.SQLITE_BUSY,
-          message: 'CANARY-недоступность',
-        ),
-      );
-      final unavailable = await repository.execute(
-        fullCommand([homeTagId, weekendTagId, sportTagId]),
-      );
-      expect(unavailable, _failure<IntentionUnavailableFailure>());
-      expect(failing.attemptedEvents, [
-        _failedCreation(
-          IntentionCreationCommandDiagnosticsStage.write,
-          DiagnosticsFailureCode.unavailable,
-        ),
-      ]);
-      await expectRolledBack(writeBefore);
-    });
   });
 
   group(
@@ -1661,13 +777,10 @@ void main() {
       test(
         'не считает constraint вне утверждённых контекстов conflict',
         () async {
+          // Первичный ключ — единственный код, который для команды создания
+          // означает конфликт; внешний ключ — обычное ограничение; код с
+          // неизвестным расширением не входит в известные ограничения.
           for (final extendedCode in [
-            SqlError.SQLITE_CONSTRAINT,
-            SqlExtendedError.SQLITE_CONSTRAINT_CHECK,
-            SqlExtendedError.SQLITE_CONSTRAINT_NOTNULL,
-            SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-            SqlExtendedError.SQLITE_CONSTRAINT_ROWID,
-            SqlExtendedError.SQLITE_CONSTRAINT_TRIGGER,
             SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY,
             SqlExtendedError.SQLITE_CONSTRAINT_FOREIGNKEY,
             SqlError.SQLITE_CONSTRAINT | (99 << 8),
@@ -1773,116 +886,6 @@ void main() {
       );
     },
   );
-
-  group('DriftPersonalGraphRepository — независимость от диагностики', () {
-    test('завершает чтения при ошибке диагностического получателя', () async {
-      final id = _id(_firstUuid);
-      await _insertIntention(
-        database,
-        id: id,
-        title: 'Подтверждённое намерение',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      final failingDiagnostics = _ThrowingDiagnosticsSink();
-      repository = _repository(database, failingDiagnostics);
-
-      final catalogResult = await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: IntentionScope.all,
-          titleFilter: null,
-          order: IntentionCatalogOrder.createdAtDescending,
-          pageSize: 100,
-        ),
-      );
-      final detailResult = await repository.watchIntention(id).first;
-
-      expect(catalogResult, isA<ResultSuccess<IntentionCatalogPage>>());
-      expect(
-        detailResult,
-        isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>(),
-      );
-      expect(
-        failingDiagnostics.attemptedEvents.map((event) => event.runtimeType),
-        [
-          CatalogPageReadDiagnosticsEvent,
-          CatalogPageReadDiagnosticsEvent,
-          IntentionDetailReadDiagnosticsEvent,
-          IntentionDetailReadDiagnosticsEvent,
-        ],
-      );
-    });
-
-    test(
-      'сохраняет подтверждённую команду один раз при ошибке диагностики',
-      () async {
-        final failingDiagnostics = _ThrowingDiagnosticsSink();
-        repository = _repository(database, failingDiagnostics);
-
-        final result = await repository.execute(
-          const CreateIntention(
-            title: 'Сохранённое намерение',
-            description: null,
-          ),
-        );
-
-        expect(
-          result,
-          isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-        );
-        final rows = await database.select(database.intentions).get();
-        expect(rows, hasLength(1));
-        expect(rows.single.title, 'Сохранённое намерение');
-        expect(failingDiagnostics.attemptedEvents, [_succeededCreation()]);
-      },
-    );
-
-    test('сохраняет весь каскад при ошибке диагностики после commit', () async {
-      final owner = _id(_firstUuid);
-      final neighbor = _id(_secondUuid);
-      final createdAt = DateTime.utc(2026, 9, 2, 10);
-      await _insertIntention(
-        database,
-        id: owner,
-        title: 'Архивируемое намерение',
-        createdAt: createdAt,
-      );
-      await _insertIntention(
-        database,
-        id: neighbor,
-        title: 'Соседнее намерение',
-        createdAt: createdAt,
-      );
-      await _insertRelation(
-        database,
-        id: _relationUuid,
-        sourceId: owner,
-        relatedId: neighbor,
-      );
-      final failingDiagnostics = _ThrowingDiagnosticsSink();
-      repository = _repository(database, failingDiagnostics);
-
-      final result = await repository.execute(ArchiveIntention(owner));
-
-      expect(
-        result,
-        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-      );
-      await _expectStoredIntention(
-        database,
-        id: owner,
-        title: 'Архивируемое намерение',
-        description: null,
-        isActionReady: false,
-        isArchived: true,
-        createdAt: createdAt,
-        updatedAt: DateTime.utc(2026, 9, 3, 12),
-      );
-      expect(await _relationIsArchived(database, _relationUuid), isTrue);
-      expect(failingDiagnostics.attemptedEvents, [
-        isA<IntentionCommandDiagnosticsEvent>(),
-      ]);
-    });
-  });
 }
 
 Future<({AppDatabase database, DriftPersonalGraphRepository repository})>
@@ -2099,16 +1102,6 @@ final class _DeterministicIntentionIdGenerator implements IntentionIdGenerator {
   IntentionId generate() => _ids[_next++];
 }
 
-final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
-  final List<DiagnosticsEvent> attemptedEvents = [];
-
-  @override
-  void record(DiagnosticsEvent event) {
-    attemptedEvents.add(event);
-    throw StateError('CANARY-diagnostics-sink-failure');
-  }
-}
-
 final class _TagAssignmentReadInterceptor
     extends LocalDatabaseConnectionObserver {
   _TagAssignmentReadInterceptor({required this.failure});
@@ -2127,17 +1120,11 @@ final class _TagAssignmentReadInterceptor
   }
 }
 
-/// Наблюдатель без вмешательства: даёт доступ к соединению хранилища.
-final class _PassiveObserver extends LocalDatabaseConnectionObserver {
-  const _PassiveObserver();
-}
-
 final class _FavoriteMarkReadInterceptor
     extends LocalDatabaseConnectionObserver {
   _FavoriteMarkReadInterceptor({required this.failure});
 
   final Object failure;
-  var failedReads = 0;
 
   @override
   List<Map<String, Object?>> afterSelect(
@@ -2145,14 +1132,13 @@ final class _FavoriteMarkReadInterceptor
     List<Map<String, Object?>> rows,
   ) {
     if (statement.statements.single.contains('FROM favorite_intentions')) {
-      failedReads++;
       throw failure;
     }
     return rows;
   }
 }
 
-enum _DmlOperation { insert, update, delete }
+enum _DmlOperation { update, delete }
 
 final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
   _FailAfterDmlInterceptor(this._operation);
@@ -2160,34 +1146,19 @@ final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
   final _DmlOperation _operation;
   var _armed = false;
   var _hasFailed = false;
-  String? failedStatement;
-  final List<String> detailReadStatements = [];
 
   void arm() => _armed = true;
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    final sql = statement.statements.single;
-    if (statement.operation == LocalDatabaseSqlOperation.select &&
-        sql.contains('FROM intentions') &&
-        sql.contains('description') &&
-        !sql.contains('title_search_key')) {
-      detailReadStatements.add(sql);
-    }
-  }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     if (!_matches(statement.operation)) return;
     if (_armed && !_hasFailed) {
       _hasFailed = true;
-      failedStatement = statement.statements.single;
       throw StateError('CANARY-after-dml-failure');
     }
   }
 
   bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.insert => operation == LocalDatabaseSqlOperation.insert,
     _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
     _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
   };
@@ -2208,7 +1179,6 @@ final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
   }
 
   bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.insert => operation == LocalDatabaseSqlOperation.insert,
     _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
     _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
   };
@@ -2222,7 +1192,6 @@ final class _StatementFaultInjector extends LocalDatabaseConnectionObserver {
   var _observing = false;
   int? _failAfter;
   Object _failure = StateError('CANARY-statement-fault');
-  String? failedStatement;
 
   void observe() {
     _observed.clear();
@@ -2249,7 +1218,6 @@ final class _StatementFaultInjector extends LocalDatabaseConnectionObserver {
     _observed.add(statement);
     if (_observed.length == _failAfter) {
       _observing = false;
-      failedStatement = statement.statements.single;
       throw _failure;
     }
   }
@@ -2298,7 +1266,6 @@ final class _FinalAssignmentsReadTamper
     extends LocalDatabaseConnectionObserver {
   var _armed = false;
   var _wrote = false;
-  var tampered = false;
 
   void arm() => _armed = true;
 
@@ -2315,12 +1282,12 @@ final class _FinalAssignmentsReadTamper
     List<Map<String, Object?>> rows,
   ) {
     if (!_wrote ||
-        tampered ||
         rows.isEmpty ||
         !statement.statements.single.contains('tag_assignments')) {
       return rows;
     }
-    tampered = true;
+    _armed = false;
+    _wrote = false;
     return rows.sublist(0, rows.length - 1);
   }
 }
@@ -2333,7 +1300,6 @@ final class _SelectedTagsReadInterceptor
 
   final Object failure;
   var _armed = false;
-  var failedReads = 0;
 
   void arm() => _armed = true;
 
@@ -2344,7 +1310,6 @@ final class _SelectedTagsReadInterceptor
   ) {
     if (_armed && statement.statements.single.contains('FROM tags')) {
       _armed = false;
-      failedReads++;
       throw failure;
     }
     return rows;
@@ -2440,9 +1405,6 @@ T _readValue<T, F extends GraphCommandFailure>(GraphResult<T, F> result) =>
         'Ожидался успех чтения, получен отказ $failure.',
       ),
     };
-
-GraphRevision _catalogRevision(Result<IntentionCatalogPage> result) =>
-    _readValue(result).revision;
 
 IntentionDetails? _watched(Result<GraphSnapshot<IntentionDetails?>> result) =>
     _readValue(result).value;

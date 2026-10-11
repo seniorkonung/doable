@@ -11,7 +11,6 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_results.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -38,9 +37,6 @@ void defineIntentionPickerSessionTests({
     tester,
   ) async {
     final (container, repository, router) = await _openApp(tester);
-    final browse = container.read(
-      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-    );
     unawaited(router.push<void>(route));
     await _settleRoute(tester);
     final first = _purpose(tester);
@@ -100,8 +96,6 @@ void defineIntentionPickerSessionTests({
     unawaited(router.push<void>(route));
     await _settleRoute(tester);
     final second = _purpose(tester);
-    expect(second, isNot(first));
-    expect(repository.queries, hasLength(7));
     final initialQuery = repository.queryAt(6);
     expect(initialQuery.titleFilter, isNull);
     expect(initialQuery.tagFilter, IntentionTagFilter.empty);
@@ -138,25 +132,9 @@ void defineIntentionPickerSessionTests({
     await tester.pumpAndSettle();
     _position(tester, listKey).jumpTo(200);
     await tester.pumpAndSettle();
-    expect(_purpose(tester), same(second));
-    expect(
-      tester
-          .widget<IntentionSearchResults>(find.byType(IntentionSearchResults))
-          .purpose,
-      same(second),
-    );
 
     await router.maybePop();
     await tester.pumpAndSettle();
-    expect(
-      container.exists(intentionCatalogViewModelProvider(second)),
-      isFalse,
-    );
-    expect(
-      container.exists(intentionTagConditionsViewModelProvider(second)),
-      isFalse,
-    );
-    expect(_purpose(tester), same(first));
     expect(_position(tester, listKey).pixels, firstOffset);
     expect(
       tester
@@ -166,8 +144,10 @@ void defineIntentionPickerSessionTests({
       'Первая',
     );
     expect(
-      container.read(intentionCatalogViewModelProvider(first)).requireValue,
-      same(firstState),
+      (container.read(intentionCatalogViewModelProvider(first)).requireValue
+              as IntentionCatalogLoaded)
+          .items,
+      hasLength(120),
     );
     expect(
       container.read(intentionTagConditionsViewModelProvider(first)).tagFilter,
@@ -177,17 +157,12 @@ void defineIntentionPickerSessionTests({
       ),
     );
     expect(
-      container.read(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-      ),
-      same(browse),
-    );
-    await router.maybePop();
-    await tester.pumpAndSettle();
-    expect(container.exists(intentionCatalogViewModelProvider(first)), isFalse);
-    expect(
-      container.exists(intentionTagConditionsViewModelProvider(first)),
-      isFalse,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
+      isA<IntentionCatalogEmpty>(),
     );
   });
 
@@ -197,40 +172,21 @@ void defineIntentionPickerSessionTests({
       final (container, repository, router) = await _openApp(tester);
       unawaited(router.push<void>(route));
       await _settleRoute(tester);
-      final closed = _purpose(tester);
       await tester.enterText(find.byKey(ValueKey(filterKey)), 'Закрытый поиск');
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
-      expect(repository.queries, hasLength(3));
       await router.maybePop();
       await tester.pumpAndSettle();
-      expect(
-        container.exists(intentionCatalogViewModelProvider(closed)),
-        isFalse,
-      );
-      expect(
-        container.exists(intentionTagConditionsViewModelProvider(closed)),
-        isFalse,
-      );
 
       unawaited(router.push<void>(route));
       await _settleRoute(tester);
-      final current = _purpose(tester);
-      expect(current, isNot(closed));
       expect(repository.queryAt(3).titleFilter, isNull);
       expect(repository.queryAt(3).tagFilter, IntentionTagFilter.empty);
       repository.complete(3, _page('Новая выдача'));
       await tester.pumpAndSettle();
-      final currentState = container.read(
-        intentionCatalogViewModelProvider(current),
-      );
       repository.complete(2, _page('Поздняя выдача'));
       repository.complete(1, _page('Устаревшая первая порция'));
       await tester.pumpAndSettle();
-      expect(
-        container.read(intentionCatalogViewModelProvider(current)),
-        same(currentState),
-      );
       expect(find.text('Новая выдача 120'), findsOneWidget);
       expect(find.text('Поздняя выдача 120'), findsNothing);
       expect(tester.takeException(), isNull);

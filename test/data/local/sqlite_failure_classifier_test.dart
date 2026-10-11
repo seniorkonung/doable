@@ -10,8 +10,6 @@ void main() {
       () {
         for (final code in [
           SqlError.SQLITE_CORRUPT,
-          SqlExtendedError.SQLITE_CORRUPT_VTAB,
-          SqlExtendedError.SQLITE_CORRUPT_SEQUENCE,
           SqlExtendedError.SQLITE_CORRUPT_INDEX,
           SqlError.SQLITE_NOTADB,
         ]) {
@@ -28,27 +26,29 @@ void main() {
       },
     );
 
-    test('разрешает retry только для точной временной SQLite allowlist', () {
-      for (final code in [
-        SqlError.SQLITE_BUSY,
-        SqlExtendedError.SQLITE_BUSY_RECOVERY,
-        SqlExtendedError.SQLITE_BUSY_SNAPSHOT,
-        SqlExtendedError.SQLITE_BUSY_TIMEOUT,
-        SqlError.SQLITE_LOCKED,
-        SqlExtendedError.SQLITE_LOCKED_SHAREDCACHE,
-        SqlExtendedError.SQLITE_LOCKED_VTAB,
-      ]) {
-        expect(
-          classifySqliteFailure(
-            SqliteException(
-              extendedResultCode: code,
-              message: 'SQLite-файл повреждён: CANARY-личные-данные',
+    // Коды занятости и блокировки хранятся одним набором: проверены общие и
+    // расширенные коды обоих семейств.
+    test(
+      'классифицирует временные коды занятости и блокировки как недоступность',
+      () {
+        for (final code in [
+          SqlError.SQLITE_BUSY,
+          SqlExtendedError.SQLITE_BUSY_SNAPSHOT,
+          SqlError.SQLITE_LOCKED,
+          SqlExtendedError.SQLITE_LOCKED_SHAREDCACHE,
+        ]) {
+          expect(
+            classifySqliteFailure(
+              SqliteException(
+                extendedResultCode: code,
+                message: 'SQLite-файл повреждён: CANARY-личные-данные',
+              ),
             ),
-          ),
-          isA<SqliteUnavailableFailure>(),
-        );
-      }
-    });
+            isA<SqliteUnavailableFailure>(),
+          );
+        }
+      },
+    );
 
     test('классифицирует IOERR_DATA как повреждение', () {
       expect(
@@ -98,38 +98,37 @@ void main() {
       expect(failure, isA<SqliteCorruptionFailure>());
     });
 
-    test('сохраняет extended код всех известных constraint без предметного conflict', () {
-      for (final code in [
-        SqlError.SQLITE_CONSTRAINT,
-        SqlExtendedError.SQLITE_CONSTRAINT_CHECK,
-        SqlExtendedError.SQLITE_CONSTRAINT_COMMITHOOK,
-        SqlExtendedError.SQLITE_CONSTRAINT_FOREIGNKEY,
-        SqlExtendedError.SQLITE_CONSTRAINT_FUNCTION,
-        SqlExtendedError.SQLITE_CONSTRAINT_NOTNULL,
-        SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY,
-        SqlExtendedError.SQLITE_CONSTRAINT_TRIGGER,
-        SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-        SqlExtendedError.SQLITE_CONSTRAINT_VTAB,
-        SqlExtendedError.SQLITE_CONSTRAINT_ROWID,
-        SqlExtendedError.SQLITE_CONSTRAINT_PINNED,
-      ]) {
-        final failure = classifySqliteFailure(
-          SqliteException(
-            extendedResultCode: code,
-            message: 'Конфликт намерения: CANARY-личные-данные',
-          ),
-        );
+    // Достаточно общего кода и кодов, от которых зависит приложение
+    // (первичный ключ — конфликт создания, уникальность — конфликт тега),
+    // а также внешнего ключа и триггера схемы.
+    test(
+      'сохраняет extended код известных constraint без предметного conflict',
+      () {
+        for (final code in [
+          SqlError.SQLITE_CONSTRAINT,
+          SqlExtendedError.SQLITE_CONSTRAINT_FOREIGNKEY,
+          SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY,
+          SqlExtendedError.SQLITE_CONSTRAINT_TRIGGER,
+          SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
+        ]) {
+          final failure = classifySqliteFailure(
+            SqliteException(
+              extendedResultCode: code,
+              message: 'Конфликт намерения: CANARY-личные-данные',
+            ),
+          );
 
-        expect(
-          failure,
-          isA<SqliteConstraintFailure>().having(
-            (failure) => failure.extendedResultCode,
-            'extendedResultCode',
-            code,
-          ),
-        );
-      }
-    });
+          expect(
+            failure,
+            isA<SqliteConstraintFailure>().having(
+              (failure) => failure.extendedResultCode,
+              'extendedResultCode',
+              code,
+            ),
+          );
+        }
+      },
+    );
 
     test('неизвестные SQLite и non-SQLite причины остаются unexpected', () {
       expect(

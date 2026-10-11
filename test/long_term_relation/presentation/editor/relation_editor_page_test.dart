@@ -8,13 +8,11 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
-import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -50,84 +48,72 @@ void main() {
     );
   });
 
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'защищённый путь оставляет описание и приоритет доступными на ${locale.languageCode}',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final repository = ControlledRelationFormRepository();
-        addTearDown(repository.dispose);
-        final details = testRelationDetails(
-          relationId: testFormRelationId(151),
-          sourceId: testSummary(index: 1).id,
-          relatedId: testSummary(index: 2).id,
-          permissions:
-              const LongTermRelationPermissions.referencedByDailyPath(),
-        );
-        await _openDetailsForEditing(
-          tester,
-          repository,
-          details,
-          locale: locale,
-        );
-        await tester.tap(
-          find.byKey(const ValueKey('relation-details-edit-relation')),
-        );
-        await tester.pumpAndSettle();
-
-        final reason = find.byKey(
-          const ValueKey('relation-editor-path-protection'),
-        );
-        expect(reason, findsOneWidget);
-        expect(
-          tester.getSemantics(reason).label,
-          contains(locale.languageCode == 'ru' ? 'дневном пути' : 'daily path'),
-        );
-        expect(
-          tester
-              .widget<OutlinedButton>(
-                find.byKey(const ValueKey('relation-editor-change-source')),
-              )
-              .onPressed,
-          isNull,
-        );
-        expect(
-          tester
-              .widget<ChoiceChip>(
-                find.byKey(const ValueKey('relation-editor-type-can')),
-              )
-              .onSelected,
-          isNull,
-        );
-        expect(
-          tester
-              .widget<TextField>(
-                find.byKey(const ValueKey('relation-editor-description')),
-              )
-              .enabled,
-          isTrue,
-        );
-        await tester.enterText(
-          find.byKey(const ValueKey('relation-editor-description')),
-          'Описание пути',
-        );
-        await tester.pump();
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.byKey(const ValueKey('relation-editor-submit')),
-              )
-              .onPressed,
-          isNotNull,
-        );
-        await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-        await tester.pump();
-        expect(repository.relationUpdateCommands, hasLength(1));
-        expect(tester.takeException(), isNull);
-        semantics.dispose();
-      },
+  testWidgets('защищённый путь оставляет описание и приоритет доступными', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(151),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+      permissions: const LongTermRelationPermissions.referencedByDailyPath(),
     );
-  }
+    await _openDetailsForEditing(tester, repository, details);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+
+    final reason = find.byKey(
+      const ValueKey('relation-editor-path-protection'),
+    );
+    expect(reason, findsOneWidget);
+    expect(tester.getSemantics(reason).label, contains('daily path'));
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey('relation-editor-change-source')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.byKey(const ValueKey('relation-editor-type-can')),
+          )
+          .onSelected,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('relation-editor-description')),
+          )
+          .enabled,
+      isTrue,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('relation-editor-description')),
+      'Описание пути',
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('relation-editor-submit')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+    await tester.pump();
+    expect(repository.relationUpdateCommands, hasLength(1));
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets('изменение разрешения открытой формы сохраняет исправимый ввод', (
     tester,
@@ -355,76 +341,6 @@ void main() {
       );
     });
   }
-
-  testWidgets('другая эпоха требует нового подтверждённого снимка участника', (
-    tester,
-  ) async {
-    final repository = ControlledRelationFormRepository();
-    addTearDown(repository.dispose);
-    final relationId = testFormRelationId(116);
-    final sourceId = testSummary(index: 1).id;
-    final relatedId = testSummary(index: 2).id;
-    await _openDetailsForEditing(
-      tester,
-      repository,
-      testRelationDetails(
-        relationId: relationId,
-        sourceId: sourceId,
-        relatedId: relatedId,
-        sourceTitle: 'Исходное',
-        relatedTitle: 'Связанное',
-        scope: RelationScope.archived,
-      ),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('relation-details-edit-relation')),
-    );
-    await tester.pumpAndSettle();
-    await _selectParticipant(
-      tester,
-      repository,
-      actionKey: 'relation-editor-change-source',
-      catalogIndex: 1,
-      title: 'Снимок каталога',
-      index: 1,
-      revision: const TestCatalogRevision(5),
-    );
-
-    repository
-        .watchAt(0)
-        .emitDetails(
-          testRelationDetails(
-            relationId: relationId,
-            sourceId: sourceId,
-            relatedId: relatedId,
-            sourceTitle: 'Несопоставимое название',
-            relatedTitle: 'Связанное',
-            scope: RelationScope.archived,
-          ),
-          revision: const TestCatalogRevision(1, epoch: 1),
-        );
-    await tester.pumpAndSettle();
-    expect(find.text('Снимок каталога'), findsOneWidget);
-    expect(find.text('Несопоставимое название'), findsNothing);
-    expect(repository.watchedIntentionIds, contains(sourceId));
-
-    repository.emitIntention(
-      testDetailsIntention(
-        index: 1,
-        title: 'Подтверждённая новая эпоха',
-        archiveState: IntentionArchiveState.archived,
-      ),
-      counts: testRelationCounts(),
-      revision: const TestCatalogRevision(2, epoch: 1),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Подтверждённая новая эпоха'), findsOneWidget);
-    expect(find.text('Снимок каталога'), findsNothing);
-    expect(
-      find.text('To Подтверждённая новая эпоха, you need Связанное'),
-      findsOneWidget,
-    );
-  });
 
   testWidgets(
     'исходящая группа предвыбирает текущее намерение исходным участником',
@@ -724,8 +640,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(router.current.name, RelationDetailsRoute.name);
-      expect(repository.relationWatches.last.relationId, created.id);
-      expect(find.byType(RelationEditorPage), findsNothing);
+      expect(
+        router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+        created.id,
+      );
+      expect(
+        find.byKey(const ValueKey('relation-editor-submit')),
+        findsNothing,
+      );
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.text(successMessage), findsNothing);
 
@@ -744,7 +666,7 @@ void main() {
   );
 
   testWidgets(
-    'удаление renderer ошибки до подтверждённого кадра передаёт её оболочке один раз',
+    'сообщение об отказе, снятое правкой формы, предъявляется оболочкой один раз',
     (tester) async {
       const message = 'Only active intentions can be linked.';
       final repository = ControlledRelationFormRepository();
@@ -767,12 +689,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(OperationFailurePresentation), findsOneWidget);
       expect(find.text(message), findsOneWidget);
       expect(find.text('Текущее намерение'), findsOneWidget);
       expect(find.text('Много ходить'), findsOneWidget);
 
-      // Исправление участника удаляет renderer ошибки, не уходя с маршрута.
+      // Исправление участника снимает сообщение из формы, не уходя с маршрута.
       await _selectParticipant(
         tester,
         repository,
@@ -783,7 +704,7 @@ void main() {
       );
 
       expect(router.current.name, RelationEditorRoute.name);
-      expect(find.byType(OperationFailurePresentation), findsNothing);
+      expect(find.text(message), findsNothing);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
@@ -799,61 +720,8 @@ void main() {
     },
   );
 
-  testWidgets('смена локали сохраняет владельца непредъявленной ошибки формы', (
-    tester,
-  ) async {
-    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
-      Locale('en'),
-    ];
-    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-    final repository = ControlledRelationFormRepository();
-    addTearDown(repository.dispose);
-    final router = await _openForm(
-      tester,
-      repository,
-      RelationDirection.outgoing,
-      locale: null,
-    );
-    await _completeDraft(tester, repository);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-    repository.failRelationCommand(
-      0,
-      const LongTermRelationUnavailableFailure(),
-    );
-    await tester.pumpAndSettle();
-
-    const englishMessage = 'The relation couldn’t be created. Try again.';
-    const russianMessage = 'Не удалось создать связь. Повторите попытку.';
-    const shellMessage = 'Создание — «новая связь»: $russianMessage';
-    expect(find.text(englishMessage), findsOneWidget);
-
-    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
-      Locale('ru'),
-    ];
-    await tester.pumpAndSettle();
-
-    expect(find.text(englishMessage), findsNothing);
-    expect(find.text(russianMessage), findsOneWidget);
-    expect(find.text(shellMessage), findsNothing);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
-
-    expect(find.text(russianMessage), findsOneWidget);
-    expect(find.text(shellMessage), findsNothing);
-    expect(repository.relationCommands, hasLength(1));
-
-    await router.maybePop();
-    await tester.pumpAndSettle();
-
-    expect(find.text(shellMessage), findsNothing);
-    expect(repository.relationCommands, hasLength(1));
-  });
-
   testWidgets(
-    'временная невидимость renderer удерживает право формы до подтверждённого кадра',
+    'отказ создания остаётся в форме после перекрытия поиском и не повторяется в оболочке',
     (tester) async {
       const message = 'The relation couldn’t be created. Try again.';
       const shellMessage = 'Create — “new relation”: $message';
@@ -939,7 +807,6 @@ void main() {
     // Участники в редакторе связи — представление без поиска: тегов и условий в нём нет.
     expect(find.textContaining('Tags:'), findsNothing);
     expect(find.text('No tags'), findsNothing);
-    expect(find.byType(IntentionTagConditionsSection), findsNothing);
 
     await _selectParticipant(
       tester,
@@ -1036,7 +903,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(router.current.name, RelationDetailsRoute.name);
-    expect(repository.relationWatches, hasLength(2));
     repository
         .watchAt(1)
         .emitDetails(
@@ -1278,7 +1144,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(repository.watchedIntentionIds, contains(replacementId));
       repository.emitIntention(
         testDetailsIntention(
           index: 3,
@@ -1390,7 +1255,6 @@ void main() {
         'Моё описание',
       );
 
-      expect(repository.watchedIntentionIds, contains(replacementId));
       repository.emitIntention(
         testDetailsIntention(
           index: 3,

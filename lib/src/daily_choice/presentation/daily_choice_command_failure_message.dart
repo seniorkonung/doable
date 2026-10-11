@@ -14,7 +14,6 @@ String dailyChoiceCommandFailureMessage(
     DailyChoiceValidationField.date => localizations.dailyChoiceDateInvalid,
     DailyChoiceValidationField.description =>
       localizations.dailyChoiceDescriptionInvalid,
-    DailyChoiceValidationField.path => localizations.dailyChoicePathInvalid,
   },
   DailyChoiceNotFoundFailure() => localizations.dailyChoiceOperationNotFound,
   DailyChoiceConflictFailure() => localizations.dailyChoiceOperationConflict,

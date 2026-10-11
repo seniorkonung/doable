@@ -10,7 +10,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,15 +25,14 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
 ) as LongTermRelationIdDecodingSuccess).id;
 
 void main() {
-  for (final (number, locale, usedByDailyPath, type) in [
-    for (final type in ['need', 'can'])
-      for (final number in [101, 102])
-        for (final locale in [const Locale('ru'), const Locale('en')])
-          for (final usedByDailyPath in [false, true])
-            (number, locale, usedByDailyPath, type),
+  // Активность связи и защита дневным путём управляют независимыми кнопками,
+  // а тип меняет только подпись: двух комбинаций хватает на все значения.
+  for (final (number, usedByDailyPath, type) in [
+    (101, false, 'need'),
+    (102, true, 'can'),
   ]) {
     testWidgets(
-      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByDailyPath ? 'в дневном пути' : 'без пути'}: собственных тегов нет на ${locale.languageCode}',
+      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByDailyPath ? 'в дневном пути' : 'без пути'}: собственных тегов нет',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 6000);
         tester.view.devicePixelRatio = 1;
@@ -92,7 +90,7 @@ void main() {
               personalGraphRepositoryProvider.overrideWithValue(repository),
             ],
             child: MaterialApp.router(
-              locale: locale,
+              locale: const Locale('ru'),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(),
@@ -118,7 +116,6 @@ void main() {
         final l10n = AppLocalizations.of(
           tester.element(find.byKey(const ValueKey('relation-details-phrase'))),
         );
-        expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(
           find.byKey(const ValueKey('tag-assignments-choose')),
           findsNothing,
@@ -203,7 +200,6 @@ void main() {
                 .toCanonicalString(),
             tagFixtureId(participantNumber),
           );
-          expect(find.byType(TagAssignmentsSection), findsOneWidget);
           expect(
             find.byKey(const ValueKey('tag-assignments-choose')),
             findsOneWidget,
@@ -220,7 +216,6 @@ void main() {
           await tester.pumpAndSettle();
         }
         expect(router.current.name, RelationDetailsRoute.name);
-        expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(_storedGraph(raw), graphBefore);
         expect(tester.takeException(), isNull);
         router.pop();

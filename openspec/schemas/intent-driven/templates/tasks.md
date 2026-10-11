@@ -17,7 +17,7 @@ make the final primary task a checkpoint for the phase's Ready to advance gate.
 
 - [ ] <!-- N -->.2 <!-- Final phase readiness checkpoint -->
   - **Acceptance criteria:**
-    - <!-- Evidence for the phase's Ready to advance condition -->
+    - <!-- The phase's Ready to advance condition from plan.md -->
   - **Verification:**
     - <!-- Focused and broader checks required at this boundary -->
   - **Dependencies:** <!-- All prerequisite task IDs -->

@@ -244,10 +244,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить следующие намерения из-за непредвиденной ошибки.';
 
   @override
-  String get catalogLoadMoreValidation =>
-      'Сохранённая позиция каталога больше недействительна.';
-
-  @override
   String get catalogRefreshUnavailable =>
       'Список намерений не обновлён: не удалось получить изменения.';
 
@@ -258,12 +254,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get catalogRefreshUnexpected =>
       'Список намерений не обновлён из-за непредвиденной ошибки.';
-
-  @override
-  String get catalogReload => 'Перезагрузить каталог';
-
-  @override
-  String get catalogReloading => 'Перезагружаем каталог…';
 
   @override
   String get catalogReady => 'Готово к действию';
@@ -1155,10 +1145,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить намерения с тегом из-за непредвиденной ошибки.';
 
   @override
-  String get tagNavigationInvalidCursor =>
-      'Продолжение выдачи недействительно. Откройте навигацию по тегу заново.';
-
-  @override
   String get tagNavigationSnapshotExpired =>
       'Список изменился. Откройте навигацию по тегу заново.';
 
@@ -1598,9 +1584,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoiceDescriptionInvalid =>
       'Проверьте описание дневного выбора.';
-
-  @override
-  String get dailyChoicePathInvalid => 'Проверьте путь дневного выбора.';
 
   @override
   String get dailyChoiceOperationNotFound =>
@@ -2190,10 +2173,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get choicePathNotFound => 'Намерение пути больше не существует.';
 
   @override
-  String get choicePathInvalid =>
-      'Не удалось проверить продолжения из-за неверного запроса.';
-
-  @override
   String get choicePathUnavailable =>
       'Продолжения временно недоступны. Повторите попытку.';
 
@@ -2297,10 +2276,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoiceCatalogExpired =>
       'Каталог изменился. Обновите его, чтобы продолжить.';
-
-  @override
-  String get dailyChoiceCatalogInvalid =>
-      'Позиция каталога больше недействительна.';
 
   @override
   String get dailyChoiceCatalogUnexpected =>

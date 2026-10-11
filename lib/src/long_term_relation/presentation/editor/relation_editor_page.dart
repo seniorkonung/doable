@@ -137,8 +137,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     });
 
     final controlsEnabled = editor.canEdit;
-    // Покинутый инициатор передал ошибку общей поверхности даже при отказе
-    // удаления формы; её оставшийся renderer не предъявляет результат снова.
+    // Покинутый инициатор передал ошибку общей поверхности; форма, пока она
+    // остаётся на экране при закрытии, не предъявляет результат снова.
     final presentsFailure =
         editor.sessionState == RelationEditorSessionState.active;
     final descriptionFailure = presentsFailure

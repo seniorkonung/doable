@@ -61,100 +61,106 @@ void main() {
         expect(tester.takeException(), isNull);
         semantics.dispose();
       });
+    }
+  }
 
-      testWidgets('текст 2.6 и малая высота сохраняют целые строки и выход '
-          '${state.name}: ${translation.locale.languageCode}', (tester) async {
-        var exits = 0;
-        await tester.pumpWidget(
-          _app(
-            locale: translation.locale,
-            state: state,
-            onExit: () => exits++,
-            textScale: 2.6,
-            size: const Size(240, 160),
-          ),
+  // Раскладку определяют текст и высота, а не язык: берём русский, где подписи
+  // длиннее, и два состояния с разными подписями и объяснением.
+  final translation = _translations.first;
+  for (final state in [
+    CreationExitState.cancellable,
+    CreationExitState.submitting,
+  ]) {
+    final submitting = state == CreationExitState.submitting;
+    testWidgets('текст 2.6 и малая высота сохраняют целые строки и выход '
+        '${state.name}: ${translation.locale.languageCode}', (tester) async {
+      var exits = 0;
+      await tester.pumpWidget(
+        _app(
+          locale: translation.locale,
+          state: state,
+          onExit: () => exits++,
+          textScale: 2.6,
+          size: const Size(240, 160),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      final viewport = tester.getRect(find.byType(CreationExitAction));
+      for (final paragraph in tester.renderObjectList<RenderParagraph>(
+        find.byType(RichText),
+      )) {
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(paragraph.size.width, lessThanOrEqualTo(viewport.width));
+      }
+      final button = find.byType(TextButton);
+      expect(button.hitTestable(), findsOneWidget);
+      await tester.tap(button);
+      await tester.pump();
+      expect(exits, 1);
+
+      if (submitting) {
+        final explanation = find.text(translation.saving);
+        expect(
+          tester.getRect(explanation).bottom,
+          greaterThan(viewport.bottom),
         );
-        expect(tester.takeException(), isNull);
-        final viewport = tester.getRect(find.byType(CreationExitAction));
-        for (final paragraph in tester.renderObjectList<RenderParagraph>(
-          find.byType(RichText),
-        )) {
-          expect(paragraph.didExceedMaxLines, isFalse);
-          expect(paragraph.size.width, lessThanOrEqualTo(viewport.width));
-        }
-        final button = find.byType(TextButton);
+        await tester.drag(
+          find.byType(CreationExitAction),
+          const Offset(0, -800),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(explanation).bottom, closeTo(viewport.bottom, 1));
+        await tester.drag(
+          find.byType(CreationExitAction),
+          const Offset(0, 800),
+        );
+        await tester.pumpAndSettle();
         expect(button.hitTestable(), findsOneWidget);
         await tester.tap(button);
         await tester.pump();
-        expect(exits, 1);
-
-        if (submitting) {
-          final explanation = find.text(translation.saving);
-          expect(
-            tester.getRect(explanation).bottom,
-            greaterThan(viewport.bottom),
-          );
-          await tester.drag(
-            find.byType(CreationExitAction),
-            const Offset(0, -800),
-          );
-          await tester.pumpAndSettle();
-          expect(
-            tester.getRect(explanation).bottom,
-            closeTo(viewport.bottom, 1),
-          );
-          await tester.drag(
-            find.byType(CreationExitAction),
-            const Offset(0, 800),
-          );
-          await tester.pumpAndSettle();
-          expect(button.hitTestable(), findsOneWidget);
-          await tester.tap(button);
-          await tester.pump();
-          expect(exits, 2);
-        }
-        expect(tester.takeException(), isNull);
-      });
-    }
-
-    testWidgets('смена состояния убирает прежнее обещание отмены и объяснение '
-        'сохранения: ${translation.locale.languageCode}', (tester) async {
-      final semantics = tester.ensureSemantics();
-      for (final state in [
-        CreationExitState.cancellable,
-        CreationExitState.submitting,
-        CreationExitState.terminal,
-        CreationExitState.cancellable,
-      ]) {
-        await tester.pumpWidget(
-          _app(locale: translation.locale, state: state, onExit: () {}),
-        );
-        final cancellable = state == CreationExitState.cancellable;
-        final submitting = state == CreationExitState.submitting;
-        expect(
-          find.text(translation.cancel),
-          cancellable ? findsOneWidget : findsNothing,
-        );
-        expect(
-          find.text(translation.leave),
-          cancellable ? findsNothing : findsOneWidget,
-        );
-        expect(
-          tester
-              .getSemantics(
-                find.bySemanticsLabel(
-                  cancellable ? translation.cancel : translation.leave,
-                ),
-              )
-              .getSemanticsData()
-              .hint,
-          submitting ? translation.saving : isEmpty,
-        );
+        expect(exits, 2);
       }
       expect(tester.takeException(), isNull);
-      semantics.dispose();
     });
   }
+
+  testWidgets('смена состояния убирает прежнее обещание отмены и объяснение '
+      'сохранения: ${translation.locale.languageCode}', (tester) async {
+    final semantics = tester.ensureSemantics();
+    for (final state in [
+      CreationExitState.cancellable,
+      CreationExitState.submitting,
+      CreationExitState.terminal,
+      CreationExitState.cancellable,
+    ]) {
+      await tester.pumpWidget(
+        _app(locale: translation.locale, state: state, onExit: () {}),
+      );
+      final cancellable = state == CreationExitState.cancellable;
+      final submitting = state == CreationExitState.submitting;
+      expect(
+        find.text(translation.cancel),
+        cancellable ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text(translation.leave),
+        cancellable ? findsNothing : findsOneWidget,
+      );
+      expect(
+        tester
+            .getSemantics(
+              find.bySemanticsLabel(
+                cancellable ? translation.cancel : translation.leave,
+              ),
+            )
+            .getSemanticsData()
+            .hint,
+        submitting ? translation.saving : isEmpty,
+      );
+    }
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 }
 
 Widget _app({

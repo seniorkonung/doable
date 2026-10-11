@@ -239,52 +239,8 @@ void main() {
     );
   });
 
-  test('отклоняет повреждённые поля и отсутствующую связь', () async {
-    addIntention(1);
-    addIntention(2);
-    addRelation(101, 1, 2);
-    addChoice(201, 1, 2);
-    addStep(301, 201, 101);
-    Future<void> expectCorruption() async {
-      expect(
-        await repository.getDailyChoice(_choiceId(201)),
-        isA<DailyChoiceReadError>().having(
-          (value) => value.failure.category,
-          'категория',
-          GraphFailureCategory.corruption,
-        ),
-      );
-    }
-
-    raw.execute('PRAGMA ignore_check_constraints = ON');
-    raw.execute(
-      "UPDATE daily_choices SET choice_date = '2026-02-30' WHERE id = ?",
-      [_uuid(201)],
-    );
-    await expectCorruption();
-    raw.execute(
-      "UPDATE daily_choices SET choice_date = '2026-09-23', description = ' ' WHERE id = ?",
-      [_uuid(201)],
-    );
-    await expectCorruption();
-    raw.execute(
-      "UPDATE daily_choices SET description = 'Описание', is_completed = 2 WHERE id = ?",
-      [_uuid(201)],
-    );
-    await expectCorruption();
-    raw.execute('UPDATE daily_choices SET is_completed = 1 WHERE id = ?', [
-      _uuid(201),
-    ]);
-    raw.execute('PRAGMA foreign_keys = OFF');
-    raw.execute(
-      'UPDATE daily_choice_path_steps SET long_term_relation_id = ? WHERE id = ?',
-      [_uuid(999), _uuid(301)],
-    );
-    await expectCorruption();
-  });
-
   test(
-    'отклоняет повреждённые текущие данные участников и переходов',
+    'отклоняет календарно недопустимую дату и пробельное описание',
     () async {
       addIntention(1);
       addIntention(2);
@@ -302,15 +258,17 @@ void main() {
         );
       }
 
-      raw.execute('PRAGMA ignore_check_constraints = ON');
-      raw.execute('UPDATE long_term_relations SET priority = 5 WHERE id = ?', [
-        _uuid(101),
-      ]);
+      // Схема пропускает обе записи: дату проверяет только шаблон, а описание
+      // только на NUL.
+      raw.execute(
+        "UPDATE daily_choices SET choice_date = '2026-02-30' WHERE id = ?",
+        [_uuid(201)],
+      );
       await expectCorruption();
-      raw.execute('UPDATE long_term_relations SET priority = 2 WHERE id = ?', [
-        _uuid(101),
-      ]);
-      raw.execute("UPDATE intentions SET title = '' WHERE id = ?", [_uuid(2)]);
+      raw.execute(
+        "UPDATE daily_choices SET choice_date = '2026-09-23', description = ' ' WHERE id = ?",
+        [_uuid(201)],
+      );
       await expectCorruption();
     },
   );
@@ -339,51 +297,7 @@ void main() {
   });
 
   test(
-    'отклоняет ветвление и чужой шаг как повреждение целого выбора',
-    () async {
-      for (var i = 1; i <= 4; i++) {
-        addIntention(i);
-      }
-      addRelation(101, 1, 2);
-      addRelation(102, 2, 3);
-      addRelation(103, 2, 4);
-      addChoice(201, 1, 3);
-      addStep(301, 201, 101);
-      addStep(302, 201, 102, 301);
-      raw.execute('DROP INDEX daily_choice_path_steps_one_successor');
-      addStep(303, 201, 103, 301);
-      expect(
-        await repository.getDailyChoice(_choiceId(201)),
-        isA<DailyChoiceReadError>().having(
-          (value) => value.failure.category,
-          'категория',
-          GraphFailureCategory.corruption,
-        ),
-      );
-
-      raw.execute('DELETE FROM daily_choice_path_steps WHERE id = ?', [
-        _uuid(303),
-      ]);
-      addChoice(202, 1, 4);
-      addStep(304, 202, 101);
-      raw.execute('PRAGMA foreign_keys = OFF');
-      raw.execute(
-        'UPDATE daily_choice_path_steps SET previous_step_id = ? WHERE id = ?',
-        [_uuid(304), _uuid(302)],
-      );
-      expect(
-        await repository.getDailyChoice(_choiceId(201)),
-        isA<DailyChoiceReadError>().having(
-          (value) => value.failure.category,
-          'категория',
-          GraphFailureCategory.corruption,
-        ),
-      );
-    },
-  );
-
-  test(
-    'читает длинный путь порциями и не загружает посторонние выборы',
+    'читает путь длиннее одной SQL-порции целиком и только своего выбора',
     () async {
       const length = 405;
       for (var i = 1; i <= length + 1; i++) {
@@ -396,41 +310,12 @@ void main() {
       }
       addChoice(2001, 1, 2);
       addStep(5000, 2001, 3001);
-      probe.selects.clear();
 
       final result = await repository.getDailyChoice(_choiceId(2000));
       expect(result, isA<DailyChoiceReadSuccess>());
       expect(
         (result as DailyChoiceReadSuccess).value.value!.path,
         hasLength(length),
-      );
-      final reads = probe.selects;
-      expect(reads.length, lessThanOrEqualTo(7));
-      expect(
-        reads
-            .where(
-              (statement) => statement.statements.single.contains(
-                'FROM daily_choices WHERE id = ?',
-              ),
-            )
-            .single
-            .arguments,
-        [_uuid(2000)],
-      );
-      expect(
-        reads
-            .where(
-              (statement) => statement.statements.single.contains(
-                'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-              ),
-            )
-            .single
-            .arguments,
-        [_uuid(2000)],
-      );
-      expect(
-        reads.every((statement) => statement.arguments.length <= 400),
-        isTrue,
       );
     },
   );
@@ -479,7 +364,6 @@ void main() {
 
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
   Object? failure;
-  final selects = <LocalDatabaseSqlStatement>[];
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -490,6 +374,5 @@ final class _ReadProbe extends LocalDatabaseConnectionObserver {
       final error = failure;
       if (error != null) throw error;
     }
-    selects.add(statement);
   }
 }

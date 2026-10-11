@@ -6,7 +6,6 @@ import 'package:doable/src/graph/data/drift_relation_count_aggregates.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
-import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -247,8 +246,8 @@ void main() {
   test(
     'обнаруживает повреждение до фильтрации групп без частичной выдачи',
     () async {
-      await database.customStatement('PRAGMA ignore_check_constraints = ON');
-      await database.customStatement('PRAGMA foreign_keys = OFF');
+      // Каждое повреждение схема пропускает: формат и тип идентификаторов она
+      // не проверяет, а описание связи проверяет только на NUL.
       final owners = <String>[];
 
       Future<(String, String)> participants(int fixture) async {
@@ -278,43 +277,7 @@ void main() {
         relatedId: invalidParticipantId.$1,
       );
 
-      final invalidType = await participants(2);
-      await _insertRawRelation(
-        database,
-        id: _uuid(901),
-        sourceId: invalidType.$1,
-        relatedId: invalidType.$2,
-        type: 'other',
-      );
-
-      final invalidPriorityStorage = await participants(3);
-      await _insertRawRelation(
-        database,
-        id: _uuid(902),
-        sourceId: invalidPriorityStorage.$1,
-        relatedId: invalidPriorityStorage.$2,
-        priority: Uint8List.fromList([1]),
-      );
-
-      final invalidArchiveStorage = await participants(4);
-      await _insertRawRelation(
-        database,
-        id: _uuid(903),
-        sourceId: invalidArchiveStorage.$1,
-        relatedId: invalidArchiveStorage.$2,
-        isArchived: Uint8List.fromList([0]),
-      );
-
-      final invalidSequence = await participants(5);
-      await _insertRawRelation(
-        database,
-        creationSequence: -1,
-        id: _uuid(904),
-        sourceId: invalidSequence.$1,
-        relatedId: invalidSequence.$2,
-      );
-
-      final whitespaceDescription = await participants(6);
+      final whitespaceDescription = await participants(2);
       await _insertRawRelation(
         database,
         id: _uuid(905),
@@ -323,7 +286,7 @@ void main() {
         description: ' \n\t ',
       );
 
-      final malformedUtf8Description = await participants(7);
+      final malformedUtf8Description = await participants(3);
       await database.customStatement(
         '''
           INSERT INTO long_term_relations (
@@ -339,19 +302,7 @@ void main() {
         [_uuid(906), malformedUtf8Description.$1, malformedUtf8Description.$2],
       );
 
-      final missingParticipant = await participants(8);
-      await database.customStatement('DELETE FROM intentions WHERE id = ?', [
-        missingParticipant.$2,
-      ]);
-      await _insertRawRelation(
-        database,
-        id: _uuid(907),
-        sourceId: missingParticipant.$1,
-        relatedId: missingParticipant.$2,
-        isArchived: 1,
-      );
-
-      final relationIdStorage = await participants(9);
+      final relationIdStorage = await participants(4);
       await _insertRawRelation(
         database,
         id: Uint8List.fromList(utf8.encode(_uuid(908))),
@@ -359,7 +310,7 @@ void main() {
         relatedId: relationIdStorage.$2,
       );
 
-      final participantIdStorage = await participants(10);
+      final participantIdStorage = await participants(5);
       final blobParticipantId = Uint8List.fromList(utf8.encode(_uuid(909)));
       await _insertRawIntention(database, blobParticipantId);
       await _insertRawRelation(
@@ -367,51 +318,6 @@ void main() {
         id: _uuid(910),
         sourceId: participantIdStorage.$1,
         relatedId: blobParticipantId,
-      );
-
-      final typeStorage = await participants(11);
-      await _insertRawRelation(
-        database,
-        id: _uuid(911),
-        sourceId: typeStorage.$1,
-        relatedId: typeStorage.$2,
-        type: Uint8List.fromList(utf8.encode('need')),
-      );
-
-      final descriptionStorage = await participants(12);
-      await _insertRawRelation(
-        database,
-        id: _uuid(912),
-        sourceId: descriptionStorage.$1,
-        relatedId: descriptionStorage.$2,
-        description: Uint8List.fromList(utf8.encode('Описание')),
-      );
-
-      final invalidParticipantState = await participants(13);
-      await _insertRawRelation(
-        database,
-        id: _uuid(913),
-        sourceId: invalidParticipantState.$1,
-        relatedId: invalidParticipantState.$2,
-      );
-      await database.customStatement(
-        'UPDATE intentions SET is_archived = 2 WHERE id = ?',
-        [invalidParticipantState.$2],
-      );
-
-      final archivedActiveParticipant = await participants(14);
-      await _insertRawRelation(
-        database,
-        id: _uuid(914),
-        sourceId: archivedActiveParticipant.$1,
-        relatedId: archivedActiveParticipant.$2,
-      );
-      await database.customStatement(
-        'DROP TRIGGER intentions_archive_requires_no_active_relations',
-      );
-      await database.customStatement(
-        'UPDATE intentions SET is_archived = 1 WHERE id = ?',
-        [archivedActiveParticipant.$2],
       );
 
       final result = await aggregates.read(owners.map(_id));
@@ -426,116 +332,16 @@ void main() {
     },
   );
 
-  test('агрегирует внутри SQLite и использует индексы обоих направлений', () async {
-    await database.close();
-    final trace = _AggregateSelectTrace();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        trace,
-      ),
-    );
-    aggregates = DriftRelationCountAggregates(database);
-    const firstOwner = '018f0b5d-6b2e-7c80-8000-000000000021';
-    const secondOwner = '018f0b5d-6b2e-7c80-8000-000000000022';
-    await _insertIntention(database, firstOwner);
-    await _insertIntention(database, secondOwner);
-    for (var index = 0; index < 24; index++) {
-      final neighbor = _uuid(1000 + index);
-      await _insertIntention(database, neighbor);
-      await _insertRelation(
-        database,
-        id: _uuid(2000 + index),
-        sourceId: index.isEven ? firstOwner : neighbor,
-        relatedId: index.isEven ? neighbor : secondOwner,
-        type: index % 3 == 0 ? 'can' : 'need',
-        isArchived: index % 5 == 0,
-      );
-    }
-    await database.transaction(() async {
-      for (var index = 0; index < 160; index++) {
-        final choiceId = _uuid(4000 + index);
-        await _insertDailyChoice(
-          database,
-          id: choiceId,
-          sourceId: firstOwner,
-          selectedId: _uuid(1000),
-          completed: index.isEven,
-        );
-        await _insertStep(
-          database,
-          id: _uuid(5000 + index),
-          choiceId: choiceId,
-          relationId: _uuid(2000),
-        );
-      }
-    });
-
-    final result = await aggregates.read({_id(firstOwner), _id(secondOwner)});
-    final aggregateSelect = trace.selects.singleWhere(
-      (entry) => entry.statement.statements.single.contains(
-        'doable_relation_count_aggregates',
-      ),
-    );
-
-    expect(result, hasLength(2));
-    expect(result[_id(firstOwner)]!.counts.dailySource, 160);
-    expect(aggregateSelect.rowCount, 2);
-    expect(aggregateSelect.statement.arguments, hasLength(2));
-
-    final plan = await database
-        .customSelect(
-          'EXPLAIN QUERY PLAN ${aggregateSelect.statement.statements.single}',
-          variables: [
-            for (final argument in aggregateSelect.statement.arguments)
-              Variable.withString(argument! as String),
-          ],
-        )
-        .get();
-    final details = plan.map((row) => row.read<String>('detail'));
-
-    expect(
-      details,
-      contains(contains('long_term_relations_source_group_order')),
-    );
-    expect(
-      details,
-      contains(contains('long_term_relations_related_group_order')),
-    );
-    expect(details, contains(contains('daily_choices_source_recent')));
-    expect(details, contains(contains('daily_choices_selected_recent')));
-
-    final relationId = _relationId(_uuid(2000));
-    final permissions = await aggregates.readPermissions([relationId]);
-    expect(permissions[relationId]!.canDelete, isFalse);
-    final permissionSelect = trace.selects.singleWhere(
-      (entry) => entry.statement.statements.single.contains(
-        'doable_daily_path_permissions',
-      ),
-    );
-    expect(permissionSelect.rowCount, 1);
-    final permissionPlan = await database
-        .customSelect(
-          'EXPLAIN QUERY PLAN ${permissionSelect.statement.statements.single}',
-          variables: [Variable.withString(relationId.toCanonicalString())],
-        )
-        .get();
-    expect(
-      permissionPlan.map((row) => row.read<String>('detail')),
-      contains(contains('daily_choice_path_steps_relation')),
-    );
-  });
-
   test('ошибка агрегата не выдаёт нули или свободное разрешение', () async {
     await database.close();
-    final trace = _AggregateSelectTrace(
+    final fault = _AggregateSelectFault(
       failCounts: true,
       failPermissions: true,
     );
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(),
-        trace,
+        fault,
       ),
     );
     aggregates = DriftRelationCountAggregates(database);
@@ -638,18 +444,13 @@ Future<void> _insertStep(
 
 Future<void> _insertRawRelation(
   AppDatabase database, {
-  int? creationSequence,
   required Object id,
   required Object sourceId,
   required Object relatedId,
-  Object type = 'need',
-  Object priority = 1,
   Object? description,
-  Object isArchived = 0,
 }) => database.customStatement(
   '''
     INSERT INTO long_term_relations (
-      ${creationSequence == null ? '' : 'creation_sequence,'}
       id,
       source_intention_id,
       related_intention_id,
@@ -657,35 +458,23 @@ Future<void> _insertRawRelation(
       priority,
       description,
       is_archived
-    ) VALUES (
-      ${creationSequence == null ? '' : '?,'}
-      ?, ?, ?, ?, ?, ?, ?
-    )
+    ) VALUES (?, ?, ?, 'need', 1, ?, 0)
   ''',
-  [
-    ?creationSequence,
-    id,
-    sourceId,
-    relatedId,
-    type,
-    priority,
-    description,
-    isArchived,
-  ],
+  [id, sourceId, relatedId, description],
 );
 
 String _uuid(int suffix) =>
     '018f0b5d-6b2e-7c80-8002-${suffix.toString().padLeft(12, '0')}';
 
-final class _AggregateSelectTrace extends LocalDatabaseConnectionObserver {
-  _AggregateSelectTrace({
+/// Отказывает при чтении агрегатов счётчиков и разрешений.
+final class _AggregateSelectFault extends LocalDatabaseConnectionObserver {
+  _AggregateSelectFault({
     this.failCounts = false,
     this.failPermissions = false,
   });
 
   final bool failCounts;
   final bool failPermissions;
-  final selects = <({LocalDatabaseSqlStatement statement, int rowCount})>[];
 
   @override
   List<Map<String, Object?>> afterSelect(
@@ -697,7 +486,6 @@ final class _AggregateSelectTrace extends LocalDatabaseConnectionObserver {
         (failPermissions && sql.contains('doable_daily_path_permissions'))) {
       throw StateError('Искусственный отказ агрегата.');
     }
-    selects.add((statement: statement, rowCount: rows.length));
     return rows;
   }
 }

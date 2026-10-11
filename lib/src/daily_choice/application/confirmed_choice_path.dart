@@ -20,11 +20,9 @@ final class ConfirmedChoicePathStep {
 
 final class ConfirmedChoicePath {
   factory ConfirmedChoicePath(Iterable<ConfirmedChoicePathStep> steps) {
-    final ordered = List<ConfirmedChoicePathStep>.unmodifiable(steps);
-    if (ordered.isEmpty) {
-      throw ArgumentError.value(steps, 'steps');
-    }
-    return ConfirmedChoicePath._(ordered);
+    return ConfirmedChoicePath._(
+      List<ConfirmedChoicePathStep>.unmodifiable(steps),
+    );
   }
 
   const ConfirmedChoicePath._(this.steps);

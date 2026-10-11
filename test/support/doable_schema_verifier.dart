@@ -1,96 +1,14 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
-import 'package:doable/src/data/local/sqlite_relation_integrity_functions.dart';
-import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:drift_dev/api/migrations_native.dart';
-import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 /// Проверяет схему Doable через единственный настроенный drift_dev verifier.
-Future<void> verifyDoableDatabaseSchema(AppDatabase database) =>
-    _verifyDoableDatabaseSchema(database);
-
-/// Выполняет проверочный SQL на reference connection, создаваемом drift_dev.
-///
-/// Нужен только raw contract-тестам. Обычные verification harnesses не
-/// принимают и не передают SQLite setup.
-Future<String> readDoableVerifierReferenceSearchKey(
-  AppDatabase database,
-  String title,
-) async {
-  late String searchKey;
-  await _verifyDoableDatabaseSchema(
-    database,
-    onReferenceConnection: (reference) {
-      searchKey =
-          reference.select('SELECT doable_title_search_key(?) AS search_key', [
-                title,
-              ]).single['search_key']
-              as String;
-    },
-  );
-  return searchKey;
-}
-
-Future<({int validId, int malformedDescription})>
-readDoableVerifierReferenceRelationValidation(AppDatabase database) async {
-  late ({int validId, int malformedDescription}) result;
-  await _verifyDoableDatabaseSchema(
-    database,
-    onReferenceConnection: (reference) {
-      final row = reference.select('''
-            SELECT
-              $relationIdIntegrityFunctionName(
-                CAST('018f0b5d-6b2e-7c80-8000-000000000001' AS BLOB)
-              ) AS valid_id,
-              $relationDescriptionIntegrityFunctionName(
-                x'80'
-              ) AS malformed_description
-          ''').single;
-      result = (
-        validId: row['valid_id']! as int,
-        malformedDescription: row['malformed_description']! as int,
-      );
-    },
-  );
-  return result;
-}
-
-Future<({int valid, String key, int invalid, Object? invalidKey})>
-readDoableVerifierReferenceTagNameFunctions(AppDatabase database) async {
-  late ({int valid, String key, int invalid, Object? invalidKey}) result;
-  await _verifyDoableDatabaseSchema(
-    database,
-    onReferenceConnection: (reference) {
-      final row = reference.select('''
-        SELECT
-          $tagNameValidFunctionName('Straße') AS valid,
-          $tagNameKeyFunctionName('Straße') AS name_key,
-          $tagNameValidFunctionName(' Straße') AS invalid,
-          $tagNameKeyFunctionName(' Straße') AS invalid_key
-      ''').single;
-      result = (
-        valid: row['valid']! as int,
-        key: row['name_key']! as String,
-        invalid: row['invalid']! as int,
-        invalidKey: row['invalid_key'],
-      );
-    },
-  );
-  return result;
-}
-
-Future<void> _verifyDoableDatabaseSchema(
-  AppDatabase database, {
-  void Function(sqlite.Database reference)? onReferenceConnection,
-}) {
+Future<void> verifyDoableDatabaseSchema(AppDatabase database) {
   // drift_dev создаёт отдельную in-memory reference connection и передаёт ей
   // setup до создания ожидаемой schema:
   // https://drift.simonbinder.eu/migrations/tests/#verifying-a-database-schema-at-runtime
   return database.validateDatabaseSchema(
     options: const ValidationOptions(validateDropped: true),
-    setup: (reference) {
-      configureDoableSqliteConnection(reference);
-      onReferenceConnection?.call(reference);
-    },
+    setup: configureDoableSqliteConnection,
   );
 }

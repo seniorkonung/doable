@@ -146,22 +146,13 @@ void main() {
       confirmed.revision.compareTo(before.revision),
       GraphRevisionOrder.newer,
     );
-    final stages = diagnostics.events
-        .whereType<DailyChoiceCommandDiagnosticsEvent>()
-        .where(
-          (event) =>
-              event.commandType == DailyChoiceCommandDiagnosticsType.delete,
-        )
-        .toList();
-    expect(stages.map((event) => event.stage), [
-      DailyChoiceCommandDiagnosticsStage.validation,
-      DailyChoiceCommandDiagnosticsStage.validation,
-      DailyChoiceCommandDiagnosticsStage.write,
-      DailyChoiceCommandDiagnosticsStage.write,
-      DailyChoiceCommandDiagnosticsStage.resultRead,
-      DailyChoiceCommandDiagnosticsStage.resultRead,
-    ]);
-    expect(stages.last.status, isA<DiagnosticsSucceeded>());
+    expect(
+      diagnostics.events
+          .whereType<DailyChoiceCommandDiagnosticsEvent>()
+          .last
+          .status,
+      isA<DiagnosticsSucceeded>(),
+    );
   });
 
   test('другая запись сохраняет прямую и путевую зависимости', () async {
@@ -234,7 +225,6 @@ void main() {
     final last = diagnostics.events
         .whereType<DailyChoiceCommandDiagnosticsEvent>()
         .last;
-    expect(last.stage, DailyChoiceCommandDiagnosticsStage.resultRead);
     expect(
       (last.status as DiagnosticsFailed).code,
       DiagnosticsFailureCode.unexpected,

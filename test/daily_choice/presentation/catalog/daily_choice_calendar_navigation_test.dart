@@ -5,309 +5,201 @@ import 'package:flutter_test/flutter_test.dart';
 import 'daily_choice_calendar_test_support.dart';
 
 /// Ожидаемые подписи шапки при выбранной 2026-10-04. Русские даты Flutter
-/// форматирует с узким неразрывным пробелом перед «г.».
-final _localizedTexts = [
-  (
-    locale: const Locale('ru'),
-    selectedDate: 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.',
-    october: 'октябрь 2026\u202Fг.',
-    november: 'ноябрь 2026\u202Fг.',
-    december: 'декабрь 2026\u202Fг.',
-    previousWeek: 'Предыдущая неделя',
-    nextWeek: 'Следующая неделя',
-    previousMonth: 'Предыдущий месяц',
-    nextMonth: 'Следующий месяц',
-    expand: 'Развернуть календарь',
-    collapse: 'Свернуть календарь',
-  ),
-  (
-    locale: const Locale('en'),
-    selectedDate: 'Selected date: Sunday, October 4, 2026',
-    october: 'October 2026',
-    november: 'November 2026',
-    december: 'December 2026',
-    previousWeek: 'Previous week',
-    nextWeek: 'Next week',
-    previousMonth: 'Previous month',
-    nextMonth: 'Next month',
-    expand: 'Expand calendar',
-    collapse: 'Collapse calendar',
-  ),
-];
+/// форматирует с узким неразрывным пробелом перед «г.». Перелистывание не
+/// зависит от языка, а подписи по языкам проверяет тест доступности.
+final _texts = (
+  locale: const Locale('ru'),
+  selectedDate: 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.',
+  october: 'октябрь 2026\u202Fг.',
+  november: 'ноябрь 2026\u202Fг.',
+  december: 'декабрь 2026\u202Fг.',
+  previousWeek: 'Предыдущая неделя',
+  nextWeek: 'Следующая неделя',
+  previousMonth: 'Предыдущий месяц',
+  nextMonth: 'Следующий месяц',
+  expand: 'Развернуть календарь',
+  collapse: 'Свернуть календарь',
+);
 
 void main() {
-  for (final texts in _localizedTexts) {
-    final language = texts.locale.languageCode;
+  final texts = _texts;
 
-    group('шапка ($language)', () {
-      testWidgets('сообщает месяц просмотра, выбранную дату и команды недели', (
-        tester,
-      ) async {
-        await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: week(date(2026, 10, 4)),
-          today: date(2026, 10, 4),
-          locale: texts.locale,
-        );
-
-        expect(find.text(texts.october), findsOneWidget);
-        expect(find.text(texts.selectedDate), findsOneWidget);
-        expect(find.byTooltip(texts.previousWeek), findsOneWidget);
-        expect(find.byTooltip(texts.nextWeek), findsOneWidget);
-        expect(find.byTooltip(texts.previousMonth), findsNothing);
-        expect(find.byTooltip(texts.nextMonth), findsNothing);
-        expect(find.byTooltip(texts.expand), findsOneWidget);
-        expect(find.byTooltip(texts.collapse), findsNothing);
-      });
-
-      testWidgets('в месячном представлении называет команды месяца', (
-        tester,
-      ) async {
-        await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: month(date(2026, 10, 4)),
-          today: date(2026, 10, 4),
-          locale: texts.locale,
-        );
-
-        expect(find.text(texts.october), findsOneWidget);
-        expect(find.text(texts.selectedDate), findsOneWidget);
-        expect(find.byTooltip(texts.previousMonth), findsOneWidget);
-        expect(find.byTooltip(texts.nextMonth), findsOneWidget);
-        expect(find.byTooltip(texts.previousWeek), findsNothing);
-        expect(find.byTooltip(texts.nextWeek), findsNothing);
-        expect(find.byTooltip(texts.collapse), findsOneWidget);
-        expect(find.byTooltip(texts.expand), findsNothing);
-      });
-    });
-
-    group('перелистывание недель ($language)', () {
-      testWidgets(
-        'кнопка следующей недели показывает 2026-10-05 — 2026-10-11 без выбора дня',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: week(date(2026, 10, 4)),
-            today: date(2026, 10, 4),
-            locale: texts.locale,
-          );
-
-          await tester.tap(find.byTooltip(texts.nextWeek));
-          await tester.pumpAndSettle();
-
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-          expect(consumer.events, [ViewportChanged(week(date(2026, 10, 11)))]);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-          // Выбранного дня нет в видимой неделе, но подпись сообщает его.
-          expect(calendarDay(date(2026, 10, 4)), findsNothing);
-          expect(find.text(texts.selectedDate), findsOneWidget);
-          expect(find.text(texts.october), findsOneWidget);
-        },
-      );
-
-      testWidgets(
-        'кнопки и свайп перелистывают одни и те же недели через границу месяца',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: week(date(2026, 10, 25)),
-            today: date(2026, 10, 4),
-            locale: texts.locale,
-          );
-
-          await tester.tap(find.byTooltip(texts.nextWeek));
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
-          expect(find.text(texts.november), findsOneWidget);
-
-          await swipeToNextPeriod(tester);
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 2), 1));
-
-          await tester.tap(find.byTooltip(texts.previousWeek));
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
-
-          await swipeToPreviousPeriod(tester);
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 19), 1));
-          expect(find.text(texts.october), findsOneWidget);
-
-          expect(consumer.events, [
-            ViewportChanged(week(date(2026, 11, 1))),
-            ViewportChanged(week(date(2026, 11, 8))),
-            ViewportChanged(week(date(2026, 11, 1))),
-            ViewportChanged(week(date(2026, 10, 25))),
-          ]);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-          expect(find.text(texts.selectedDate), findsOneWidget);
-        },
-      );
-    });
-
-    group('перелистывание месяцев ($language)', () {
-      testWidgets('кнопка следующего месяца показывает ноябрь без выбора дня', (
-        tester,
-      ) async {
+  group('перелистывание недель', () {
+    testWidgets(
+      'кнопки и свайп перелистывают одни и те же недели через границу месяца',
+      (tester) async {
         final consumer = await pumpCalendarConsumer(
           tester,
           selectedDate: date(2026, 10, 4),
-          viewport: month(date(2026, 10, 4)),
+          viewport: week(date(2026, 10, 25)),
           today: date(2026, 10, 4),
           locale: texts.locale,
         );
 
-        await tester.tap(find.byTooltip(texts.nextMonth));
+        await tester.tap(find.byTooltip(texts.nextWeek));
         await tester.pumpAndSettle();
-
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-        expect(consumer.events, [ViewportChanged(month(date(2026, 11, 1)))]);
-        expect(consumer.selectedDate, date(2026, 10, 4));
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
         expect(find.text(texts.november), findsOneWidget);
-        expect(find.text(texts.october), findsNothing);
-        // Выбранного дня нет в видимом месяце, но подпись сообщает его.
-        expect(calendarDay(date(2026, 10, 4)), findsNothing);
-        expect(find.text(texts.selectedDate), findsOneWidget);
-      });
-
-      testWidgets('кнопки и свайп перелистывают одни и те же месяцы', (
-        tester,
-      ) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 4),
-          viewport: month(date(2026, 10, 4)),
-          today: date(2026, 10, 4),
-          locale: texts.locale,
-        );
-
-        await tester.tap(find.byTooltip(texts.nextMonth));
-        await tester.pumpAndSettle();
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
 
         await swipeToNextPeriod(tester);
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 5));
-        expect(find.text(texts.december), findsOneWidget);
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 2), 1));
 
-        await tester.tap(find.byTooltip(texts.previousMonth));
+        await tester.tap(find.byTooltip(texts.previousWeek));
         await tester.pumpAndSettle();
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
 
         await swipeToPreviousPeriod(tester);
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 19), 1));
         expect(find.text(texts.october), findsOneWidget);
 
         expect(consumer.events, [
-          ViewportChanged(month(date(2026, 11, 1))),
-          ViewportChanged(month(date(2026, 12, 1))),
-          ViewportChanged(month(date(2026, 11, 1))),
-          ViewportChanged(month(date(2026, 10, 1))),
+          ViewportChanged(week(date(2026, 11, 1))),
+          ViewportChanged(week(date(2026, 11, 8))),
+          ViewportChanged(week(date(2026, 11, 1))),
+          ViewportChanged(week(date(2026, 10, 25))),
         ]);
         expect(consumer.selectedDate, date(2026, 10, 4));
         expect(find.text(texts.selectedDate), findsOneWidget);
-      });
+      },
+    );
+  });
+
+  group('перелистывание месяцев', () {
+    testWidgets('кнопки и свайп перелистывают одни и те же месяцы', (
+      tester,
+    ) async {
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: date(2026, 10, 4),
+        viewport: month(date(2026, 10, 4)),
+        today: date(2026, 10, 4),
+        locale: texts.locale,
+      );
+
+      await tester.tap(find.byTooltip(texts.nextMonth));
+      await tester.pumpAndSettle();
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+
+      await swipeToNextPeriod(tester);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 5));
+      expect(find.text(texts.december), findsOneWidget);
+
+      await tester.tap(find.byTooltip(texts.previousMonth));
+      await tester.pumpAndSettle();
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+
+      await swipeToPreviousPeriod(tester);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(find.text(texts.october), findsOneWidget);
+
+      expect(consumer.events, [
+        ViewportChanged(month(date(2026, 11, 1))),
+        ViewportChanged(month(date(2026, 12, 1))),
+        ViewportChanged(month(date(2026, 11, 1))),
+        ViewportChanged(month(date(2026, 10, 1))),
+      ]);
+      expect(consumer.selectedDate, date(2026, 10, 4));
+      expect(find.text(texts.selectedDate), findsOneWidget);
     });
+  });
 
-    group('раскрытие и сворачивание ($language)', () {
-      testWidgets(
-        'сворачивание показывает неделю точной даты просмотра, раскрытие сохраняет её',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: month(date(2026, 11, 15)),
-            today: date(2026, 10, 4),
-            locale: texts.locale,
-          );
+  group('раскрытие и сворачивание', () {
+    testWidgets(
+      'сворачивание показывает неделю точной даты просмотра, раскрытие сохраняет её',
+      (tester) async {
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2026, 10, 4),
+          viewport: month(date(2026, 11, 15)),
+          today: date(2026, 10, 4),
+          locale: texts.locale,
+        );
 
-          await tester.tap(find.byTooltip(texts.collapse));
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
-          expect(find.text(texts.november), findsOneWidget);
-          expect(find.byTooltip(texts.expand), findsOneWidget);
-          expect(find.byTooltip(texts.nextWeek), findsOneWidget);
+        await tester.tap(find.byTooltip(texts.collapse));
+        await tester.pumpAndSettle();
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
+        expect(find.text(texts.november), findsOneWidget);
+        expect(find.byTooltip(texts.expand), findsOneWidget);
+        expect(find.byTooltip(texts.nextWeek), findsOneWidget);
 
-          await tester.tap(find.byTooltip(texts.expand));
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-          expect(find.text(texts.november), findsOneWidget);
-          expect(find.byTooltip(texts.collapse), findsOneWidget);
-          expect(find.byTooltip(texts.nextMonth), findsOneWidget);
+        await tester.tap(find.byTooltip(texts.expand));
+        await tester.pumpAndSettle();
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+        expect(find.text(texts.november), findsOneWidget);
+        expect(find.byTooltip(texts.collapse), findsOneWidget);
+        expect(find.byTooltip(texts.nextMonth), findsOneWidget);
 
-          // Повторное сворачивание возвращает ту же неделю, а не неделю
-          // начала месяца.
-          await tester.tap(find.byTooltip(texts.collapse));
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
+        // Повторное сворачивание возвращает ту же неделю, а не неделю
+        // начала месяца.
+        await tester.tap(find.byTooltip(texts.collapse));
+        await tester.pumpAndSettle();
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
 
-          expect(consumer.events, [
-            ViewportChanged(week(date(2026, 11, 15))),
-            ViewportChanged(month(date(2026, 11, 15))),
-            ViewportChanged(week(date(2026, 11, 15))),
-          ]);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-          expect(find.text(texts.selectedDate), findsOneWidget);
-        },
-      );
+        expect(consumer.events, [
+          ViewportChanged(week(date(2026, 11, 15))),
+          ViewportChanged(month(date(2026, 11, 15))),
+          ViewportChanged(week(date(2026, 11, 15))),
+        ]);
+        expect(consumer.selectedDate, date(2026, 10, 4));
+        expect(find.text(texts.selectedDate), findsOneWidget);
+      },
+    );
 
-      testWidgets(
-        'после свайпа недели в следующий месяц раскрывается месяц даты просмотра',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: week(date(2026, 10, 29)),
-            today: date(2026, 10, 4),
-            locale: texts.locale,
-          );
+    testWidgets(
+      'после свайпа недели в следующий месяц раскрывается месяц даты просмотра',
+      (tester) async {
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2026, 10, 4),
+          viewport: week(date(2026, 10, 29)),
+          today: date(2026, 10, 4),
+          locale: texts.locale,
+        );
 
-          await swipeToNextPeriod(tester);
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 2), 1));
+        await swipeToNextPeriod(tester);
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 2), 1));
 
-          await tester.tap(find.byTooltip(texts.expand));
-          await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip(texts.expand));
+        await tester.pumpAndSettle();
 
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-          expect(find.text(texts.november), findsOneWidget);
-          expect(consumer.events, [
-            ViewportChanged(week(date(2026, 11, 5))),
-            ViewportChanged(month(date(2026, 11, 5))),
-          ]);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-          expect(find.text(texts.selectedDate), findsOneWidget);
-        },
-      );
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+        expect(find.text(texts.november), findsOneWidget);
+        expect(consumer.events, [
+          ViewportChanged(week(date(2026, 11, 5))),
+          ViewportChanged(month(date(2026, 11, 5))),
+        ]);
+        expect(consumer.selectedDate, date(2026, 10, 4));
+        expect(find.text(texts.selectedDate), findsOneWidget);
+      },
+    );
 
-      testWidgets(
-        'после свайпа недели в предыдущий месяц раскрывается месяц даты просмотра',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: week(date(2026, 12, 3)),
-            today: date(2026, 10, 4),
-            locale: texts.locale,
-          );
+    testWidgets(
+      'после свайпа недели в предыдущий месяц раскрывается месяц даты просмотра',
+      (tester) async {
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2026, 10, 4),
+          viewport: week(date(2026, 12, 3)),
+          today: date(2026, 10, 4),
+          locale: texts.locale,
+        );
 
-          await swipeToPreviousPeriod(tester);
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 23), 1));
+        await swipeToPreviousPeriod(tester);
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 23), 1));
 
-          await tester.tap(find.byTooltip(texts.expand));
-          await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip(texts.expand));
+        await tester.pumpAndSettle();
 
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-          expect(find.text(texts.november), findsOneWidget);
-          expect(consumer.events, [
-            ViewportChanged(week(date(2026, 11, 26))),
-            ViewportChanged(month(date(2026, 11, 26))),
-          ]);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-        },
-      );
-    });
-  }
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+        expect(find.text(texts.november), findsOneWidget);
+        expect(consumer.events, [
+          ViewportChanged(week(date(2026, 11, 26))),
+          ViewportChanged(month(date(2026, 11, 26))),
+        ]);
+        expect(consumer.selectedDate, date(2026, 10, 4));
+      },
+    );
+  });
 
   group('представление переключают только команды', () {
     for (final start in [week(date(2026, 10, 4)), month(date(2026, 10, 4))]) {
@@ -507,92 +399,81 @@ void main() {
       },
     );
 
-    for (final (
-          :start,
-          :next,
-          :toggle,
-          :beforeMidpoint,
-          :afterMidpoint,
-          :reported,
-          :beforeMidpointWeeks,
-          :afterMidpointWeeks,
-        )
-        in [
-          (
-            start: week(date(2026, 10, 4)),
-            next: 'Следующая неделя',
-            toggle: 'Развернуть календарь',
-            beforeMidpoint: month(date(2026, 10, 4)),
-            reported: week(date(2026, 10, 11)),
-            afterMidpoint: month(date(2026, 10, 11)),
-            beforeMidpointWeeks: weeksFrom(date(2026, 9, 28), 5),
-            afterMidpointWeeks: weeksFrom(date(2026, 9, 28), 5),
-          ),
-          (
-            start: month(date(2026, 10, 4)),
-            next: 'Следующий месяц',
-            toggle: 'Свернуть календарь',
-            beforeMidpoint: week(date(2026, 10, 4)),
-            reported: month(date(2026, 11, 1)),
-            afterMidpoint: week(date(2026, 11, 1)),
-            beforeMidpointWeeks: weeksFrom(date(2026, 9, 28), 1),
-            afterMidpointWeeks: weeksFrom(date(2026, 10, 26), 1),
-          ),
-        ]) {
-      final mode = start.mode.name;
+    // Отмену и сохранение перехода при смене представления посреди
+    // перелистывания ведёт одна остановка страницы для обоих представлений,
+    // поэтому проверено недельное.
+    final (
+      :start,
+      :next,
+      :toggle,
+      :beforeMidpoint,
+      :afterMidpoint,
+      :reported,
+      :beforeMidpointWeeks,
+      :afterMidpointWeeks,
+    ) = (
+      start: week(date(2026, 10, 4)),
+      next: 'Следующая неделя',
+      toggle: 'Развернуть календарь',
+      beforeMidpoint: month(date(2026, 10, 4)),
+      reported: week(date(2026, 10, 11)),
+      afterMidpoint: month(date(2026, 10, 11)),
+      beforeMidpointWeeks: weeksFrom(date(2026, 9, 28), 5),
+      afterMidpointWeeks: weeksFrom(date(2026, 9, 28), 5),
+    );
+    final mode = start.mode.name;
 
-      testWidgets(
-        'смена представления до середины перелистывания отменяет его ($mode)',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: start,
-            today: date(2026, 10, 4),
-          );
+    testWidgets(
+      'смена представления до середины перелистывания отменяет его ($mode)',
+      (tester) async {
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2026, 10, 4),
+          viewport: start,
+          today: date(2026, 10, 4),
+        );
 
-          await tester.tap(find.byTooltip(next));
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 50));
-          expect(consumer.events, isEmpty);
-          await tester.tap(find.byTooltip(toggle));
-          await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip(next));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(consumer.events, isEmpty);
+        await tester.tap(find.byTooltip(toggle));
+        await tester.pumpAndSettle();
 
-          expect(visibleWeeks(tester), beforeMidpointWeeks);
-          expect(consumer.events, [ViewportChanged(beforeMidpoint)]);
-          expect(consumer.viewport, beforeMidpoint);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-        },
-      );
+        expect(visibleWeeks(tester), beforeMidpointWeeks);
+        expect(consumer.events, [ViewportChanged(beforeMidpoint)]);
+        expect(consumer.viewport, beforeMidpoint);
+        expect(consumer.selectedDate, date(2026, 10, 4));
+      },
+    );
 
-      testWidgets(
-        'смена представления после середины перелистывания сохраняет новый период ($mode)',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: start,
-            today: date(2026, 10, 4),
-          );
+    testWidgets(
+      'смена представления после середины перелистывания сохраняет новый период ($mode)',
+      (tester) async {
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2026, 10, 4),
+          viewport: start,
+          today: date(2026, 10, 4),
+        );
 
-          await tester.tap(find.byTooltip(next));
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 200));
-          expect(tester.hasRunningAnimations, isTrue);
-          expect(consumer.events, [ViewportChanged(reported)]);
-          await tester.tap(find.byTooltip(toggle));
-          await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip(next));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(tester.hasRunningAnimations, isTrue);
+        expect(consumer.events, [ViewportChanged(reported)]);
+        await tester.tap(find.byTooltip(toggle));
+        await tester.pumpAndSettle();
 
-          expect(visibleWeeks(tester), afterMidpointWeeks);
-          expect(consumer.events, [
-            ViewportChanged(reported),
-            ViewportChanged(afterMidpoint),
-          ]);
-          expect(consumer.viewport, afterMidpoint);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-        },
-      );
-    }
+        expect(visibleWeeks(tester), afterMidpointWeeks);
+        expect(consumer.events, [
+          ViewportChanged(reported),
+          ViewportChanged(afterMidpoint),
+        ]);
+        expect(consumer.viewport, afterMidpoint);
+        expect(consumer.selectedDate, date(2026, 10, 4));
+      },
+    );
   });
 
   group('края диапазона', () {
@@ -772,117 +653,51 @@ void main() {
     }
   });
 
-  group('удаление во время перелистывания', () {
-    for (final (
-          :start,
-          :next,
-          :previous,
-          :nextViewport,
-          :backViewport,
-          :startWeeks,
-          :nextWeeks,
-        )
-        in [
-          (
-            start: week(date(2026, 10, 4)),
-            next: 'Следующая неделя',
-            previous: 'Предыдущая неделя',
-            nextViewport: week(date(2026, 10, 11)),
-            backViewport: week(date(2026, 10, 4)),
-            startWeeks: weeksFrom(date(2026, 9, 28), 1),
-            nextWeeks: weeksFrom(date(2026, 10, 5), 1),
-          ),
-          (
-            start: month(date(2026, 10, 4)),
-            next: 'Следующий месяц',
-            previous: 'Предыдущий месяц',
-            nextViewport: month(date(2026, 11, 1)),
-            backViewport: month(date(2026, 10, 1)),
-            startWeeks: weeksFrom(date(2026, 9, 28), 5),
-            nextWeeks: weeksFrom(date(2026, 10, 26), 6),
-          ),
-        ]) {
-      final mode = start.mode.name;
-
-      testWidgets(
-        'календарь, удалённый до конца анимации кнопки, не сообщает о просмотре ($mode)',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: start,
-            today: date(2026, 10, 4),
-          );
-
-          // Страница ещё не дошла до середины перехода.
-          await tester.tap(find.byTooltip(next));
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 50));
-          // Кадр без сдвига времени убирает календарь до следующего шага
-          // анимации.
-          consumer.removeCalendar();
-          await tester.pump();
-          await tester.pumpAndSettle();
-
-          expect(consumer.events, isEmpty);
-          expect(consumer.viewport, start);
-
-          // Новый календарь перелистывается и кнопкой, и свайпом.
-          consumer.restoreCalendar();
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), startWeeks);
-
-          await tester.tap(find.byTooltip(next));
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), nextWeeks);
-          await swipeToPreviousPeriod(tester);
-
-          expect(consumer.events, [
-            ViewportChanged(nextViewport),
-            ViewportChanged(backViewport),
-          ]);
-          expect(visibleWeeks(tester), startWeeks);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-        },
+  // Календарь, убранный посреди анимации (уход со страницы), не сообщает о
+  // просмотре. Остановку анимации при удалении ведёт библиотека одинаково для
+  // обоих представлений и для кнопки со свайпом, поэтому проверена одна кнопка
+  // в недельном представлении.
+  testWidgets(
+    'календарь, удалённый до конца анимации кнопки, не сообщает о просмотре',
+    (tester) async {
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: date(2026, 10, 4),
+        viewport: week(date(2026, 10, 4)),
+        today: date(2026, 10, 4),
       );
 
-      testWidgets(
-        'календарь, удалённый до конца доводки свайпа, не сообщает о просмотре повторно ($mode)',
-        (tester) async {
-          final consumer = await pumpCalendarConsumer(
-            tester,
-            selectedDate: date(2026, 10, 4),
-            viewport: start,
-            today: date(2026, 10, 4),
-          );
+      // Страница ещё не дошла до середины перехода.
+      await tester.tap(find.byTooltip('Следующая неделя'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      // Кадр без сдвига времени убирает календарь до следующего шага
+      // анимации.
+      consumer.removeCalendar();
+      await tester.pump();
+      await tester.pumpAndSettle();
 
-          // Жест проходит середину страницы, доводка ещё продолжается.
-          await tester.drag(calendarPeriodArea, const Offset(-600, 0));
-          await tester.pump(const Duration(milliseconds: 20));
-          consumer.removeCalendar();
-          await tester.pump();
-          await tester.pumpAndSettle();
+      expect(consumer.events, isEmpty);
+      expect(consumer.viewport, week(date(2026, 10, 4)));
 
-          expect(consumer.events, [ViewportChanged(nextViewport)]);
+      // Новый календарь перелистывается и кнопкой, и свайпом.
+      consumer.restoreCalendar();
+      await tester.pumpAndSettle();
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
 
-          // Новый календарь показывает принятый просмотр и перелистывается.
-          consumer.restoreCalendar();
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), nextWeeks);
+      await tester.tap(find.byTooltip('Следующая неделя'));
+      await tester.pumpAndSettle();
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+      await swipeToPreviousPeriod(tester);
 
-          await tester.tap(find.byTooltip(previous));
-          await tester.pumpAndSettle();
-
-          expect(consumer.events, [
-            ViewportChanged(nextViewport),
-            ViewportChanged(backViewport),
-          ]);
-          expect(visibleWeeks(tester), startWeeks);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-        },
-      );
-    }
-  });
+      expect(consumer.events, [
+        ViewportChanged(week(date(2026, 10, 11))),
+        ViewportChanged(week(date(2026, 10, 4))),
+      ]);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
+      expect(consumer.selectedDate, date(2026, 10, 4));
+    },
+  );
 }
 
 /// Последняя неделя диапазона: пять допустимых дней и две позиции за

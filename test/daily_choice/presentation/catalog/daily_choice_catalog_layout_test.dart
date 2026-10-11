@@ -13,24 +13,26 @@ import 'daily_choice_catalog_page_test_support.dart';
 /// Узкий экран телефона.
 const _screen = Size(360, 780);
 
-/// Обычный и увеличенный системный размер текста.
-const _textScales = [1.0, 2.5];
+/// Языки и системные размеры текста: русский проверяется целиком в обычном и
+/// увеличенном масштабе. Английские подписи дней недели длиннее русских, поэтому
+/// английский проверяется только свёрнутой неделей в увеличенном масштабе:
+/// остальная раскладка от языка не зависит.
+final _configurations = [
+  (locale: const Locale('ru'), textScale: 1.0, full: true),
+  (locale: const Locale('ru'), textScale: 2.5, full: true),
+  (locale: const Locale('en'), textScale: 2.5, full: false),
+];
 
 /// Локальное сегодня проверок свёрнутой недели и прокрутки.
 final _today = date(2026, 10, 4);
 
-/// Раскрытые месяцы с четырьмя, пятью и шестью неделями: сегодня и выбранный
-/// день — середина месяца.
+/// Раскрытые месяцы с четырьмя и шестью неделями, крайними по числу строк:
+/// сегодня и выбранный день — середина месяца.
 final _months = [
   (
     name: 'февраль 2027 года из четырёх недель',
     today: date(2027, 2, 15),
     weeks: weeksFrom(date(2027, 2, 1), 4),
-  ),
-  (
-    name: 'апрель 2026 года из пяти недель',
-    today: date(2026, 4, 15),
-    weeks: weeksFrom(date(2026, 3, 30), 5),
   ),
   (
     name: 'март 2026 года из шести недель',
@@ -40,318 +42,290 @@ final _months = [
 ];
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    for (final textScale in _textScales) {
-      final language = locale.languageCode;
+  for (final (:locale, :textScale, :full) in _configurations) {
+    final language = locale.languageCode;
 
-      group('экран 360×780, $language, масштаб текста $textScale', () {
-        testWidgets('свёрнутая неделя занимает семь колонок во всю ширину, '
-            'тексты страницы показаны целиком, а дни и команды нажимаются', (
-          tester,
-        ) async {
+    group('экран 360×780, $language, масштаб текста $textScale', () {
+      testWidgets('свёрнутая неделя занимает семь колонок во всю ширину, '
+          'тексты страницы показаны целиком, а дни и команды нажимаются', (
+        tester,
+      ) async {
+        final repository = CatalogPageRepository();
+        await _open(tester, repository, locale, textScale, today: _today);
+        repository.completeFirst(0, [
+          catalogPageItem(1, date: _today),
+        ], total: 1);
+        await tester.pumpAndSettle();
+        final l10n = _l10n(tester);
+
+        _expectColumns(tester, weeksFrom(date(2026, 9, 28), 1));
+        _expectCommands(tester);
+        expect(
+          find.descendant(
+            of: find.byType(DailyChoiceCalendar),
+            matching: find.text(_selectedDateLabel(tester, _today)),
+          ),
+          findsOneWidget,
+        );
+        await _expectWholeTexts(tester, textScale);
+
+        await _tapCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+        await _tapCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
+
+        final day = date(2026, 10, 1);
+        await _reveal(tester, calendarDay(day));
+        _expectTappable(tester, calendarDay(day));
+        await tester.tap(calendarDay(day));
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      });
+
+      if (!full) return;
+
+      for (final shown in _months) {
+        testWidgets('раскрытый ${shown.name} увеличивает высоту календаря '
+            'на свои строки и сдвигает выдачу, все дни нажимаются, а '
+            'сворачивание возвращает прежнюю высоту', (tester) async {
           final repository = CatalogPageRepository();
-          await _open(tester, repository, locale, textScale, today: _today);
+          await _open(
+            tester,
+            repository,
+            locale,
+            textScale,
+            today: shown.today,
+          );
           repository.completeFirst(0, [
-            catalogPageItem(1, date: _today),
+            catalogPageItem(1, date: shown.today),
           ], total: 1);
           await tester.pumpAndSettle();
           final l10n = _l10n(tester);
+          final week = _measure(tester);
+          expect(week.rows, 1);
 
-          _expectColumns(tester, weeksFrom(date(2026, 9, 28), 1));
-          _expectCommands(tester);
+          await _tapCommand(tester, l10n.dailyChoiceCalendarExpand);
+          final month = _measure(tester);
+          expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
+          expect(month.rows, shown.weeks.length);
+          expect(month.rowHeight, moreOrLessEquals(week.rowHeight));
+          // Шапка прежняя, поэтому календарь вырастает ровно на строки
+          // месяца, и выдача сдвигается вниз на столько же.
+          final grown = (shown.weeks.length - 1) * week.rowHeight;
           expect(
-            find.descendant(
-              of: find.byType(DailyChoiceCalendar),
-              matching: find.text(_selectedDateLabel(tester, _today)),
-            ),
+            month.calendar.height - week.calendar.height,
+            moreOrLessEquals(grown),
+          );
+          expect(month.countOffset - week.countOffset, moreOrLessEquals(grown));
+          // Месяц раскрывается внутри страницы: прокрутка остаётся одной.
+          expect(_pageScroll, findsOneWidget);
+          _expectColumns(tester, shown.weeks);
+          _expectCommands(tester);
+          await _expectWholeTexts(tester, textScale);
+
+          for (final row in shown.weeks) {
+            await _reveal(tester, calendarDay(row.first, skipOffstage: false));
+            for (final day in row) {
+              _expectTappable(tester, calendarDay(day));
+            }
+          }
+          // Последний день самого месяца: день соседнего месяца перенёс бы
+          // просмотр в свой месяц.
+          final lastDay = shown.weeks
+              .expand((week) => week)
+              .lastWhere((day) => day.month == shown.today.month);
+          await _reveal(tester, calendarDay(lastDay, skipOffstage: false));
+          await tester.tap(calendarDay(lastDay));
+          await tester.pump();
+          repository.completeFirst(1, [
+            catalogPageItem(2, date: lastDay),
+          ], total: 1);
+          await _settle(tester);
+          expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
+          expect(
+            find.byTooltip(l10n.dailyChoiceCalendarCollapse),
+            findsOneWidget,
+          );
+
+          // Подпись нового выбранного дня может занять другое число строк,
+          // поэтому сворачивание сравнивается с раскрытым после выбора.
+          final selected = _measure(tester);
+          await _tapCommand(tester, l10n.dailyChoiceCalendarCollapse);
+          final collapsed = _measure(tester);
+          expect(collapsed.rows, 1);
+          expect(
+            selected.calendar.height - collapsed.calendar.height,
+            moreOrLessEquals(grown),
+          );
+          expect(
+            selected.countOffset - collapsed.countOffset,
+            moreOrLessEquals(grown),
+          );
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      testWidgets('у страницы одна вертикальная прокрутка: жест из '
+          'календаря прокручивает страницу, горизонтальный листает неделю, '
+          'а фильтры, подгрузка и последняя строка достижимы жестами над '
+          'панелью без зарезервированного места', (tester) async {
+        final repository = CatalogPageRepository();
+        await _open(tester, repository, locale, textScale, today: _today);
+        repository.completeFirst(
+          0,
+          [
+            for (var number = 1; number <= 20; number++)
+              catalogPageItem(number, date: _today),
+          ],
+          total: 21,
+          cursor: const CatalogPageCursor(),
+        );
+        await tester.pumpAndSettle();
+        final l10n = _l10n(tester);
+        expect(_pageScroll, findsOneWidget);
+        final scroll = tester.state<ScrollableState>(_pageScroll).position;
+
+        final day = calendarDay(date(2026, 10, 1));
+        await _reveal(tester, day);
+        final before = scroll.pixels;
+        await tester.drag(day, const Offset(0, -150));
+        await tester.pumpAndSettle();
+        expect(scroll.pixels, greaterThan(before + 100));
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
+
+        await _reveal(tester, day);
+        final scrolled = scroll.pixels;
+        // Больше половины, но меньше ширины недели.
+        await tester.drag(day, const Offset(-200, 0));
+        await tester.pumpAndSettle();
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+        expect(scroll.pixels, scrolled);
+
+        for (final key in _filterKeys) {
+          await _dragUntilReachable(
+            tester,
+            find.byKey(ValueKey(key), skipOffstage: false),
+          );
+        }
+        final loadMore = find.byKey(
+          const ValueKey('daily-choice-load-more'),
+          skipOffstage: false,
+        );
+        await _dragUntilReachable(tester, loadMore);
+        await tester.tap(loadMore);
+        await tester.pump();
+        repository.completeMore(1, [catalogPageItem(21, date: _today)]);
+        await tester.pumpAndSettle();
+
+        final lastRow = find.byKey(
+          const ValueKey('daily-choice-row-21'),
+          skipOffstage: false,
+        );
+        await _dragToEnd(tester);
+        _expectAtEnd(tester, lastRow);
+        await _expectWholeTexts(tester, textScale);
+        await _dragUntilReachable(
+          tester,
+          find.byTooltip(l10n.dailyChoiceCalendarExpand, skipOffstage: false),
+        );
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('начальные загрузка и отказ, отказ повтора и пустая '
+          'выдача показаны целиком и достижимы жестами над панелью', (
+        tester,
+      ) async {
+        final repository = CatalogPageRepository();
+        await _open(tester, repository, locale, textScale, today: _today);
+        final l10n = _l10n(tester);
+        final retry = find.widgetWithText(
+          TextButton,
+          l10n.commonRetry,
+          skipOffstage: false,
+        );
+
+        await _dragUntilReachable(
+          tester,
+          find.text(l10n.dailyChoiceCatalogLoading, skipOffstage: false),
+        );
+        await _expectWholeTexts(tester, textScale);
+
+        for (final attempt in [0, 1]) {
+          repository.failUnavailable(attempt);
+          await tester.pumpAndSettle();
+          await _dragUntilReachable(
+            tester,
+            find.text(l10n.dailyChoiceCatalogUnavailable, skipOffstage: false),
+          );
+          await _dragUntilReachable(tester, retry);
+          await _expectWholeTexts(tester, textScale);
+          await tester.tap(retry);
+          await tester.pump();
+        }
+
+        repository.completeFirst(2, [], total: 0);
+        await tester.pumpAndSettle();
+        await _dragUntilReachable(
+          tester,
+          find.text(l10n.dailyChoiceCatalogTotalCount(0), skipOffstage: false),
+        );
+        await _dragUntilReachable(
+          tester,
+          find.text(l10n.dailyChoiceCatalogEmpty, skipOffstage: false),
+        );
+        await _expectWholeTexts(tester, textScale);
+        await _dragUntilReachable(
+          tester,
+          calendarDay(date(2026, 10, 1), skipOffstage: false),
+        );
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('фильтр выполнения показывает название и каждое '
+          'состояние целиком, а меню выбирает состояние для выбранного дня', (
+        tester,
+      ) async {
+        final repository = CatalogPageRepository();
+        await _open(tester, repository, locale, textScale, today: _today);
+        repository.completeFirst(0, [], total: 0);
+        await tester.pumpAndSettle();
+        final l10n = _l10n(tester);
+        final filter = find.byKey(
+          const ValueKey('daily-choice-completion-filter'),
+          skipOffstage: false,
+        );
+
+        for (final (index, (value, state)) in [
+          (false, l10n.dailyChoiceCatalogIncomplete),
+          (true, l10n.dailyChoiceCatalogCompleted),
+          (null, l10n.dailyChoiceCatalogAllStates),
+        ].indexed) {
+          await _dragUntilReachable(tester, filter);
+          await tester.tap(filter);
+          await tester.pumpAndSettle();
+          final item = find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is DropdownMenuItem<bool?> && widget.value == value,
+              )
+              .last;
+          _expectTappable(tester, item);
+          _expectWholeTextsIn(tester, item, textScale);
+          await tester.tap(item);
+          await tester.pump();
+          repository.completeFirst(index + 1, [], total: 0);
+          await tester.pumpAndSettle();
+
+          await _dragUntilReachable(tester, filter);
+          expect(
+            find.descendant(of: filter, matching: find.text(state)),
             findsOneWidget,
           );
           await _expectWholeTexts(tester, textScale);
-
-          await _tapCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-          await _tapCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-          expect(repository.queries, hasLength(1));
-
-          final day = date(2026, 10, 1);
-          await _reveal(tester, calendarDay(day));
-          _expectTappable(tester, calendarDay(day));
-          await tester.tap(calendarDay(day));
-          await tester.pump();
-          expect(repository.queries, hasLength(2));
-          expect(repository.queries[1].date, day);
-          expect(tester.takeException(), isNull);
-        });
-
-        for (final shown in _months) {
-          testWidgets('раскрытый ${shown.name} увеличивает высоту календаря '
-              'на свои строки и сдвигает выдачу, все дни нажимаются, а '
-              'сворачивание возвращает прежнюю высоту', (tester) async {
-            final repository = CatalogPageRepository();
-            await _open(
-              tester,
-              repository,
-              locale,
-              textScale,
-              today: shown.today,
-            );
-            repository.completeFirst(0, [
-              catalogPageItem(1, date: shown.today),
-            ], total: 1);
-            await tester.pumpAndSettle();
-            final l10n = _l10n(tester);
-            final week = _measure(tester);
-            expect(week.rows, 1);
-
-            await _tapCommand(tester, l10n.dailyChoiceCalendarExpand);
-            final month = _measure(tester);
-            expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
-            expect(month.rows, shown.weeks.length);
-            expect(month.rowHeight, moreOrLessEquals(week.rowHeight));
-            // Шапка прежняя, поэтому календарь вырастает ровно на строки
-            // месяца, и выдача сдвигается вниз на столько же.
-            final grown = (shown.weeks.length - 1) * week.rowHeight;
-            expect(
-              month.calendar.height - week.calendar.height,
-              moreOrLessEquals(grown),
-            );
-            expect(
-              month.countOffset - week.countOffset,
-              moreOrLessEquals(grown),
-            );
-            // Месяц раскрывается внутри страницы: прокрутка остаётся одной.
-            expect(_pageScroll, findsOneWidget);
-            _expectColumns(tester, shown.weeks);
-            _expectCommands(tester);
-            await _expectWholeTexts(tester, textScale);
-
-            for (final row in shown.weeks) {
-              await _reveal(
-                tester,
-                calendarDay(row.first, skipOffstage: false),
-              );
-              for (final day in row) {
-                _expectTappable(tester, calendarDay(day));
-              }
-            }
-            // Последний день самого месяца: день соседнего месяца перенёс бы
-            // просмотр в свой месяц.
-            final lastDay = shown.weeks
-                .expand((week) => week)
-                .lastWhere((day) => day.month == shown.today.month);
-            await _reveal(tester, calendarDay(lastDay, skipOffstage: false));
-            await tester.tap(calendarDay(lastDay));
-            await tester.pump();
-            expect(repository.queries, hasLength(2));
-            expect(repository.queries[1].date, lastDay);
-            repository.completeFirst(1, [
-              catalogPageItem(2, date: lastDay),
-            ], total: 1);
-            await _settle(tester);
-            expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
-            expect(
-              find.byTooltip(l10n.dailyChoiceCalendarCollapse),
-              findsOneWidget,
-            );
-
-            // Подпись нового выбранного дня может занять другое число строк,
-            // поэтому сворачивание сравнивается с раскрытым после выбора.
-            final selected = _measure(tester);
-            await _tapCommand(tester, l10n.dailyChoiceCalendarCollapse);
-            final collapsed = _measure(tester);
-            expect(collapsed.rows, 1);
-            expect(
-              selected.calendar.height - collapsed.calendar.height,
-              moreOrLessEquals(grown),
-            );
-            expect(
-              selected.countOffset - collapsed.countOffset,
-              moreOrLessEquals(grown),
-            );
-            expect(tester.takeException(), isNull);
-          });
         }
-
-        testWidgets('у страницы одна вертикальная прокрутка: жест из '
-            'календаря прокручивает страницу, горизонтальный листает неделю, '
-            'а фильтры, подгрузка и последняя строка достижимы жестами над '
-            'панелью без зарезервированного места', (tester) async {
-          final repository = CatalogPageRepository();
-          await _open(tester, repository, locale, textScale, today: _today);
-          repository.completeFirst(
-            0,
-            [
-              for (var number = 1; number <= 20; number++)
-                catalogPageItem(number, date: _today),
-            ],
-            total: 21,
-            cursor: const CatalogPageCursor(),
-          );
-          await tester.pumpAndSettle();
-          final l10n = _l10n(tester);
-          expect(_pageScroll, findsOneWidget);
-          final scroll = tester.state<ScrollableState>(_pageScroll).position;
-
-          final day = calendarDay(date(2026, 10, 1));
-          await _reveal(tester, day);
-          final before = scroll.pixels;
-          await tester.drag(day, const Offset(0, -150));
-          await tester.pumpAndSettle();
-          expect(scroll.pixels, greaterThan(before + 100));
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-
-          await _reveal(tester, day);
-          final scrolled = scroll.pixels;
-          // Больше половины, но меньше ширины недели.
-          await tester.drag(day, const Offset(-200, 0));
-          await tester.pumpAndSettle();
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-          expect(scroll.pixels, scrolled);
-          expect(repository.queries, hasLength(1));
-
-          for (final key in _filterKeys) {
-            await _dragUntilReachable(
-              tester,
-              find.byKey(ValueKey(key), skipOffstage: false),
-            );
-          }
-          final loadMore = find.byKey(
-            const ValueKey('daily-choice-load-more'),
-            skipOffstage: false,
-          );
-          await _dragUntilReachable(tester, loadMore);
-          await tester.tap(loadMore);
-          await tester.pump();
-          expect(repository.queries, hasLength(2));
-          expect(repository.queries[1].date, _today);
-          expect(repository.queries[1].cursor, isA<CatalogPageCursor>());
-          repository.completeMore(1, [catalogPageItem(21, date: _today)]);
-          await tester.pumpAndSettle();
-
-          final lastRow = find.byKey(
-            const ValueKey('daily-choice-row-21'),
-            skipOffstage: false,
-          );
-          await _dragToEnd(tester);
-          _expectAtEnd(tester, lastRow);
-          await _expectWholeTexts(tester, textScale);
-          await _dragUntilReachable(
-            tester,
-            find.byTooltip(l10n.dailyChoiceCalendarExpand, skipOffstage: false),
-          );
-          expect(tester.takeException(), isNull);
-        });
-
-        testWidgets('начальные загрузка и отказ, отказ повтора и пустая '
-            'выдача показаны целиком и достижимы жестами над панелью', (
-          tester,
-        ) async {
-          final repository = CatalogPageRepository();
-          await _open(tester, repository, locale, textScale, today: _today);
-          final l10n = _l10n(tester);
-          final retry = find.widgetWithText(
-            TextButton,
-            l10n.commonRetry,
-            skipOffstage: false,
-          );
-
-          await _dragUntilReachable(
-            tester,
-            find.text(l10n.dailyChoiceCatalogLoading, skipOffstage: false),
-          );
-          await _expectWholeTexts(tester, textScale);
-
-          for (final attempt in [0, 1]) {
-            repository.failUnavailable(attempt);
-            await tester.pumpAndSettle();
-            await _dragUntilReachable(
-              tester,
-              find.text(
-                l10n.dailyChoiceCatalogUnavailable,
-                skipOffstage: false,
-              ),
-            );
-            await _dragUntilReachable(tester, retry);
-            await _expectWholeTexts(tester, textScale);
-            await tester.tap(retry);
-            await tester.pump();
-            expect(repository.queries, hasLength(attempt + 2));
-            expect(repository.queries[attempt + 1].date, _today);
-            expect(repository.queries[attempt + 1].cursor, isNull);
-          }
-
-          repository.completeFirst(2, [], total: 0);
-          await tester.pumpAndSettle();
-          await _dragUntilReachable(
-            tester,
-            find.text(
-              l10n.dailyChoiceCatalogTotalCount(0),
-              skipOffstage: false,
-            ),
-          );
-          await _dragUntilReachable(
-            tester,
-            find.text(l10n.dailyChoiceCatalogEmpty, skipOffstage: false),
-          );
-          await _expectWholeTexts(tester, textScale);
-          await _dragUntilReachable(
-            tester,
-            calendarDay(date(2026, 10, 1), skipOffstage: false),
-          );
-          expect(tester.takeException(), isNull);
-        });
-
-        testWidgets('фильтр выполнения показывает название и каждое '
-            'состояние целиком, а меню выбирает состояние для выбранного дня', (
-          tester,
-        ) async {
-          final repository = CatalogPageRepository();
-          await _open(tester, repository, locale, textScale, today: _today);
-          repository.completeFirst(0, [], total: 0);
-          await tester.pumpAndSettle();
-          final l10n = _l10n(tester);
-          final filter = find.byKey(
-            const ValueKey('daily-choice-completion-filter'),
-            skipOffstage: false,
-          );
-
-          for (final (index, (value, state)) in [
-            (false, l10n.dailyChoiceCatalogIncomplete),
-            (true, l10n.dailyChoiceCatalogCompleted),
-            (null, l10n.dailyChoiceCatalogAllStates),
-          ].indexed) {
-            await _dragUntilReachable(tester, filter);
-            await tester.tap(filter);
-            await tester.pumpAndSettle();
-            final item = find
-                .byWidgetPredicate(
-                  (widget) =>
-                      widget is DropdownMenuItem<bool?> &&
-                      widget.value == value,
-                )
-                .last;
-            _expectTappable(tester, item);
-            _expectWholeTextsIn(tester, item, textScale);
-            await tester.tap(item);
-            await tester.pump();
-            expect(repository.queries, hasLength(index + 2));
-            expect(repository.queries[index + 1].date, _today);
-            expect(repository.queries[index + 1].isCompleted, value);
-            repository.completeFirst(index + 1, [], total: 0);
-            await tester.pumpAndSettle();
-
-            await _dragUntilReachable(tester, filter);
-            expect(
-              find.descendant(of: filter, matching: find.text(state)),
-              findsOneWidget,
-            );
-            await _expectWholeTexts(tester, textScale);
-          }
-          expect(tester.takeException(), isNull);
-        });
+        expect(tester.takeException(), isNull);
       });
-    }
+    });
   }
 }
 

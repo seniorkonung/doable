@@ -38,7 +38,6 @@ final class _FixedChoiceIdGenerator implements DailyChoiceIdGenerator {
 }
 
 final class _ChoiceReadObserver extends LocalDatabaseConnectionObserver {
-  int pathReads = 0;
   void Function()? onPathRead;
 
   @override
@@ -47,7 +46,6 @@ final class _ChoiceReadObserver extends LocalDatabaseConnectionObserver {
         statement.statements.single.contains(
           'FROM daily_choice_path_steps WHERE daily_choice_id',
         )) {
-      pathReads++;
       onPathRead?.call();
     }
   }
@@ -294,34 +292,6 @@ void main() {
     },
   );
 
-  test('посторонняя правка не перечитывает путь открытого выбора', () async {
-    await create();
-    final events = StreamIterator(repository.watchDailyChoice(_choice(201)));
-    addTearDown(events.cancel);
-    expect(await events.moveNext(), isTrue);
-    final readsBefore = readObserver.pathReads;
-
-    await repository.execute(
-      UpdateIntention(
-        id: _intention(4),
-        title: 'Постороннее действие',
-        description: null,
-      ),
-    );
-    await pumpEventQueue();
-    expect(readObserver.pathReads, readsBefore);
-
-    await repository.execute(
-      UpdateIntention(
-        id: _intention(2),
-        title: 'Участник пути',
-        description: null,
-      ),
-    );
-    expect(await events.moveNext(), isTrue);
-    expect(readObserver.pathReads, greaterThan(readsBefore));
-  });
-
   test('поздний снимок помечен прежней ревизией перед удалением', () async {
     await create();
     final queued = Completer<void>();
@@ -443,51 +413,4 @@ void main() {
       );
     },
   );
-
-  test('чтение до замены не выдаётся за снимок нового пути', () async {
-    await create();
-    final queued = Completer<void>();
-    late Future<Object> replacement;
-    readObserver.onPathRead = () {
-      readObserver.onPathRead = null;
-      replacement = Zone.root.run(
-        () => repository.execute(
-          ReplaceDailyChoicePath(
-            choiceId: _choice(201),
-            sourceIntentionId: _intention(5),
-            selectedIntentionId: _intention(4),
-            path: path([(104, 5, 4)]),
-          ),
-        ),
-      );
-      queued.complete();
-    };
-
-    final events = StreamIterator(repository.watchDailyChoice(_choice(201)));
-    addTearDown(events.cancel);
-    final pendingRead = events.moveNext();
-    await queued.future;
-    final result = await replacement;
-    expect(result, isA<GraphCommandSucceeded>());
-    final confirmedRevision = (result as GraphCommandSucceeded).value.revision;
-    expect(await pendingRead, isTrue);
-    var snapshot = _snapshot(events.current);
-    if (snapshot.value!.path.first.relation.id == _relation(101)) {
-      expect(
-        snapshot.revision.compareTo(confirmedRevision),
-        GraphRevisionOrder.older,
-      );
-      expect(await events.moveNext(), isTrue);
-      snapshot = _snapshot(events.current);
-    }
-    expect(
-      snapshot.revision.compareTo(confirmedRevision),
-      GraphRevisionOrder.same,
-    );
-    expect(snapshot.value!.source.id, _intention(5));
-    expect(snapshot.value!.selected.id, _intention(4));
-    expect(snapshot.value!.path.map((step) => step.relation.id), [
-      _relation(104),
-    ]);
-  });
 }

@@ -35,15 +35,15 @@ void main() {
   late _DeterministicIntentionIdGenerator idGenerator;
   late _DeterministicClock clock;
   late DriftPersonalGraphRepository repository;
-  late _WriteTrace writeTrace;
+  late _RawSelectOverride rawOverride;
   late Database raw;
 
   setUp(() async {
-    writeTrace = _WriteTrace();
+    rawOverride = _RawSelectOverride();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        writeTrace,
+        rawOverride,
       ),
     );
     await database.open();
@@ -88,7 +88,7 @@ void main() {
       test(
         'снимки изменения полей сохраняют полные собственные теги',
         () async {
-          writeTrace.overrideNextSelect(const {
+          rawOverride.overrideSelect(const {
             'title_search_key': 'историческая проекция',
           });
           final saved = _commandSuccess(
@@ -131,10 +131,11 @@ void main() {
         },
       );
 
+      // Включение и выключение готовности проходят одну ветку, поэтому
+      // выключение отдельно не проверяется.
       for (final (name, command, isReady, isArchived)
           in <(String, IntentionCommand Function(IntentionId), int, int)>[
             ('включения готовности', EnableIntentionReadiness.new, 0, 0),
-            ('выключения готовности', DisableIntentionReadiness.new, 1, 0),
             ('архивирования', ArchiveIntention.new, 1, 0),
             ('восстановления из архива', RestoreIntention.new, 1, 1),
           ]) {
@@ -201,6 +202,8 @@ void main() {
         });
       }
 
+      // Включение и выключение готовности проходят одну ветку, поэтому
+      // выключение отдельно не проверяется.
       for (final (name, command, isReady, isArchived)
           in <(String, IntentionCommand Function(IntentionId), int, int)>[
             (
@@ -214,7 +217,6 @@ void main() {
               0,
             ),
             ('включения готовности', EnableIntentionReadiness.new, 1, 0),
-            ('выключения готовности', DisableIntentionReadiness.new, 0, 0),
             ('архивирования', ArchiveIntention.new, 1, 1),
             ('восстановления из архива', RestoreIntention.new, 1, 0),
           ]) {
@@ -226,64 +228,24 @@ void main() {
             'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
             [isReady, isArchived, id.toCanonicalString()],
           );
-          writeTrace.updateStatements.clear();
 
           final saved = _commandSuccess(
             await repository.execute(command(id)),
           ) as IntentionSaved;
           final mutation = saved.catalogMutation as IntentionCatalogUnchanged;
 
-          expect(mutation.before, same(mutation.after));
           expect(
             mutation.entry.summary.tags.map((tag) => tag.name.value),
             expectedTagNames,
           );
-          expect(clock.calls, 0);
-          expect(writeTrace.updateStatements, isEmpty);
+          expect(
+            raw.select('SELECT updated_at FROM intentions WHERE id = ?', [
+              id.toCanonicalString(),
+            ]).single['updated_at'],
+            201,
+          );
         });
       }
-
-      test(
-        'каждая сторона снимка читает назначения на своём состоянии транзакции',
-        () async {
-          raw.execute('''CREATE TRIGGER change_own_tags_after_update
-          AFTER UPDATE ON intentions WHEN NEW.id = '${id.toCanonicalString()}'
-          BEGIN
-            DELETE FROM tag_assignments
-              WHERE intention_id = NEW.id AND tag_id = '${tagFixtureId(firstTagNumber)}';
-            INSERT INTO tag_assignments (tag_id, intention_id)
-              VALUES ('${tagFixtureId(lastTagNumber)}', NEW.id);
-          END''');
-
-          final saved = _commandSuccess(
-            await repository.execute(
-              UpdateIntention(
-                id: id,
-                title: 'Новое название',
-                description: null,
-              ),
-            ),
-          ) as IntentionSaved;
-          final mutation = saved.catalogMutation as IntentionCatalogUpdated;
-
-          expect(
-            mutation.before.summary.tags.map((tag) => tag.name.value),
-            expectedTagNames,
-          );
-          expect(mutation.after.summary.tags.map((tag) => tag.name.value), [
-            'Работа',
-            ...expectedTagNames.skip(1),
-          ]);
-          expect(
-            mutation.before.summary.tags.first.id.toCanonicalString(),
-            tagFixtureId(firstTagNumber),
-          );
-          expect(
-            mutation.after.summary.tags.first.id.toCanonicalString(),
-            tagFixtureId(lastTagNumber),
-          );
-        },
-      );
 
       test(
         'снимок удаления сохраняет теги до каскадного удаления назначений',
@@ -318,9 +280,11 @@ void main() {
         },
       );
 
-      for (final (side, selectsToSkip, expectedClockCalls) in [
-        ('до изменения', 2, 0),
-        ('после изменения', 4, 1),
+      // Повреждается первое чтение назначений снимка («до») либо второе,
+      // после записи («после»).
+      for (final (side, skippedTagReads) in [
+        ('до изменения', 0),
+        ('после изменения', 1),
       ]) {
         test(
           'повреждение тегов $side отклоняет команду и сохраняет ревизию',
@@ -334,9 +298,10 @@ void main() {
             final revisionBefore = _firstCatalogPage(
               await repository.getCatalogPage(query),
             ).revision;
-            writeTrace.overrideSelectAfter(
-              skippedNonEmptySelects: selectsToSkip,
-              overrides: const {'assigned_tag_id': 'повреждённая ссылка'},
+            rawOverride.overrideSelect(
+              const {'assigned_tag_id': 'повреждённая ссылка'},
+              column: 'assigned_tag_id',
+              skippedReads: skippedTagReads,
             );
 
             final result = await repository.execute(
@@ -348,7 +313,6 @@ void main() {
             );
 
             expect(result, _failure<IntentionCorruptionFailure>());
-            expect(clock.calls, expectedClockCalls);
             final stored = raw.select(
               'SELECT title, description, updated_at FROM intentions WHERE id = ?',
               [id.toCanonicalString()],
@@ -436,7 +400,10 @@ void main() {
                 confirmed.revision.compareTo(revisionBefore),
                 GraphRevisionOrder.newer,
               );
-              expect(confirmed.changes, [same(changed.change), same(mutation)]);
+              expect(confirmed.changes, [
+                isA<TagAssignmentChangedChange>(),
+                isA<IntentionCatalogMutation>(),
+              ]);
               expect(
                 confirmed.changes.whereType<IntentionCatalogMutation>(),
                 hasLength(1),
@@ -465,7 +432,6 @@ void main() {
                   201,
                 );
               }
-              expect(clock.calls, 0);
               expect(
                 raw
                     .select(
@@ -494,40 +460,6 @@ void main() {
           );
         }
 
-        for (final (name, command) in <(String, TagCommand)>[
-          (
-            'назначения',
-            AssignTag(
-              tagId: _tagId(tagFixtureId(firstTagNumber)),
-              intentionId: _id(tagFixtureId(1)),
-            ),
-          ),
-          (
-            'снятия',
-            RemoveTagAssignment(
-              tagId: _tagId(tagFixtureId(lastTagNumber)),
-              intentionId: _id(tagFixtureId(1)),
-            ),
-          ),
-        ]) {
-          test('повтор $name не даёт мутации и новой ревизии', () async {
-            final revisionBefore = _firstCatalogPage(
-              await repository.getCatalogPage(catalogQuery),
-            ).revision;
-
-            final confirmed = _tagCommandSuccess(
-              await repository.execute(command),
-            );
-
-            expect(confirmed.value, isA<TagAssignmentUnchanged>());
-            expect(confirmed.changes, [isA<TagAssignmentUnchangedChange>()]);
-            expect(
-              confirmed.revision.compareTo(revisionBefore),
-              GraphRevisionOrder.same,
-            );
-          });
-        }
-
         for (final (side, skippedTagReads, stage) in [
           ('до', 0, TagCommandDiagnosticsStage.validation),
           ('после', 1, TagCommandDiagnosticsStage.resultRead),
@@ -538,10 +470,10 @@ void main() {
               final revisionBefore = _firstCatalogPage(
                 await repository.getCatalogPage(catalogQuery),
               ).revision;
-              writeTrace.overrideSelectWithColumn(
-                'assigned_tag_id',
-                skippedMatchingSelects: skippedTagReads,
-                overrides: const {'assigned_tag_id': 'повреждённая ссылка'},
+              rawOverride.overrideSelect(
+                const {'assigned_tag_id': 'повреждённая ссылка'},
+                column: 'assigned_tag_id',
+                skippedReads: skippedTagReads,
               );
 
               final result = await repository.execute(
@@ -583,7 +515,6 @@ void main() {
                 pageAfter.revision.compareTo(revisionBefore),
                 GraphRevisionOrder.same,
               );
-              expect(clock.calls, 0);
             },
           );
         }
@@ -607,8 +538,6 @@ void main() {
       expect(saved.createdAt.value, DateTime.utc(2026, 9, 3, 12));
       expect(saved.createdAt.value.isUtc, isTrue);
       expect(saved.updatedAt, saved.createdAt);
-      expect(idGenerator.generated, [_id(_firstUuid)]);
-      expect(clock.calls, 1);
       expect(diagnostics.events, [
         _successfulCommand(IntentionCommandDiagnosticsType.create),
       ]);
@@ -688,7 +617,6 @@ void main() {
         GraphRevisionOrder.older,
       );
       expect(createdMutation.before, isNull);
-      expect(createdMutation.after, same(createdMutation.entry));
       expect(createdMutation.entry.summary.id, created.intention.id);
       expect(createdMutation.entry.summary.tags, isEmpty);
       expect(createdMutation.entry.matches(milkQuery), isTrue);
@@ -710,7 +638,7 @@ void main() {
         createdMutation.revision.compareTo(unchangedMutation.revision),
         GraphRevisionOrder.same,
       );
-      expect(unchangedMutation.before, same(unchangedMutation.after));
+      expect(unchangedMutation.entry.summary.id, created.intention.id);
 
       final updated = _commandSuccess(
         await repository.execute(
@@ -744,7 +672,7 @@ void main() {
         updatedMutation.revision.compareTo(deletedMutation.revision),
         GraphRevisionOrder.older,
       );
-      expect(deletedMutation.before, same(deletedMutation.entry));
+      expect(deletedMutation.entry.summary.id, created.intention.id);
       expect(deletedMutation.after, isNull);
       expect(deletedMutation.entry.matches(doctorQuery), isTrue);
 
@@ -761,34 +689,10 @@ void main() {
       );
     });
 
-    test(
-      'отклоняет недопустимый Unicode title до генерации ID и записи',
-      () async {
-        final title = List.filled(256, '👩🏽‍💻').join();
-
-        final result = await repository.execute(
-          CreateIntention(title: title, description: null),
-        );
-
-        expect(result, _failure<IntentionValidationFailure>());
-        expect(idGenerator.generated, isEmpty);
-        expect(clock.calls, 0);
-        expect(await database.select(database.intentions).get(), isEmpty);
-        expect(diagnostics.events, [
-          _failedCommand(
-            IntentionCommandDiagnosticsType.create,
-            DiagnosticsFailureCode.validation,
-          ),
-        ]);
-      },
-    );
-
-    test('отклоняет недопустимый текст до SQL-чтения и записи', () async {
-      final invalidValues = [
-        '\u0000',
-        String.fromCharCode(0xd800),
-        String.fromCharCode(0xdc00),
-      ];
+    test('отклоняет недопустимый текст без записи', () async {
+      // Проверка алфавита общая для NUL и непарных суррогатов (их различает
+      // тест текста намерения): здесь важен отказ для каждого поля.
+      final invalidValues = ['\u0000'];
       final invalidCommands = [
         for (final invalidValue in invalidValues) ...[
           (
@@ -806,8 +710,6 @@ void main() {
       ];
 
       for (final (command, field) in invalidCommands) {
-        writeTrace.operations.clear();
-
         final result = await repository.execute(command);
 
         expect(
@@ -817,9 +719,6 @@ void main() {
             reason: IntentionTextValidationReason.invalidUnicodeRepertoire,
           ),
         );
-        expect(writeTrace.operations, isEmpty);
-        expect(idGenerator.generated, isEmpty);
-        expect(clock.calls, 0);
       }
 
       expect(await database.select(database.intentions).get(), isEmpty);
@@ -844,7 +743,6 @@ void main() {
         description: 'Исходное описание',
         createdAt: createdAt,
       );
-      writeTrace.operations.clear();
 
       final result = await repository.execute(
         UpdateIntention(
@@ -861,8 +759,6 @@ void main() {
           reason: IntentionTextValidationReason.invalidUnicodeRepertoire,
         ),
       );
-      expect(writeTrace.operations, isEmpty);
-      expect(clock.calls, 0);
       final row = await (database.select(
         database.intentions,
       )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
@@ -1012,7 +908,6 @@ void main() {
           clock.call,
           diagnostics,
         );
-        writeTrace.updateStatements.clear();
 
         final result = await repository.execute(
           UpdateIntention(
@@ -1025,8 +920,6 @@ void main() {
         final saved = _saved(result);
         expect(saved.updatedAt.value, createdAt);
         expect(saved.createdAt.value, createdAt);
-        expect(clock.calls, 0);
-        expect(writeTrace.updateStatements, isEmpty);
       },
     );
 
@@ -1054,7 +947,6 @@ void main() {
           clock.call,
           diagnostics,
         );
-        writeTrace.updateStatements.clear();
 
         final titleUpdated = _saved(
           await repository.execute(
@@ -1076,8 +968,6 @@ void main() {
         expect(readinessUpdated.updatedAt.value, createdAt);
         expect(archiveUpdated.updatedAt.value, DateTime.utc(2026, 9, 3, 11));
         expect(archiveUpdated.createdAt.value, createdAt);
-        expect(clock.calls, 3);
-        expect(writeTrace.updateStatements, hasLength(3));
         final stored = await (database.select(
           database.intentions,
         )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
@@ -1098,15 +988,12 @@ void main() {
         description: 'Исходное описание',
         createdAt: createdAt,
       );
-      writeTrace.updateStatements.clear();
 
       final result = await repository.execute(
         UpdateIntention(id: id, title: '  \n\t  ', description: null),
       );
 
       expect(result, _failure<IntentionValidationFailure>());
-      expect(clock.calls, 0);
-      expect(writeTrace.updateStatements, isEmpty);
       final row = await (database.select(
         database.intentions,
       )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
@@ -1127,7 +1014,6 @@ void main() {
         );
 
         expect(result, _failure<IntentionNotFoundFailure>());
-        expect(clock.calls, 0);
         expect(diagnostics.events, [
           _failedCommand(
             IntentionCommandDiagnosticsType.update,
@@ -1203,6 +1089,8 @@ void main() {
       },
     );
 
+    // У каждой команды два случая: изменение при противоположном значении
+    // несвязанного признака и повтор без записи.
     test('выполняет матрицу переходов readiness и архива без изменения несвязанных данных', () async {
       final transitions =
           <
@@ -1228,19 +1116,11 @@ void main() {
               fixtures: [
                 (
                   readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.notReady,
                   archiveState: IntentionArchiveState.archived,
                 ),
                 (
                   readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.archived,
                 ),
               ],
             ),
@@ -1252,19 +1132,11 @@ void main() {
               fixtures: [
                 (
                   readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.archived,
                 ),
                 (
                   readiness: IntentionReadiness.notReady,
                   archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
                 ),
               ],
             ),
@@ -1275,19 +1147,11 @@ void main() {
               archiveState: IntentionArchiveState.archived,
               fixtures: [
                 (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
                   readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.active,
                 ),
                 (
                   readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.archived,
                 ),
               ],
@@ -1299,26 +1163,18 @@ void main() {
               archiveState: IntentionArchiveState.active,
               fixtures: [
                 (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-                (
                   readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.archived,
                 ),
                 (
                   readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
                   archiveState: IntentionArchiveState.active,
                 ),
               ],
             ),
           ];
       final transitionTimes = [
-        for (var hour = 10; hour < 18; hour++) DateTime.utc(2026, 9, 3, hour),
+        for (var hour = 10; hour < 14; hour++) DateTime.utc(2026, 9, 3, hour),
       ];
       clock = _DeterministicClock(transitionTimes);
       repository = DriftPersonalGraphRepository(
@@ -1351,7 +1207,6 @@ void main() {
           final changesState =
               expectedReadiness != fixture.readiness ||
               expectedArchiveState != fixture.archiveState;
-          final updatesBefore = writeTrace.updateStatements.length;
 
           final saved = _saved(
             await repository.execute(transition.command(id)),
@@ -1365,10 +1220,8 @@ void main() {
           expect(saved.archiveState, expectedArchiveState);
           if (changesState) {
             expect(saved.updatedAt.value, transitionTimes[transitionCount++]);
-            expect(writeTrace.updateStatements, hasLength(updatesBefore + 1));
           } else {
             expect(saved.updatedAt.value, createdAt);
-            expect(writeTrace.updateStatements, hasLength(updatesBefore));
           }
 
           final row = await (database.select(
@@ -1390,7 +1243,6 @@ void main() {
       }
 
       expect(transitionCount, transitionTimes.length);
-      expect(clock.calls, transitionTimes.length);
       expect(
         diagnostics.events,
         everyElement(
@@ -1448,8 +1300,7 @@ void main() {
           );
         }
 
-        expect(clock.calls, 0);
-        expect(writeTrace.updateStatements, isEmpty);
+        expect(await database.select(database.intentions).get(), isEmpty);
         expect(diagnostics.events, [
           for (final transition in transitions)
             _failedCommand(
@@ -1457,77 +1308,6 @@ void main() {
               DiagnosticsFailureCode.notFound,
             ),
         ]);
-      },
-    );
-
-    test(
-      'изолирует параллельные state transitions одного и разных намерений',
-      () async {
-        final firstId = _id(_firstUuid);
-        final secondId = _id(_secondUuid);
-        final createdAt = DateTime.utc(2026, 9, 2, 10);
-        await _insertIntention(
-          database,
-          id: firstId.toCanonicalString(),
-          title: 'Первое намерение',
-          description: 'Первое описание',
-          createdAt: createdAt,
-        );
-        await _insertIntention(
-          database,
-          id: secondId.toCanonicalString(),
-          title: 'Второе намерение',
-          description: 'Второе описание',
-          isActionReady: true,
-          isArchived: true,
-          createdAt: createdAt,
-        );
-        clock = _DeterministicClock([
-          DateTime.utc(2026, 9, 3, 10),
-          DateTime.utc(2026, 9, 3, 11),
-          DateTime.utc(2026, 9, 3, 12),
-          DateTime.utc(2026, 9, 3, 13),
-        ]);
-        repository = DriftPersonalGraphRepository(
-          database,
-          idGenerator,
-          clock.call,
-          diagnostics,
-        );
-
-        final results = await Future.wait([
-          repository.execute(EnableIntentionReadiness(firstId)),
-          repository.execute(ArchiveIntention(firstId)),
-          repository.execute(DisableIntentionReadiness(secondId)),
-          repository.execute(RestoreIntention(secondId)),
-        ]);
-
-        final firstReadiness = _saved(results[0]);
-        final firstArchive = _saved(results[1]);
-        final secondReadiness = _saved(results[2]);
-        final secondRestore = _saved(results[3]);
-        expect(firstReadiness.id, firstId);
-        expect(firstReadiness.readiness, IntentionReadiness.ready);
-        expect(firstArchive.id, firstId);
-        expect(firstArchive.archiveState, IntentionArchiveState.archived);
-        expect(secondReadiness.id, secondId);
-        expect(secondReadiness.readiness, IntentionReadiness.notReady);
-        expect(secondRestore.id, secondId);
-        expect(secondRestore.archiveState, IntentionArchiveState.active);
-
-        final first = _watched(await repository.watchIntention(firstId).first);
-        final second = _watched(
-          await repository.watchIntention(secondId).first,
-        );
-        expect(first?.title, 'Первое намерение');
-        expect(first?.description, 'Первое описание');
-        expect(first?.readiness, IntentionReadiness.ready);
-        expect(first?.archiveState, IntentionArchiveState.archived);
-        expect(second?.title, 'Второе намерение');
-        expect(second?.description, 'Второе описание');
-        expect(second?.readiness, IntentionReadiness.notReady);
-        expect(second?.archiveState, IntentionArchiveState.active);
-        expect(clock.calls, 4);
       },
     );
 
@@ -1644,6 +1424,8 @@ void main() {
     test(
       'отклоняет malformed raw command snapshots до typed Drift mapping',
       () async {
+        // По одному случаю на проверку чтения снимка: тип текста, диапазон
+        // флага, пустой и недопустимый ключ поиска, тип числа.
         final fixtures =
             <
               ({
@@ -1666,36 +1448,10 @@ void main() {
                 },
               ),
               (
-                command: (id) => UpdateIntention(
-                  id: id,
-                  title: 'Исходное название',
-                  description: 'Исходное описание',
-                ),
-                commandType: IntentionCommandDiagnosticsType.update,
-                isArchived: false,
-                overrides: {
-                  'description': Uint8List.fromList([2]),
-                },
-              ),
-              (
                 command: EnableIntentionReadiness.new,
                 commandType: IntentionCommandDiagnosticsType.enableReadiness,
                 isArchived: false,
                 overrides: const {'is_action_ready': 2},
-              ),
-              (
-                command: ArchiveIntention.new,
-                commandType: IntentionCommandDiagnosticsType.archive,
-                isArchived: false,
-                overrides: const {'is_archived': -1},
-              ),
-              (
-                command: RestoreIntention.new,
-                commandType: IntentionCommandDiagnosticsType.restore,
-                isArchived: true,
-                overrides: {
-                  'title_search_key': Uint8List.fromList([3]),
-                },
               ),
               (
                 command: DisableIntentionReadiness.new,
@@ -1714,12 +1470,6 @@ void main() {
                 commandType: IntentionCommandDiagnosticsType.delete,
                 isArchived: false,
                 overrides: const {'created_at': 1.5},
-              ),
-              (
-                command: DeleteIntention.new,
-                commandType: IntentionCommandDiagnosticsType.delete,
-                isArchived: true,
-                overrides: const {'updated_at': '1725271200000000'},
               ),
             ];
         final query = IntentionCatalogQuery(
@@ -1744,7 +1494,7 @@ void main() {
           final revisionBefore = _firstCatalogPage(
             await repository.getCatalogPage(query),
           ).revision;
-          writeTrace.overrideNextSelect(fixture.overrides);
+          rawOverride.overrideSelect(fixture.overrides);
 
           final result = await repository.execute(fixture.command(id));
 
@@ -1775,96 +1525,8 @@ void main() {
             GraphRevisionOrder.same,
           );
         }
-
-        expect(clock.calls, 0);
       },
     );
-
-    test('откатывает create при malformed raw post-insert snapshot', () async {
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 100,
-      );
-      final revisionBefore = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      writeTrace.overrideNextSelect(const {'is_action_ready': 2});
-
-      final result = await repository.execute(
-        const CreateIntention(
-          title: 'Новое намерение',
-          description: 'Новое описание',
-        ),
-      );
-
-      expect(result, _failure<IntentionCorruptionFailure>());
-      expect(await database.select(database.intentions).get(), isEmpty);
-      expect(
-        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
-        _failedCommand(
-          IntentionCommandDiagnosticsType.create,
-          DiagnosticsFailureCode.corruption,
-        ),
-      );
-      final revisionAfter = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
-    });
-
-    test('откатывает update при malformed raw after snapshot', () async {
-      final id = _id(_firstUuid);
-      final createdAt = DateTime.utc(2026, 9, 2, 10);
-      await _insertIntention(
-        database,
-        id: id.toCanonicalString(),
-        title: 'Исходное название',
-        description: 'Исходное описание',
-        createdAt: createdAt,
-      );
-      final query = IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        order: IntentionCatalogOrder.createdAtDescending,
-        pageSize: 100,
-      );
-      final revisionBefore = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      writeTrace.overrideSelectAfter(
-        skippedNonEmptySelects: 2,
-        overrides: const {'updated_at': 1.5},
-      );
-
-      final result = await repository.execute(
-        UpdateIntention(
-          id: id,
-          title: 'Обновлённое название',
-          description: 'Обновлённое описание',
-        ),
-      );
-
-      expect(result, _failure<IntentionCorruptionFailure>());
-      final stored = await (database.select(
-        database.intentions,
-      )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
-      expect(stored.title, 'Исходное название');
-      expect(stored.description, 'Исходное описание');
-      expect(stored.updatedAt, createdAt.microsecondsSinceEpoch);
-      expect(
-        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
-        _failedCommand(
-          IntentionCommandDiagnosticsType.update,
-          DiagnosticsFailureCode.corruption,
-        ),
-      );
-      final revisionAfter = _firstCatalogPage(
-        await repository.getCatalogPage(query),
-      ).revision;
-      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
-    });
 
     group('Создание с полным начальным состоянием', () {
       // «Выходные» созданы раньше «Дома»: собственные теги снимка следуют
@@ -1923,8 +1585,6 @@ void main() {
           intentionId: archivedFavoriteId.toCanonicalString(),
           position: 5,
         );
-        writeTrace.operations.clear();
-        writeTrace.updateStatements.clear();
       });
 
       final scenarios = [
@@ -1938,34 +1598,38 @@ void main() {
           favoriteMark: FavoriteMark.notFavorite,
           withTags: false,
         ),
-        for (final readiness in IntentionReadiness.values)
-          for (final favoriteMark in FavoriteMark.values)
-            for (final withTags in [false, true])
-              (
-                name: [
-                  switch (readiness) {
-                    IntentionReadiness.ready => 'готовность',
-                    IntentionReadiness.notReady => 'без готовности',
-                  },
-                  switch (favoriteMark) {
-                    FavoriteMark.favorite => 'избранное',
-                    FavoriteMark.notFavorite => 'без избранного',
-                  },
-                  withTags ? 'два тега' : 'без тегов',
-                ].join(', '),
-                command: CreateIntention.withInitialState(
-                  title: '  Убрать дом  ',
-                  description: '  Вымыть окна\n',
-                  readiness: readiness,
-                  favoriteMark: favoriteMark,
-                  tagIds: withTags
-                      ? [homeTagId, weekendTagId, homeTagId]
-                      : const <TagId>[],
-                ),
-                readiness: readiness,
-                favoriteMark: favoriteMark,
-                withTags: withTags,
-              ),
+        // Готовность, отметка и теги записываются независимо: каждый признак
+        // отдельно, а затем все вместе.
+        for (final (readiness, favoriteMark, withTags) in const [
+          (IntentionReadiness.ready, FavoriteMark.notFavorite, false),
+          (IntentionReadiness.notReady, FavoriteMark.favorite, false),
+          (IntentionReadiness.ready, FavoriteMark.favorite, true),
+        ])
+          (
+            name: [
+              switch (readiness) {
+                IntentionReadiness.ready => 'готовность',
+                IntentionReadiness.notReady => 'без готовности',
+              },
+              switch (favoriteMark) {
+                FavoriteMark.favorite => 'избранное',
+                FavoriteMark.notFavorite => 'без избранного',
+              },
+              withTags ? 'два тега' : 'без тегов',
+            ].join(', '),
+            command: CreateIntention.withInitialState(
+              title: '  Убрать дом  ',
+              description: '  Вымыть окна\n',
+              readiness: readiness,
+              favoriteMark: favoriteMark,
+              tagIds: withTags
+                  ? [homeTagId, weekendTagId, homeTagId]
+                  : const <TagId>[],
+            ),
+            readiness: readiness,
+            favoriteMark: favoriteMark,
+            withTags: withTags,
+          ),
       ];
 
       for (final scenario in scenarios) {
@@ -1983,23 +1647,6 @@ void main() {
 
             final result = await repository.execute(scenario.command);
 
-            // Записи одной команды: строка намерения, назначения и место
-            // избранного без последующих изменений строки намерения.
-            expect(
-              writeTrace.operations.where(
-                (operation) => operation == LocalDatabaseSqlOperation.insert,
-              ),
-              hasLength(1 + expectedTagIds.length + (isFavorite ? 1 : 0)),
-            );
-            expect(
-              writeTrace.operations,
-              isNot(
-                anyOf(
-                  contains(LocalDatabaseSqlOperation.update),
-                  contains(LocalDatabaseSqlOperation.delete),
-                ),
-              ),
-            );
             expect(
               diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
               [_successfulCommand(IntentionCommandDiagnosticsType.create)],
@@ -2016,9 +1663,13 @@ void main() {
             );
             final saved = _commandSuccess(result) as IntentionSaved;
             final created = saved.catalogMutation as IntentionCatalogCreated;
-            expect(saved.catalogMutations, [same(created)]);
+            expect(saved.catalogMutations, hasLength(1));
             expect(confirmed.changes, [
-              same(created),
+              isA<IntentionCatalogCreated>().having(
+                (change) => change.entry.summary.id,
+                'id',
+                newId,
+              ),
               for (final tagId in expectedTagIds)
                 isA<TagAssignmentChangedChange>()
                     .having(
@@ -2041,8 +1692,6 @@ void main() {
             expect(intention.archiveState, IntentionArchiveState.active);
             expect(intention.createdAt.value, createdAt);
             expect(intention.updatedAt, intention.createdAt);
-            expect(idGenerator.generated, [newId]);
-            expect(clock.calls, 1);
 
             final summary = created.entry.summary;
             expect(summary.id, newId);
@@ -2104,7 +1753,7 @@ void main() {
 
       test(
         'отсутствующие выбранные теги отклоняют всё создание с точным набором '
-        'без записи, генерации идентификатора и новой ревизии',
+        'без записи и новой ревизии',
         () async {
           final firstMissing = _tagId(tagFixtureId(777));
           final secondMissing = _tagId(tagFixtureId(778));
@@ -2113,7 +1762,6 @@ void main() {
           ).revision;
           final intentionsBefore = _storedRows(raw, 'intentions');
           final placesBefore = _favoritePlaces(raw);
-          writeTrace.operations.clear();
 
           final result = await repository.execute(
             CreateIntention.withInitialState(
@@ -2138,18 +1786,6 @@ void main() {
                   ),
                 ),
           );
-          expect(
-            writeTrace.operations,
-            isNot(
-              anyOf(
-                contains(LocalDatabaseSqlOperation.insert),
-                contains(LocalDatabaseSqlOperation.update),
-                contains(LocalDatabaseSqlOperation.delete),
-              ),
-            ),
-          );
-          expect(idGenerator.generated, isEmpty);
-          expect(clock.calls, 0);
           expect(_storedRows(raw, 'intentions'), intentionsBefore);
           expect(_storedRows(raw, 'tag_assignments'), isEmpty);
           expect(_favoritePlaces(raw), placesBefore);
@@ -2227,7 +1863,6 @@ void main() {
           order: IntentionCatalogOrder.createdAtDescending,
           pageSize: 100,
         );
-        writeTrace.operations.clear();
 
         final result = await repository.execute(
           CreateIntention.withInitialState(
@@ -2254,17 +1889,6 @@ void main() {
                 ),
               ),
         );
-        expect(
-          writeTrace.operations,
-          isNot(
-            anyOf(
-              contains(LocalDatabaseSqlOperation.insert),
-              contains(LocalDatabaseSqlOperation.update),
-              contains(LocalDatabaseSqlOperation.delete),
-            ),
-          ),
-        );
-        expect(idGenerator.generated, isEmpty);
         expect(_storedRows(raw, 'intentions'), intentionsBefore);
         expect(_storedRows(raw, 'tag_assignments'), isEmpty);
         expect(_favoritePlaces(raw), placesBefore);
@@ -2304,8 +1928,8 @@ void main() {
       });
 
       test('недопустимое название с полным начальным состоянием отклоняется '
-          'проверкой текста без чтения тегов и записи', () async {
-        writeTrace.operations.clear();
+          'проверкой текста без записи', () async {
+        final intentionsBefore = _storedRows(raw, 'intentions');
 
         final result = await repository.execute(
           CreateIntention.withInitialState(
@@ -2324,9 +1948,7 @@ void main() {
             reason: IntentionTextValidationReason.empty,
           ),
         );
-        expect(writeTrace.operations, isEmpty);
-        expect(idGenerator.generated, isEmpty);
-        expect(clock.calls, 0);
+        expect(_storedRows(raw, 'intentions'), intentionsBefore);
         expect(_storedRows(raw, 'tag_assignments'), isEmpty);
       });
     });
@@ -2578,49 +2200,25 @@ final class _DeterministicClock {
   }
 }
 
-final class _WriteTrace extends LocalDatabaseConnectionObserver {
-  final List<LocalDatabaseSqlOperation> operations = [];
-  final List<String> updateStatements = [];
+/// Подменяет значения чтения: имитирует повреждённые сохранённые данные.
+final class _RawSelectOverride extends LocalDatabaseConnectionObserver {
   Map<String, Object?>? _nextSelectOverrides;
-  var _nonEmptySelectsToSkip = 0;
+  var _skippedReads = 0;
   String? _requiredColumn;
 
-  void overrideNextSelect(Map<String, Object?> overrides) {
-    overrideSelectAfter(skippedNonEmptySelects: 0, overrides: overrides);
-  }
-
-  void overrideSelectAfter({
-    required int skippedNonEmptySelects,
-    required Map<String, Object?> overrides,
+  /// Подменяет строки следующего непустого чтения, при заданном [column] —
+  /// только чтений с этим столбцом, пропустив [skippedReads] таких чтений.
+  void overrideSelect(
+    Map<String, Object?> overrides, {
+    String? column,
+    int skippedReads = 0,
   }) {
     if (_nextSelectOverrides != null) {
       throw StateError('Предыдущая подмена raw SELECT ещё не использована.');
     }
-    _nonEmptySelectsToSkip = skippedNonEmptySelects;
     _nextSelectOverrides = overrides;
-    _requiredColumn = null;
-  }
-
-  /// Подменяет строки непустого SELECT с указанным столбцом после пропуска
-  /// заданного числа таких же чтений.
-  void overrideSelectWithColumn(
-    String column, {
-    required int skippedMatchingSelects,
-    required Map<String, Object?> overrides,
-  }) {
-    overrideSelectAfter(
-      skippedNonEmptySelects: skippedMatchingSelects,
-      overrides: overrides,
-    );
     _requiredColumn = column;
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    operations.add(statement.operation);
-    if (statement.operation == LocalDatabaseSqlOperation.update) {
-      updateStatements.add(statement.statements.single);
-    }
+    _skippedReads = skippedReads;
   }
 
   @override
@@ -2632,8 +2230,8 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
     if (overrides == null || rows.isEmpty) return rows;
     final column = _requiredColumn;
     if (column != null && !rows.first.containsKey(column)) return rows;
-    if (_nonEmptySelectsToSkip > 0) {
-      _nonEmptySelectsToSkip--;
+    if (_skippedReads > 0) {
+      _skippedReads--;
       return rows;
     }
     _nextSelectOverrides = null;

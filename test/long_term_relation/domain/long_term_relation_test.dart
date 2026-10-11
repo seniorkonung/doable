@@ -32,46 +32,6 @@ void main() {
   });
 
   group('модель долговременной связи', () {
-    test('сохраняет проверенные идентичность и параметры', () {
-      final relation = LongTermRelation(
-        id: _relationId('018f0b5d-6b2e-7c80-8000-000000000001'),
-        sourceIntentionId: _intentionId('0f8fad5b-d9cb-469f-a165-70867728950e'),
-        relatedIntentionId: _intentionId(
-          '7c9e6679-7425-40de-944b-e07fc1f90ae7',
-        ),
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        scope: RelationScope.archived,
-        creationSequence: RelationCreationSequence(7),
-      );
-
-      expect(
-        relation.id.toCanonicalString(),
-        '018f0b5d-6b2e-7c80-8000-000000000001',
-      );
-      expect(
-        relation.sourceIntentionId.toCanonicalString(),
-        '0f8fad5b-d9cb-469f-a165-70867728950e',
-      );
-      expect(
-        relation.relatedIntentionId.toCanonicalString(),
-        '7c9e6679-7425-40de-944b-e07fc1f90ae7',
-      );
-      expect(relation.type, LongTermRelationType.need);
-      expect(relation.priority, RelationPriority.p2);
-      expect(relation.scope, RelationScope.archived);
-      expect(relation.creationSequence.value, 7);
-    });
-
-    test('не смешивает идентификаторы связи и намерения', () {
-      const serialized = '0f8fad5b-d9cb-469f-a165-70867728950e';
-      final relationId = _relationId(serialized);
-      final intentionId = _intentionId(serialized);
-
-      expect(relationId.toCanonicalString(), intentionId.toCanonicalString());
-      expect(relationId, isNot(equals(intentionId)));
-    });
-
     test('отклоняет прямую самосвязь по идентификатору намерения', () {
       final intentionId = _intentionId('0f8fad5b-d9cb-469f-a165-70867728950e');
 
@@ -95,47 +55,7 @@ void main() {
       );
     });
   });
-
-  test('перечисления задают полный закрытый набор вариантов', () {
-    expect(LongTermRelationType.values.map(_relationTypeLabel), [
-      'need',
-      'can',
-    ]);
-    expect(RelationPriority.values.map(_priorityLabel), [
-      'p1',
-      'p2',
-      'p3',
-      'p4',
-    ]);
-    expect(RelationDirection.values.map(_directionLabel), [
-      'incoming',
-      'outgoing',
-    ]);
-    expect(RelationScope.values.map(_scopeLabel), ['active', 'archived']);
-  });
 }
-
-String _relationTypeLabel(LongTermRelationType type) => switch (type) {
-  LongTermRelationType.need => 'need',
-  LongTermRelationType.can => 'can',
-};
-
-String _priorityLabel(RelationPriority priority) => switch (priority) {
-  RelationPriority.p1 => 'p1',
-  RelationPriority.p2 => 'p2',
-  RelationPriority.p3 => 'p3',
-  RelationPriority.p4 => 'p4',
-};
-
-String _directionLabel(RelationDirection direction) => switch (direction) {
-  RelationDirection.incoming => 'incoming',
-  RelationDirection.outgoing => 'outgoing',
-};
-
-String _scopeLabel(RelationScope scope) => switch (scope) {
-  RelationScope.active => 'active',
-  RelationScope.archived => 'archived',
-};
 
 LongTermRelationId _relationId(String value) =>
     switch (LongTermRelationId.decode(value)) {

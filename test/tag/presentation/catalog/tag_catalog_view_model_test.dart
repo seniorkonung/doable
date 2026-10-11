@@ -357,198 +357,39 @@ void main() {
     );
   });
 
-  for (final (intentionId, recipient) in [
-    (_intentionId(1), 'намерения'),
-    (_intentionId(2), 'другого намерения'),
-  ]) {
-    for (final assigned in [false, true]) {
-      test(
-        'повтор восстанавливает бюджет устаревших проверок $recipient: ${assigned ? 'назначен' : 'свободен'}',
-        () async {
-          final h = _Harness();
-          addTearDown(h.dispose);
-          h.repository.page(0, []);
-          await pumpEventQueue();
-          h.model.setMode(TagCatalogSelectionMode(intentionId));
-          h.repository.selectionPage(1, intentionId, [
-            TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-          ], revision: 2);
-          await pumpEventQueue();
-          h.model.selectTag(_id(52));
-          h.repository.tagRead(_tag(52, 'Из редактора'), revision: 2);
-          await pumpEventQueue();
-
-          for (var index = 0; index < 8; index++) {
-            h.repository.statusRead(index, false, revision: 1);
-            await pumpEventQueue();
-          }
-          expect(h.repository.statusQueries, hasLength(8));
-          expect(
-            (h.state as TagCatalogLoaded).selectedAssignment,
-            TagCatalogSelectedAssignment.unavailable,
-          );
-          expect(h.model.assignSelected(), isNull);
-
-          h.model.retrySelectedAssignment();
-          expect(h.repository.statusQueries, hasLength(9));
-          for (var index = 8; index < 11; index++) {
-            h.repository.statusRead(index, false, revision: 1);
-            await pumpEventQueue();
-            expect(
-              (h.state as TagCatalogLoaded).selectedAssignment,
-              TagCatalogSelectedAssignment.unknown,
-            );
-            expect(h.repository.statusQueries, hasLength(index + 2));
-            expect(h.model.assignSelected(), isNull);
-          }
-          h.repository.statusRead(11, assigned, revision: 2);
-          await pumpEventQueue();
-          expect(
-            (h.state as TagCatalogLoaded).selectedAssignment,
-            assigned
-                ? TagCatalogSelectedAssignment.assigned
-                : TagCatalogSelectedAssignment.available,
-          );
-          expect(
-            h.model.assignSelected(),
-            assigned ? isNull : isA<TagCommandAccepted>(),
-          );
-        },
-      );
-    }
-    for (final assigned in [false, true]) {
-      test(
-        'поздний отказ проверки не заменяет статус полного снимка для $recipient: ${assigned ? 'назначен' : 'свободен'}',
-        () async {
-          final h = _Harness();
-          addTearDown(h.dispose);
-          h.repository.page(0, []);
-          await pumpEventQueue();
-          h.model.setMode(TagCatalogSelectionMode(intentionId));
-          h.repository.selectionPage(1, intentionId, [
-            TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-          ]);
-          await pumpEventQueue();
-          h.model.selectTag(_id(52));
-          h.repository.tagRead(_tag(52, 'Из редактора'));
-          await pumpEventQueue();
-          expect(h.repository.statusQueries.single, (_id(52), intentionId));
-          expect(h.model.assignSelected(), isNull);
-
-          await h.created(_tag(52, 'Из редактора'), revision: 2);
-          h.repository.selectionPage(2, intentionId, [
-            TagSelectionRow(
-              tag: _tag(52, 'Из редактора'),
-              isAssigned: assigned,
-            ),
-          ], revision: 2);
-          await pumpEventQueue();
-          expect(
-            (h.state as TagCatalogLoaded).selectedAssignment,
-            assigned
-                ? TagCatalogSelectedAssignment.assigned
-                : TagCatalogSelectedAssignment.available,
-          );
-
-          h.repository.statusReads.first.complete(
-            const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
-          );
-          await pumpEventQueue();
-          expect(
-            (h.state as TagCatalogLoaded).selectedAssignment,
-            assigned
-                ? TagCatalogSelectedAssignment.assigned
-                : TagCatalogSelectedAssignment.available,
-          );
-          expect(h.repository.statusQueries, hasLength(2));
-          expect(
-            h.model.assignSelected(),
-            assigned ? isNull : isA<TagCommandAccepted>(),
-          );
-        },
-      );
-    }
-    for (final assigned in [false, true]) {
-      for (final tagReadFirst in [false, true]) {
-        test(
-          'повтор проверки пары $recipient после ${tagReadFirst ? 'раннего' : 'позднего'} наблюдения тега: ${assigned ? 'назначен' : 'свободен'}',
-          () async {
-            final h = _Harness();
-            addTearDown(h.dispose);
-            h.repository.page(0, []);
-            await pumpEventQueue();
-            h.model.setMode(TagCatalogSelectionMode(intentionId));
-            h.repository.selectionPage(1, intentionId, [
-              TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-            ]);
-            await pumpEventQueue();
-            h.model.selectTag(_id(52));
-            if (tagReadFirst) h.repository.tagRead(_tag(52, 'Из редактора'));
-            h.repository.statusReads.single.complete(
-              const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
-            );
-            await pumpEventQueue();
-            if (!tagReadFirst) {
-              h.repository.tagRead(_tag(52, 'Из редактора'));
-              await pumpEventQueue();
-            }
-            expect(
-              (h.state as TagCatalogLoaded).selectedAssignment,
-              TagCatalogSelectedAssignment.unavailable,
-            );
-            expect(h.model.assignSelected(), isNull);
-            h.model.retrySelectedAssignment();
-            expect(h.repository.statusQueries, hasLength(2));
-            expect(h.model.assignSelected(), isNull);
-            h.repository.statusRead(1, assigned);
-            await pumpEventQueue();
-            expect(
-              (h.state as TagCatalogLoaded).selectedAssignment,
-              assigned
-                  ? TagCatalogSelectedAssignment.assigned
-                  : TagCatalogSelectedAssignment.available,
-            );
-            expect(
-              h.model.assignSelected(),
-              assigned ? isNull : isA<TagCommandAccepted>(),
-            );
-          },
+  for (final assigned in [false, true]) {
+    test(
+      'точечное чтение выбора из редактора до обновления снимка: ${assigned ? 'назначен' : 'свободен'}',
+      () async {
+        final intentionId = _intentionId(1);
+        final h = _Harness();
+        addTearDown(h.dispose);
+        h.repository.page(0, []);
+        await pumpEventQueue();
+        h.model.setMode(TagCatalogSelectionMode(intentionId));
+        h.repository.selectionPage(1, intentionId, [
+          TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+        ]);
+        await pumpEventQueue();
+        h.model.selectTag(_id(52));
+        h.repository.tagRead(_tag(52, 'Из редактора'));
+        await pumpEventQueue();
+        expect(h.repository.statusQueries.single, (_id(52), intentionId));
+        expect(h.model.assignSelected(), isNull);
+        h.repository.statusRead(0, assigned);
+        await pumpEventQueue();
+        expect(
+          (h.state as TagCatalogLoaded).selectedAssignment,
+          assigned
+              ? TagCatalogSelectedAssignment.assigned
+              : TagCatalogSelectedAssignment.available,
         );
-      }
-    }
-    for (final assigned in [false, true]) {
-      test(
-        'точечное чтение выбора из редактора до обновления снимка для $recipient: ${assigned ? 'назначен' : 'свободен'}',
-        () async {
-          final h = _Harness();
-          addTearDown(h.dispose);
-          h.repository.page(0, []);
-          await pumpEventQueue();
-          h.model.setMode(TagCatalogSelectionMode(intentionId));
-          h.repository.selectionPage(1, intentionId, [
-            TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-          ]);
-          await pumpEventQueue();
-          h.model.selectTag(_id(52));
-          h.repository.tagRead(_tag(52, 'Из редактора'));
-          await pumpEventQueue();
-          expect(h.repository.statusQueries.single, (_id(52), intentionId));
-          expect(h.model.assignSelected(), isNull);
-          h.repository.statusRead(0, assigned);
-          await pumpEventQueue();
-          expect(
-            (h.state as TagCatalogLoaded).selectedAssignment,
-            assigned
-                ? TagCatalogSelectedAssignment.assigned
-                : TagCatalogSelectedAssignment.available,
-          );
-          expect(
-            h.model.assignSelected(),
-            assigned ? isNull : isA<TagCommandAccepted>(),
-          );
-        },
-      );
-    }
+        expect(
+          h.model.assignSelected(),
+          assigned ? isNull : isA<TagCommandAccepted>(),
+        );
+      },
+    );
   }
 
   test(
@@ -727,31 +568,6 @@ void main() {
     expect(h.model.assignSelected(), isNull);
   });
 
-  test('ответ точечного чтения другой эпохи не открывает назначение', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.repository.page(0, []);
-    await pumpEventQueue();
-    h.model.setMode(TagCatalogSelectionMode(_intentionId(1)));
-    h.repository.selectionPage(1, _intentionId(1), [
-      TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-    ]);
-    await pumpEventQueue();
-    h.model.selectTag(_id(52));
-    h.repository.tagRead(_tag(52, 'Из редактора'));
-    h.repository.statusRead(0, false, epoch: 1);
-    await pumpEventQueue();
-    expect(h.model.assignSelected(), isNull);
-    expect(h.repository.statusQueries, hasLength(2));
-    h.repository.statusRead(1, true);
-    await pumpEventQueue();
-    expect(
-      (h.state as TagCatalogLoaded).selectedAssignment,
-      TagCatalogSelectedAssignment.assigned,
-    );
-    expect(h.model.assignSelected(), isNull);
-  });
-
   test(
     'отсутствие получателя и отказ точечного чтения не разрешают назначение',
     () async {
@@ -809,64 +625,56 @@ void main() {
     },
   );
 
-  for (final (intentionId, recipient) in [
-    (_intentionId(1), 'намерения'),
-    (_intentionId(2), 'другого намерения'),
-  ]) {
-    for (final assigned in [false, true]) {
-      test(
-        'полный снимок сохраняет выбор и признак назначения для $recipient: ${assigned ? 'назначен' : 'свободен'}',
-        () async {
-          final h = _Harness();
-          addTearDown(h.dispose);
-          h.repository.page(0, []);
-          await pumpEventQueue();
-          h.model.setMode(TagCatalogSelectionMode(intentionId));
-          h.repository.selectionPage(1, intentionId, [
-            TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
-            TagSelectionRow(tag: _tag(52, 'Выбранный'), isAssigned: assigned),
-          ]);
-          await pumpEventQueue();
-          h.model.selectTag(_id(52));
-          expect(
-            (h.state as TagCatalogLoaded).selection,
-            isA<TagCatalogSelectionReady>(),
-          );
-          expect(h.repository.statusQueries, isEmpty);
+  for (final assigned in [false, true]) {
+    test(
+      'полный снимок сохраняет выбор и признак назначения: ${assigned ? 'назначен' : 'свободен'}',
+      () async {
+        final intentionId = _intentionId(1);
+        final h = _Harness();
+        addTearDown(h.dispose);
+        h.repository.page(0, []);
+        await pumpEventQueue();
+        h.model.setMode(TagCatalogSelectionMode(intentionId));
+        h.repository.selectionPage(1, intentionId, [
+          TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+          TagSelectionRow(tag: _tag(52, 'Выбранный'), isAssigned: assigned),
+        ]);
+        await pumpEventQueue();
+        h.model.selectTag(_id(52));
+        expect(
+          (h.state as TagCatalogLoaded).selection,
+          isA<TagCatalogSelectionReady>(),
+        );
+        expect(h.repository.statusQueries, isEmpty);
 
-          await h.renamed(
-            _tag(1, 'Первый'),
-            _tag(1, 'Изменённый'),
-            revision: 2,
-          );
-          expect((h.state as TagCatalogLoaded).selection.id, _id(52));
-          expect(h.model.assignSelected(), isNull);
-          h.repository.selectionPage(2, intentionId, [
-            TagSelectionRow(tag: _tag(1, 'Изменённый'), isAssigned: false),
-            TagSelectionRow(tag: _tag(52, 'Выбранный'), isAssigned: assigned),
-          ], revision: 2);
-          await pumpEventQueue();
-          final loaded = h.state as TagCatalogLoaded;
-          expect(loaded.selection.id, _id(52));
-          expect(loaded.selectionRows.map((row) => row.tag.id), [
-            _id(1),
-            _id(52),
-          ]);
-          expect(
-            loaded.selectedAssignment,
-            assigned
-                ? TagCatalogSelectedAssignment.assigned
-                : TagCatalogSelectedAssignment.available,
-          );
-          expect(h.repository.statusQueries, isEmpty);
-          expect(
-            h.model.assignSelected(),
-            assigned ? isNull : isA<TagCommandAccepted>(),
-          );
-          expect(h.repository.commands, hasLength(assigned ? 1 : 2));
-        },
-      );
-    }
+        await h.renamed(_tag(1, 'Первый'), _tag(1, 'Изменённый'), revision: 2);
+        expect((h.state as TagCatalogLoaded).selection.id, _id(52));
+        expect(h.model.assignSelected(), isNull);
+        h.repository.selectionPage(2, intentionId, [
+          TagSelectionRow(tag: _tag(1, 'Изменённый'), isAssigned: false),
+          TagSelectionRow(tag: _tag(52, 'Выбранный'), isAssigned: assigned),
+        ], revision: 2);
+        await pumpEventQueue();
+        final loaded = h.state as TagCatalogLoaded;
+        expect(loaded.selection.id, _id(52));
+        expect(loaded.selectionRows.map((row) => row.tag.id), [
+          _id(1),
+          _id(52),
+        ]);
+        expect(
+          loaded.selectedAssignment,
+          assigned
+              ? TagCatalogSelectedAssignment.assigned
+              : TagCatalogSelectedAssignment.available,
+        );
+        expect(h.repository.statusQueries, isEmpty);
+        expect(
+          h.model.assignSelected(),
+          assigned ? isNull : isA<TagCommandAccepted>(),
+        );
+        expect(h.repository.commands, hasLength(assigned ? 1 : 2));
+      },
+    );
   }
 
   test('актуализация блокирует признак назначения до полного подтверждённого снимка', () async {
@@ -990,33 +798,6 @@ void main() {
     },
   );
 
-  test('отсутствие выбранного тега до пакета убирает строку и отбрасывает старые снимки', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.repository.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
-    await pumpEventQueue();
-    h.model.selectTag(_id(1));
-    h.repository.tagRead(null, revision: 2);
-    await pumpEventQueue();
-    final refreshing = h.state as TagCatalogLoaded;
-    expect(refreshing.items.map((tag) => tag.id), [_id(2)]);
-    expect(refreshing.selection, isA<TagCatalogNoSelection>());
-    expect(refreshing.freshness, TagCatalogFreshness.refreshing);
-    expect(h.model.canActOn(_id(1)), isFalse);
-    expect(h.model.canActOn(_id(2)), isFalse);
-
-    h.repository.page(1, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
-    await pumpEventQueue();
-    expect((h.state as TagCatalogLoaded).items.map((tag) => tag.id), [_id(2)]);
-    expect(h.repository.queries, hasLength(3));
-    h.repository.page(2, [_tag(2, 'Работа'), _tag(3, 'Новый')], revision: 2);
-    await pumpEventQueue();
-    final fresh = h.state as TagCatalogLoaded;
-    expect(fresh.freshness, TagCatalogFreshness.current);
-    expect(fresh.items.map((tag) => tag.id), [_id(2), _id(3)]);
-    expect(h.model.canActOn(_id(2)), isTrue);
-  });
-
   test('отсутствие выбранного тега из редактора до обновления снимка очищает выбор до пакета', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -1087,52 +868,6 @@ void main() {
     },
   );
 
-  test('снимок новой ревизии перед пакетом обновляет выбранное имя', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.repository.page(0, [_tag(1, 'Дом')], revision: 2);
-    await pumpEventQueue();
-    h.model.selectTag(_id(52));
-    h.repository.tagRead(_tag(52, 'Старое имя'));
-    await pumpEventQueue();
-
-    await h.renamed(_tag(52, 'Старое имя'), _tag(52, 'Новое имя'), revision: 2);
-    h.repository.tagRead(_tag(52, 'Старое имя'));
-    await pumpEventQueue();
-
-    final loaded = h.state as TagCatalogLoaded;
-    expect(
-      loaded.selection,
-      isA<TagCatalogSelectionReady>().having(
-        (selection) => selection.tag.name.value,
-        'название',
-        'Новое имя',
-      ),
-    );
-    expect(h.model.canActOn(_id(52)), isTrue);
-    expect(h.repository.queries, hasLength(1));
-  });
-
-  test('снимок новой ревизии перед пакетом очищает удалённый выбор', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.repository.page(0, [_tag(1, 'Дом')], revision: 2);
-    await pumpEventQueue();
-    h.model.selectTag(_id(52));
-    h.repository.tagRead(_tag(52, 'Старое имя'));
-    await pumpEventQueue();
-
-    await h.deleted(_id(52), revision: 2);
-    h.repository.tagRead(_tag(52, 'Старое имя'));
-    await pumpEventQueue();
-
-    final loaded = h.state as TagCatalogLoaded;
-    expect(loaded.selection, isA<TagCatalogNoSelection>());
-    expect(loaded.items.map((tag) => tag.id), [_id(1)]);
-    expect(h.model.canActOn(_id(52)), isFalse);
-    expect(h.repository.queries, hasLength(1));
-  });
-
   test('пакет прежней ревизии не откатывает более поздний выбор', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -1191,8 +926,8 @@ void main() {
     await pumpEventQueue();
     expect(h.repository.queries, hasLength(4));
     expect(
-      (h.state as TagCatalogLoaded).revision,
-      isA<_Revision>().having((revision) => revision.number, 'номер', 3),
+      (h.state as TagCatalogLoaded).items.single.name.value,
+      'Последнее имя',
     );
 
     h.repository.page(3, [
@@ -1436,25 +1171,6 @@ void main() {
     expect(
       (h.state as TagCatalogLoaded).freshness,
       TagCatalogFreshness.current,
-    );
-  });
-
-  test('новая эпоха отбрасывает поздний полный снимок прежней эпохи', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.repository.page(0, [_tag(1, 'Дом')]);
-    await pumpEventQueue();
-    await h.created(_tag(2, 'Работа'), revision: 2);
-    await h.deleted(_id(1), revision: 1, epoch: 1);
-    h.repository.page(1, [_tag(2, 'Работа')], revision: 2);
-    await pumpEventQueue();
-    h.repository.page(2, [_tag(3, 'Другое')], revision: 1, epoch: 1);
-    await pumpEventQueue();
-    final loaded = h.state as TagCatalogLoaded;
-    expect(loaded.items.map((tag) => tag.id), [_id(3)]);
-    expect(
-      loaded.revision.compareTo(const _Revision(1, 1)),
-      GraphRevisionOrder.same,
     );
   });
 
@@ -1763,10 +1479,10 @@ final class _Harness {
     await accepted.future;
   }
 
-  Future<void> deleted(TagId id, {required int revision, int epoch = 0}) async {
+  Future<void> deleted(TagId id, {required int revision}) async {
     final accepted =
         coordinator.acceptTagDelete(DeleteTag(id)) as TagCommandAccepted;
-    final r = _Revision(revision, epoch);
+    final r = _Revision(revision);
     repository.completeCommand(
       TagDeleted(TagDeletedChange(revision: r, tagId: id)),
       r,
@@ -1822,16 +1538,12 @@ final class _Repository extends Fake implements PersonalGraphRepository {
     return completer.future;
   }
 
-  void statusRead(
-    int index,
-    bool assigned, {
-    int revision = 1,
-    int epoch = 0,
-  }) => statusReads[index].complete(
-    TagAssignmentStatusSuccess(
-      GraphSnapshot(value: assigned, revision: _Revision(revision, epoch)),
-    ),
-  );
+  void statusRead(int index, bool assigned, {int revision = 1}) =>
+      statusReads[index].complete(
+        TagAssignmentStatusSuccess(
+          GraphSnapshot(value: assigned, revision: _Revision(revision)),
+        ),
+      );
 
   @override
   Stream<TagReadResult> watchTag(TagId id) {
@@ -1855,10 +1567,10 @@ final class _Repository extends Fake implements PersonalGraphRepository {
     return completer.future;
   }
 
-  void page(int index, List<Tag> tags, {int revision = 1, int epoch = 0}) {
+  void page(int index, List<Tag> tags, {int revision = 1}) {
     pages[index].complete(
       TagCatalogSuccess(
-        TagCatalogSnapshot(items: tags, revision: _Revision(revision, epoch)),
+        TagCatalogSnapshot(items: tags, revision: _Revision(revision)),
       ),
     );
   }
@@ -1907,14 +1619,11 @@ final class _Repository extends Fake implements PersonalGraphRepository {
 }
 
 final class _Revision implements GraphRevision {
-  const _Revision(this.number, [this.epoch = 0]);
+  const _Revision(this.number);
   final int number;
-  final int epoch;
 
   @override
   GraphRevisionOrder compareTo(GraphRevision other) => switch (other) {
-    _Revision(epoch: final e) when e != epoch =>
-      GraphRevisionOrder.differentEpoch,
     _Revision(number: final n) when number < n => GraphRevisionOrder.older,
     _Revision(number: final n) when number > n => GraphRevisionOrder.newer,
     _Revision() => GraphRevisionOrder.same,

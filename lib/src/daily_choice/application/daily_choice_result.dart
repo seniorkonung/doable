@@ -11,7 +11,6 @@ enum DailyChoiceValidationField {
   selectedIntention,
   date,
   description,
-  path,
 }
 
 final class DailyChoiceValidationFailure extends DailyChoiceCommandFailure {

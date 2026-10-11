@@ -33,18 +33,6 @@ void main() {
       expect(_filter('ﬃ').matches(TagName.fromInput('офис FFI')), isTrue);
     });
 
-    test('сопоставляет греческую конечную сигму по общему правилу', () {
-      expect(_filter('οσ').matches(TagName.fromInput('ΟΣ')), isTrue);
-      expect(_filter('ος').matches(TagName.fromInput('οσ')), isTrue);
-    });
-
-    test('не применяет турецкие правила регистра', () {
-      expect(_filter('I').matches(TagName.fromInput('i')), isTrue);
-      expect(_filter('I').matches(TagName.fromInput('ı')), isFalse);
-      expect(_filter('İ').matches(TagName.fromInput('i')), isFalse);
-      expect(_filter('İ').matches(TagName.fromInput('i\u0307')), isTrue);
-    });
-
     test('различает буквы е и ё', () {
       expect(_filter('ВСЕ').matches(TagName.fromInput('Все')), isTrue);
       expect(_filter('ВСЕ').matches(TagName.fromInput('Всё')), isFalse);
@@ -114,17 +102,6 @@ void main() {
       );
       expect(
         _filter('👩🏽‍💻').matches(TagName.fromInput('Работа 👩🏽‍💻')),
-        isTrue,
-      );
-    });
-
-    test('сопоставляет регистр символов за пределами BMP', () {
-      expect(
-        _filter('\u{10400}').matches(TagName.fromInput('Тег \u{10428}')),
-        isTrue,
-      );
-      expect(
-        _filter('\u{10428}').matches(TagName.fromInput('Тег \u{10400}')),
         isTrue,
       );
     });

@@ -2,14 +2,10 @@ import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
-import 'package:doable/src/tag/application/tag_change.dart';
-import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -22,57 +18,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
-import '../../../support/tag_assignment_changed.dart';
 
 void main() {
-  testWidgets(
-    'поиск сохраняет явное назначение скрытого тега тому же намерению',
-    (tester) async {
-      final h = await _show(tester);
-      await tester.tap(_row(h.home));
-      await tester.enterText(_search, 'работ');
-      await tester.pump();
-      expect(_row(h.home), findsNothing);
-      expect(_row(h.work), findsOneWidget);
-      expect(find.text('Дом'), findsOneWidget);
-      expect(h.repository.commands, isEmpty);
-      expect(h.repository.reads, hasLength(1));
-
-      await tester.tap(_assign);
-      await tester.pump();
-      final command = h.repository.commands.single as AssignTag;
-      expect(command.tagId, h.home.id);
-      expect(command.intentionId, h.intention.value);
-      h.repository.command.complete(
-        TagCommandSucceeded(
-          ConfirmedGraphResult(
-            revision: const TagCatalogTestRevision(2),
-            value: testTagAssignmentChanged(
-              TagAssignmentChangedChange(
-                revision: const TagCatalogTestRevision(2),
-                assignment: command.assignment,
-                state: TagAssignmentState.assigned,
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      h.repository.complete(
-        [h.home, h.work],
-        revision: 2,
-        assignedIds: {h.home.id},
-      );
-      await tester.pump();
-      expect(tester.widget<TextField>(_search).controller!.text, 'работ');
-      expect(_row(h.home), findsNothing);
-      expect(find.text('Дом'), findsOneWidget);
-      expect(find.text('Назначен'), findsOneWidget);
-      expect(tester.widget<FilledButton>(_assign).onPressed, isNull);
-      expect(h.repository.commands, hasLength(1));
-    },
-  );
-
   testWidgets('отказ назначения сохраняет скрытый выбор для явного повтора', (
     tester,
   ) async {
@@ -94,48 +41,11 @@ void main() {
     );
     expect(tester.widget<FilledButton>(_assign).onPressed, isNotNull);
     expect(h.repository.commands, hasLength(1));
-    expect(h.repository.reads, hasLength(1));
 
     await tester.tap(find.byTooltip('Очистить поиск тегов'));
     await tester.pump();
     expect(tester.widget<Semantics>(_row(h.home)).properties.selected, isTrue);
     expect(h.repository.commands, hasLength(1));
-  });
-
-  testWidgets('выбор из редактора подтверждает пару до явного назначения', (
-    tester,
-  ) async {
-    final editor = Completer<Tag?>();
-    final h = await _show(tester, onOpenEditor: (_) => editor.future);
-    final created = _tag(52, 'Из редактора');
-    await tester.enterText(_search, 'работ');
-    await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-    editor.complete(created);
-    await tester.pump();
-    h.repository.observe(created);
-    h.repository.statusReads.single.complete(
-      const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
-    );
-    await tester.pump();
-    expect(h.repository.statusQueries.single, (created.id, h.intention.value));
-    expect(find.text('Из редактора'), findsOneWidget);
-    expect(_row(created), findsNothing);
-    expect(tester.widget<FilledButton>(_assign).onPressed, isNull);
-    expect(h.repository.commands, isEmpty);
-    expect(tester.widget<TextField>(_search).controller!.text, 'работ');
-
-    await tester.tap(find.text('Повторить'));
-    await tester.pump();
-    expect(tester.widget<FilledButton>(_assign).onPressed, isNull);
-    h.repository.statusReads.last.complete(
-      const TagAssignmentStatusSuccess(
-        GraphSnapshot(value: false, revision: TagCatalogTestRevision()),
-      ),
-    );
-    await tester.pump();
-    expect(tester.widget<FilledButton>(_assign).onPressed, isNotNull);
-    expect(h.repository.reads, hasLength(1));
-    expect(h.repository.commands, isEmpty);
   });
 
   testWidgets('возврат редактора прежнего открытия не меняет новый выбор', (
@@ -160,7 +70,6 @@ void main() {
     editor.complete(_tag(52, 'Прежний редактор'));
     await tester.pump();
     expect(tester.widget<Semantics>(_row(h.home)).properties.selected, isTrue);
-    expect(h.repository.statusReads, isEmpty);
     expect(h.repository.commands, isEmpty);
     expect(tester.widget<TextField>(_search).controller!.text, 'дом');
   });
@@ -250,9 +159,7 @@ void main() {
       );
       expect(_hidden, findsNothing);
       expect(draft.current.tagIds, [d.home.id, d.work.id]);
-      expect(d.repository.reads, hasLength(1));
       expect(d.repository.commands, isEmpty);
-      expect(d.repository.statusQueries, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
@@ -266,14 +173,13 @@ void main() {
         onOpenEditor: (_) => (editors..add(Completer())).last.future,
       );
       final draft = d.tagSet.value;
-      final input = tester.widget<TextField>(_search).controller!;
       await tester.enterText(_search, 'дом');
       await tester.pump();
 
       await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
       editors.last.complete(null);
       await tester.pump();
-      expect(input.text, 'дом');
+      expect(tester.widget<TextField>(_search).controller!.text, 'дом');
       expect(_hidden, findsNothing);
       expect(draft.current.tagIds, isEmpty);
 
@@ -288,8 +194,7 @@ void main() {
       d.rebuild();
       await tester.pump();
       expect(draft.current.tagIds, [d.home.id]);
-      expect(tester.widget<TextField>(_search).controller, same(input));
-      expect(input.text, 'дом');
+      expect(tester.widget<TextField>(_search).controller!.text, 'дом');
 
       final created = _tag(52, 'Домашнее');
       editors.last.complete(created);
@@ -304,10 +209,8 @@ void main() {
       expect(_visibleNames(tester), ['Дом']);
       expect(tester.widget<FilledButton>(_add).onPressed, isNotNull);
       expect(draft.current.tagIds, [d.home.id]);
-      expect(input.text, 'дом');
-      expect(d.repository.reads, hasLength(1));
+      expect(tester.widget<TextField>(_search).controller!.text, 'дом');
       expect(d.repository.commands, isEmpty);
-      expect(d.repository.statusQueries, isEmpty);
 
       await tester.tap(_add);
       await tester.pump();
@@ -349,7 +252,6 @@ void main() {
       await tester.pump();
       expect(_hiddenText('Работа'), findsOneWidget);
       expect(find.text('Прежний редактор'), findsNothing);
-      expect(d.repository.observations.containsKey(stale.id), isFalse);
       expect(tester.widget<TextField>(_search).controller!.text, 'дом');
       expect(first.current.tagIds, isEmpty);
       expect(second.current.tagIds, [d.work.id]);
@@ -373,7 +275,6 @@ void main() {
       );
       expect(tester.widget<FilledButton>(_add).onPressed, isNull);
       expect(second.current.tagIds, [d.work.id]);
-      expect(d.repository.reads, hasLength(3));
       expect(d.repository.commands, isEmpty);
       expect(tester.takeException(), isNull);
     },

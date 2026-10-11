@@ -46,13 +46,12 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
   Future<DailyChoiceCatalogPage> _readDailyChoiceCatalogPageOnSnapshot(
     DailyChoiceCatalogQuery query,
   ) async {
-    final cursor = query.cursor;
+    final _DriftDailyChoiceCatalogCursor? cursor = switch (query.cursor) {
+      null => null,
+      final _DriftDailyChoiceCatalogCursor own => own,
+      _ => throw StateError('Недопустимый курсор каталога дневных выборов.'),
+    };
     if (cursor != null &&
-        (cursor is! _DriftDailyChoiceCatalogCursor ||
-            !cursor.matches(query, _epoch))) {
-      throw const _InvalidDailyChoiceCatalogCursor();
-    }
-    if (cursor is _DriftDailyChoiceCatalogCursor &&
         cursor.revision.compareTo(_currentRevision) !=
             GraphRevisionOrder.same) {
       throw const _DailyChoiceCatalogSnapshotHasExpired();
@@ -69,7 +68,7 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
       variables.add(Variable<int>(completed ? 1 : 0));
     }
     final where = filters.isEmpty ? '' : 'WHERE ${filters.join(' AND ')}';
-    final totalCount = cursor is! _DriftDailyChoiceCatalogCursor
+    final totalCount = cursor == null
         ? _requiredStoredInteger(
             (await _database
                     .customSelect(
@@ -85,7 +84,7 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
 
     final pageFilters = [...filters];
     final pageVariables = [...variables];
-    if (cursor is _DriftDailyChoiceCatalogCursor) {
+    if (cursor != null) {
       pageFilters.add('''(choice_date < ? OR
         (choice_date = ? AND creation_sequence < ?))''');
       pageVariables.addAll([
@@ -120,20 +119,14 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
         }),
     ];
     final items = await _verifyDailyChoiceCatalogItems(choices);
-    final returnedCount =
-        (cursor is _DriftDailyChoiceCatalogCursor ? cursor.returnedCount : 0) +
-        items.length;
+    final returnedCount = (cursor?.returnedCount ?? 0) + items.length;
     if (hasNext ? returnedCount >= totalCount : returnedCount != totalCount) {
       throw const _StoredIntentionCorruption();
     }
     final revision = _currentRevision;
     final nextCursor = hasNext
         ? _DriftDailyChoiceCatalogCursor(
-            epoch: _epoch,
             revision: revision,
-            date: query.date,
-            isCompleted: query.isCompleted,
-            pageSize: query.pageSize,
             boundaryDate: _requiredStoredString(
               selectedRows.last.data,
               'choice_date',
@@ -361,36 +354,18 @@ DailyChoiceCatalogItem _catalogItemFor(
 
 final class _DriftDailyChoiceCatalogCursor implements DailyChoiceCatalogCursor {
   const _DriftDailyChoiceCatalogCursor({
-    required this.epoch,
     required this.revision,
-    required this.date,
-    required this.isCompleted,
-    required this.pageSize,
     required this.boundaryDate,
     required this.boundarySequence,
     required this.expectedCount,
     required this.returnedCount,
   });
 
-  final _GraphEpoch epoch;
   final GraphRevision revision;
-  final CalendarDate? date;
-  final bool? isCompleted;
-  final int pageSize;
   final String boundaryDate;
   final int boundarySequence;
   final int expectedCount;
   final int returnedCount;
-
-  bool matches(DailyChoiceCatalogQuery query, _GraphEpoch owner) =>
-      identical(epoch, owner) &&
-      date == query.date &&
-      isCompleted == query.isCompleted &&
-      pageSize == query.pageSize;
-}
-
-final class _InvalidDailyChoiceCatalogCursor implements Exception {
-  const _InvalidDailyChoiceCatalogCursor();
 }
 
 final class _DailyChoiceCatalogSnapshotHasExpired implements Exception {
@@ -398,9 +373,6 @@ final class _DailyChoiceCatalogSnapshotHasExpired implements Exception {
 }
 
 DailyChoiceCatalogReadFailure _classifyDailyChoiceCatalogFailure(Object error) {
-  if (error is _InvalidDailyChoiceCatalogCursor) {
-    return const DailyChoiceCatalogValidationFailure();
-  }
   if (error is _DailyChoiceCatalogSnapshotHasExpired) {
     return const DailyChoiceCatalogSnapshotExpired();
   }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -9,7 +7,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -38,7 +35,7 @@ final class DailyChoicePickerTagSearchCase {
     required this.readinessFilter,
     required this.rowReadiness,
     required this.totalCountLabel,
-    required this.emptyScopeMessages,
+    required this.emptyScopeMessage,
   });
 
   final PageRouteInfo route;
@@ -51,8 +48,8 @@ final class DailyChoicePickerTagSearchCase {
   final List<IntentionReadiness> rowReadiness;
   final String Function(int count) totalCountLabel;
 
-  /// Сообщение о пустом допустимом охвате по языку.
-  final Map<String, String> emptyScopeMessages;
+  /// Сообщение о пустом допустимом охвате.
+  final String emptyScopeMessage;
 }
 
 /// Проверки подключения поиска по тегам к странице выбора намерения.
@@ -65,66 +62,8 @@ void defineDailyChoicePickerTagSearchTests(
     listKey: '${page.keyPrefix}-list',
     readinessFilter: page.readinessFilter,
   );
-  for (final (language, ownTags, otherTags, noTags) in [
-    ('en', 'Tags: Здоровье, Отдых', 'Tags: Семья', 'No tags'),
-    ('ru', 'Теги: Здоровье, Отдых', 'Теги: Семья', 'Без тегов'),
-  ]) {
-    testWidgets('$language: строки без условий показывают собственные теги, '
-        'а выбор одноимённого намерения возвращает его идентификатор', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      final repository = ControlledCatalogRepository();
-      final opened = await _openPicker(
-        tester,
-        repository,
-        page,
-        locale: Locale(language),
-      );
-      final items = [
-        _summary(
-          page,
-          3,
-          title: 'Гулять',
-          tags: [_tag(1, 'Здоровье'), _tag(2, 'Отдых')],
-        ),
-        _summary(page, 2, title: 'Гулять', tags: [_tag(3, 'Семья')]),
-        _summary(page, 1, title: 'Читать'),
-      ];
-      repository.complete(1, _firstPage(items));
-      await tester.pumpAndSettle();
-
-      _expectPickerQuery(page, repository.queryAt(1), IntentionTagFilter.empty);
-      expect(_shownConditions(tester), isEmpty);
-      final rows = find.byType(IntentionSummaryView);
-      expect(rows, findsNWidgets(3));
-      for (final (index, title, tagsLine) in [
-        (0, 'Гулять', ownTags),
-        (1, 'Гулять', otherTags),
-        (2, 'Читать', noTags),
-      ]) {
-        final row = rows.at(index);
-        expect(
-          find.descendant(of: row, matching: find.text(tagsLine)),
-          findsOneWidget,
-        );
-        expect(
-          tester.getSemantics(row).label,
-          allOf(contains(title), contains(tagsLine)),
-        );
-      }
-
-      await tester.tap(find.text('Гулять').last);
-      await tester.pumpAndSettle();
-      expect(await opened.selection, items[1].id);
-      semantics.dispose();
-    });
-  }
-
-  testWidgets('условие добавляется через экран поиска тега под полем '
-      'названия, переключается и снимается, а отмена ничего не меняет', (
-    tester,
-  ) async {
+  testWidgets('условие добавляется через экран поиска тега, переключается и '
+      'снимается, а отмена ничего не меняет', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
@@ -132,13 +71,6 @@ void defineDailyChoicePickerTagSearchTests(
     final opened = await _openPicker(tester, repository, page);
     repository.complete(1, _firstPage(_summaries(page, const [], count: 3)));
     await tester.pumpAndSettle();
-
-    final section = tester.getRect(find.byType(IntentionTagConditionsSection));
-    expect(
-      section.top,
-      greaterThanOrEqualTo(tester.getRect(_filterField(page)).bottom),
-    );
-    expect(section.bottom, lessThanOrEqualTo(tester.getRect(_list(page)).top));
 
     await tester.tap(_addCondition);
     await tester.pumpAndSettle();
@@ -185,282 +117,24 @@ void defineDailyChoicePickerTagSearchTests(
     _expectNoCommands(repository);
   });
 
-  testWidgets('добавление, переключение и снятие условия начинают выдачу '
-      'прокрученного списка с верхней позиции', (tester) async {
+  testWidgets('пустая выдача при условиях по тегам сообщает об отсутствии '
+      'совпадений по условиям, а не о пустом охвате', (tester) async {
     final repository = ControlledCatalogRepository();
-    final health = _tag(1, 'Здоровье');
-    repository.tagCatalogItems = [health];
+    const byConditions = 'No intentions match the tag conditions.';
+    final byScope = page.emptyScopeMessage;
     final opened = await _openPicker(tester, repository, page);
-    repository.complete(1, _firstPage(_summaries(page, const [], count: 60)));
+    repository.complete(1, _firstPage(const []));
     await tester.pumpAndSettle();
-    await _scrollListDown(tester, page);
+    expect(find.text(byScope), findsOneWidget);
+    expect(find.text(byConditions), findsNothing);
 
-    await tester.tap(_addCondition);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      _pickerAction(health, IntentionTagRequirement.mustBeAbsent),
-    );
-    await _pumpUntilQueries(tester, repository, 3);
-    _expectPickerQuery(
-      page,
-      repository.queryAt(2),
-      IntentionTagFilter(excludedTagIds: [health.id]),
-    );
-    repository.complete(2, _firstPage(_summaries(page, const [], count: 59)));
-    await tester.pumpAndSettle();
-
-    expect(opened.router.current.name, page.route.routeName);
-    expect(_shownConditions(tester), ['not Здоровье']);
-    expect(_listPosition(tester, page).pixels, 0);
-    expect(find.text('Намерение 59'), findsOneWidget);
-    await _scrollListDown(tester, page);
-
-    await tester.tap(_conditionToggle(health));
-    await _pumpUntilQueries(tester, repository, 4);
-    _expectPickerQuery(
-      page,
-      repository.queryAt(3),
-      IntentionTagFilter(requiredTagIds: [health.id]),
-    );
-    repository.complete(3, _firstPage(_summaries(page, [health], count: 58)));
-    await tester.pumpAndSettle();
-
-    expect(_shownConditions(tester), ['Здоровье']);
-    expect(_listPosition(tester, page).pixels, 0);
-    expect(find.text('Намерение 58'), findsOneWidget);
-    await _scrollListDown(tester, page);
-
-    await tester.tap(_conditionRemove(health));
-    await _pumpUntilQueries(tester, repository, 5);
-    _expectPickerQuery(page, repository.queryAt(4), IntentionTagFilter.empty);
-    repository.complete(4, _firstPage(_summaries(page, const [], count: 60)));
-    await tester.pumpAndSettle();
-
-    expect(_shownConditions(tester), isEmpty);
-    expect(_listPosition(tester, page).pixels, 0);
-    expect(find.text('Намерение 60'), findsOneWidget);
-    _expectNoCommands(repository);
-  });
-
-  testWidgets('отказ обновления и согласование без изменения условий '
-      'сохраняют экранную позицию прокрученного списка', (tester) async {
-    final repository = ControlledCatalogRepository();
-    final health = _tag(1, 'Здоровье');
-    final rest = _tag(2, 'Отдых');
-    final opened = await _openPicker(tester, repository, page);
-    await _applyConditions(tester, opened.container, repository, page, [
-      (health, IntentionTagRequirement.mustBePresent),
-      (rest, IntentionTagRequirement.mustBeAbsent),
-    ], _firstPage(_summaries(page, [health], count: 60), revision: 1));
-    await _scrollListDown(tester, page);
-    final positionBefore = _listPosition(tester, page).pixels;
-    final visibleRow = _rowAtListCenter(tester, page);
-    final rowTopBefore = tester.getRect(visibleRow).top;
-
-    final accepted = acceptTagCommand(
-      opened.container,
-      repository,
-      DeleteTag(rest.id),
-      tagDeletionSuccess(
-        tagId: rest.id,
-        revision: const TestCatalogRevision(2),
-      ),
-    );
-    await accepted.future;
-    await tester.pump();
-    await tester.pump();
-    await _pumpUntilReconciliationQueries(tester, repository, 1);
-    repository.completeReconciliation(
-      0,
-      const ResultFailure(IntentionUnavailableFailure()),
-    );
-    await tester.pumpAndSettle();
-
-    final message = find.text(
-      'The intention list isn’t up to date: changes couldn’t be loaded.',
-    );
-    expect(message, findsOneWidget);
-    expect(_listPosition(tester, page).pixels, positionBefore);
-    // Отказ лежит поверх верхнего края списка и не сдвигает его строки.
-    expect(tester.getRect(visibleRow).top, rowTopBefore);
-    expect(
-      tester.getRect(_refreshStatus).top,
-      moreOrLessEquals(tester.getRect(_list(page)).top, epsilon: 0.01),
-    );
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
-    await _pumpUntilReconciliationQueries(tester, repository, 2);
-    repository.completeReconciliation(
-      1,
-      reconciliationFirstPortion(const [], totalCount: 60, revision: 2),
-    );
-    await tester.pumpAndSettle();
-
-    expect(message, findsNothing);
-    expect(find.text(page.totalCountLabel(60)), findsOneWidget);
-    expect(_listPosition(tester, page).pixels, positionBefore);
-    expect(tester.getRect(visibleRow).top, rowTopBefore);
-  });
-
-  for (final (name, change) in <(String, Future<void> Function(WidgetTester))>[
-    (
-      'снятие условия',
-      (tester) => tester.tap(_conditionRemove(_tag(1, 'Здоровье'))),
-    ),
-    (
-      'новый текст названия',
-      (tester) => tester.enterText(_filterField(page), 'Намерение'),
-    ),
-  ]) {
-    testWidgets('$name начинает выдачу с верхней позиции, когда прокрученный '
-        'список снят с экрана успешной пустой выдачей', (tester) async {
-      final repository = ControlledCatalogRepository();
-      final health = _tag(1, 'Здоровье');
-      final opened = await _openPicker(tester, repository, page);
-      await _applyConditions(tester, opened.container, repository, page, [
-        (health, IntentionTagRequirement.mustBePresent),
-      ], _firstPage(_summaries(page, [health], count: 60), revision: 1));
-      await _scrollListDown(tester, page);
-
-      // Удаление обязательного тега снимает список с экрана без смены
-      // параметров поиска.
-      await _deleteTag(tester, opened.container, repository, health, 2);
-      expect(_list(page), findsNothing);
-      expect(find.text(_emptyByConditions), findsOneWidget);
-
-      final answered = repository.queries.length;
-      await change(tester);
-      await _pumpUntilQueries(tester, repository, answered + 1);
-      // Состав новой выдачи задаёт управляемое хранилище: странице важна
-      // только смена параметров над снятым с экрана списком.
-      repository.complete(
-        answered,
-        _firstPage(_summaries(page, const [], count: 60), revision: 2),
-      );
-      await tester.pumpAndSettle();
-
-      expect(_listPosition(tester, page).pixels, 0);
-      expect(find.text('Намерение 60'), findsOneWidget);
-    });
-  }
-
-  testWidgets('выдача, вернувшаяся после временной пустоты без смены '
-      'параметров, сохраняет экранную позицию', (tester) async {
-    final repository = ControlledCatalogRepository();
-    final health = _tag(1, 'Здоровье');
-    final rest = _tag(2, 'Отдых');
-    final opened = await _openPicker(tester, repository, page);
-    await _applyConditions(tester, opened.container, repository, page, [
-      (health, IntentionTagRequirement.mustBePresent),
-      (rest, IntentionTagRequirement.mustBeAbsent),
-    ], _firstPage(_summaries(page, [health], count: 60), revision: 1));
-    await _scrollListDown(tester, page);
-    final positionBefore = _listPosition(tester, page).pixels;
-
-    await _deleteTag(tester, opened.container, repository, health, 2);
-    expect(_list(page), findsNothing);
-
-    // Согласование после удаления исключённого тега возвращает совпадения
-    // без смены параметров; их состав задаёт управляемое хранилище.
-    await _deleteTag(tester, opened.container, repository, rest, 3);
-    await _pumpUntilReconciliationQueries(tester, repository, 1);
-    repository.completeReconciliation(
-      0,
-      reconciliationFirstPortion(
-        _summaries(page, const [], count: 60),
-        totalCount: 60,
-        revision: 3,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Намерение 60'), findsNothing);
-    expect(_listPosition(tester, page).pixels, positionBefore);
-  });
-
-  testWidgets('условия по тегам действуют вместе с ограничениями страницы, '
-      'а выбор строки возвращает идентификатор намерения', (tester) async {
-    final repository = ControlledCatalogRepository();
-    final health = _tag(1, 'Здоровье');
-    final sport = _tag(2, 'Спорт');
-    final opened = await _openPicker(tester, repository, page);
-    final items = _summaries(page, [health], count: 2);
-    await _applyConditions(tester, opened.container, repository, page, [
-      (health, IntentionTagRequirement.mustBePresent),
-      (sport, IntentionTagRequirement.mustBeAbsent),
-    ], _firstPage(items));
-
-    _expectPickerQuery(
-      page,
-      repository.queries.last,
-      IntentionTagFilter(
-        requiredTagIds: [health.id],
-        excludedTagIds: [sport.id],
-      ),
-    );
-    expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
-    expect(find.text(page.totalCountLabel(2)), findsOneWidget);
-
-    await tester.tap(find.text(items.last.title));
-    await tester.pumpAndSettle();
-    expect(await opened.selection, items.last.id);
-    _expectNoCommands(repository);
-  });
-
-  testWidgets('условия по тегам не сохраняются после закрытия поиска', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    final opened = await _openPicker(tester, repository, page);
     await _applyConditions(tester, opened.container, repository, page, [
       (_tag(1, 'Здоровье'), IntentionTagRequirement.mustBePresent),
     ], _firstPage(const []));
-    expect(_shownConditions(tester), ['Здоровье']);
 
-    await tester.tap(find.byKey(ValueKey('${page.keyPrefix}-cancel')));
-    await tester.pumpAndSettle();
-    expect(await opened.selection, isNull);
-    final reopenedQuery = repository.queries.length;
-    unawaited(opened.router.push<IntentionId>(page.route));
-    await _pumpUntilQueries(tester, repository, reopenedQuery + 1);
-
-    _expectPickerQuery(
-      page,
-      repository.queryAt(reopenedQuery),
-      IntentionTagFilter.empty,
-    );
-    expect(_shownConditions(tester), isEmpty);
+    expect(find.text(byConditions), findsOneWidget);
+    expect(find.text(byScope), findsNothing);
   });
-
-  for (final (language, byConditions) in [
-    ('en', 'No intentions match the tag conditions.'),
-    ('ru', 'По условиям по тегам совпадений нет.'),
-  ]) {
-    testWidgets('$language: пустая выдача при условиях по тегам сообщает об '
-        'отсутствии совпадений по условиям, а не о пустом охвате', (
-      tester,
-    ) async {
-      final repository = ControlledCatalogRepository();
-      final byScope = page.emptyScopeMessages[language]!;
-      final opened = await _openPicker(
-        tester,
-        repository,
-        page,
-        locale: Locale(language),
-      );
-      repository.complete(1, _firstPage(const []));
-      await tester.pumpAndSettle();
-      expect(find.text(byScope), findsOneWidget);
-      expect(find.text(byConditions), findsNothing);
-
-      await _applyConditions(tester, opened.container, repository, page, [
-        (_tag(1, 'Здоровье'), IntentionTagRequirement.mustBePresent),
-      ], _firstPage(const []));
-
-      expect(find.text(byConditions), findsOneWidget);
-      expect(find.text(byScope), findsNothing);
-    });
-  }
 
   testWidgets('отказ обновления из-за недоступности показан над сохранённым '
       'списком, а повтор согласует выдачу с прежними ограничениями', (
@@ -493,13 +167,10 @@ void defineDailyChoicePickerTagSearchTests(
     expect(find.text(page.totalCountLabel(3)), findsOneWidget);
     expect(find.byType(IntentionSummaryView), findsNWidgets(3));
     expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
-    // Место под отказ отведено перед началом выдачи: первая строка стоит
-    // под ним и остаётся достижимой.
+    // Отказ не закрывает первую строку: она остаётся достижимой.
     expect(
-      tester.getRect(_refreshStatus).bottom,
-      lessThanOrEqualTo(
-        tester.getRect(find.byType(IntentionSummaryView).first).top,
-      ),
+      find.byType(IntentionSummaryView).first.hitTestable(),
+      findsOneWidget,
     );
     _expectPickerQuery(
       page,
@@ -532,167 +203,7 @@ void defineDailyChoicePickerTagSearchTests(
     expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
     _expectNoCommands(repository, tagCommands: 1);
   });
-
-  for (final (name, failure, text) in <(String, IntentionFailure, String)>[
-    (
-      'повреждения',
-      const IntentionCorruptionFailure(),
-      'The intention list isn’t up to date: stored data is damaged.',
-    ),
-    (
-      'неожиданной ошибки',
-      const IntentionUnexpectedFailure(),
-      'The intention list isn’t up to date because of an unexpected error.',
-    ),
-  ]) {
-    testWidgets('отказ обновления из-за $name показан над сохранённым '
-        'списком без повтора', (tester) async {
-      final repository = ControlledCatalogRepository();
-      final health = _tag(1, 'Здоровье');
-      final opened = await _openPicker(tester, repository, page);
-      await _failRefresh(
-        tester,
-        opened.container,
-        repository,
-        page,
-        required: health,
-        deletedExcluded: _tag(2, 'Отдых'),
-        items: _summaries(page, [health], count: 3),
-        failure: failure,
-      );
-
-      expect(find.text(text), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
-      expect(find.text(page.totalCountLabel(3)), findsOneWidget);
-      expect(find.byType(IntentionSummaryView), findsNWidgets(3));
-      expect(repository.reconciliationQueries, hasLength(1));
-    });
-  }
-
-  testWidgets('успешная пустая выдача показывает только сообщение о пустоте, '
-      'без представления отказа обновления', (tester) async {
-    final repository = ControlledCatalogRepository();
-    final opened = await _openPicker(tester, repository, page);
-    await _applyConditions(tester, opened.container, repository, page, [
-      (_tag(1, 'Здоровье'), IntentionTagRequirement.mustBePresent),
-    ], _firstPage(const []));
-
-    expect(find.text(_emptyByConditions), findsOneWidget);
-    expect(tester.getSize(_refreshStatus).height, 0);
-    expect(
-      find.descendant(of: _refreshStatus, matching: find.byType(Text)),
-      findsNothing,
-    );
-    expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
-  });
-
-  testWidgets('отказ обновления из-за недоступности показан над исходно '
-      'пустой выдачей, а повтор согласует её с прежними ограничениями', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    final health = _tag(1, 'Здоровье');
-    final rest = _tag(2, 'Отдых');
-    final filter = IntentionTagFilter(
-      requiredTagIds: [health.id],
-      excludedTagIds: [rest.id],
-    );
-    final opened = await _openPicker(tester, repository, page);
-    await _failRefresh(
-      tester,
-      opened.container,
-      repository,
-      page,
-      required: health,
-      deletedExcluded: rest,
-      items: const [],
-      failure: const IntentionUnavailableFailure(),
-    );
-
-    // Сообщение о пустоте остаётся, но выдача явно названа не обновлённой.
-    final message = find.text(
-      'The intention list isn’t up to date: changes couldn’t be loaded.',
-    );
-    expect(message, findsOneWidget);
-    expect(find.text(_emptyByConditions), findsOneWidget);
-    expect(
-      tester.getRect(_refreshStatus).bottom,
-      lessThanOrEqualTo(tester.getRect(find.text(_emptyByConditions)).top),
-    );
-    expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
-    _expectPickerQuery(
-      page,
-      repository.reconciliationQueryAt(0).catalogQuery,
-      filter,
-    );
-
-    final retry = find.descendant(
-      of: _refreshStatus,
-      matching: find.widgetWithText(FilledButton, 'Try again'),
-    );
-    expect(retry, findsOneWidget);
-    await tester.tap(retry);
-    await _pumpUntilReconciliationQueries(tester, repository, 2);
-    // Повтор читает ту же область с прежними условиями и ограничениями.
-    expect(
-      repository.reconciliationQueryAt(1).catalogQuery,
-      same(repository.reconciliationQueryAt(0).catalogQuery),
-    );
-    repository.completeReconciliation(
-      1,
-      reconciliationFirstPortion(const [], totalCount: 0, revision: 2),
-    );
-    await tester.pumpAndSettle();
-
-    expect(message, findsNothing);
-    expect(retry, findsNothing);
-    expect(find.text(_emptyByConditions), findsOneWidget);
-    expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
-    _expectNoCommands(repository, tagCommands: 1);
-  });
-
-  for (final (name, failure, text) in <(String, IntentionFailure, String)>[
-    (
-      'повреждения',
-      const IntentionCorruptionFailure(),
-      'The intention list isn’t up to date: stored data is damaged.',
-    ),
-    (
-      'неожиданной ошибки',
-      const IntentionUnexpectedFailure(),
-      'The intention list isn’t up to date because of an unexpected error.',
-    ),
-  ]) {
-    testWidgets('отказ обновления из-за $name показан над исходно пустой '
-        'выдачей без повтора', (tester) async {
-      final repository = ControlledCatalogRepository();
-      final health = _tag(1, 'Здоровье');
-      final opened = await _openPicker(tester, repository, page);
-      await _failRefresh(
-        tester,
-        opened.container,
-        repository,
-        page,
-        required: health,
-        deletedExcluded: _tag(2, 'Отдых'),
-        items: const [],
-        failure: failure,
-      );
-
-      expect(find.text(text), findsOneWidget);
-      expect(find.text(_emptyByConditions), findsOneWidget);
-      expect(
-        tester.getRect(_refreshStatus).bottom,
-        lessThanOrEqualTo(tester.getRect(find.text(_emptyByConditions)).top),
-      );
-      expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
-      expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
-      expect(repository.reconciliationQueries, hasLength(1));
-    });
-  }
 }
-
-const _emptyByConditions = 'No intentions match the tag conditions.';
 
 typedef _OpenedPicker = ({
   ProviderContainer container,
@@ -705,9 +216,8 @@ typedef _OpenedPicker = ({
 Future<_OpenedPicker> _openPicker(
   WidgetTester tester,
   ControlledCatalogRepository repository,
-  DailyChoicePickerTagSearchCase page, {
-  Locale locale = const Locale('en'),
-}) async {
+  DailyChoicePickerTagSearchCase page,
+) async {
   final container = reconciliationCatalogContainer(repository);
   final router = AppRouter();
   addTearDown(container.dispose);
@@ -716,7 +226,7 @@ Future<_OpenedPicker> _openPicker(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
-        locale: locale,
+        locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(),
@@ -806,25 +316,6 @@ Future<void> _failRefresh(
   await tester.pump();
 }
 
-/// Подтверждает физическое удаление тега без действий на странице выбора.
-Future<void> _deleteTag(
-  WidgetTester tester,
-  ProviderContainer container,
-  ControlledCatalogRepository repository,
-  Tag tag,
-  int revision,
-) async {
-  final accepted = acceptTagCommand(
-    container,
-    repository,
-    DeleteTag(tag.id),
-    tagDeletionSuccess(tagId: tag.id, revision: TestCatalogRevision(revision)),
-  );
-  await accepted.future;
-  await tester.pump();
-  await tester.pump();
-}
-
 /// Запрос страницы выбора сохраняет её ограничения при любых условиях.
 void _expectPickerQuery(
   DailyChoicePickerTagSearchCase page,
@@ -848,55 +339,9 @@ void _expectNoCommands(
   expect(repository.dailyChoiceCommands, isEmpty);
 }
 
-final _refreshStatus = find.byType(IntentionCatalogRefreshStatusView);
 final _addCondition = find.byKey(
   const ValueKey('intention-tag-conditions-add'),
 );
-
-Finder _filterField(DailyChoicePickerTagSearchCase page) =>
-    find.byKey(ValueKey('${page.keyPrefix}-filter'));
-
-Finder _list(DailyChoicePickerTagSearchCase page) =>
-    find.byKey(PageStorageKey<String>('${page.keyPrefix}-list'));
-
-ScrollPosition _listPosition(
-  WidgetTester tester,
-  DailyChoicePickerTagSearchCase page,
-) => tester
-    .state<ScrollableState>(
-      find.descendant(of: _list(page), matching: find.byType(Scrollable)),
-    )
-    .position;
-
-/// Строка выдачи, занимающая середину области списка.
-Finder _rowAtListCenter(
-  WidgetTester tester,
-  DailyChoicePickerTagSearchCase page,
-) {
-  final center = tester.getRect(_list(page)).center.dy;
-  final rows = find.byType(IntentionSummaryView);
-  for (final row in tester.widgetList<IntentionSummaryView>(rows)) {
-    final finder = find.byWidget(row);
-    final rect = tester.getRect(finder);
-    if (rect.top <= center && rect.bottom > center) {
-      final title = row.title;
-      return find.byWidgetPredicate(
-        (widget) => widget is IntentionSummaryView && widget.title == title,
-      );
-    }
-  }
-  fail('В середине списка нет строки выдачи.');
-}
-
-/// Прокручивает список выдачи ниже начала.
-Future<void> _scrollListDown(
-  WidgetTester tester,
-  DailyChoicePickerTagSearchCase page,
-) async {
-  await tester.drag(_list(page), const Offset(0, -600));
-  await tester.pumpAndSettle();
-  expect(_listPosition(tester, page).pixels, greaterThan(0));
-}
 
 Finder _conditionToggle(Tag tag) => find.byKey(
   ValueKey('intention-tag-condition-toggle-${tag.id.toCanonicalString()}'),

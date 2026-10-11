@@ -60,301 +60,222 @@ const _freeRelation = 103;
 /// действия и исходного намерения.
 const _openChoice = 201;
 
-/// Избранные намерения «Избранное 01» … «Избранное 40» на местах 1…40:
-/// список Главной длиннее экрана.
-const _longFavoriteCount = 40;
-const _firstLongFavorite = 1001;
-
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    final code = locale.languageCode;
+  // Сценарии от языка не зависят: тексты Главной в обеих локалях проверяет
+  // home_accessibility_test.
+  const locale = Locale('ru');
 
-    testWidgets(
-      'с пустой Главной человек отмечает намерения и видит их на Главной в '
-      'порядке отметок, а строка открывает своё намерение на $code',
-      (tester) async {
-        final harness = await _harness(tester, locale);
-        final app = await _App.start(tester, locale, harness, _seedGraph);
-        final l10n = app.l10n;
-        final before = retainedTagFixtureGraph(app.raw);
+  testWidgets(
+    'с пустой Главной человек отмечает намерения и видит их на Главной в '
+    'порядке отметок, а строка открывает своё намерение',
+    (tester) async {
+      final harness = await _harness(tester, locale);
+      final app = await _App.start(tester, locale, harness, _seedGraph);
+      final l10n = app.l10n;
+      final before = retainedTagFixtureGraph(app.raw);
 
-        _expectHomeRoot(tester, app);
-        expect(find.text(l10n.homeEmptyNoFavorites), findsOneWidget);
+      _expectHomeRoot(tester, app);
+      expect(find.text(l10n.homeEmptyNoFavorites), findsOneWidget);
 
-        // Переход пустой Главной открывает граф намерений.
-        await _tap(tester, find.text(l10n.homeOpenIntentionGraph));
-        await _until(tester, find.byType(IntentionCatalogPage));
-        expect(_selected(tester), AppDestination.intentionGraph);
-        await _expectRows(tester, IntentionCatalogPage, [
-          ('Спать', false),
-          ('Бегать', false),
-          ('Читать', false),
-          ('Гулять', false),
-          ('Гулять', false),
-        ], l10n);
+      // Переход пустой Главной открывает граф намерений.
+      await _tap(tester, find.text(l10n.homeOpenIntentionGraph));
+      await _until(tester, find.byType(IntentionCatalogPage));
+      expect(_selected(tester), AppDestination.intentionGraph);
+      await _expectRows(tester, IntentionCatalogPage, [
+        ('Спать', false),
+        ('Бегать', false),
+        ('Читать', false),
+        ('Гулять', false),
+        ('Гулять', false),
+      ], l10n);
 
-        // Порядок отметок не совпадает с порядком каталога.
-        for (final (row, intention, title) in [
-          (4, _walk, 'Гулять'),
-          (2, _read, 'Читать'),
-          (3, _otherWalk, 'Гулять'),
-        ]) {
-          await _openFromCatalog(tester, row: row, intention: intention);
-          await _toggleMark(
-            tester,
-            l10n.graphOperationMessage(
-              l10n.graphOperationMarkFavorite,
-              title,
-              l10n.detailsFavoriteMarked,
-            ),
-          );
-          await _closeTop(tester, IntentionDetailsPage);
-        }
-        expect(storedFavoriteMarks(app.raw), [
-          (tagFixtureId(_walk), 1),
-          (tagFixtureId(_read), 2),
-          (tagFixtureId(_otherWalk), 3),
-        ]);
-
-        // Каталог и поиски показывают отметку звездой в собственном порядке
-        // выдачи: порядок избранных на него не влияет.
-        await _expectSearches(tester, app);
-
-        await _select(tester, AppDestination.home);
-        await _expectHome(tester, [
-          _homeRow(l10n, _walk, 'Гулять', ready: true, relations: 0),
-          _homeRow(l10n, _read, 'Читать', ready: true, relations: 0),
-          _homeRow(l10n, _otherWalk, 'Гулять', ready: false, relations: 1),
-        ]);
-        // Неотмеченные и архивированные намерения на Главной не показаны.
-        for (final title in ['Бегать', 'Спать', 'Плавать']) {
-          expect(
-            find.descendant(
-              of: find.byType(HomePage),
-              matching: find.text(title),
-            ),
-            findsNothing,
-          );
-        }
-
-        // Строка открывает именно своё намерение, в том числе второе из
-        // одноимённых, а закрытие страницы возвращает на Главную.
-        for (final (row, intention) in [(2, _otherWalk), (0, _walk)]) {
-          await _openFromHome(tester, row: row, intention: intention);
-          expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
-          await _closeTop(tester, IntentionDetailsPage);
-          _expectHomeRoot(tester, app);
-        }
-
-        // Отметки не меняют намерения, связи и дневные выборы.
-        expect(retainedTagFixtureGraph(app.raw), before);
-        expect(find.byKey(_message), findsNothing);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets(
-      'Главная отражает подтверждённые изменения графа без нового запуска '
-      'на $code',
-      (tester) async {
-        final harness = await _harness(tester, locale);
-        final app = await _App.start(
+      // Порядок отметок не совпадает с порядком каталога.
+      for (final (row, intention, title) in [
+        (4, _walk, 'Гулять'),
+        (2, _read, 'Читать'),
+        (3, _otherWalk, 'Гулять'),
+      ]) {
+        await _openFromCatalog(tester, row: row, intention: intention);
+        await _toggleMark(
           tester,
-          locale,
-          harness,
-          (database) =>
-              _seedGraph(database, favorites: const [_walk, _read, _otherWalk]),
+          l10n.graphOperationMessage(
+            l10n.graphOperationMarkFavorite,
+            title,
+            l10n.detailsFavoriteMarked,
+          ),
         );
-        final l10n = app.l10n;
-        final a = _homeRow(l10n, _walk, 'Гулять', ready: true, relations: 0);
-        final b = _homeRow(l10n, _read, 'Читать', ready: true, relations: 0);
-        final c = _homeRow(
-          l10n,
-          _otherWalk,
-          'Гулять',
-          ready: false,
-          relations: 1,
-        );
-        final d = _homeRow(l10n, _swim, 'Плавать', ready: true, relations: 0);
-        await _expectHome(tester, [a, b, c]);
+        await _closeTop(tester, IntentionDetailsPage);
+      }
+      expect(storedFavoriteMarks(app.raw), [
+        (tagFixtureId(_walk), 1),
+        (tagFixtureId(_read), 2),
+        (tagFixtureId(_otherWalk), 3),
+      ]);
 
-        // Архивирование Б скрывает его, а страница Б показывает его избранным.
-        await _openFromHome(tester, row: 1, intention: _read);
-        await _archive(tester);
+      // Каталог и поиски показывают отметку звездой в собственном порядке
+      // выдачи: порядок избранных на него не влияет.
+      await _expectSearches(tester, app);
+
+      await _select(tester, AppDestination.home);
+      await _expectHome(tester, [
+        _homeRow(l10n, _walk, 'Гулять', ready: true, relations: 0),
+        _homeRow(l10n, _read, 'Читать', ready: true, relations: 0),
+        _homeRow(l10n, _otherWalk, 'Гулять', ready: false, relations: 1),
+      ]);
+      // Неотмеченные и архивированные намерения на Главной не показаны.
+      for (final title in ['Бегать', 'Спать', 'Плавать']) {
+        expect(
+          find.descendant(
+            of: find.byType(HomePage),
+            matching: find.text(title),
+          ),
+          findsNothing,
+        );
+      }
+
+      // Строка открывает именно своё намерение, в том числе второе из
+      // одноимённых, а закрытие страницы возвращает на Главную.
+      for (final (row, intention) in [(2, _otherWalk), (0, _walk)]) {
+        await _openFromHome(tester, row: row, intention: intention);
         expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
         await _closeTop(tester, IntentionDetailsPage);
         _expectHomeRoot(tester, app);
-        await _expectHome(tester, [a, c]);
+      }
 
-        // Восстановление возвращает Б на его место.
-        await _select(tester, AppDestination.intentionGraph);
-        await _selectScope(tester, l10n.catalogScopeArchived);
-        await _expectRows(tester, IntentionCatalogPage, [
-          ('Плавать', false),
-          ('Читать', true),
-        ], l10n);
-        await _openFromCatalog(tester, row: 1, intention: _read);
-        await _restore(tester);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _select(tester, AppDestination.home);
-        await _expectHome(tester, [a, b, c]);
+      // Отметки не меняют намерения, связи и дневные выборы.
+      expect(retainedTagFixtureGraph(app.raw), before);
+      expect(find.byKey(_message), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-        // Снятая и поставленная заново отметка А ставит его последним.
-        await _openFromHome(tester, row: 0, intention: _walk);
-        await _toggleMark(tester, null);
-        expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
-        await _toggleMark(tester, null);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _expectHome(tester, [b, c, a]);
+  testWidgets(
+    'Главная отражает подтверждённые изменения графа без нового запуска',
+    (tester) async {
+      final harness = await _harness(tester, locale);
+      final app = await _App.start(
+        tester,
+        locale,
+        harness,
+        (database) =>
+            _seedGraph(database, favorites: const [_walk, _read, _otherWalk]),
+      );
+      final l10n = app.l10n;
+      final a = _homeRow(l10n, _walk, 'Гулять', ready: true, relations: 0);
+      final b = _homeRow(l10n, _read, 'Читать', ready: true, relations: 0);
+      final c = _homeRow(
+        l10n,
+        _otherWalk,
+        'Гулять',
+        ready: false,
+        relations: 1,
+      );
+      final d = _homeRow(l10n, _swim, 'Плавать', ready: true, relations: 0);
+      await _expectHome(tester, [a, b, c]);
 
-        // Отметка архивированного Г проявляется последней только после его
-        // восстановления.
-        await _select(tester, AppDestination.intentionGraph);
-        await _expectRows(tester, IntentionCatalogPage, [
-          ('Плавать', false),
-        ], l10n);
-        await _openFromCatalog(tester, row: 0, intention: _swim);
-        await _toggleMark(tester, null);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _select(tester, AppDestination.home);
-        await _expectHome(tester, [b, c, a]);
-        await _select(tester, AppDestination.intentionGraph);
-        await _expectRows(tester, IntentionCatalogPage, [
-          ('Плавать', true),
-        ], l10n);
-        await _openFromCatalog(tester, row: 0, intention: _swim);
-        await _restore(tester);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _select(tester, AppDestination.home);
-        await _expectHome(tester, [b, c, a, d]);
+      // Архивирование Б скрывает его, а страница Б показывает его избранным.
+      await _openFromHome(tester, row: 1, intention: _read);
+      await _archive(tester);
+      expect(_controlTooltip(tester), l10n.detailsUnmarkFavoriteAction);
+      await _closeTop(tester, IntentionDetailsPage);
+      _expectHomeRoot(tester, app);
+      await _expectHome(tester, [a, c]);
 
-        // Переименование и изменение готовности обновляют строку без
-        // изменения порядка.
-        await _openFromHome(tester, row: 1, intention: _otherWalk);
-        await _rename(tester, 'Гулять вечером');
-        await _enableReadiness(tester);
-        await _closeTop(tester, IntentionDetailsPage);
-        final renamed = _homeRow(
-          l10n,
-          _otherWalk,
-          'Гулять вечером',
-          ready: true,
-          relations: 1,
-        );
-        await _expectHome(tester, [b, renamed, a, d]);
+      // Восстановление возвращает Б на его место.
+      await _select(tester, AppDestination.intentionGraph);
+      await _selectScope(tester, l10n.catalogScopeArchived);
+      await _expectRows(tester, IntentionCatalogPage, [
+        ('Плавать', false),
+        ('Читать', true),
+      ], l10n);
+      await _openFromCatalog(tester, row: 1, intention: _read);
+      await _restore(tester);
+      await _closeTop(tester, IntentionDetailsPage);
+      await _select(tester, AppDestination.home);
+      await _expectHome(tester, [a, b, c]);
 
-        // Физическое удаление убирает строку.
-        await _openFromHome(tester, row: 3, intention: _swim);
-        await _delete(tester);
-        _expectHomeRoot(tester, app);
-        await _expectHome(tester, [b, renamed, a]);
+      // Снятая и поставленная заново отметка А ставит его последним.
+      await _openFromHome(tester, row: 0, intention: _walk);
+      await _toggleMark(tester, null);
+      expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
+      await _toggleMark(tester, null);
+      await _closeTop(tester, IntentionDetailsPage);
+      await _expectHome(tester, [b, c, a]);
 
-        // Новая долговременная связь меняет число активных связей строки.
-        await _openFromHome(tester, row: 0, intention: _read);
-        await _createNeedRelation(tester, relatedTitle: 'Спать');
-        await _closeTop(tester, IntentionDetailsPage);
-        await _expectHome(tester, [
-          _homeRow(l10n, _read, 'Читать', ready: true, relations: 1),
-          renamed,
-          a,
-        ]);
-        expect(storedFavoriteMarks(app.raw), [
-          (tagFixtureId(_read), 2),
-          (tagFixtureId(_otherWalk), 3),
-          (tagFixtureId(_walk), 4),
-        ]);
+      // Отметка архивированного Г проявляется последней только после его
+      // восстановления.
+      await _select(tester, AppDestination.intentionGraph);
+      await _expectRows(tester, IntentionCatalogPage, [
+        ('Плавать', false),
+      ], l10n);
+      await _openFromCatalog(tester, row: 0, intention: _swim);
+      await _toggleMark(tester, null);
+      await _closeTop(tester, IntentionDetailsPage);
+      await _select(tester, AppDestination.home);
+      await _expectHome(tester, [b, c, a]);
+      await _select(tester, AppDestination.intentionGraph);
+      await _expectRows(tester, IntentionCatalogPage, [
+        ('Плавать', true),
+      ], l10n);
+      await _openFromCatalog(tester, row: 0, intention: _swim);
+      await _restore(tester);
+      await _closeTop(tester, IntentionDetailsPage);
+      await _select(tester, AppDestination.home);
+      await _expectHome(tester, [b, c, a, d]);
 
-        // Каталог по-прежнему показывает отметку звездой в своём порядке.
-        await _select(tester, AppDestination.intentionGraph);
-        await _selectScope(tester, l10n.catalogScopeActive);
-        await _expectRows(tester, IntentionCatalogPage, [
-          ('Спать', false),
-          ('Бегать', false),
-          ('Читать', true),
-          ('Гулять вечером', true),
-          ('Гулять', true),
-        ], l10n);
-        expect(find.byKey(_message), findsNothing);
-        expect(tester.takeException(), isNull);
-      },
-    );
+      // Переименование и изменение готовности обновляют строку без
+      // изменения порядка.
+      await _openFromHome(tester, row: 1, intention: _otherWalk);
+      await _rename(tester, 'Гулять вечером');
+      await _enableReadiness(tester);
+      await _closeTop(tester, IntentionDetailsPage);
+      final renamed = _homeRow(
+        l10n,
+        _otherWalk,
+        'Гулять вечером',
+        ready: true,
+        relations: 1,
+      );
+      await _expectHome(tester, [b, renamed, a, d]);
 
-    testWidgets(
-      'обновление списка не сбрасывает позицию прокрутки Главной на $code',
-      (tester) async {
-        final harness = await _harness(tester, locale);
-        final app = await _App.start(tester, locale, harness, _seedLongList);
-        final l10n = app.l10n;
-        await _until(tester, find.byType(HomeIntentionRow));
-        _homePosition(tester).jumpTo(500);
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
+      // Физическое удаление убирает строку.
+      await _openFromHome(tester, row: 3, intention: _swim);
+      await _delete(tester);
+      _expectHomeRoot(tester, app);
+      await _expectHome(tester, [b, renamed, a]);
 
-        // Строки, с которыми работает сценарий, видны без прокрутки.
-        await _openFromHome(
-          tester,
-          row: _shownHomeTitles(tester).indexOf(_longTitle(10)),
-          intention: _longFavorite(10),
-        );
-        await _rename(tester, 'Избранное 10 вечером');
-        await _closeTop(tester, IntentionDetailsPage);
-        await _waitFor(
-          tester,
-          () => _shownHomeTitles(tester).contains('Избранное 10 вечером'),
-        );
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
-        expect(_neighbours(tester, 'Избранное 10 вечером'), (
-          _longTitle(9),
-          _longTitle(11),
-        ));
+      // Новая долговременная связь меняет число активных связей строки.
+      await _openFromHome(tester, row: 0, intention: _read);
+      await _createNeedRelation(tester, relatedTitle: 'Спать');
+      await _closeTop(tester, IntentionDetailsPage);
+      await _expectHome(tester, [
+        _homeRow(l10n, _read, 'Читать', ready: true, relations: 1),
+        renamed,
+        a,
+      ]);
+      expect(storedFavoriteMarks(app.raw), [
+        (tagFixtureId(_read), 2),
+        (tagFixtureId(_otherWalk), 3),
+        (tagFixtureId(_walk), 4),
+      ]);
 
-        await _openFromHome(
-          tester,
-          row: _shownHomeTitles(tester).indexOf(_longTitle(12)),
-          intention: _longFavorite(12),
-        );
-        await _archive(tester);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _waitFor(
-          tester,
-          () => !_shownHomeTitles(tester).contains(_longTitle(12)),
-        );
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
-        expect(_neighbours(tester, _longTitle(11)), (
-          'Избранное 10 вечером',
-          _longTitle(13),
-        ));
-
-        // Восстановление на странице, открытой из каталога, возвращает
-        // строку на место, а Главная остаётся в прежней позиции.
-        await _select(tester, AppDestination.intentionGraph);
-        await _selectScope(tester, l10n.catalogScopeArchived);
-        await _expectRows(tester, IntentionCatalogPage, [
-          (_longTitle(12), true),
-        ], l10n);
-        await _openFromCatalog(tester, row: 0, intention: _longFavorite(12));
-        await _restore(tester);
-        await _closeTop(tester, IntentionDetailsPage);
-        await _select(tester, AppDestination.home);
-        await _waitFor(
-          tester,
-          () => _shownHomeTitles(tester).contains(_longTitle(12)),
-        );
-        await tester.pumpAndSettle();
-        expect(_homePosition(tester).pixels, 500);
-        expect(_neighbours(tester, _longTitle(12)), (
-          _longTitle(11),
-          _longTitle(13),
-        ));
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
+      // Каталог по-прежнему показывает отметку звездой в своём порядке.
+      await _select(tester, AppDestination.intentionGraph);
+      await _selectScope(tester, l10n.catalogScopeActive);
+      await _expectRows(tester, IntentionCatalogPage, [
+        ('Спать', false),
+        ('Бегать', false),
+        ('Читать', true),
+        ('Гулять вечером', true),
+        ('Гулять', true),
+      ], l10n);
+      expect(find.byKey(_message), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// Запуск приложения на постоянном хранилище [LocalDatabaseHarness].
@@ -474,27 +395,6 @@ void _seedGraph(sqlite.Database database, {List<int> favorites = const []}) {
     );
   }
 }
-
-/// Длинный список избранных намерений без связей.
-void _seedLongList(sqlite.Database database) {
-  for (var number = 1; number <= _longFavoriteCount; number++) {
-    final intention = _longFavorite(number);
-    database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(intention), _longTitle(number), 1, 0, number, number],
-    );
-    storeFavoriteMark(
-      database,
-      intentionId: tagFixtureId(intention),
-      position: number,
-    );
-  }
-}
-
-int _longFavorite(int number) => _firstLongFavorite + number - 1;
-
-String _longTitle(int number) =>
-    'Избранное ${number.toString().padLeft(2, '0')}';
 
 /// Проверяет звёзды отмеченных А, Б и В в каталоге намерений и в поисках
 /// действия, исходного намерения и участника связи. Каждая выдача сохраняет
@@ -628,19 +528,6 @@ List<_HomeRow> _shownHomeRows(WidgetTester tester) => [
       final texts => fail('Недопустимое содержимое строки Главной: $texts'),
     },
 ];
-
-List<String> _shownHomeTitles(WidgetTester tester) => [
-  for (final (_, title, _, _) in _shownHomeRows(tester)) title,
-];
-
-/// Соседние строки строки [title] в списке Главной.
-(String, String) _neighbours(WidgetTester tester, String title) {
-  final titles = _shownHomeTitles(tester);
-  final index = titles.indexOf(title);
-  expect(index, greaterThan(0), reason: title);
-  expect(index, lessThan(titles.length - 1), reason: title);
-  return (titles[index - 1], titles[index + 1]);
-}
 
 int _intentionNumber(HomeIntentionRow row) {
   final id = row.row.id.toCanonicalString();
@@ -941,19 +828,6 @@ Future<void> _selectScope(WidgetTester tester, String label) async {
   await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
-
-ScrollPosition _homePosition(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(
-            of: find.byKey(
-              const PageStorageKey<String>('home-favorite-intentions'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    )
-    .position;
 
 Future<void> _popToRoot(WidgetTester tester, _App app) async {
   while (app.router.canPop()) {

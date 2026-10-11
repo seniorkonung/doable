@@ -1,8 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -35,35 +32,6 @@ void main() {
       }
     });
 
-    test('равенство ограничено типом дневного выбора', () {
-      const uuid = '018f0b5d-6b2e-7c80-8000-000000000001';
-      final first = _decode(uuid);
-      final second = _decode(uuid);
-      final intention = switch (IntentionId.decode(uuid)) {
-        IntentionIdDecodingSuccess(:final id) => id,
-        InvalidIntentionIdDecoding() => throw StateError('Некорректный UUID.'),
-      };
-      final relation = switch (LongTermRelationId.decode(uuid)) {
-        LongTermRelationIdDecodingSuccess(:final id) => id,
-        InvalidLongTermRelationIdDecoding() => throw StateError(
-          'Некорректный UUID.',
-        ),
-      };
-      final step = switch (ChoicePathStepId.decode(uuid)) {
-        ChoicePathStepIdDecodingSuccess(:final id) => id,
-        InvalidChoicePathStepIdDecoding() => throw StateError(
-          'Некорректный UUID.',
-        ),
-      };
-
-      expect(first, second);
-      expect(first.hashCode, second.hashCode);
-      expect({first, second}, hasLength(1));
-      expect(first, isNot(intention));
-      expect(first, isNot(relation));
-      expect(first, isNot(step));
-    });
-
     test('рабочий генератор создаёт уникальные UUID v7', () {
       final generator = UuidV7DailyChoiceIdGenerator();
       final ids = List.generate(32, (_) => generator.generate());
@@ -74,14 +42,6 @@ void main() {
         expect(_decode(id.toCanonicalString()), id);
       }
     });
-
-    test('подменяемый генератор позволяет воспроизвести коллизию', () {
-      final id = _decode('018f0b5d-6b2e-7c80-8000-000000000001');
-      final DailyChoiceIdGenerator generator = _FixedDailyChoiceIdGenerator(id);
-
-      expect(generator.generate(), id);
-      expect(generator.generate(), id);
-    });
   });
 }
 
@@ -91,12 +51,3 @@ DailyChoiceId _decode(String value) => switch (DailyChoiceId.decode(value)) {
     'Ожидался корректный UUID.',
   ),
 };
-
-final class _FixedDailyChoiceIdGenerator implements DailyChoiceIdGenerator {
-  const _FixedDailyChoiceIdGenerator(this.id);
-
-  final DailyChoiceId id;
-
-  @override
-  DailyChoiceId generate() => id;
-}

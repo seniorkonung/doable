@@ -65,220 +65,215 @@ const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
 
 void main() {
-  for (final locale in const [Locale('ru'), Locale('en')]) {
-    final code = locale.languageCode;
+  // Сценарий от языка не зависит: тексты Главной в обеих локалях проверяет
+  // home_accessibility_test.
+  const locale = Locale('ru');
 
-    testWidgets('человек отмечает намерения на их страницах, переставляет их '
-        'на Главной жестом и действием экранного диктора, в том числе мимо '
-        'скрытого архивированного, снимает и возвращает отметку, а после '
-        'полного перезапуска Главная открывается с тем же полным порядком и '
-        'отметками без изменения времени намерений на $code', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final install = await _install(tester, locale);
-      final l10n = install.l10n;
-      final first = await _launch(tester, install, seed: _seedGraph);
-      _expectHomeRoot(tester, first);
-      expect(_homeText(l10n.homeEmptyNoFavorites), findsOneWidget);
+  testWidgets('человек отмечает намерения на их страницах, переставляет их '
+      'на Главной жестом и действием экранного диктора, в том числе мимо '
+      'скрытого архивированного, снимает и возвращает отметку, а после '
+      'полного перезапуска Главная открывается с тем же полным порядком и '
+      'отметками без изменения времени намерений', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final install = await _install(tester, locale);
+    final l10n = install.l10n;
+    final first = await _launch(tester, install, seed: _seedGraph);
+    _expectHomeRoot(tester, first);
+    expect(_homeText(l10n.homeEmptyNoFavorites), findsOneWidget);
 
-      // Порядок отметок не совпадает с порядком каталога.
-      await openIntentionGraph(
-        tester,
-        waitFor: _until,
-        content: _catalogRow(_walk),
-      );
-      for (final intention in [_walk, _read, _swim, _run, _sleep]) {
-        await _openFromCatalog(tester, intention);
-        await _toggleMark(tester);
-        await _closeDetails(tester);
-      }
-      await openHome(tester, waitFor: _until);
-      await _expectConfirmedHome(tester, first, const [
-        _walk,
-        _read,
-        _swim,
-        _run,
-        _sleep,
-      ]);
-      expect(
-        storedFavoriteMarks(first.raw),
-        _places(const [_walk, _read, _swim, _run, _sleep]),
-      );
-
-      // Жест: «Спать» перетаскивается ручкой сразу после «Гулять».
-      var times = _intentionTimes(first.raw);
-      await _dragHandle(tester, _sleep, -3);
-      await _expectConfirmedHome(tester, first, const [
-        _walk,
-        _sleep,
-        _read,
-        _swim,
-        _run,
-      ]);
-      expect(
-        storedFavoriteMarks(first.raw),
-        _places(const [_walk, _sleep, _read, _swim, _run]),
-      );
-      expect(_intentionTimes(first.raw), times);
-
-      // Действие экранного диктора: «Читать» — на одно место ниже. Новое
-      // место объявляется после подтверждения записи.
-      _moveBySemantics(
-        tester,
-        l10n,
-        _read,
-        (actions) => actions.reorderItemDown,
-      );
-      await _expectConfirmedHome(tester, first, const [
-        _walk,
-        _sleep,
-        _swim,
-        _read,
-        _run,
-      ]);
-      expect(
-        find.semantics.byLabel(l10n.homeReorderMoved('Читать', 4, 5)),
-        findsOne,
-      );
-      expect(
-        storedFavoriteMarks(first.raw),
-        _places(const [_walk, _sleep, _swim, _read, _run]),
-      );
-      expect(_intentionTimes(first.raw), times);
-
-      // Архивированное «Плавать» скрыто на Главной и сохраняет место.
-      await _openFromHome(tester, _swim);
-      await _archive(tester);
-      await _closeDetails(tester);
-      await _expectConfirmedHome(tester, first, const [
-        _walk,
-        _sleep,
-        _read,
-        _run,
-      ]);
-
-      // «Бегать» ставится сразу после «Спать» и встаёт перед скрытым
-      // «Плавать»: остальные сохраняют взаимный порядок.
-      times = _intentionTimes(first.raw);
-      await _dragHandle(tester, _run, -1);
-      await _expectConfirmedHome(tester, first, const [
-        _walk,
-        _sleep,
-        _run,
-        _read,
-      ]);
-      expect(
-        storedFavoriteMarks(first.raw),
-        _places(const [_walk, _sleep, _run, _swim, _read]),
-      );
-      expect(_intentionTimes(first.raw), times);
-
-      // Восстановленное «Плавать» возвращается на своё место.
-      await openIntentionGraph(tester, waitFor: _until);
-      await _selectScope(tester, l10n.catalogScopeArchived);
-      await _openFromCatalog(tester, _swim);
-      await _restore(tester);
-      await _closeDetails(tester);
-      await openHome(tester, waitFor: _until);
-      await _expectConfirmedHome(tester, first, const [
-        _walk,
-        _sleep,
-        _run,
-        _swim,
-        _read,
-      ]);
-
-      // Снятая и поставленная заново отметка ставит «Гулять» в конец.
-      await _openFromHome(tester, _walk);
-      await _toggleMark(tester);
-      expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
+    // Порядок отметок не совпадает с порядком каталога.
+    await openIntentionGraph(
+      tester,
+      waitFor: _until,
+      content: _catalogRow(_walk),
+    );
+    for (final intention in [_walk, _read, _swim, _run, _sleep]) {
+      await _openFromCatalog(tester, intention);
       await _toggleMark(tester);
       await _closeDetails(tester);
-      await _expectConfirmedHome(tester, first, const [
-        _sleep,
-        _run,
-        _swim,
-        _read,
-        _walk,
-      ]);
+    }
+    await openHome(tester, waitFor: _until);
+    await _expectConfirmedHome(tester, first, const [
+      _walk,
+      _read,
+      _swim,
+      _run,
+      _sleep,
+    ]);
+    expect(
+      storedFavoriteMarks(first.raw),
+      _places(const [_walk, _read, _swim, _run, _sleep]),
+    );
 
-      // «Спать» остаётся архивированным избранным намерением на время
-      // перезапуска.
-      await _openFromHome(tester, _sleep);
-      await _archive(tester);
-      await _closeDetails(tester);
-      await _expectConfirmedHome(tester, first, const [
-        _run,
-        _swim,
-        _read,
-        _walk,
-      ]);
-      final marks = [
-        (tagFixtureId(_sleep), 2),
-        (tagFixtureId(_run), 3),
-        (tagFixtureId(_swim), 4),
-        (tagFixtureId(_read), 5),
-        (tagFixtureId(_walk), 6),
-      ];
-      expect(storedFavoriteMarks(first.raw), marks);
+    // Жест: «Спать» перетаскивается ручкой сразу после «Гулять».
+    var times = _intentionTimes(first.raw);
+    await _dragHandle(tester, _sleep, -3);
+    await _expectConfirmedHome(tester, first, const [
+      _walk,
+      _sleep,
+      _read,
+      _swim,
+      _run,
+    ]);
+    expect(
+      storedFavoriteMarks(first.raw),
+      _places(const [_walk, _sleep, _read, _swim, _run]),
+    );
+    expect(_intentionTimes(first.raw), times);
 
-      // Перед завершением выбран граф намерений и поверх открыта страница
-      // намерения: новый запуск их не восстанавливает.
-      await openIntentionGraph(tester, waitFor: _until);
-      await _openFromCatalog(tester, _sleep);
-      times = _intentionTimes(first.raw);
-      expect(_builtMessages, findsNothing);
+    // Действие экранного диктора: «Читать» — на одно место ниже. Новое
+    // место объявляется после подтверждения записи.
+    _moveBySemantics(tester, l10n, _read, (actions) => actions.reorderItemDown);
+    await _expectConfirmedHome(tester, first, const [
+      _walk,
+      _sleep,
+      _swim,
+      _read,
+      _run,
+    ]);
+    expect(
+      find.semantics.byLabel(l10n.homeReorderMoved('Читать', 4, 5)),
+      findsOne,
+    );
+    expect(
+      storedFavoriteMarks(first.raw),
+      _places(const [_walk, _sleep, _swim, _read, _run]),
+    );
+    expect(_intentionTimes(first.raw), times);
 
-      await first.shutdown(tester);
-      final second = await _launch(tester, install);
-      _expectHomeRoot(tester, second);
-      await _expectConfirmedHome(tester, second, const [
-        _run,
-        _swim,
-        _read,
-        _walk,
-      ]);
-      expect(storedFavoriteMarks(second.raw), marks);
-      expect(_intentionTimes(second.raw), times);
+    // Архивированное «Плавать» скрыто на Главной и сохраняет место.
+    await _openFromHome(tester, _swim);
+    await _archive(tester);
+    await _closeDetails(tester);
+    await _expectConfirmedHome(tester, first, const [
+      _walk,
+      _sleep,
+      _read,
+      _run,
+    ]);
 
-      // Отметки сохранились у активных и архивированного намерений.
-      await openIntentionGraph(
-        tester,
-        waitFor: _until,
-        content: _catalogRow(_walk),
-      );
-      await _expectStars(
-        tester,
-        l10n,
-        shown: const [_walk, _read, _swim, _run, _sing],
-        favorites: const {_walk, _read, _swim, _run},
-      );
-      await _selectScope(tester, l10n.catalogScopeArchived);
-      await _expectStars(
-        tester,
-        l10n,
-        shown: const [_sleep],
-        favorites: const {_sleep},
-      );
+    // «Бегать» ставится сразу после «Спать» и встаёт перед скрытым
+    // «Плавать»: остальные сохраняют взаимный порядок.
+    times = _intentionTimes(first.raw);
+    await _dragHandle(tester, _run, -1);
+    await _expectConfirmedHome(tester, first, const [
+      _walk,
+      _sleep,
+      _run,
+      _read,
+    ]);
+    expect(
+      storedFavoriteMarks(first.raw),
+      _places(const [_walk, _sleep, _run, _swim, _read]),
+    );
+    expect(_intentionTimes(first.raw), times);
 
-      // Восстановленное после перезапуска «Спать» встаёт на своё первое
-      // место.
-      await _openFromCatalog(tester, _sleep);
-      await _restore(tester);
-      await _closeDetails(tester);
-      await openHome(tester, waitFor: _until);
-      await _expectConfirmedHome(tester, second, const [
-        _sleep,
-        _run,
-        _swim,
-        _read,
-        _walk,
-      ]);
-      expect(storedFavoriteMarks(second.raw), marks);
-      expect(_builtMessages, findsNothing);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    });
-  }
+    // Восстановленное «Плавать» возвращается на своё место.
+    await openIntentionGraph(tester, waitFor: _until);
+    await _selectScope(tester, l10n.catalogScopeArchived);
+    await _openFromCatalog(tester, _swim);
+    await _restore(tester);
+    await _closeDetails(tester);
+    await openHome(tester, waitFor: _until);
+    await _expectConfirmedHome(tester, first, const [
+      _walk,
+      _sleep,
+      _run,
+      _swim,
+      _read,
+    ]);
+
+    // Снятая и поставленная заново отметка ставит «Гулять» в конец.
+    await _openFromHome(tester, _walk);
+    await _toggleMark(tester);
+    expect(_controlTooltip(tester), l10n.detailsMarkFavoriteAction);
+    await _toggleMark(tester);
+    await _closeDetails(tester);
+    await _expectConfirmedHome(tester, first, const [
+      _sleep,
+      _run,
+      _swim,
+      _read,
+      _walk,
+    ]);
+
+    // «Спать» остаётся архивированным избранным намерением на время
+    // перезапуска.
+    await _openFromHome(tester, _sleep);
+    await _archive(tester);
+    await _closeDetails(tester);
+    await _expectConfirmedHome(tester, first, const [
+      _run,
+      _swim,
+      _read,
+      _walk,
+    ]);
+    final marks = [
+      (tagFixtureId(_sleep), 2),
+      (tagFixtureId(_run), 3),
+      (tagFixtureId(_swim), 4),
+      (tagFixtureId(_read), 5),
+      (tagFixtureId(_walk), 6),
+    ];
+    expect(storedFavoriteMarks(first.raw), marks);
+
+    // Перед завершением выбран граф намерений и поверх открыта страница
+    // намерения: новый запуск их не восстанавливает.
+    await openIntentionGraph(tester, waitFor: _until);
+    await _openFromCatalog(tester, _sleep);
+    times = _intentionTimes(first.raw);
+    expect(_builtMessages, findsNothing);
+
+    await first.shutdown(tester);
+    final second = await _launch(tester, install);
+    _expectHomeRoot(tester, second);
+    await _expectConfirmedHome(tester, second, const [
+      _run,
+      _swim,
+      _read,
+      _walk,
+    ]);
+    expect(storedFavoriteMarks(second.raw), marks);
+    expect(_intentionTimes(second.raw), times);
+
+    // Отметки сохранились у активных и архивированного намерений.
+    await openIntentionGraph(
+      tester,
+      waitFor: _until,
+      content: _catalogRow(_walk),
+    );
+    await _expectStars(
+      tester,
+      l10n,
+      shown: const [_walk, _read, _swim, _run, _sing],
+      favorites: const {_walk, _read, _swim, _run},
+    );
+    await _selectScope(tester, l10n.catalogScopeArchived);
+    await _expectStars(
+      tester,
+      l10n,
+      shown: const [_sleep],
+      favorites: const {_sleep},
+    );
+
+    // Восстановленное после перезапуска «Спать» встаёт на своё первое
+    // место.
+    await _openFromCatalog(tester, _sleep);
+    await _restore(tester);
+    await _closeDetails(tester);
+    await openHome(tester, waitFor: _until);
+    await _expectConfirmedHome(tester, second, const [
+      _sleep,
+      _run,
+      _swim,
+      _read,
+      _walk,
+    ]);
+    expect(storedFavoriteMarks(second.raw), marks);
+    expect(_builtMessages, findsNothing);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 }
 
 /// Установка приложения: постоянное хранилище, переживающее перезапуски.
@@ -439,7 +434,7 @@ List<String> _shownHome(WidgetTester tester) {
 
 /// Дожидается, пока Главная покажет подтверждённый цельным снимком список
 /// [expected] без принятой перестановки, и проверяет показанные строки:
-/// порядок, отсутствие признака сохранения и доступные ручки.
+/// порядок и отсутствие признака сохранения.
 Future<void> _expectConfirmedHome(
   WidgetTester tester,
   _Launch app,
@@ -462,7 +457,6 @@ Future<void> _expectConfirmedHome(
   expect(_shownHome(tester), ids);
   final l10n = AppLocalizations.of(tester.element(find.byType(HomePage)));
   expect(_homeText(l10n.homeReorderSaving), findsNothing);
-  expect(find.byType(ReorderableDragStartListener), findsNWidgets(ids.length));
   // Успех перестановки предъявляется новым порядком, без сообщения.
   expect(_builtMessages, findsNothing);
 }

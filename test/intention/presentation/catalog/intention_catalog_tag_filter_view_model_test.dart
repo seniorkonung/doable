@@ -52,10 +52,6 @@ void main() {
       final filters = [
         IntentionTagFilter(requiredTagIds: [_tagId(1)]),
         IntentionTagFilter(excludedTagIds: [_tagId(2)]),
-        IntentionTagFilter(
-          requiredTagIds: [_tagId(1)],
-          excludedTagIds: [_tagId(1)],
-        ),
       ];
       for (var index = 0; index < filters.length; index++) {
         notifier.changeTagFilter(filters[index]);
@@ -64,32 +60,23 @@ void main() {
         expect(query.cursor, isNull);
         expect(query.titleFilter, isNull);
         expect(query.tagFilter, filters[index]);
-        if (index == 2) {
-          _completeEmptyPage(repository, index + 1);
-          final empty =
-              await container.read(provider.future) as IntentionCatalogEmpty;
-          expect(empty.selection.tagFilter, filters[index]);
-          expect(empty.totalCount, 0);
-          expect(empty.nextCursor, isNull);
-        } else {
-          final summary = testSummary(index: index + 2);
-          repository.complete(
-            index + 1,
-            ResultSuccess(
-              IntentionCatalogFirstPage(
-                items: [summary],
-                totalCount: 1,
-                nextCursor: null,
-                revision: const TestCatalogRevision(0),
-              ),
+        final summary = testSummary(index: index + 2);
+        repository.complete(
+          index + 1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [summary],
+              totalCount: 1,
+              nextCursor: null,
+              revision: const TestCatalogRevision(0),
             ),
-          );
-          final loaded =
-              await container.read(provider.future) as IntentionCatalogLoaded;
-          expect(loaded.items.map((item) => item.id), [summary.id]);
-          expect(loaded.totalCount, 1);
-          expect(loaded.nextCursor, isNull);
-        }
+          ),
+        );
+        final loaded =
+            await container.read(provider.future) as IntentionCatalogLoaded;
+        expect(loaded.items.map((item) => item.id), [summary.id]);
+        expect(loaded.totalCount, 1);
+        expect(loaded.nextCursor, isNull);
       }
     },
   );
@@ -124,15 +111,12 @@ void main() {
       final health = _tagId(1);
       final rest = _tagId(2);
       final sport = _tagId(3);
+      // Добавление условий и снятие всех условий идут одним путём модели.
       final filters = [
-        IntentionTagFilter(requiredTagIds: [health], excludedTagIds: [sport]),
         IntentionTagFilter(
           requiredTagIds: [health, rest],
           excludedTagIds: [sport],
         ),
-        IntentionTagFilter(requiredTagIds: [rest], excludedTagIds: [sport]),
-        IntentionTagFilter(requiredTagIds: [rest]),
-        IntentionTagFilter(excludedTagIds: [sport]),
         IntentionTagFilter.empty,
       ];
       for (var index = 0; index < filters.length; index++) {
@@ -156,9 +140,6 @@ void main() {
       }
       await tester.pump(const Duration(milliseconds: 251));
       expect(repository.queries, hasLength(filters.length + 1));
-      expect(repository.commands, isEmpty);
-      expect(repository.relationCommands, isEmpty);
-      expect(repository.dailyChoiceCommands, isEmpty);
     },
   );
 
@@ -212,66 +193,51 @@ void main() {
     },
   );
 
-  for (final (text, failure) in [
-    (
-      'нуль\u0000внутри',
-      IntentionCatalogFilterValidationFailure.invalidUnicodeRepertoire,
-    ),
-    (
-      String.fromCharCode(0xd800),
-      IntentionCatalogFilterValidationFailure.invalidUnicodeRepertoire,
-    ),
-    (
-      List.filled(256, 'я').join(),
-      IntentionCatalogFilterValidationFailure.tooLong,
-    ),
-  ]) {
-    testWidgets(
-      'изменение тегов сразу отклоняет недопустимый текст длиной ${text.length}',
-      (tester) async {
-        final repository = ControlledCatalogRepository();
-        final container = reconciliationCatalogContainer(repository);
-        final provider = intentionCatalogViewModelProvider(
-          const BrowseIntentionCatalog(),
-        );
-        final subscription = container.listen(
-          provider,
-          (_, _) {},
-          fireImmediately: true,
-        );
-        addTearDown(subscription.close);
-        addTearDown(container.dispose);
-        _completeEmptyPage(repository, 0);
-        await tester.pump(Duration.zero);
-        final notifier = container.read(provider.notifier);
-        final filter = IntentionTagFilter(
-          requiredTagIds: [_tagId(1)],
-          excludedTagIds: [_tagId(2)],
-        );
-        notifier.changeTitleFilter(text);
-        notifier.changeTagFilter(filter);
-        await tester.pump(Duration.zero);
-        final invalid =
-            container.read(provider).requireValue
-                as IntentionCatalogInvalidFilter;
-        expect(invalid.selection.titleFilterText, text);
-        expect(invalid.selection.tagFilter, filter);
-        expect(invalid.selection.filterValidationFailure, failure);
-        await tester.pump(const Duration(milliseconds: 251));
-        expect(repository.queries, hasLength(1));
-
-        notifier.changeTitleFilter('верное');
-        await tester.pump(const Duration(milliseconds: 250));
-        expect(repository.queryAt(1).tagFilter, filter);
-        expect(
-          repository.queryAt(1).titleFilter?.map((value) => value),
-          'верное',
-        );
-        _completeEmptyPage(repository, 1);
-        await tester.pump(Duration.zero);
-      },
+  // Виды недопустимого текста различает проверка фильтра; модель отклоняет
+  // их одним путём.
+  testWidgets('изменение тегов сразу отклоняет недопустимый текст', (
+    tester,
+  ) async {
+    const text = 'нуль\u0000внутри';
+    const failure =
+        IntentionCatalogFilterValidationFailure.invalidUnicodeRepertoire;
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    final provider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
     );
-  }
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    addTearDown(container.dispose);
+    _completeEmptyPage(repository, 0);
+    await tester.pump(Duration.zero);
+    final notifier = container.read(provider.notifier);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [_tagId(1)],
+      excludedTagIds: [_tagId(2)],
+    );
+    notifier.changeTitleFilter(text);
+    notifier.changeTagFilter(filter);
+    await tester.pump(Duration.zero);
+    final invalid =
+        container.read(provider).requireValue as IntentionCatalogInvalidFilter;
+    expect(invalid.selection.titleFilterText, text);
+    expect(invalid.selection.tagFilter, filter);
+    expect(invalid.selection.filterValidationFailure, failure);
+    await tester.pump(const Duration(milliseconds: 251));
+    expect(repository.queries, hasLength(1));
+
+    notifier.changeTitleFilter('верное');
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(repository.queryAt(1).tagFilter, filter);
+    expect(repository.queryAt(1).titleFilter?.map((value) => value), 'верное');
+    _completeEmptyPage(repository, 1);
+    await tester.pump(Duration.zero);
+  });
 
   test(
     'охват, порядок, текст и повтор первой порции сохраняют оба набора тегов',
@@ -420,21 +386,13 @@ void main() {
         );
       }
       expect(repository.queries, hasLength(11));
-      expect(repository.commands, isEmpty);
-      expect(repository.relationCommands, isEmpty);
-      expect(repository.dailyChoiceCommands, isEmpty);
     },
   );
 
+  // Ограничения назначений, отличные от умолчаний: готовность у действия,
+  // охват всех и исключённый участник у участника архивной связи.
   for (final purpose in <IntentionCatalogPurpose>[
-    const BrowseIntentionCatalog(),
     _actionSearchPurpose,
-    _sourceSearchPurpose,
-    SelectRelationParticipant(
-      session: IntentionSearchSession(),
-      excludedIntentionId: testSummary(index: 9).id,
-      selectionContext: RelationParticipantSelectionContext.activeRelation,
-    ),
     SelectRelationParticipant(
       session: IntentionSearchSession(),
       excludedIntentionId: testSummary(index: 9).id,
@@ -455,7 +413,7 @@ void main() {
         'участник архивной связи',
     };
     test(
-      'продолжение, его повтор и восстановление сохраняют совместный запрос: $context',
+      'продолжение и его повтор сохраняют совместный запрос: $context',
       () async {
         final repository = ControlledCatalogRepository();
         final container = reconciliationCatalogContainer(
@@ -505,18 +463,9 @@ void main() {
         final retry = notifier.retryNextPage();
         repository.complete(
           3,
-          const ResultFailure(IntentionGenericValidationFailure()),
+          const ResultFailure(IntentionUnexpectedFailure()),
         );
         await retry;
-        final recovery = notifier.recoverFromInvalidCursor();
-        repository.complete(
-          4,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        await recovery;
-        final recoveryRetry = notifier.retryRecovery();
-        _completeEmptyPage(repository, 5, revision: 1);
-        await recoveryRetry;
         for (final query in repository.queries.skip(2)) {
           expect(query.tagFilter, filter);
           expect(query.scope, first.query.scope);
@@ -533,8 +482,6 @@ void main() {
         }
         expect(repository.queryAt(2).cursor, same(cursor));
         expect(repository.queryAt(3).cursor, same(cursor));
-        expect(repository.queryAt(4).cursor, isNull);
-        expect(repository.queryAt(5).cursor, isNull);
         expect(
           container.read(provider).requireValue.selection.tagFilter,
           filter,

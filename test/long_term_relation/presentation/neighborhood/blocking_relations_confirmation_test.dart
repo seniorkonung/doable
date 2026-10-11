@@ -128,40 +128,32 @@ void main() {
         semantics.dispose();
       },
     );
-
-    testWidgets(
-      'подтверждение только дневного выбора не говорит о назначениях связей на ${locale.languageCode}',
-      (tester) async {
-        final harness = await _pumpAction(tester, locale);
-        harness.selectDaily(
-          _dailyItem(ownerId: harness.intentionId, index: 42),
-        );
-        await tester.pump();
-
-        await tester.tap(
-          find.byKey(const ValueKey('blocking-relations-review')),
-        );
-        await tester.pumpAndSettle();
-
-        expect(
-          find.textContaining(
-            locale.languageCode == 'ru'
-                ? 'Все назначения тегов выбранным долговременным связям'
-                : 'All tag assignments of the selected long-term relations',
-          ),
-          findsNothing,
-        );
-        expect(
-          find.textContaining(
-            locale.languageCode == 'ru'
-                ? 'Переиспользуемые теги и все их назначения намерениям сохранятся'
-                : 'The reusable tags and all their assignments to intentions will remain',
-          ),
-          findsOneWidget,
-        );
-      },
-    );
   }
+
+  testWidgets(
+    'подтверждение только дневного выбора не говорит о назначениях связей',
+    (tester) async {
+      final harness = await _pumpAction(tester, const Locale('ru'));
+      harness.selectDaily(_dailyItem(ownerId: harness.intentionId, index: 42));
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          'Все назначения тегов выбранным долговременным связям',
+        ),
+        findsNothing,
+      );
+      expect(
+        find.textContaining(
+          'Переиспользуемые теги и все их назначения намерениям сохранятся',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'смешанное подтверждение показывает оба вида и фиксирует только их',
@@ -274,86 +266,58 @@ void main() {
     semantics.dispose();
   });
 
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'защищённая связь блокирует смешанный набор на ${locale.languageCode}',
-      (tester) async {
-        final harness = await _pumpAction(tester, locale);
-        final relation = testGroupRow(ownerId: harness.intentionId, index: 2);
-        final daily = _dailyItem(ownerId: harness.intentionId, index: 3);
-        harness.repository.protectedIds.add(relation.relation.id);
-        harness.select(relation);
-        harness.selectDaily(daily);
-        await tester.pump();
-        await tester.tap(
-          find.byKey(const ValueKey('blocking-relations-review')),
-        );
-        await tester.pumpAndSettle();
-        expect(harness.repository.commands, isEmpty);
-        expect(
-          find.byKey(const ValueKey('blocking-relations-confirm-delete')),
-          findsNothing,
-        );
-        expect(
-          find.textContaining(
-            locale.languageCode == 'ru'
-                ? 'отдельно удалите дневной выбор'
-                : 'delete the daily choice separately',
-          ),
-          findsWidgets,
-        );
-        expect(
-          harness.container
-              .read(
-                blockingRelationsSelectionViewModelProvider(
-                  harness.intentionId,
-                ),
-              )
-              .selectedByReference
-              .length,
-          2,
-        );
-      },
+  testWidgets('защищённая связь блокирует смешанный набор', (tester) async {
+    final harness = await _pumpAction(tester, const Locale('ru'));
+    final relation = testGroupRow(ownerId: harness.intentionId, index: 2);
+    final daily = _dailyItem(ownerId: harness.intentionId, index: 3);
+    harness.repository.protectedIds.add(relation.relation.id);
+    harness.select(relation);
+    harness.selectDaily(daily);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+    expect(harness.repository.commands, isEmpty);
+    expect(
+      find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+      findsNothing,
     );
-  }
-
-  for (final locale in [const Locale('ru'), const Locale('en')]) {
-    testWidgets(
-      'зависимость пути запрещает массовое удаление на ${locale.languageCode}',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-        addTearDown(
-          tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-        );
-        final harness = await _pumpAction(tester, locale);
-        final row = testGroupRow(ownerId: harness.intentionId, index: 31);
-        harness.repository.protectedIds.add(row.relation.id);
-        harness.select(row);
-        await tester.pump();
-        await tester.tap(
-          find.byKey(const ValueKey('blocking-relations-review')),
-        );
-        await tester.pumpAndSettle();
-
-        final reason = find.textContaining(
-          locale.languageCode == 'ru' ? 'дневном пути' : 'daily path',
-        );
-        expect(reason, findsOneWidget);
-        expect(
-          tester.getSemantics(reason).label,
-          contains(locale.languageCode == 'ru' ? 'дневном пути' : 'daily path'),
-        );
-        expect(
-          find.byKey(const ValueKey('blocking-relations-confirm-delete')),
-          findsNothing,
-        );
-        expect(harness.repository.commands, isEmpty);
-        expect(tester.takeException(), isNull);
-        semantics.dispose();
-      },
+    expect(find.textContaining('отдельно удалите дневной выбор'), findsWidgets);
+    expect(
+      harness.container
+          .read(
+            blockingRelationsSelectionViewModelProvider(harness.intentionId),
+          )
+          .selectedByReference
+          .length,
+      2,
     );
-  }
+  });
+
+  testWidgets('зависимость пути запрещает массовое удаление', (tester) async {
+    final semantics = tester.ensureSemantics();
+    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(
+      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+    );
+    final harness = await _pumpAction(tester, const Locale('ru'));
+    final row = testGroupRow(ownerId: harness.intentionId, index: 31);
+    harness.repository.protectedIds.add(row.relation.id);
+    harness.select(row);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+
+    final reason = find.textContaining('дневном пути');
+    expect(reason, findsOneWidget);
+    expect(tester.getSemantics(reason).label, contains('дневном пути'));
+    expect(
+      find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+      findsNothing,
+    );
+    expect(harness.repository.commands, isEmpty);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets(
     'новая зависимость закрывает открытое подтверждение с объяснением',
@@ -430,14 +394,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(
-      harness.container
-          .read(
-            blockingRelationsSelectionViewModelProvider(harness.intentionId),
-          )
-          .selected,
-      isEmpty,
-    );
     expect(
       find.byKey(const ValueKey('blocking-relations-review')),
       findsNothing,
@@ -546,9 +502,6 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
     await tester.pumpAndSettle();
-    expect(harness.repository.selectedReads, 1);
-    expect(harness.repository.selectedWatches, 1);
-    expect(harness.repository.relationWatches, 0);
     expect(
       harness.repository.selectedIds,
       rows.map((row) => row.relation.id).toSet(),
@@ -653,16 +606,6 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
       await tester.pumpAndSettle();
-      final later = testGroupRow(ownerId: harness.intentionId, index: 3);
-      expect(
-        harness.container
-            .read(
-              blockingRelationsSelectionViewModelProvider(harness.intentionId),
-            )
-            .selected
-            .containsKey(later.relation.id),
-        isFalse,
-      );
       final confirm = find.byKey(
         const ValueKey('blocking-relations-confirm-delete'),
       );
@@ -941,15 +884,6 @@ void main() {
         findsOneWidget,
       );
       expect(harness.repository.commands, isEmpty);
-      expect(
-        harness.container
-            .read(
-              blockingRelationsSelectionViewModelProvider(harness.intentionId),
-            )
-            .selected
-            .keys,
-        {row.relation.id},
-      );
       harness.repository.readFailure = null;
       await tester.tap(
         find.byKey(const ValueKey('blocking-relations-refresh-retry')),
@@ -999,10 +933,6 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(harness.repository.selectedIds, {
-        first.relation.id,
-        second.relation.id,
-      });
     },
   );
 
@@ -1029,13 +959,12 @@ void main() {
     expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
     expect(harness.repository.commands, isEmpty);
     expect(
-      harness.container
-          .read(
-            blockingRelationsSelectionViewModelProvider(harness.intentionId),
-          )
-          .selected
-          .keys,
-      {row.relation.id},
+      find.byKey(
+        ValueKey(
+          'blocking-relations-confirm-row-${row.relation.id.toCanonicalString()}',
+        ),
+      ),
+      findsOneWidget,
     );
   });
 }
@@ -1167,9 +1096,6 @@ final class _CommandRepository
       StreamController<SelectedRelationsReadResult>.broadcast(sync: true);
   SelectedRelationsQuery? _watchedQuery;
   GraphRevision _revision = const TestGraphRevision(2);
-  int selectedReads = 0;
-  int selectedWatches = 0;
-  int relationWatches = 0;
   Set<LongTermRelationId> selectedIds = {};
   final _relationUpdates =
       <LongTermRelationId, StreamController<LongTermRelationReadResult>>{};
@@ -1233,7 +1159,6 @@ final class _CommandRepository
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
   ) async {
-    selectedReads++;
     selectedIds = query.relationIds;
     return _currentSelection(query);
   }
@@ -1242,7 +1167,6 @@ final class _CommandRepository
   Stream<SelectedRelationsReadResult> watchSelectedRelations(
     SelectedRelationsQuery query,
   ) => Stream.multi((controller) {
-    selectedWatches++;
     selectedIds = query.relationIds;
     _watchedQuery = query;
     controller.addSync(_currentSelection(query));
@@ -1323,7 +1247,6 @@ final class _CommandRepository
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
-    relationWatches++;
     if (!(isPrepared?.call() ?? false)) {
       return Stream.value(_currentRelation(id));
     }

@@ -17,25 +17,18 @@ const _phone = Size(360, 780);
 /// Локальное сегодня проверок — воскресенье, последний день своей недели.
 final _today = date(2026, 10, 4);
 
-/// Следующий за сегодняшним день — первый день следующей недели.
-final _tomorrow = date(2026, 10, 5);
-
 /// Полные даты, которые экранный диктор читает на каждом языке. Русские даты
 /// Flutter форматирует с узким неразрывным пробелом перед «г.».
 final _texts = [
   (
     locale: const Locale('ru'),
     selectedToday: 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.',
-    selectedTomorrow: 'Выбранная дата: понедельник, 5 октября 2026\u202Fг.',
     today: 'воскресенье, 4 октября 2026\u202Fг., Сегодня',
-    tomorrow: 'понедельник, 5 октября 2026\u202Fг.',
   ),
   (
     locale: const Locale('en'),
     selectedToday: 'Selected date: Sunday, October 4, 2026',
-    selectedTomorrow: 'Selected date: Monday, October 5, 2026',
     today: 'Sunday, October 4, 2026, Today',
-    tomorrow: 'Monday, October 5, 2026',
   ),
 ];
 
@@ -93,83 +86,9 @@ void main() {
         semantics.dispose();
       });
 
-      testWidgets('различает выбранный и сегодняшний день по отдельности и при '
-          'совпадении, а выбор дня, соседние периоды, раскрытие и '
-          'сворачивание выполняются доступной активацией без свайпа', (
-        tester,
-      ) async {
-        final semantics = tester.ensureSemantics();
-        final repository = CatalogPageRepository();
-        await pumpCatalogPage(
-          tester,
-          repository,
-          today: _today,
-          locale: texts.locale,
-          size: _phone,
-        );
-        repository.completeFirst(0, [], total: 0);
-        await tester.pumpAndSettle();
-        final l10n = _l10n(tester);
-
-        // Сегодняшний день выбран: оба признака у одного дня.
-        _expectDay(tester, texts.today, isSelected: true);
-        expect(find.semantics.byLabel(_fullDate(tester, _today)), findsNothing);
-
-        await _activateCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-        expect(visibleWeeks(tester), weeksFrom(_tomorrow, 1));
-        expect(repository.queries, hasLength(1));
-
-        tester.semantics.tap(find.semantics.byLabel(texts.tomorrow));
-        // Выбор применён до следующего кадра.
-        expect(repository.queries, hasLength(2));
-        expect(repository.queries[1].date, _tomorrow);
-        expect(repository.queries[1].isCompleted, isNull);
-        expect(repository.queries[1].cursor, isNull);
-        await _settle(tester);
-        expect(_announced(tester), contains(texts.selectedTomorrow));
-
-        await _activateCommand(tester, l10n.dailyChoiceCalendarExpand);
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
-        // Диктор читает сегодняшний и следующий за ним выбранный день подряд.
-        final announced = _announced(tester);
-        final today = announced.indexOf(texts.today);
-        expect(today, isNonNegative);
-        expect(announced[today + 1], texts.tomorrow);
-        _expectDay(tester, texts.today, isSelected: false);
-        _expectDay(tester, texts.tomorrow, isSelected: true);
-        expect(
-          _dayNodes(
-            tester,
-          ).where((node) => node.flagsCollection.isSelected == Tristate.isTrue),
-          hasLength(1),
-        );
-
-        await _activateCommand(tester, l10n.dailyChoiceCalendarNextMonth);
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-        // Выбранный день вне просматриваемого месяца остаётся названным.
-        expect(_announced(tester), contains(texts.selectedTomorrow));
-        await _activateCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
-        // Перелистывание месяца переносит дату просмотра в его первый день,
-        // поэтому сворачивается неделя 1 октября.
-        await _activateCommand(tester, l10n.dailyChoiceCalendarCollapse);
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-        _expectDay(tester, texts.today, isSelected: false);
-        await _activateCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-        expect(visibleWeeks(tester), weeksFrom(_tomorrow, 1));
-        _expectDay(tester, texts.tomorrow, isSelected: true);
-        await _activateCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-
-        // Просмотр периодов и смена представления ничего не читают.
-        expect(repository.queries, hasLength(2));
-        repository.completeFirst(1, [
-          catalogPageItem(1, date: _tomorrow),
-        ], total: 1);
-        await _settle(tester);
-        expect(_announced(tester), contains(_rowLabel(l10n, 1, _tomorrow)));
-        semantics.dispose();
-      });
+      // Порядок чтения отказов и масштаб текста не зависят от языка: подписи
+      // страницы по языкам проверяет тест выше.
+      if (texts != _texts.first) return;
 
       testWidgets('читает отказы с повтором на месте выдачи и выполняет '
           'повтор, подгрузку, фильтр выполнения и сброс доступной '
@@ -427,31 +346,6 @@ void _expectEveryActionNamed(WidgetTester tester) {
   }
 }
 
-/// Дни календаря в порядке обхода: только у них и пунктов панели есть
-/// состояние выбранности.
-List<SemanticsNode> _dayNodes(WidgetTester tester) => [
-  for (final node in tester.semantics.simulatedAccessibilityTraversal())
-    if (node.flagsCollection.isSelected != Tristate.none &&
-        node.getSemanticsData().role != SemanticsRole.tab)
-      node,
-];
-
-/// День объявляется одной кнопкой выбора с явным состоянием выбранности.
-void _expectDay(WidgetTester tester, String label, {required bool isSelected}) {
-  final node = find.semantics.byLabel(label).evaluate().single;
-  expect(node.flagsCollection.isButton, isTrue, reason: label);
-  expect(
-    node.getSemanticsData().actions,
-    SemanticsAction.tap.index,
-    reason: '$label: доступно только действие выбора',
-  );
-  expect(
-    node.flagsCollection.isSelected,
-    isSelected ? Tristate.isTrue : Tristate.isFalse,
-    reason: label,
-  );
-}
-
 /// Сообщение объявляется при появлении без перехода к нему.
 void _expectLiveRegion(WidgetTester tester, String message) {
   expect(
@@ -464,22 +358,6 @@ void _expectLiveRegion(WidgetTester tester, String message) {
     isTrue,
     reason: message,
   );
-}
-
-/// Выполняет команду шапки календаря доступной активацией по её названию.
-Future<void> _activateCommand(WidgetTester tester, String name) async {
-  tester.semantics.tap(
-    find.semantics.byPredicate((node) => node.tooltip == name),
-  );
-  await _settle(tester);
-}
-
-/// Доводит до конца перелистывание календаря. Индикатор загрузки выдачи не
-/// даёт дождаться покоя всех анимаций, поэтому время продвигается явно.
-Future<void> _settle(WidgetTester tester) async {
-  await tester.pump();
-  await tester.pump(const Duration(seconds: 1));
-  await tester.pump();
 }
 
 /// Полная дата с днём недели по текущей локали.

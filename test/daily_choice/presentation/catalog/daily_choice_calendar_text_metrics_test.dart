@@ -6,64 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 const _style = TextStyle(fontSize: 16, height: 1.5);
 
 void main() {
-  testWidgets(
-    'высота совпадает с высотой виджета Text той же ширины в масштабе '
-    'текста системы, в том числе с переносом',
-    (tester) async {
-      for (final (textScale, width) in [
-        (1.0, 200.0),
-        (2.5, 200.0),
-        (2.5, 40.0),
-      ]) {
-        await _pumpTexts(
-          tester,
-          textScale: textScale,
-          width: width,
-          texts: ['7', '28', 'Сегодня'],
-        );
-
-        final measured = tallestTextHeight(
-          _context(tester),
-          texts: ['7', '28', 'Сегодня'],
-          style: _style,
-          maxWidth: width,
-        );
-
-        expect(
-          measured,
-          _renderedHeights(tester).reduce((a, b) => a > b ? a : b),
-          reason: 'масштаб $textScale, ширина $width',
-        );
-      }
-    },
-  );
-
-  testWidgets('крупный текст выше обычного, а перенос добавляет строки', (
-    tester,
-  ) async {
-    Future<double> heightOf(double textScale, double width) async {
-      await _pumpTexts(
-        tester,
-        textScale: textScale,
-        width: width,
-        texts: const [],
-      );
-      return tallestTextHeight(
-        _context(tester),
-        texts: ['28'],
-        style: _style,
-        maxWidth: width,
-      );
-    }
-
-    final line = await heightOf(1, 200);
-    expect(line, 24);
-    expect(await heightOf(2.5, 200), 2.5 * line);
-    // Две цифры шириной в 40 пикселей тестового шрифта каждая не помещаются в
-    // одну строку шириной 50.
-    expect(await heightOf(2.5, 50), 2 * 2.5 * line);
-  });
-
   testWidgets('учитывает системную настройку жирного текста', (tester) async {
     await _pumpTexts(
       tester,

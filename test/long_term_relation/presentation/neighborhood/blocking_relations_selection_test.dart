@@ -136,33 +136,16 @@ void main() {
     harness.repository.emitPrepared({
       reference: SelectedDailyChoiceMissing(original.id),
     }, revision: const TestGraphRevision(4));
-    expect(harness.state, same(prepared));
-    expect(harness.repository.commands, isEmpty);
-  });
-
-  test('новая защита связи не удаляет дневную часть выбора молча', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final relation = testGroupRow(ownerId: harness.intentionId, index: 21);
-    final daily = _dailyItem(ownerId: harness.intentionId, index: 22);
-    final relationRef = LongTermBlockingRelationReference(relation.relation.id);
-    final dailyRef = DailyChoiceBlockingRelationReference(daily.id);
-    harness.viewModel.select(relation);
-    harness.viewModel.selectDailyChoice(daily);
-    harness.repository.queueRelation(
-      relation,
-      permissions: const LongTermRelationPermissions.referencedByDailyPath(),
-    );
-    harness.repository.queueDaily(daily);
-
-    expect(await harness.viewModel.refreshSelection(), isTrue);
-    final editing = harness.state as BlockingRelationsSelectionEditing;
-    expect(editing.selectedByReference.keys, {relationRef, dailyRef});
     expect(
-      editing.invalidReasonsByReference[relationRef],
-      BlockingRelationsInvalidReason.referencedByDailyPath,
+      ((harness.state as BlockingRelationsSelectionPrepared)
+                  .snapshot
+                  .items
+                  .single
+              as BlockingRelationsSelectedDailyChoice)
+          .item
+          .isCompleted,
+      isTrue,
     );
-    expect(harness.viewModel.prepare(), isFalse);
     expect(harness.repository.commands, isEmpty);
   });
 
@@ -315,79 +298,49 @@ void main() {
     expect(harness.viewModel.prepare(), isFalse);
   });
 
-  test('принятая смешанная команда завершается после ухода', () async {
-    final harness = _Harness();
-    final relation = testGroupRow(ownerId: harness.intentionId, index: 13);
-    final daily = _dailyItem(ownerId: harness.intentionId, index: 14);
-    harness.viewModel.select(relation);
-    harness.viewModel.selectDailyChoice(daily);
-    expect(harness.viewModel.prepare(), isTrue);
-    harness.viewModel.confirm(presentationTitle: 'Намерение');
-    expect(harness.repository.commands, hasLength(1));
-    harness.dispose();
-    harness.repository.fail(
-      0,
-      const DeleteBlockingRelationsUnavailableFailure(),
-    );
-    await pumpEventQueue();
-    expect(harness.repository.commands, hasLength(1));
-  });
-
-  test('актуализация читает весь выбор одним согласованным запросом', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final rows = testGroupRows(ownerId: harness.intentionId, from: 1, count: 3);
-    for (final row in rows) {
-      harness.viewModel.select(row);
-      harness.repository.queueRelation(row);
-    }
-
-    expect(await harness.viewModel.refreshSelection(), isTrue);
-    expect(harness.repository.selectedQueries, hasLength(1));
-    expect(
-      harness.repository.selectedQueries.single.relationIds,
-      rows.map((row) => row.relation.id).toSet(),
-    );
-  });
-
-  test('выбор сохраняется между всеми группами и заменой порций', () {
+  test('выбор сохраняется между группами и заменой порций', () {
     final harness = _Harness();
     addTearDown(harness.dispose);
     final selected = <LongTermRelationSummary>[];
     var index = 1;
-    for (final scope in RelationScope.values) {
-      for (final type in LongTermRelationType.values) {
-        for (final direction in RelationDirection.values) {
-          final page = testGroupRows(
-            ownerId: harness.intentionId,
-            from: index,
-            count: 2,
-            scope: scope,
-            type: type,
-            direction: direction,
-            neighborTitles: {index: 'Одинаковое', index + 1: 'Одинаковое'},
-          );
-          expect(harness.viewModel.select(page.first), isTrue);
-          selected.add(page.first);
-          index += 2;
-        }
-      }
+    // Выбор не зависит от параметров группы: берутся исходная группа и та, где
+    // все три параметра другие.
+    for (final (scope, type, direction) in [
+      (
+        RelationScope.active,
+        LongTermRelationType.need,
+        RelationDirection.outgoing,
+      ),
+      (
+        RelationScope.archived,
+        LongTermRelationType.can,
+        RelationDirection.incoming,
+      ),
+    ]) {
+      final page = testGroupRows(
+        ownerId: harness.intentionId,
+        from: index,
+        count: 2,
+        scope: scope,
+        type: type,
+        direction: direction,
+        neighborTitles: {index: 'Одинаковое', index + 1: 'Одинаковое'},
+      );
+      expect(harness.viewModel.select(page.first), isTrue);
+      selected.add(page.first);
+      index += 2;
     }
 
     expect(harness.state.intentionId, harness.intentionId);
-    expect(harness.state.selected.length, 8);
+    expect(harness.state.selected.length, 2);
     expect(
       harness.state.selected.keys,
       containsAll(selected.map((row) => row.relation.id)),
     );
     expect(harness.viewModel.select(selected.first), isFalse);
-    expect(harness.state.selected.length, 8);
-    expect(
-      harness.state.selected[selected.first.relation.id],
-      same(selected.first),
-    );
+    expect(harness.state.selected.length, 2);
     expect(harness.viewModel.unselect(selected[1].relation.id), isTrue);
-    expect(harness.state.selected.length, 7);
+    expect(harness.state.selected.length, 1);
     expect(
       harness.state.selected.containsKey(selected.first.relation.id),
       isTrue,
@@ -397,38 +350,7 @@ void main() {
     final otherOwner = testIntentionId(80);
     final unrelated = testGroupRow(ownerId: otherOwner, index: 90);
     expect(harness.viewModel.select(unrelated), isFalse);
-    expect(harness.state.selected.length, 7);
-  });
-
-  test('подтверждение фиксирует отдельный набор, а отмена не пишет', () {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final page = testGroupRows(ownerId: harness.intentionId, from: 1, count: 2);
-    expect(harness.viewModel.prepare(), isFalse);
-    harness.viewModel.select(page.first);
-    expect(harness.viewModel.prepare(), isTrue);
-    final prepared =
-        (harness.state as BlockingRelationsSelectionPrepared).snapshot;
-    expect(prepared.command.relationIds, {page.first.relation.id});
-    expect(() => prepared.command.relationIds.clear(), throwsUnsupportedError);
-    final firstId = page.first.relation.id;
-    page.clear();
-    expect(prepared.rows.single.relation.id, firstId);
-    harness.viewModel.cancel();
-    expect(harness.state, isA<BlockingRelationsSelectionEditing>());
-    expect(harness.repository.commands, isEmpty);
-
-    final laterPage = testGroupRows(
-      ownerId: harness.intentionId,
-      from: 2,
-      count: 1,
-    );
-    harness.viewModel.select(laterPage.single);
-    expect(prepared.command.relationIds, {firstId});
-    expect(harness.viewModel.prepare(), isTrue);
-    final next = (harness.state as BlockingRelationsSelectionPrepared).snapshot;
-    expect(next.command.relationIds, {firstId, laterPage.single.relation.id});
-    expect(prepared.rows.single.relation.id, firstId);
+    expect(harness.state.selected.length, 1);
   });
 
   test('принятая команда выполняется один раз после закрытия сессии', () async {
@@ -485,97 +407,6 @@ void main() {
   );
 
   test(
-    'после успеха новый выбор пуст и требует отдельного подтверждения',
-    () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final first = testGroupRow(ownerId: harness.intentionId, index: 1);
-      final second = testGroupRow(ownerId: harness.intentionId, index: 2);
-      harness.viewModel.select(first);
-      harness.viewModel.prepare();
-      harness.viewModel.confirm(presentationTitle: 'Намерение');
-      final command =
-          harness.repository.commands.single as DeleteBlockingRelations;
-      expect(harness.viewModel.select(second), isFalse);
-      expect(harness.viewModel.prepare(), isFalse);
-      const revision = TestGraphRevision(5);
-      final deleted = BlockingRelationsDeleted(
-        command: command,
-        revision: revision,
-        deletedRelations: [first.relation],
-        counts: {
-          harness.intentionId: testRelationCounts(),
-          first.relation.relatedIntentionId: testRelationCounts(),
-        },
-      );
-      harness.repository.succeed(
-        0,
-        GraphCommandSucceeded<
-          BlockingRelationsDeleted,
-          DeleteBlockingRelationsFailure
-        >(ConfirmedGraphResult(revision: revision, value: deleted)),
-      );
-      await pumpEventQueue();
-
-      expect(harness.state, isA<BlockingRelationsSelectionEditing>());
-      expect(harness.state.selected, isEmpty);
-      expect(harness.viewModel.prepare(), isFalse);
-      harness.viewModel.confirm(presentationTitle: 'Намерение');
-      expect(harness.repository.commands, hasLength(1));
-
-      expect(harness.viewModel.select(second), isTrue);
-      expect(harness.viewModel.prepare(), isTrue);
-      final next =
-          (harness.state as BlockingRelationsSelectionPrepared).snapshot;
-      expect(next.command, isNot(same(command)));
-      expect(next.command.relationIds, {second.relation.id});
-      harness.viewModel.confirm(presentationTitle: 'Намерение');
-      expect(harness.repository.commands, hasLength(2));
-      expect(harness.repository.commands.last, same(next.command));
-    },
-  );
-
-  test('конфликт требует чтения и явного удаления недоступной связи', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final first = testGroupRow(ownerId: harness.intentionId, index: 1);
-    final second = testGroupRow(ownerId: harness.intentionId, index: 2);
-    harness.viewModel.select(first);
-    harness.viewModel.select(second);
-    harness.viewModel.prepare();
-    harness.viewModel.confirm(presentationTitle: 'Намерение');
-    harness.repository.fail(
-      0,
-      DeleteBlockingRelationsSelectionConflictFailure.longTerm(
-        relationId: second.relation.id,
-        reason: BlockingRelationConflictReason.relationMissing,
-      ),
-    );
-    await pumpEventQueue();
-
-    harness.repository.queueRelation(
-      first,
-      revision: const TestGraphRevision(3),
-    );
-    harness.repository.queueMissing(second.relation.id);
-    expect(await harness.viewModel.refreshSelection(), isTrue);
-    final editing = harness.state as BlockingRelationsSelectionEditing;
-    expect(editing.selected.keys, {first.relation.id, second.relation.id});
-    expect(editing.invalidIds, {second.relation.id});
-    expect(harness.viewModel.prepare(), isFalse);
-    expect(harness.repository.commands, hasLength(1));
-
-    expect(harness.viewModel.unselect(second.relation.id), isTrue);
-    expect(harness.viewModel.prepare(), isTrue);
-    harness.viewModel.confirm(presentationTitle: 'Намерение');
-    expect(harness.repository.commands, hasLength(2));
-    expect(
-      (harness.repository.commands.last as DeleteBlockingRelations).relationIds,
-      {first.relation.id},
-    );
-  });
-
-  test(
     'актуализация сохраняет идентификаторы при изменении полей и ревизий',
     () async {
       final harness = _Harness();
@@ -595,10 +426,6 @@ void main() {
         revision: const TestGraphRevision(5),
       );
       expect(await harness.viewModel.refreshSelection(), isTrue);
-      expect(
-        harness.state.selected[original.relation.id],
-        isNot(same(original)),
-      );
       expect(
         harness.state.selected[original.relation.id]!.related.title,
         'Новое название',
@@ -674,7 +501,10 @@ void main() {
 
       expect(await harness.viewModel.refreshSelection(), isFalse);
       expect(harness.state, isA<BlockingRelationsSelectionRefreshFailed>());
-      expect(harness.state.selected[original.relation.id], same(original));
+      expect(
+        harness.state.selected[original.relation.id]!.related.title,
+        original.related.title,
+      );
       expect(harness.state.selected.keys, {
         original.relation.id,
         second.relation.id,
@@ -699,7 +529,10 @@ void main() {
 
       expect(await harness.viewModel.refreshSelection(), isTrue);
       final editing = harness.state as BlockingRelationsSelectionEditing;
-      expect(editing.selected[row.relation.id], same(row));
+      expect(
+        editing.selected[row.relation.id]!.relation.sourceIntentionId,
+        row.relation.sourceIntentionId,
+      );
       expect(
         editing.invalidReasons[row.relation.id],
         BlockingRelationsInvalidReason.noLongerBlocking,

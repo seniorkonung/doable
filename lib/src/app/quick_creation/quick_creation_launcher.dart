@@ -88,40 +88,11 @@ final class QuickCreationLauncher {
       // push завершается при закрытии страницы. Открытие подтверждает новый
       // экземпляр маршрута непосредственно над сохранённой историей.
       // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/push.html
-      unawaited(
-        router
-            .push<void>(
-              route,
-              onFailure: (_) {
-                _reportFailure(StackTrace.current);
-                finish();
-              },
-            )
-            .then<void>(
-              (_) => finish(),
-              onError: (Object _, StackTrace stack) {
-                _reportFailure(stack);
-                finish();
-              },
-            ),
-      );
+      unawaited(router.push<void>(route).then<void>((_) => finish()));
       check();
       await openedOrStopped.future;
-    } catch (_, stack) {
-      _reportFailure(stack);
     } finally {
       router.removeListener(check);
     }
   }
-}
-
-void _reportFailure(StackTrace stack) {
-  FlutterError.reportError(
-    FlutterErrorDetails(
-      exception: FlutterError('Не удалось начать быстрое создание.'),
-      stack: stack,
-      library: 'quick creation',
-      context: ErrorDescription('при открытии первой страницы создания'),
-    ),
-  );
 }

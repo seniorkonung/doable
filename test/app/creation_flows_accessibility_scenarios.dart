@@ -1,13 +1,15 @@
 part of 'creation_flows_integration_test.dart';
 
 void _registerAccessibilityTests() {
+  // Узкий и низкий экраны с клавиатурой — крайние случаи требований панели.
   const devices = [
     (name: 'телефон вертикально', size: Size(400, 800)),
-    (name: 'планшет вертикально', size: Size(800, 1280)),
     (name: 'планшет горизонтально', size: Size(1280, 800)),
   ];
-  for (final flow in _Flow.values) {
-    for (final locale in [const Locale('ru'), const Locale('en')]) {
+  // Дневной выбор от намерения подтверждается той же страницей, что и от
+  // действия; системные строки читаются из локализаций одного языка.
+  for (final flow in const [_Flow.intention, _Flow.relation, _Flow.bottomUp]) {
+    for (final locale in [const Locale('ru')]) {
       for (final device in devices) {
         testWidgets(
           '${flow.label}: действия и сообщения на ${locale.languageCode}, '

@@ -241,10 +241,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'More intentions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get catalogLoadMoreValidation =>
-      'The saved catalog position is no longer valid.';
-
-  @override
   String get catalogRefreshUnavailable =>
       'The intention list isn’t up to date: changes couldn’t be loaded.';
 
@@ -255,12 +251,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get catalogRefreshUnexpected =>
       'The intention list isn’t up to date because of an unexpected error.';
-
-  @override
-  String get catalogReload => 'Reload catalog';
-
-  @override
-  String get catalogReloading => 'Reloading catalog…';
 
   @override
   String get catalogReady => 'Ready for action';
@@ -1151,10 +1141,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load tagged intentions because of an unexpected error.';
 
   @override
-  String get tagNavigationInvalidCursor =>
-      'This result continuation is invalid. Reopen tag navigation.';
-
-  @override
   String get tagNavigationSnapshotExpired =>
       'The list has changed. Reopen tag navigation.';
 
@@ -1592,9 +1578,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoiceDescriptionInvalid =>
       'Check the daily choice description.';
-
-  @override
-  String get dailyChoicePathInvalid => 'Check the daily choice path.';
 
   @override
   String get dailyChoiceOperationNotFound =>
@@ -2187,10 +2170,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'An intention on this path no longer exists.';
 
   @override
-  String get choicePathInvalid =>
-      'Continuations could not be checked because of an invalid request.';
-
-  @override
   String get choicePathUnavailable =>
       'Continuations are temporarily unavailable. Try again.';
 
@@ -2294,10 +2273,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoiceCatalogExpired =>
       'The catalog changed. Refresh it to continue.';
-
-  @override
-  String get dailyChoiceCatalogInvalid =>
-      'The catalog position is no longer valid.';
 
   @override
   String get dailyChoiceCatalogUnexpected =>

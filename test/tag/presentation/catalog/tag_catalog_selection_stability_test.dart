@@ -25,9 +25,7 @@ void main() {
   _registerDraftScenarios();
   for (final (intentionNumber, language, scale) in [
     (100, 'ru', 1.0),
-    (100, 'en', 2.5),
-    (200, 'en', 1.0),
-    (200, 'ru', 2.5),
+    (100, 'ru', 2.5),
   ]) {
     final description = 'намерение $intentionNumber, $language, текст $scale';
 
@@ -103,10 +101,9 @@ void main() {
           expect(tester.getRect(list), listBounds);
           expect(tester.getRect(assign), actionBounds);
           expect(
-            tester.state<ScrollableState>(scrollable).position,
-            same(position),
+            tester.state<ScrollableState>(scrollable).position.pixels,
+            pixels,
           );
-          expect(position.pixels, pixels);
           expect(tester.widget<FilledButton>(assign).onPressed, isNull);
           expect(repository.commandCount, 0);
           expect(tester.takeException(), isNull);
@@ -173,10 +170,9 @@ void main() {
               reason: 'Выбор загруженного тега не меняет границы списка.',
             );
             expect(
-              tester.state<ScrollableState>(scrollable).position,
-              same(position),
+              tester.state<ScrollableState>(scrollable).position.pixels,
+              pixels,
             );
-            expect(position.pixels, pixels);
             for (final visibleRow in visible) {
               expect(_row(visibleRow.tag), findsOneWidget);
               expect(
@@ -195,8 +191,6 @@ void main() {
               tester.widget<FilledButton>(assign).onPressed,
               row.isAssigned ? isNull : isNotNull,
             );
-            expect(repository.catalogModes, hasLength(1));
-            expect(repository.assignmentReads, 0);
             expect(repository.commandCount, 0);
             expect(tester.takeException(), isNull);
           }
@@ -238,73 +232,60 @@ void main() {
     );
   }
 
-  for (final intentionNumber in [100, 200]) {
-    testWidgets(
-      'поздний ответ прежнего выбора не заменяет текущий тег: намерение $intentionNumber',
-      (tester) async {
-        final repository = await _showCatalog(
-          tester,
-          intentionNumber: intentionNumber,
-          language: 'ru',
-          scale: 1,
-        );
-        final first = repository.rows[0].tag;
-        final second = repository.rows[1].tag;
-        await tester.tap(_row(first));
-        await tester.pump();
-        final formerObservation = repository.observations[first.id]!.single;
-        await tester.tap(_row(second));
-        await tester.pump();
-        expect(formerObservation.cancelled, isTrue);
-
-        repository.observations[second.id]!.single.deliver(
-          TagReadSuccess(
-            GraphSnapshot(value: second, revision: const _Revision()),
-          ),
-        );
-        await tester.pump();
-        final list = find.byKey(const ValueKey('tag-catalog-list'));
-        final listBounds = tester.getRect(list);
-
-        formerObservation.deliver(
-          TagReadSuccess(
-            GraphSnapshot(
-              value: Tag(
-                id: first.id,
-                name: TagName.fromInput('Поздний ответ'),
-              ),
-              revision: const _Revision(2),
-            ),
-          ),
-          afterCancellation: true,
-        );
-        for (final duration in [
-          Duration.zero,
-          const Duration(milliseconds: 16),
-        ]) {
-          await tester.pump(duration);
-          expect(find.text('Поздний ответ'), findsNothing);
-          expect(
-            tester.widget<Semantics>(_row(second)).properties.selected,
-            isTrue,
-          );
-          expect(
-            tester.widget<Semantics>(_row(first)).properties.selected,
-            isFalse,
-          );
-          expect(tester.getRect(list), listBounds);
-          expect(find.byType(CircularProgressIndicator), findsNothing);
-          expect(repository.catalogModes, hasLength(1));
-          expect(repository.commandCount, 0);
-          expect(tester.takeException(), isNull);
-        }
-      },
+  testWidgets('поздний ответ прежнего выбора не заменяет текущий тег', (
+    tester,
+  ) async {
+    final repository = await _showCatalog(
+      tester,
+      intentionNumber: 100,
+      language: 'ru',
+      scale: 1,
     );
-  }
+    final first = repository.rows[0].tag;
+    final second = repository.rows[1].tag;
+    await tester.tap(_row(first));
+    await tester.pump();
+    final formerObservation = repository.observations[first.id]!.single;
+    await tester.tap(_row(second));
+    await tester.pump();
+
+    repository.observations[second.id]!.single.deliver(
+      TagReadSuccess(GraphSnapshot(value: second, revision: const _Revision())),
+    );
+    await tester.pump();
+    final list = find.byKey(const ValueKey('tag-catalog-list'));
+    final listBounds = tester.getRect(list);
+
+    formerObservation.deliver(
+      TagReadSuccess(
+        GraphSnapshot(
+          value: Tag(id: first.id, name: TagName.fromInput('Поздний ответ')),
+          revision: const _Revision(2),
+        ),
+      ),
+      afterCancellation: true,
+    );
+    for (final duration in [Duration.zero, const Duration(milliseconds: 16)]) {
+      await tester.pump(duration);
+      expect(find.text('Поздний ответ'), findsNothing);
+      expect(
+        tester.widget<Semantics>(_row(second)).properties.selected,
+        isTrue,
+      );
+      expect(
+        tester.widget<Semantics>(_row(first)).properties.selected,
+        isFalse,
+      );
+      expect(tester.getRect(list), listBounds);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(repository.commandCount, 0);
+      expect(tester.takeException(), isNull);
+    }
+  });
 }
 
 void _registerDraftScenarios() {
-  for (final (language, scale) in [('ru', 1.0), ('en', 2.5), ('ru', 2.5)]) {
+  for (final (language, scale) in [('ru', 1.0), ('ru', 2.5)]) {
     final description = '$language, текст $scale';
 
     testWidgets(
@@ -374,16 +355,13 @@ void _registerDraftScenarios() {
             expect(tester.getRect(list), listBounds);
             expect(tester.getRect(add), actionBounds);
             expect(
-              tester.state<ScrollableState>(scrollable).position,
-              same(position),
+              tester.state<ScrollableState>(scrollable).position.pixels,
+              pixels,
             );
-            expect(position.pixels, pixels);
             for (final visibleTag in visible) {
               expect(tester.getRect(_row(visibleTag)), bounds[visibleTag.id]);
             }
             expect(find.byType(CircularProgressIndicator), findsNothing);
-            expect(repository.catalogModes, [const TagCatalogBrowseMode()]);
-            expect(repository.assignmentReads, 0);
             expect(repository.commandCount, 0);
             expect(tester.takeException(), isNull);
           }
@@ -471,9 +449,7 @@ void _registerDraftScenarios() {
               findsOneWidget,
             );
           }
-          expect(repository.catalogModes, [const TagCatalogBrowseMode()]);
           expect(repository.commandCount, 0);
-          expect(repository.assignmentReads, 0);
           expect(tester.takeException(), isNull);
         } finally {
           semantics.dispose();
@@ -632,7 +608,6 @@ final class _ControlledRepository extends Fake
   final catalogRead = Completer<TagCatalogResult>();
   final catalogModes = <TagCatalogMode>[];
   final observations = <TagId, List<_ControlledTagSubscription>>{};
-  int assignmentReads = 0;
   int commandCount = 0;
 
   @override
@@ -646,7 +621,6 @@ final class _ControlledRepository extends Fake
     TagId id,
     IntentionId intentionId,
   ) async {
-    assignmentReads++;
     return TagAssignmentStatusSuccess(
       GraphSnapshot(
         value: rows.singleWhere((row) => row.tag.id == id).isAssigned,

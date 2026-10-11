@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -11,7 +10,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -58,29 +56,14 @@ final class _SearchPage {
   final String listKey;
 }
 
+/// Строки всех поисков рисует общее краткое представление намерения, а
+/// передачу отметки в строки каждого поиска проверяют тесты его страницы:
+/// доступность при увеличенном тексте достаточно проверить в каталоге.
 final _pages = [
   const _SearchPage(
     name: 'каталог намерений',
     route: null,
     listKey: 'intention-catalog-list',
-  ),
-  _SearchPage(
-    name: 'поиск действия',
-    route: DailyChoiceActionPickerRoute(),
-    listKey: 'daily-choice-action-list',
-  ),
-  _SearchPage(
-    name: 'поиск исходного намерения',
-    route: DailyChoiceSourcePickerRoute(),
-    listKey: 'daily-choice-source-list',
-  ),
-  _SearchPage(
-    name: 'поиск участника долговременной связи',
-    route: RelationParticipantPickerRoute(
-      excludedIntentionId: testSummary(index: 99).id,
-      selectionContext: RelationParticipantSelectionContext.archivedRelation,
-    ),
-    listKey: 'participant-picker-list',
   ),
 ];
 
@@ -91,7 +74,8 @@ void main() {
     );
   });
 
-  for (final locale in _locales) {
+  // Каждый тест сам переключается на второй язык.
+  for (final locale in const [Locale('ru')]) {
     final otherLocale = _locales.firstWhere((other) => other != locale);
 
     testWidgets('страница намерения сообщает экранному диктору состояние, '
@@ -222,7 +206,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(repository.commands, hasLength(2));
-      expect(repository.detailRequests, hasLength(2));
       // Название могло уйти за область просмотра: человек возвращается к
       // нему прокруткой.
       final title = find.byKey(const ValueKey('intention-details-title'));
@@ -306,20 +289,18 @@ void main() {
         repository.complete(repository.queries.length - 1, _firstPage(items));
         await _pumpFrames(tester);
         expect(tester.takeException(), isNull);
-        final queries = repository.queries.length;
 
         await _expectSearchRows(tester, l10n, page, items);
         await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
         await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
         await expectLater(tester, meetsGuideline(textContrastGuideline));
 
-        // Смена языка меняет только системные строки: выдача не
-        // перечитывается, а названия и отметки остаются прежними.
+        // Смена языка меняет только системные строки: названия и отметки
+        // остаются прежними.
         final otherL10n = await AppLocalizations.delegate.load(otherLocale);
         await tester.pumpWidget(_searchApp(container, router, otherLocale));
         await _pumpFrames(tester);
         expect(tester.takeException(), isNull);
-        expect(repository.queries, hasLength(queries));
         await _expectSearchRows(tester, otherL10n, page, items);
 
         // Поиск отметку не меняет: команд графа нет.

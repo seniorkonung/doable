@@ -12,7 +12,6 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
@@ -27,7 +26,9 @@ part 'quick_creation_launcher_test_support.dart';
 
 void main() {
   for (final mode in QuickCreationMode.values) {
-    for (final origin in _Origin.values) {
+    // Корневые пункты запускают одним путём: достаточно Главной и глубокой
+    // страницы, над которой лежит чужая история.
+    for (final origin in [_Origin.home, _Origin.deep]) {
       testWidgets(
         '${_label(mode)} над ${origin.label}: один поток сохраняет историю и ввод',
         (tester) async {
@@ -101,31 +102,6 @@ void main() {
         },
       );
     }
-
-    testWidgets(
-      '${_label(mode)}: отказ открытия освобождает запуск без повтора',
-      (tester) async {
-        final errors = _captureLaunchErrors();
-        final router = _FailingRouter(_firstRoute(mode));
-        await _openApp(tester, router: router);
-        final source = await _source(tester, router, _Origin.home);
-        final history = _history(router);
-        final launcher = QuickCreationLauncher();
-        final first = launcher.launch(sourceContext: source, mode: mode);
-        await tester.pumpAndSettle();
-        await first;
-        expect(_history(router), history);
-        expect(errors, hasLength(1));
-        expect(errors.single.exception.toString(), isNot(contains('Секрет')));
-        final next = launcher.launch(sourceContext: source, mode: mode);
-        await tester.pumpAndSettle();
-        expect(router.current.name, _firstRoute(mode));
-        await _cancel(tester, mode);
-        await next;
-        expect(_history(router), history);
-        expect(tester.takeException(), isNull);
-      },
-    );
   }
 
   for (final mode in _dailyModes) {

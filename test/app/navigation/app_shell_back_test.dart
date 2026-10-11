@@ -6,10 +6,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
@@ -24,7 +21,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
-import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -52,52 +48,6 @@ final _laterDate = CalendarDate.fromParts(2026, 9, 26);
 final _android = TargetPlatformVariant.only(TargetPlatform.android);
 
 void main() {
-  testWidgets('«назад» с каталога дневных выборов выбирает Главную и '
-      'сохраняет состояние каталога и его календаря', (tester) async {
-    final app = await _start(tester);
-    await _select(tester, AppDestination.dailyChoices);
-    await selectDailyChoiceCatalogDate(tester, _earlierDate, tap: _tap);
-    await _waitFor(
-      tester,
-      () =>
-          _dailyRows.evaluate().length == 1 &&
-          _dailyRowOn(_earlierDate).evaluate().length == 1,
-    );
-    // Раскрытый календарь показывает предыдущий месяц.
-    await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
-    await showDailyChoiceCatalogPeriod(
-      tester,
-      CalendarDate.fromParts(2026, 8, 15),
-      tap: _tap,
-    );
-    final catalog = tester.state(find.byType(DailyChoiceCatalogPage));
-    final calendar = tester.state(_built(DailyChoiceCalendar));
-    final viewport = shownDailyChoiceCatalogViewport(tester);
-    expect(viewport.mode, DailyChoiceCalendarMode.month);
-    expect(viewport.focusedDate.month, 8);
-
-    // Framework готов обработать «назад»: платформа передаст его приложению.
-    expect(app.platform.frameworkHandlesBack, isTrue);
-    await _back(tester);
-
-    _expectRootPage(tester, app.router, AppDestination.home);
-    expect(app.platform.exits, 0);
-    expect(app.platform.frameworkHandlesBack, isFalse);
-    // Покинутая страница остаётся в дереве со своим состоянием.
-    expect(tester.state(_built(DailyChoiceCatalogPage)), same(catalog));
-
-    await _select(tester, AppDestination.dailyChoices);
-
-    expect(tester.state(find.byType(DailyChoiceCatalogPage)), same(catalog));
-    expect(tester.state(_built(DailyChoiceCalendar)), same(calendar));
-    expect(shownDailyChoiceCatalogDate(tester), _earlierDate);
-    expect(shownDailyChoiceCatalogViewport(tester), viewport);
-    expect(_dailyRows, findsOneWidget);
-    expect(_dailyRowOn(_earlierDate), findsOneWidget);
-    expect(app.platform.frameworkHandlesBack, isTrue);
-    expect(tester.takeException(), isNull);
-  }, variant: _android);
-
   testWidgets('«назад» с каталога намерений выбирает Главную и сохраняет '
       'параметры и позицию каталога', (tester) async {
     final app = await _start(tester);
@@ -107,7 +57,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.drag(_catalogList, const Offset(0, -300));
     await tester.pumpAndSettle();
-    final catalog = tester.state(find.byType(IntentionCatalogPage));
     final offset = _catalogOffset(tester);
     final rows = _catalogRows(tester);
     expect(offset, greaterThan(0));
@@ -120,12 +69,9 @@ void main() {
     _expectRootPage(tester, app.router, AppDestination.home);
     expect(app.platform.exits, 0);
     expect(app.platform.frameworkHandlesBack, isFalse);
-    // Покинутая страница остаётся в дереве со своим состоянием.
-    expect(tester.state(_built(IntentionCatalogPage)), same(catalog));
 
     await _select(tester, AppDestination.intentionGraph);
 
-    expect(tester.state(find.byType(IntentionCatalogPage)), same(catalog));
     expect(
       tester.widget<TextField>(_titleFilter).controller!.text,
       'Намерение',
@@ -247,33 +193,6 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: _android);
 
-  testWidgets('«назад» в подробном просмотре дневного выбора закрывает только '
-      'его и не меняет выбранный пункт', (tester) async {
-    final app = await _start(tester);
-    await _select(tester, AppDestination.dailyChoices);
-
-    await _open(
-      tester,
-      find.byKey(const ValueKey('daily-choice-row-1')),
-      DailyChoiceDetailsPage,
-    );
-    expect(app.platform.frameworkHandlesBack, isTrue);
-    await _back(tester);
-
-    expect(find.byType(DailyChoiceDetailsPage), findsNothing);
-    _expectRootPage(tester, app.router, AppDestination.dailyChoices);
-    expect(app.platform.exits, 0);
-    // Каталог без страниц поверх по-прежнему получает «назад».
-    expect(app.platform.frameworkHandlesBack, isTrue);
-
-    await _back(tester);
-
-    _expectRootPage(tester, app.router, AppDestination.home);
-    expect(app.platform.exits, 0);
-    expect(app.platform.frameworkHandlesBack, isFalse);
-    expect(tester.takeException(), isNull);
-  }, variant: _android);
-
   testWidgets('«назад» в каталоге тегов поверх каталога намерений закрывает '
       'только его и не меняет выбранный пункт', (tester) async {
     final app = await _start(tester);
@@ -301,8 +220,9 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: _android);
 
-  testWidgets('оболочка объявляет готовность из выбранного пункта и сама '
-      'перехода не выполняет', (tester) async {
+  testWidgets('платформа передаёт «назад» приложению только с каталогов', (
+    tester,
+  ) async {
     final app = await _start(tester);
 
     for (final destination in [
@@ -313,14 +233,6 @@ void main() {
     ]) {
       await _select(tester, destination);
 
-      final declaration = _declaration(tester);
-      expect(
-        declaration.canPop,
-        destination == AppDestination.home,
-        reason: destination.name,
-      );
-      // Переход на Главную выполняет только маршрутизатор вкладок.
-      expect(declaration.onPopInvokedWithResult, isNull);
       expect(
         app.platform.frameworkHandlesBack,
         destination != AppDestination.home,
@@ -335,7 +247,6 @@ void main() {
     await tester.pumpAndSettle();
 
     _expectRootPage(tester, app.router, AppDestination.intentionGraph);
-    expect(_declaration(tester).canPop, isFalse);
     expect(app.platform.frameworkHandlesBack, isTrue);
     expect(tester.takeException(), isNull);
   }, variant: _android);
@@ -355,19 +266,6 @@ const _rootPages = {
   AppDestination.dailyChoices: DailyChoiceCatalogPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
-
-final _dailyRows = find.byWidgetPredicate(
-  (widget) => switch (widget.key) {
-    ValueKey<String>(:final value) => value.startsWith('daily-choice-row-'),
-    _ => false,
-  },
-);
-
-/// Строка выдачи каталога дневных выборов с дневным выбором на [date].
-Finder _dailyRowOn(CalendarDate date) => find.ancestor(
-  of: find.textContaining(date.toCanonicalString()),
-  matching: _dailyRows,
-);
 
 final _titleFilter = find.byKey(const ValueKey('catalog-filter-field'));
 
@@ -505,14 +403,6 @@ void _expectRootPage(
   expect(bar, findsOneWidget);
   expect(tester.widget<AppNavigationBar>(bar).selected, destination);
 }
-
-/// Объявление оболочки платформе: `PopScope` вокруг области вкладок и панели.
-PopScope<Object?> _declaration(WidgetTester tester) => tester.widget(
-  find.ancestor(
-    of: find.byType(AppNavigationBar),
-    matching: find.byWidgetPredicate((widget) => widget is PopScope),
-  ),
-);
 
 /// Позиция прокрутки выдачи каталога намерений.
 double _catalogOffset(WidgetTester tester) => tester

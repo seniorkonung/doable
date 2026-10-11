@@ -1,6 +1,5 @@
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../intention/domain/intention_id.dart';
-import '../../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
@@ -9,20 +8,7 @@ import '../../domain/daily_choice.dart';
 /// Целое предложение для одной замены. Смысл каждого перехода остаётся в
 /// ConfirmedChoicePath и повторно сверяется с графом во время записи.
 final class DailyChoicePathReplaceProposal {
-  DailyChoicePathReplaceProposal(this.path) {
-    final steps = path.steps;
-    final visited = <IntentionId>{steps.first.sourceIntentionId};
-    final relations = <LongTermRelationId>{};
-    var current = steps.first.sourceIntentionId;
-    for (final step in steps) {
-      if (step.sourceIntentionId != current ||
-          !visited.add(step.relatedIntentionId) ||
-          !relations.add(step.relationId)) {
-        throw ArgumentError.value(path, 'path');
-      }
-      current = step.relatedIntentionId;
-    }
-  }
+  const DailyChoicePathReplaceProposal(this.path);
 
   final ConfirmedChoicePath path;
   IntentionId get sourceIntentionId => path.steps.first.sourceIntentionId;

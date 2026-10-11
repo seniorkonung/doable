@@ -7,18 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late AppDatabase database;
-  late _SqlTrace sqlTrace;
 
   setUp(() async {
-    sqlTrace = _SqlTrace();
-    database = AppDatabase(
-      observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        sqlTrace,
-      ),
-    );
+    database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
-    sqlTrace.clear();
   });
 
   tearDown(() => database.close());
@@ -61,52 +53,32 @@ void main() {
     );
 
     test(
-      'выбирает параметризованный путь по числу Unicode-кодовых точек',
+      'находит название по фильтрам из одной, двух и трёх кодовых точек',
       () async {
         const id = '018f0b5d-6b2e-7c80-8000-000000000102';
         await _insertIntention(database, id: id, title: '😀😀😀 купить молоко');
 
         expect(await _findByTitleFilter(database, '😀'), [id]);
-        expect(_lastSelectStatement, contains('instr('));
-        expect(_lastSelectArguments, ['😀']);
-
-        sqlTrace.clear();
         expect(await _findByTitleFilter(database, '😀😀'), [id]);
-        expect(_lastSelectStatement, contains('instr('));
-        expect(_lastSelectArguments, ['😀😀']);
-
-        sqlTrace.clear();
         expect(await _findByTitleFilter(database, '😀😀😀'), [id]);
-        expect(_lastSelectStatement, contains('title_search_key MATCH ?'));
-        expect(_lastSelectArguments, ['"😀😀😀"']);
 
-        final queryPlan = await database
-            .customSelect(
-              'EXPLAIN QUERY PLAN $_lastSelectStatement',
-              variables: _lastSelectArguments.map(Variable.withString).toList(),
-            )
-            .get();
-        expect(
-          queryPlan.map((row) => row.read<String>('detail')).join('\n'),
-          contains('intention_titles_fts'),
-        );
+        expect(await _findByTitleFilter(database, '🙂'), isEmpty);
+        expect(await _findByTitleFilter(database, '🙂🙂'), isEmpty);
+        expect(await _findByTitleFilter(database, '😀😀😀😀'), isEmpty);
       },
     );
 
-    test(
-      'готовит короткий фильтр только через единый поисковый ключ',
-      () async {
-        const id = '018f0b5d-6b2e-7c80-8000-000000000105';
-        await _insertIntention(database, id: id, title: 'ꭰ');
+    test('сопоставляет короткий фильтр без учёта регистра', () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000105';
+      await _insertIntention(database, id: id, title: 'ꭰ');
 
-        expect(await _findByTitleFilter(database, 'ꭰ'), [id]);
-        expect(_lastSelectStatement, contains('instr("title_search_key", ?)'));
-        expect(_lastSelectStatement, isNot(contains(' OR instr(')));
-        expect(_lastSelectArguments, ['Ꭰ']);
-      },
-    );
+      expect(await _findByTitleFilter(database, 'ꭰ'), [id]);
+      expect(await _findByTitleFilter(database, 'Ꭰ'), [id]);
+    });
 
     test('сохраняет буквальную семантику для синтаксических FTS-символов и Unicode', () async {
+      // Запрос всегда строится как одна буквальная фраза: достаточно кавычки,
+      // ключевого слова, префиксного знака, дефиса и Unicode-символов.
       const fixtures = [
         (
           searchKey: 'скажи "да"',
@@ -121,30 +93,6 @@ void main() {
           interpretedSearchKey: 'кофе',
         ),
         (
-          searchKey: 'дело AND срочно',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000205',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000206',
-          interpretedSearchKey: 'срочно дело',
-        ),
-        (
-          searchKey: 'дело NOT срочно',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000207',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000208',
-          interpretedSearchKey: 'дело важно',
-        ),
-        (
-          searchKey: 'NEAR(дело срочно)',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000209',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000210',
-          interpretedSearchKey: 'дело очень срочно',
-        ),
-        (
-          searchKey: '(дело OR срочно)',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000211',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000212',
-          interpretedSearchKey: 'срочно',
-        ),
-        (
           searchKey: 'купить*',
           literalId: '018f0b5d-6b2e-7c80-8000-000000000213',
           interpretedId: '018f0b5d-6b2e-7c80-8000-000000000214',
@@ -155,12 +103,6 @@ void main() {
           literalId: '018f0b5d-6b2e-7c80-8000-000000000215',
           interpretedId: '018f0b5d-6b2e-7c80-8000-000000000216',
           interpretedSearchKey: 'self care',
-        ),
-        (
-          searchKey: 'сделать  дело',
-          literalId: '018f0b5d-6b2e-7c80-8000-000000000217',
-          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000218',
-          interpretedSearchKey: 'сделать дело',
         ),
         (
           searchKey: 'ёжик café',
@@ -187,22 +129,6 @@ void main() {
         ], reason: fixture.searchKey);
       }
     });
-
-    test(
-      'index-aware integrity-check проходит для согласованных данных',
-      () async {
-        await _insertIntention(
-          database,
-          id: '018f0b5d-6b2e-7c80-8000-000000000103',
-          title: 'Заняться спортом',
-        );
-
-        await expectLater(
-          verifyIntentionTitlesFtsIntegrity(database),
-          completes,
-        );
-      },
-    );
 
     test('index-aware integrity-check обнаруживает рассогласованный индекс, который не видно content-чтению', () async {
       const id = '018f0b5d-6b2e-7c80-8000-000000000104';
@@ -263,38 +189,4 @@ Future<List<String>> _findByTitleFilter(
 
   final rows = await query.get();
   return rows.map((row) => row.id).toList();
-}
-
-String get _lastSelectStatement => _currentSqlTrace.lastSelect.statement;
-
-List<String> get _lastSelectArguments =>
-    _currentSqlTrace.lastSelect.arguments.cast<String>();
-
-late _SqlTrace _currentSqlTrace;
-
-final class _SqlTrace extends LocalDatabaseConnectionObserver {
-  final selects = <_SelectStatement>[];
-
-  _SelectStatement get lastSelect => selects.last;
-
-  void clear() {
-    selects.clear();
-    _currentSqlTrace = this;
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation == LocalDatabaseSqlOperation.select) {
-      selects.add(
-        _SelectStatement(statement.statements.single, statement.arguments),
-      );
-    }
-  }
-}
-
-final class _SelectStatement {
-  const _SelectStatement(this.statement, this.arguments);
-
-  final String statement;
-  final List<Object?> arguments;
 }

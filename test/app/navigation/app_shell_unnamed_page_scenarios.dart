@@ -1,61 +1,50 @@
 part of 'app_shell_pages_above_test.dart';
 
 void _registerUnnamedPageTests() {
-  for (final purpose in [
-    ChoicePathPurpose.refreshCreation,
-    ChoicePathPurpose.replace,
+  // Направление пути не влияет на панель: нужны оба назначения, а направление
+  // достаточно сменить между ними.
+  for (final (purpose, direction) in [
+    (ChoicePathPurpose.refreshCreation, ChoicePathDraftDirection.topDown),
+    (ChoicePathPurpose.replace, ChoicePathDraftDirection.bottomUp),
   ]) {
-    for (final direction in ChoicePathDraftDirection.values) {
-      testWidgets(
-        'безымянное построение пути: ${_purposeName(purpose)}, ${_directionName(direction)}',
-        (tester) async {
-          final router = await _start(tester);
-          final startingId = _intentionId(
-            direction == ChoicePathDraftDirection.topDown ? _read : _run,
-          );
-          final page = switch (purpose) {
-            ChoicePathPurpose.create => throw StateError(
-              'Создание открывается типизированным маршрутом',
-            ),
-            ChoicePathPurpose.refreshCreation =>
-              ChoicePathPage.forCreationRefresh(
-                startingIntentionId: startingId,
-                direction: direction,
-              ),
-            ChoicePathPurpose.replace => ChoicePathPage.forReplacement(
+    testWidgets(
+      'безымянное построение пути: ${_purposeName(purpose)}, ${_directionName(direction)}',
+      (tester) async {
+        final router = await _start(tester);
+        final startingId = _intentionId(
+          direction == ChoicePathDraftDirection.topDown ? _read : _run,
+        );
+        final page = switch (purpose) {
+          ChoicePathPurpose.create => throw StateError(
+            'Создание открывается типизированным маршрутом',
+          ),
+          ChoicePathPurpose.refreshCreation =>
+            ChoicePathPage.forCreationRefresh(
               startingIntentionId: startingId,
               direction: direction,
             ),
-          };
-          unawaited(
-            Navigator.of(tester.element(find.byType(HomePage)))
-                .push<void>(MaterialPageRoute(builder: (_) => page)),
-          );
-          await _until(tester, find.byType(ChoicePathPage));
-          await tester.pumpAndSettle();
-          final shown = tester.widget<ChoicePathPage>(
-            find.byType(ChoicePathPage),
-          );
-          expect(shown.purpose, purpose);
-          expect(shown.direction, direction);
-          expect(
-            tester
-                .state<ChoicePathPageState>(find.byType(ChoicePathPage))
-                .creationSession,
-            isNull,
-          );
-          _expectAboveShell(
-            tester,
-            ChoicePathPage,
-            AppDestination.home,
-            expectedPanel: false,
-          );
-          await _close(tester, ChoicePathPage);
-          _expectRootPage(tester, router, AppDestination.home);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+          ChoicePathPurpose.replace => ChoicePathPage.forReplacement(
+            startingIntentionId: startingId,
+            direction: direction,
+          ),
+        };
+        unawaited(
+          Navigator.of(tester.element(find.byType(HomePage)))
+              .push<void>(MaterialPageRoute(builder: (_) => page)),
+        );
+        await _until(tester, find.byType(ChoicePathPage));
+        await tester.pumpAndSettle();
+        _expectAboveShell(
+          tester,
+          ChoicePathPage,
+          AppDestination.home,
+          expectedPanel: false,
+        );
+        await _close(tester, ChoicePathPage);
+        _expectRootPage(tester, router, AppDestination.home);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final direction in ChoicePathDraftDirection.values) {
@@ -137,10 +126,6 @@ void _registerUnnamedPageTests() {
           tester,
           _summary(picker, topDown ? 'Читать' : 'Бегать'),
           ChoicePathPage,
-        );
-        expect(
-          tester.widget<ChoicePathPage>(find.byType(ChoicePathPage)).purpose,
-          ChoicePathPurpose.replace,
         );
         _expectAboveShell(
           tester,

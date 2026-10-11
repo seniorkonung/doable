@@ -14,8 +14,8 @@ final class DailyChoiceCatalogQueryValidationException implements Exception {
   final DailyChoiceCatalogQueryValidationFailure failure;
 }
 
-/// Продолжение принадлежит одному репозиторию, фильтрам, размеру порции,
-/// эпохе, ревизии и последнему ключу порядка. Содержимое скрыто от клиента.
+/// Продолжение несёт ревизию и последний ключ порядка. Содержимое скрыто от
+/// клиента.
 abstract interface class DailyChoiceCatalogCursor {}
 
 final class DailyChoiceCatalogQuery {
@@ -166,16 +166,7 @@ sealed class DailyChoiceCatalogReadFailure implements GraphCommandFailure {
   const DailyChoiceCatalogReadFailure();
 }
 
-/// Чужой курсор либо продолжение с другими фильтрами или размером порции.
-final class DailyChoiceCatalogValidationFailure
-    extends DailyChoiceCatalogReadFailure {
-  const DailyChoiceCatalogValidationFailure();
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.validation;
-}
-
-/// Ревизия или эпоха продолжения больше не совпадает с текущим снимком.
+/// Ревизия продолжения больше не совпадает с текущим снимком.
 final class DailyChoiceCatalogSnapshotExpired
     extends DailyChoiceCatalogReadFailure {
   const DailyChoiceCatalogSnapshotExpired();

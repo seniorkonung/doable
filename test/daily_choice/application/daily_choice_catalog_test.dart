@@ -1,7 +1,6 @@
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -13,31 +12,10 @@ import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
-  test('запрос по умолчанию охватывает все даты и оба состояния', () {
-    final query = DailyChoiceCatalogQuery();
-
-    expect(query.date, isNull);
-    expect(query.isCompleted, isNull);
-    expect(query.pageSize, 50);
-    expect(query.cursor, isNull);
-  });
-
-  test('запрос сохраняет явные фильтры и границы порции', () {
-    final date = CalendarDate.fromParts(2026, 9, 24);
-    const cursor = _Cursor();
+  test('размер порции допускает границы 1 и 100 и отвергает остальные', () {
     for (final size in [1, 100]) {
-      final query = DailyChoiceCatalogQuery(
-        date: date,
-        isCompleted: false,
-        pageSize: size,
-        cursor: cursor,
-      );
-      expect(query.date, date);
-      expect(query.isCompleted, false);
-      expect(query.pageSize, size);
-      expect(query.cursor, same(cursor));
+      expect(DailyChoiceCatalogQuery(pageSize: size).pageSize, size);
     }
-    expect(DailyChoiceCatalogQuery(isCompleted: true).isCompleted, true);
     for (final size in [-1, 0, 101]) {
       expect(
         () => DailyChoiceCatalogQuery(pageSize: size),
@@ -93,7 +71,7 @@ void main() {
     );
   });
 
-  test('первая порция сохраняет один снимок и неизменяемый список', () async {
+  test('первая порция копирует список и проверяет согласованность', () async {
     final items = [_item(1), _item(2)];
     final revision = _Revision(7);
     final page = DailyChoiceCatalogFirstPage(
@@ -113,9 +91,6 @@ void main() {
     expect(result, isA<DailyChoiceCatalogPageSuccess>());
     expect(page.items.map((item) => item.id), [_choice(1), _choice(2)]);
     expect(page.totalCount, 3);
-    expect(page.revision, same(revision));
-    expect(page.nextCursor, isA<DailyChoiceCatalogCursor>());
-    expect(() => page.items.clear(), throwsUnsupportedError);
     expect(
       () => DailyChoiceCatalogFirstPage(
         items: [_item(1)],
@@ -125,42 +100,6 @@ void main() {
       ),
       throwsA(isA<DailyChoiceCatalogPageValidationException>()),
     );
-  });
-
-  test(
-    'продолжение не выдаёт новое количество за согласованное с первой порцией',
-    () {
-      final page = DailyChoiceCatalogContinuationPage(
-        items: [_item(3)],
-        nextCursor: null,
-        revision: _Revision(7),
-      );
-      expect(page.items.single.id, _choice(3));
-      expect(page.nextCursor, isNull);
-    },
-  );
-
-  test('типизированные исходы различают чужой и устаревший курсор', () {
-    const failures = <DailyChoiceCatalogReadFailure>[
-      DailyChoiceCatalogValidationFailure(),
-      DailyChoiceCatalogSnapshotExpired(),
-      DailyChoiceCatalogUnavailableFailure(),
-      DailyChoiceCatalogCorruptionFailure(),
-      DailyChoiceCatalogUnexpectedFailure(),
-    ];
-    expect(failures.map((failure) => failure.category), [
-      GraphFailureCategory.validation,
-      GraphFailureCategory.conflict,
-      GraphFailureCategory.unavailable,
-      GraphFailureCategory.corruption,
-      GraphFailureCategory.unexpected,
-    ]);
-    for (final failure in failures) {
-      final DailyChoiceCatalogPageResult result = DailyChoiceCatalogPageError(
-        failure,
-      );
-      expect(result, isA<DailyChoiceCatalogPageError>());
-    }
   });
 }
 

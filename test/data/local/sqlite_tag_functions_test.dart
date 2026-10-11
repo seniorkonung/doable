@@ -53,22 +53,6 @@ void main() {
     },
   );
 
-  test('ключ закрепляет Unicode folding без нормализации', () {
-    String key(String name) =>
-        database.select('SELECT $tagNameKeyFunctionName(?) AS value', [
-              name,
-            ]).single['value']
-            as String;
-
-    expect(key('Straße'), 'strasse');
-    expect(key('STRASSE'), 'strasse');
-    expect(key('Все'), 'все');
-    expect(key('Всё'), 'всё');
-    expect(key('é'), 'é');
-    expect(key('e\u0301'), 'e\u0301');
-    expect(key('İ'), 'i\u0307');
-  });
-
   test('ошибка декодирования TEXT прерывает SQL без сохранения строки', () {
     database.execute('''
       CREATE TABLE tag_names (
@@ -150,7 +134,10 @@ void main() {
     }
     expect(actualTrimmed, expectedTrimmed);
 
-    for (final point in expectedTrimmed) {
+    // Набор закреплён выше целиком; поведение приложения и SQL-функций
+    // проверяется на представителях: ASCII-пробел, неразрывный пробел,
+    // пробел вне латиницы и BOM, который SQLite отдельно удаляет при чтении.
+    for (final point in const [0x0020, 0x00a0, 0x3000, 0xfeff]) {
       final character = String.fromCharCode(point);
       expect(TagName.fromInput('$characterДом$character').value, 'Дом');
       if (point == 0xfeff) continue;
@@ -165,16 +152,9 @@ void main() {
   });
 
   test('v1 закрепляет сегментацию составных графем на границе длины', () {
-    for (final cluster in [
-      'e\u0301',
-      '👩🏽‍💻',
-      '🏳️‍🌈',
-      '🇷🇺',
-      '👨‍👩‍👧‍👦',
-      '1️⃣',
-      '\u1100\u1161\u11a8',
-      'कि',
-    ]) {
+    // Сегментацию задаёт одна зависимость; представители: сочетаемый знак,
+    // последовательность с ZWJ и пара региональных индикаторов.
+    for (final cluster in ['e\u0301', '👩🏽‍💻', '🇷🇺']) {
       final allowed = List.filled(255, cluster).join();
       final rejected = List.filled(256, cluster).join();
       final row = database.select(

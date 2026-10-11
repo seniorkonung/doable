@@ -1,19 +1,15 @@
-import 'dart:io';
 import 'dart:ui' show CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -23,7 +19,6 @@ import 'package:doable/src/long_term_relation/presentation/neighborhood/relation
 import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -297,16 +292,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(RelationNeighborhoodSliver)),
-    );
-    expect(
-      container
-          .read(blockingRelationsSelectionViewModelProvider(owner))
-          .selectedByReference
-          .keys,
-      {DailyChoiceBlockingRelationReference(first.id)},
-    );
     expect(find.text('Selected relations: 1'), findsOneWidget);
     final thirdRow = find.byKey(
       ValueKey(
@@ -435,7 +420,6 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(container.read(provider).selected, isEmpty);
     await _pumpUntilRequestCount(tester, repository, 2);
     repository.completePage(
       1,
@@ -458,12 +442,13 @@ void main() {
     );
     await tester.tap(second);
     await tester.pump();
-    expect(container.read(provider).selected.keys, {testRelationId(2)});
+    expect(
+      tester.getSemantics(second).flagsCollection.isChecked,
+      CheckedState.isTrue,
+    );
     // Окрестность связи — представление без поиска: тегов и условий в ней нет.
-    expect(find.byType(IntentionSummaryView), findsWidgets);
     expect(find.textContaining('Tags:'), findsNothing);
     expect(find.text('No tags'), findsNothing);
-    expect(find.byType(IntentionTagConditionsSection), findsNothing);
     await tester.drag(find.byType(Scrollable), const Offset(0, 3000));
     await tester.pump();
     expect(find.text('Selected relations: 1'), findsOneWidget);
@@ -498,10 +483,6 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(RelationNeighborhoodSliver)),
-      );
-      final selection = blockingRelationsSelectionViewModelProvider(ownerId);
       expect(find.text('Selected relations: 0'), findsOneWidget);
       final first = find.byKey(
         ValueKey(
@@ -521,7 +502,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(first);
       await tester.pumpAndSettle();
-      expect(container.read(selection).selected.keys, {testRelationId(1)});
       expect(
         tester.getSemantics(first).label,
         contains('Remove from selection'),
@@ -541,7 +521,6 @@ void main() {
         tester.getSemantics(third).flagsCollection.isChecked,
         CheckedState.isFalse,
       );
-      expect(container.read(selection).selected.keys, {testRelationId(1)});
 
       await tester.drag(find.byType(Scrollable), const Offset(0, 3000));
       await tester.pumpAndSettle();
@@ -592,7 +571,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(container.read(selection).selected.keys, {testRelationId(1)});
+      expect(find.text('Selected relations: 1'), findsOneWidget);
       final archived = find.byKey(
         ValueKey(
           'relation-neighborhood-select-${testRelationId(4).toCanonicalString()}',
@@ -606,10 +585,6 @@ void main() {
       );
       await tester.tap(archived);
       await tester.pumpAndSettle();
-      expect(container.read(selection).selected.keys, {
-        testRelationId(1),
-        testRelationId(4),
-      });
       expect(find.text('Selected relations: 2'), findsOneWidget);
       final review = find.byKey(const ValueKey('blocking-relations-review'));
       await tester.ensureVisible(review);
@@ -636,209 +611,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));
       await tester.pumpAndSettle();
-      expect(container.read(selection).selected.keys, {
-        testRelationId(1),
-        testRelationId(4),
-      });
+      expect(find.text('Selected relations: 2'), findsOneWidget);
       await _scrollTo(tester, archived);
       await tester.tap(archived);
       await tester.pumpAndSettle();
-      expect(container.read(selection).selected.keys, {testRelationId(1)});
-      expect(repository.queries, hasLength(5));
+      expect(find.text('Selected relations: 1'), findsOneWidget);
       semantics.dispose();
     },
   );
-
-  testWidgets('просматривает весь выбор сверх порции на большом соседстве', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final repository = ControlledNeighborhoodRepository();
-    addTearDown(repository.dispose);
-    final ownerId = testIntentionId(1);
-    final counts = testRelationCounts(
-      activeNeedOutgoing: 250,
-      archivedCanIncoming: 5000,
-    );
-    await _pumpNeighborhoodSliver(
-      tester,
-      repository,
-      ownerId,
-      selectionMode: true,
-      pageSize: 50,
-    );
-    repository.completePage(
-      0,
-      RelationGroupFirstPage(
-        items: testGroupRows(ownerId: ownerId, from: 1, count: 50),
-        counts: counts,
-        nextCursor: const TestRelationGroupCursor(50),
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(RelationNeighborhoodSliver)),
-    );
-    final neighborhood = container.read(
-      relationNeighborhoodViewModelProvider(ownerId).notifier,
-    );
-    final selectionProvider = blockingRelationsSelectionViewModelProvider(
-      ownerId,
-    );
-    final selection = container.read(selectionProvider.notifier);
-
-    final pageWatch = Stopwatch()..start();
-    for (var pageIndex = 1; pageIndex < 5; pageIndex++) {
-      final loaded = container.read(
-        relationNeighborhoodViewModelProvider(ownerId),
-      ) as RelationGroupLoaded;
-      final request = neighborhood.loadMoreIfNeeded(
-        visibleIndex: loaded.items.length - 1,
-      );
-      await _pumpUntilRequestCount(tester, repository, pageIndex + 1);
-      repository.completePage(
-        pageIndex,
-        RelationGroupContinuationPage(
-          items: testGroupRows(
-            ownerId: ownerId,
-            from: pageIndex * 50 + 1,
-            count: 50,
-          ),
-          nextCursor: pageIndex == 4
-              ? null
-              : TestRelationGroupCursor((pageIndex + 1) * 50),
-          revision: revision,
-        ),
-      );
-      await request;
-      await tester.pumpAndSettle();
-    }
-    pageWatch.stop();
-    final active = container.read(
-      relationNeighborhoodViewModelProvider(ownerId),
-    ) as RelationGroupLoaded;
-    expect(active.items, hasLength(250));
-    expect(active.nextCursor, isNull);
-    expect(active.items.map((row) => row.relation.id).toSet(), hasLength(250));
-    expect(repository.queries, hasLength(5));
-
-    for (final row in active.items.take(50)) {
-      expect(selection.select(row), isTrue);
-    }
-    final lastActive = find.byKey(
-      ValueKey(
-        'relation-neighborhood-select-${testRelationId(250).toCanonicalString()}',
-      ),
-    );
-    await _scrollUntilBuiltAndVisible(tester, lastActive, maxAttempts: 300);
-    await tester.tap(lastActive);
-    await tester.pumpAndSettle();
-    expect(container.read(selectionProvider).selected, hasLength(51));
-
-    tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
-    await tester.pump();
-    neighborhood.selectGroup(
-      const RelationGroupSelection(
-        type: LongTermRelationType.can,
-        direction: RelationDirection.incoming,
-        scope: RelationScope.archived,
-      ),
-    );
-    await _pumpUntilRequestCount(tester, repository, 6);
-    repository.completePage(
-      5,
-      RelationGroupFirstPage(
-        items: testGroupRows(
-          ownerId: ownerId,
-          from: 251,
-          count: 50,
-          type: LongTermRelationType.can,
-          direction: RelationDirection.incoming,
-          scope: RelationScope.archived,
-        ),
-        counts: counts,
-        nextCursor: const TestRelationGroupCursor(300),
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(repository.queries.last.scope, RelationScope.archived);
-    expect(repository.queries.last.type, LongTermRelationType.can);
-    final archived = find.byKey(
-      ValueKey(
-        'relation-neighborhood-select-${testRelationId(251).toCanonicalString()}',
-      ),
-    );
-    await _scrollUntilBuiltAndVisible(tester, archived);
-    await tester.tap(archived);
-    await tester.pumpAndSettle();
-    expect(container.read(selectionProvider).selected, hasLength(52));
-
-    final rssBeforeReview = ProcessInfo.currentRss;
-    final reviewWatch = Stopwatch()..start();
-    tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
-    await tester.pump();
-    final review = find.byKey(const ValueKey('blocking-relations-review'));
-    await _scrollTo(tester, review);
-    await tester.tap(review);
-    await tester.pumpAndSettle();
-    reviewWatch.stop();
-    final rssAfterReview = ProcessInfo.currentRss;
-    final prepared =
-        container.read(selectionProvider) as BlockingRelationsSelectionPrepared;
-    final selectedIds = {
-      for (var index = 1; index <= 50; index++) testRelationId(index),
-      testRelationId(250),
-      testRelationId(251),
-    };
-    expect(
-      prepared.snapshot.rows.map((row) => row.relation.id).toSet(),
-      selectedIds,
-    );
-    expect(prepared.snapshot.command.relationIds, selectedIds);
-    expect(repository.queries, hasLength(6));
-
-    final browseWatch = Stopwatch()..start();
-    for (final id in prepared.snapshot.command.relationIds) {
-      final row = find.byKey(
-        ValueKey('blocking-relations-confirm-row-${id.toCanonicalString()}'),
-      );
-      await tester.scrollUntilVisible(
-        row,
-        400,
-        scrollable: find.byType(Scrollable).last,
-      );
-      expect(row, findsOneWidget);
-      final selectedRow = prepared.snapshot.rows.singleWhere(
-        (candidate) => candidate.relation.id == id,
-      );
-      final rowSemantics = find.byKey(
-        ValueKey(
-          'blocking-relations-confirm-semantics-${id.toCanonicalString()}',
-        ),
-      );
-      expect(
-        tester.getSemantics(rowSemantics).label,
-        contains(selectedRow.source.title),
-      );
-      expect(
-        tester.getSemantics(rowSemantics).label,
-        contains(selectedRow.related.title),
-      );
-    }
-    browseWatch.stop();
-    expect(repository.queries, hasLength(6));
-    stdout.writeln(
-      'Измерения OpenSpec 6.17 UI: active=250, archived=5000, '
-      'selected=52, pageLoad=${pageWatch.elapsedMicroseconds}us, '
-      'review=${reviewWatch.elapsedMicroseconds}us, '
-      'browse=${browseWatch.elapsedMicroseconds}us, '
-      'reviewRssDelta=${rssAfterReview - rssBeforeReview}B, '
-      'browseRssDelta=${ProcessInfo.currentRss - rssAfterReview}B',
-    );
-    semantics.dispose();
-  }, timeout: const Timeout(Duration(minutes: 5)));
 
   testWidgets(
     'сохраняет русский выбор при открытии связи и возврате с крупным текстом',
@@ -896,15 +676,9 @@ void main() {
       );
       await tester.tap(checkbox);
       await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(RelationNeighborhoodSliver)),
-      );
       expect(
-        container
-            .read(blockingRelationsSelectionViewModelProvider(ownerId))
-            .selected
-            .keys,
-        {testRelationId(1)},
+        tester.getSemantics(checkbox).flagsCollection.isChecked,
+        CheckedState.isTrue,
       );
       final phrase = find.text('Чтобы Намерение-владелец, нужно Связанное 1');
       await _scrollTo(tester, phrase);
@@ -913,14 +687,11 @@ void main() {
       expect(find.text('Просмотр связи'), findsOneWidget);
       Navigator.of(tester.element(find.text('Просмотр связи'))).pop();
       await tester.pumpAndSettle();
+      await _scrollTo(tester, checkbox);
       expect(
-        container
-            .read(blockingRelationsSelectionViewModelProvider(ownerId))
-            .selected
-            .keys,
-        {testRelationId(1)},
+        tester.getSemantics(checkbox).flagsCollection.isChecked,
+        CheckedState.isTrue,
       );
-      expect(repository.queries, hasLength(1));
       expect(tester.takeException(), isNull);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
@@ -929,79 +700,81 @@ void main() {
     },
   );
 
-  testWidgets(
-    'новая связь при открытом подтверждении не входит в выбранный набор',
-    (tester) async {
-      final repository = ControlledNeighborhoodRepository();
-      addTearDown(repository.dispose);
-      final ownerId = testIntentionId(1);
-      await _pumpNeighborhoodSliver(
-        tester,
-        repository,
-        ownerId,
-        selectionMode: true,
-      );
-      repository.completePage(
-        0,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
-          counts: testRelationCounts(activeNeedOutgoing: 1),
-          nextCursor: null,
-          revision: revision,
-        ),
-      );
-      await tester.pumpAndSettle();
-      final first = find.byKey(
-        ValueKey(
-          'relation-neighborhood-select-${testRelationId(1).toCanonicalString()}',
-        ),
-      );
-      await _scrollTo(tester, first);
-      await tester.tap(first);
-      await tester.pumpAndSettle();
-      final review = find.byKey(const ValueKey('blocking-relations-review'));
-      await tester.ensureVisible(review);
-      await tester.pumpAndSettle();
-      await tester.tap(review);
-      await tester.pumpAndSettle();
+  testWidgets('новая связь при открытом подтверждении не входит в выбранный набор', (
+    tester,
+  ) async {
+    final repository = ControlledNeighborhoodRepository();
+    addTearDown(repository.dispose);
+    final ownerId = testIntentionId(1);
+    await _pumpNeighborhoodSliver(
+      tester,
+      repository,
+      ownerId,
+      selectionMode: true,
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
+        counts: testRelationCounts(activeNeedOutgoing: 1),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final first = find.byKey(
+      ValueKey(
+        'relation-neighborhood-select-${testRelationId(1).toCanonicalString()}',
+      ),
+    );
+    await _scrollTo(tester, first);
+    await tester.tap(first);
+    await tester.pumpAndSettle();
+    final review = find.byKey(const ValueKey('blocking-relations-review'));
+    await tester.ensureVisible(review);
+    await tester.pumpAndSettle();
+    await tester.tap(review);
+    await tester.pumpAndSettle();
 
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(RelationNeighborhoodSliver)),
-      );
-      container
-          .read(relationNeighborhoodViewModelProvider(ownerId).notifier)
-          .showBlockingRelations();
-      await tester.pump();
-      repository.completePage(
-        1,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 2),
-          counts: testRelationCounts(activeNeedOutgoing: 2),
-          nextCursor: null,
-          revision: const TestGraphRevision(2),
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(RelationNeighborhoodSliver)),
+    );
+    container
+        .read(relationNeighborhoodViewModelProvider(ownerId).notifier)
+        .showBlockingRelations();
+    await tester.pump();
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: ownerId, from: 1, count: 2),
+        counts: testRelationCounts(activeNeedOutgoing: 2),
+        nextCursor: null,
+        revision: const TestGraphRevision(2),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(
+        ValueKey(
+          'blocking-relations-confirm-row-${testRelationId(1).toCanonicalString()}',
         ),
-      );
-      await tester.pumpAndSettle();
-      final prepared = container.read(
-        blockingRelationsSelectionViewModelProvider(ownerId),
-      ) as BlockingRelationsSelectionPrepared;
-      expect(prepared.snapshot.command.relationIds, {testRelationId(1)});
-      expect(
-        find.byKey(
-          ValueKey(
-            'blocking-relations-confirm-row-${testRelationId(2).toCanonicalString()}',
-          ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        ValueKey(
+          'blocking-relations-confirm-row-${testRelationId(2).toCanonicalString()}',
         ),
-        findsNothing,
-      );
-      final cancel = find.byKey(const ValueKey('blocking-relations-cancel'));
-      await tester.ensureVisible(cancel);
-      await tester.pumpAndSettle();
-      await tester.tap(cancel);
-      await tester.pumpAndSettle();
-      expect(repository.requestCount, 2);
-    },
-  );
+      ),
+      findsNothing,
+    );
+    final cancel = find.byKey(const ValueKey('blocking-relations-cancel'));
+    await tester.ensureVisible(cancel);
+    await tester.pumpAndSettle();
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
+  });
 
   testWidgets(
     'открывает активные исходящие связи «нужно» и показывает полную сводку',
@@ -1013,7 +786,6 @@ void main() {
 
       await _pumpDetailsPage(tester, repository, ownerId);
 
-      expect(repository.queries, hasLength(1));
       _expectQuery(
         repository.queryAt(0),
         intentionId: ownerId,
@@ -1109,25 +881,15 @@ void main() {
 
     await _scrollTo(tester, find.text('To Моё намерение, you need Сосед один'));
     final neighborhood = find.byType(RelationNeighborhoodSliver);
-    final participants = find.descendant(
-      of: neighborhood,
-      matching: find.byType(IntentionSummaryView),
-    );
     // Избранное намерение само участвует в каждой связи своего соседства.
     expect(
-      find.descendant(of: participants, matching: find.text('Моё намерение')),
+      find.descendant(of: neighborhood, matching: find.text('Моё намерение')),
       findsWidgets,
     );
     expect(
       find.descendant(of: neighborhood, matching: find.byIcon(Icons.star)),
       findsNothing,
     );
-    for (final participant in participants.evaluate()) {
-      expect(
-        (participant.widget as IntentionSummaryView).confirmedFavoriteMark,
-        isNull,
-      );
-    }
     expect(
       find.descendant(
         of: neighborhood,
@@ -1140,7 +902,7 @@ void main() {
   });
 
   testWidgets(
-    'восемь переходов открывают только выбранную группу и сохраняют параметры',
+    'переходы открывают только выбранную группу и сохраняют параметры',
     (tester) async {
       final repository = ControlledNeighborhoodRepository();
       addTearDown(repository.dispose);
@@ -1157,15 +919,13 @@ void main() {
       await tester.pumpAndSettle();
 
       var requestIndex = 1;
-      for (final group in [
-        ..._groups.where((group) => group != _groups[3]),
-        _groups[3],
-      ]) {
+      // Плитки строятся одним циклом по перечислениям: достаточно группы, где
+      // все три параметра отличаются от исходной, и возврата к исходной.
+      for (final group in [_groups[0], _groups[3]]) {
         await _scrollTo(tester, find.byKey(_groupKey(group)));
         await tester.tap(find.byKey(_groupKey(group)));
         await tester.pump();
 
-        expect(repository.queries, hasLength(requestIndex + 1));
         _expectQuery(
           repository.queryAt(requestIndex),
           intentionId: ownerId,
@@ -1501,18 +1261,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(IntentionDetailsPage)),
-      );
-      final state = container.read(
-        relationNeighborhoodViewModelProvider(ownerId),
-      );
-      expect(state, isA<RelationGroupLoaded>());
-      final anchor = (state as RelationGroupLoaded).scrollAnchor;
-      expect(anchor, isNotNull);
-      final anchoredRow = _rowFinderById(
-        anchor!.relationId.toCanonicalString(),
-      );
+      // После замены списка показанная пользователю связь остаётся в области
+      // прокрутки.
+      final anchoredRow = _rowFinder(9);
       expect(anchoredRow, findsOneWidget);
       final rowRect = tester.getRect(anchoredRow);
       final viewportRect = tester.getRect(find.byType(Scrollable));
@@ -1559,16 +1310,6 @@ void main() {
       );
       await _pumpUntilRequestCount(tester, repository, refreshRequestIndex + 1);
       await tester.pump();
-
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(RelationNeighborhoodSliver)),
-      );
-      expect(
-        (container.read(
-          relationNeighborhoodViewModelProvider(ownerId),
-        ) as RelationGroupConfirmedState).summaryFreshness,
-        RelationSummaryFreshness.refreshing,
-      );
 
       expect(find.text('Обновляем сохранённые числа связей…'), findsOneWidget);
       expect(

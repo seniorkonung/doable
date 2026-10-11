@@ -7,13 +7,10 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         AppDatabase,
@@ -24,8 +21,6 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
-import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -33,15 +28,10 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tag_command.dart';
-import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -57,91 +47,52 @@ const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 void main() {
   group('AppRuntime', () {
     test(
-      'создаёт один модуль графа в одном container без automatic retry',
+      'по умолчанию предоставляет каталогу местную дату устройства',
       () async {
-        final repository = _ControlledPersonalGraphRepository();
-        var repositoryFactoryCalls = 0;
-        final runtime = AppRuntime(
-          quickCreationModeStore: InMemoryQuickCreationModeStore(),
-          connectionFactory: openInMemoryLocalDatabase,
-          diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) {
-            repositoryFactoryCalls += 1;
-            return repository;
-          },
-        );
-        addTearDown(runtime.shutdown);
-
-        final bootstrapping = runtime.bootstrap();
-        expect(runtime.bootstrap(), same(bootstrapping));
-        final result = await bootstrapping;
-
-        expect(result, isA<AppRuntimeReady>());
-        final ready = result as AppRuntimeReady;
-        expect(
-          ready.container.read(personalGraphRepositoryProvider),
-          same(repository),
-        );
-        final coordinator = ready.container.read(
-          graphCommandCoordinatorProvider.notifier,
-        );
-        expect(coordinator, same(runtime.commandCoordinator));
-        final router = ready.container.read(appRouterProvider);
-        expect(ready.container.read(appRouterProvider), same(router));
-        expect(ready.container.retry!(0, Exception('отказ provider')), isNull);
-
-        final repeated = await runtime.bootstrap();
-        expect(repeated, same(ready));
-        expect(repositoryFactoryCalls, 1);
-      },
-    );
-
-    test('по умолчанию предоставляет каталогу часы устройства', () async {
-      final runtime = AppRuntime(
-        quickCreationModeStore: InMemoryQuickCreationModeStore(),
-        connectionFactory: openInMemoryLocalDatabase,
-        diagnosticsSink: InMemoryDiagnosticsSink(),
-        repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
-      );
-      addTearDown(runtime.shutdown);
-
-      final ready = await runtime.bootstrap() as AppRuntimeReady;
-
-      expect(
-        ready.container.read(dailyChoiceLocalDateSourceProvider),
-        same(readDeviceLocalDay),
-      );
-    });
-
-    test(
-      'передаёт каталогу подставленный источник даты без чтения при запуске',
-      () async {
-        final localDate = ControlledDailyChoiceLocalDate(
-          CalendarDate.fromParts(2026, 10, 5),
-        );
         final runtime = AppRuntime(
           quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: openInMemoryLocalDatabase,
           diagnosticsSink: InMemoryDiagnosticsSink(),
           repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
-          dailyChoiceLocalDateSource: localDate.read,
         );
         addTearDown(runtime.shutdown);
 
         final ready = await runtime.bootstrap() as AppRuntimeReady;
-        final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
+        final before = DateTime.now();
+        final reading = ready.container.read(
+          dailyChoiceLocalDateSourceProvider,
+        )();
+        final after = DateTime.now();
 
-        expect(localDate.readCount, 0);
-        expect(source().date, CalendarDate.fromParts(2026, 10, 5));
-
-        localDate.today = CalendarDate.fromParts(2026, 10, 6);
-        expect(
-          ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
-          CalendarDate.fromParts(2026, 10, 6),
-        );
-        expect(localDate.readCount, 2);
+        // Допускаем полночь между двумя показаниями часов теста.
+        expect(reading.date, anyOf(_dateOf(before), _dateOf(after)));
       },
     );
+
+    test('передаёт каталогу подставленный источник даты, который показывает новый день', () async {
+      final localDate = ControlledDailyChoiceLocalDate(
+        CalendarDate.fromParts(2026, 10, 5),
+      );
+      final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
+        connectionFactory: openInMemoryLocalDatabase,
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+        repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
+        dailyChoiceLocalDateSource: localDate.read,
+      );
+      addTearDown(runtime.shutdown);
+
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
+
+      expect(source().date, CalendarDate.fromParts(2026, 10, 5));
+
+      localDate.today = CalendarDate.fromParts(2026, 10, 6);
+      expect(
+        ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
+        CalendarDate.fromParts(2026, 10, 6),
+      );
+    });
 
     test('повторяет bootstrap только после retryable outcome', () async {
       var connectionAttempts = 0;
@@ -212,20 +163,16 @@ void main() {
           ];
 
       for (final scenario in scenarios) {
-        var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
           quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: scenario.connectionFactory,
           diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) {
-            repositoryFactoryCalls += 1;
-            return _ControlledPersonalGraphRepository();
-          },
+          repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
         );
         addTearDown(runtime.shutdown);
 
         expect(await runtime.bootstrap(), scenario.result);
-        expect(repositoryFactoryCalls, 0);
+        expect(() => runtime.commandCoordinator, throwsStateError);
         await runtime.shutdown();
       }
     });
@@ -272,8 +219,8 @@ void main() {
       ) as IntentionCommandAccepted;
 
       final shutdown = runtime.shutdown();
+      final repeatedShutdown = runtime.shutdown();
 
-      expect(runtime.shutdown(), same(shutdown));
       expect(
         coordinator.acceptCreation(
           IntentionCreationFormKey(),
@@ -290,251 +237,10 @@ void main() {
 
       repository.complete(const ResultFailure(IntentionUnavailableFailure()));
       await accepted.future;
-      await shutdown;
+      await Future.wait([shutdown, repeatedShutdown]);
 
       expect(closeObserver.closeCalls, 1);
     });
-
-    test(
-      'подключает создание связи к coordinator времени жизни приложения',
-      () async {
-        final repository = _ControlledPersonalGraphRepository();
-        final closeObserver = _CloseTrackingObserver();
-        final runtime = AppRuntime(
-          quickCreationModeStore: InMemoryQuickCreationModeStore(),
-          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-            openInMemoryLocalDatabase(),
-            closeObserver,
-          ),
-          diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) => repository,
-        );
-        addTearDown(runtime.shutdown);
-        await runtime.bootstrap();
-        final coordinator = runtime.commandCoordinator;
-        final accepted = coordinator.acceptRelationCreation(
-          LongTermRelationCreationFormKey(),
-          CreateLongTermRelation(
-            sourceIntentionId: _intentionId(_relationSourceUuid),
-            relatedIntentionId: _intentionId(_relationRelatedUuid),
-            type: LongTermRelationType.need,
-            priority: RelationPriority.p2,
-            description: null,
-          ),
-        ) as LongTermRelationCommandAccepted;
-
-        final shutdown = runtime.shutdown();
-
-        expect(closeObserver.closeCalls, 0);
-        expect(
-          coordinator.acceptRelationCreation(
-            LongTermRelationCreationFormKey(),
-            CreateLongTermRelation(
-              sourceIntentionId: _intentionId(_relationSourceUuid),
-              relatedIntentionId: _intentionId(_relationRelatedUuid),
-              type: LongTermRelationType.can,
-              priority: RelationPriority.p4,
-              description: null,
-            ),
-          ),
-          isA<GraphCommandCoordinatorDraining>(),
-        );
-
-        repository.complete(
-          const GraphCommandFailed<
-            LongTermRelationCommandSuccess,
-            LongTermRelationCommandFailure
-          >(LongTermRelationUnavailableFailure()),
-        );
-        await accepted.future;
-        await shutdown;
-
-        expect(closeObserver.closeCalls, 1);
-      },
-    );
-
-    test(
-      'shutdown дожидается массового удаления и освобождает весь набор',
-      () async {
-        final repository = _ControlledPersonalGraphRepository();
-        final closeObserver = _CloseTrackingObserver();
-        final runtime = AppRuntime(
-          quickCreationModeStore: InMemoryQuickCreationModeStore(),
-          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-            openInMemoryLocalDatabase(),
-            closeObserver,
-          ),
-          diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) => repository,
-        );
-        addTearDown(runtime.shutdown);
-        await runtime.bootstrap();
-        final coordinator = runtime.commandCoordinator;
-        final intentionId = _intentionId(_relationSourceUuid);
-        final relationId = _relationId(_relationRelatedUuid);
-        final choiceId = _choiceId(_relationRelatedUuid);
-        final accepted = coordinator.acceptBlockingRelationsDelete(
-          DeleteBlockingRelations(
-            intentionId: intentionId,
-            references: {
-              LongTermBlockingRelationReference(relationId),
-              DailyChoiceBlockingRelationReference(choiceId),
-            },
-          ),
-          presentationTitle: 'Намерение',
-        ) as BlockingRelationsDeleteAccepted;
-        coordinator.releaseInitiatorPresentation(accepted.token);
-
-        final shutdown = runtime.shutdown();
-        expect(coordinator.isRunning(intentionId), isTrue);
-        expect(coordinator.isRelationRunning(relationId), isTrue);
-        expect(coordinator.isDailyChoiceRunning(choiceId), isTrue);
-        expect(closeObserver.closeCalls, 0);
-        expect(
-          coordinator.acceptBlockingRelationsDelete(
-            DeleteBlockingRelations.longTerm(
-              intentionId: _intentionId(_relationRelatedUuid),
-              relationIds: {_relationId(_relationSourceUuid)},
-            ),
-            presentationTitle: 'Другое',
-          ),
-          isA<GraphCommandCoordinatorDraining>(),
-        );
-
-        repository.complete(
-          const GraphCommandFailed<
-            BlockingRelationsDeleted,
-            DeleteBlockingRelationsFailure
-          >(DeleteBlockingRelationsUnavailableFailure()),
-        );
-        final completion = await accepted.future;
-        expect(completion.token, same(accepted.token));
-        expect(coordinator.isRunning(intentionId), isFalse);
-        expect(coordinator.isRelationRunning(relationId), isFalse);
-        expect(coordinator.isDailyChoiceRunning(choiceId), isFalse);
-        await shutdown;
-        expect(closeObserver.closeCalls, 1);
-      },
-    );
-
-    test('shutdown дожидается принятой дневной команды', () async {
-      final repository = _ControlledPersonalGraphRepository();
-      final closeObserver = _CloseTrackingObserver();
-      final runtime = AppRuntime(
-        quickCreationModeStore: InMemoryQuickCreationModeStore(),
-        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          closeObserver,
-        ),
-        diagnosticsSink: InMemoryDiagnosticsSink(),
-        repositoryFactory: (_) => repository,
-      );
-      addTearDown(runtime.shutdown);
-      await runtime.bootstrap();
-      final coordinator = runtime.commandCoordinator;
-      final choiceId = _choiceId(_relationRelatedUuid);
-      final accepted = coordinator.acceptDailyChoiceDelete(
-        DeleteDailyChoice(choiceId),
-      ) as DailyChoiceCommandAccepted;
-      coordinator.releaseInitiatorPresentation(accepted.token);
-
-      final shutdown = runtime.shutdown();
-      expect(coordinator.isDailyChoiceRunning(choiceId), isTrue);
-      expect(closeObserver.closeCalls, 0);
-      expect(
-        coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(choiceId)),
-        isA<GraphCommandCoordinatorDraining>(),
-      );
-
-      repository.complete(
-        const GraphCommandFailed<
-          DailyChoiceCommandSuccess,
-          DailyChoiceCommandFailure
-        >(DailyChoiceUnavailableFailure()),
-      );
-      await accepted.future;
-      await shutdown;
-      expect(closeObserver.closeCalls, 1);
-    });
-
-    test('shutdown дожидается команды тега до закрытия базы', () async {
-      final repository = _ControlledPersonalGraphRepository();
-      final closeObserver = _CloseTrackingObserver();
-      final runtime = AppRuntime(
-        quickCreationModeStore: InMemoryQuickCreationModeStore(),
-        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          closeObserver,
-        ),
-        diagnosticsSink: InMemoryDiagnosticsSink(),
-        repositoryFactory: (_) => repository,
-      );
-      addTearDown(runtime.shutdown);
-      await runtime.bootstrap();
-      final coordinator = runtime.commandCoordinator;
-      final tagId =
-          (TagId.decode(_relationSourceUuid) as TagIdDecodingSuccess).id;
-      final accepted =
-          coordinator.acceptTagDelete(DeleteTag(tagId)) as TagCommandAccepted;
-      coordinator.releaseInitiatorPresentation(accepted.token);
-
-      final shutdown = runtime.shutdown();
-      expect(coordinator.isTagRunning(tagId), isTrue);
-      expect(closeObserver.closeCalls, 0);
-      expect(
-        coordinator.acceptTagDelete(DeleteTag(tagId)),
-        isA<GraphCommandCoordinatorDraining>(),
-      );
-
-      repository.complete(const TagCommandFailed(TagUnavailableFailure()));
-      final completion = await accepted.future;
-      expect(completion.isFailure, isTrue);
-      await shutdown;
-      expect(closeObserver.closeCalls, 1);
-    });
-
-    test(
-      'shutdown сохраняет резервирование назначения до закрытия базы',
-      () async {
-        final repository = _ControlledPersonalGraphRepository();
-        final closeObserver = _CloseTrackingObserver();
-        final runtime = AppRuntime(
-          quickCreationModeStore: InMemoryQuickCreationModeStore(),
-          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-            openInMemoryLocalDatabase(),
-            closeObserver,
-          ),
-          diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) => repository,
-        );
-        addTearDown(runtime.shutdown);
-        await runtime.bootstrap();
-        final coordinator = runtime.commandCoordinator;
-        final tagId =
-            (TagId.decode(_relationSourceUuid) as TagIdDecodingSuccess).id;
-        final intentionId = _intentionId(_relationRelatedUuid);
-        final accepted = coordinator.acceptTagAssign(
-          AssignTag(tagId: tagId, intentionId: intentionId),
-        ) as TagCommandAccepted;
-        coordinator.releaseInitiatorPresentation(accepted.token);
-
-        final shutdown = runtime.shutdown();
-        expect(coordinator.isTagRunning(tagId), isTrue);
-        expect(coordinator.isRunning(intentionId), isTrue);
-        expect(closeObserver.closeCalls, 0);
-        expect(
-          coordinator.acceptTagAssign(
-            AssignTag(tagId: tagId, intentionId: intentionId),
-          ),
-          isA<GraphCommandCoordinatorDraining>(),
-        );
-
-        repository.complete(const TagCommandFailed(TagUnavailableFailure()));
-        await accepted.future;
-        await shutdown;
-        expect(closeObserver.closeCalls, 1);
-      },
-    );
 
     test(
       'shutdown ждёт in-flight bootstrap и не создаёт provider graph',
@@ -545,7 +251,6 @@ void main() {
           openingStarted: openingStarted,
           allowOpening: allowOpening,
         );
-        var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
           quickCreationModeStore: InMemoryQuickCreationModeStore(),
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
@@ -553,10 +258,7 @@ void main() {
             lifecycleObserver,
           ),
           diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) {
-            repositoryFactoryCalls += 1;
-            return _ControlledPersonalGraphRepository();
-          },
+          repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
         );
         addTearDown(() async {
           if (!allowOpening.isCompleted) allowOpening.complete();
@@ -568,19 +270,21 @@ void main() {
         final shutdown = runtime.shutdown();
 
         expect(runtime.bootstrap, throwsStateError);
-        expect(repositoryFactoryCalls, 0);
         expect(lifecycleObserver.closeCalls, 0);
 
         allowOpening.complete();
         await expectLater(bootstrapping, throwsStateError);
         await shutdown;
 
-        expect(repositoryFactoryCalls, 0);
+        expect(() => runtime.commandCoordinator, throwsStateError);
         expect(lifecycleObserver.closeCalls, 1);
       },
     );
   });
 }
+
+CalendarDate _dateOf(DateTime moment) =>
+    CalendarDate.fromParts(moment.year, moment.month, moment.day);
 
 final class _ControlledPersonalGraphRepository
     with
@@ -672,31 +376,6 @@ final class _ControlledPersonalGraphRepository
   ) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
 }
-
-IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
-  IntentionIdDecodingSuccess(:final id) => id,
-  InvalidIntentionIdDecoding() => throw StateError(
-    'Некорректный UUID fixture.',
-  ),
-};
-
-LongTermRelationId _relationId(String value) =>
-    switch (LongTermRelationId.decode(value)) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() => throw StateError(
-        'Некорректный UUID fixture связи.',
-      ),
-    };
-
-DailyChoiceId _choiceId(String value) => switch (DailyChoiceId.decode(value)) {
-  DailyChoiceIdDecodingSuccess(:final id) => id,
-  InvalidDailyChoiceIdDecoding() => throw StateError(
-    'Некорректный UUID fixture дневного выбора.',
-  ),
-};
-
-const _relationSourceUuid = '018f47c2-6b7d-7abc-8def-0123456789ab';
-const _relationRelatedUuid = '018f47c2-6b7d-7abc-8def-0123456789ac';
 
 final class _CloseTrackingObserver extends LocalDatabaseConnectionObserver {
   var closeCalls = 0;

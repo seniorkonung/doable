@@ -11,8 +11,12 @@ void _registerPrimaryNavigationScenarios() {
       tester.element(find.byType(TagNavigationPage)),
       listen: false,
     );
-    final provider = tagNavigationViewModelProvider(_tag.id);
-    final model = container.read(provider.notifier);
+    final model = container.read(
+      tagNavigationViewModelProvider(_tag.id).notifier,
+    );
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(TagNavigationPage)),
+    );
     void expectPanel() {
       expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(appNavigationDestinations().hitTestable(), findsNWidgets(3));
@@ -32,17 +36,17 @@ void _registerPrimaryNavigationScenarios() {
       expect(tester.takeException(), isNull);
     }
 
-    expect(container.read(provider), isA<TagNavigationInitialLoading>());
+    expect(find.text(l10n.tagNavigationLoading), findsOneWidget);
     expectPanel();
     reads.fail(0, const TaggedIntentionsUnavailableFailure());
     await tester.pumpAndSettle();
-    expect(container.read(provider), isA<TagNavigationInitialFailure>());
+    expect(find.text(l10n.tagNavigationUnavailable), findsOneWidget);
     expectPanel();
     unawaited(model.retryFirstPage());
     await tester.pump();
     reads.page(1, []);
     await tester.pumpAndSettle();
-    expect((container.read(provider) as TagNavigationLoaded).isEmpty, isTrue);
+    expect(find.text(l10n.tagNavigationEmptyActive), findsOneWidget);
     expectPanel();
 
     model.setScope(TaggedIntentionsScope.archived);
@@ -52,10 +56,7 @@ void _registerPrimaryNavigationScenarios() {
     expectPanel();
     unawaited(model.loadMore());
     await tester.pump();
-    expect(
-      (container.read(provider) as TagNavigationLoaded).pageStatus,
-      isA<TagNavigationPageLoading>(),
-    );
+    expect(find.text(l10n.tagNavigationLoadingMore), findsOneWidget);
     expectPanel();
     reads.fail(3, const TaggedIntentionsUnavailableFailure());
     await tester.pumpAndSettle();
@@ -65,10 +66,7 @@ void _registerPrimaryNavigationScenarios() {
       TagReadSuccess(GraphSnapshot(value: _tag, revision: const _Revision(2))),
     );
     await tester.pump();
-    expect(
-      (container.read(provider) as TagNavigationLoaded).freshness,
-      TagNavigationFreshness.refreshing,
-    );
+    expect(find.text(l10n.tagNavigationRefreshing), findsOneWidget);
     expectPanel();
     reads.fail(4, const TaggedIntentionsUnavailableFailure());
     await tester.pumpAndSettle();
@@ -77,7 +75,7 @@ void _registerPrimaryNavigationScenarios() {
       const TagReadSuccess(GraphSnapshot(value: null, revision: _Revision(3))),
     );
     await tester.pumpAndSettle();
-    expect(container.read(provider), isA<TagNavigationTagMissing>());
+    expect(find.text(l10n.tagNotFound), findsOneWidget);
     expectPanel();
   });
 }

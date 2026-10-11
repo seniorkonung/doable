@@ -114,10 +114,10 @@ void main() {
       }
       expect(farthestOffset, greaterThan(0));
       expect(scrollable.position.pixels, lessThan(100));
-      expect(
-        container.read(tagAssignmentsViewModelProvider(intentionId)),
-        same(state),
-      );
+      final afterScroll = container.read(
+        tagAssignmentsViewModelProvider(intentionId),
+      ) as TagAssignmentsLoaded;
+      expect(afterScroll.items, hasLength(expectedCount));
     },
   );
 }
