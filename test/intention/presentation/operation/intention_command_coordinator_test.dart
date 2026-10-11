@@ -215,7 +215,7 @@ void main() {
       expect(completion.target, isA<CreatingIntentionOperationTarget>());
       expect(completion.presentationTitle, 'Полное намерение');
       expect(completion.revision, same(revision));
-      // Готовность, избранное и назначения входят в один пакет создания на
+      // Готовность и назначения входят в один пакет создания на
       // его ревизии, а не в отдельные завершения.
       final changes = completion.confirmedChange!.changes.toList();
       expect(changes, [
@@ -877,9 +877,8 @@ Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
   ),
 );
 
-/// Подтверждённое полное создание: одна каталожная мутация с готовностью,
-/// избранным и обоими тегами и по факту на каждое назначение, все на
-/// [revision].
+/// Подтверждённое полное создание: одна каталожная мутация с готовностью
+/// и обоими тегами и по факту на каждое назначение, все на [revision].
 Result<ConfirmedGraphResult<IntentionCommandSuccess>>
 _confirmedFullCreatedResult(GraphRevision revision) {
   final id = _id(_firstUuid);

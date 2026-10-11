@@ -178,7 +178,7 @@ void main() {
         : 'при живой форме';
     testWidgets(
       'успех полного создания $initiator предъявляется одним сообщением без '
-      'отдельных исходов готовности, избранного и назначений, '
+      'отдельных исходов готовности и назначений, '
       '${fullCreation.locale.languageCode}',
       (tester) async {
         final harness = await _pumpPresenterApp(
@@ -1842,7 +1842,7 @@ final class _PresenterHarness {
     return accepted;
   }
 
-  /// Создание с готовностью, избранным и двумя тегами из отдельной формы.
+  /// Создание с готовностью и двумя тегами из отдельной формы.
   IntentionCommandAccepted startFullCreation({required bool releaseInitiator}) {
     final commandIndex = repository.commands.length;
     final accepted = _coordinator.acceptCreation(
