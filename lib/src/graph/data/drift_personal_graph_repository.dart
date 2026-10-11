@@ -1726,6 +1726,8 @@ final class _StoredIntentionColumnNames {
   final String updatedAt;
 }
 
+/// Различает ревизии разных экземпляров репозитория: понадобится при
+/// восстановлении из резервной копии без перезапуска приложения.
 final class _GraphEpoch {}
 
 final class _AsyncSequencer {
