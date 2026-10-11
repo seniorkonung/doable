@@ -46,7 +46,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`; соответствующие существующие тесты.
   - **Объём:** M.
 
-- [ ] 1.6 Сократить общий компонент строки намерения до используемых вариантов
+- [x] 1.6 Сократить общий компонент строки намерения до используемых вариантов
   - **Критерии приёмки:**
     - Из `IntentionSummaryView` удалены звезда, `confirmedFavoriteMark`, `IntentionSummarySemanticsNode` и `semanticsNode`; обычное объединение семантики через `MergeSemantics` сохранено по решению 3 дизайна.
     - Тексты и действия оставшихся потребителей доступны прежним образом; Widgetbook и тесты строки сохраняют примеры готовности, архивирования, тегов и связей без вариантов избранного. Другие параметры с потребителями сохранены.
