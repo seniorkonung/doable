@@ -37,7 +37,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/details/intention_details_page.dart`, `intention_details_state.dart`, `intention_details_view_model.dart` в той же папке; `test/intention/presentation/details/`, удаляемые `test/app/favorite_mark_app_flow_test.dart` и `test/intention/presentation/favorite_mark_accessibility_test.dart`.
   - **Объём:** M.
 
-- [ ] 1.5 Убрать передачу отметки в строки каталога и четырёх контекстов поиска
+- [x] 1.5 Убрать передачу отметки в строки каталога и четырёх контекстов поиска
   - **Критерии приёмки:**
     - Каталог и общий поиск намерений, поиск действия, исходного намерения и участника долговременной связи больше не передают `confirmedFavoriteMark` в общую строку.
     - Сохранены выбор по идентификатору, готовность, архивное состояние, теги и счётчики; смешанные проверки этих данных продолжают действовать без ожидания звезды.
