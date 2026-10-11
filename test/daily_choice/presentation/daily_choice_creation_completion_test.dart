@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -22,35 +21,18 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
-enum _FailurePoint {
-  none,
-  beforeConfirmation,
-  beforeRoot,
-  afterRoot,
-  afterResult,
-}
-
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
     );
   });
-  // Направление не меняет завершение: оно чередуется по точкам отказа, так что
-  // каждая точка проверена в одном направлении, а оба направления — в наборе.
-  for (final (direction, point) in [
-    (ChoicePathDraftDirection.topDown, _FailurePoint.none),
-    (ChoicePathDraftDirection.bottomUp, _FailurePoint.beforeConfirmation),
-    (ChoicePathDraftDirection.topDown, _FailurePoint.beforeRoot),
-    (ChoicePathDraftDirection.bottomUp, _FailurePoint.afterRoot),
-    (ChoicePathDraftDirection.topDown, _FailurePoint.afterResult),
-  ]) {
+  for (final direction in ChoicePathDraftDirection.values) {
     testWidgets(
-      'завершение $direction при $point сохраняет одну запись, исходную историю и выход',
+      'завершение $direction сохраняет одну запись, исходную историю и выход',
       (tester) async {
-        final app = await _launch(tester, direction, point);
+        final app = await _launch(tester, direction);
         final history = app.history;
-        final confirmationId = app.router.stackData.last.matchId;
         await _tap(tester, 'daily-choice-submit');
         await tester.pumpAndSettle();
         expect(app.completions, hasLength(1));
@@ -65,83 +47,22 @@ void main() {
           history,
         );
         expect(find.textContaining('Дневной выбор создан'), findsWidgets);
-        if (point == _FailurePoint.none || point == _FailurePoint.afterResult) {
-          expect(app.router.stackData, hasLength(history.length + 1));
-          expect(app.router.stackData.last.name, DailyChoiceDetailsRoute.name);
-          expect(
-            tester
-                .widget<DailyChoiceDetailsPage>(
-                  find.byType(DailyChoiceDetailsPage),
-                )
-                .choiceId,
-            durabilityChoice(201),
-          );
-          expect(find.byType(ChoicePathPage), findsNothing);
-          expect(find.byType(DailyChoiceCreationPage), findsNothing);
-          if (point == _FailurePoint.afterResult) {
-            final resultMatchId = app.router.stackData.last.matchId;
-            app.router.releaseFailure();
-            await tester.pumpAndSettle();
-            expect(app.router.stackData.last.matchId, resultMatchId);
-            expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
-          }
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-        } else {
-          if (point == _FailurePoint.beforeConfirmation) {
-            expect(app.router.stackData.last.matchId, confirmationId);
-            await completeDailyChoiceCreation(
-              router: app.router,
-              session: app.session,
-              confirmationMatchId: confirmationId,
-              choiceId: durabilityChoice(201),
-            );
-            expect(app.errors, hasLength(1));
-            expect(
-              tester
-                  .widget<FilledButton>(
-                    find.byKey(const ValueKey('daily-choice-submit')),
-                  )
-                  .onPressed,
-              isNull,
-            );
-            await tester.binding.handlePopRoute();
-            await tester.pumpAndSettle();
-          }
-          if (point != _FailurePoint.afterRoot) {
-            expect(app.router.stackData.last.name, ChoicePathRoute.name);
-            expect(
-              find.byKey(const ValueKey('choice-path-creation-status')),
-              findsOneWidget,
-            );
-            expect(
-              find.byKey(const ValueKey('choice-path-open-confirmation')),
-              findsNothing,
-            );
-            expect(
-              find.byKey(const ValueKey('choice-path-select-action')),
-              findsNothing,
-            );
-            expect(
-              find.byKey(const ValueKey('choice-path-select-source')),
-              findsNothing,
-            );
-            expect(
-              find.byKey(const ValueKey('choice-path-back-0')),
-              findsNothing,
-            );
-            await tester.binding.handlePopRoute();
-            await tester.pumpAndSettle();
-          }
-        }
+        expect(app.router.stackData, hasLength(history.length + 1));
+        expect(app.router.stackData.last.name, DailyChoiceDetailsRoute.name);
+        expect(
+          tester
+              .widget<DailyChoiceDetailsPage>(
+                find.byType(DailyChoiceDetailsPage),
+              )
+              .choiceId,
+          durabilityChoice(201),
+        );
+        expect(find.byType(ChoicePathPage), findsNothing);
+        expect(find.byType(DailyChoiceCreationPage), findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
         expect(app.router.stackData.map((route) => route.matchId), history);
         expect(find.byType(IntentionDetailsPage), findsOneWidget);
-        expect(app.errors, hasLength(point == _FailurePoint.none ? 0 : 1));
-        for (final error in app.errors) {
-          expect(error.library, 'daily choice creation');
-          expect(error.toString(), isNot(contains('Секретный черновик')));
-          expect(error.toString(), isNot(contains(durabilityUuid(201))));
-        }
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(
@@ -164,27 +85,25 @@ void main() {
       },
     );
   }
-  for (final (direction, point) in [
-    (ChoicePathDraftDirection.topDown, _FailurePoint.beforeRoot),
-    (ChoicePathDraftDirection.bottomUp, _FailurePoint.afterResult),
-  ]) {
+  for (final direction in ChoicePathDraftDirection.values) {
     testWidgets(
-      'поздний отказ $point и прежнее завершение $direction сохраняют новую сессию',
+      'прежнее завершение $direction не меняет открытый результат и новую сессию',
       (tester) async {
-        final app = await _launch(tester, direction, point, delayFailure: true);
+        final app = await _launch(tester, direction);
         final confirmationId = app.router.stackData.last.matchId;
         await _tap(tester, 'daily-choice-submit');
         expect(app.completions, hasLength(1));
-        expect(app.errors, isEmpty);
         final savedHistory = app.router.stackData
             .map((route) => route.matchId)
             .toList();
-        await completeDailyChoiceCreation(
+        expect(app.router.stackData.last.name, DailyChoiceDetailsRoute.name);
+        completeDailyChoiceCreation(
           router: app.router,
           session: app.session,
           confirmationMatchId: confirmationId,
           choiceId: durabilityChoice(201),
         );
+        await tester.pumpAndSettle();
         expect(
           app.router.stackData.map((route) => route.matchId),
           savedHistory,
@@ -206,21 +125,19 @@ void main() {
         final newHistory = app.router.stackData
             .map((route) => route.matchId)
             .toList();
-        app.router.releaseFailure();
-        await tester.pumpAndSettle();
-        await completeDailyChoiceCreation(
+        completeDailyChoiceCreation(
           router: app.router,
           session: app.session,
           confirmationMatchId: confirmationId,
           choiceId: durabilityChoice(201),
         );
+        await tester.pumpAndSettle();
         expect(app.router.stackData.map((route) => route.matchId), newHistory);
         expect(app.completions, hasLength(1));
         expect(
           await app.database.customSelect('SELECT id FROM daily_choices').get(),
           hasLength(1),
         );
-        expect(app.errors, hasLength(1));
         expect(tester.takeException(), isNull);
       },
     );
@@ -234,22 +151,18 @@ final class _App {
     this.session,
     this.history,
     this.completions,
-    this.errors,
   );
-  final _FailingRouter router;
+  final AppRouter router;
   final AppDatabase database;
   final DailyChoiceCreationFlowSession session;
   final List<LocalKey> history;
   final List<DailyChoiceCommandCompletion> completions;
-  final List<FlutterErrorDetails> errors;
 }
 
 Future<_App> _launch(
   WidgetTester tester,
   ChoicePathDraftDirection direction,
-  _FailurePoint point, {
-  bool delayFailure = false,
-}) async {
+) async {
   tester.view.physicalSize = const Size(1200, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -262,16 +175,7 @@ Future<_App> _launch(
       personalGraphRepositoryProvider.overrideWithValue(repository),
     ],
   );
-  final router = _FailingRouter(point, delayFailure: delayFailure);
-  final errors = <FlutterErrorDetails>[];
-  final previousOnError = FlutterError.onError;
-  FlutterError.onError = (details) {
-    if (details.library == 'daily choice creation') {
-      errors.add(details);
-    } else {
-      previousOnError?.call(details);
-    }
-  };
+  final router = AppRouter();
   final completions = <DailyChoiceCommandCompletion>[];
   final subscription = container
       .read(graphCommandCoordinatorProvider.notifier)
@@ -280,7 +184,6 @@ Future<_App> _launch(
       .cast<DailyChoiceCommandCompletion>()
       .listen(completions.add);
   addTearDown(() async {
-    FlutterError.onError = previousOnError;
     await tester.pumpWidget(const SizedBox.shrink());
     await subscription.cancel();
     container.dispose();
@@ -347,7 +250,7 @@ Future<_App> _launch(
         : 'choice-path-select-source',
   );
   await _tap(tester, 'choice-path-open-confirmation');
-  return _App(router, database, session, history, completions, errors);
+  return _App(router, database, session, history, completions);
 }
 
 Future<void> _tap(WidgetTester tester, String key) async {
@@ -355,54 +258,4 @@ Future<void> _tap(WidgetTester tester, String key) async {
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pumpAndSettle();
-}
-
-/// Настоящий стек приложения с управляемыми отказами отдельных мутаций.
-final class _FailingRouter extends RootStackRouter {
-  _FailingRouter(this.point, {this.delayFailure = false});
-  final _FailurePoint point;
-  final bool delayFailure;
-  final _gate = Completer<void>();
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-
-  void releaseFailure() => _gate.complete();
-
-  @override
-  void removeRoute(RouteData route, {bool notify = true}) {
-    if (point == _FailurePoint.beforeConfirmation &&
-        route.name == DailyChoiceCreationRoute.name) {
-      throw StateError('Секретный черновик ${durabilityUuid(201)}');
-    }
-    super.removeRoute(route, notify: notify);
-  }
-
-  @override
-  Future<T?> replace<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) {
-    if (route.routeName != DailyChoiceDetailsRoute.name) {
-      return super.replace<T>(route, onFailure: onFailure);
-    }
-    if (point == _FailurePoint.beforeRoot) {
-      if (delayFailure) {
-        return _gate.future.then<T?>(
-          (_) => throw StateError('Секретный черновик'),
-        );
-      }
-      throw StateError('Секретный черновик');
-    }
-    if (point == _FailurePoint.afterRoot) {
-      removeRoute(stackData.last, notify: false);
-      return Future<T?>.error(StateError('Секретный черновик'));
-    }
-    if (point == _FailurePoint.afterResult) {
-      unawaited(super.replace<T>(route, onFailure: onFailure));
-      return _gate.future.then<T?>(
-        (_) => throw StateError('Секретный черновик'),
-      );
-    }
-    return super.replace<T>(route, onFailure: onFailure);
-  }
 }

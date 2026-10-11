@@ -203,13 +203,11 @@ final class DailyChoiceCreationPageState
       if (next.event case DailyChoiceCreationCreated(:final choiceId)) {
         model.consumeEvent();
         if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
-        unawaited(
-          completeDailyChoiceCreation(
-            router: context.router.root,
-            session: widget.session,
-            confirmationMatchId: routeMatchId,
-            choiceId: choiceId,
-          ),
+        completeDailyChoiceCreation(
+          router: context.router.root,
+          session: widget.session,
+          confirmationMatchId: routeMatchId,
+          choiceId: choiceId,
         );
       } else if (next.operation is DailyChoiceCreationFailed &&
           previous?.operation != next.operation) {

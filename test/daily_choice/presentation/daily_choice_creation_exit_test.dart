@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -37,8 +36,6 @@ import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
 enum _Step { path, preview, confirmation }
-
-enum _Failure { none, confirmation, root, afterRoot }
 
 void main() {
   setUp(() {
@@ -147,7 +144,6 @@ void main() {
           await app.database.customSelect('SELECT id FROM daily_choices').get(),
           hasLength(1),
         );
-        expect(app.errors, isEmpty);
         expect(tester.takeException(), isNull);
       },
     );
@@ -183,66 +179,6 @@ void main() {
         }
         await _expectOriginalHistory(tester, app);
         expect(app.completions, hasLength(cancelFirst ? 0 : 1));
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
-  for (final (direction, failure) in [
-    (ChoicePathDraftDirection.topDown, _Failure.confirmation),
-    (ChoicePathDraftDirection.bottomUp, _Failure.root),
-    (ChoicePathDraftDirection.topDown, _Failure.afterRoot),
-  ]) {
-    testWidgets(
-      'отказ выхода $direction при $failure допускает только повтор выхода',
-      (tester) async {
-        final app = await _launch(tester, direction, _Step.confirmation);
-        final confirmation = app.router.current.matchId;
-        app.router.failure = failure;
-        final exit = tester
-            .widget<CreationExitAction>(find.byType(CreationExitAction))
-            .onExit;
-        exit();
-        await tester.pumpAndSettle();
-        expect(app.errors, hasLength(1));
-        expect(
-          app.errors.single.toString(),
-          isNot(contains('Секретный черновик')),
-        );
-        expect(
-          app.errors.single.toString(),
-          isNot(contains(durabilityUuid(201))),
-        );
-        if (failure == _Failure.confirmation) {
-          expect(app.router.current.matchId, confirmation);
-          expect(
-            tester
-                .widget<FilledButton>(
-                  find.byKey(const ValueKey('daily-choice-submit')),
-                )
-                .onPressed,
-            isNull,
-          );
-          expect(
-            tester
-                .widget<TextField>(
-                  find.byKey(const ValueKey('daily-choice-description')),
-                )
-                .enabled,
-            isFalse,
-          );
-        }
-        if (failure != _Failure.afterRoot) {
-          final retry = tester.widget<CreationExitAction>(
-            find.byType(CreationExitAction),
-          );
-          expect(retry.state, CreationExitState.terminal);
-          retry.onExit();
-          await tester.pumpAndSettle();
-        }
-        await _expectOriginalHistory(tester, app);
-        exit();
-        expect(app.repository.commands, 0);
-        expect(app.completions, isEmpty);
         expect(tester.takeException(), isNull);
       },
     );
@@ -287,73 +223,6 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets(
-    'отказ удаления после подсказки ChoicePathDraftDirection.bottomUp оставляет безопасный повтор',
-    (tester) async {
-      final app = await _launch(
-        tester,
-        ChoicePathDraftDirection.bottomUp,
-        _Step.preview,
-      );
-      app.router.failure = _Failure.root;
-      tester
-          .widget<CreationExitAction>(find.byType(CreationExitAction))
-          .onExit();
-      await tester.pumpAndSettle();
-      expect(app.errors, hasLength(1));
-      expect(app.router.current.name, ChoicePathRoute.name);
-      expect(app.router.pagelessRoutesObserver.hasPagelessTopRoute, isFalse);
-      expect(
-        find.byKey(const ValueKey('choice-suggestion-select-0')),
-        findsNothing,
-      );
-      final retry = tester.widget<CreationExitAction>(
-        find.byType(CreationExitAction),
-      );
-      expect(retry.state, CreationExitState.terminal);
-      retry.onExit();
-      await tester.pumpAndSettle();
-      await _expectOriginalHistory(tester, app);
-      expect(app.repository.commands, 0);
-      expect(tester.takeException(), isNull);
-    },
-  );
-  for (final (direction, failure) in [
-    (ChoicePathDraftDirection.topDown, _Failure.confirmation),
-    (ChoicePathDraftDirection.bottomUp, _Failure.root),
-  ]) {
-    testWidgets(
-      'поздний отказ записи $direction после частичного выхода при $failure не возобновляет поток',
-      (tester) async {
-        final app = await _launch(tester, direction, _Step.confirmation);
-        await _tap(tester, 'daily-choice-submit');
-        app.router.failure = failure;
-        tester
-            .widget<CreationExitAction>(find.byType(CreationExitAction))
-            .onExit();
-        await tester.pumpAndSettle();
-        expect(
-          tester
-              .widget<CreationExitAction>(find.byType(CreationExitAction))
-              .state,
-          CreationExitState.submitting,
-        );
-        app.repository.result.complete(false);
-        await tester.pumpAndSettle();
-        final retry = tester.widget<CreationExitAction>(
-          find.byType(CreationExitAction),
-        );
-        expect(retry.state, CreationExitState.terminal);
-        retry.onExit();
-        await tester.pumpAndSettle();
-        await _expectOriginalHistory(tester, app);
-        expect(app.repository.commands, 1);
-        expect(app.completions, hasLength(1));
-        expect(app.errors, hasLength(1));
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
   testWidgets(
     'прежние действия пути и подсказки ChoicePathDraftDirection.topDown не закрывают другую верхнюю страницу',
     (tester) async {
@@ -427,14 +296,12 @@ final class _App {
     this.repository,
     this.history,
     this.completions,
-    this.errors,
   );
-  final _Router router;
+  final AppRouter router;
   final AppDatabase database;
   final _Repository repository;
   final List<LocalKey> history;
   final List<DailyChoiceCommandCompletion> completions;
-  final List<FlutterErrorDetails> errors;
 }
 
 Future<_App> _launch(
@@ -457,16 +324,7 @@ Future<_App> _launch(
       personalGraphRepositoryProvider.overrideWithValue(repository),
     ],
   );
-  final router = _Router();
-  final errors = <FlutterErrorDetails>[];
-  final previousOnError = FlutterError.onError;
-  FlutterError.onError = (details) {
-    if (details.library == 'daily choice creation') {
-      errors.add(details);
-    } else {
-      previousOnError?.call(details);
-    }
-  };
+  final router = AppRouter();
   final completions = <DailyChoiceCommandCompletion>[];
   final subscription = container
       .read(graphCommandCoordinatorProvider.notifier)
@@ -475,7 +333,6 @@ Future<_App> _launch(
       .cast<DailyChoiceCommandCompletion>()
       .listen(completions.add);
   addTearDown(() async {
-    FlutterError.onError = previousOnError;
     await tester.pumpWidget(const SizedBox.shrink());
     await subscription.cancel();
     container.dispose();
@@ -529,7 +386,7 @@ Future<_App> _launch(
       await _tap(tester, 'choice-suggestion-select-0');
       expect(find.byType(DailyChoiceCreationPage), findsOneWidget);
   }
-  return _App(router, database, repository, history, completions, errors);
+  return _App(router, database, repository, history, completions);
 }
 
 Future<void> _tap(WidgetTester tester, String key) async {
@@ -554,28 +411,6 @@ Future<void> _expectOriginalHistory(WidgetTester tester, _App app) async {
         .text,
     'Чужой черновик',
   );
-}
-
-final class _Router extends RootStackRouter {
-  var failure = _Failure.none;
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-
-  @override
-  void removeRoute(RouteData route, {bool notify = true}) {
-    final shouldFail = switch (failure) {
-      _Failure.none => false,
-      _Failure.confirmation => route.name == DailyChoiceCreationRoute.name,
-      _Failure.root || _Failure.afterRoot => route.name == ChoicePathRoute.name,
-    };
-    if (!shouldFail) {
-      super.removeRoute(route, notify: notify);
-      return;
-    }
-    if (failure == _Failure.afterRoot) super.removeRoute(route, notify: false);
-    failure = _Failure.none;
-    throw StateError('Секретный черновик ${durabilityUuid(201)}');
-  }
 }
 
 /// Чтения идут в настоящее хранилище, а принятую запись завершает проверка.

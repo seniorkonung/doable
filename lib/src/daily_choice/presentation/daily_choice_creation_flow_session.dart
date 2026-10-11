@@ -85,7 +85,7 @@ final class DailyChoiceCreationFlowSession {
       !_accepting && state is DailyChoiceCreationFlowEditing;
 
   /// Одна попытка открытия подтверждённого результата на весь поток.
-  /// Отказ перехода и удаление отдельных страниц не разрешают повтор.
+  /// Удаление отдельных страниц не разрешает повтор.
   bool claimOpening(DailyChoiceId choiceId) {
     if (_openingAttempted) return false;
     if (state case DailyChoiceCreationFlowSaved(choiceId: final savedId)
@@ -151,7 +151,7 @@ final class DailyChoiceCreationFlowSession {
   }
 
   /// Прекращает продолжение и автоматический переход до удаления маршрутов.
-  /// Повторный выход после частичного отказа удаления не возобновляет поток.
+  /// Повторный выход не возобновляет поток.
   /// Закрытие одного подтверждения этот метод не вызывает; закрытие корня —
   /// вызывает. Принятая команда и право предъявления здесь не освобождаются.
   bool leave() {
