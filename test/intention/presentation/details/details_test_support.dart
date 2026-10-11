@@ -29,7 +29,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 
-import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
@@ -82,10 +81,7 @@ final class ControlledDetailRequest {
 }
 
 final class ControlledDetailsRepository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

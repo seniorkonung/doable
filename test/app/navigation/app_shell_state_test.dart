@@ -21,7 +21,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -1322,10 +1321,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
     }
     return _delegate.execute(command);
   }
-
-  @override
-  Future<FavoriteIntentionsResult> getFavoriteIntentions() =>
-      _delegate.getFavoriteIntentions();
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

@@ -10,7 +10,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -575,10 +574,6 @@ final class _ControlledRepository extends Fake
   @override
   Future<TagAssignmentsResult> getTagAssignments(IntentionId id) =>
       delegate.getTagAssignments(id);
-
-  @override
-  Future<FavoriteIntentionsResult> getFavoriteIntentions() =>
-      delegate.getFavoriteIntentions();
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(

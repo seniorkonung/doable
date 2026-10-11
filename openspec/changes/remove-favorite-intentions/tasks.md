@@ -83,7 +83,7 @@
   - **Вероятные файлы:** `lib/src/favorite/application/favorite_order_command.dart`, `lib/src/favorite/domain/favorite_order.dart`, `lib/src/favorite/presentation/favorite_order_failure_message.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, удаляемая часть `drift_personal_graph_repository_favorite_order.dart`; соответствующие специализированные тесты в `test/favorite/` и `test/graph/`.
   - **Объём:** M.
 
-- [ ] 1.10 Удалить чтение полного списка избранных из границы личного графа
+- [x] 1.10 Удалить чтение полного списка избранных из границы личного графа
   - **Критерии приёмки:**
     - `PersonalGraphRepository` больше не наследует `FavoriteReadContract`; удалены контракт списка, его модели и `drift_personal_graph_repository_favorite_list.dart`, включая подключения в основной реализации.
     - Тестовые репозитории освобождены от `FavoriteReadContractTestFallback` и прежнего чтения; сам fallback и специализированные проверки списка удалены. Пустых совместимых реализаций не осталось, а порционные чтения графа и полные снимки тегов сохранены по ADR-0009 и ADR-0013.

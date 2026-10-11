@@ -26,7 +26,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
-import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'daily_choice_calendar_test_support.dart';
 
@@ -464,10 +463,7 @@ Future<void> _openCatalog(
 }
 
 final class _Repository
-    with
-        TagReadContractTestFallback,
-        FavoriteReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   final queries = <DailyChoiceCatalogQuery>[];
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
