@@ -45,7 +45,7 @@ final class IntentionCreationStorageObserver
         }
       }
     }
-    if (_fail && tables.contains('favorite_intentions')) {
+    if (_fail && tables.contains('tag_assignments')) {
       _fail = false;
       faultPoint = (
         inTransaction: !connection.autocommit,
@@ -53,7 +53,7 @@ final class IntentionCreationStorageObserver
       );
       throw sqlite.SqliteException(
         extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-        message: 'Управляемый отказ после полного начального состояния',
+        message: 'Управляемый отказ после записи части назначений тегов',
       );
     }
   }

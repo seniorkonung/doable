@@ -22,7 +22,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
-import '../support/favorite_storage_fixture.dart';
 import '../support/local_database_harness.dart';
 import '../support/intention_creation_storage_observer.dart';
 import '../support/intention_creation_origin.dart';
@@ -44,8 +43,8 @@ final _message = _key('graph-operation-message');
 final _failure = _key('intention-editor-failure');
 
 void main() {
-  testWidgets('отказ файлового хранилища после всех записей полного черновика '
-      'откатывает граф, FTS и порядок; компактная панель '
+  testWidgets('отказ файлового хранилища после записи части назначений тегов '
+      'откатывает граф и FTS; компактная панель '
       'предъявляет один отказ и явный повтор сохраняет одно намерение '
       'на экране 568×320 с открытой клавиатурой и масштабом 200% '
       'даже при отказе диагностики', (tester) async {
@@ -59,7 +58,6 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpAndSettle();
     final before = _storedGraph(app.raw);
-    final marks = storedFavoriteMarks(app.raw);
     _expectTightKeyboard(tester);
     app.storage.observeCreation(fail: true);
     app.diagnostics.throwOnIntentionCommand = true;
@@ -78,7 +76,6 @@ void main() {
     expect(failed.confirmedChange, isNull);
     _expectFaultPoint(app, [_home, sport]);
     expect(_storedGraph(app.raw), before);
-    expect(storedFavoriteMarks(app.raw), marks);
     _expectDraft(tester, [_home, sport]);
     _expectTightKeyboard(tester);
     // Отказ читается от начала до конца прокруткой при той же клавиатуре.
@@ -115,11 +112,7 @@ void main() {
     await _tap(tester, _submit);
     final saved = await _creation(tester, app, count: 2);
     await _wait(tester, () => _sheet.evaluate().isEmpty);
-    final id = _expectSaved(app, saved, [_home, sport]);
-    expect(storedFavoriteMarks(app.raw), [
-      ...marks,
-      (id.toCanonicalString(), 3),
-    ]);
+    _expectSaved(app, saved, [_home, sport]);
     expect(app.diagnostics.thrown, 2);
     await returnToIntentionGraphAfterCreation(
       tester,
@@ -197,7 +190,6 @@ Future<_App> _launch(
       'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 1, 1)',
       [tagFixtureId(id), title, archived],
     );
-    storeFavoriteMark(raw, intentionId: tagFixtureId(id), position: id);
   }
   raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
     tagFixtureId(301),
@@ -238,13 +230,12 @@ Future<void> _open(WidgetTester tester, _App app) async {
   expect(find.byType(IntentionEditorPage), findsOneWidget);
 }
 
-/// Команда создаётся исключительно формой: все пять полей и отдельный тег
-/// подготавливаются реальными панелью, общим выбором и редактором тега.
+/// Название, описание, готовность и теги команды подготавливаются
+/// реальными панелью, общим выбором и редактором тега.
 Future<TagId> _prepare(WidgetTester tester, _App app) async {
   await _open(tester, app);
   await tester.enterText(_key('intention-editor-title'), _rawTitle);
   await tester.enterText(_key('intention-editor-description'), _description);
-  await _tap(tester, _key('intention-editor-favorite'));
   await _tap(tester, _key('intention-editor-readiness'));
   await _tap(tester, _key('intention-editor-readiness-confirm'));
   await _tap(tester, _key('intention-editor-choose-tags'));
@@ -297,7 +288,6 @@ void _expectDraft(WidgetTester tester, List<TagId> tags) {
   for (final id in tags) {
     expect(_chip(id), findsOneWidget);
   }
-  expect(_icon(tester, 'intention-editor-favorite'), Icons.star);
   expect(_icon(tester, 'intention-editor-readiness'), Icons.check_circle);
 }
 
@@ -320,7 +310,6 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
     'intention_titles_fts',
     'tags',
     'tag_assignments',
-    'favorite_intentions',
     'long_term_relations',
     'daily_choices',
     'daily_choice_path_steps',
@@ -375,7 +364,7 @@ final class _Diagnostics implements DiagnosticsSink {
       'INSERT ',
       'SELECT ',
       'UPDATE ',
-      'favorite_intentions',
+      'tag_assignments',
       ...privateValues,
       for (final table in ['tags', 'intentions'])
         for (final row in raw.select('SELECT id FROM $table'))
@@ -386,8 +375,8 @@ final class _Diagnostics implements DiagnosticsSink {
   }
 }
 
-/// Свидетельство, что отказ сработал после полного набора внутри транзакции,
-/// а не раньше записи тегов, отметок, готовности или временных меток.
+/// Отказ прерывает открытую транзакцию после записи намерения
+/// и одного из выбранных назначений тегов.
 void _expectFaultPoint(_App app, List<TagId> tags) {
   final point = app.storage.faultPoint!;
   expect(point.inTransaction, isTrue);
@@ -405,21 +394,18 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
     isA<int>(),
   ]);
   expect(row[6], row[7]);
-  expect(
-    point.graph['tag_assignments']!.skip(1),
-    unorderedEquals([
-      for (final tag in tags)
-        [
-          isA<int>(),
-          tag.toCanonicalString(),
-          point.graph['tags']!.singleWhere(
-            (stored) => stored[1] == tag.toCanonicalString(),
-          )[0],
-          row.first,
-        ],
-    ]),
-  );
-  expect(point.graph['favorite_intentions']!.last, [row.first, 3]);
+  final assignments = point.graph['tag_assignments']!
+      .where((assignment) => assignment[3] == row.first)
+      .toList();
+  expect(assignments, hasLength(1));
+  expect(assignments.length, lessThan(tags.length));
+  final assignment = assignments.single;
+  expect(assignment, [
+    isA<int>(),
+    isIn(tags.map((tag) => tag.toCanonicalString())),
+    point.graph['tags']!.singleWhere((stored) => stored[1] == assignment[1])[0],
+    row.first,
+  ]);
   expect(point.graph['intention_titles_fts']!.last, ['рисовать акварель']);
   expect(point.graph['ftsCreatedMatches'], hasLength(1));
 }
@@ -434,7 +420,7 @@ Future<IntentionCommandCompletion> _creation(
   return app.creations.last;
 }
 
-IntentionId _expectSaved(
+void _expectSaved(
   _App app,
   IntentionCommandCompletion completion,
   List<TagId> tags,
@@ -461,8 +447,6 @@ IntentionId _expectSaved(
   expect(stored, [_title, _description, 1, 0, isA<int>(), isA<int>()]);
   expect(stored[4], stored[5]);
   expect(_storedGraph(app.raw)['ftsCreatedMatches'], hasLength(1));
-  final mutation = saved.catalogMutation as IntentionCatalogCreated;
-  expect(mutation.entry.summary.favoriteMark, FavoriteMark.favorite);
   expect(
     saved.additionalChanges.whereType<TagAssignmentChangedChange>().map(
       (change) => change.assignment.tagId,
@@ -481,7 +465,6 @@ IntentionId _expectSaved(
         .map((row) => row['tag_id']),
     unorderedEquals(tags.map((id) => id.toCanonicalString())),
   );
-  return intention.id;
 }
 
 void _expectInlineFailure(String text) {
