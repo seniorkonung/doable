@@ -58,11 +58,14 @@ void main() {
       repository.completeDailyFailure(1);
       final completion = await accepted.future;
       final claim = await claimFuture;
-      expect(claim?.completion, same(completion));
+      expect(claim?.completions, [same(completion)]);
       expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
       expect(coordinator.isDailyChoiceRunning(_choiceA), isFalse);
       await independent.future;
-      coordinator.confirmPresentation(claim!);
+      coordinator.confirmAppPresentation(
+        claim!,
+        claim.completions.map((completion) => completion.token),
+      );
       registration.release();
       await coordinator.shutdown();
     },
