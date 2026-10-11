@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 
 import '../../app/routing/app_router.gr.dart';
 import '../domain/daily_choice_id.dart';
@@ -10,12 +9,10 @@ import 'daily_choice_creation_flow_session.dart';
 
 /// Прекращает создание до удаления его страниц; чужая история и новая сессия
 /// недоступны.
-/// [previewRoute] — конкретный безымянный просмотр подсказки над корнем.
 void leaveDailyChoiceCreation({
   required StackRouter router,
   required DailyChoiceCreationFlowSession session,
   required LocalKey ownerMatchId,
-  Route<void>? previewRoute,
 }) {
   bool hasStack(List<LocalKey> suffix) => listEquals(
     router.stackData.map((route) => route.matchId).toList(),
@@ -35,28 +32,9 @@ void leaveDailyChoiceCreation({
   }
   if (!hasStack(suffix)) return;
   final pageless = router.pagelessRoutesObserver;
-  if (previewRoute != null) {
-    if (top.matchId != session.rootMatchId ||
-        !identical(pageless.current, previewRoute) ||
-        !previewRoute.isCurrent) {
-      return;
-    }
-  } else if (pageless.hasPagelessTopRoute) {
-    return;
-  }
+  if (pageless.hasPagelessTopRoute) return;
 
   session.leave();
-  if (previewRoute != null) {
-    // Уведомление сессии тоже может передать верхнюю позицию другой странице.
-    if (!hasStack(suffix) ||
-        !identical(pageless.current, previewRoute) ||
-        !previewRoute.isCurrent) {
-      return;
-    }
-    // Удаляем именно собственную подсказку, не произвольный верхний маршрут:
-    // https://api.flutter.dev/flutter/widgets/NavigatorState/removeRoute.html
-    previewRoute.navigator!.removeRoute(previewRoute);
-  }
   while (suffix.isNotEmpty) {
     if (session.state is! DailyChoiceCreationFlowLeft ||
         !hasStack(suffix) ||

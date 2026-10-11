@@ -258,249 +258,178 @@ void main() {
 
   _registerCreationRouteScenarios();
 
-  for (final bottomUp in [false, true]) {
-    testWidgets(
-      'подсказка ${bottomUp ? 'снизу' : 'сверху'} создаёт отдельный выбор без наследования полей',
-      (tester) async {
-        tester.view.physicalSize = const Size(1200, 2400);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        tester.binding.platformDispatcher.localesTestValue = const [
-          Locale('ru'),
-        ];
-        addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+  testWidgets(
+    'сохранённый маршрут не предлагается, пошаговый выбор не наследует его поля',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
 
-        final harness = (await tester.runAsync(
-          LocalDatabaseHarness.fileBacked,
-        ))!;
-        await tester.runAsync(() async {
-          await _seed(harness);
-          await _seedPreviousChoice(harness);
-        });
-        // Каталог открывается на дне прежнего выбора. Выбор снизу создаётся
-        // на тот же день, выбор сверху — на другой.
-        final catalogToday = CalendarDate.fromParts(2030, 9, 24);
-        final createdDate = bottomUp
-            ? catalogToday
-            : CalendarDate.fromParts(2024, 9, 24);
-        final runtime = AppRuntime(
-          quickCreationModeStore: InMemoryQuickCreationModeStore(),
-          connectionFactory: () =>
-              openFileBackedLocalDatabase(harness.databaseFile),
-          diagnosticsSink: InMemoryDiagnosticsSink(),
-          dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
-            catalogToday,
-          ).read,
-        );
-        addTearDown(() async {
-          await tester.pumpWidget(const SizedBox.shrink());
-          await runtime.shutdown();
-          await harness.dispose();
-        });
-        await tester.pumpWidget(MainApp(runtime: runtime));
-        final ready = await runtime.bootstrap() as AppRuntimeReady;
-        final repository = ready.container.read(
-          personalGraphRepositoryProvider,
-        );
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      await tester.runAsync(() async {
+        await _seed(harness);
+        await _seedPreviousChoice(harness);
+      });
+      final catalogToday = CalendarDate.fromParts(2030, 9, 24);
+      final createdDate = CalendarDate.fromParts(2024, 9, 24);
+      final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
+        connectionFactory: () =>
+            openFileBackedLocalDatabase(harness.databaseFile),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(catalogToday)
+            .read,
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await harness.dispose();
+      });
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final repository = ready.container.read(personalGraphRepositoryProvider);
 
-        if (bottomUp) {
-          await openDailyChoices(tester, tap: _tap);
-          await tester.pumpAndSettle();
-          await openQuickCreation(
-            tester,
-            QuickCreationMode.dailyChoiceFromAction,
-            openedPage: find.byType(DailyChoiceActionPickerPage),
-            wait: _waitFor,
-          );
-          await tester.pumpAndSettle();
-          await _tap(tester, find.text('Продолжение действия'));
-        } else {
-          await _openPath(tester);
+      await _openPath(tester);
+
+      await _waitFor(tester, find.byType(ChoicePathPage));
+      final router = ready.container.read(appRouterProvider);
+      expect(router.current.name, ChoicePathRoute.name);
+      await _waitFor(tester, find.text('Исходное намерение: Основание'));
+      expect(find.text('Прежние маршруты'), findsNothing);
+      expect(find.text('Просмотреть весь маршрут'), findsNothing);
+      expect(find.text('Выбрать маршрут'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(ChoicePathPage),
+          matching: find.textContaining('Продолжение действия'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('Перейти к подтверждению выбора'), findsNothing);
+
+      await _continue(tester, 101);
+      await _continue(tester, 102);
+      await _waitFor(
+        tester,
+        find.text('Выбрать действие «Продолжение действия»'),
+      );
+      expect(find.text('Перейти к подтверждению выбора'), findsNothing);
+      await _openConfirmation(tester);
+      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+      expect(
+        find.descendant(
+          of: find.byType(DailyChoiceCreationPage),
+          matching: find.text('Чтобы Основание, нужно Действие в середине'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DailyChoiceCreationPage),
+          matching: find.text(
+            'Чтобы Действие в середине, можно Продолжение действия',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('daily-choice-description')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('daily-choice-completed')),
+            )
+            .value,
+        isFalse,
+      );
+      final today = DateTime.now();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
+            .controller!
+            .text,
+        CalendarDate.fromParts(
+          today.year,
+          today.month,
+          today.day,
+        ).toCanonicalString(),
+      );
+      expect(_savedIds(harness), hasLength(1));
+
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        createdDate.toCanonicalString(),
+      );
+      final submit = find.byKey(const ValueKey('daily-choice-submit'));
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.tap(submit);
+      await tester.pump();
+      await _waitFor(tester, find.textContaining('Дневной выбор создан'));
+
+      final ids = _savedIds(harness);
+      expect(ids, hasLength(2));
+      expect(ids.toSet(), hasLength(2));
+      final source = await _read(repository, ids.first);
+      final created = await _read(repository, ids.last);
+      expect(source.choice.date, CalendarDate.fromParts(2030, 9, 24));
+      expect(source.choice.description?.value, 'Описание источника');
+      expect(source.choice.isCompleted, isTrue);
+      expect(created.choice.date, createdDate);
+      expect(created.choice.description, isNull);
+      expect(created.choice.isCompleted, isFalse);
+      expect(created.path.map((step) => step.relation.id), [
+        _relation(101),
+        _relation(102),
+      ]);
+
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await openDailyChoices(tester, tap: _tap);
+      // Каталог сохраняет день прежнего выбора; новый находится на другом дне.
+      final expectedDays = [(catalogToday, ids.first), (createdDate, ids.last)];
+      for (final (day, expectedId) in expectedDays) {
+        if (day != catalogToday) {
+          await selectDailyChoiceCatalogDate(tester, day, tap: _tap);
         }
-
-        await _waitFor(tester, find.byType(ChoicePathPage));
-        final router = ready.container.read(appRouterProvider);
-        expect(router.current.name, ChoicePathRoute.name);
-
-        final suggestion = find.byKey(
-          const ValueKey('choice-suggestion-select-0'),
-        );
-        await _tap(
+        await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+        await _waitFor(
           tester,
-          find.byKey(const ValueKey('choice-suggestion-view-0')),
+          find.byKey(const ValueKey('daily-choice-edit-open')),
         );
-        await tester.pumpAndSettle();
         expect(
-          find.textContaining(
-            'Нужно: Чтобы Основание, нужно Действие в середине',
-          ),
+          tester
+              .widget<DailyChoiceDetailsPage>(
+                find.byType(DailyChoiceDetailsPage),
+              )
+              .choiceId,
+          expectedId,
+        );
+        expect(
+          find.byKey(const ValueKey('daily-choice-relation-1')),
           findsOneWidget,
         );
         expect(
-          find.textContaining(
-            'Можно: Чтобы Действие в середине, можно Продолжение действия',
-          ),
+          find.byKey(const ValueKey('daily-choice-relation-2')),
           findsOneWidget,
         );
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        await _tap(tester, suggestion);
-        await _waitFor(tester, find.byType(DailyChoiceCreationPage));
-        expect(
-          find.descendant(
-            of: find.byType(DailyChoiceCreationPage),
-            matching: find.text('Чтобы Основание, нужно Действие в середине'),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(
-            of: find.byType(DailyChoiceCreationPage),
-            matching: find.text(
-              'Чтобы Действие в середине, можно Продолжение действия',
-            ),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          tester
-              .widget<TextField>(
-                find.byKey(const ValueKey('daily-choice-description')),
-              )
-              .controller!
-              .text,
-          isEmpty,
-        );
-        expect(
-          tester
-              .widget<SwitchListTile>(
-                find.byKey(const ValueKey('daily-choice-completed')),
-              )
-              .value,
-          isFalse,
-        );
-        final today = DateTime.now();
-        expect(
-          tester
-              .widget<TextField>(
-                find.byKey(const ValueKey('daily-choice-date')),
-              )
-              .controller!
-              .text,
-          CalendarDate.fromParts(
-            today.year,
-            today.month,
-            today.day,
-          ).toCanonicalString(),
-        );
-        expect(_savedIds(harness), hasLength(1));
-
-        if (!bottomUp) {
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-          expect(_savedIds(harness), hasLength(1));
-          await _tap(tester, suggestion);
-          await _waitFor(tester, find.byType(DailyChoiceCreationPage));
-        }
-
-        await tester.enterText(
-          find.byKey(const ValueKey('daily-choice-date')),
-          createdDate.toCanonicalString(),
-        );
-        if (bottomUp) {
-          await tester.enterText(
-            find.byKey(const ValueKey('daily-choice-description')),
-            'Описание источника',
-          );
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('daily-choice-completed')),
-          );
-        }
-        final submit = find.byKey(const ValueKey('daily-choice-submit'));
-        await tester.ensureVisible(submit);
-        await tester.tap(submit);
-        await tester.tap(submit);
-        await tester.pump();
-        await _waitFor(tester, find.textContaining('Дневной выбор создан'));
-
-        final ids = _savedIds(harness);
-        expect(ids, hasLength(2));
-        expect(ids.toSet(), hasLength(2));
-        final source = await _read(repository, ids.first);
-        final created = await _read(repository, ids.last);
-        expect(source.choice.date, CalendarDate.fromParts(2030, 9, 24));
-        expect(source.choice.description?.value, 'Описание источника');
-        expect(source.choice.isCompleted, isTrue);
-        expect(created.choice.date, createdDate);
-        expect(
-          created.choice.description?.value,
-          bottomUp ? 'Описание источника' : null,
-        );
-        expect(created.choice.isCompleted, bottomUp);
-        expect(created.path.map((step) => step.relation.id), [
-          _relation(101),
-          _relation(102),
-        ]);
-
-        await tester.pumpAndSettle();
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        if (!bottomUp) {
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-          await openDailyChoices(tester, tap: _tap);
-        }
-        // Каталог показывает выборы одного дня: выбор, созданный на другой
-        // день, человек находит, выбрав этот день.
-        final expectedDays = bottomUp
-            ? [
-                (catalogToday, [ids.last, ids.first]),
-              ]
-            : [
-                (catalogToday, [ids.first]),
-                (createdDate, [ids.last]),
-              ];
-        for (final (day, expectedOrder) in expectedDays) {
-          if (day != catalogToday) {
-            await selectDailyChoiceCatalogDate(tester, day, tap: _tap);
-          }
-          await _waitFor(
-            tester,
-            find.byKey(ValueKey('daily-choice-row-${expectedOrder.length}')),
-          );
-          for (var index = 0; index < expectedOrder.length; index += 1) {
-            await _tap(
-              tester,
-              find.byKey(ValueKey('daily-choice-row-${index + 1}')),
-            );
-            await _waitFor(
-              tester,
-              find.byKey(const ValueKey('daily-choice-edit-open')),
-            );
-            expect(
-              tester
-                  .widget<DailyChoiceDetailsPage>(
-                    find.byType(DailyChoiceDetailsPage),
-                  )
-                  .choiceId,
-              expectedOrder[index],
-            );
-            expect(
-              find.byKey(const ValueKey('daily-choice-relation-1')),
-              findsOneWidget,
-            );
-            expect(
-              find.byKey(const ValueKey('daily-choice-relation-2')),
-              findsOneWidget,
-            );
-            await tester.binding.handlePopRoute();
-            await tester.pumpAndSettle();
-          }
-        }
-      },
-    );
-  }
+      }
+    },
+  );
 
   testWidgets(
     'из дневного каталога сохраняет нижний путь через общую форму и открывает самостоятельные записи',
@@ -1053,7 +982,7 @@ void main() {
   );
 
   testWidgets(
-    'после конфликта подсказки новый путь и поля попадают в отдельный выбор',
+    'после конфликта пошаговый выбор нового пути сохраняет независимые поля',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1;
@@ -1082,10 +1011,9 @@ void main() {
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
       await _openPath(tester);
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('choice-suggestion-select-0')),
-      );
+      await _continue(tester, 101);
+      await _continue(tester, 102);
+      await _openConfirmation(tester);
       await _waitFor(tester, find.byType(DailyChoiceCreationPage));
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-date')),

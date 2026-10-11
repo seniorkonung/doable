@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -33,11 +32,6 @@ import '../../../support/catalog_reconciliation_test_fallback.dart';
 final class ControlledNeighborhoodRepository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
-    ChoicePathSuggestionsQuery query,
-  ) => throw UnimplementedError();
-
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

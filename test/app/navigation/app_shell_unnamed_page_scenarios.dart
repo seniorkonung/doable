@@ -49,43 +49,6 @@ void _registerUnnamedPageTests() {
 
   for (final direction in ChoicePathDraftDirection.values) {
     testWidgets(
-      'безымянная подсказка прежнего пути: ${_directionName(direction)}',
-      (tester) async {
-        final router = await _start(tester);
-        final destination = await _startCreationPath(tester, direction);
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('choice-suggestion-view-0')),
-        );
-        await _until(tester, find.text('Full route'));
-        await tester.pumpAndSettle();
-        expect(find.byType(AppNavigationBar), findsNothing);
-        expect(_destinations.hitTestable(), findsNothing);
-        expect(_announcedDestinations, findsNothing);
-        final preview = find.ancestor(
-          of: find.text('Full route'),
-          matching: find.byType(Scaffold),
-        );
-        expect(tester.getRect(preview), Offset.zero & _screen(tester));
-        await tester.binding.handlePopRoute();
-        await _waitFor(
-          tester,
-          () => find.text('Full route').evaluate().isEmpty,
-        );
-        await tester.pumpAndSettle();
-        _expectAboveShell(
-          tester,
-          ChoicePathPage,
-          destination,
-          expectedPanel: false,
-        );
-        await _closeAll(tester);
-        _expectRootPage(tester, router, destination);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets(
       'безымянное подтверждение замены пути: ${_directionName(direction)}',
       (tester) async {
         final router = await _start(tester);
@@ -204,41 +167,6 @@ void _registerUnnamedPageTests() {
     _expectRootPage(tester, router, AppDestination.intentionGraph);
     expect(tester.takeException(), isNull);
   });
-}
-
-Future<AppDestination> _startCreationPath(
-  WidgetTester tester,
-  ChoicePathDraftDirection direction,
-) async {
-  switch (direction) {
-    case ChoicePathDraftDirection.topDown:
-      await _select(tester, AppDestination.intentionGraph);
-      await _open(
-        tester,
-        _summary(IntentionCatalogPage, 'Читать'),
-        IntentionDetailsPage,
-      );
-      await _open(
-        tester,
-        find.byKey(const ValueKey('intention-details-choose-path')),
-        ChoicePathPage,
-      );
-      return AppDestination.intentionGraph;
-    case ChoicePathDraftDirection.bottomUp:
-      await _select(tester, AppDestination.dailyChoices);
-      await openQuickCreation(
-        tester,
-        QuickCreationMode.dailyChoiceFromAction,
-        openedPage: find.byType(DailyChoiceActionPickerPage),
-        wait: _until,
-      );
-      await _open(
-        tester,
-        _summary(DailyChoiceActionPickerPage, 'Бегать'),
-        ChoicePathPage,
-      );
-      return AppDestination.dailyChoices;
-  }
 }
 
 Future<void> _confirmPath(

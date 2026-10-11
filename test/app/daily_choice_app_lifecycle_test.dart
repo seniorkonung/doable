@@ -7,7 +7,6 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -165,7 +164,7 @@ final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
 
 void main() {
   testWidgets(
-    'повтор по подсказке завершается после ухода, смены фокуса и повторного открытия',
+    'создание снизу вверх завершается после ухода, смены фокуса и повторного открытия',
     (tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
@@ -214,7 +213,19 @@ void main() {
       await _tap(tester, find.text('Намерение 3'));
       await _tap(
         tester,
-        find.byKey(const ValueKey('choice-suggestion-select-0')),
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
       await _until(
         tester,
@@ -997,11 +1008,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   Stream<SelectedRelationsReadResult> watchSelectedRelations(
     SelectedRelationsQuery query,
   ) => _delegate.watchSelectedRelations(query);
-
-  @override
-  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
-    ChoicePathSuggestionsQuery query,
-  ) => _delegate.getChoicePathSuggestions(query);
 
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(

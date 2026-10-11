@@ -12,13 +12,11 @@ final class DailyChoiceCreationExitAction extends StatefulWidget {
   const DailyChoiceCreationExitAction({
     required this.session,
     required this.ownerMatchId,
-    this.previewRoute,
     super.key,
   });
 
   final DailyChoiceCreationFlowSession session;
   final LocalKey ownerMatchId;
-  final Route<void>? previewRoute;
 
   @override
   State<DailyChoiceCreationExitAction> createState() =>
@@ -89,7 +87,6 @@ final class _DailyChoiceCreationExitActionState
         router: router,
         session: session,
         ownerMatchId: widget.ownerMatchId,
-        previewRoute: widget.previewRoute,
       ),
     );
   }
