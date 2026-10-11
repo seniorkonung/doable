@@ -259,7 +259,7 @@ void main() {
   _registerCreationRouteScenarios();
 
   testWidgets(
-    'пошаговое создание сверху сохраняет отдельный выбор без наследования полей',
+    'сохранённый маршрут не предлагается, пошаговый выбор не наследует его поля',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1;
@@ -296,9 +296,26 @@ void main() {
       await _waitFor(tester, find.byType(ChoicePathPage));
       final router = ready.container.read(appRouterProvider);
       expect(router.current.name, ChoicePathRoute.name);
+      await _waitFor(tester, find.text('Исходное намерение: Основание'));
+      expect(find.text('Прежние маршруты'), findsNothing);
+      expect(find.text('Просмотреть весь маршрут'), findsNothing);
+      expect(find.text('Выбрать маршрут'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(ChoicePathPage),
+          matching: find.textContaining('Продолжение действия'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('Перейти к подтверждению выбора'), findsNothing);
 
       await _continue(tester, 101);
       await _continue(tester, 102);
+      await _waitFor(
+        tester,
+        find.text('Выбрать действие «Продолжение действия»'),
+      );
+      expect(find.text('Перейти к подтверждению выбора'), findsNothing);
       await _openConfirmation(tester);
       await _waitFor(tester, find.byType(DailyChoiceCreationPage));
       expect(

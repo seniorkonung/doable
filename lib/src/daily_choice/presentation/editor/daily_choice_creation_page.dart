@@ -10,7 +10,6 @@ import '../../../long_term_relation/application/long_term_relation_projection.da
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../application/choice_path_draft.dart';
-import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
@@ -32,13 +31,6 @@ final class DailyChoiceCreationStep {
   });
 
   DailyChoiceCreationStep.fromSummary(LongTermRelationSummary step)
-    : this(
-        relation: step.relation,
-        sourceTitle: step.source.title,
-        relatedTitle: step.related.title,
-      );
-
-  DailyChoiceCreationStep.fromSuggestion(DailyChoicePathStepDetails step)
     : this(
         relation: step.relation,
         sourceTitle: step.source.title,
