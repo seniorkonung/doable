@@ -506,7 +506,7 @@ void main() {
       expect(repository.commands, hasLength(1));
     });
 
-    test('успех передаёт подтверждённый идентификатор только своей сессии и только один раз без подтверждения сообщения', () async {
+    test('успех передаёт подтверждённый идентификатор только своей сессии и только один раз при занятой общей поверхности', () async {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
       final coordinator = container.read(
@@ -570,7 +570,7 @@ void main() {
       );
       final success = await presenter.nextClaim();
       expect(
-        success!.completion,
+        success!.completions.single,
         isA<IntentionCommandCompletion>().having(
           (completion) => completion.result,
           'результат той же отправки',
@@ -585,8 +585,6 @@ void main() {
           ),
         ),
       );
-      coordinator.confirmPresentation(success);
-
       repository.completeCommand(1, _savedResult(intention: otherIntention));
       await _deliverEvents(container);
       expect(
@@ -601,9 +599,13 @@ void main() {
       await _deliverEvents(container);
       expect(container.read(otherProvider).event, isNull);
       expect(events, hasLength(1));
+      coordinator.confirmAppPresentation(
+        success,
+        success.completions.map((completion) => completion.token),
+      );
       final otherSuccess = await presenter.nextClaim();
       expect(
-        otherSuccess!.completion,
+        otherSuccess!.completions.single,
         isA<IntentionCommandCompletion>().having(
           (completion) => completion.result,
           'результат второй отправки',
@@ -618,7 +620,10 @@ void main() {
           ),
         ),
       );
-      coordinator.confirmPresentation(otherSuccess);
+      coordinator.confirmAppPresentation(
+        otherSuccess,
+        otherSuccess.completions.map((completion) => completion.token),
+      );
       expect(repository.commands, hasLength(2));
     });
 
@@ -666,7 +671,7 @@ void main() {
 
       final claim = await presenter.nextClaim();
       expect(
-        claim!.completion,
+        claim!.completions.single,
         isA<IntentionCommandCompletion>().having(
           (completion) => completion.result,
           'результат',
@@ -675,7 +680,10 @@ void main() {
       );
       expect(coordinator.isKeyRunning(formKey), isFalse);
       expect(container.read(provider).event, isNull);
-      coordinator.confirmPresentation(claim);
+      coordinator.confirmAppPresentation(
+        claim,
+        claim.completions.map((completion) => completion.token),
+      );
       expect(repository.commands, hasLength(1));
     });
   });
@@ -1522,8 +1530,11 @@ void main() {
       await _settle(container);
 
       final fallback = await presenter.nextClaim();
-      expect(fallback!.completion, isA<IntentionCommandCompletion>());
-      coordinator.confirmPresentation(fallback);
+      expect(fallback!.completions.single, isA<IntentionCommandCompletion>());
+      coordinator.confirmAppPresentation(
+        fallback,
+        fallback.completions.map((completion) => completion.token),
+      );
       expect(container.read(provider).event, isNull);
       expect(repository.commands, hasLength(1));
     });
@@ -1592,14 +1603,17 @@ void main() {
       expect(reopenedEvents, isEmpty);
       final success = await presenter.nextClaim();
       expect(
-        success!.completion,
+        success!.completions.single,
         isA<IntentionCommandCompletion>().having(
           (completion) => completion.result,
           'результат',
           isA<ResultSuccess<IntentionCommandSuccess>>(),
         ),
       );
-      coordinator.confirmPresentation(success);
+      coordinator.confirmAppPresentation(
+        success,
+        success.completions.map((completion) => completion.token),
+      );
       expect(repository.commands, hasLength(1));
     });
 
@@ -1770,7 +1784,7 @@ void main() {
       await _settle(session.container);
 
       expect(session.repository.commands, hasLength(2));
-      expect(surface.presented.map((claim) => claim.completion), [
+      expect(surface.presented, [
         isA<IntentionCommandCompletion>().having(
           (completion) => completion.result,
           'отказ первой отправки',
@@ -1972,8 +1986,8 @@ void _expectFailureKeptByForm(
   expect(surface.presented, isEmpty, reason: reason);
 }
 
-/// Общая поверхность приложения: получает права предъявления по очереди
-/// и сразу подтверждает каждое предъявление.
+/// Общая поверхность приложения: получает наборы результатов по очереди
+/// и сразу подтверждает охваченные результаты.
 final class _AppSurface {
   _AppSurface(this._coordinator)
     : _registration = _coordinator.registerAppPresentation() {
@@ -1985,15 +1999,18 @@ final class _AppSurface {
   final GraphAppPresentationRegistration _registration;
 
   /// Предъявленные результаты в порядке выдачи.
-  final presented = <GraphAppPresentationClaim>[];
+  final presented = <GraphCommandCompletion>[];
 
   void _requestNext() => unawaited(
     _registration.nextClaim().then((claim) {
       if (claim == null) {
         return;
       }
-      presented.add(claim);
-      _coordinator.confirmPresentation(claim);
+      presented.addAll(claim.completions);
+      _coordinator.confirmAppPresentation(
+        claim,
+        claim.completions.map((completion) => completion.token),
+      );
       _requestNext();
     }),
   );

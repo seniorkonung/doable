@@ -35,7 +35,7 @@
   - **Вероятные файлы:** `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `test/intention/presentation/operation/intention_command_coordinator_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.4 Согласовать проверки потребителей намерений с новым правом оболочки
+- [x] 1.4 Согласовать проверки потребителей намерений с новым правом оболочки
   - **Критерии приёмки:**
     - Тестовые получатели общей поверхности читают набор результатов и подтверждают охваченное подмножество через `confirmAppPresentation`; прежняя операция подтверждения остаётся только у прав инициатора.
     - Проверки сохраняют исходные гарантии: каталог согласует каждый terminal outcome независимо от сообщения, успех создания закрывает форму при занятой поверхности, а уже предъявленная ошибка не повторяется после успешной повторной попытки.

@@ -835,14 +835,17 @@ void main() {
     final claim = await presenter.nextClaim();
     expect(claim, isNotNull);
     expect(
-      claim!.completion,
+      claim!.completions.single,
       isA<IntentionCommandCompletion>().having(
         (completion) => completion.presentationTitle,
         'название намерения',
         intention.title,
       ),
     );
-    coordinator.confirmPresentation(claim);
+    coordinator.confirmAppPresentation(
+      claim,
+      claim.completions.map((completion) => completion.token),
+    );
 
     subscription.close();
     container.dispose();
