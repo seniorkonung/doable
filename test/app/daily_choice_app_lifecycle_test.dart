@@ -14,6 +14,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
@@ -186,7 +187,7 @@ void main() {
       // Каталог открывается на дне прежнего дневного выбора, а новый выбор
       // создаётся на другой день.
       final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
-      final createdDate = CalendarDate.fromParts(2027, 1, 2);
+      final createdDate = CalendarDate.fromParts(2026, 9, 24);
       final runtime = AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
@@ -204,6 +205,16 @@ void main() {
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
       await openDailyChoices(tester, tap: _tap);
+      final createdDayMark = dailyChoiceCatalogDayMark(createdDate);
+      await _until(
+        tester,
+        () =>
+            dailyChoiceCatalogDayMark(durabilityChoiceDate)
+                .evaluate()
+                .isNotEmpty,
+      );
+      expect(dailyChoiceCatalogDay(createdDate), findsOneWidget);
+      expect(createdDayMark, findsNothing);
       await openQuickCreation(
         tester,
         QuickCreationMode.dailyChoiceFromAction,
@@ -279,6 +290,21 @@ void main() {
       ScaffoldMessenger.of(tester.element(message.first)).hideCurrentSnackBar();
       await tester.pumpAndSettle();
       expect(message, findsNothing);
+      // Уже существующая модель согласуется до возврата со страницы создания.
+      // Скрытая страница откладывает перестроение, поэтому значок проверяется
+      // после возврата, а здесь — её результат без создания нового провайдера.
+      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
+        durabilityChoiceDate,
+      );
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+      await _until(tester, () {
+        expect(ready.container.exists(marksProvider), isTrue);
+        return ready.container
+                .read(marksProvider)
+                .dayStatuses
+                ?.statuses[createdDate] ==
+            DailyChoiceDayStatus.hasIncomplete;
+      });
       expect(
         find.byKey(const ValueKey('choice-path-creation-status')),
         findsOneWidget,
@@ -286,6 +312,10 @@ void main() {
       expect(find.byKey(const ValueKey('daily-choice-submit')), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(
+        tester.widget<Icon>(dailyChoiceCatalogDayMark(createdDate)).icon,
+        Icons.circle_outlined,
+      );
       // Новый выбор относится к другому дню: человек выбирает этот день.
       await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));

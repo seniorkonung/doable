@@ -1,8 +1,10 @@
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
@@ -39,7 +41,7 @@ Future<void> _until(bool Function() condition) async {
 
 void main() {
   test(
-    'реальный каталог и подробности согласуют дубликаты и изменения графа',
+    'реальный каталог, отметки и подробности согласуют изменения графа',
     () async {
       final sourceDay = CalendarDate.fromParts(2026, 9, 24);
       final targetDay = CalendarDate.fromParts(2026, 9, 25);
@@ -48,7 +50,12 @@ void main() {
       addTearDown(database.close);
       await _seedGraph(database);
       for (var number = 201; number <= 251; number++) {
-        await _insertChoice(database, number, sourceDay);
+        await _insertChoice(
+          database,
+          number,
+          sourceDay,
+          completed: number != 201,
+        );
       }
 
       final repository = DriftPersonalGraphRepository(
@@ -56,6 +63,7 @@ void main() {
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 9, 24),
         InMemoryDiagnosticsSink(),
+        dailyChoiceIdGenerator: _SequentialChoiceIds(401),
       );
       // Локальное сегодня совпадает с днём записей, но каталог выбирает этот
       // день явно и не зависит от первоначального охвата.
@@ -72,6 +80,26 @@ void main() {
         (_, _) {},
       );
       addTearDown(subscription.close);
+      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
+        sourceDay,
+      );
+      final marksSubscription = container.listen(marksProvider, (_, _) {});
+      addTearDown(marksSubscription.close);
+      Future<void> expectMarks(
+        Map<CalendarDate, DailyChoiceDayStatus> expected,
+      ) async {
+        await _until(() {
+          final marks = container.read(marksProvider);
+          return !marks.hasReadFailure &&
+              marks.dayStatuses != null &&
+              marks.dayStatuses!.statuses.length == expected.length &&
+              expected.entries.every(
+                (entry) =>
+                    marks.dayStatuses!.statuses[entry.key] == entry.value,
+              );
+        });
+      }
+
       DailyChoiceCatalogLoaded catalog() =>
           container.read(dailyChoiceCatalogViewModelProvider)
               as DailyChoiceCatalogLoaded;
@@ -99,6 +127,7 @@ void main() {
         for (var number = 202; number <= 251; number++) _choice(number),
       });
       expect(catalog().items.last.id, _choice(201));
+      await expectMarks({sourceDay: DailyChoiceDayStatus.hasIncomplete});
 
       final details = DailyChoiceDetailsViewModel(repository, _choice(201));
       addTearDown(details.dispose);
@@ -116,6 +145,24 @@ void main() {
         opened().details.path.last.related.id,
         opened().details.selected.id,
       );
+
+      // Единственный невыполненный выбор определяет отметку всего дня.
+      for (final completed in [true, false]) {
+        final command = coordinator.acceptDailyChoiceUpdate(
+          UpdateDailyChoiceFields(
+            choiceId: _choice(201),
+            patch: DailyChoiceFieldsPatch(
+              isCompleted: DailyChoiceFieldSet(completed),
+            ),
+          ),
+        ) as DailyChoiceCommandAccepted;
+        await command.future;
+        await expectMarks({
+          sourceDay: completed
+              ? DailyChoiceDayStatus.allCompleted
+              : DailyChoiceDayStatus.hasIncomplete,
+        });
+      }
 
       final update = coordinator.acceptDailyChoiceUpdate(
         UpdateDailyChoiceFields(
@@ -143,6 +190,10 @@ void main() {
       expect(catalog().items.any((item) => item.id == _choice(201)), isFalse);
       expect(catalog().items.every((item) => item.date == sourceDay), isTrue);
       expect(opened().details.choice.date, targetDay);
+      await expectMarks({
+        sourceDay: DailyChoiceDayStatus.allCompleted,
+        targetDay: DailyChoiceDayStatus.allCompleted,
+      });
 
       final rename = coordinator.acceptExisting(
         UpdateIntention(
@@ -192,6 +243,25 @@ void main() {
       );
       expect(catalog(), isA<DailyChoiceCatalogEmpty>());
       expect(catalog().selection.date, targetDay);
+      await expectMarks({sourceDay: DailyChoiceDayStatus.allCompleted});
+
+      final creation = coordinator.acceptDailyChoiceCreation(
+        DailyChoiceCreationFormKey(),
+        _create(targetDay),
+      ) as DailyChoiceCommandAccepted;
+      await creation.future;
+      await expectMarks({
+        sourceDay: DailyChoiceDayStatus.allCompleted,
+        targetDay: DailyChoiceDayStatus.hasIncomplete,
+      });
+      final moveLast = coordinator.acceptDailyChoiceUpdate(
+        UpdateDailyChoiceFields(
+          choiceId: _choice(401),
+          patch: DailyChoiceFieldsPatch(date: DailyChoiceFieldSet(sourceDay)),
+        ),
+      ) as DailyChoiceCommandAccepted;
+      await moveLast.future;
+      await expectMarks({sourceDay: DailyChoiceDayStatus.hasIncomplete});
     },
   );
 

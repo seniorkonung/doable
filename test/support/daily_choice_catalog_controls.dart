@@ -34,6 +34,12 @@ Finder dailyChoiceCatalogDay(CalendarDate date) => find.byKey(
   ValueKey('daily-choice-calendar-day-${date.toCanonicalString()}'),
 );
 
+/// Значок отметки показанного дня. У дня без выборов значка нет.
+Finder dailyChoiceCatalogDayMark(CalendarDate date) => find.descendant(
+  of: dailyChoiceCatalogDay(date),
+  matching: find.byType(Icon),
+);
+
 /// Выбирает [date] днём открытого каталога дневных выборов.
 ///
 /// Если день не виден, шаг перелистывает календарь к нему командами шапки:
