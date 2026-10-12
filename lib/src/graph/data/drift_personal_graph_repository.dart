@@ -38,6 +38,9 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../statistics/application/contribution_counts.dart';
+import '../../statistics/application/statistics_period.dart';
+import '../../statistics/application/statistics_read_contract.dart';
 import '../../tag/application/tag_catalog.dart';
 import '../../tag/application/tag_assignment_status.dart';
 import '../../tag/application/tag_assignments.dart';
@@ -77,8 +80,10 @@ part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
+part 'drift_personal_graph_repository_statistics.dart';
 
-final class DriftPersonalGraphRepository implements PersonalGraphRepository {
+final class DriftPersonalGraphRepository
+    implements PersonalGraphRepository, StatisticsReadContract {
   DriftPersonalGraphRepository(
     this._database,
     this._idGenerator,
@@ -117,6 +122,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      _readStatisticsPage(query);
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
