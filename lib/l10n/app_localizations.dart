@@ -134,6 +134,240 @@ abstract class AppLocalizations {
   /// **'Intention graph'**
   String get appDestinationIntentionGraph;
 
+  /// Вид статистики по исходным намерениям дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Source intentions'**
+  String get statisticsSourceIntentions;
+
+  /// Вид статистики по промежуточным намерениям сохранённого пути
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate intentions'**
+  String get statisticsIntermediateIntentions;
+
+  /// Вид статистики по выбранным действиям
+  ///
+  /// In en, this message translates to:
+  /// **'Selected actions'**
+  String get statisticsSelectedActions;
+
+  /// Вкладка статистики календарного месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get statisticsMonthTab;
+
+  /// Вкладка статистики календарного года
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get statisticsYearTab;
+
+  /// Название выбранного месяца с годом в локали приложения
+  ///
+  /// In en, this message translates to:
+  /// **'{date}'**
+  String statisticsMonthPeriod(DateTime date);
+
+  /// Название выбранного или просматриваемого года в локали приложения
+  ///
+  /// In en, this message translates to:
+  /// **'{date}'**
+  String statisticsYearPeriod(DateTime date);
+
+  /// Название месяца в раскрытом выборе периода в локали приложения
+  ///
+  /// In en, this message translates to:
+  /// **'{date}'**
+  String statisticsMonthName(DateTime date);
+
+  /// Команда выбора предыдущего месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get statisticsPreviousMonth;
+
+  /// Команда выбора следующего месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get statisticsNextMonth;
+
+  /// Команда выбора предыдущего года или его просмотра в раскрытом выборе
+  ///
+  /// In en, this message translates to:
+  /// **'Previous year'**
+  String get statisticsPreviousYear;
+
+  /// Команда выбора следующего года или его просмотра в раскрытом выборе
+  ///
+  /// In en, this message translates to:
+  /// **'Next year'**
+  String get statisticsNextYear;
+
+  /// Команда раскрытия выбора месяцев или годов
+  ///
+  /// In en, this message translates to:
+  /// **'Expand period selection'**
+  String get statisticsExpandPeriodSelector;
+
+  /// Команда явного сворачивания выбора месяцев или годов
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse period selection'**
+  String get statisticsCollapsePeriodSelector;
+
+  /// Видимая и доступная отметка периода, содержащего текущую местную дату
+  ///
+  /// In en, this message translates to:
+  /// **'Current period'**
+  String get statisticsCurrentPeriod;
+
+  /// Заголовок сводки дневных выборов всего периода
+  ///
+  /// In en, this message translates to:
+  /// **'Period summary'**
+  String get statisticsPeriodSummary;
+
+  /// Подпись выбора вида статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics view'**
+  String get statisticsViewLabel;
+
+  /// Точное число элементов выбранного вида с числовой формой локали
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} item} other{{count} items}}'**
+  String statisticsTotalItems(int count);
+
+  /// Запланированный вклад сводки периода
+  ///
+  /// In en, this message translates to:
+  /// **'Planned contribution: {count}'**
+  String statisticsPlannedContribution(int count);
+
+  /// Вклад сводки периода
+  ///
+  /// In en, this message translates to:
+  /// **'Contribution: {count}'**
+  String statisticsContribution(int count);
+
+  /// Число невыполненных выборов раньше текущей местной даты
+  ///
+  /// In en, this message translates to:
+  /// **'Missed: {count}'**
+  String statisticsMissed(int count);
+
+  /// Число невыполненных выборов текущей местной даты и позже
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming: {count}'**
+  String statisticsUpcoming(int count);
+
+  /// Компактный видимый вклад элемента из запланированного
+  ///
+  /// In en, this message translates to:
+  /// **'{contribution} of {planned}'**
+  String statisticsContributionCounts(int contribution, int planned);
+
+  /// Доступная подпись тех же чисел, что в компактном вкладе элемента; название намерения передаётся без перевода, архивная отметка использует detailsArchived
+  ///
+  /// In en, this message translates to:
+  /// **'Contribution: {contribution}. Planned contribution: {planned}'**
+  String statisticsContributionCountsSemantics(int contribution, int planned);
+
+  /// Видимая и доступная доля вклада элемента; отношение к вкладу периода передаётся без умножения на 100
+  ///
+  /// In en, this message translates to:
+  /// **'Share of the period’s contribution: {share}'**
+  String statisticsContributionShare(num share);
+
+  /// Доступное объяснение отсутствия доли при нулевом вкладе периода; видимая доля в этом случае не показывается
+  ///
+  /// In en, this message translates to:
+  /// **'No share: the period’s contribution is zero'**
+  String get statisticsNoContributionShare;
+
+  /// Начальное получение статистики выбранных условий
+  ///
+  /// In en, this message translates to:
+  /// **'Loading statistics…'**
+  String get statisticsLoading;
+
+  /// Подтверждённый пустой вид, в том числе при непустой сводке периода
+  ///
+  /// In en, this message translates to:
+  /// **'No daily choices are credited to this view for the selected period.'**
+  String get statisticsEmpty;
+
+  /// Обновление статистики с сохранением прежних подтверждённых чисел
+  ///
+  /// In en, this message translates to:
+  /// **'Updating statistics…'**
+  String get statisticsRefreshing;
+
+  /// Получение следующей порции элементов выбранного вида
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more items…'**
+  String get statisticsLoadingMore;
+
+  /// Первичный отказ из-за доказанной недоступности; допускает commonRetry
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load statistics. Try again.'**
+  String get statisticsUnavailable;
+
+  /// Первичный отказ из-за повреждения данных без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. Statistics cannot be shown.'**
+  String get statisticsCorruption;
+
+  /// Первичный неизвестный отказ без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load statistics because of an unexpected error.'**
+  String get statisticsUnexpectedFailure;
+
+  /// Отказ обновления из-за недоступности над прежними числами; допускает commonRetry
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics are out of date: changes could not be loaded. Try again.'**
+  String get statisticsRefreshUnavailable;
+
+  /// Отказ обновления из-за повреждения над прежними числами без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics are out of date: stored data is damaged.'**
+  String get statisticsRefreshCorruption;
+
+  /// Неизвестный отказ обновления над прежними числами без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics are out of date because of an unexpected error.'**
+  String get statisticsRefreshUnexpectedFailure;
+
+  /// Отказ следующей порции из-за недоступности в конце сохранённого списка; допускает commonRetry
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load more items. Try again.'**
+  String get statisticsLoadMoreUnavailable;
+
+  /// Отказ следующей порции из-за повреждения в конце сохранённого списка без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'More items cannot be shown: stored data is damaged.'**
+  String get statisticsLoadMoreCorruption;
+
+  /// Неизвестный отказ следующей порции в конце сохранённого списка без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load more items because of an unexpected error.'**
+  String get statisticsLoadMoreUnexpectedFailure;
+
   /// Доступное название кнопки быстрого создания
   ///
   /// In en, this message translates to:

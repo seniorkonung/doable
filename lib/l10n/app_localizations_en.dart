@@ -28,6 +28,212 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Intention graph';
 
   @override
+  String get statisticsSourceIntentions => 'Source intentions';
+
+  @override
+  String get statisticsIntermediateIntentions => 'Intermediate intentions';
+
+  @override
+  String get statisticsSelectedActions => 'Selected actions';
+
+  @override
+  String get statisticsMonthTab => 'Month';
+
+  @override
+  String get statisticsYearTab => 'Year';
+
+  @override
+  String statisticsMonthPeriod(DateTime date) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.yMMMM(localeName);
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString';
+  }
+
+  @override
+  String statisticsYearPeriod(DateTime date) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.y(localeName);
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString';
+  }
+
+  @override
+  String statisticsMonthName(DateTime date) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.MMMM(localeName);
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString';
+  }
+
+  @override
+  String get statisticsPreviousMonth => 'Previous month';
+
+  @override
+  String get statisticsNextMonth => 'Next month';
+
+  @override
+  String get statisticsPreviousYear => 'Previous year';
+
+  @override
+  String get statisticsNextYear => 'Next year';
+
+  @override
+  String get statisticsExpandPeriodSelector => 'Expand period selection';
+
+  @override
+  String get statisticsCollapsePeriodSelector => 'Collapse period selection';
+
+  @override
+  String get statisticsCurrentPeriod => 'Current period';
+
+  @override
+  String get statisticsPeriodSummary => 'Period summary';
+
+  @override
+  String get statisticsViewLabel => 'Statistics view';
+
+  @override
+  String statisticsTotalItems(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString items',
+      one: '$countString item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statisticsPlannedContribution(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Planned contribution: $countString';
+  }
+
+  @override
+  String statisticsContribution(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Contribution: $countString';
+  }
+
+  @override
+  String statisticsMissed(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Missed: $countString';
+  }
+
+  @override
+  String statisticsUpcoming(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Upcoming: $countString';
+  }
+
+  @override
+  String statisticsContributionCounts(int contribution, int planned) {
+    final intl.NumberFormat contributionNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String contributionString = contributionNumberFormat.format(
+      contribution,
+    );
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
+
+    return '$contributionString of $plannedString';
+  }
+
+  @override
+  String statisticsContributionCountsSemantics(int contribution, int planned) {
+    final intl.NumberFormat contributionNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String contributionString = contributionNumberFormat.format(
+      contribution,
+    );
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
+
+    return 'Contribution: $contributionString. Planned contribution: $plannedString';
+  }
+
+  @override
+  String statisticsContributionShare(num share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return 'Share of the period’s contribution: $shareString';
+  }
+
+  @override
+  String get statisticsNoContributionShare =>
+      'No share: the period’s contribution is zero';
+
+  @override
+  String get statisticsLoading => 'Loading statistics…';
+
+  @override
+  String get statisticsEmpty =>
+      'No daily choices are credited to this view for the selected period.';
+
+  @override
+  String get statisticsRefreshing => 'Updating statistics…';
+
+  @override
+  String get statisticsLoadingMore => 'Loading more items…';
+
+  @override
+  String get statisticsUnavailable => 'Could not load statistics. Try again.';
+
+  @override
+  String get statisticsCorruption =>
+      'Stored data is damaged. Statistics cannot be shown.';
+
+  @override
+  String get statisticsUnexpectedFailure =>
+      'Could not load statistics because of an unexpected error.';
+
+  @override
+  String get statisticsRefreshUnavailable =>
+      'Statistics are out of date: changes could not be loaded. Try again.';
+
+  @override
+  String get statisticsRefreshCorruption =>
+      'Statistics are out of date: stored data is damaged.';
+
+  @override
+  String get statisticsRefreshUnexpectedFailure =>
+      'Statistics are out of date because of an unexpected error.';
+
+  @override
+  String get statisticsLoadMoreUnavailable =>
+      'Could not load more items. Try again.';
+
+  @override
+  String get statisticsLoadMoreCorruption =>
+      'More items cannot be shown: stored data is damaged.';
+
+  @override
+  String get statisticsLoadMoreUnexpectedFailure =>
+      'Could not load more items because of an unexpected error.';
+
+  @override
   String get quickCreationLabel => 'Quick create';
 
   @override
