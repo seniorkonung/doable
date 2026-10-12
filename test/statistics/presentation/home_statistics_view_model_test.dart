@@ -377,6 +377,7 @@ final class _Harness {
     );
     subscription = container.listen(homeStatisticsViewModelProvider, (_, _) {});
     model = container.read(homeStatisticsViewModelProvider.notifier);
+    model.setVisible(true);
   }
 
   final reader = _Reader();

@@ -42,6 +42,7 @@ final class HomeStatisticsSelection {
   bool get isCurrentPeriod => period.contains(localDate);
 
   HomeStatisticsSelection copyWith({
+    CalendarDate? localDate,
     HomeStatisticsTab? tab,
     StatisticsMonth? month,
     StatisticsYear? year,
@@ -49,7 +50,7 @@ final class HomeStatisticsSelection {
     bool? isPeriodSelectorExpanded,
     StatisticsYear? browsedYear,
   }) => HomeStatisticsSelection(
-    localDate: localDate,
+    localDate: localDate ?? this.localDate,
     tab: tab ?? this.tab,
     month: month ?? this.month,
     year: year ?? this.year,
@@ -109,6 +110,25 @@ final class HomeStatisticsPageFailure extends HomeStatisticsPageStatus {
   bool get canRetry => failure is StatisticsReadUnavailableFailure;
 }
 
+sealed class HomeStatisticsRefreshStatus {
+  const HomeStatisticsRefreshStatus();
+}
+
+final class HomeStatisticsRefreshIdle extends HomeStatisticsRefreshStatus {
+  const HomeStatisticsRefreshIdle();
+}
+
+final class HomeStatisticsRefreshing extends HomeStatisticsRefreshStatus {
+  const HomeStatisticsRefreshing();
+}
+
+final class HomeStatisticsRefreshFailure extends HomeStatisticsRefreshStatus {
+  const HomeStatisticsRefreshFailure(this.failure);
+
+  final StatisticsReadFailure failure;
+  bool get canRetry => failure is StatisticsReadUnavailableFailure;
+}
+
 /// Сводка, число и элементы относятся к одному снимку выбранных условий.
 sealed class HomeStatisticsLoaded extends HomeStatisticsReadState {
   HomeStatisticsLoaded({
@@ -118,6 +138,7 @@ sealed class HomeStatisticsLoaded extends HomeStatisticsReadState {
     required this.revision,
     required this.nextCursor,
     this.pageStatus = const HomeStatisticsPageIdle(),
+    this.refreshStatus = const HomeStatisticsRefreshIdle(),
   }) : items = List.unmodifiable(items);
 
   final StatisticsPeriodSummary summary;
@@ -126,6 +147,25 @@ sealed class HomeStatisticsLoaded extends HomeStatisticsReadState {
   final GraphRevision revision;
   final StatisticsCursor? nextCursor;
   final HomeStatisticsPageStatus pageStatus;
+  final HomeStatisticsRefreshStatus refreshStatus;
+
+  HomeStatisticsLoaded withRefreshStatus(
+    HomeStatisticsRefreshStatus refreshStatus,
+  ) => switch (this) {
+    HomeStatisticsEmpty() => HomeStatisticsEmpty(
+      summary: summary,
+      revision: revision,
+      refreshStatus: refreshStatus,
+    ),
+    HomeStatisticsData() => HomeStatisticsData(
+      summary: summary,
+      totalItems: totalItems,
+      items: items,
+      revision: revision,
+      nextCursor: nextCursor,
+      refreshStatus: refreshStatus,
+    ),
+  };
 }
 
 final class HomeStatisticsData extends HomeStatisticsLoaded {
@@ -136,6 +176,7 @@ final class HomeStatisticsData extends HomeStatisticsLoaded {
     required super.revision,
     required super.nextCursor,
     super.pageStatus,
+    super.refreshStatus,
   });
 
   HomeStatisticsData withPageStatus(HomeStatisticsPageStatus pageStatus) =>
@@ -146,10 +187,14 @@ final class HomeStatisticsData extends HomeStatisticsLoaded {
         revision: revision,
         nextCursor: nextCursor,
         pageStatus: pageStatus,
+        refreshStatus: refreshStatus,
       );
 }
 
 final class HomeStatisticsEmpty extends HomeStatisticsLoaded {
-  HomeStatisticsEmpty({required super.summary, required super.revision})
-    : super(totalItems: 0, items: const [], nextCursor: null);
+  HomeStatisticsEmpty({
+    required super.summary,
+    required super.revision,
+    super.refreshStatus,
+  }) : super(totalItems: 0, items: const [], nextCursor: null);
 }

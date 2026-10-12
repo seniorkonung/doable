@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../daily_choice/domain/calendar_date.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/application/graph_command_result.dart';
+import '../../graph/application/graph_revision.dart';
 import '../../graph/application/personal_graph_repository_provider.dart';
 import '../application/statistics_period.dart';
 import '../application/statistics_read_contract.dart';
@@ -18,15 +21,64 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
     ref.read(dailyChoiceLocalDateSourceProvider)().date,
   );
   var _generation = 0;
+  var _isVisible = false;
+  var _needsRead = true;
+  int? _readingGeneration;
+  GraphRevision? _requiredRevision;
+  Object? _lifetime;
 
   @override
   HomeStatisticsState build() {
     _reader = ref.watch(personalGraphRepositoryProvider);
-    unawaited(_loadFirst(++_generation));
+    _requiredRevision = null;
+    _needsRead = true;
+    _readingGeneration = null;
+    ++_generation;
+    final lifetime = _lifetime = Object();
+    final coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    final completions = coordinator.completions.listen(_onCompletion);
+    ref.onDispose(() {
+      _lifetime = null;
+      ++_generation;
+      unawaited(completions.cancel());
+    });
+    scheduleMicrotask(() {
+      if (ref.mounted && identical(lifetime, _lifetime)) {
+        unawaited(_readIfVisible());
+      }
+    });
     return HomeStatisticsState(
       selection: _selection,
       read: const HomeStatisticsInitialLoad(),
     );
+  }
+
+  /// Страница сообщает видимость маршрута; наличие слушателей её не заменяет.
+  void setVisible(bool visible) {
+    if (visible == _isVisible) return;
+    _isVisible = visible;
+    if (visible) {
+      unawaited(_readIfVisible());
+    } else if (_readingGeneration == _generation) {
+      ++_generation;
+      _readingGeneration = null;
+      final current = state.read;
+      if (current is HomeStatisticsData &&
+          current.pageStatus is HomeStatisticsPageLoading) {
+        state = state.copyWith(
+          read: current.withPageStatus(const HomeStatisticsPageIdle()),
+        );
+      } else {
+        _needsRead = true;
+      }
+    }
+  }
+
+  /// Сигнал часов меняет только границу невыполненного и отметку текущего периода.
+  void setLocalDate(CalendarDate localDate) {
+    if (localDate == _selection.localDate) return;
+    _publishSelection(_selection.copyWith(localDate: localDate));
+    unawaited(_markStale());
   }
 
   void selectTab(HomeStatisticsTab tab) {
@@ -83,9 +135,19 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
   void browseNextYear() => _browseYear(_selection.browsedYear.next);
 
   Future<void> retryFirstPage() {
+    if (!_isVisible) return Future.value();
     if (state.read case HomeStatisticsInitialFailure(canRetry: true)) {
-      state = state.copyWith(read: const HomeStatisticsInitialLoad());
-      return _loadFirst(++_generation);
+      return _markStale();
+    }
+    return Future.value();
+  }
+
+  Future<void> retryRefresh() {
+    if (!_isVisible) return Future.value();
+    if (state.read case HomeStatisticsLoaded(
+      refreshStatus: HomeStatisticsRefreshFailure(canRetry: true),
+    )) {
+      return _markStale();
     }
     return Future.value();
   }
@@ -102,8 +164,10 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
   }
 
   Future<void> loadMore() {
+    if (!_isVisible) return Future.value();
     if (state.read case final HomeStatisticsData current
         when current.nextCursor != null &&
+            current.refreshStatus is HomeStatisticsRefreshIdle &&
             current.pageStatus is HomeStatisticsPageIdle) {
       return _loadMore(current);
     }
@@ -111,8 +175,12 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
   }
 
   Future<void> retryLoadMore() {
+    if (!_isVisible) return Future.value();
     final current = state.read;
-    if (current is! HomeStatisticsData) return Future.value();
+    if (current is! HomeStatisticsData ||
+        current.refreshStatus is! HomeStatisticsRefreshIdle) {
+      return Future.value();
+    }
     if (current.pageStatus case HomeStatisticsPageFailure(canRetry: true)) {
       return _loadMore(current);
     }
@@ -135,43 +203,153 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
       selection: selection,
       read: const HomeStatisticsInitialLoad(),
     );
-    unawaited(_loadFirst(++_generation));
+    unawaited(_markStale());
   }
 
-  Future<void> _loadFirst(int generation) async {
-    final result = await _readPage();
-    if (!ref.mounted || generation != _generation) return;
-    final read = switch (result) {
-      GraphResultSuccess(value: final StatisticsFirstPage page) =>
-        page.totalItems == 0
-            ? HomeStatisticsEmpty(
-                summary: page.summary,
-                revision: page.revision,
-              )
-            : HomeStatisticsData(
-                summary: page.summary,
-                totalItems: page.totalItems,
-                items: page.items,
-                revision: page.revision,
-                nextCursor: page.nextCursor,
-              ),
-      GraphResultSuccess() => const HomeStatisticsInitialFailure(
-        StatisticsReadUnexpectedFailure(),
-      ),
-      GraphResultFailure(:final failure) => HomeStatisticsInitialFailure(
-        failure,
-      ),
-    };
-    state = state.copyWith(read: read);
+  void _onCompletion(GraphCommandCompletion completion) {
+    final revision = completion.revision;
+    if (revision == null) return;
+    final known = _requiredRevision;
+    if (known != null) {
+      final order = revision.compareTo(known);
+      if (order == GraphRevisionOrder.older ||
+          order == GraphRevisionOrder.same) {
+        return;
+      }
+    }
+    _requiredRevision = revision;
+    ++_generation;
+    _needsRead = true;
+    final lifetime = _lifetime;
+    scheduleMicrotask(() {
+      if (ref.mounted && identical(lifetime, _lifetime)) {
+        unawaited(_readIfVisible());
+      }
+    });
+  }
+
+  Future<void> _markStale() {
+    ++_generation;
+    _needsRead = true;
+    return _readIfVisible();
+  }
+
+  Future<void> _readIfVisible() {
+    if (!_isVisible || !_needsRead) return Future.value();
+    _needsRead = false;
+    final current = state.read;
+    final confirmed = current is HomeStatisticsLoaded ? current : null;
+    state = state.copyWith(
+      read:
+          confirmed?.withRefreshStatus(const HomeStatisticsRefreshing()) ??
+          const HomeStatisticsInitialLoad(),
+    );
+    _readingGeneration = _generation;
+    return _replaceLoaded(_generation, _selection, confirmed);
+  }
+
+  bool _isCurrent(int generation) =>
+      ref.mounted && generation == _generation && _isVisible;
+
+  bool _precedesRequired(GraphRevision revision) {
+    final required = _requiredRevision;
+    if (required == null) return false;
+    final order = revision.compareTo(required);
+    return order == GraphRevisionOrder.older ||
+        order == GraphRevisionOrder.differentEpoch;
+  }
+
+  Future<void> _replaceLoaded(
+    int generation,
+    HomeStatisticsSelection selection,
+    HomeStatisticsLoaded? confirmed,
+  ) async {
+    final result = await _readPage(selection);
+    if (!_isCurrent(generation)) return;
+    final StatisticsFirstPage first;
+    switch (result) {
+      case GraphResultSuccess(value: final StatisticsFirstPage page):
+        first = page;
+      case GraphResultSuccess():
+        return _failReplacement(
+          const StatisticsReadUnexpectedFailure(),
+          confirmed,
+        );
+      case GraphResultFailure(:final failure):
+        return _failReplacement(failure, confirmed);
+    }
+    if (_precedesRequired(first.revision)) return _markStale();
+    final items = [...first.items];
+    var cursor = first.nextCursor;
+    while (cursor != null && items.length < (confirmed?.items.length ?? 0)) {
+      final continuation = await _readPage(selection, cursor: cursor);
+      if (!_isCurrent(generation)) return;
+      switch (continuation) {
+        case GraphResultSuccess(value: final StatisticsContinuationPage page):
+          if (page.revision.compareTo(first.revision) !=
+              GraphRevisionOrder.same) {
+            return _markStale();
+          }
+          items.addAll(page.items);
+          cursor = page.nextCursor;
+        case GraphResultSuccess():
+          return _failReplacement(
+            const StatisticsReadUnexpectedFailure(),
+            confirmed,
+          );
+        case GraphResultFailure(:final failure):
+          return _failReplacement(failure, confirmed);
+      }
+    }
+    _readingGeneration = null;
+    _requiredRevision = first.revision;
+    state = state.copyWith(
+      read: first.totalItems == 0
+          ? HomeStatisticsEmpty(
+              summary: first.summary,
+              revision: first.revision,
+            )
+          : HomeStatisticsData(
+              summary: first.summary,
+              totalItems: first.totalItems,
+              items: items,
+              revision: first.revision,
+              nextCursor: cursor,
+            ),
+    );
+  }
+
+  Future<void> _failReplacement(
+    StatisticsReadFailure failure,
+    HomeStatisticsLoaded? confirmed,
+  ) {
+    if (failure is StatisticsSnapshotExpired) return _markStale();
+    _readingGeneration = null;
+    state = state.copyWith(
+      read:
+          confirmed?.withRefreshStatus(HomeStatisticsRefreshFailure(failure)) ??
+          HomeStatisticsInitialFailure(failure),
+    );
+    return Future.value();
   }
 
   Future<void> _loadMore(HomeStatisticsData confirmed) async {
     final generation = _generation;
+    _readingGeneration = generation;
     state = state.copyWith(
       read: confirmed.withPageStatus(const HomeStatisticsPageLoading()),
     );
-    final result = await _readPage(cursor: confirmed.nextCursor);
-    if (!ref.mounted || generation != _generation) return;
+    final result = await _readPage(_selection, cursor: confirmed.nextCursor);
+    if (!_isCurrent(generation)) return;
+    _readingGeneration = null;
+    if (result case GraphResultFailure(failure: StatisticsSnapshotExpired())) {
+      return _markStale();
+    }
+    if (result case GraphResultSuccess(:final value)
+        when value.revision.compareTo(confirmed.revision) !=
+            GraphRevisionOrder.same) {
+      return _markStale();
+    }
     final read = switch (result) {
       GraphResultSuccess(value: final StatisticsContinuationPage page) =>
         HomeStatisticsData(
@@ -191,13 +369,16 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
     state = state.copyWith(read: read);
   }
 
-  Future<StatisticsPageResult> _readPage({StatisticsCursor? cursor}) async {
+  Future<StatisticsPageResult> _readPage(
+    HomeStatisticsSelection selection, {
+    StatisticsCursor? cursor,
+  }) async {
     try {
       return await _reader.getStatisticsPage(
         StatisticsQuery(
-          period: _selection.period,
-          view: _selection.view,
-          localDate: _selection.localDate,
+          period: selection.period,
+          view: selection.view,
+          localDate: selection.localDate,
           pageSize: 100,
           cursor: cursor,
         ),
