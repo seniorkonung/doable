@@ -34,15 +34,20 @@ final class HomeStatisticsContent extends StatefulWidget {
 
 final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
   final _scrollController = ScrollController();
+  int? _loadMoreIndex;
 
   @override
   void didUpdateWidget(HomeStatisticsContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     final before = oldWidget.state.selection;
     final after = widget.state.selection;
-    if ((before.period != after.period || before.view != after.view) &&
-        _scrollController.hasClients) {
-      _scrollController.jumpTo(0);
+    if (before.period != after.period || before.view != after.view) {
+      // AppBar слушает прокрутку: уведомлять его во время build нельзя.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+      });
     }
   }
 
@@ -56,64 +61,182 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
     final read = widget.state.read;
-    return CustomScrollView(
-      controller: _scrollController,
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverMainAxisGroup(
-            slivers: [
-              SliverToBoxAdapter(child: widget.periodSelector),
-              if (read case HomeStatisticsLoaded(:final summary))
-                SliverToBoxAdapter(child: _PeriodSummary(summary: summary)),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(child: widget.periodSelector),
+          if (read case HomeStatisticsLoaded(:final summary))
+            SliverToBoxAdapter(child: _PeriodSummary(summary: summary)),
+          if (read case HomeStatisticsLoaded(:final refreshStatus))
+            SliverToBoxAdapter(child: _refreshNotice(texts, refreshStatus)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(texts.statisticsViewLabel),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Text(texts.statisticsViewLabel),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final view in StatisticsView.values)
-                            _ViewButton(
-                              view: view,
-                              selected: widget.state.selection.view == view,
-                              onPressed: () => widget.onViewSelected(view),
-                            ),
-                        ],
-                      ),
-                      if (read case HomeStatisticsLoaded(:final totalItems))
-                        Text(texts.statisticsTotalItems(totalItems)),
+                      for (final view in StatisticsView.values)
+                        _ViewButton(
+                          view: view,
+                          selected: widget.state.selection.view == view,
+                          onPressed: () => widget.onViewSelected(view),
+                        ),
                     ],
                   ),
+                  if (read case HomeStatisticsLoaded(:final totalItems))
+                    Text(texts.statisticsTotalItems(totalItems)),
+                ],
+              ),
+            ),
+          ),
+          switch (read) {
+            HomeStatisticsData() => SliverList.builder(
+              // Ленивое построение: https://api.flutter.dev/flutter/widgets/SliverList/SliverList.builder.html
+              itemCount: read.items.length,
+              itemBuilder: (context, index) {
+                _scheduleLoadMore(index, read);
+                return _StatisticsRow(
+                  item: read.items[index],
+                  periodContribution: read.summary.counts.contribution,
+                );
+              },
+            ),
+            HomeStatisticsInitialLoad() => SliverToBoxAdapter(
+              child: _ReadNotice(message: texts.statisticsLoading),
+            ),
+            HomeStatisticsInitialFailure(:final failure, :final canRetry) =>
+              SliverToBoxAdapter(
+                child: _ReadNotice(
+                  message: _failureMessage(texts, failure, _ReadStage.initial),
+                  onRetry: canRetry ? widget.onRetryFirstPage : null,
                 ),
               ),
-              if (read case HomeStatisticsData())
-                SliverList.builder(
-                  itemCount: read.items.length,
-                  itemBuilder: (context, index) => _StatisticsRow(
-                    item: read.items[index],
-                    periodContribution: read.summary.counts.contribution,
-                  ),
-                )
-              else
-                SliverToBoxAdapter(
-                  child: Text(
-                    read is HomeStatisticsEmpty
-                        ? texts.statisticsEmpty
-                        : texts.statisticsLoading,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
+            HomeStatisticsEmpty() => SliverToBoxAdapter(
+              child: _ReadNotice(message: texts.statisticsEmpty),
+            ),
+          },
+          if (read case HomeStatisticsData(:final pageStatus))
+            SliverToBoxAdapter(child: _pageNotice(texts, pageStatus)),
+        ],
+      ),
     );
   }
+
+  Widget _refreshNotice(
+    AppLocalizations texts,
+    HomeStatisticsRefreshStatus status,
+  ) => switch (status) {
+    HomeStatisticsRefreshIdle() => const SizedBox.shrink(),
+    HomeStatisticsRefreshing() => _ReadNotice(
+      message: texts.statisticsRefreshing,
+    ),
+    HomeStatisticsRefreshFailure(:final failure, :final canRetry) =>
+      _ReadNotice(
+        message: _failureMessage(texts, failure, _ReadStage.refresh),
+        onRetry: canRetry ? widget.onRetryRefresh : null,
+      ),
+  };
+
+  Widget _pageNotice(AppLocalizations texts, HomeStatisticsPageStatus status) =>
+      switch (status) {
+        HomeStatisticsPageIdle() => const SizedBox.shrink(),
+        HomeStatisticsPageLoading() => _ReadNotice(
+          message: texts.statisticsLoadingMore,
+        ),
+        HomeStatisticsPageFailure(:final failure, :final canRetry) =>
+          _ReadNotice(
+            message: _failureMessage(texts, failure, _ReadStage.more),
+            onRetry: canRetry ? widget.onRetryLoadMore : null,
+          ),
+      };
+
+  void _scheduleLoadMore(int index, HomeStatisticsData read) {
+    if (read.nextCursor == null) return;
+    final scheduled = _loadMoreIndex != null;
+    _loadMoreIndex = index;
+    if (scheduled) return;
+    // Модель уведомляется после компоновки, чтобы не менять её во время build.
+    // https://api.flutter.dev/flutter/scheduler/SchedulerBinding/addPostFrameCallback.html
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final lastIndex = _loadMoreIndex;
+      _loadMoreIndex = null;
+      if (mounted && identical(widget.state.read, read) && lastIndex != null) {
+        widget.onLoadMoreIfNeeded(lastIndex);
+      }
+    });
+  }
+}
+
+enum _ReadStage { initial, refresh, more }
+
+String _failureMessage(
+  AppLocalizations texts,
+  StatisticsReadFailure failure,
+  _ReadStage stage,
+) => switch ((stage, failure)) {
+  (_ReadStage.initial, StatisticsReadUnavailableFailure()) =>
+    texts.statisticsUnavailable,
+  (_ReadStage.initial, StatisticsReadCorruptionFailure()) =>
+    texts.statisticsCorruption,
+  (
+    _ReadStage.initial,
+    StatisticsReadUnexpectedFailure() || StatisticsSnapshotExpired(),
+  ) =>
+    texts.statisticsUnexpectedFailure,
+  (_ReadStage.refresh, StatisticsReadUnavailableFailure()) =>
+    texts.statisticsRefreshUnavailable,
+  (_ReadStage.refresh, StatisticsReadCorruptionFailure()) =>
+    texts.statisticsRefreshCorruption,
+  (
+    _ReadStage.refresh,
+    StatisticsReadUnexpectedFailure() || StatisticsSnapshotExpired(),
+  ) =>
+    texts.statisticsRefreshUnexpectedFailure,
+  (_ReadStage.more, StatisticsReadUnavailableFailure()) =>
+    texts.statisticsLoadMoreUnavailable,
+  (_ReadStage.more, StatisticsReadCorruptionFailure()) =>
+    texts.statisticsLoadMoreCorruption,
+  (
+    _ReadStage.more,
+    StatisticsReadUnexpectedFailure() || StatisticsSnapshotExpired(),
+  ) =>
+    texts.statisticsLoadMoreUnexpectedFailure,
+};
+
+final class _ReadNotice extends StatelessWidget {
+  const _ReadNotice({required this.message, this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    // Сообщает об обновлении без переноса доступного фокуса.
+    // https://api.flutter.dev/flutter/semantics/SemanticsProperties/liveRegion.html
+    liveRegion: true,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(message),
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              child: Text(AppLocalizations.of(context).commonRetry),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 final class _PeriodSummary extends StatelessWidget {
