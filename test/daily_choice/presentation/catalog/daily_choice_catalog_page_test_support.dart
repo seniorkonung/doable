@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -16,6 +17,12 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +92,7 @@ final class CatalogPageRepository
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
   final dayStatusQueries = <DailyChoiceDayStatusQuery>[];
   final _dayStatusRequests = <Completer<DailyChoiceDayStatusesReadResult>>[];
+  late TagCommandResult _tagCommandResult;
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
@@ -99,18 +107,63 @@ final class CatalogPageRepository
   /// Завершает отдельное чтение отметок без изменения выдачи каталога.
   void completeDayStatuses(
     int index,
-    Map<CalendarDate, DailyChoiceDayStatus> statuses,
-  ) => _dayStatusRequests[index].complete(
+    Map<CalendarDate, DailyChoiceDayStatus> statuses, {
+    int revision = 0,
+  }) => _dayStatusRequests[index].complete(
     GraphResultSuccess(
       GraphSnapshot(
         value: DailyChoiceDayStatuses(
           query: dayStatusQueries[index],
           statuses: statuses,
         ),
-        revision: const _Revision(),
+        revision: _Revision(revision),
       ),
     ),
   );
+
+  /// Завершает отдельное чтение отметок отказом, не затрагивая выдачу.
+  void failDayStatuses(int index) => _dayStatusRequests[index].complete(
+    const DailyChoiceDayStatusesReadError(DailyChoiceDayStatusesReadFailure()),
+  );
+
+  /// Подтверждает новую ревизию через настоящий координатор, не меняя
+  /// дневные выборы: восстановление отметок не зависит от вида изменения.
+  Future<void> confirmTagRename(
+    GraphCommandCoordinator coordinator, {
+    required int revision,
+  }) async {
+    final id = (TagId.decode(_uuid(1)) as TagIdDecodingSuccess).id;
+    final before = Tag(id: id, name: TagName.fromInput('Тег ${revision - 1}'));
+    final after = Tag(id: id, name: TagName.fromInput('Тег $revision'));
+    final graphRevision = _Revision(revision);
+    _tagCommandResult = TagCommandSucceeded(
+      ConfirmedGraphResult(
+        revision: graphRevision,
+        value: TagRenamed(
+          TagRenamedChange(
+            revision: graphRevision,
+            before: before,
+            after: after,
+          ),
+        ),
+      ),
+    );
+    final accepted = coordinator.acceptTagRename(
+      RenameTag(tagId: id, name: after.name),
+    ) as TagCommandAccepted;
+    await accepted.future;
+  }
+
+  @override
+  Future<GraphCommandResult<T, F>> execute<
+    T extends GraphCommandOutcome,
+    F extends GraphCommandFailure
+  >(GraphCommand<T, F> command) async {
+    if (command is RenameTag) {
+      return _tagCommandResult as GraphCommandResult<T, F>;
+    }
+    throw UnsupportedError('Команда не предусмотрена сценарием.');
+  }
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
@@ -211,8 +264,16 @@ String _uuid(int number) =>
     '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}';
 
 final class _Revision implements GraphRevision {
-  const _Revision();
+  const _Revision([this.value = 0]);
+
+  final int value;
 
   @override
-  GraphRevisionOrder compareTo(GraphRevision other) => GraphRevisionOrder.same;
+  GraphRevisionOrder compareTo(GraphRevision other) => other is! _Revision
+      ? GraphRevisionOrder.differentEpoch
+      : value < other.value
+      ? GraphRevisionOrder.older
+      : value > other.value
+      ? GraphRevisionOrder.newer
+      : GraphRevisionOrder.same;
 }
