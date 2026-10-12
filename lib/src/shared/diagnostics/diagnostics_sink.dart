@@ -182,6 +182,17 @@ final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
+/// Чтение состояний дней: исход, длительность и безопасная категория отказа.
+///
+/// Даты, диапазон, идентификаторы, пользовательский текст и исходное исключение
+/// не входят в контракт события.
+final class DailyChoiceDayStatusesReadDiagnosticsEvent
+    extends DiagnosticsEvent {
+  const DailyChoiceDayStatusesReadDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}
+
 final class DailyChoiceCatalogPageReadDiagnosticsEvent
     extends DiagnosticsEvent {
   const DailyChoiceCatalogPageReadDiagnosticsEvent({
