@@ -1,5 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/localization/app_locale_resolution.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
@@ -163,10 +164,14 @@ final class CalendarConsumer {
     CalendarDate? selectedDate,
     DailyChoiceCalendarViewport? viewport,
     CalendarDate? today,
+    Map<CalendarDate, DailyChoiceDayStatus>? dayStatuses,
+    bool? hasDayMarksReadFailure,
   }) => _host.currentState!._replace(
     selectedDate: selectedDate,
     viewport: viewport,
     today: today,
+    dayStatuses: dayStatuses,
+    hasDayMarksReadFailure: hasDayMarksReadFailure,
   );
 
   /// Перестраивает потребителя с прежними входами: календарь получает новый
@@ -208,6 +213,8 @@ Future<CalendarConsumer> pumpCalendarConsumer(
   Locale locale = const Locale('ru'),
   List<Widget> contentBelow = const [],
   PageStorageKey<String>? scrollStorageKey,
+  Map<CalendarDate, DailyChoiceDayStatus> dayStatuses = const {},
+  bool hasDayMarksReadFailure = false,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -226,6 +233,8 @@ Future<CalendarConsumer> pumpCalendarConsumer(
           today: today,
           contentBelow: contentBelow,
           scrollStorageKey: scrollStorageKey,
+          dayStatuses: dayStatuses,
+          hasDayMarksReadFailure: hasDayMarksReadFailure,
         ),
       ),
     ),
@@ -243,6 +252,8 @@ final class _CalendarConsumerHost extends StatefulWidget {
     required this.today,
     required this.contentBelow,
     required this.scrollStorageKey,
+    required this.dayStatuses,
+    required this.hasDayMarksReadFailure,
   });
 
   final CalendarConsumer consumer;
@@ -251,6 +262,8 @@ final class _CalendarConsumerHost extends StatefulWidget {
   final CalendarDate today;
   final List<Widget> contentBelow;
   final PageStorageKey<String>? scrollStorageKey;
+  final Map<CalendarDate, DailyChoiceDayStatus> dayStatuses;
+  final bool hasDayMarksReadFailure;
 
   @override
   State<_CalendarConsumerHost> createState() => _CalendarConsumerHostState();
@@ -260,6 +273,9 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
   late CalendarDate _selectedDate = widget.selectedDate;
   late DailyChoiceCalendarViewport _viewport = widget.viewport;
   late CalendarDate _today = widget.today;
+  late Map<CalendarDate, DailyChoiceDayStatus> _dayStatuses =
+      widget.dayStatuses;
+  late bool _hasDayMarksReadFailure = widget.hasDayMarksReadFailure;
   bool _scrollViewShown = true;
   bool _calendarShown = true;
 
@@ -279,11 +295,16 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
     CalendarDate? selectedDate,
     DailyChoiceCalendarViewport? viewport,
     CalendarDate? today,
+    Map<CalendarDate, DailyChoiceDayStatus>? dayStatuses,
+    bool? hasDayMarksReadFailure,
   }) {
     setState(() {
       _selectedDate = selectedDate ?? _selectedDate;
       _viewport = viewport ?? _viewport;
       _today = today ?? _today;
+      _dayStatuses = dayStatuses ?? _dayStatuses;
+      _hasDayMarksReadFailure =
+          hasDayMarksReadFailure ?? _hasDayMarksReadFailure;
     });
   }
 
@@ -307,6 +328,8 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
     selectedDate: _selectedDate,
     viewport: _viewport,
     today: _today,
+    dayStatusForDate: (value) => _dayStatuses[value],
+    hasDayMarksReadFailure: _hasDayMarksReadFailure,
     onDateSelected: (value) {
       widget.consumer.events.add(DateSelected(value));
       setState(() {

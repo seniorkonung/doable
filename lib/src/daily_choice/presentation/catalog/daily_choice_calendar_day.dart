@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_text_metrics.dart';
 
@@ -21,9 +22,9 @@ import 'daily_choice_calendar_text_metrics.dart';
 /// [rowHeight].
 ///
 /// Для вспомогательных технологий ячейка — одна кнопка выбора с полной датой
-/// и днём недели, состоянием выбранности и отдельной отметкой «сегодня».
-/// Доступная активация выполняет то же нажатие, что и касание; число в ячейке
-/// остаётся оформлением и отдельно не читается.
+/// и днём недели, состоянием выбранности, отдельной отметкой «сегодня» и
+/// состоянием дня [status], если есть отметка. Доступная активация выполняет
+/// то же нажатие, что и касание; число и отметка отдельно не читаются.
 final class DailyChoiceCalendarDay extends StatelessWidget {
   const DailyChoiceCalendarDay({
     super.key,
@@ -32,9 +33,11 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
     required this.isToday,
     required this.isOutsideMonth,
     required this.onSelected,
+    this.status,
   });
 
   final CalendarDate date;
+  final DailyChoiceDayStatus? status;
   final bool isSelected;
   final bool isToday;
 
@@ -48,7 +51,7 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
   /// Число любого дня месяца, в том числе выделенное как сегодняшнее,
   /// помещается в ячейку целиком в текущем масштабе текста: если ширины не
   /// хватает, число переносится, а строка становится выше. Ячейка не ниже
-  /// области нажатия.
+  /// области нажатия. Место под отметку резервируется и при её отсутствии.
   static double rowHeight(BuildContext context, {required double columnWidth}) {
     final theme = Theme.of(context);
     final numbers = [for (var day = 1; day <= 31; day++) '$day'];
@@ -63,7 +66,11 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
     ].reduce(math.max);
     return math.max(
       _minHeight,
-      numberHeight + _inset.vertical + _padding.vertical,
+      numberHeight +
+          _markGap +
+          _markHeight(context) +
+          _inset.vertical +
+          _padding.vertical,
     );
   }
 
@@ -102,13 +109,35 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
               child: Padding(
                 padding: _padding,
                 child: Center(
-                  child: Text(
-                    '${date.day}',
-                    textAlign: TextAlign.center,
-                    style: _numberStyle(
-                      theme,
-                      isToday: isToday,
-                    )?.copyWith(color: foreground),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${date.day}',
+                        textAlign: TextAlign.center,
+                        style: _numberStyle(
+                          theme,
+                          isToday: isToday,
+                        )?.copyWith(color: foreground),
+                      ),
+                      const SizedBox(height: _markGap),
+                      SizedBox(
+                        height: _markHeight(context),
+                        child: switch (status) {
+                          null => null,
+                          final status => Icon(
+                            switch (status) {
+                              DailyChoiceDayStatus.allCompleted => Icons.check,
+                              DailyChoiceDayStatus.hasIncomplete =>
+                                Icons.circle_outlined,
+                            },
+                            size: _markSize,
+                            applyTextScaling: true,
+                            color: foreground,
+                          ),
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -120,15 +149,24 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
   }
 
   /// Полная дата с днём недели по текущей локали и, у сегодняшнего дня,
-  /// отметка «сегодня».
+  /// отметка «сегодня», затем состояние дня, если оно известно.
   String _label(BuildContext context) {
     // Технический `DateTime` в UTC нужен только для форматирования
     // календарных частей и не задаёт часовой пояс даты.
     final fullDate = MaterialLocalizations.of(context)
         .formatFullDate(DateTime.utc(date.year, date.month, date.day));
-    return isToday
-        ? '$fullDate, ${AppLocalizations.of(context).dailyChoiceCalendarToday}'
-        : fullDate;
+    final localizations = AppLocalizations.of(context);
+    return [
+      fullDate,
+      if (isToday) localizations.dailyChoiceCalendarToday,
+      ?switch (status) {
+        null => null,
+        DailyChoiceDayStatus.allCompleted =>
+          localizations.dailyChoiceCalendarDayAllCompleted,
+        DailyChoiceDayStatus.hasIncomplete =>
+          localizations.dailyChoiceCalendarDayHasIncomplete,
+      },
+    ].join(', ');
   }
 }
 
@@ -141,6 +179,14 @@ const _inset = EdgeInsets.all(2);
 
 /// Отступ числа от верхнего и нижнего края выделения.
 const _padding = EdgeInsets.symmetric(vertical: 4);
+
+const _markSize = 14.0;
+const _markGap = 2.0;
+
+// Высота совпадает с масштабированием Icon.applyTextScaling:
+// https://api.flutter.dev/flutter/widgets/Icon/applyTextScaling.html
+double _markHeight(BuildContext context) =>
+    MediaQuery.textScalerOf(context).scale(_markSize);
 
 TextStyle? _numberStyle(ThemeData theme, {required bool isToday}) => theme
     .textTheme

@@ -1,4 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
@@ -77,6 +78,87 @@ final _pageScroll = find.byWidgetPredicate(
 );
 
 void main() {
+  for (final textScale in [1.0, 2.5]) {
+    testWidgets('отметки при масштабе $textScale помещаются под числами '
+        'без изменения высоты строк недели и месяца', (tester) async {
+      final consumer = await _pumpOnPhone(
+        tester,
+        locale: const Locale('ru'),
+        textScale: textScale,
+        viewport: week(date(2026, 10, 4)),
+      );
+      final statuses = {
+        date(2026, 9, 30): DailyChoiceDayStatus.allCompleted,
+        date(2026, 10, 4): DailyChoiceDayStatus.hasIncomplete,
+      };
+      for (final viewport in [
+        week(date(2026, 10, 4)),
+        month(date(2026, 10, 4)),
+      ]) {
+        consumer.replaceInputs(
+          viewport: viewport,
+          dayStatuses: {},
+          hasDayMarksReadFailure: false,
+        );
+        await tester.pumpAndSettle();
+        final before = await _calendarLayout(tester);
+        final number = find.descendant(
+          of: calendarDay(date(2026, 10, 4)),
+          matching: find.text('4'),
+        );
+        final numberOffset =
+            _rect(tester, number).top -
+            _rect(tester, calendarDay(date(2026, 10, 4))).top;
+
+        consumer.replaceInputs(dayStatuses: statuses);
+        await tester.pumpAndSettle();
+        final marked = await _calendarLayout(tester);
+        expect(marked.rowHeight, moreOrLessEquals(before.rowHeight));
+        expect(marked.gridHeight, moreOrLessEquals(before.gridHeight));
+        expect(
+          marked.calendar.height,
+          moreOrLessEquals(before.calendar.height),
+        );
+        expect(marked.messageTop, moreOrLessEquals(before.messageTop));
+        expect(
+          _rect(tester, number).top -
+              _rect(tester, calendarDay(date(2026, 10, 4))).top,
+          moreOrLessEquals(numberOffset),
+        );
+        for (final day in statuses.keys) {
+          final cell = calendarDay(day);
+          final mark = find.descendant(of: cell, matching: find.byType(Icon));
+          final number = find.descendant(
+            of: cell,
+            matching: find.text('${day.day}'),
+          );
+          final markRect = _rect(tester, mark);
+          expect(_contains(_rect(tester, cell), markRect), isTrue);
+          expect(markRect.top, greaterThan(_rect(tester, number).bottom));
+          expect(markRect.height, greaterThanOrEqualTo(12 * textScale));
+        }
+
+        consumer.replaceInputs(hasDayMarksReadFailure: true);
+        await tester.pumpAndSettle();
+        final failed = await _calendarLayout(tester);
+        expect(failed.rowHeight, moreOrLessEquals(before.rowHeight));
+        final failure = find.text('Отметки дней не загружены.');
+        _expectFullyShown(
+          tester,
+          failure,
+          within: failed.calendar,
+          textScale: textScale,
+        );
+        expect(
+          _rect(tester, failure).bottom,
+          lessThan(_rect(tester, calendarDay(date(2026, 9, 28))).top),
+        );
+        expect(tester.takeException(), isNull);
+      }
+      expect(consumer.events, isEmpty);
+    });
+  }
+
   for (final (:locale, :textScale, :full) in _configurations) {
     final language = locale.languageCode;
 

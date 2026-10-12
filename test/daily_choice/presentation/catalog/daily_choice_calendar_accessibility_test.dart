@@ -1,6 +1,7 @@
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +27,9 @@ final _localizedTexts = [
     nextMonth: 'Следующий месяц',
     expand: 'Развернуть календарь',
     collapse: 'Свернуть календарь',
+    allCompleted: 'Все дневные выборы выполнены',
+    hasIncomplete: 'Есть невыполненный дневной выбор',
+    marksUnavailable: 'Отметки дней не загружены.',
   ),
   (
     locale: const Locale('en'),
@@ -41,6 +45,9 @@ final _localizedTexts = [
     nextMonth: 'Next month',
     expand: 'Expand calendar',
     collapse: 'Collapse calendar',
+    allCompleted: 'All daily choices are completed',
+    hasIncomplete: 'There is an incomplete daily choice',
+    marksUnavailable: 'Day marks could not be loaded.',
   ),
 ];
 
@@ -78,6 +85,60 @@ void main() {
           semantics.dispose();
         },
       );
+
+      testWidgets('состояние дня дополняет дату и «сегодня», сохраняя '
+          'выбранность; строка отказа читается под шапкой без действий', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2026, 10, 5),
+          viewport: month(date(2026, 10, 4)),
+          today: date(2026, 10, 4),
+          locale: texts.locale,
+          dayStatuses: {
+            date(2026, 10, 4): DailyChoiceDayStatus.allCompleted,
+            date(2026, 10, 5): DailyChoiceDayStatus.hasIncomplete,
+          },
+          hasDayMarksReadFailure: true,
+        );
+        final completed = '${texts.todayOctober4}, ${texts.allCompleted}';
+        final incomplete = '${texts.october5}, ${texts.hasIncomplete}';
+        _expectDay(tester, completed, isSelected: false);
+        _expectDay(tester, incomplete, isSelected: true);
+        _expectDay(
+          tester,
+          _dayLabel(tester, date(2026, 10, 7)),
+          isSelected: false,
+        );
+        expect(
+          _announced(tester),
+          containsAllInOrder([
+            texts.collapse,
+            texts.marksUnavailable,
+            texts.september28,
+            completed,
+            incomplete,
+          ]),
+        );
+        final failure = find.semantics.byLabel(texts.marksUnavailable);
+        expect(failure, findsOne);
+        expect(failure.evaluate().single.getSemanticsData().actions, 0);
+        expect(find.byType(SnackBar), findsNothing);
+
+        tester.semantics.tap(find.semantics.byLabel(completed));
+        await tester.pumpAndSettle();
+        _expectDay(tester, completed, isSelected: true);
+        expect(consumer.events, [DateSelected(date(2026, 10, 4))]);
+
+        consumer.replaceInputs(dayStatuses: {});
+        await tester.pumpAndSettle();
+        _expectDay(tester, texts.todayOctober4, isSelected: true);
+        expect(find.semantics.byLabel(completed), findsNothing);
+        expect(failure, findsOne);
+        semantics.dispose();
+      });
 
       // Остальные проверки не зависят от языка: подписи по языкам читает тест
       // выше.
