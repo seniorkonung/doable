@@ -1,3 +1,4 @@
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
@@ -36,6 +37,11 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 final class ControlledCatalogRepository
     with TagReadContractTestFallback
     implements PersonalGraphRepository {
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => Completer<DailyChoiceDayStatusesReadResult>().future;
+
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

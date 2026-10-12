@@ -10,6 +10,7 @@ import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/application/choice_path_draft.dart';
 import '../../daily_choice/application/confirmed_choice_path.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
+import '../../daily_choice/application/daily_choice_day_statuses.dart';
 import '../../daily_choice/application/daily_choice_id_generator.dart';
 import '../../daily_choice/application/daily_choice_result.dart';
 import '../../daily_choice/domain/calendar_date.dart';
@@ -65,6 +66,7 @@ import 'package:sqlite3/sqlite3.dart';
 part 'drift_daily_choice_path_validation.dart';
 part 'drift_personal_graph_repository_daily_choice_reads.dart';
 part 'drift_personal_graph_repository_daily_choice_catalog.dart';
+part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
 part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_blocking_relations.dart';
@@ -158,6 +160,11 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) => _readDailyChoiceCatalogPage(query);
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => _readDailyChoiceDayStatuses(query);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

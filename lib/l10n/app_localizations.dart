@@ -3557,6 +3557,24 @@ abstract class AppLocalizations {
   /// **'Today'**
   String get dailyChoiceCalendarToday;
 
+  /// Доступное состояние дня с отметкой: все дневные выборы этой даты выполнены
+  ///
+  /// In en, this message translates to:
+  /// **'All daily choices are completed'**
+  String get dailyChoiceCalendarDayAllCompleted;
+
+  /// Доступное состояние дня с отметкой: на эту дату есть хотя бы один невыполненный дневной выбор
+  ///
+  /// In en, this message translates to:
+  /// **'There is an incomplete daily choice'**
+  String get dailyChoiceCalendarDayHasIncomplete;
+
+  /// Единая пассивная строка отказа получения отметок дней под шапкой календаря, без предложения повтора или другого действия
+  ///
+  /// In en, this message translates to:
+  /// **'Day marks could not be loaded.'**
+  String get dailyChoiceCalendarDayMarksUnavailable;
+
   /// Команда раскрытия календаря из недели в сетку месяца даты просмотра
   ///
   /// In en, this message translates to:

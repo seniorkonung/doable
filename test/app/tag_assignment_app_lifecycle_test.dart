@@ -6,6 +6,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -491,6 +492,11 @@ final class _ControlledReads extends Fake implements PersonalGraphRepository {
   }
 
   void releaseCatalogRead() => _catalogRelease!.complete();
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => delegate.getDailyChoiceDayStatuses(query);
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async {

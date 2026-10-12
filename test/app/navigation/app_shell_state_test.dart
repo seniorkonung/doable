@@ -8,12 +8,14 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
@@ -296,17 +298,28 @@ void main() {
     });
 
     testWidgets('изменение дневного выбора через страницу намерения '
-        'согласуется со скрытым каталогом дневных выборов: календарь, фильтры '
+        'обновляет отметки скрытого каталога: календарь, фильтры '
         'и позиция сохраняются, а количество и продолжение выдачи относятся к '
         'новой ревизии', (tester) async {
       final app = await _start(tester);
-      // Последний созданный выбор выполнен и в выдачу невыполненных не входит.
-      // Снятие выполнения делает его первой строкой выдачи.
-      const changed = _firstChoice + _choiceCount - 1;
-      expect(_isCompleted(changed), isTrue);
+      // Последний невыполненный выбор уходит из выдачи в пустой просматриваемый
+      // день: там появляется галочка, а количество исходного дня уменьшается.
+      const changed = _firstChoice + _choiceCount - 2;
+      expect(_isCompleted(changed), isFalse);
       await _prepareDailyChoiceCatalog(tester, app);
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
+      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
+        _today,
+      );
+      await _waitFor(tester, () {
+        expect(app.container.exists(marksProvider), isTrue);
+        return app.container.read(marksProvider).dayStatuses != null;
+      });
+      expect(
+        app.container.read(marksProvider).dayStatuses!.statuses[_viewedDate],
+        isNull,
+      );
 
       await _select(tester, AppDestination.intentionGraph);
       await _enterTitleFilter(tester, app, _activeTitle(1), total: 1);
@@ -327,6 +340,10 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-completed')),
       );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-edit-date')),
+        _viewedDate.toCanonicalString(),
+      );
       await _tap(
         tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
@@ -335,6 +352,15 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-open')),
       );
+      // Существующая модель скрытого каталога согласуется до возврата.
+      await _waitFor(tester, () {
+        expect(app.container.exists(marksProvider), isTrue);
+        return app.container
+                .read(marksProvider)
+                .dayStatuses
+                ?.statuses[_viewedDate] ==
+            DailyChoiceDayStatus.allCompleted;
+      });
       await _closeTop(tester, DailyChoiceDetailsPage);
       await _closeTop(tester, IntentionDetailsPage);
       await _select(tester, AppDestination.dailyChoices);
@@ -349,7 +375,6 @@ void main() {
       // Невыполненные выборы дня после изменения в порядке выдачи: более
       // поздние по созданию раньше.
       final expected = [
-        tagFixtureId(changed),
         for (var choice = changed - 1; choice >= _firstChoice; choice--)
           if (!_isCompleted(choice)) tagFixtureId(choice),
       ];
@@ -391,6 +416,11 @@ void main() {
         find.byKey(const ValueKey('daily-choice-load-more')),
         findsNothing,
       );
+      await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
+      expect(
+        tester.widget<Icon>(dailyChoiceCatalogDayMark(_viewedDate)).icon,
+        Icons.check,
+      );
       expect(tester.takeException(), isNull);
     });
   });
@@ -422,9 +452,19 @@ void main() {
       );
       // Последний созданный выбор — первая строка каталога.
       const changed = _firstChoice + _choiceCount - 1;
-      final wasCompleted = _isCompleted(changed);
+      // Только он не выполнен: его изменение должно заменить кружок галочкой.
+      app.raw.execute(
+        'UPDATE daily_choices SET is_completed = CASE WHEN id = ? THEN 0 ELSE 1 END',
+        [tagFixtureId(changed)],
+      );
+      const wasCompleted = false;
       await _select(tester, AppDestination.dailyChoices);
       await _selectDay(tester, app, _choiceDate, total: _choiceCount);
+      await _until(tester, dailyChoiceCatalogDayMark(_choiceDate));
+      expect(
+        tester.widget<Icon>(dailyChoiceCatalogDayMark(_choiceDate)).icon,
+        Icons.circle_outlined,
+      );
       // Раскрытый календарь показывает следующий месяц.
       await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
       await showDailyChoiceCatalogPeriod(
@@ -462,6 +502,17 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-open')),
       );
+      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
+        CalendarDate.fromParts(2026, 9, 20),
+      );
+      await _waitFor(tester, () {
+        expect(app.container.exists(marksProvider), isTrue);
+        return app.container
+                .read(marksProvider)
+                .dayStatuses
+                ?.statuses[_choiceDate] ==
+            DailyChoiceDayStatus.allCompleted;
+      });
       await _closeTop(tester, DailyChoiceDetailsPage);
       await _waitFor(
         tester,
@@ -473,6 +524,13 @@ void main() {
 
       expect(_dailyChoiceRow(tester, 1), _completion(app.l10n, !wasCompleted));
       expect(_dailyChoiceParameters(tester, app), before);
+      await showDailyChoiceCatalogPeriod(tester, _choiceDate, tap: _tap);
+      await _waitFor(
+        tester,
+        () =>
+            tester.widget<Icon>(dailyChoiceCatalogDayMark(_choiceDate)).icon ==
+            Icons.check,
+      );
       expect(tester.takeException(), isNull);
     });
   });
@@ -1302,6 +1360,11 @@ final class _ObservedRepository implements PersonalGraphRepository {
     final gate = _gate;
     if (gate != null && !gate.isCompleted) gate.complete();
   }
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => _delegate.getDailyChoiceDayStatuses(query);
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

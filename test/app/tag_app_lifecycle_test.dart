@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -258,6 +259,11 @@ final class _ControlledRepository extends Fake
 
   void holdNextRename() => _heldRename = Completer<void>();
   void releaseRename() => _heldRename!.complete();
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => delegate.getDailyChoiceDayStatuses(query);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

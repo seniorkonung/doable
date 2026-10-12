@@ -2083,6 +2083,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCalendarToday => 'Today';
 
   @override
+  String get dailyChoiceCalendarDayAllCompleted =>
+      'All daily choices are completed';
+
+  @override
+  String get dailyChoiceCalendarDayHasIncomplete =>
+      'There is an incomplete daily choice';
+
+  @override
+  String get dailyChoiceCalendarDayMarksUnavailable =>
+      'Day marks could not be loaded.';
+
+  @override
   String get dailyChoiceCalendarExpand => 'Expand calendar';
 
   @override

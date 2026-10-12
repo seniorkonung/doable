@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -421,6 +422,11 @@ final class _Repository implements PersonalGraphRepository {
   final PersonalGraphRepository delegate;
   final result = Completer<bool>();
   var commands = 0;
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => delegate.getDailyChoiceDayStatuses(query);
 
   @override
   Future<GraphCommandResult<S, F>> execute<

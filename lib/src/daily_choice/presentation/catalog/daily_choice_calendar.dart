@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
 import 'daily_choice_calendar_text_metrics.dart';
@@ -36,6 +37,11 @@ import 'daily_choice_calendar_viewport.dart';
 ///
 /// Шапка называет месяц и год даты просмотра, а отдельная подпись — полную
 /// выбранную дату, даже если её нет в видимом периоде.
+/// Под числом дня [dayStatusForDate] задаёт галочку для всех выполненных
+/// дневных выборов, пустой кружок для невыполненного или отсутствие отметки.
+/// Место под отметку резервируется всегда и масштабируется вместе с текстом.
+/// [hasDayMarksReadFailure] добавляет под шапкой пассивную строку отказа,
+/// не меняя отметок, выбора или просмотра и не предлагая действий.
 ///
 /// Календарь рассчитан на размещение элементом общей вертикальной прокрутки
 /// страницы: он занимает доступную ширину, а высоту определяет сам по шапке,
@@ -53,7 +59,8 @@ import 'daily_choice_calendar_viewport.dart';
 ///
 /// Для вспомогательных технологий каждый допустимый день — одна кнопка выбора
 /// с полной датой, днём недели, состоянием выбранности и отдельной отметкой
-/// «сегодня»; дни читаются в календарном порядке после шапки. Команды шапки
+/// «сегодня», а у дня с отметкой — состоянием дня; дни читаются в календарном
+/// порядке после шапки и строки отказа. Команды шапки
 /// названы по текущему представлению и сообщают свою доступность; все действия
 /// выполнимы доступной активацией без жестов. Подписи следуют локали
 /// приложения и меняются вместе с ней без событий.
@@ -68,11 +75,23 @@ final class DailyChoiceCalendar extends StatefulWidget {
     required this.today,
     required this.onDateSelected,
     required this.onViewportChanged,
+    this.dayStatusForDate,
+    this.hasDayMarksReadFailure = false,
   });
 
   final CalendarDate selectedDate;
   final DailyChoiceCalendarViewport viewport;
   final CalendarDate today;
+
+  /// Готовое состояние дня или `null`, если отметки нет. Календарь вызывает
+  /// функцию для всех строящихся дней, включая соседние периоды; чтения,
+  /// окна и ревизии остаются у потребителя.
+  final DailyChoiceDayStatus? Function(CalendarDate date)? dayStatusForDate;
+
+  /// Показывать под шапкой пассивную строку отказа получения отметок.
+  /// Переданные состояния дней при этом сохраняются.
+  final bool hasDayMarksReadFailure;
+
   final ValueChanged<CalendarDate> onDateSelected;
   final ValueChanged<DailyChoiceCalendarViewport> onViewportChanged;
 
@@ -111,6 +130,15 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
           onNext: _hasNextPeriod(viewport) ? _showNextPeriod : null,
           onToggleMode: _toggleMode,
         ),
+        if (widget.hasDayMarksReadFailure)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              AppLocalizations.of(context)
+                  .dailyChoiceCalendarDayMarksUnavailable,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
         // Библиотека задаёт строкам фиксированную высоту, поэтому её
         // рассчитывает календарь: по ширине колонки и масштабу текста.
         LayoutBuilder(
@@ -222,6 +250,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
     return DailyChoiceCalendarDay(
       key: ValueKey('daily-choice-calendar-day-${date.toCanonicalString()}'),
       date: date,
+      status: widget.dayStatusForDate?.call(date),
       isSelected: date == widget.selectedDate,
       isToday: date == widget.today,
       isOutsideMonth:

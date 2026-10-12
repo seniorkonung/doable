@@ -5,6 +5,7 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart'
     hide DailyChoiceCatalogPage;
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
@@ -465,6 +466,11 @@ Future<void> _openCatalog(
 final class _Repository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => Completer<DailyChoiceDayStatusesReadResult>().future;
+
   final queries = <DailyChoiceCatalogQuery>[];
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
 
