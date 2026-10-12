@@ -40,9 +40,7 @@ final class ControlledCatalogRepository
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
     DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
+  ) => Completer<DailyChoiceDayStatusesReadResult>().future;
 
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(

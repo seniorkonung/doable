@@ -7,6 +7,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar.dart';
+import 'daily_choice_calendar_day_marks_view_model.dart';
 import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
@@ -32,6 +33,9 @@ final class _DailyChoiceCatalogPageState
   /// меняют.
   late DailyChoiceCalendarViewport _viewport;
 
+  /// Начальная дата удерживает одну модель отметок при выборе другого дня.
+  late final CalendarDate _initialDate;
+
   /// Текущий местный день, отмеченный в календаре.
   ///
   /// Страница перечитывает его при создании, возвращении приложения в
@@ -43,8 +47,9 @@ final class _DailyChoiceCatalogPageState
   @override
   void initState() {
     super.initState();
+    _initialDate = ref.read(dailyChoiceCatalogViewModelProvider).selection.date;
     _viewport = DailyChoiceCalendarViewport(
-      focusedDate: ref.read(dailyChoiceCatalogViewModelProvider).selection.date,
+      focusedDate: _initialDate,
       mode: DailyChoiceCalendarMode.week,
     );
     _localDay = DailyChoiceLocalDayObserver(
@@ -64,6 +69,9 @@ final class _DailyChoiceCatalogPageState
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(dailyChoiceCatalogViewModelProvider);
     final model = ref.read(dailyChoiceCatalogViewModelProvider.notifier);
+    final dayMarks = ref.watch(
+      dailyChoiceCalendarDayMarksViewModelProvider(_initialDate),
+    );
     return Scaffold(
       appBar: AppBar(title: Text(l10n.appDestinationDailyChoices)),
       // Календарь, фильтры, количество, полосы обновления и выдача
@@ -85,9 +93,11 @@ final class _DailyChoiceCatalogPageState
                   selectedDate: state.selection.date,
                   viewport: _viewport,
                   today: _localDay.today,
+                  dayStatusForDate: (date) =>
+                      dayMarks.dayStatuses?.statuses[date],
+                  hasDayMarksReadFailure: dayMarks.hasReadFailure,
                   onDateSelected: (date) => _selectDate(model, date),
-                  onViewportChanged: (viewport) =>
-                      setState(() => _viewport = viewport),
+                  onViewportChanged: _setViewport,
                 ),
               ),
             ),
@@ -145,8 +155,17 @@ final class _DailyChoiceCatalogPageState
   /// выбранной датой модели — синхронно, до следующего кадра. Повторный выбор
   /// того же дня только возвращает к нему просмотр.
   void _selectDate(DailyChoiceCatalogViewModel model, CalendarDate date) {
-    setState(() => _viewport = _viewport.withFocusedDate(date));
+    _setViewport(_viewport.withFocusedDate(date));
     model.selectDate(date);
+  }
+
+  void _setViewport(DailyChoiceCalendarViewport viewport) {
+    setState(() => _viewport = viewport);
+    ref
+        .read(
+          dailyChoiceCalendarDayMarksViewModelProvider(_initialDate).notifier,
+        )
+        .setViewport(viewport);
   }
 
   /// Слайверы выдачи под фильтрами.

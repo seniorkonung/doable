@@ -5,8 +5,10 @@ import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -74,14 +76,41 @@ Future<void> pumpCatalogPage(
 
 /// Хранилище личного графа для страничных проверок каталога дневных выборов.
 ///
-/// Записывает каждый запрос каталога в [queries] и оставляет его ответ
-/// незавершённым, пока сценарий не завершит его успехом или отказом по номеру
-/// запроса.
+/// Записывает запросы выдачи в [queries], а отметок — в [dayStatusQueries].
+/// Ответы остаются незавершёнными до решения сценария по номеру запроса.
 final class CatalogPageRepository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   final queries = <DailyChoiceCatalogQuery>[];
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
+  final dayStatusQueries = <DailyChoiceDayStatusQuery>[];
+  final _dayStatusRequests = <Completer<DailyChoiceDayStatusesReadResult>>[];
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) {
+    dayStatusQueries.add(query);
+    final request = Completer<DailyChoiceDayStatusesReadResult>();
+    _dayStatusRequests.add(request);
+    return request.future;
+  }
+
+  /// Завершает отдельное чтение отметок без изменения выдачи каталога.
+  void completeDayStatuses(
+    int index,
+    Map<CalendarDate, DailyChoiceDayStatus> statuses,
+  ) => _dayStatusRequests[index].complete(
+    GraphResultSuccess(
+      GraphSnapshot(
+        value: DailyChoiceDayStatuses(
+          query: dayStatusQueries[index],
+          statuses: statuses,
+        ),
+        revision: const _Revision(),
+      ),
+    ),
+  );
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
@@ -155,10 +184,11 @@ final class CatalogPageCursor implements DailyChoiceCatalogCursor {
 }
 
 /// Дневной выбор номер [number] на дату [date]: «Чтобы Основание, я сегодня
-/// Действие», не выполнен.
+/// Действие»; выполнение задаёт [isCompleted].
 DailyChoiceCatalogItem catalogPageItem(
   int number, {
   required CalendarDate date,
+  bool isCompleted = false,
 }) => DailyChoiceCatalogItem(
   id: (DailyChoiceId.decode(_uuid(number)) as DailyChoiceIdDecodingSuccess).id,
   source: DailyChoiceCatalogParticipant(
@@ -174,7 +204,7 @@ DailyChoiceCatalogItem catalogPageItem(
     readiness: IntentionReadiness.ready,
   ),
   date: date,
-  isCompleted: false,
+  isCompleted: isCompleted,
 );
 
 String _uuid(int number) =>
