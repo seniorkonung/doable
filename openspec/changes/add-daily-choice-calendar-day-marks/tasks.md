@@ -76,7 +76,7 @@
   - **Вероятные файлы:** новые `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_state.dart`, соответствующий generated-файл провайдера, `test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.8 Добавить русские и английские строки состояний дня и отказа получения отметок
+- [x] 1.8 Добавить русские и английские строки состояний дня и отказа получения отметок
   - **Критерии приёмки:**
     - Локализация содержит сообщения «все дневные выборы выполнены», «есть невыполненный дневной выбор» и единую пассивную строку отказа; строка не предлагает повтор или другое действие.
     - Строки доступны через существующий `AppLocalizations` и действующие правила выбора локали и английского fallback.

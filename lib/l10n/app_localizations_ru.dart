@@ -2085,6 +2085,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCalendarToday => 'Сегодня';
 
   @override
+  String get dailyChoiceCalendarDayAllCompleted =>
+      'Все дневные выборы выполнены';
+
+  @override
+  String get dailyChoiceCalendarDayHasIncomplete =>
+      'Есть невыполненный дневной выбор';
+
+  @override
+  String get dailyChoiceCalendarDayMarksUnavailable =>
+      'Отметки дней не загружены.';
+
+  @override
   String get dailyChoiceCalendarExpand => 'Развернуть календарь';
 
   @override
