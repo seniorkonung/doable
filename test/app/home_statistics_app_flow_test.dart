@@ -1,0 +1,574 @@
+import 'dart:async';
+import 'dart:ui' show Tristate;
+
+import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/main.dart';
+import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../support/app_root_pages.dart';
+import '../support/daily_choice_durability_fixture.dart';
+import '../support/daily_choice_local_date.dart';
+import '../support/in_memory_diagnostics_sink.dart';
+import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/local_database_harness.dart';
+
+final _today = CalendarDate.fromParts(2026, 10, 12);
+
+void main() {
+  testWidgets(
+    'периоды, вид, раскрытие, порции и прокрутка сохраняются при навигации и смене языка',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _start(tester, seedMore: _seedCatalog);
+      await _until(tester, find.text(app.texts.statisticsEmpty));
+      await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
+      await _until(tester, find.text(app.texts.statisticsEmpty));
+      await _tap(tester, find.text(app.texts.statisticsYearTab));
+      await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear));
+      await _until(
+        tester,
+        find.text(app.texts.statisticsPlannedContribution(220)),
+      );
+      await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
+      await _until(tester, find.text(app.texts.statisticsTotalItems(220)));
+      await _tap(
+        tester,
+        find.byTooltip(app.texts.statisticsExpandPeriodSelector),
+      );
+      await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear).last);
+
+      await _scrollTo(tester, find.text('Промежуточное 071'));
+      final offset = _homeScroll(tester).position.pixels;
+      var reads = app.reads;
+      expect(offset, greaterThan(0));
+      expect(reads, greaterThan(4));
+      await openIntentionGraph(tester);
+      await openHome(tester);
+      await tester.pumpAndSettle();
+      expect(_homeScroll(tester).position.pixels, offset);
+      expect(find.text('Промежуточное 071'), findsOneWidget);
+      await openHome(tester);
+      await tester.pumpAndSettle();
+      expect(_homeScroll(tester).position.pixels, offset);
+      await app.coverHome(tester);
+      await app.back(tester);
+      expect(_homeScroll(tester).position.pixels, offset);
+      await app.coverHome(tester);
+      await openHome(tester);
+      await tester.pumpAndSettle();
+      expect(_homeScroll(tester).position.pixels, offset);
+      expect(app.reads, reads);
+
+      await app.coverHome(tester);
+      await app.intention(
+        tester,
+        UpdateIntention(
+          id: durabilityIntention(1071),
+          title: 'Изменённое промежуточное',
+          description: null,
+        ),
+      );
+      await app.intention(
+        tester,
+        UpdateIntention(
+          id: durabilityIntention(1),
+          title: 'Новое исходное намерение',
+          description: null,
+        ),
+      );
+      expect(app.reads, reads);
+      await app.back(tester);
+      await _until(tester, find.text('Изменённое промежуточное'));
+      expect(_homeScroll(tester).position.pixels, offset);
+      expect(app.reads, reads + 2);
+      reads = app.reads;
+
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
+      await tester.pumpAndSettle();
+      expect(_homeScroll(tester).position.pixels, offset);
+      expect(app.reads, reads);
+      _homeScroll(tester).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      final english = lookupAppLocalizations(const Locale('en'));
+      expect(
+        find.byTooltip(english.statisticsCollapsePeriodSelector),
+        findsOneWidget,
+      );
+      expect(find.text('2025'), findsWidgets);
+      expect(find.text('2024'), findsWidgets);
+      expect(
+        tester
+            .getSemantics(find.text(english.statisticsYearTab))
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      expect(
+        tester
+            .getSemantics(find.text(english.statisticsIntermediateIntentions))
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      await _tap(tester, find.text(english.statisticsMonthTab));
+      await _until(tester, find.text(english.statisticsEmpty));
+      expect(
+        find.text(english.statisticsMonthPeriod(DateTime.utc(2026, 9))),
+        findsOneWidget,
+      );
+      await _tap(tester, find.text(english.statisticsYearTab));
+      await _until(tester, find.text(english.statisticsTotalItems(220)));
+      expect(find.text('2025'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'полночь и возврат приложения обновляют границу невыполненного только при показе',
+    (tester) async {
+      final clock = ControlledDailyChoiceLocalDate(
+        _today,
+        untilNextDate: const Duration(seconds: 2),
+      );
+      final app = await _start(tester, clock: clock);
+      await _until(tester, find.text(app.texts.statisticsEmpty));
+      await app.choice(
+        tester,
+        durabilityCreate(date: _today, completed: false),
+      );
+      await _until(tester, find.text(app.texts.statisticsUpcoming(1)));
+      clock.today = CalendarDate.fromParts(2026, 10, 13);
+      clock.untilNextDate = const Duration(hours: 12);
+      await tester.pump(const Duration(seconds: 2));
+      await _until(tester, find.text(app.texts.statisticsMissed(1)));
+      expect(find.text(app.texts.statisticsUpcoming(0)), findsOneWidget);
+      expect(
+        find.text(app.texts.statisticsMonthPeriod(DateTime.utc(2026, 10))),
+        findsOneWidget,
+      );
+      await app.choice(
+        tester,
+        UpdateDailyChoiceFields(
+          choiceId: durabilityChoice(201),
+          patch: DailyChoiceFieldsPatch(
+            date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 10, 14)),
+          ),
+        ),
+      );
+      await _until(tester, find.text(app.texts.statisticsUpcoming(1)));
+      await openIntentionGraph(tester);
+      await tester.pumpAndSettle();
+      final reads = app.reads;
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      clock.today = CalendarDate.fromParts(2026, 10, 15);
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+      expect(app.reads, reads);
+      await openHome(tester);
+      await _until(tester, find.text(app.texts.statisticsMissed(1)));
+      expect(find.text(app.texts.statisticsUpcoming(0)), findsOneWidget);
+      expect(app.reads, reads + 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'новый запуск на том же SQLite начинает текущий месяц и исходные намерения',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      addTearDown(harness.dispose);
+      final first = await _start(
+        tester,
+        connectionFactory: () =>
+            openFileBackedLocalDatabase(harness.databaseFile),
+      );
+      await _until(tester, find.text(first.texts.statisticsEmpty));
+      await first.choice(tester, durabilityCreate(date: _today));
+      await _until(tester, find.text(first.texts.statisticsContribution(1)));
+      await _tap(tester, find.text(first.texts.statisticsYearTab));
+      await _tap(tester, find.byTooltip(first.texts.statisticsPreviousYear));
+      await _tap(tester, find.text(first.texts.statisticsSelectedActions));
+      await _tap(
+        tester,
+        find.byTooltip(first.texts.statisticsExpandPeriodSelector),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(first.runtime.shutdown);
+
+      final second = await _start(
+        tester,
+        seed: false,
+        connectionFactory: () =>
+            openFileBackedLocalDatabase(harness.databaseFile),
+      );
+      await _until(tester, find.text(second.texts.statisticsContribution(1)));
+      expect(find.text('Намерение 1'), findsOneWidget);
+      expect(find.text('Намерение 3'), findsNothing);
+      expect(
+        find.byTooltip(second.texts.statisticsExpandPeriodSelector),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .getSemantics(find.text(second.texts.statisticsMonthTab))
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      expect(
+        find.text(second.texts.statisticsMonthPeriod(DateTime.utc(2026, 10))),
+        findsOneWidget,
+      );
+      await _tap(tester, find.text(second.texts.statisticsYearTab));
+      await _until(tester, find.text(second.texts.statisticsContribution(1)));
+      expect(find.text('2026'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'команды SQLite отражаются после показа Главной без скрытых чтений',
+    (tester) async {
+      final app = await _start(tester);
+      await _until(tester, find.text(app.texts.statisticsEmpty));
+      final initialReads = app.reads;
+
+      await openIntentionGraph(tester);
+      await tester.pumpAndSettle();
+      await app.choice(
+        tester,
+        durabilityCreate(date: _today, completed: false),
+      );
+      await app.choice(
+        tester,
+        UpdateDailyChoiceFields(
+          choiceId: durabilityChoice(201),
+          patch: const DailyChoiceFieldsPatch(
+            isCompleted: DailyChoiceFieldSet(true),
+          ),
+        ),
+      );
+      await app.intention(
+        tester,
+        UpdateIntention(
+          id: durabilityIntention(1),
+          title: 'Быть здоровым',
+          description: null,
+        ),
+      );
+      expect(app.reads, initialReads);
+      await openHome(tester);
+      await _until(tester, find.text('Быть здоровым'));
+      expect(find.text(app.texts.statisticsContribution(1)), findsOneWidget);
+      expect(
+        find.text(app.texts.statisticsPlannedContribution(1)),
+        findsOneWidget,
+      );
+      expect(app.reads, initialReads + 1);
+
+      await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
+      await _until(tester, find.text('Намерение 2'));
+      await app.coverHome(tester);
+      final coveredReads = app.reads;
+      await app.choice(
+        tester,
+        UpdateDailyChoiceFields(
+          choiceId: durabilityChoice(201),
+          patch: DailyChoiceFieldsPatch(
+            date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 11, 1)),
+          ),
+        ),
+      );
+      expect(app.reads, coveredReads);
+      await app.back(tester);
+      await _until(
+        tester,
+        find.text(app.texts.statisticsPlannedContribution(0)),
+      );
+      expect(app.reads, coveredReads + 1);
+
+      await app.coverHome(tester);
+      final replacingReads = app.reads;
+      await app.choice(
+        tester,
+        UpdateDailyChoiceFields(
+          choiceId: durabilityChoice(201),
+          patch: DailyChoiceFieldsPatch(date: DailyChoiceFieldSet(_today)),
+        ),
+      );
+      await app.choice(
+        tester,
+        ReplaceDailyChoicePath(
+          choiceId: durabilityChoice(201),
+          sourceIntentionId: durabilityIntention(1),
+          selectedIntentionId: durabilityIntention(4),
+          path: durabilityPath([103]),
+        ),
+      );
+      await app.intention(tester, ArchiveIntention(durabilityIntention(4)));
+      expect(app.reads, replacingReads);
+      await openHome(tester);
+      await _until(
+        tester,
+        find.text(app.texts.statisticsPlannedContribution(1)),
+      );
+      expect(find.text(app.texts.statisticsEmpty), findsOneWidget);
+      expect(find.text('Намерение 2'), findsNothing);
+      expect(app.reads, replacingReads + 1);
+      await _tap(tester, find.text(app.texts.statisticsSelectedActions));
+      await _until(tester, find.text('Намерение 4'));
+      expect(find.text(app.texts.detailsArchived), findsOneWidget);
+      expect(
+        find.text(app.texts.statisticsContributionCounts(1, 1)),
+        findsOneWidget,
+      );
+
+      await app.coverHome(tester);
+      final deletingReads = app.reads;
+      await app.choice(tester, DeleteDailyChoice(durabilityChoice(201)));
+      expect(app.reads, deletingReads);
+      await app.back(tester);
+      await _until(
+        tester,
+        find.text(app.texts.statisticsPlannedContribution(0)),
+      );
+      expect(find.text(app.texts.statisticsEmpty), findsOneWidget);
+      expect(app.reads, deletingReads + 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+final class _App {
+  _App(this.runtime, this.container, this.diagnostics);
+
+  final AppRuntime runtime;
+  final ProviderContainer container;
+  final InMemoryDiagnosticsSink diagnostics;
+  final texts = lookupAppLocalizations(const Locale('ru'));
+
+  int get reads => diagnostics.events
+      .whereType<StatisticsReadDiagnosticsEvent>()
+      .where(
+        (event) =>
+            event.status is DiagnosticsStarted &&
+            event.stage == StatisticsReadDiagnosticsStage.sourceData,
+      )
+      .length;
+
+  Future<void> choice(WidgetTester tester, DailyChoiceCommand command) async {
+    await tester.runAsync(() async {
+      final coordinator = runtime.commandCoordinator;
+      final start = switch (command) {
+        CreateDailyChoice() => coordinator.acceptDailyChoiceCreation(
+          DailyChoiceCreationFormKey(),
+          command,
+        ),
+        UpdateDailyChoiceFields() => coordinator.acceptDailyChoiceUpdate(
+          command,
+        ),
+        ReplaceDailyChoicePath() => coordinator.acceptDailyChoiceReplace(
+          command,
+        ),
+        DeleteDailyChoice() => coordinator.acceptDailyChoiceDelete(command),
+      };
+      expect(start, isA<DailyChoiceCommandAccepted>());
+      final completion = await (start as DailyChoiceCommandAccepted).future;
+      expect(completion.isFailure, isFalse);
+    });
+    await tester.pump();
+  }
+
+  Future<void> intention(
+    WidgetTester tester,
+    ExistingIntentionCommand command,
+  ) async {
+    await tester.runAsync(() async {
+      final start = runtime.commandCoordinator.acceptExisting(
+        command,
+        presentationTitle: 'Намерение',
+      );
+      expect(start, isA<IntentionCommandAccepted>());
+      final completion = await (start as IntentionCommandAccepted).future;
+      expect(completion.isFailure, isFalse);
+    });
+    await tester.pump();
+  }
+
+  Future<void> coverHome(WidgetTester tester) async {
+    unawaited(
+      container
+          .read(appRouterProvider)
+          .push(IntentionDetailsRoute(intentionId: durabilityIntention(1))),
+    );
+    await _until(tester, find.byType(IntentionDetailsPage));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> back(WidgetTester tester) async {
+    await container.read(appRouterProvider).maybePop();
+    await tester.pumpAndSettle();
+  }
+}
+
+Future<_App> _start(
+  WidgetTester tester, {
+  ControlledDailyChoiceLocalDate? clock,
+  LocalDataConnectionFactory connectionFactory = openInMemoryLocalDatabase,
+  bool seed = true,
+  Future<void> Function(AppDatabase)? seedMore,
+}) async {
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+  tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+  addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+  tester.view.physicalSize = const Size(1200, 1400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  late AppDatabase database;
+  final diagnostics = InMemoryDiagnosticsSink();
+  final runtime = AppRuntime(
+    connectionFactory: connectionFactory,
+    diagnosticsSink: diagnostics,
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
+    dailyChoiceLocalDateSource:
+        (clock ?? ControlledDailyChoiceLocalDate(_today)).read,
+    repositoryFactory: (opened) {
+      database = opened;
+      return DriftPersonalGraphRepository(
+        opened,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 10, 12),
+        diagnostics,
+        dailyChoiceIdGenerator: FixedChoiceIds(durabilityChoice(201)),
+        choicePathStepIdGenerator: SequentialStepIds(301),
+      );
+    },
+  );
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await runtime.shutdown();
+  });
+  final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+  if (seed) await tester.runAsync(() => seedDurabilityGraph(database));
+  if (seedMore != null) await tester.runAsync(() => seedMore(database));
+  await tester.pumpWidget(MainApp(runtime: runtime));
+  await _until(tester, find.byType(HomePage));
+  return _App(runtime, ready.container, diagnostics);
+}
+
+ScrollableState _homeScroll(WidgetTester tester) =>
+    tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byType(HomePage),
+        matching: find.byType(Scrollable),
+      ),
+    );
+
+Future<void> _scrollTo(WidgetTester tester, Finder row) async {
+  for (var attempt = 0; attempt < 80; attempt++) {
+    if (row.evaluate().isNotEmpty) {
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(find.byType(HomePage), const Offset(0, -700));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+    await tester.pumpAndSettle();
+  }
+  fail('Строка каталога не появилась: $row');
+}
+
+Future<void> _seedCatalog(AppDatabase database) =>
+    database.transaction(() async {
+      for (var index = 1; index <= 220; index++) {
+        final middle = 1000 + index;
+        final firstRelation = 2000 + index * 2;
+        final choice = 3000 + index;
+        final firstStep = 4000 + index * 2;
+        await database.customStatement(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 1, 1)',
+          [
+            durabilityUuid(middle),
+            'Промежуточное ${index.toString().padLeft(3, '0')}',
+          ],
+        );
+        for (final (relation, source, selected) in [
+          (firstRelation, 1, middle),
+          (firstRelation + 1, middle, 4),
+        ]) {
+          await database.customStatement(
+            "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, 'need', 2)",
+            [
+              durabilityUuid(relation),
+              durabilityUuid(source),
+              durabilityUuid(selected),
+            ],
+          );
+        }
+        await database.customStatement(
+          "INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, '2025-09-12', 1)",
+          [durabilityUuid(choice), durabilityUuid(1), durabilityUuid(4)],
+        );
+        for (var step = 0; step < 2; step++) {
+          await database.customStatement(
+            'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id, previous_step_id) VALUES (?, ?, ?, ?)',
+            [
+              durabilityUuid(firstStep + step),
+              durabilityUuid(choice),
+              durabilityUuid(firstRelation + step),
+              step == 0 ? null : durabilityUuid(firstStep),
+            ],
+          );
+        }
+      }
+    });
+
+Future<void> _until(WidgetTester tester, Finder finder) async {
+  for (var attempt = 0; attempt < 500; attempt++) {
+    if (finder.evaluate().isNotEmpty) return;
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 2)),
+    );
+    await tester.pump(const Duration(milliseconds: 10));
+  }
+  fail('Ожидаемый элемент не появился: $finder');
+}
+
+Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
