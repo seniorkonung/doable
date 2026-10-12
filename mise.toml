@@ -15,7 +15,9 @@ check = [
     "bash test/tool/check_ci_scope_test.sh",
     "flutter pub get --enforce-lockfile --directory widgetbook",
     "flutter analyze",
-    "flutter test --concurrency=2",
+    "flutter test --concurrency=2 --exclude-tags=statistics-performance",
+    # Временные бюджеты измеряются без конкуренции с другими тестами.
+    "flutter test test/graph/data/drift_statistics_read_cost_test.dart --concurrency=1",
     "cd widgetbook && flutter test"
 ]
 check-fast = [

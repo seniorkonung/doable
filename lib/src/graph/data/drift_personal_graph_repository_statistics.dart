@@ -29,24 +29,11 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           final summary = cursor == null
               ? await _readStatisticsSummary(query)
               : null;
-          final aggregate = _statisticsAggregate(query.view);
+          final aggregate = _statisticsAggregate(
+            query.view,
+            includeTotal: cursor == null,
+          );
           final variables = _statisticsPeriodVariables(query);
-          int? totalItems;
-          if (cursor == null) {
-            final countRow = await _database
-                .customSelect(
-                  'SELECT COUNT(*) AS total_items FROM ($aggregate)',
-                  variables: variables,
-                  readsFrom: {
-                    _database.dailyChoices,
-                    _database.dailyChoicePathSteps,
-                    _database.longTermRelations,
-                  },
-                )
-                .getSingle();
-            totalItems = _requiredStoredInteger(countRow.data, 'total_items');
-            if (totalItems < 0) throw const StatisticsDataValidationException();
-          }
           // Сравнение полного ключа сохраняет порядок равных вкладов:
           // https://www.sqlite.org/rowvalue.html#scrolling_window_queries
           final boundary = cursor == null
@@ -73,6 +60,13 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
                 },
               )
               .get();
+          int? totalItems;
+          if (cursor == null) {
+            totalItems = rows.isEmpty
+                ? 0
+                : _requiredStoredInteger(rows.first.data, 'total_items');
+            if (totalItems < 0) throw const StatisticsDataValidationException();
+          }
           final counts = [
             for (final row in rows)
               (
@@ -243,7 +237,7 @@ List<Variable> _statisticsPeriodVariables(StatisticsQuery query) => [
   Variable<String>(query.period.lastDate.toCanonicalString()),
 ];
 
-String _statisticsAggregate(StatisticsView view) {
+String _statisticsAggregate(StatisticsView view, {required bool includeTotal}) {
   final id = switch (view) {
     StatisticsView.sourceIntentions => 'c.source_intention_id',
     StatisticsView.intermediateIntentions => 'r.related_intention_id',
@@ -258,8 +252,11 @@ String _statisticsAggregate(StatisticsView view) {
       : '';
   // Простой сохранённый путь содержит промежуточное намерение один раз.
   // COUNT учитывает самостоятельные выборы, включая полные дубликаты.
+  // Окно считает группы до LIMIT, без повторной агрегации всех шагов:
+  // https://www.sqlite.org/windowfunctions.html#aggregate_window_functions
+  final total = includeTotal ? ', COUNT(*) OVER() AS total_items' : '';
   return '''SELECT $id AS intention_id, COUNT(*) AS planned,
-              SUM(c.is_completed) AS contribution
+              SUM(c.is_completed) AS contribution $total
             FROM daily_choices c INDEXED BY daily_choices_date_creation_order
             $path
             WHERE c.choice_date BETWEEN ? AND ? $intermediate
