@@ -4,6 +4,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -16,7 +17,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
-  late DriftPersonalGraphRepository repository;
+  late PersonalGraphRepository repository;
   late InMemoryDiagnosticsSink diagnostics;
   late _ReadFailureProbe probe;
 

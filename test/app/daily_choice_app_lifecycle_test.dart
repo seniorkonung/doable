@@ -6,6 +6,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
@@ -952,6 +953,11 @@ final class _ObservedRepository implements PersonalGraphRepository {
 
   /// Команды, дошедшие до хранилища.
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => _delegate.getDailyChoiceDayStatuses(query);
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
@@ -2019,6 +2020,13 @@ final class _CheckpointHarness {
 final class _CheckpointGraphRepository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) => throw UnsupportedError(
+    'Чтение состояний дней не используется в этом тесте.',
+  );
+
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

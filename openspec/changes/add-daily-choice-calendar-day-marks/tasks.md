@@ -33,7 +33,7 @@
   - **Вероятные файлы:** `lib/src/graph/data/drift_personal_graph_repository.dart`; новые `lib/src/graph/data/drift_personal_graph_repository_daily_choice_day_statuses.dart`, `test/graph/data/drift_daily_choice_day_statuses_test.dart`, `test/graph/data/drift_daily_choice_day_statuses_read_cost_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.4 Подключить чтение состояний дней к общей границе личного графа и её тестовым реализациям
+- [x] 1.4 Подключить чтение состояний дней к общей границе личного графа и её тестовым реализациям
   - **Критерии приёмки:**
     - `PersonalGraphRepository` публикует операцию 1.1, реализованную в 1.3, по [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md); отдельный репозиторий отметок не появляется.
     - Существующие явные реализации интерфейса и обёртки в тестах остаются совместимыми: обёртки реального адаптера делегируют новое чтение, управляемые реализации возвращают предусмотренный сценарием результат. Неиспользуемое чтение не подменяется ложным успешным пустым ответом.

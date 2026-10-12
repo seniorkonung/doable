@@ -1,5 +1,6 @@
 import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/daily_choice_catalog.dart';
+import '../../daily_choice/application/daily_choice_day_statuses.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -52,6 +53,12 @@ abstract interface class PersonalGraphRepository
   /// Смена ревизии продолжения — конфликт.
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
+  );
+
+  /// Читает состояния дней на одной ревизии по контракту
+  /// [DailyChoiceDayStatusesReadResult] в ограниченном диапазоне [query].
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
   );
 
   Future<Result<IntentionCatalogPage>> getCatalogPage(

@@ -161,6 +161,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     DailyChoiceCatalogQuery query,
   ) => _readDailyChoiceCatalogPage(query);
 
+  @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
     DailyChoiceDayStatusQuery query,
   ) => _readDailyChoiceDayStatuses(query);
