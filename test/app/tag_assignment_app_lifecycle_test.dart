@@ -14,6 +14,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -492,6 +493,10 @@ final class _ControlledReads extends Fake implements PersonalGraphRepository {
   }
 
   void releaseCatalogRead() => _catalogRelease!.complete();
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      delegate.getStatisticsPage(query);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

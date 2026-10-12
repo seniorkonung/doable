@@ -40,6 +40,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_read_contract_test_fallback.dart';
+import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
@@ -886,7 +887,10 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

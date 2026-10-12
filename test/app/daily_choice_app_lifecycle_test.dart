@@ -37,6 +37,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -983,6 +984,10 @@ final class _ObservedRepository implements PersonalGraphRepository {
 
   /// Команды, дошедшие до хранилища.
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      _delegate.getStatisticsPage(query);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

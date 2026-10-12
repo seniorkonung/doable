@@ -5,12 +5,15 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
@@ -20,7 +23,8 @@ import '../../support/local_database_harness.dart';
 void main() {
   late LocalDatabaseHarness harness;
   late AppDatabase database;
-  late DriftPersonalGraphRepository repository;
+  late PersonalGraphRepository repository;
+  late ProviderContainer container;
   late InMemoryDiagnosticsSink diagnostics;
   late _ReadGate gate;
 
@@ -29,12 +33,19 @@ void main() {
     gate = _ReadGate();
     database = await harness.openReadyDatabase(observer: gate);
     diagnostics = InMemoryDiagnosticsSink();
-    repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 10, 12),
-      diagnostics,
+    container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(
+          DriftPersonalGraphRepository(
+            database,
+            UuidV7IntentionIdGenerator(),
+            () => DateTime.utc(2026, 10, 12),
+            diagnostics,
+          ),
+        ),
+      ],
     );
+    repository = container.read(personalGraphRepositoryProvider);
     await seedDurabilityGraph(database);
     await database.customStatement(
       '''INSERT INTO long_term_relations
@@ -43,7 +54,10 @@ void main() {
       [durabilityUuid(105), durabilityUuid(3), durabilityUuid(4)],
     );
   });
-  tearDown(() => harness.dispose());
+  tearDown(() async {
+    container.dispose();
+    await harness.dispose();
+  });
 
   Future<void> addChoice(
     int number,

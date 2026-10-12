@@ -23,6 +23,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -529,6 +530,10 @@ final class _ControlledRepository extends Fake
       if (!held.release.isCompleted) held.release.complete();
     }
   }
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      delegate.getStatisticsPage(query);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

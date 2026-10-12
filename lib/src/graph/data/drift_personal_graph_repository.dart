@@ -82,8 +82,7 @@ part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_statistics.dart';
 
-final class DriftPersonalGraphRepository
-    implements PersonalGraphRepository, StatisticsReadContract {
+final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
     this._database,
     this._idGenerator,
