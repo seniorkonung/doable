@@ -193,6 +193,36 @@ final class DailyChoiceDayStatusesReadDiagnosticsEvent
   }) : super(status);
 }
 
+/// Вид чтения статистики, без его условий и пользовательских данных.
+enum StatisticsReadDiagnosticsType { homePage, intentionSection, breakdown }
+
+enum StatisticsReadDiagnosticsStage {
+  /// Чтение агрегатов или исходных данных для подсчёта.
+  sourceData,
+
+  relationSnapshot,
+  computation,
+
+  /// Чтение названий и архивных состояний отображаемой порции.
+  titles,
+}
+
+/// Чтение статистики: вид, этап, исход, длительность и категория отказа.
+///
+/// Пользовательский текст, идентификаторы, даты, период, числа статистики
+/// и исходное исключение не входят в контракт события.
+/// Передача получателю — через [recordDiagnosticsSafely].
+final class StatisticsReadDiagnosticsEvent extends DiagnosticsEvent {
+  const StatisticsReadDiagnosticsEvent({
+    required this.readType,
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final StatisticsReadDiagnosticsType readType;
+  final StatisticsReadDiagnosticsStage stage;
+}
+
 final class DailyChoiceCatalogPageReadDiagnosticsEvent
     extends DiagnosticsEvent {
   const DailyChoiceCatalogPageReadDiagnosticsEvent({

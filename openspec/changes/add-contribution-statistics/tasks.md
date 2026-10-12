@@ -11,7 +11,7 @@
   - **Вероятные файлы:** новые `lib/src/statistics/application/statistics_period.dart`, `lib/src/statistics/application/statistics_read_contract.dart` и соответствующие тесты в новом `test/statistics/application/`; образцы — `daily_choice_day_statuses.dart`, `tag_read_result.dart` и `graph_revision.dart` в существующих модулях.
   - **Размер:** M.
 
-- [ ] 1.2 Добавить безопасное диагностическое событие чтения статистики
+- [x] 1.2 Добавить безопасное диагностическое событие чтения статистики
   - **Критерии приёмки:**
     - `StatisticsReadDiagnosticsEvent` и его кодирование существующим `DeveloperDiagnosticsSink` передают вид чтения, этап, длительность и категорию результата по решению 9 дизайна. В этой фазе используются этапы чтения агрегатов и отображаемых данных порции Главной.
     - Событие не принимает пользовательский текст, идентификаторы, даты, период, числа статистики или исходное исключение. Передача использует существующий `recordDiagnosticsSafely`.
