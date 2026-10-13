@@ -201,6 +201,155 @@ void main() {
   );
 
   test(
+    'устаревшая первая порция повторяется без пользовательского отказа',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      final updates = <HomeStatisticsReadState>[];
+      final observer = h.container.listen(
+        homeStatisticsViewModelProvider,
+        (_, next) => updates.add(next.read),
+      );
+      addTearDown(observer.close);
+
+      h.reader.fail(0, const StatisticsSnapshotExpired());
+      await pumpEventQueue();
+
+      expect(h.reader.queries, hasLength(2));
+      final query = h.reader.queries.last;
+      expect(query.cursor, isNull);
+      expect(query.period, StatisticsMonth(2026, 10));
+      expect(query.view, StatisticsView.sourceIntentions);
+      expect(query.localDate, _today);
+      expect(h.state.read, isA<HomeStatisticsInitialLoad>());
+      expect(updates.whereType<HomeStatisticsInitialFailure>(), isEmpty);
+
+      h.reader.first(1, revision: 1);
+      await pumpEventQueue();
+      expect(h.loaded.items.single.title, 'Версия 1');
+      expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshIdle>());
+    },
+  );
+
+  test(
+    'устаревшая первая порция обновления сохраняет прежние числа до замены',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reader.first(0);
+      await pumpEventQueue();
+      final updates = <HomeStatisticsReadState>[];
+      final observer = h.container.listen(
+        homeStatisticsViewModelProvider,
+        (_, next) => updates.add(next.read),
+      );
+      addTearDown(observer.close);
+      await h.change(1);
+
+      h.reader.fail(1, const StatisticsSnapshotExpired());
+      await pumpEventQueue();
+
+      expect(h.reader.queries, hasLength(3));
+      expect(h.reader.queries.last.cursor, isNull);
+      expect(h.loaded.items.single.title, 'Версия 0');
+      expect(h.loaded.summary.counts.contribution, 1);
+      expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshing>());
+      expect(
+        updates,
+        everyElement(
+          isA<HomeStatisticsLoaded>().having(
+            (read) => read.refreshStatus,
+            'статус обновления',
+            isA<HomeStatisticsRefreshing>(),
+          ),
+        ),
+      );
+
+      h.reader.first(2, revision: 1, count: 2);
+      await pumpEventQueue();
+      expect(
+        h.loaded.items.map((item) => item.title),
+        everyElement('Версия 1'),
+      );
+      expect(h.loaded.summary.counts.contribution, 2);
+      expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshIdle>());
+    },
+  );
+
+  test(
+    'позднее истечение первой порции под скрытой Главной ждёт её возврата',
+    () async {
+      final h = _Harness(visible: false);
+      addTearDown(h.dispose);
+      h.model.selectPeriod(StatisticsMonth(2025, 3));
+      h.model.selectView(StatisticsView.selectedActions);
+      h.model.setVisible(true);
+      h.reader.first(0);
+      await pumpEventQueue();
+      await h.change(1);
+      h.model.setVisible(false);
+      await h.change(2);
+      await h.change(3);
+      final updates = <HomeStatisticsState>[];
+      final observer = h.container.listen(
+        homeStatisticsViewModelProvider,
+        (_, next) => updates.add(next),
+      );
+      addTearDown(observer.close);
+
+      h.reader.fail(1, const StatisticsSnapshotExpired());
+      await pumpEventQueue();
+
+      expect(h.reader.queries, hasLength(2));
+      expect(updates, isEmpty);
+      expect(h.loaded.items.single.title, 'Версия 0');
+
+      h.model.setVisible(true);
+      h.model.setVisible(true);
+      expect(h.reader.queries, hasLength(3));
+      final query = h.reader.queries.last;
+      expect(query.cursor, isNull);
+      expect(query.period, StatisticsMonth(2025, 3));
+      expect(query.view, StatisticsView.selectedActions);
+      expect(h.loaded.items.single.title, 'Версия 0');
+      expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshing>());
+      h.reader.first(2, revision: 3);
+      await pumpEventQueue();
+      expect(h.loaded.items.single.title, 'Версия 3');
+      expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshIdle>());
+    },
+  );
+
+  test(
+    'истечение первой порции прежних условий не меняет актуальную выдачу',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.model.selectPeriod(StatisticsMonth(2025, 3));
+      h.model.selectView(StatisticsView.selectedActions);
+      h.reader.first(2, revision: 1);
+      await pumpEventQueue();
+      final updates = <HomeStatisticsState>[];
+      final observer = h.container.listen(
+        homeStatisticsViewModelProvider,
+        (_, next) => updates.add(next),
+      );
+      addTearDown(observer.close);
+
+      h.reader.fail(0, const StatisticsSnapshotExpired());
+      h.reader.fail(1, const StatisticsSnapshotExpired());
+      await pumpEventQueue();
+
+      expect(h.reader.queries, hasLength(3));
+      expect(updates, isEmpty);
+      expect(h.loaded.items.single.title, 'Версия 1');
+      expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshIdle>());
+      expect(h.state.selection.period, StatisticsMonth(2025, 3));
+      expect(h.state.selection.view, StatisticsView.selectedActions);
+    },
+  );
+
+  test(
     'устаревшее продолжение пересобирает основу вместо повтора курсора',
     () async {
       final h = _Harness();
@@ -354,7 +503,7 @@ void main() {
   );
 
   test(
-    'закрытие модели освобождает подписку и останавливает пересборку',
+    'закрытая модель игнорирует истечение первой порции и новые команды',
     () async {
       final h = _Harness();
       addTearDown(h.dispose);
@@ -362,7 +511,8 @@ void main() {
       await h.change(1);
       h.subscription.close();
       await h.container.pump();
-      h.reader.first(3, revision: 1, count: 100, total: 300, cursor: _Cursor());
+      h.reader.fail(3, const StatisticsSnapshotExpired());
+      await pumpEventQueue();
       await h.change(2);
       expect(h.reader.queries, hasLength(4));
     },
