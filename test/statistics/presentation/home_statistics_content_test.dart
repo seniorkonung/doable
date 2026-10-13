@@ -354,6 +354,111 @@ void main() {
     },
   );
 
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      '${locale.languageCode}: статус и повтор видны при глубокой прокрутке и тексте 3×',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 700);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final semantics = tester.ensureSemantics();
+        final items = List.generate(
+          100,
+          (i) => _item(i + 1, 'Намерение ${i + 1}', 1, 1),
+        );
+        final harness = _Harness(_data(items));
+        await harness.pump(tester, locale: locale, textScale: 3);
+        final texts = harness.texts(tester);
+        final row = find.text('Намерение 60');
+        await tester.scrollUntilVisible(row, 1500, maxScrolls: 30);
+        await tester.pumpAndSettle();
+        final position = tester
+            .state<ScrollableState>(find.byType(Scrollable))
+            .position;
+        final offset = position.pixels;
+        expect(row.hitTestable(), findsOneWidget);
+
+        harness.show(
+          _data(items, refreshStatus: const HomeStatisticsRefreshing()),
+        );
+        await tester.pump();
+        final refreshing = find.text(texts.statisticsRefreshing);
+        expect(refreshing.hitTestable(at: Alignment.topCenter), findsOneWidget);
+        expect(
+          tester.getSemantics(refreshing).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+        expect(row.hitTestable(), findsOneWidget);
+        expect(position.pixels, offset);
+
+        void failRefresh() => harness.show(
+          _data(
+            items,
+            refreshStatus: const HomeStatisticsRefreshFailure(
+              StatisticsReadUnavailableFailure(),
+            ),
+          ),
+        );
+        failRefresh();
+        await tester.pump();
+        final failure = find.text(texts.statisticsRefreshUnavailable);
+        final retry = find.text(texts.commonRetry);
+        expect(failure.hitTestable(at: Alignment.topCenter), findsOneWidget);
+        expect(retry.hitTestable(), findsOneWidget);
+        expect(row.hitTestable(), findsOneWidget);
+        expect(position.pixels, offset);
+        expect(
+          tester.getBottomRight(retry).dy,
+          lessThanOrEqualTo(
+            tester.getTopLeft(find.byType(CustomScrollView)).dy,
+          ),
+        );
+        expect(
+          tester.getSemantics(failure).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+        expect(tester.getSemantics(retry).flagsCollection.isButton, isTrue);
+        await tester.drag(
+          find.ancestor(
+            of: failure,
+            matching: find.byType(SingleChildScrollView),
+          ),
+          const Offset(0, -1500),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          failure.hitTestable(at: const Alignment(0, .99)),
+          findsOneWidget,
+        );
+        expect(retry.hitTestable(), findsOneWidget);
+        expect(row.hitTestable(), findsOneWidget);
+        expect(position.pixels, offset);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pump();
+        expect(harness.retries, ['refresh']);
+        expect(refreshing.hitTestable(at: Alignment.topCenter), findsOneWidget);
+        expect(position.pixels, offset);
+
+        failRefresh();
+        await tester.pump();
+        await tester.tap(retry);
+        await tester.pump();
+        expect(harness.retries, ['refresh', 'refresh']);
+        expect(refreshing.hitTestable(at: Alignment.topCenter), findsOneWidget);
+        harness.show(_data(items.reversed.toList()));
+        await tester.pumpAndSettle();
+        expect(refreshing, findsNothing);
+        expect(failure, findsNothing);
+        expect(retry, findsNothing);
+        expect(position.pixels, offset);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
   testWidgets('замена сохраняет прокрутку и ограничивает её новым содержимым', (
     tester,
   ) async {

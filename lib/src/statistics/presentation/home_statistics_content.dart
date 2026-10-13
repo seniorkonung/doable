@@ -63,69 +63,104 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
     final read = widget.state.read;
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(child: widget.periodSelector),
-          if (read case HomeStatisticsLoaded(:final summary))
-            SliverToBoxAdapter(child: _PeriodSummary(summary: summary)),
-          if (read case HomeStatisticsLoaded(:final refreshStatus))
-            SliverToBoxAdapter(child: _refreshNotice(texts, refreshStatus)),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(texts.statisticsViewLabel),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final view in StatisticsView.values)
-                        _ViewButton(
-                          view: view,
-                          selected: widget.state.selection.view == view,
-                          onPressed: () => widget.onViewSelected(view),
-                        ),
-                    ],
-                  ),
-                  if (read case HomeStatisticsLoaded(:final totalItems))
-                    Text(texts.statisticsTotalItems(totalItems)),
-                ],
+      // Сообщение занимает место над каталогом и не перекрывает его строки.
+      // https://api.flutter.dev/flutter/widgets/Expanded-class.html
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (read case HomeStatisticsLoaded(:final refreshStatus))
+              // Даже при крупном тексте остаётся место для прежних строк.
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight / 2,
+                ),
+                child: _refreshNotice(texts, refreshStatus),
               ),
-            ),
-          ),
-          switch (read) {
-            HomeStatisticsData() => SliverList.builder(
-              // Ленивое построение: https://api.flutter.dev/flutter/widgets/SliverList/SliverList.builder.html
-              itemCount: read.items.length,
-              itemBuilder: (context, index) {
-                _scheduleLoadMore(index, read);
-                return _StatisticsRow(
-                  item: read.items[index],
-                  periodContribution: read.summary.counts.contribution,
-                );
-              },
-            ),
-            HomeStatisticsInitialLoad() => SliverToBoxAdapter(
-              child: _ReadNotice(message: texts.statisticsLoading),
-            ),
-            HomeStatisticsInitialFailure(:final failure, :final canRetry) =>
-              SliverToBoxAdapter(
-                child: _ReadNotice(
-                  message: _failureMessage(texts, failure, _ReadStage.initial),
-                  onRetry: canRetry ? widget.onRetryFirstPage : null,
+            Expanded(
+              // Обход каталога не ставит его невидимые кнопки перед повтором.
+              // https://api.flutter.dev/flutter/widgets/FocusTraversalGroup-class.html
+              child: FocusTraversalGroup(
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: [
+                    SliverToBoxAdapter(child: widget.periodSelector),
+                    if (read case HomeStatisticsLoaded(:final summary))
+                      SliverToBoxAdapter(
+                        child: _PeriodSummary(summary: summary),
+                      ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(texts.statisticsViewLabel),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final view in StatisticsView.values)
+                                  _ViewButton(
+                                    view: view,
+                                    selected:
+                                        widget.state.selection.view == view,
+                                    onPressed: () =>
+                                        widget.onViewSelected(view),
+                                  ),
+                              ],
+                            ),
+                            if (read case HomeStatisticsLoaded(
+                              :final totalItems,
+                            ))
+                              Text(texts.statisticsTotalItems(totalItems)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    switch (read) {
+                      HomeStatisticsData() => SliverList.builder(
+                        // Ленивое построение: https://api.flutter.dev/flutter/widgets/SliverList/SliverList.builder.html
+                        itemCount: read.items.length,
+                        itemBuilder: (context, index) {
+                          _scheduleLoadMore(index, read);
+                          return _StatisticsRow(
+                            item: read.items[index],
+                            periodContribution:
+                                read.summary.counts.contribution,
+                          );
+                        },
+                      ),
+                      HomeStatisticsInitialLoad() => SliverToBoxAdapter(
+                        child: _ReadNotice(message: texts.statisticsLoading),
+                      ),
+                      HomeStatisticsInitialFailure(
+                        :final failure,
+                        :final canRetry,
+                      ) =>
+                        SliverToBoxAdapter(
+                          child: _ReadNotice(
+                            message: _failureMessage(
+                              texts,
+                              failure,
+                              _ReadStage.initial,
+                            ),
+                            onRetry: canRetry ? widget.onRetryFirstPage : null,
+                          ),
+                        ),
+                      HomeStatisticsEmpty() => SliverToBoxAdapter(
+                        child: _ReadNotice(message: texts.statisticsEmpty),
+                      ),
+                    },
+                    if (read case HomeStatisticsData(:final pageStatus))
+                      SliverToBoxAdapter(child: _pageNotice(texts, pageStatus)),
+                  ],
                 ),
               ),
-            HomeStatisticsEmpty() => SliverToBoxAdapter(
-              child: _ReadNotice(message: texts.statisticsEmpty),
             ),
-          },
-          if (read case HomeStatisticsData(:final pageStatus))
-            SliverToBoxAdapter(child: _pageNotice(texts, pageStatus)),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -137,10 +172,12 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
     HomeStatisticsRefreshIdle() => const SizedBox.shrink(),
     HomeStatisticsRefreshing() => _ReadNotice(
       message: texts.statisticsRefreshing,
+      scrollMessage: true,
     ),
     HomeStatisticsRefreshFailure(:final failure, :final canRetry) =>
       _ReadNotice(
         message: _failureMessage(texts, failure, _ReadStage.refresh),
+        scrollMessage: true,
         onRetry: canRetry ? widget.onRetryRefresh : null,
       ),
   };
@@ -212,22 +249,38 @@ String _failureMessage(
 };
 
 final class _ReadNotice extends StatelessWidget {
-  const _ReadNotice({required this.message, this.onRetry});
+  const _ReadNotice({
+    required this.message,
+    this.onRetry,
+    this.scrollMessage = false,
+  });
 
   final String message;
   final VoidCallback? onRetry;
+  final bool scrollMessage;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    // Сообщает об обновлении без переноса доступного фокуса.
-    // https://api.flutter.dev/flutter/semantics/SemanticsProperties/liveRegion.html
-    liveRegion: true,
-    child: Padding(
+  Widget build(BuildContext context) {
+    final notice = Semantics(
+      // Сообщает об обновлении без переноса доступного фокуса.
+      // https://api.flutter.dev/flutter/semantics/SemanticsProperties/liveRegion.html
+      liveRegion: true,
+      child: Text(message),
+    );
+    return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(message),
+          if (scrollMessage)
+            Flexible(
+              // Крупный текст прокручивается отдельно; повтор остаётся видимым.
+              // https://api.flutter.dev/flutter/widgets/SingleChildScrollView-class.html
+              child: SingleChildScrollView(primary: false, child: notice),
+            )
+          else
+            notice,
           if (onRetry != null)
             TextButton(
               onPressed: onRetry,
@@ -235,8 +288,8 @@ final class _ReadNotice extends StatelessWidget {
             ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 final class _PeriodSummary extends StatelessWidget {

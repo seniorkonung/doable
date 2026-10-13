@@ -20,6 +20,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
@@ -137,6 +138,95 @@ void main() {
       expect(find.text('2025'), findsWidgets);
       expect(tester.takeException(), isNull);
       semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'возврат после команды сохраняет глубокую прокрутку со статусом, отказом и повтором',
+    (tester) async {
+      final gate = _StatisticsRefreshGate();
+      final app = await _start(
+        tester,
+        seedMore: _seedCatalog,
+        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          gate,
+        ),
+      );
+      addTearDown(gate.release);
+      await _until(tester, find.text(app.texts.statisticsEmpty));
+      await _tap(tester, find.text(app.texts.statisticsYearTab));
+      await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear));
+      await _until(tester, find.text(app.texts.statisticsContribution(220)));
+      await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
+      await _until(tester, find.text(app.texts.statisticsTotalItems(220)));
+      final row = find.text('Промежуточное 071');
+      final oldCounts = find.descendant(
+        of: find.ancestor(of: row, matching: find.byType(Card)),
+        matching: find.text(app.texts.statisticsContributionCounts(1, 1)),
+      );
+      await _scrollTo(tester, row);
+      final offset = _homeScroll(tester).position.pixels;
+      expect(row.hitTestable(), findsOneWidget);
+      await app.coverHome(tester);
+      await app.choice(
+        tester,
+        UpdateDailyChoiceFields(
+          choiceId: durabilityChoice(3071),
+          patch: const DailyChoiceFieldsPatch(
+            isCompleted: DailyChoiceFieldSet(false),
+          ),
+        ),
+      );
+      gate.holdNextRead();
+      await app.back(tester);
+      expect(
+        find.text(app.texts.statisticsRefreshing).hitTestable(),
+        findsOneWidget,
+      );
+      expect(row.hitTestable(), findsOneWidget);
+      expect(oldCounts.hitTestable(), findsOneWidget);
+      expect(_homeScroll(tester).position.pixels, offset);
+
+      gate.release();
+      await _until(tester, find.text(app.texts.statisticsRefreshUnavailable));
+      expect(
+        find.text(app.texts.statisticsRefreshUnavailable).hitTestable(),
+        findsOneWidget,
+      );
+      final retry = find.text(app.texts.commonRetry);
+      expect(retry.hitTestable(), findsOneWidget);
+      expect(row.hitTestable(), findsOneWidget);
+      expect(oldCounts.hitTestable(), findsOneWidget);
+      expect(_homeScroll(tester).position.pixels, offset);
+      await tester.tap(retry);
+      await tester.pump();
+      await _until(
+        tester,
+        find.text(app.texts.statisticsRefreshing),
+        absent: true,
+      );
+      expect(find.text(app.texts.statisticsRefreshing), findsNothing);
+      expect(find.text(app.texts.statisticsRefreshUnavailable), findsNothing);
+      expect(retry, findsNothing);
+      expect(_homeScroll(tester).position.pixels, offset);
+      expect(find.text('Промежуточное 070').hitTestable(), findsOneWidget);
+
+      _homeScroll(tester).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(find.text('2025'), findsOneWidget);
+      expect(find.text(app.texts.statisticsContribution(219)), findsOneWidget);
+      expect(find.text(app.texts.statisticsTotalItems(220)), findsOneWidget);
+      await _scrollTo(tester, row);
+      final card = find.ancestor(of: row, matching: find.byType(Card));
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.text(app.texts.statisticsContributionCounts(0, 1)),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -370,6 +460,34 @@ void main() {
   );
 }
 
+final class _StatisticsRefreshGate extends LocalDatabaseConnectionObserver {
+  Completer<void>? _release;
+
+  void holdNextRead() => _release = Completer<void>();
+
+  void release() {
+    final release = _release;
+    if (release != null && !release.isCompleted) release.complete();
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) async {
+    final release = _release;
+    if (release == null || rows.isEmpty || !rows.first.containsKey('planned')) {
+      return rows;
+    }
+    await release.future;
+    _release = null;
+    throw sqlite.SqliteException(
+      extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+      message: 'Управляемая недоступность чтения статистики',
+    );
+  }
+}
+
 final class _App {
   _App(this.runtime, this.container, this.diagnostics);
 
@@ -489,10 +607,15 @@ Future<_App> _start(
 
 ScrollableState _homeScroll(WidgetTester tester) =>
     tester.state<ScrollableState>(
-      find.descendant(
-        of: find.byType(HomePage),
-        matching: find.byType(Scrollable),
-      ),
+      find
+          .descendant(
+            of: find.descendant(
+              of: find.byType(HomePage),
+              matching: find.byType(CustomScrollView),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
 
 Future<void> _scrollTo(WidgetTester tester, Finder row) async {
@@ -556,15 +679,24 @@ Future<void> _seedCatalog(AppDatabase database) =>
       }
     });
 
-Future<void> _until(WidgetTester tester, Finder finder) async {
+Future<void> _until(
+  WidgetTester tester,
+  Finder finder, {
+  bool absent = false,
+}) async {
   for (var attempt = 0; attempt < 500; attempt++) {
-    if (finder.evaluate().isNotEmpty) return;
+    final found = finder.evaluate().isNotEmpty;
+    if (found != absent) return;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 2)),
     );
     await tester.pump(const Duration(milliseconds: 10));
   }
-  fail('Ожидаемый элемент не появился: $finder');
+  fail(
+    absent
+        ? 'Элемент не исчез: $finder'
+        : 'Ожидаемый элемент не появился: $finder',
+  );
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
