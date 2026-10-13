@@ -29,21 +29,18 @@ extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
     try {
       if (query.cursor != null) {
         return StatisticsPageSuccess(
-          await _throughRelationsStage(
-            StatisticsReadDiagnosticsStage.titles,
-            () {
-              final cursor = query.cursor;
-              if (cursor is! _ThroughRelationsStatisticsCursor ||
-                  !cursor.matches(query)) {
-                throw const StatisticsSnapshotExpired();
-              }
-              final cached = _throughRelationsResults
-                  .where((entry) => identical(entry.key, cursor.resultKey))
-                  .firstOrNull;
-              if (cached == null) throw const StatisticsSnapshotExpired();
-              return _readThroughRelationsSlice(query, cached, cursor.offset);
-            },
-          ),
+          await _statisticsStage(StatisticsReadDiagnosticsStage.titles, () {
+            final cursor = query.cursor;
+            if (cursor is! _ThroughRelationsStatisticsCursor ||
+                !cursor.matches(query)) {
+              throw const StatisticsSnapshotExpired();
+            }
+            final cached = _throughRelationsResults
+                .where((entry) => identical(entry.key, cursor.resultKey))
+                .firstOrNull;
+            if (cached == null) throw const StatisticsSnapshotExpired();
+            return _readThroughRelationsSlice(query, cached, cursor.offset);
+          }),
         );
       }
 
@@ -51,18 +48,18 @@ extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
           .where((entry) => entry.matches(query, _currentRevision))
           .firstOrNull;
       if (result == null) {
-        final source = await _throughRelationsStage(
+        final source = await _statisticsStage(
           StatisticsReadDiagnosticsStage.sourceData,
           () => readStatisticsSeedGroups(
             period: query.period,
             localDate: query.localDate,
           ),
         );
-        final graph = await _throughRelationsStage(
+        final graph = await _statisticsStage(
           StatisticsReadDiagnosticsStage.relationSnapshot,
           loadStatisticsRelationSnapshot,
         );
-        final entries = await _throughRelationsStage(
+        final entries = await _statisticsStage(
           StatisticsReadDiagnosticsStage.computation,
           () => _statisticsReachabilityRunner(graph, source.groups),
         );
@@ -70,7 +67,7 @@ extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
       }
       final ready = result;
       return StatisticsPageSuccess(
-        await _throughRelationsStage(
+        await _statisticsStage(
           StatisticsReadDiagnosticsStage.titles,
           () => _readThroughRelationsSlice(query, ready, 0),
         ),
@@ -123,43 +120,6 @@ extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
     }
     return page;
   });
-
-  Future<T> _throughRelationsStage<T>(
-    StatisticsReadDiagnosticsStage stage,
-    Future<T> Function() read,
-  ) async {
-    final stopwatch = Stopwatch()..start();
-    void record(DiagnosticsStatus status) => _recordDiagnostics(
-      StatisticsReadDiagnosticsEvent(
-        readType: StatisticsReadDiagnosticsType.homePage,
-        stage: stage,
-        status: status,
-      ),
-    );
-    record(const DiagnosticsStarted());
-    try {
-      final result = await read();
-      record(DiagnosticsSucceeded(stopwatch.elapsed));
-      return result;
-    } on Object catch (error) {
-      final failure = _classifyStatisticsReadFailure(error);
-      record(
-        DiagnosticsFailed(
-          duration: stopwatch.elapsed,
-          code: switch (failure) {
-            StatisticsSnapshotExpired() => DiagnosticsFailureCode.conflict,
-            StatisticsReadUnavailableFailure() =>
-              DiagnosticsFailureCode.unavailable,
-            StatisticsReadCorruptionFailure() =>
-              DiagnosticsFailureCode.corruption,
-            StatisticsReadUnexpectedFailure() =>
-              DiagnosticsFailureCode.unexpected,
-          },
-        ),
-      );
-      throw failure;
-    }
-  }
 }
 
 final class _ThroughRelationsStatisticsResult {

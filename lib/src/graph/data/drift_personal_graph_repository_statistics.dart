@@ -137,6 +137,45 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
     }
   }
 
+  Future<T> _statisticsStage<T>(
+    StatisticsReadDiagnosticsStage stage,
+    Future<T> Function() read, {
+    StatisticsReadDiagnosticsType readType =
+        StatisticsReadDiagnosticsType.homePage,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    void record(DiagnosticsStatus status) => _recordDiagnostics(
+      StatisticsReadDiagnosticsEvent(
+        readType: readType,
+        stage: stage,
+        status: status,
+      ),
+    );
+    record(const DiagnosticsStarted());
+    try {
+      final result = await read();
+      record(DiagnosticsSucceeded(stopwatch.elapsed));
+      return result;
+    } on Object catch (error) {
+      final failure = _classifyStatisticsReadFailure(error);
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: switch (failure) {
+            StatisticsSnapshotExpired() => DiagnosticsFailureCode.conflict,
+            StatisticsReadUnavailableFailure() =>
+              DiagnosticsFailureCode.unavailable,
+            StatisticsReadCorruptionFailure() =>
+              DiagnosticsFailureCode.corruption,
+            StatisticsReadUnexpectedFailure() =>
+              DiagnosticsFailureCode.unexpected,
+          },
+        ),
+      );
+      throw failure;
+    }
+  }
+
   Future<List<StatisticsItem>> _readStatisticsItems(
     List<ContributionReachabilityEntry> selected,
   ) async {
