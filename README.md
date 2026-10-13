@@ -70,15 +70,18 @@ mise run --skip-tools benchmark
 The single benchmark command discovers all `benchmark/**/*_benchmark.dart`
 files, including intention catalog and statistics measurements. The runner
 uses Flutter's test engine for the native database and
-isolate environment. Its files live under `benchmark/`; timing budgets are
-reported as JSON (`withinBudget` or `exceeded`), while incorrect results still
-fail the run. A full run uses 3 warmups and 40 samples per series and can take
-several hours. To verify the harness without drawing performance conclusions:
+isolate environment. Its files live under `benchmark/`. By default, each series
+runs once without warmups; timings are reported as `smoke`, while incorrect
+results still fail the run. This is the normal verification mode.
+
+Only run repeated p95 measurements when explicitly requested. They use 3 warmups
+and 40 samples per series, report `withinBudget` or `exceeded`, and can take
+several hours:
 
 ```sh
 mise run --skip-tools benchmark -- \
-  --dart-define=BENCHMARK_SAMPLES=1 \
-  --dart-define=BENCHMARK_WARMUPS=0
+  --dart-define=BENCHMARK_SAMPLES=40 \
+  --dart-define=BENCHMARK_WARMUPS=3
 ```
 
 Select a profile with the runner's `--plain-name` and a series with the

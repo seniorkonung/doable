@@ -3,11 +3,11 @@ import 'dart:io';
 
 const benchmarkSamples = int.fromEnvironment(
   'BENCHMARK_SAMPLES',
-  defaultValue: 40,
+  defaultValue: 1,
 );
 const benchmarkWarmups = int.fromEnvironment(
   'BENCHMARK_WARMUPS',
-  defaultValue: 3,
+  defaultValue: 0,
 );
 final _caseFilter = RegExp(const String.fromEnvironment('BENCHMARK_CASE'));
 
