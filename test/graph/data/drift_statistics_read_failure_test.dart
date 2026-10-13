@@ -1,6 +1,9 @@
+import 'dart:isolate';
+
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -121,6 +124,63 @@ void main() {
     },
   );
 
+  for (final (stage, error, category) in [
+    (
+      StatisticsReadDiagnosticsStage.sourceData,
+      sqlite.SqliteException(message: 'Недоступно', extendedResultCode: 5),
+      GraphFailureCategory.unavailable,
+    ),
+    (
+      StatisticsReadDiagnosticsStage.relationSnapshot,
+      sqlite.SqliteException(message: 'Повреждение', extendedResultCode: 11),
+      GraphFailureCategory.corruption,
+    ),
+    (
+      StatisticsReadDiagnosticsStage.computation,
+      StateError('CANARY-содержимое-графа'),
+      GraphFailureCategory.unexpected,
+    ),
+    (
+      StatisticsReadDiagnosticsStage.relationSnapshot,
+      const StatisticsSnapshotExpired(),
+      GraphFailureCategory.conflict,
+    ),
+    (
+      StatisticsReadDiagnosticsStage.titles,
+      sqlite.SqliteException(message: 'Недоступно', extendedResultCode: 5),
+      GraphFailureCategory.unavailable,
+    ),
+  ]) {
+    test(
+      'отказ этапа через связи отклоняет всё чтение: ${stage.name}/${category.name}',
+      () async {
+        if (stage == StatisticsReadDiagnosticsStage.computation) {
+          repository = DriftPersonalGraphRepository(
+            database,
+            UuidV7IntentionIdGenerator(),
+            () => DateTime.utc(2026, 2, 12),
+            diagnostics,
+            statisticsReachabilityRunner: _failedComputation,
+          );
+        } else {
+          probe.failure = error;
+          probe.failureStage = stage;
+        }
+        expectFailure(
+          await repository.readThroughRelationsStatisticsPage(query()),
+          category,
+          stage,
+        );
+        expect(
+          diagnostics.events.whereType<StatisticsReadDiagnosticsEvent>().where(
+            (event) => event.status is DiagnosticsFailed,
+          ),
+          hasLength(1),
+        );
+      },
+    );
+  }
+
   test('некорректная календарная дата отклоняет весь период', () async {
     // Формат этой даты допускается схемой, но календарный день не существует.
     await database.customStatement('UPDATE daily_choices SET choice_date = ?', [
@@ -174,6 +234,8 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
     final sql = statement.statements.single;
     final stage = sql.contains('FROM intentions')
         ? StatisticsReadDiagnosticsStage.titles
+        : sql.contains('creation_sequence >')
+        ? StatisticsReadDiagnosticsStage.relationSnapshot
         : StatisticsReadDiagnosticsStage.sourceData;
     if (stage == failureStage) {
       if (failure case final error?) throw error;
@@ -199,3 +261,8 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
     ];
   }
 }
+
+Future<List<ContributionReachabilityEntry>> _failedComputation(
+  ContributionRelationGraph graph,
+  List<ContributionSeedGroup> groups,
+) => Isolate.run(() => throw StateError('CANARY-содержимое-графа'));

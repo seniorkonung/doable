@@ -70,7 +70,7 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           final counts = [
             for (final row in rows)
               (
-                id: _decodeStoredRelationIntentionId(
+                intentionId: _decodeStoredRelationIntentionId(
                   _requiredStoredString(row.data, 'intention_id'),
                 ),
                 counts: ContributionCounts(
@@ -87,51 +87,13 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           stopwatch.reset();
           record(const DiagnosticsStarted());
           final selected = counts.take(query.pageSize).toList(growable: false);
-          final items = <StatisticsItem>[];
-          if (selected.isNotEmpty) {
-            final titles = await _database
-                .customSelect(
-                  '''SELECT id, title, is_archived FROM intentions
-               WHERE id IN (${List.filled(selected.length, '?').join(', ')})''',
-                  variables: [
-                    for (final row in selected)
-                      Variable<String>(row.id.toCanonicalString()),
-                  ],
-                  readsFrom: {_database.intentions},
-                )
-                .get();
-            final byId = {
-              for (final row in titles)
-                _decodeStoredRelationIntentionId(
-                  _requiredStoredString(row.data, 'id'),
-                ): row,
-            };
-            for (final counted in selected) {
-              final row = byId[counted.id];
-              if (row == null) throw const _StoredIntentionCorruption();
-              items.add(
-                StatisticsItem(
-                  id: counted.id,
-                  title: _requiredStoredString(row.data, 'title'),
-                  archiveState: switch (_requiredStoredInteger(
-                    row.data,
-                    'is_archived',
-                  )) {
-                    0 => domain.IntentionArchiveState.active,
-                    1 => domain.IntentionArchiveState.archived,
-                    _ => throw const _StoredIntentionCorruption(),
-                  },
-                  counts: counted.counts,
-                ),
-              );
-            }
-          }
+          final items = await _readStatisticsItems(selected);
           final revision = _currentRevision;
           final nextCursor = rows.length > query.pageSize
               ? _DriftStatisticsCursor(
                   query: query,
                   revision: revision,
-                  intentionId: selected.last.id,
+                  intentionId: selected.last.intentionId,
                   counts: selected.last.counts,
                 )
               : null;
@@ -170,6 +132,51 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
       );
       return StatisticsPageError(failure);
     }
+  }
+
+  Future<List<StatisticsItem>> _readStatisticsItems(
+    List<ContributionReachabilityEntry> selected,
+  ) async {
+    final items = <StatisticsItem>[];
+    if (selected.isNotEmpty) {
+      final titles = await _database
+          .customSelect(
+            '''SELECT id, title, is_archived FROM intentions
+         WHERE id IN (${List.filled(selected.length, '?').join(', ')})''',
+            variables: [
+              for (final row in selected)
+                Variable<String>(row.intentionId.toCanonicalString()),
+            ],
+            readsFrom: {_database.intentions},
+          )
+          .get();
+      final byId = {
+        for (final row in titles)
+          _decodeStoredRelationIntentionId(
+            _requiredStoredString(row.data, 'id'),
+          ): row,
+      };
+      for (final counted in selected) {
+        final row = byId[counted.intentionId];
+        if (row == null) throw const _StoredIntentionCorruption();
+        items.add(
+          StatisticsItem(
+            id: counted.intentionId,
+            title: _requiredStoredString(row.data, 'title'),
+            archiveState: switch (_requiredStoredInteger(
+              row.data,
+              'is_archived',
+            )) {
+              0 => domain.IntentionArchiveState.active,
+              1 => domain.IntentionArchiveState.archived,
+              _ => throw const _StoredIntentionCorruption(),
+            },
+            counts: counted.counts,
+          ),
+        );
+      }
+    }
+    return items;
   }
 
   Future<StatisticsPeriodSummary> _readStatisticsSummary(

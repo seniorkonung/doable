@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import '../../data/local/app_database.dart' as local;
@@ -85,6 +86,7 @@ part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_statistics.dart';
 part 'drift_statistics_relation_snapshot.dart';
 part 'drift_statistics_seed_groups.dart';
+part 'drift_through_relations_statistics_reader.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -96,6 +98,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     DailyChoiceIdGenerator? dailyChoiceIdGenerator,
     ChoicePathStepIdGenerator? choicePathStepIdGenerator,
     TagIdGenerator? tagIdGenerator,
+    this._statisticsReachabilityRunner = runContributionReachabilityInIsolate,
   }) : _relationIdGenerator =
            relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
        _dailyChoiceIdGenerator =
@@ -124,6 +127,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   var _mutationSequence = 0;
   var _lastRelationChangeSequence = 0;
   ContributionRelationGraph? _statisticsRelationSnapshot;
+  final ContributionReachabilityRunner _statisticsReachabilityRunner;
+  final List<_ThroughRelationsStatisticsResult> _throughRelationsResults = [];
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
