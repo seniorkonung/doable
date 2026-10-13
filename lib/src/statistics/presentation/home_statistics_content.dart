@@ -5,6 +5,7 @@ import '../../intention/domain/intention.dart';
 import '../application/contribution_counts.dart';
 import '../application/statistics_read_contract.dart';
 import 'home_statistics_state.dart';
+import 'statistics_read_notice.dart';
 
 /// Единая прокрутка выбора периода, сводки и ленивого каталога.
 /// Чтениями и допустимостью повтора владеет модель страницы.
@@ -133,24 +134,28 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
                         },
                       ),
                       HomeStatisticsInitialLoad() => SliverToBoxAdapter(
-                        child: _ReadNotice(message: texts.statisticsLoading),
+                        child: StatisticsReadNotice(
+                          message: texts.statisticsLoading,
+                        ),
                       ),
                       HomeStatisticsInitialFailure(
                         :final failure,
                         :final canRetry,
                       ) =>
                         SliverToBoxAdapter(
-                          child: _ReadNotice(
-                            message: _failureMessage(
+                          child: StatisticsReadNotice(
+                            message: statisticsReadFailureMessage(
                               texts,
                               failure,
-                              _ReadStage.initial,
+                              StatisticsReadStage.initial,
                             ),
                             onRetry: canRetry ? widget.onRetryFirstPage : null,
                           ),
                         ),
                       HomeStatisticsEmpty() => SliverToBoxAdapter(
-                        child: _ReadNotice(message: texts.statisticsEmpty),
+                        child: StatisticsReadNotice(
+                          message: texts.statisticsEmpty,
+                        ),
                       ),
                     },
                     if (read case HomeStatisticsData(:final pageStatus))
@@ -170,13 +175,17 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
     HomeStatisticsRefreshStatus status,
   ) => switch (status) {
     HomeStatisticsRefreshIdle() => const SizedBox.shrink(),
-    HomeStatisticsRefreshing() => _ReadNotice(
+    HomeStatisticsRefreshing() => StatisticsReadNotice(
       message: texts.statisticsRefreshing,
       scrollMessage: true,
     ),
     HomeStatisticsRefreshFailure(:final failure, :final canRetry) =>
-      _ReadNotice(
-        message: _failureMessage(texts, failure, _ReadStage.refresh),
+      StatisticsReadNotice(
+        message: statisticsReadFailureMessage(
+          texts,
+          failure,
+          StatisticsReadStage.refresh,
+        ),
         scrollMessage: true,
         onRetry: canRetry ? widget.onRetryRefresh : null,
       ),
@@ -185,12 +194,16 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
   Widget _pageNotice(AppLocalizations texts, HomeStatisticsPageStatus status) =>
       switch (status) {
         HomeStatisticsPageIdle() => const SizedBox.shrink(),
-        HomeStatisticsPageLoading() => _ReadNotice(
+        HomeStatisticsPageLoading() => StatisticsReadNotice(
           message: texts.statisticsLoadingMore,
         ),
         HomeStatisticsPageFailure(:final failure, :final canRetry) =>
-          _ReadNotice(
-            message: _failureMessage(texts, failure, _ReadStage.more),
+          StatisticsReadNotice(
+            message: statisticsReadFailureMessage(
+              texts,
+              failure,
+              StatisticsReadStage.more,
+            ),
             onRetry: canRetry ? widget.onRetryLoadMore : null,
           ),
       };
@@ -209,92 +222,6 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
         widget.onLoadMoreIfNeeded(lastIndex);
       }
     });
-  }
-}
-
-enum _ReadStage { initial, refresh, more }
-
-String _failureMessage(
-  AppLocalizations texts,
-  StatisticsReadFailure failure,
-  _ReadStage stage,
-) => switch ((stage, failure)) {
-  (_ReadStage.initial, StatisticsReadUnavailableFailure()) =>
-    texts.statisticsUnavailable,
-  (_ReadStage.initial, StatisticsReadCorruptionFailure()) =>
-    texts.statisticsCorruption,
-  (
-    _ReadStage.initial,
-    StatisticsReadUnexpectedFailure() ||
-        StatisticsSnapshotExpired() ||
-        StatisticsIntentionNotFoundFailure(),
-  ) =>
-    texts.statisticsUnexpectedFailure,
-  (_ReadStage.refresh, StatisticsReadUnavailableFailure()) =>
-    texts.statisticsRefreshUnavailable,
-  (_ReadStage.refresh, StatisticsReadCorruptionFailure()) =>
-    texts.statisticsRefreshCorruption,
-  (
-    _ReadStage.refresh,
-    StatisticsReadUnexpectedFailure() ||
-        StatisticsSnapshotExpired() ||
-        StatisticsIntentionNotFoundFailure(),
-  ) =>
-    texts.statisticsRefreshUnexpectedFailure,
-  (_ReadStage.more, StatisticsReadUnavailableFailure()) =>
-    texts.statisticsLoadMoreUnavailable,
-  (_ReadStage.more, StatisticsReadCorruptionFailure()) =>
-    texts.statisticsLoadMoreCorruption,
-  (
-    _ReadStage.more,
-    StatisticsReadUnexpectedFailure() ||
-        StatisticsSnapshotExpired() ||
-        StatisticsIntentionNotFoundFailure(),
-  ) =>
-    texts.statisticsLoadMoreUnexpectedFailure,
-};
-
-final class _ReadNotice extends StatelessWidget {
-  const _ReadNotice({
-    required this.message,
-    this.onRetry,
-    this.scrollMessage = false,
-  });
-
-  final String message;
-  final VoidCallback? onRetry;
-  final bool scrollMessage;
-
-  @override
-  Widget build(BuildContext context) {
-    final notice = Semantics(
-      // Сообщает об обновлении без переноса доступного фокуса.
-      // https://api.flutter.dev/flutter/semantics/SemanticsProperties/liveRegion.html
-      liveRegion: true,
-      child: Text(message),
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (scrollMessage)
-            Flexible(
-              // Крупный текст прокручивается отдельно; повтор остаётся видимым.
-              // https://api.flutter.dev/flutter/widgets/SingleChildScrollView-class.html
-              child: SingleChildScrollView(primary: false, child: notice),
-            )
-          else
-            notice,
-          if (onRetry != null)
-            TextButton(
-              onPressed: onRetry,
-              child: Text(AppLocalizations.of(context).commonRetry),
-            ),
-        ],
-      ),
-    );
   }
 }
 

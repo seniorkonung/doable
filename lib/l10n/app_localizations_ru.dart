@@ -277,6 +277,15 @@ class AppLocalizationsRu extends AppLocalizations {
       'Доля отсутствует: вклад намерения в этом виде равен нулю';
 
   @override
+  String get statisticsRefreshUnavailableShort => 'Нет обновления.';
+
+  @override
+  String get statisticsRefreshCorruptionShort => 'Данные повреждены.';
+
+  @override
+  String get statisticsRefreshUnexpectedShort => 'Ошибка обновления.';
+
+  @override
   String get statisticsCalendarDayAllCompleted =>
       'Все засчитанные дневные выборы выполнены';
 

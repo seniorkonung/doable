@@ -416,6 +416,24 @@ abstract class AppLocalizations {
   /// **'No share: this intention’s contribution in this view is zero'**
   String get statisticsBreakdownNoContributionShare;
 
+  /// Краткий статус неудачного обновления рядом с прежними строками; допускает повтор
+  ///
+  /// In en, this message translates to:
+  /// **'Update unavailable.'**
+  String get statisticsRefreshUnavailableShort;
+
+  /// Краткий статус повреждения данных при обновлении; без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Damaged data.'**
+  String get statisticsRefreshCorruptionShort;
+
+  /// Краткий статус неизвестного отказа обновления; без обычного повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Update error.'**
+  String get statisticsRefreshUnexpectedShort;
+
   /// Значение галочки календаря статистики: выполнены все выборы дня, засчитанные намерению в выбранном виде; остальные выборы дня не учитываются
   ///
   /// In en, this message translates to:

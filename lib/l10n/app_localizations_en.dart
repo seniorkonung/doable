@@ -274,6 +274,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'No share: this intention’s contribution in this view is zero';
 
   @override
+  String get statisticsRefreshUnavailableShort => 'Update unavailable.';
+
+  @override
+  String get statisticsRefreshCorruptionShort => 'Damaged data.';
+
+  @override
+  String get statisticsRefreshUnexpectedShort => 'Update error.';
+
+  @override
   String get statisticsCalendarDayAllCompleted =>
       'All credited daily choices are completed';
 
