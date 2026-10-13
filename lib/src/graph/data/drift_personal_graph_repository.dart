@@ -162,6 +162,39 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       };
 
   @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) async {
+    try {
+      final section = await _readIntentionStatisticsSection(query);
+      return section == null
+          ? const IntentionStatisticsSectionError(
+              StatisticsIntentionNotFoundFailure(),
+            )
+          : IntentionStatisticsSectionSuccess(section);
+    } on Object catch (error) {
+      return IntentionStatisticsSectionError(
+        _classifyStatisticsReadFailure(error),
+      );
+    }
+  }
+
+  @override
+  Future<IntentionStatisticsBreakdownResult<T>> getIntentionStatisticsBreakdown<
+    T
+  >(StatisticsBreakdownCursor<T> cursor) async {
+    try {
+      return IntentionStatisticsBreakdownSuccess(
+        await _readIntentionStatisticsBreakdown(cursor),
+      );
+    } on Object catch (error) {
+      return IntentionStatisticsBreakdownError(
+        _classifyStatisticsReadFailure(error),
+      );
+    }
+  }
+
+  @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
       _readTagCatalog(mode);
 

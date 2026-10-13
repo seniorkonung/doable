@@ -1,4 +1,5 @@
 import '../../daily_choice/domain/calendar_date.dart';
+import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention_id.dart';
 import 'contribution_counts.dart';
@@ -6,6 +7,26 @@ import 'intention_statistics_breakdown.dart';
 import 'intention_statistics_calendar.dart';
 import 'statistics_period.dart';
 import 'statistics_read_contract.dart';
+
+typedef IntentionStatisticsSectionResult =
+    GraphResult<IntentionStatisticsSection, StatisticsReadFailure>;
+typedef IntentionStatisticsSectionSuccess =
+    GraphResultSuccess<IntentionStatisticsSection, StatisticsReadFailure>;
+typedef IntentionStatisticsSectionError =
+    GraphResultFailure<IntentionStatisticsSection, StatisticsReadFailure>;
+
+typedef IntentionStatisticsBreakdownResult<T> =
+    GraphResult<StatisticsBreakdownContinuationPage<T>, StatisticsReadFailure>;
+typedef IntentionStatisticsBreakdownSuccess<T> =
+    GraphResultSuccess<
+      StatisticsBreakdownContinuationPage<T>,
+      StatisticsReadFailure
+    >;
+typedef IntentionStatisticsBreakdownError<T> =
+    GraphResultFailure<
+      StatisticsBreakdownContinuationPage<T>,
+      StatisticsReadFailure
+    >;
 
 /// Условия одного чтения раздела. Размер порции проверяется тем же
 /// контрактом, что у Главной. Каждая допустимая разбивка получает свою порцию.

@@ -47,6 +47,8 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
+import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
+import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -1365,6 +1367,16 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
       _delegate.getStatisticsPage(query);
+
+  @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) => _delegate.getIntentionStatisticsSection(query);
+
+  @override
+  Future<IntentionStatisticsBreakdownResult<T>>
+  getIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor) =>
+      _delegate.getIntentionStatisticsBreakdown(cursor);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

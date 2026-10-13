@@ -8,6 +8,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -42,11 +43,11 @@ const _relations = [
 void main() {
   late LocalDatabaseHarness harness;
   late AppDatabase database;
-  late DriftPersonalGraphRepository repository;
+  late PersonalGraphRepository repository;
   late InMemoryDiagnosticsSink diagnostics;
   late _ReadProbe probe;
 
-  DriftPersonalGraphRepository createRepository({
+  PersonalGraphRepository createRepository({
     IntentionContributionRunner runner = runIntentionContributionInIsolate,
   }) => DriftPersonalGraphRepository(
     database,
@@ -134,9 +135,9 @@ void main() {
     await addChoice(205, [107], date: '2026-10-13');
 
     for (final view in StatisticsView.values) {
-      final section = (await repository.readIntentionStatisticsSection(
-        query(view: view),
-      ))!;
+      final section = _value(
+        await repository.getIntentionStatisticsSection(query(view: view)),
+      );
       expect(_counts(section.periodCounts), (5, 3));
       expect(
         [
@@ -185,9 +186,11 @@ void main() {
             : 0,
       );
 
-      final year = (await repository.readIntentionStatisticsSection(
-        query(view: view, period: StatisticsYear(2026)),
-      ))!;
+      final year = _value(
+        await repository.getIntentionStatisticsSection(
+          query(view: view, period: StatisticsYear(2026)),
+        ),
+      );
       final months = (year.calendar as IntentionStatisticsYearCalendar).months;
       expect(months, hasLength(12));
       expect(_counts(months[9]), _counts(section.selectedCounts));
@@ -202,7 +205,9 @@ void main() {
     final items = [...first.items];
     var cursor = first.nextCursor;
     while (cursor != null) {
-      final page = await repository.readIntentionStatisticsBreakdown(cursor);
+      final page = _value(
+        await repository.getIntentionStatisticsBreakdown(cursor),
+      );
       expect(page.items.length, lessThanOrEqualTo(1));
       expect(page.revision.compareTo(revision), GraphRevisionOrder.same);
       items.addAll(page.items);
@@ -230,9 +235,9 @@ void main() {
         await addChoice(201 + i, paths[i]);
       }
       for (final view in StatisticsView.values) {
-        final section = (await repository.readIntentionStatisticsSection(
-          query(view: view),
-        ))!;
+        final section = _value(
+          await repository.getIntentionStatisticsSection(query(view: view)),
+        );
         Future<void> intentions(
           StatisticsBreakdownFirstPage<StatisticsItem> first,
           List<(int, int)> expected,
@@ -308,7 +313,9 @@ void main() {
       await repository.execute(ArchiveIntention(durabilityIntention(4))),
       isA<GraphCommandSucceeded>(),
     );
-    final section = (await repository.readIntentionStatisticsSection(query()))!;
+    final section = _value(
+      await repository.getIntentionStatisticsSection(query()),
+    );
     final details =
         section.details as IntentionStatisticsThroughRelationsDetails;
     final rows = await collect(details.relations, section.revision);
@@ -337,11 +344,13 @@ void main() {
     'отсутствующее намерение отличается от пустого периода и вида',
     () async {
       expect(
-        await repository.readIntentionStatisticsSection(query(intention: 999)),
-        isNull,
+        await repository.getIntentionStatisticsSection(query(intention: 999)),
+        _readFailure(isA<StatisticsIntentionNotFoundFailure>()),
       );
       expect(_computations(diagnostics), 0);
-      final empty = (await repository.readIntentionStatisticsSection(query()))!;
+      final empty = _value(
+        await repository.getIntentionStatisticsSection(query()),
+      );
       expect(_counts(empty.selectedCounts), (0, 0));
       expect(
         (empty.calendar as IntentionStatisticsMonthCalendar).statuses,
@@ -354,9 +363,11 @@ void main() {
       expect(details.selectedActions.items, isEmpty);
       await addChoice(201, [102]);
       repository = createRepository();
-      final emptyView = (await repository.readIntentionStatisticsSection(
-        query(view: StatisticsView.selectedActions),
-      ))!;
+      final emptyView = _value(
+        await repository.getIntentionStatisticsSection(
+          query(view: StatisticsView.selectedActions),
+        ),
+      );
       expect(_counts(emptyView.periodCounts), (1, 1));
       expect(_counts(emptyView.selectedCounts), (0, 0));
       expect(
@@ -396,17 +407,12 @@ void main() {
         },
       );
       var completed = false;
-      final reading = repository.readIntentionStatisticsSection(query());
+      final reading = repository.getIntentionStatisticsSection(query());
       final rejected = expectLater(
         reading,
-        throwsA(isA<StatisticsSnapshotExpired>()),
+        completion(_readFailure(isA<StatisticsSnapshotExpired>())),
       );
-      reading.then<void>(
-        (_) => completed = true,
-        onError: (Object _) {
-          completed = true;
-        },
-      );
+      reading.then<void>((_) => completed = true);
       final gate = await started.first as SendPort;
       addTearDown(() => gate.send(null));
       await Future<void>(() {});
@@ -440,7 +446,9 @@ void main() {
           DiagnosticsFailureCode.conflict,
         ),
       );
-      final fresh = (await repository.readIntentionStatisticsSection(query()))!;
+      final fresh = _value(
+        await repository.getIntentionStatisticsSection(query()),
+      );
       expect(_counts(fresh.selectedCounts), (1, 0));
       expect(_counts(fresh.cards.intermediateIntentions), (1, 0));
       expect(
@@ -461,25 +469,25 @@ void main() {
     () async {
       await addChoice(201, [102]);
       await addChoice(202, [108]);
-      final section = (await repository.readIntentionStatisticsSection(
-        query(),
-      ))!;
+      final section = _value(
+        await repository.getIntentionStatisticsSection(query()),
+      );
       final cursor =
           (section.details as IntentionStatisticsThroughRelationsDetails)
               .selectedActions
               .nextCursor!;
       final titleReads = probe.titleRows.length;
       await expectLater(
-        createRepository().readIntentionStatisticsBreakdown(cursor),
-        throwsA(isA<StatisticsSnapshotExpired>()),
+        createRepository().getIntentionStatisticsBreakdown(cursor),
+        completion(_readFailure(isA<StatisticsSnapshotExpired>())),
       );
       expect(
         await repository.execute(ArchiveIntention(durabilityIntention(4))),
         isA<GraphCommandSucceeded>(),
       );
       await expectLater(
-        repository.readIntentionStatisticsBreakdown(cursor),
-        throwsA(isA<StatisticsSnapshotExpired>()),
+        repository.getIntentionStatisticsBreakdown(cursor),
+        completion(_readFailure(isA<StatisticsSnapshotExpired>())),
       );
       expect(probe.titleRows, hasLength(titleReads));
       expect(probe.sourceReads, 1);
@@ -490,36 +498,42 @@ void main() {
   test('кэш сохраняет два результата, а вытесненный курсор не пересчитывает раздел', () async {
     await addChoice(201, [102]);
     await addChoice(202, [108]);
-    final first = (await repository.readIntentionStatisticsSection(query()))!;
+    final first = _value(
+      await repository.getIntentionStatisticsSection(query()),
+    );
     final firstCursor =
         (first.details as IntentionStatisticsThroughRelationsDetails)
             .selectedActions
             .nextCursor!;
-    final wider = (await repository.readIntentionStatisticsSection(
-      query(pageSize: 2),
-    ))!;
+    final wider = _value(
+      await repository.getIntentionStatisticsSection(query(pageSize: 2)),
+    );
     expect(
       (wider.details as IntentionStatisticsThroughRelationsDetails)
           .selectedActions
           .items,
       hasLength(2),
     );
-    final year = (await repository.readIntentionStatisticsSection(
-      query(period: StatisticsYear(2026)),
-    ))!;
+    final year = _value(
+      await repository.getIntentionStatisticsSection(
+        query(period: StatisticsYear(2026)),
+      ),
+    );
     final yearCursor =
         (year.details as IntentionStatisticsThroughRelationsDetails)
             .selectedActions
             .nextCursor!;
-    await repository.readIntentionStatisticsSection(
-      query(period: StatisticsMonth(2026, 11)),
+    _value(
+      await repository.getIntentionStatisticsSection(
+        query(period: StatisticsMonth(2026, 11)),
+      ),
     );
     await expectLater(
-      repository.readIntentionStatisticsBreakdown(firstCursor),
-      throwsA(isA<StatisticsSnapshotExpired>()),
+      repository.getIntentionStatisticsBreakdown(firstCursor),
+      completion(_readFailure(isA<StatisticsSnapshotExpired>())),
     );
     expect(
-      (await repository.readIntentionStatisticsBreakdown(yearCursor))
+      _value(await repository.getIntentionStatisticsBreakdown(yearCursor))
           .items
           .single
           .id,
@@ -527,7 +541,7 @@ void main() {
     );
     expect(probe.sourceReads, 3);
     expect(_computations(diagnostics), 3);
-    await repository.readIntentionStatisticsSection(query());
+    _value(await repository.getIntentionStatisticsSection(query()));
     expect(probe.sourceReads, 4);
   });
 
@@ -535,18 +549,24 @@ void main() {
     'ключ кэша различает намерение и местную дату без смены ревизии',
     () async {
       await addChoice(201, [102], completed: false);
-      final source = (await repository.readIntentionStatisticsSection(
-        query(view: StatisticsView.sourceIntentions),
-      ))!;
-      final other = (await repository.readIntentionStatisticsSection(
-        query(view: StatisticsView.sourceIntentions, intention: 3),
-      ))!;
-      final tomorrow = (await repository.readIntentionStatisticsSection(
-        query(
-          view: StatisticsView.sourceIntentions,
-          localDate: CalendarDate.fromParts(2026, 10, 13),
+      final source = _value(
+        await repository.getIntentionStatisticsSection(
+          query(view: StatisticsView.sourceIntentions),
         ),
-      ))!;
+      );
+      final other = _value(
+        await repository.getIntentionStatisticsSection(
+          query(view: StatisticsView.sourceIntentions, intention: 3),
+        ),
+      );
+      final tomorrow = _value(
+        await repository.getIntentionStatisticsSection(
+          query(
+            view: StatisticsView.sourceIntentions,
+            localDate: CalendarDate.fromParts(2026, 10, 13),
+          ),
+        ),
+      );
       expect(_counts(source.selectedCounts), (1, 0));
       expect(_counts(other.selectedCounts), (0, 0));
       expect(source.details.uncompleted.upcoming, 1);
@@ -564,10 +584,10 @@ void main() {
       await addChoice(201, [101, 102]);
       probe.failTitleRead = 2;
       await expectLater(
-        repository.readIntentionStatisticsSection(
+        repository.getIntentionStatisticsSection(
           query(view: StatisticsView.intermediateIntentions),
         ),
-        throwsA(isA<StatisticsReadUnavailableFailure>()),
+        completion(_readFailure(isA<StatisticsReadUnavailableFailure>())),
       );
       final event = diagnostics.events
           .whereType<StatisticsReadDiagnosticsEvent>()
@@ -589,8 +609,8 @@ void main() {
     await addChoice(201, [101, 102]);
     repository = createRepository(runner: _failedComputation);
     await expectLater(
-      repository.readIntentionStatisticsSection(query()),
-      throwsA(isA<StatisticsReadUnexpectedFailure>()),
+      repository.getIntentionStatisticsSection(query()),
+      completion(_readFailure(isA<StatisticsReadUnexpectedFailure>())),
     );
     expect(probe.titleRows, isEmpty);
     final events = diagnostics.events
@@ -613,14 +633,16 @@ void main() {
   test('отказ продолжения сохраняет кэш для явного повтора', () async {
     await addChoice(201, [102]);
     await addChoice(202, [108]);
-    final first = (await repository.readIntentionStatisticsSection(query()))!;
+    final first = _value(
+      await repository.getIntentionStatisticsSection(query()),
+    );
     final cursor = (first.details as IntentionStatisticsThroughRelationsDetails)
         .relations
         .nextCursor!;
     probe.failTitleRead = probe.titleReads + 1;
     await expectLater(
-      repository.readIntentionStatisticsBreakdown(cursor),
-      throwsA(isA<StatisticsReadUnavailableFailure>()),
+      repository.getIntentionStatisticsBreakdown(cursor),
+      completion(_readFailure(isA<StatisticsReadUnavailableFailure>())),
     );
     final event = diagnostics.events
         .whereType<StatisticsReadDiagnosticsEvent>()
@@ -634,7 +656,9 @@ void main() {
         DiagnosticsFailureCode.unavailable,
       ),
     );
-    final next = await repository.readIntentionStatisticsBreakdown(cursor);
+    final next = _value(
+      await repository.getIntentionStatisticsBreakdown(cursor),
+    );
     expect(next.items.single.id, durabilityRelation(108));
     expect(probe.sourceReads, 1);
     expect(_computations(diagnostics), 1);
@@ -644,11 +668,23 @@ void main() {
     await addChoice(201, [101, 102]);
     probe.corruptRelationArchive = true;
     await expectLater(
-      repository.readIntentionStatisticsSection(query()),
-      throwsA(isA<StatisticsReadCorruptionFailure>()),
+      repository.getIntentionStatisticsSection(query()),
+      completion(_readFailure(isA<StatisticsReadCorruptionFailure>())),
     );
   });
 }
+
+T _value<T>(GraphResult<T, StatisticsReadFailure> result) {
+  expect(result, isA<GraphResultSuccess<T, StatisticsReadFailure>>());
+  return (result as GraphResultSuccess<T, StatisticsReadFailure>).value;
+}
+
+Matcher _readFailure(Matcher failure) =>
+    isA<GraphResultFailure<Object?, StatisticsReadFailure>>().having(
+      (result) => result.failure,
+      'причина отказа',
+      failure,
+    );
 
 (int, int) _counts(ContributionCounts counts) =>
     (counts.planned, counts.contribution);

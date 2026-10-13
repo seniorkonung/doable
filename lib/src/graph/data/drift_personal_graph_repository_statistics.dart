@@ -124,6 +124,8 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           duration: stopwatch.elapsed,
           code: switch (failure) {
             StatisticsSnapshotExpired() => DiagnosticsFailureCode.conflict,
+            StatisticsIntentionNotFoundFailure() =>
+              DiagnosticsFailureCode.notFound,
             StatisticsReadUnavailableFailure() =>
               DiagnosticsFailureCode.unavailable,
             StatisticsReadCorruptionFailure() =>
@@ -163,6 +165,8 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           duration: stopwatch.elapsed,
           code: switch (failure) {
             StatisticsSnapshotExpired() => DiagnosticsFailureCode.conflict,
+            StatisticsIntentionNotFoundFailure() =>
+              DiagnosticsFailureCode.notFound,
             StatisticsReadUnavailableFailure() =>
               DiagnosticsFailureCode.unavailable,
             StatisticsReadCorruptionFailure() =>

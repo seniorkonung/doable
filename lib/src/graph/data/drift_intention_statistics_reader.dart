@@ -27,11 +27,11 @@ runIntentionContributionInIsolate(
   ),
 );
 
-/// Внутренняя сборка адаптера; общий контракт личного графа не расширяется.
-extension DriftIntentionStatisticsReading on DriftPersonalGraphRepository {
+/// Внутренняя сборка чтений раздела и разбивок за общей границей репозитория.
+extension _IntentionStatisticsReading on DriftPersonalGraphRepository {
   /// Одна согласованная попытка. null означает отсутствие намерения;
   /// остальные отказы передаются как [StatisticsReadFailure], без повторов.
-  Future<IntentionStatisticsSection?> readIntentionStatisticsSection(
+  Future<IntentionStatisticsSection?> _readIntentionStatisticsSection(
     IntentionStatisticsQuery query,
   ) async {
     Future<T> stage<T>(
@@ -144,7 +144,7 @@ extension DriftIntentionStatisticsReading on DriftPersonalGraphRepository {
   /// Курсор задаёт все условия и тип строки. Проверка кэша и ревизии идёт
   /// внутри очереди до чтения названий; вытеснение не вызывает пересчёта.
   Future<StatisticsBreakdownContinuationPage<T>>
-  readIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor) =>
+  _readIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor) =>
       _statisticsStage(
         StatisticsReadDiagnosticsStage.titles,
         () => _sequencer.run(() async {

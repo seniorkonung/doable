@@ -5,6 +5,8 @@ import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
 import 'contribution_counts.dart';
+import 'intention_statistics_breakdown.dart';
+import 'intention_statistics_read_contract.dart';
 import 'statistics_period.dart';
 
 /// Виды статистики в порядке показа на Главной.
@@ -134,14 +136,23 @@ sealed class StatisticsReadFailure implements GraphCommandFailure {
 }
 
 /// Продолжение утратило привязку к условиям или снимку либо снимок первой
-/// порции «Через связи» устарел при подготовке или подсчёте.
-/// Нужна новая первая порция, а не повтор прежнего курсора на новой ревизии.
+/// порции «Через связи» или раздела устарел при подготовке или подсчёте.
+/// Нужна новая первая порция или раздел, а не прежний курсор на новой ревизии.
 /// Это сигнал согласования, а не недоступность, повреждение или неизвестный отказ.
 final class StatisticsSnapshotExpired extends StatisticsReadFailure {
   const StatisticsSnapshotExpired();
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
+/// Намерение раздела отсутствует. Это не пустой период или вид.
+/// Чтение Главной не возвращает этот отказ.
+final class StatisticsIntentionNotFoundFailure extends StatisticsReadFailure {
+  const StatisticsIntentionNotFoundFailure();
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.notFound;
 }
 
 final class StatisticsReadUnavailableFailure extends StatisticsReadFailure {
@@ -172,7 +183,7 @@ typedef StatisticsPageSuccess =
 typedef StatisticsPageError =
     GraphResultFailure<StatisticsPage, StatisticsReadFailure>;
 
-/// Контракт чтения статистики Главной за единой границей личного графа.
+/// Контракт чтения статистики за единой границей личного графа.
 abstract interface class StatisticsReadContract {
   /// Без курсора возвращает [StatisticsFirstPage]: сводку всего периода,
   /// точное число элементов вида и первую порцию на одной ревизии.
@@ -211,4 +222,32 @@ abstract interface class StatisticsReadContract {
   /// Только доказанная недоступность допускает обычный повтор тех же условий;
   /// повреждение и неизвестный отказ — нет. Отказ не заменяется нулями.
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query);
+
+  /// Возвращает четыре карточки, сводку выбранного вида, календарь и первые
+  /// порции допустимых разбивок на одной ревизии личного графа.
+  /// [StatisticsIntentionNotFoundFailure] отличается от успешного раздела
+  /// существующего намерения без засчитанных выборов.
+  ///
+  /// Один вызов выполняет одну согласованную попытку без внутренних повторов
+  /// исходных данных, снимка или подсчёта. При [StatisticsSnapshotExpired]
+  /// новый раздел запрашивает только живой, видимый потребитель актуального
+  /// поколения. Поздний ответ после скрытия, смены условий или освобождения
+  /// не запускает чтений; выполняющаяся транзакция или подсчёт могут завершиться.
+  /// До согласованной замены потребитель сохраняет прежние подтверждённые
+  /// числа с признаком обновления, не предъявляя устаревание как отказ.
+  /// Категории остальных отказов и допустимость обычного повтора следуют
+  /// [getStatisticsPage]; частичный результат или ложные нули не возвращаются.
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  );
+
+  /// Продолжает одну разбивку с условиями, типом строк, размером порции
+  /// и ревизией исходного раздела, закреплёнными в [cursor].
+  /// Порядок, предел размера и отсутствие повторов или пропусков заданы
+  /// [StatisticsBreakdownPage]. При смене ревизии, эпохи или утрате результата
+  /// возвращает [StatisticsSnapshotExpired], не пересчитывая раздел.
+  /// Потребитель получает новую основу по [getIntentionStatisticsSection],
+  /// а остальные отказы сохраняют уже загруженные строки.
+  Future<IntentionStatisticsBreakdownResult<T>>
+  getIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor);
 }

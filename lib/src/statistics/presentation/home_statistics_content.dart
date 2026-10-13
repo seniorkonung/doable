@@ -225,7 +225,9 @@ String _failureMessage(
     texts.statisticsCorruption,
   (
     _ReadStage.initial,
-    StatisticsReadUnexpectedFailure() || StatisticsSnapshotExpired(),
+    StatisticsReadUnexpectedFailure() ||
+        StatisticsSnapshotExpired() ||
+        StatisticsIntentionNotFoundFailure(),
   ) =>
     texts.statisticsUnexpectedFailure,
   (_ReadStage.refresh, StatisticsReadUnavailableFailure()) =>
@@ -234,7 +236,9 @@ String _failureMessage(
     texts.statisticsRefreshCorruption,
   (
     _ReadStage.refresh,
-    StatisticsReadUnexpectedFailure() || StatisticsSnapshotExpired(),
+    StatisticsReadUnexpectedFailure() ||
+        StatisticsSnapshotExpired() ||
+        StatisticsIntentionNotFoundFailure(),
   ) =>
     texts.statisticsRefreshUnexpectedFailure,
   (_ReadStage.more, StatisticsReadUnavailableFailure()) =>
@@ -243,7 +247,9 @@ String _failureMessage(
     texts.statisticsLoadMoreCorruption,
   (
     _ReadStage.more,
-    StatisticsReadUnexpectedFailure() || StatisticsSnapshotExpired(),
+    StatisticsReadUnexpectedFailure() ||
+        StatisticsSnapshotExpired() ||
+        StatisticsIntentionNotFoundFailure(),
   ) =>
     texts.statisticsLoadMoreUnexpectedFailure,
 };
