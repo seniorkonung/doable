@@ -8,6 +8,8 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
+import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
@@ -19,15 +21,23 @@ import '../../../long_term_relation/presentation/neighborhood/relation_neighborh
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
 import '../../../tag/presentation/catalog/tag_selection_context.dart';
+import '../../../statistics/application/intention_statistics_target.dart';
+import '../../../statistics/presentation/intention_statistics_section.dart';
+import '../../../statistics/presentation/intention_statistics_view_model.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
 
 @RoutePage()
 final class IntentionDetailsPage extends ConsumerStatefulWidget {
-  const IntentionDetailsPage({required this.intentionId, super.key});
+  const IntentionDetailsPage({
+    required this.intentionId,
+    this.statisticsTarget,
+    super.key,
+  });
 
   final IntentionId intentionId;
+  final IntentionStatisticsTarget? statisticsTarget;
 
   @override
   ConsumerState<IntentionDetailsPage> createState() =>
@@ -37,14 +47,80 @@ final class IntentionDetailsPage extends ConsumerStatefulWidget {
 final class _IntentionDetailsPageState
     extends ConsumerState<IntentionDetailsPage> {
   final _neighborhoodKey = GlobalKey();
+  final _statisticsKey = GlobalKey();
+  var _statisticsPageKey = Object();
+  late final DailyChoiceLocalDayObserver _localDay;
+  var _visible = false;
+  var _statisticsOpeningScheduled = false;
   var _selectionMode = false;
+
+  IntentionStatisticsViewModelProvider get _statisticsProvider =>
+      intentionStatisticsViewModelProvider(
+        widget.intentionId,
+        _statisticsPageKey,
+        target: widget.statisticsTarget,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _localDay = DailyChoiceLocalDayObserver(
+      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+      onTodayChanged: () =>
+          ref.read(_statisticsProvider.notifier).setLocalDate(_localDay.today),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Учитывает также диалоги и удаление маршрута до конца его анимации.
+    // https://api.flutter.dev/flutter/widgets/ModalRoute/isCurrentOf.html
+    _visible = ModalRoute.isCurrentOf(context) == true;
+    _syncStatisticsVisibility();
+  }
+
+  void _syncStatisticsVisibility() {
+    scheduleMicrotask(() {
+      if (!mounted) return;
+      final model = ref.read(_statisticsProvider.notifier);
+      model.setLocalDate(_localDay.today);
+      model.setVisible(_visible);
+    });
+  }
+
+  @override
+  void dispose() {
+    _localDay.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant IntentionDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.intentionId != widget.intentionId) {
       _selectionMode = false;
+      _statisticsPageKey = Object();
+      _statisticsOpeningScheduled = false;
+      _syncStatisticsVisibility();
     }
+  }
+
+  void _openStatisticsAfterLoad(IntentionDetailsState details) {
+    if (widget.statisticsTarget == null ||
+        _statisticsOpeningScheduled ||
+        details is! IntentionDetailsLoaded) {
+      return;
+    }
+    _statisticsOpeningScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final sectionContext = _statisticsKey.currentContext;
+      if (sectionContext == null) return;
+      // Цель применяется единожды, после размещения загруженной страницы.
+      // https://api.flutter.dev/flutter/widgets/Scrollable/ensureVisible.html
+      unawaited(Scrollable.ensureVisible(sectionContext));
+    });
   }
 
   void _showBlockingRelations() {
@@ -89,6 +165,9 @@ final class _IntentionDetailsPageState
     final localizations = AppLocalizations.of(context);
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
+    // Подписка принадлежит странице, в том числе пока её данные загружаются.
+    ref.watch(_statisticsProvider);
+    _openStatisticsAfterLoad(details);
     // Открытие страницы одновременно начинает только начальную группу
     // соседства; сам sliver переиспользует это состояние после загрузки
     // подробных данных намерения.
@@ -105,6 +184,10 @@ final class _IntentionDetailsPageState
                 state: details,
                 selectionMode: _selectionMode,
                 neighborhoodKey: _neighborhoodKey,
+                statisticsSection: IntentionStatisticsSectionSliver(
+                  key: _statisticsKey,
+                  provider: _statisticsProvider,
+                ),
                 onShowBlockingRelations: _showBlockingRelations,
                 onDelete: _delete,
               ),
@@ -148,6 +231,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.state,
     required this.selectionMode,
     required this.neighborhoodKey,
+    required this.statisticsSection,
     required this.onShowBlockingRelations,
     required this.onDelete,
   });
@@ -156,6 +240,7 @@ final class _DetailsContent extends ConsumerWidget {
   final IntentionDetailsState state;
   final bool selectionMode;
   final GlobalKey neighborhoodKey;
+  final Widget statisticsSection;
   final VoidCallback onShowBlockingRelations;
   final VoidCallback onDelete;
 
@@ -171,6 +256,7 @@ final class _DetailsContent extends ConsumerWidget {
         state: loaded,
         selectionMode: selectionMode,
         neighborhoodKey: neighborhoodKey,
+        statisticsSection: statisticsSection,
         onBeginEditing: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .beginEditing,
@@ -243,6 +329,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.state,
     required this.selectionMode,
     required this.neighborhoodKey,
+    required this.statisticsSection,
     required this.onBeginEditing,
     required this.onCancelEditing,
     required this.onTitleChanged,
@@ -261,6 +348,7 @@ final class _LoadedDetails extends StatelessWidget {
   final IntentionDetailsLoaded state;
   final bool selectionMode;
   final GlobalKey neighborhoodKey;
+  final Widget statisticsSection;
   final VoidCallback onBeginEditing;
   final VoidCallback onCancelEditing;
   final ValueChanged<String> onTitleChanged;
@@ -379,6 +467,7 @@ final class _LoadedDetails extends StatelessWidget {
             ),
           ),
         ),
+        statisticsSection,
         RelationNeighborhoodSliver(
           key: neighborhoodKey,
           intentionId: intention.id,

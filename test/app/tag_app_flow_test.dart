@@ -26,6 +26,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _until(tester, finder);
   await tester.pumpAndSettle();
   await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pump();
 }
@@ -78,8 +79,9 @@ void main() {
     await _tap(tester, find.text('Намерение 1'));
     final homeRemove = find.byKey(
       ValueKey('tag-assignment-remove-${tagFixtureId(firstTagNumber)}'),
+      skipOffstage: false,
     );
-    final empty = find.text('Назначений тегов пока нет.');
+    final empty = find.text('Назначений тегов пока нет.', skipOffstage: false);
     await _tap(tester, homeRemove);
     await _until(tester, empty);
     const first = 'Снятие — «назначение тега»: Назначение тега снято.';
@@ -91,11 +93,17 @@ void main() {
       (lastTagNumber, false),
     ]) {
       final tagId = tagFixtureId(number);
-      final remove = find.byKey(ValueKey('tag-assignment-remove-$tagId'));
+      final remove = find.byKey(
+        ValueKey('tag-assignment-remove-$tagId'),
+        skipOffstage: false,
+      );
       if (assign) {
         await _tap(
           tester,
-          find.byKey(const ValueKey('tag-assignments-choose')),
+          find.byKey(
+            const ValueKey('tag-assignments-choose'),
+            skipOffstage: false,
+          ),
         );
         await _tap(tester, find.byKey(ValueKey('tag-catalog-row-$tagId')));
         await _tap(tester, find.byKey(const ValueKey('tag-catalog-assign')));

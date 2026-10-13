@@ -23,7 +23,7 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
   });
 
   final IntentionStatisticsState state;
-  final void Function(IntentionId, StatisticsBreakdown) onOpenIntention;
+  final void Function(IntentionId, StatisticsBreakdown)? onOpenIntention;
   final void Function(StatisticsBreakdown, int) onLoadMoreIfNeeded;
   final VoidCallback onRetry;
   final VoidCallback onRetryRefresh;
@@ -78,7 +78,9 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
       itemBuilder: (item) => _BreakdownRow(
         item: item,
         contribution: contribution,
-        onPressed: () => onOpenIntention(item.id, kind),
+        onPressed: onOpenIntention == null
+            ? null
+            : () => onOpenIntention!(item.id, kind),
       ),
     );
     final rows = SliverMainAxisGroup(
@@ -98,10 +100,12 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
               item: relation.relatedIntention,
               contribution: contribution,
               relationArchived: relation.scope == RelationScope.archived,
-              onPressed: () => onOpenIntention(
-                relation.relatedIntention.id,
-                StatisticsBreakdown.relations,
-              ),
+              onPressed: onOpenIntention == null
+                  ? null
+                  : () => onOpenIntention!(
+                      relation.relatedIntention.id,
+                      StatisticsBreakdown.relations,
+                    ),
             ),
           ),
         if (breakdowns.selectedActions case final actions?)
@@ -302,7 +306,7 @@ final class _BreakdownRow extends StatelessWidget {
   final StatisticsItem item;
   final int contribution;
   final bool relationArchived;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {

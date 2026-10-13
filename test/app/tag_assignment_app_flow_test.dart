@@ -52,7 +52,10 @@ void main() {
       tagFixtureId(number),
     ) as IntentionIdDecodingSuccess).id;
     unawaited(router.push(IntentionDetailsRoute(intentionId: id)));
-    final choose = find.byKey(const ValueKey('tag-assignments-choose'));
+    final choose = find.byKey(
+      const ValueKey('tag-assignments-choose'),
+      skipOffstage: false,
+    );
     await _until(tester, choose);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
@@ -132,7 +135,10 @@ void main() {
     router.pop();
     await _until(
       tester,
-      find.byKey(ValueKey('tag-assignment-remove-$existingTagId')),
+      find.byKey(
+        ValueKey('tag-assignment-remove-$existingTagId'),
+        skipOffstage: false,
+      ),
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
@@ -166,11 +172,20 @@ void main() {
     await _tap(tester, assign);
     await _waitFor(tester, () => _assigned(raw, newTagId, number));
     router.pop();
-    final remove = find.byKey(ValueKey('tag-assignment-remove-$newTagId'));
+    final remove = find.byKey(
+      ValueKey('tag-assignment-remove-$newTagId'),
+      skipOffstage: false,
+    );
     await _until(tester, remove);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
-    await _tap(tester, find.byKey(ValueKey('tag-assignment-open-$newTagId')));
+    await _tap(
+      tester,
+      find.byKey(
+        ValueKey('tag-assignment-open-$newTagId'),
+        skipOffstage: false,
+      ),
+    );
     await _until(tester, find.byType(TagNavigationPage));
     await tester.pumpAndSettle();
     expect(
@@ -269,6 +284,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _until(tester, finder);
   await tester.pumpAndSettle();
   await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pump();
 }

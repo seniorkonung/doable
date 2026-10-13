@@ -44,9 +44,9 @@ import 'package:doable/src/intention/domain/intention_id.dart' as _i23;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as _i11;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart'
-    as _i34;
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart'
     as _i35;
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart'
+    as _i36;
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart'
     as _i19;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
@@ -54,16 +54,18 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
     as _i13;
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
-    as _i32;
+    as _i33;
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart'
     as _i14;
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart'
     as _i15;
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart'
-    as _i33;
+    as _i34;
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
     as _i16;
-import 'package:doable/src/tag/domain/tag_id.dart' as _i37;
+import 'package:doable/src/statistics/application/intention_statistics_target.dart'
+    as _i32;
+import 'package:doable/src/tag/domain/tag_id.dart' as _i38;
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart'
     as _i17;
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart'
@@ -71,7 +73,7 @@ import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart'
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart'
     as _i20;
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart'
-    as _i36;
+    as _i37;
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart'
     as _i21;
 import 'package:flutter/material.dart' as _i25;
@@ -523,11 +525,16 @@ class IntentionDetailsRoute
     extends _i22.PageRouteInfo<IntentionDetailsRouteArgs> {
   IntentionDetailsRoute({
     required _i23.IntentionId intentionId,
+    _i32.IntentionStatisticsTarget? statisticsTarget,
     _i25.Key? key,
     List<_i22.PageRouteInfo>? children,
   }) : super(
          IntentionDetailsRoute.name,
-         args: IntentionDetailsRouteArgs(intentionId: intentionId, key: key),
+         args: IntentionDetailsRouteArgs(
+           intentionId: intentionId,
+           statisticsTarget: statisticsTarget,
+           key: key,
+         ),
          initialChildren: children,
        );
 
@@ -539,6 +546,7 @@ class IntentionDetailsRoute
       final args = data.argsAs<IntentionDetailsRouteArgs>();
       return _i12.IntentionDetailsPage(
         intentionId: args.intentionId,
+        statisticsTarget: args.statisticsTarget,
         key: args.key,
       );
     },
@@ -546,26 +554,35 @@ class IntentionDetailsRoute
 }
 
 class IntentionDetailsRouteArgs {
-  const IntentionDetailsRouteArgs({required this.intentionId, this.key});
+  const IntentionDetailsRouteArgs({
+    required this.intentionId,
+    this.statisticsTarget,
+    this.key,
+  });
 
   final _i23.IntentionId intentionId;
+
+  final _i32.IntentionStatisticsTarget? statisticsTarget;
 
   final _i25.Key? key;
 
   @override
   String toString() {
-    return 'IntentionDetailsRouteArgs{intentionId: $intentionId, key: $key}';
+    return 'IntentionDetailsRouteArgs{intentionId: $intentionId, statisticsTarget: $statisticsTarget, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! IntentionDetailsRouteArgs) return false;
-    return intentionId == other.intentionId && key == other.key;
+    return intentionId == other.intentionId &&
+        statisticsTarget == other.statisticsTarget &&
+        key == other.key;
   }
 
   @override
-  int get hashCode => intentionId.hashCode ^ key.hashCode;
+  int get hashCode =>
+      intentionId.hashCode ^ statisticsTarget.hashCode ^ key.hashCode;
 }
 
 /// generated route for
@@ -589,7 +606,7 @@ class IntentionEditorRoute extends _i22.PageRouteInfo<void> {
 class RelationDetailsRoute
     extends _i22.PageRouteInfo<RelationDetailsRouteArgs> {
   RelationDetailsRoute({
-    required _i32.LongTermRelationId relationId,
+    required _i33.LongTermRelationId relationId,
     _i25.Key? key,
     List<_i22.PageRouteInfo>? children,
   }) : super(
@@ -615,7 +632,7 @@ class RelationDetailsRoute
 class RelationDetailsRouteArgs {
   const RelationDetailsRouteArgs({required this.relationId, this.key});
 
-  final _i32.LongTermRelationId relationId;
+  final _i33.LongTermRelationId relationId;
 
   final _i25.Key? key;
 
@@ -639,7 +656,7 @@ class RelationDetailsRouteArgs {
 /// [_i15.RelationEditorPage]
 class RelationEditorRoute extends _i22.PageRouteInfo<RelationEditorRouteArgs> {
   RelationEditorRoute({
-    required _i33.RelationEditorContext editorContext,
+    required _i34.RelationEditorContext editorContext,
     _i25.Key? key,
     List<_i22.PageRouteInfo>? children,
   }) : super(
@@ -665,7 +682,7 @@ class RelationEditorRoute extends _i22.PageRouteInfo<RelationEditorRouteArgs> {
 class RelationEditorRouteArgs {
   const RelationEditorRouteArgs({required this.editorContext, this.key});
 
-  final _i33.RelationEditorContext editorContext;
+  final _i34.RelationEditorContext editorContext;
 
   final _i25.Key? key;
 
@@ -690,7 +707,7 @@ class RelationEditorRouteArgs {
 class RelationParticipantPickerRoute
     extends _i22.PageRouteInfo<RelationParticipantPickerRouteArgs> {
   RelationParticipantPickerRoute({
-    required _i34.RelationParticipantSelectionContext selectionContext,
+    required _i35.RelationParticipantSelectionContext selectionContext,
     _i23.IntentionId? excludedIntentionId,
     _i25.Key? key,
     List<_i22.PageRouteInfo>? children,
@@ -726,7 +743,7 @@ class RelationParticipantPickerRouteArgs {
     this.key,
   });
 
-  final _i34.RelationParticipantSelectionContext selectionContext;
+  final _i35.RelationParticipantSelectionContext selectionContext;
 
   final _i23.IntentionId? excludedIntentionId;
 
@@ -814,7 +831,7 @@ class TagCatalogRouteArgs {
 class TagConditionPickerRoute
     extends _i22.PageRouteInfo<TagConditionPickerRouteArgs> {
   TagConditionPickerRoute({
-    required List<_i35.IntentionTagCondition> conditions,
+    required List<_i36.IntentionTagCondition> conditions,
     _i25.Key? key,
     List<_i22.PageRouteInfo>? children,
   }) : super(
@@ -840,7 +857,7 @@ class TagConditionPickerRoute
 class TagConditionPickerRouteArgs {
   const TagConditionPickerRouteArgs({required this.conditions, this.key});
 
-  final List<_i35.IntentionTagCondition> conditions;
+  final List<_i36.IntentionTagCondition> conditions;
 
   final _i25.Key? key;
 
@@ -853,7 +870,7 @@ class TagConditionPickerRouteArgs {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! TagConditionPickerRouteArgs) return false;
-    return const _i29.ListEquality<_i35.IntentionTagCondition>().equals(
+    return const _i29.ListEquality<_i36.IntentionTagCondition>().equals(
           conditions,
           other.conditions,
         ) &&
@@ -862,7 +879,7 @@ class TagConditionPickerRouteArgs {
 
   @override
   int get hashCode =>
-      const _i29.ListEquality<_i35.IntentionTagCondition>().hash(conditions) ^
+      const _i29.ListEquality<_i36.IntentionTagCondition>().hash(conditions) ^
       key.hashCode;
 }
 
@@ -870,7 +887,7 @@ class TagConditionPickerRouteArgs {
 /// [_i20.TagEditorPage]
 class TagEditorRoute extends _i22.PageRouteInfo<TagEditorRouteArgs> {
   TagEditorRoute({
-    required _i36.TagEditorContext editorContext,
+    required _i37.TagEditorContext editorContext,
     _i25.Key? key,
     List<_i22.PageRouteInfo>? children,
   }) : super(
@@ -896,7 +913,7 @@ class TagEditorRoute extends _i22.PageRouteInfo<TagEditorRouteArgs> {
 class TagEditorRouteArgs {
   const TagEditorRouteArgs({required this.editorContext, this.key});
 
-  final _i36.TagEditorContext editorContext;
+  final _i37.TagEditorContext editorContext;
 
   final _i25.Key? key;
 
@@ -920,7 +937,7 @@ class TagEditorRouteArgs {
 /// [_i21.TagNavigationPage]
 class TagNavigationRoute extends _i22.PageRouteInfo<TagNavigationRouteArgs> {
   TagNavigationRoute({
-    required _i37.TagId tagId,
+    required _i38.TagId tagId,
     _i25.Key? key,
     List<_i22.PageRouteInfo>? children,
   }) : super(
@@ -945,7 +962,7 @@ class TagNavigationRoute extends _i22.PageRouteInfo<TagNavigationRouteArgs> {
 class TagNavigationRouteArgs {
   const TagNavigationRouteArgs({required this.tagId, this.key});
 
-  final _i37.TagId tagId;
+  final _i38.TagId tagId;
 
   final _i25.Key? key;
 

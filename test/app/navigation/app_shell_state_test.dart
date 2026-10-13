@@ -329,7 +329,10 @@ void main() {
       await _open(tester, _catalogRow(_activeTitle(1)), IntentionDetailsPage);
       await _tap(
         tester,
-        find.byKey(const ValueKey('relation-neighborhood-daily-source')),
+        find.byKey(
+          const ValueKey('relation-neighborhood-daily-source'),
+          skipOffstage: false,
+        ),
       );
       await _open(
         tester,

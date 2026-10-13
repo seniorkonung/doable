@@ -761,6 +761,7 @@ final class _App {
       .whereType<StatisticsReadDiagnosticsEvent>()
       .where(
         (event) =>
+            event.readType == StatisticsReadDiagnosticsType.homePage &&
             event.stage == StatisticsReadDiagnosticsStage.titles &&
             event.status is DiagnosticsSucceeded,
       )
@@ -770,6 +771,7 @@ final class _App {
       .whereType<StatisticsReadDiagnosticsEvent>()
       .where(
         (event) =>
+            event.readType == StatisticsReadDiagnosticsType.homePage &&
             event.status is DiagnosticsStarted &&
             event.stage == StatisticsReadDiagnosticsStage.sourceData,
       )
@@ -1012,7 +1014,9 @@ Future<void> _untilCondition(
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await tester.pumpAndSettle();
   await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
