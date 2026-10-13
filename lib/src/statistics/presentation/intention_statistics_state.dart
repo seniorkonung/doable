@@ -55,12 +55,13 @@ final class IntentionStatisticsSelection {
       };
 
   IntentionStatisticsSelection copyWith({
+    CalendarDate? localDate,
     IntentionStatisticsMode? mode,
     StatisticsMonth? month,
     StatisticsYear? year,
     StatisticsView? view,
   }) => IntentionStatisticsSelection(
-    localDate: localDate,
+    localDate: localDate ?? this.localDate,
     mode: mode ?? this.mode,
     month: month ?? this.month,
     year: year ?? this.year,
@@ -269,6 +270,7 @@ sealed class IntentionStatisticsLoaded extends IntentionStatisticsReadState {
   const IntentionStatisticsLoaded({
     required this.section,
     required this.breakdowns,
+    this.refreshStatus = const IntentionStatisticsRefreshIdle(),
   });
 
   factory IntentionStatisticsLoaded.first(IntentionStatisticsSection section) {
@@ -280,17 +282,21 @@ sealed class IntentionStatisticsLoaded extends IntentionStatisticsReadState {
 
   final IntentionStatisticsSection section;
   final IntentionStatisticsBreakdowns breakdowns;
+  final IntentionStatisticsRefreshStatus refreshStatus;
 
-  IntentionStatisticsLoaded withBreakdowns(
-    IntentionStatisticsBreakdowns breakdowns,
-  ) => switch (this) {
+  IntentionStatisticsLoaded copyWith({
+    IntentionStatisticsBreakdowns? breakdowns,
+    IntentionStatisticsRefreshStatus? refreshStatus,
+  }) => switch (this) {
     IntentionStatisticsData() => IntentionStatisticsData(
       section: section,
-      breakdowns: breakdowns,
+      breakdowns: breakdowns ?? this.breakdowns,
+      refreshStatus: refreshStatus ?? this.refreshStatus,
     ),
     IntentionStatisticsEmpty() => IntentionStatisticsEmpty(
       section: section,
-      breakdowns: breakdowns,
+      breakdowns: breakdowns ?? this.breakdowns,
+      refreshStatus: refreshStatus ?? this.refreshStatus,
     ),
   };
 }
@@ -299,6 +305,7 @@ final class IntentionStatisticsData extends IntentionStatisticsLoaded {
   const IntentionStatisticsData({
     required super.section,
     required super.breakdowns,
+    super.refreshStatus,
   });
 }
 
@@ -306,5 +313,28 @@ final class IntentionStatisticsEmpty extends IntentionStatisticsLoaded {
   const IntentionStatisticsEmpty({
     required super.section,
     required super.breakdowns,
+    super.refreshStatus,
   });
+}
+
+sealed class IntentionStatisticsRefreshStatus {
+  const IntentionStatisticsRefreshStatus();
+}
+
+final class IntentionStatisticsRefreshIdle
+    extends IntentionStatisticsRefreshStatus {
+  const IntentionStatisticsRefreshIdle();
+}
+
+final class IntentionStatisticsRefreshing
+    extends IntentionStatisticsRefreshStatus {
+  const IntentionStatisticsRefreshing();
+}
+
+final class IntentionStatisticsRefreshFailure
+    extends IntentionStatisticsRefreshStatus {
+  const IntentionStatisticsRefreshFailure(this.failure);
+
+  final StatisticsReadFailure failure;
+  bool get canRetry => failure is StatisticsReadUnavailableFailure;
 }

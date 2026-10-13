@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../daily_choice/domain/calendar_date.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../graph/application/personal_graph_repository_provider.dart';
@@ -24,6 +26,10 @@ final class IntentionStatisticsViewModel
     extends _$IntentionStatisticsViewModel {
   late StatisticsReadContract _reader;
   var _generation = 0;
+  var _isVisible = false;
+  var _needsRead = true;
+  GraphRevision? _requiredRevision;
+  Object? _lifetime;
 
   /// Ключ создаётся один раз на страницу и сохраняется до её закрытия.
   @override
@@ -37,17 +43,72 @@ final class IntentionStatisticsViewModel
       ref.read(dailyChoiceLocalDateSourceProvider)().date,
       target,
     );
-    final generation = ++_generation;
-    ref.onDispose(() => ++_generation);
+    ++_generation;
+    _requiredRevision = null;
+    _needsRead = true;
+    final lifetime = _lifetime = Object();
+    final coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    final completions = coordinator.completions.listen(_onCompletion);
+    ref.onDispose(() {
+      _lifetime = null;
+      ++_generation;
+      unawaited(completions.cancel());
+    });
     scheduleMicrotask(() {
-      if (_isCurrent(generation)) {
-        unawaited(_readSection(generation, selection));
+      if (ref.mounted && identical(lifetime, _lifetime)) {
+        unawaited(_readIfVisible());
       }
     });
     return IntentionStatisticsState(
       selection: selection,
       read: const IntentionStatisticsInitialLoad(),
     );
+  }
+
+  /// Видимость задаёт верхний маршрут страницы, а не наличие слушателей.
+  void setVisible(bool visible) {
+    if (visible == _isVisible) return;
+    _isVisible = visible;
+    if (visible) {
+      unawaited(_readIfVisible());
+      return;
+    }
+    ++_generation;
+    final current = state.read;
+    if (current is IntentionStatisticsInitialLoad ||
+        current is IntentionStatisticsLoaded &&
+            current.refreshStatus is IntentionStatisticsRefreshing) {
+      _needsRead = true;
+    }
+    if (current is IntentionStatisticsLoaded) {
+      state = state.withRead(
+        current.copyWith(breakdowns: _stopPageLoads(current.breakdowns)),
+      );
+    }
+  }
+
+  IntentionStatisticsBreakdowns _stopPageLoads(
+    IntentionStatisticsBreakdowns parts,
+  ) {
+    IntentionStatisticsBreakdownState<T>? reset<T>(
+      IntentionStatisticsBreakdownState<T>? page,
+    ) => page != null && page.pageStatus is IntentionStatisticsPageLoading
+        ? page.withPageStatus(const IntentionStatisticsPageIdle())
+        : page;
+    return parts.copyWith(
+      sourceIntentions: reset(parts.sourceIntentions),
+      selectedActions: reset(parts.selectedActions),
+      relations: reset(parts.relations),
+    );
+  }
+
+  void setLocalDate(CalendarDate localDate) {
+    if (localDate == state.selection.localDate) return;
+    state = IntentionStatisticsState(
+      selection: state.selection.copyWith(localDate: localDate),
+      read: state.read,
+    );
+    unawaited(_markStale());
   }
 
   void selectMode(IntentionStatisticsMode mode) {
@@ -79,8 +140,19 @@ final class IntentionStatisticsViewModel
   }
 
   Future<void> retry() {
+    if (!_isVisible) return Future.value();
     if (state.read case IntentionStatisticsFailure(canRetry: true)) {
-      return _restart(state.selection);
+      return _markStale();
+    }
+    return Future.value();
+  }
+
+  Future<void> retryRefresh() {
+    if (!_isVisible) return Future.value();
+    if (state.read case IntentionStatisticsLoaded(
+      refreshStatus: IntentionStatisticsRefreshFailure(canRetry: true),
+    )) {
+      return _markStale();
     }
     return Future.value();
   }
@@ -98,20 +170,76 @@ final class IntentionStatisticsViewModel
       _requestMore(breakdown, retry: true);
 
   Future<void> _restart(IntentionStatisticsSelection selection) {
-    final generation = ++_generation;
     state = IntentionStatisticsState(
       selection: selection,
       read: const IntentionStatisticsInitialLoad(),
     );
-    return _readSection(generation, selection);
+    return _markStale();
   }
 
-  bool _isCurrent(int generation) => ref.mounted && generation == _generation;
+  void _onCompletion(GraphCommandCompletion completion) {
+    final revision = completion.revision;
+    if (revision == null) return;
+    final known = _requiredRevision;
+    if (known != null) {
+      final order = revision.compareTo(known);
+      if (order == GraphRevisionOrder.older ||
+          order == GraphRevisionOrder.same) {
+        return;
+      }
+    }
+    _requiredRevision = revision;
+    ++_generation;
+    _needsRead = true;
+    final lifetime = _lifetime;
+    scheduleMicrotask(() {
+      if (ref.mounted && identical(lifetime, _lifetime)) {
+        unawaited(_readIfVisible());
+      }
+    });
+  }
 
-  Future<void> _readSection(
+  Future<void> _markStale() {
+    ++_generation;
+    _needsRead = true;
+    return _readIfVisible();
+  }
+
+  Future<void> _readIfVisible() {
+    if (!_isVisible || !_needsRead) return Future.value();
+    _needsRead = false;
+    final generation = _generation;
+    final selection = state.selection;
+    final current = state.read;
+    final confirmed = current is IntentionStatisticsLoaded
+        ? current.copyWith(breakdowns: _stopPageLoads(current.breakdowns))
+        : null;
+    state = state.withRead(
+      confirmed?.copyWith(
+            refreshStatus: const IntentionStatisticsRefreshing(),
+          ) ??
+          const IntentionStatisticsInitialLoad(),
+    );
+    return _replaceLoaded(generation, selection, confirmed);
+  }
+
+  bool _isCurrent(int generation) =>
+      ref.mounted && generation == _generation && _isVisible;
+
+  bool _precedesRequired(GraphRevision revision) {
+    final required = _requiredRevision;
+    if (required == null) return false;
+    final order = revision.compareTo(required);
+    return order == GraphRevisionOrder.older ||
+        order == GraphRevisionOrder.differentEpoch;
+  }
+
+  Future<void> _replaceLoaded(
     int generation,
     IntentionStatisticsSelection selection,
+    IntentionStatisticsLoaded? confirmed,
   ) async {
+    if (!_isCurrent(generation)) return;
     final IntentionStatisticsSectionResult result;
     try {
       result = await _reader.getIntentionStatisticsSection(
@@ -125,22 +253,106 @@ final class IntentionStatisticsViewModel
       );
     } on Object {
       if (_isCurrent(generation)) {
-        state = state.withRead(
-          const IntentionStatisticsFailure(StatisticsReadUnexpectedFailure()),
+        await _failReplacement(
+          const StatisticsReadUnexpectedFailure(),
+          confirmed,
         );
       }
       return;
     }
     if (!_isCurrent(generation)) return;
+    final IntentionStatisticsSection section;
     switch (result) {
       case GraphResultSuccess(:final value):
-        state = state.withRead(IntentionStatisticsLoaded.first(value));
-      case GraphResultFailure(failure: StatisticsSnapshotExpired()):
-        return _restart(selection);
-      case GraphResultFailure(failure: StatisticsIntentionNotFoundFailure()):
-        state = state.withRead(const IntentionStatisticsNotFound());
+        section = value;
       case GraphResultFailure(:final failure):
-        state = state.withRead(IntentionStatisticsFailure(failure));
+        return _failReplacement(failure, confirmed);
+    }
+    if (_precedesRequired(section.revision)) return _markStale();
+    var replacement = IntentionStatisticsLoaded.first(section);
+
+    Future<StatisticsReadFailure?> restore<T>(
+      IntentionStatisticsBreakdownState<T>? first,
+      IntentionStatisticsBreakdownState<T>? previous,
+      IntentionStatisticsBreakdowns Function(
+        IntentionStatisticsBreakdowns,
+        IntentionStatisticsBreakdownState<T>,
+      )
+      replace,
+    ) async {
+      if (first == null) return null;
+      var page = first;
+      while (page.nextCursor != null &&
+          page.items.length < (previous?.items.length ?? 0)) {
+        final continuation = await _readBreakdown(page.nextCursor!);
+        if (!_isCurrent(generation)) return null;
+        switch (continuation) {
+          case GraphResultSuccess(:final value):
+            if (value.revision.compareTo(section.revision) !=
+                GraphRevisionOrder.same) {
+              return const StatisticsSnapshotExpired();
+            }
+            page = page.append(value);
+          case GraphResultFailure(:final failure):
+            return failure;
+        }
+      }
+      replacement = replacement.copyWith(
+        breakdowns: replace(replacement.breakdowns, page),
+      );
+      return null;
+    }
+
+    var failure = await restore(
+      replacement.breakdowns.sourceIntentions,
+      confirmed?.breakdowns.sourceIntentions,
+      (parts, page) => parts.copyWith(sourceIntentions: page),
+    );
+    if (!_isCurrent(generation)) return;
+    if (failure != null) return _failReplacement(failure, confirmed);
+    failure = await restore(
+      replacement.breakdowns.relations,
+      confirmed?.breakdowns.relations,
+      (parts, page) => parts.copyWith(relations: page),
+    );
+    if (!_isCurrent(generation)) return;
+    if (failure != null) return _failReplacement(failure, confirmed);
+    failure = await restore(
+      replacement.breakdowns.selectedActions,
+      confirmed?.breakdowns.selectedActions,
+      (parts, page) => parts.copyWith(selectedActions: page),
+    );
+    if (!_isCurrent(generation)) return;
+    if (failure != null) return _failReplacement(failure, confirmed);
+    _requiredRevision = section.revision;
+    state = state.withRead(replacement);
+  }
+
+  Future<void> _failReplacement(
+    StatisticsReadFailure failure,
+    IntentionStatisticsLoaded? confirmed,
+  ) {
+    if (failure is StatisticsSnapshotExpired) return _markStale();
+    state = state.withRead(
+      failure is StatisticsIntentionNotFoundFailure
+          ? const IntentionStatisticsNotFound()
+          : confirmed?.copyWith(
+                  refreshStatus: IntentionStatisticsRefreshFailure(failure),
+                ) ??
+                IntentionStatisticsFailure(failure),
+    );
+    return Future.value();
+  }
+
+  Future<IntentionStatisticsBreakdownResult<T>> _readBreakdown<T>(
+    StatisticsBreakdownCursor<T> cursor,
+  ) async {
+    try {
+      return await _reader.getIntentionStatisticsBreakdown(cursor);
+    } on Object {
+      return const IntentionStatisticsBreakdownError(
+        StatisticsReadUnexpectedFailure(),
+      );
     }
   }
 
@@ -150,7 +362,12 @@ final class IntentionStatisticsViewModel
     bool retry = false,
   }) {
     final current = state.read;
-    if (current is! IntentionStatisticsLoaded) return Future.value();
+    if (!_isVisible ||
+        _needsRead ||
+        current is! IntentionStatisticsLoaded ||
+        current.refreshStatus is! IntentionStatisticsRefreshIdle) {
+      return Future.value();
+    }
     return switch (breakdown) {
       StatisticsBreakdown.sourceIntentions => _loadMore(
         current.breakdowns.sourceIntentions,
@@ -199,39 +416,25 @@ final class IntentionStatisticsViewModel
     if (current is! IntentionStatisticsLoaded) return;
     final generation = _generation;
     state = state.withRead(
-      current.withBreakdowns(
-        replace(
+      current.copyWith(
+        breakdowns: replace(
           current.breakdowns,
           breakdown.withPageStatus(const IntentionStatisticsPageLoading()),
         ),
       ),
     );
-    final IntentionStatisticsBreakdownResult<T> result;
-    try {
-      result = await _reader.getIntentionStatisticsBreakdown(cursor);
-    } on Object {
-      if (_isCurrent(generation)) {
-        _publishBreakdown(
-          replace,
-          breakdown.withPageStatus(
-            const IntentionStatisticsPageFailure(
-              StatisticsReadUnexpectedFailure(),
-            ),
-          ),
-        );
-      }
-      return;
-    }
+    if (!_isCurrent(generation)) return;
+    final result = await _readBreakdown(cursor);
     if (!_isCurrent(generation)) return;
     switch (result) {
       case GraphResultSuccess(:final value):
         if (value.revision.compareTo(current.section.revision) !=
             GraphRevisionOrder.same) {
-          return _restart(state.selection);
+          return _markStale();
         }
         _publishBreakdown(replace, breakdown.append(value));
       case GraphResultFailure(failure: StatisticsSnapshotExpired()):
-        return _restart(state.selection);
+        return _markStale();
       case GraphResultFailure(:final failure):
         _publishBreakdown(
           replace,
@@ -251,7 +454,7 @@ final class IntentionStatisticsViewModel
     final current = state.read;
     if (current is! IntentionStatisticsLoaded) return;
     state = state.withRead(
-      current.withBreakdowns(replace(current.breakdowns, breakdown)),
+      current.copyWith(breakdowns: replace(current.breakdowns, breakdown)),
     );
   }
 }

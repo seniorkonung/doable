@@ -66,7 +66,7 @@ final class IntentionStatisticsViewModelProvider
 }
 
 String _$intentionStatisticsViewModelHash() =>
-    r'9a194214054decb95671de71609ecc0f6db019cb';
+    r'8b44d7875bd618f85018be1e4e233f81cbfd0513';
 
 final class IntentionStatisticsViewModelFamily extends $Family
     with
