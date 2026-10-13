@@ -1,10 +1,6 @@
-@Tags(['slow', 'statistics-performance'])
-library;
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
@@ -18,13 +14,14 @@ import 'package:doable/src/statistics/application/statistics_read_contract.dart'
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/contribution_statistics_fixture.dart';
-import '../../support/in_memory_diagnostics_sink.dart';
-import '../../support/local_database_harness.dart';
+import '../support/contribution_statistics_fixture.dart';
+import '../support/benchmark.dart';
+import '../../test/support/in_memory_diagnostics_sink.dart';
+import '../../test/support/local_database_harness.dart';
 
 void main() {
   for (final profile in ContributionStatisticsProfile.values) {
-    test('точность и ограниченная материализация: ${profile.name}', () async {
+    test('бенчмарк сохранённых путей: ${profile.name}', () async {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
       final trace = _StatisticsTrace();
@@ -63,8 +60,8 @@ void main() {
         'journalMode': raw.select('PRAGMA journal_mode').single.values.single!,
         'synchronous': raw.select('PRAGMA synchronous').single.values.single!,
         'tempStore': raw.select('PRAGMA temp_store').single.values.single!,
-        'warmups': 3,
-        'repetitions': 40,
+        'warmups': benchmarkWarmups,
+        'repetitions': benchmarkSamples,
       });
       final repository = DriftPersonalGraphRepository(
         database,
@@ -123,12 +120,19 @@ void main() {
               if (expected.length > 100) ((expected.length - 1) ~/ 100) * 100,
             ];
             for (final offset in offsets) {
+              final benchmarkCase =
+                  '${profile.name}/${archived ? 'archived' : 'active'}/${period is StatisticsMonth ? 'month' : 'year'}/${view.name}/$offset';
+              if (!benchmarkIncludes(benchmarkCase)) continue;
               final queue = <Duration>[];
               final requests = <Duration>[];
               final commands = <Duration>[];
               final cursorPreparation = <Duration>[];
               final sql = <List<Duration>>[];
-              for (var sample = -3; sample < 40; sample++) {
+              for (
+                var sample = -benchmarkWarmups;
+                sample < benchmarkSamples;
+                sample++
+              ) {
                 StatisticsCursor? cursor;
                 StatisticsQuery query() => StatisticsQuery(
                   period: period,
@@ -244,11 +248,11 @@ void main() {
                 'periodChoices': volume.choices,
                 'periodSteps': volume.steps,
                 ...fixture.distribution(period),
-                'queueP95Ms': _p95(queue),
-                'requestP95Ms': _p95(requests),
-                'commandP95Ms': _p95(commands),
-                'cursorPreparationP95Ms': _p95(cursorPreparation),
-                'selectP95Ms': sql.map(_p95).toList(),
+                'queueP95Ms': benchmarkP95(queue),
+                'requestP95Ms': benchmarkP95(requests),
+                'commandP95Ms': benchmarkP95(commands),
+                'cursorPreparationP95Ms': benchmarkP95(cursorPreparation),
+                'selectP95Ms': sql.map(benchmarkP95).toList(),
               });
               // Бюджеты согласованы для двух целевых профилей задачи 1.5.
               final budgetMs = period is StatisticsMonth ? 150 : 1250;
@@ -257,13 +261,7 @@ void main() {
                 ('полное чтение', requests),
                 ('подтверждение команды', commands),
               ]) {
-                expect(
-                  _p95(samples),
-                  lessThanOrEqualTo(budgetMs),
-                  reason:
-                      'p95: $label, ${profile.name}, ${view.name}, '
-                      'порция $offset, период $firstDate — $lastDate',
-                );
+                reportBenchmarkBudget(benchmarkCase, label, samples, budgetMs);
               }
             }
           }
@@ -294,12 +292,6 @@ void _expectItems(
     ),
     expected.skip(offset).take(100),
   );
-}
-
-double _p95(List<Duration> samples) {
-  final sorted = samples.map((duration) => duration.inMicroseconds).toList()
-    ..sort();
-  return sorted[max(0, (sorted.length * 0.95).ceil() - 1)] / 1000;
 }
 
 void _report(Map<String, Object> values) => stdout.writeln(jsonEncode(values));

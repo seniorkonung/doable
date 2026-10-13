@@ -59,6 +59,55 @@ mise run codegen-check-test
 
 ## Pull request checks
 
+`mise run --skip-tools check` runs formatting, analysis, functional tests and
+Widgetbook checks. Benchmarks are separate from this command and
+from automatic test discovery:
+
+```sh
+mise run --skip-tools benchmark
+```
+
+The single benchmark command discovers all `benchmark/**/*_benchmark.dart`
+files, including intention catalog and statistics measurements. The runner
+uses Flutter's test engine for the native database and
+isolate environment. Its files live under `benchmark/`; timing budgets are
+reported as JSON (`withinBudget` or `exceeded`), while incorrect results still
+fail the run. A full run uses 3 warmups and 40 samples per series and can take
+several hours. To verify the harness without drawing performance conclusions:
+
+```sh
+mise run --skip-tools benchmark -- \
+  --dart-define=BENCHMARK_SAMPLES=1 \
+  --dart-define=BENCHMARK_WARMUPS=0
+```
+
+Select a profile with the runner's `--plain-name` and a series with the
+`BENCHMARK_CASE` regular expression. Case names contain the profile,
+`active`/`archived`, `month`/`year`, the view (where applicable), and the series
+or saved-path page offset. For example:
+
+```sh
+mise run --skip-tools benchmark -- \
+  --plain-name 'бенчмарк раздела: longPaths' \
+  --dart-define=BENCHMARK_CASE=longPaths/archived/year/throughRelations/computeRace
+```
+
+The remaining eight `slow` suites were reviewed when benchmarks were separated:
+
+| Suite | Checks retained in regular tests |
+| --- | --- |
+| Intention catalog large fixture | Complete keyset traversal, bounded reads, tag filtering and reconciliation; repeated latency measurements moved to `benchmark/` |
+| Daily choice read cost | Path preservation, bounded page reads, startup reads and a responsive event loop during worker-isolate SQL |
+| Relation group large fixture | Ordering, archive scopes, batched selection and command/revision consistency |
+| Tag catalog read cost | Complete snapshot without omissions |
+| Tag assignment read cost | Complete assignment and selection snapshots |
+| Tagged entities read cost | Complete ordered traversal and bounded materialization |
+| Tag assignment widget read cost | Loaded contents and usable scrolling |
+| Tag navigation widget read cost | Pagination, bounded mounted rows and consistent refresh after mutations |
+
+These functional checks retain `slow` because of their fixtures or traversal
+work. They have no repeated timing measurements or elapsed-time budgets.
+
 Every pull request must pass the single `Full checks` status. Project checks
 always run, while the release APK and packaged Android privacy-manifest check
 run for artifact-impacting or unclassified changes. A documentation-only,

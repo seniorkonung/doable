@@ -1,6 +1,3 @@
-@Tags(['slow', 'statistics-performance'])
-library;
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -23,8 +20,9 @@ import 'package:doable/src/statistics/application/statistics_read_contract.dart'
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/contribution_statistics_fixture.dart';
-import '../../support/local_database_harness.dart';
+import '../support/contribution_statistics_fixture.dart';
+import '../support/benchmark.dart';
+import '../../test/support/local_database_harness.dart';
 
 const _readZone = #statisticsCostRead;
 
@@ -32,7 +30,7 @@ enum _Series { cold, warm, rebuilt, last, readRace, computeRace }
 
 void main() {
   for (final profile in ContributionStatisticsProfile.values) {
-    test('через связи: точность, очередь и подсчёт, ${profile.name}', () async {
+    test('бенчмарк через связи: ${profile.name}', () async {
       final fullRun = Stopwatch()..start();
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
@@ -58,8 +56,8 @@ void main() {
         'graphBytes': fixture.graphBytes,
         ..._volume(fixture, null),
         ...await _environment(raw, harness),
-        'warmups': 3,
-        'repetitions': 40,
+        'warmups': benchmarkWarmups,
+        'repetitions': benchmarkSamples,
       });
       var commandNumber = 0;
       final cycleId = (LongTermRelationId.decode(
@@ -156,6 +154,9 @@ void main() {
             ..._volume(fixture, period),
           });
           for (final series in _Series.values) {
+            final benchmarkCase =
+                '${profile.name}/${archived ? 'archived' : 'active'}/${period is StatisticsMonth ? 'month' : 'year'}/${series.name}';
+            if (!benchmarkIncludes(benchmarkCase)) continue;
             var repository = createRepository();
             var cycleArchived = originalCycleArchived;
             final samples = <String, List<Duration>>{};
@@ -175,7 +176,11 @@ void main() {
             }
             statePreparation.stop();
             var groups = 0, snapshotRows = 0, snapshotPages = 0;
-            for (var sample = -3; sample < 40; sample++) {
+            for (
+              var sample = -benchmarkWarmups;
+              sample < benchmarkSamples;
+              sample++
+            ) {
               final prepareWatch = Stopwatch()..start();
               StatisticsCursor? cursor;
               var offset = 0;
@@ -325,7 +330,7 @@ void main() {
               'snapshotRows': snapshotRows,
               'snapshotPages': snapshotPages,
               for (final MapEntry(key: key, value: values) in samples.entries)
-                '${key}P95Ms': _p95(values),
+                '${key}P95Ms': benchmarkP95(values),
             });
             // Бюджеты Phase 2 установлены после 48 серий замеров задачи 2.7;
             // их обоснование и область действия — в решении 10 дизайна.
@@ -347,13 +352,7 @@ void main() {
             };
             for (final MapEntry(key: key, value: values) in samples.entries) {
               if (budgets[key] case final budget?) {
-                expect(
-                  _p95(values),
-                  lessThanOrEqualTo(budget),
-                  reason:
-                      'p95: $key, ${profile.name}, ${series.name}, '
-                      'архивирование $archived, $period',
-                );
+                reportBenchmarkBudget(benchmarkCase, key, values, budget);
               }
             }
             // После гонки актуальные числа проверяются отдельным запросом;
@@ -486,12 +485,6 @@ Future<Map<String, Object>> _environment(
   ])
     pragma: raw.select('PRAGMA $pragma').single.values.single!,
 };
-
-double _p95(List<Duration> samples) {
-  expect(samples, hasLength(40));
-  final sorted = samples.map((value) => value.inMicroseconds).toList()..sort();
-  return sorted[37] / 1000;
-}
 
 void _report(Map<String, Object> values) => stdout.writeln(jsonEncode(values));
 
