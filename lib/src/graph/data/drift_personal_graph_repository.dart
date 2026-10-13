@@ -41,6 +41,8 @@ import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
 import '../../statistics/application/contribution_counts.dart';
+import '../../statistics/application/intention_statistics_breakdown.dart';
+import '../../statistics/application/intention_statistics_read_contract.dart';
 import '../../statistics/application/statistics_period.dart';
 import '../../statistics/application/statistics_read_contract.dart';
 import '../../tag/application/tag_catalog.dart';
@@ -86,6 +88,7 @@ part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_statistics.dart';
 part 'drift_statistics_relation_snapshot.dart';
 part 'drift_statistics_seed_groups.dart';
+part 'drift_intention_statistics_source.dart';
 part 'drift_through_relations_statistics_reader.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
