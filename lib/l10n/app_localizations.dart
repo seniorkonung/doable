@@ -374,6 +374,84 @@ abstract class AppLocalizations {
   /// **'Could not load more items because of an unexpected error.'**
   String get statisticsLoadMoreUnexpectedFailure;
 
+  /// Название раздела статистики на странице намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics'**
+  String get statisticsSectionTitle;
+
+  /// Заголовок разбивки вклада намерения по исходным намерениям
+  ///
+  /// In en, this message translates to:
+  /// **'By source intentions'**
+  String get statisticsBreakdownSourceIntentions;
+
+  /// Заголовок разбивки вклада намерения по выбранным действиям
+  ///
+  /// In en, this message translates to:
+  /// **'By selected actions'**
+  String get statisticsBreakdownSelectedActions;
+
+  /// Заголовок разбивки вклада по исходящим связям намерения; архивная отметка связи использует relationNeighborhoodRelationArchived, намерения — detailsArchived
+  ///
+  /// In en, this message translates to:
+  /// **'By relations'**
+  String get statisticsBreakdownRelations;
+
+  /// Число запланированных выборов вида «Через связи», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices with this intention on the saved selection path: {count} of {planned}'**
+  String statisticsExplicitPathChoices(int count, int planned);
+
+  /// Доля строки разбивки относительно вклада намерения в выбранном виде, а не всего периода; отношение передаётся без умножения на 100
+  ///
+  /// In en, this message translates to:
+  /// **'Share of this intention’s contribution in this view: {share}'**
+  String statisticsBreakdownContributionShare(num share);
+
+  /// Доступное объяснение отсутствия доли строки разбивки при нулевом вкладе намерения в выбранном виде
+  ///
+  /// In en, this message translates to:
+  /// **'No share: this intention’s contribution in this view is zero'**
+  String get statisticsBreakdownNoContributionShare;
+
+  /// Значение галочки календаря статистики: выполнены все выборы дня, засчитанные намерению в выбранном виде; остальные выборы дня не учитываются
+  ///
+  /// In en, this message translates to:
+  /// **'All credited daily choices are completed'**
+  String get statisticsCalendarDayAllCompleted;
+
+  /// Значение кружка календаря статистики: среди засчитанных намерению выборов дня есть невыполненный
+  ///
+  /// In en, this message translates to:
+  /// **'There is an incomplete credited daily choice'**
+  String get statisticsCalendarDayHasIncomplete;
+
+  /// Доступное состояние дня без отметки: выбранный вид не засчитывает намерению выборов этой даты
+  ///
+  /// In en, this message translates to:
+  /// **'No credited daily choices'**
+  String get statisticsCalendarDayNoChoices;
+
+  /// Доступная подпись дня статистики с полной датой и локализованным состоянием; календарь раздела не выбирает день
+  ///
+  /// In en, this message translates to:
+  /// **'{date}. {dayStatus}'**
+  String statisticsCalendarDaySemantics(DateTime date, String dayStatus);
+
+  /// Доступная подпись столбика года: месяц с годом и обе меры; текущий период обозначается существующей statisticsCurrentPeriod
+  ///
+  /// In en, this message translates to:
+  /// **'{month}. {counts}'**
+  String statisticsMonthBarSemantics(DateTime month, String counts);
+
+  /// Доступная подпись карточки вида: локализованные вид, период и обе меры; выбранное состояние передаётся свойством Semantics.selected. Доля выбранного вида использует statisticsContributionShare или statisticsNoContributionShare; название намерения не переводится, архивная отметка использует detailsArchived
+  ///
+  /// In en, this message translates to:
+  /// **'{view}. {period}. {counts}'**
+  String statisticsViewCardSemantics(String view, String period, String counts);
+
   /// Доступное название кнопки быстрого создания
   ///
   /// In en, this message translates to:

@@ -237,6 +237,81 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load more items because of an unexpected error.';
 
   @override
+  String get statisticsSectionTitle => 'Statistics';
+
+  @override
+  String get statisticsBreakdownSourceIntentions => 'By source intentions';
+
+  @override
+  String get statisticsBreakdownSelectedActions => 'By selected actions';
+
+  @override
+  String get statisticsBreakdownRelations => 'By relations';
+
+  @override
+  String statisticsExplicitPathChoices(int count, int planned) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
+
+    return 'Daily choices with this intention on the saved selection path: $countString of $plannedString';
+  }
+
+  @override
+  String statisticsBreakdownContributionShare(num share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return 'Share of this intention’s contribution in this view: $shareString';
+  }
+
+  @override
+  String get statisticsBreakdownNoContributionShare =>
+      'No share: this intention’s contribution in this view is zero';
+
+  @override
+  String get statisticsCalendarDayAllCompleted =>
+      'All credited daily choices are completed';
+
+  @override
+  String get statisticsCalendarDayHasIncomplete =>
+      'There is an incomplete credited daily choice';
+
+  @override
+  String get statisticsCalendarDayNoChoices => 'No credited daily choices';
+
+  @override
+  String statisticsCalendarDaySemantics(DateTime date, String dayStatus) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.yMMMMEEEEd(
+      localeName,
+    );
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString. $dayStatus';
+  }
+
+  @override
+  String statisticsMonthBarSemantics(DateTime month, String counts) {
+    final intl.DateFormat monthDateFormat = intl.DateFormat.yMMMM(localeName);
+    final String monthString = monthDateFormat.format(month);
+
+    return '$monthString. $counts';
+  }
+
+  @override
+  String statisticsViewCardSemantics(
+    String view,
+    String period,
+    String counts,
+  ) {
+    return '$view. $period. $counts';
+  }
+
+  @override
   String get quickCreationLabel => 'Quick create';
 
   @override
