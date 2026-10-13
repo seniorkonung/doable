@@ -30,7 +30,7 @@ accepted ADRs are immutable.
 
 ## Additional Context
 
-- ADR-0026–ADR-0028 — proposed, originating change `add-contribution-statistics` из параллельной ветки; в этой ветке их файлов нет. Они не связаны с оформлением, но их номера заняты, поэтому запись этого изменения получила номер 0029.
+- ADR-0026–ADR-0028 — proposed, originating change `add-contribution-statistics`. Они не связаны с оформлением, но их номера заняты, поэтому запись этого изменения получила номер 0029. Обе ветки добавляют строки в индекс ADR, и при слиянии второй ветки индекс сводится по номерам.
 
 ## ADRs Owned by This Change
 

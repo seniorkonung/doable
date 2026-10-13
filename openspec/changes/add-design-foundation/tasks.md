@@ -2,28 +2,29 @@
 
 - [ ] 1.1 Поставить один файл Inter как семейство `Inter` приложения, с лицензией и записанной контрольной суммой
   - **Критерии приёмки:**
-    - В `lib/src/design_system/fonts/` лежат два файла: вариативный файл прямого начертания из официального выпуска Inter с осями `wght` и `opsz` и текст лицензии SIL Open Font License 1.1. Рядом записаны версия выпуска, источник и SHA-256 файла.
-    - `pubspec.yaml` приложения объявляет семейство `Inter` этим файлом и включает лицензию в ассеты. Новых пакетов и разрешений нет.
+    - В `lib/src/design_system/fonts/` лежат:
+      - файл шрифта — вариативный файл прямого начертания из официального выпуска Inter с осями `wght` и `opsz`;
+      - текст лицензии SIL Open Font License 1.1;
+      - описание выпуска с версией, источником и SHA-256 файла.
+    - `pubspec.yaml` приложения объявляет семейство `Inter` этим файлом, а лицензию — в списке `flutter: licenses:` (решение 6 [дизайна](design.md)). Новых пакетов и разрешений нет.
     - Приложение семейство пока не использует, поэтому его внешний вид не меняется.
   - **Проверка:**
     - `fc-query lib/src/design_system/fonts/<файл>` показывает оси `wght` и `opsz`, а `sha256sum` совпадает с записанной суммой.
-    - `mise exec --no-deps -- flutter test test/design_system/inter_font_asset_test.dart`: в `FontManifest.json` есть семейство `Inter` с этим файлом, файл лицензии загружается из ассетов.
+    - `mise exec --no-deps -- flutter analyze`; наличие лицензии в сборке подтверждает сборка release APK в задаче 1.8.
   - **Зависимости:** нет.
-  - **Вероятные файлы:**
-    - `pubspec.yaml`;
-    - новые файлы шрифта, лицензии и описания выпуска в `lib/src/design_system/fonts/`;
-    - новый `test/design_system/inter_font_asset_test.dart`.
+  - **Вероятные файлы:** `pubspec.yaml`; новые файлы шрифта, лицензии и описания выпуска в `lib/src/design_system/fonts/`.
   - **Размер:** S.
 
 - [ ] 1.2 Описать палитру дизайн-системы расширением темы `DoableColors` для светлой и тёмной тем
   - **Критерии приёмки:**
     - `DoableColors` (`ThemeExtension`) содержит все цветовые токены дизайн-системы под именами токенов в camelCase. Есть два экземпляра, для светлой и тёмной тем, со значениями из `tokens.json`.
+    - Набор токенов перечислен один раз, и компилятор требует значение каждого токена в обеих темах. Поэтому `copyWith`, `lerp` и список «имя токена — цвет» для страницы цветов Widgetbook охватывают все токены.
     - Алиасы `p1`, `danger`, `dangerSoft` и `onDanger` — вычисляемые свойства по [ADR-0029](../../../docs/adr/0029-represent-design-system-as-foundation-module.md).
-    - `copyWith` и `lerp` охватывают все поля. Палитра доступна списком «имя токена — цвет» в порядке дизайн-системы: из него Widgetbook строит страницу цветов.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/design_system/doable_colors_test.dart`. Проверяется по каждому токену списка: `lerp` на краях возвращает исходные палитры, `copyWith` без аргументов сохраняет цвета, алиасы совпадают со своей основой.
+    - `mise exec --no-deps -- flutter analyze`: пропущенный токен — ошибка компиляции.
+    - Значения сверяются с `tokens.json` в задаче 1.7.
   - **Зависимости:** нет.
-  - **Вероятные файлы:** новые `lib/src/design_system/doable_colors.dart`, `test/design_system/doable_colors_test.dart`.
+  - **Вероятные файлы:** новый `lib/src/design_system/doable_colors.dart`.
   - **Размер:** S.
 
 - [ ] 1.3 Описать стили текста `DoableType` на Inter так, как их рисуют макеты
@@ -33,13 +34,14 @@
       - кегль и отношение высоты строки к кеглю;
       - `TextLeadingDistribution.even`;
       - межбуквенный интервал в логических пикселях;
-      - вес через `FontWeight`, включая 650.
-    - Каждый стиль задаёт `FontVariation.opticalSize`, равный кеглю, и не задаёт `FontVariation('wght')`, поэтому `copyWith(fontWeight: …)` меняет вес (решение 6 [дизайна](design.md)).
-    - Ни один стиль не меньше 13 логических пикселей. Стили доступны списком «имя — стиль» для страницы типографики Widgetbook.
+      - вес токена через `FontWeight`, от 400 до 700.
+    - Каждый стиль задаёт `FontVariation.opticalSize`, равный кеглю, и не задаёт `FontVariation('wght')`. Поэтому `copyWith(fontWeight: …)` меняет вес, в том числе на 650 у будущих компонентов (решение 6 [дизайна](design.md)).
+    - Набор стилей перечислен один раз, и компилятор требует определение каждого стиля. Стили доступны списком «имя — стиль» для страницы типографики Widgetbook.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/design_system/doable_type_test.dart`: для каждого стиля списка выполняются правила семейства, оптического размера, отсутствия вариации веса и минимального кегля.
+    - `mise exec --no-deps -- flutter analyze`.
+    - Вид стилей сверяется с макетами в задаче 1.7.
   - **Зависимости:** 1.1, семейство `Inter`.
-  - **Вероятные файлы:** новые `lib/src/design_system/doable_type.dart`, `test/design_system/doable_type_test.dart`.
+  - **Вероятные файлы:** новый `lib/src/design_system/doable_type.dart`.
   - **Размер:** S.
 
 - [ ] 1.4 Строить из токенов светлую и тёмную `ThemeData` с оформлением используемых виджетов Material
@@ -48,29 +50,24 @@
       - `ColorScheme` и `TextTheme` построены по таблицам решений 3 и 6 [дизайна](design.md);
       - семейство — `Inter`;
       - расширение `DoableColors` той же яркости.
-    - Темы виджетов из решения 4 задают минимальные, а не фиксированные размеры (решение 7). Шкалы отступов и радиусов и минимальная высота кнопок — константы модуля с именами токенов.
-    - Приложение функцию пока не использует.
+    - Темы виджетов из решения 4 реализованы, включая значки `AppBar`, ручку модальных нижних панелей и выключенный переключатель. Они задают минимальные, а не фиксированные размеры (решение 7).
+    - Шкалы отступов и радиусов и минимальная высота кнопок — константы модуля с именами токенов. Приложение функцию пока не использует.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/design_system/doable_theme_test.dart`. Для каждой яркости проверяется:
-      - яркость схемы совпадает с яркостью расширения;
-      - роли текста используют семейство `Inter`;
-      - ни одна роль текста не меньше 13.
     - `mise exec --no-deps -- flutter analyze`.
+    - Вид тем проверяется в Widgetbook в задачах 1.5–1.7.
   - **Зависимости:** 1.2, 1.3.
-  - **Вероятные файлы:** новые `lib/src/design_system/doable_theme.dart`, `lib/src/design_system/doable_metrics.dart`, `test/design_system/doable_theme_test.dart`.
+  - **Вероятные файлы:** новые `lib/src/design_system/doable_theme.dart`, `lib/src/design_system/doable_metrics.dart`.
   - **Размер:** M.
 
 - [ ] 1.5 Показывать компоненты Widgetbook в светлой и тёмной темах приложения с настоящим Inter
   - **Критерии приёмки:**
     - Дополнение темы Widgetbook предлагает светлую и тёмную темы из модуля вместо `ThemeData()`. Комментарий о теме по умолчанию описывает новое состояние.
     - `widgetbook/pubspec.yaml` объявляет семейство `Inter` тем же файлом шрифта через путь `packages/doable/…`, без копии (решение 8 [дизайна](design.md)).
-    - Существующие примеры и проверка масштаба текста до 2.5 работают в обеих темах.
   - **Проверка:**
-    - В каталоге `widgetbook/` — `mise exec --no-deps -- flutter test`:
-      - пример панели навигации строится в теме с расширением `DoableColors`;
-      - манифест шрифтов каталога содержит семейство `Inter`.
+    - `mise run widgetbook`: существующие примеры показаны в обеих темах, текст набран Inter, а не запасным шрифтом, в том числе при масштабе текста 2.5.
+    - Существующие тесты Widgetbook проходят: в каталоге `widgetbook/` — `mise exec --no-deps -- flutter test`.
   - **Зависимости:** 1.1, 1.4.
-  - **Вероятные файлы:** `widgetbook/lib/widgetbook_app.dart`, `widgetbook/pubspec.yaml`, `widgetbook/test/widgetbook_app_test.dart`.
+  - **Вероятные файлы:** `widgetbook/lib/widgetbook_app.dart`, `widgetbook/pubspec.yaml`.
   - **Размер:** S.
 
 - [ ] 1.6 Добавить в Widgetbook раздел «Основы» с цветами и типографикой из модуля
@@ -80,13 +77,11 @@
       - каждый стиль `DoableType` с именем и образцом текста на русском и английском.
     - Примеры строятся из списков модуля и не повторяют значений.
   - **Проверка:**
-    - В каталоге `widgetbook/` — `mise exec --no-deps -- flutter test`: раздел «Основы» и оба примера строятся в светлой и тёмной темах и при масштабе текста 2.5 без ошибок раскладки.
+    - `mise run widgetbook`: раздел «Основы» и оба примера открываются в светлой и тёмной темах.
+    - Существующие тесты Widgetbook проходят.
   - **Зависимости:** 1.2, 1.3, 1.5.
-  - **Вероятные файлы:**
-    - `widgetbook/lib/catalog.dart`;
-    - новые `widgetbook/lib/foundations/colors_use_cases.dart`, `widgetbook/lib/foundations/typography_use_cases.dart`;
-    - `widgetbook/test/widgetbook_app_test.dart`.
-  - **Размер:** M.
+  - **Вероятные файлы:** `widgetbook/lib/catalog.dart`; новые `widgetbook/lib/foundations/colors_use_cases.dart`, `widgetbook/lib/foundations/typography_use_cases.dart`.
+  - **Размер:** S.
 
 - [ ] 1.7 Сверить основы в каталоге с отрисованными макетами и устранить расхождения
   - **Критерии приёмки:**
@@ -95,8 +90,7 @@
     - Снимки и материалы дизайна в репозиторий не попадают.
   - **Проверка:**
     - `mise run widgetbook`.
-    - Отрисовка состояний headless-браузером по порядку из README приватных материалов и сравнение снимков в обеих темах.
-    - Повторный прогон тестов задач 1.2–1.6 после исправлений.
+    - Состояния отрисованы headless-браузером по порядку из README приватных материалов, снимки сравнены в обеих темах.
   - **Зависимости:** 1.6.
   - **Вероятные файлы:** только при расхождениях — `lib/src/design_system/doable_colors.dart`, `lib/src/design_system/doable_type.dart`, `lib/src/design_system/doable_theme.dart`.
   - **Размер:** S.
@@ -107,7 +101,7 @@
     - Проверки репозитория проходят, а приложение выглядит как до изменения.
   - **Проверка:**
     - `mise run check`, `mise run codegen-check`.
-    - Как в CI: `mise exec --no-deps -- flutter build apk --release` и `dart run tool/check_android_privacy_manifest.dart <aapt2> <apk>`. Набор разрешений release APK не изменился.
+    - Как в CI: `mise exec --no-deps -- flutter build apk --release` и `dart run tool/check_android_privacy_manifest.dart <aapt2> <apk>`. Сборка проходит с объявленной лицензией шрифта, набор разрешений release APK не изменился.
     - `openspec validate add-design-foundation --strict --no-interactive`.
   - **Зависимости:** 1.1–1.7.
   - **Вероятные файлы:** нет, только проверка.
