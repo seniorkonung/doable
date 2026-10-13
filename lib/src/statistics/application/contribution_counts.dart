@@ -1,4 +1,4 @@
-/// Нарушен числовой инвариант прочитанной статистики. На границе чтения
+/// Нарушен инвариант прочитанной статистики. На границе чтения
 /// адаптер преобразует это исключение в отказ повреждения всего результата.
 final class StatisticsDataValidationException implements Exception {
   const StatisticsDataValidationException();
