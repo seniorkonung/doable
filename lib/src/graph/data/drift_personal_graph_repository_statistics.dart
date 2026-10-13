@@ -27,13 +27,13 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
             _ => throw const StatisticsSnapshotExpired(),
           };
           final summary = cursor == null
-              ? await _readStatisticsSummary(query)
+              ? await _readStatisticsSummary(query.period, query.localDate)
               : null;
           final aggregate = _statisticsAggregate(
             query.view,
             includeTotal: cursor == null,
           );
-          final variables = _statisticsPeriodVariables(query);
+          final variables = _statisticsPeriodVariables(query.period);
           // Сравнение полного ключа сохраняет порядок равных вкладов:
           // https://www.sqlite.org/rowvalue.html#scrolling_window_queries
           final boundary = cursor == null
@@ -173,7 +173,8 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
   }
 
   Future<StatisticsPeriodSummary> _readStatisticsSummary(
-    StatisticsQuery query,
+    StatisticsPeriod period,
+    CalendarDate localDate,
   ) async {
     // Группы дат и выполнения ограничены календарным периодом. Декодирование
     // проверяет необходимые значения, не материализуя выборы и их пути.
@@ -186,9 +187,9 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
          WHERE choice_date BETWEEN ? AND ?
          GROUP BY choice_date, is_completed''',
           variables: [
-            Variable<String>(query.localDate.toCanonicalString()),
-            Variable<String>(query.localDate.toCanonicalString()),
-            ..._statisticsPeriodVariables(query),
+            Variable<String>(localDate.toCanonicalString()),
+            Variable<String>(localDate.toCanonicalString()),
+            ..._statisticsPeriodVariables(period),
           ],
           readsFrom: {_database.dailyChoices},
         )
@@ -232,9 +233,9 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
   }
 }
 
-List<Variable> _statisticsPeriodVariables(StatisticsQuery query) => [
-  Variable<String>(query.period.firstDate.toCanonicalString()),
-  Variable<String>(query.period.lastDate.toCanonicalString()),
+List<Variable> _statisticsPeriodVariables(StatisticsPeriod period) => [
+  Variable<String>(period.firstDate.toCanonicalString()),
+  Variable<String>(period.lastDate.toCanonicalString()),
 ];
 
 String _statisticsAggregate(StatisticsView view, {required bool includeTotal}) {
