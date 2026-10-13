@@ -30,6 +30,8 @@
   "@statisticsIntermediateIntentions": {"description": "Вид статистики по промежуточным намерениям сохранённого пути"},
   "statisticsSelectedActions": "Selected actions",
   "@statisticsSelectedActions": {"description": "Вид статистики по выбранным действиям"},
+  "statisticsThroughRelations": "Through relations",
+  "@statisticsThroughRelations": {"description": "Вид статистики по сохранённому пути и текущим активным связям"},
   "statisticsMonthTab": "Month",
   "@statisticsMonthTab": {"description": "Вкладка статистики календарного месяца"},
   "statisticsYearTab": "Year",

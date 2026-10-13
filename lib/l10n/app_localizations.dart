@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'Selected actions'**
   String get statisticsSelectedActions;
 
+  /// Вид статистики по сохранённому пути и текущим активным связям
+  ///
+  /// In en, this message translates to:
+  /// **'Through relations'**
+  String get statisticsThroughRelations;
+
   /// Вкладка статистики календарного месяца
   ///
   /// In en, this message translates to:
