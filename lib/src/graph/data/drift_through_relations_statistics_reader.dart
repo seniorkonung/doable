@@ -18,14 +18,12 @@ runContributionReachabilityInIsolate(
   List<ContributionSeedGroup> groups,
 ) => Isolate.run(() => computeContributionReachability(graph, groups));
 
-/// Внутренняя сборка адаптера. Публичная маршрутизация вида подключается
-/// после подтверждения производительности; здесь вид задан самим чтением.
-extension DriftThroughRelationsStatisticsReading
-    on DriftPersonalGraphRepository {
+/// Внутренняя сборка чтения вида «Через связи» за общей границей репозитория.
+extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
   /// Одна попытка: подготовка и названия идут через общую очередь, подсчёт —
   /// вне неё. Устаревание, включая вытеснение кэша, требует новой первой порции.
   /// Курсор связан со всеми условиями [query] и ревизией, включая эпоху.
-  Future<StatisticsPageResult> readThroughRelationsStatisticsPage(
+  Future<StatisticsPageResult> _readThroughRelationsStatisticsPage(
     StatisticsQuery query,
   ) async {
     try {

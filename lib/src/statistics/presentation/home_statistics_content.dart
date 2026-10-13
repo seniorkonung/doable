@@ -341,6 +341,7 @@ final class _ViewButton extends StatelessWidget {
       StatisticsView.intermediateIntentions =>
         texts.statisticsIntermediateIntentions,
       StatisticsView.selectedActions => texts.statisticsSelectedActions,
+      StatisticsView.throughRelations => texts.statisticsThroughRelations,
     };
     final colors = Theme.of(context).colorScheme;
     return MergeSemantics(

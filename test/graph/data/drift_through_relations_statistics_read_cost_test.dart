@@ -164,8 +164,7 @@ void main() {
             StatisticsQuery query([StatisticsCursor? cursor]) =>
                 StatisticsQuery(
                   period: period,
-                  // Внутренний reader задаёт вид сам; публичный enum расширяется в 2.9.
-                  view: StatisticsView.sourceIntentions,
+                  view: StatisticsView.throughRelations,
                   localDate: CalendarDate.fromParts(2026, 6, 15),
                   pageSize: 100,
                   cursor: cursor,
@@ -200,9 +199,7 @@ void main() {
                   final lastOffset = ((preceding.length - 1) ~/ 100) * 100;
                   while (offset < lastOffset) {
                     final page = _page(
-                      await repository.readThroughRelationsStatisticsPage(
-                        query(cursor),
-                      ),
+                      await repository.getStatisticsPage(query(cursor)),
                     );
                     _expectPage(page, preceding, offset, volume);
                     cursor = page.nextCursor;
@@ -243,9 +240,7 @@ void main() {
                   : null;
               final requestWatch = Stopwatch()..start();
               final result = await runZoned(
-                () => repository.readThroughRelationsStatisticsPage(
-                  query(cursor),
-                ),
+                () => repository.getStatisticsPage(query(cursor)),
                 zoneValues: {_readZone: true},
               );
               requestWatch.stop();
@@ -363,9 +358,7 @@ void main() {
             }
             // После гонки актуальные числа проверяются отдельным запросом;
             // его время не смешивается с отклонённой попыткой.
-            final actual = _page(
-              await repository.readThroughRelationsStatisticsPage(query()),
-            );
+            final actual = _page(await repository.getStatisticsPage(query()));
             _expectPage(actual, expected[cycleArchived]!, 0, volume);
             // Восстановление исходного состояния тоже проходит через команду.
             if (cycleArchived != originalCycleArchived) {

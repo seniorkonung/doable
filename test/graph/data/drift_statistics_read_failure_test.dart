@@ -23,9 +23,12 @@ void main() {
   late InMemoryDiagnosticsSink diagnostics;
   late _FailureProbe probe;
 
-  StatisticsQuery query({StatisticsPeriod? period}) => StatisticsQuery(
+  StatisticsQuery query({
+    StatisticsPeriod? period,
+    StatisticsView view = StatisticsView.sourceIntentions,
+  }) => StatisticsQuery(
     period: period ?? StatisticsMonth(2026, 2),
-    view: StatisticsView.sourceIntentions,
+    view: view,
     localDate: CalendarDate.fromParts(2026, 2, 12),
     pageSize: 100,
   );
@@ -167,7 +170,9 @@ void main() {
           probe.failureStage = stage;
         }
         expectFailure(
-          await repository.readThroughRelationsStatisticsPage(query()),
+          await repository.getStatisticsPage(
+            query(view: StatisticsView.throughRelations),
+          ),
           category,
           stage,
         );

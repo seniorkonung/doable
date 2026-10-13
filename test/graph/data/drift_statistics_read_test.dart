@@ -228,7 +228,11 @@ void main() {
           isA<GraphCommandSucceeded>(),
         );
       }
-      for (final view in StatisticsView.values) {
+      for (final view in const [
+        StatisticsView.sourceIntentions,
+        StatisticsView.intermediateIntentions,
+        StatisticsView.selectedActions,
+      ]) {
         final page = await first(view);
         expect(page.items, isNotEmpty);
         for (final item in page.items) {
@@ -281,7 +285,11 @@ void main() {
         );
       }
     }
-    for (final view in StatisticsView.values) {
+    for (final (view, offset) in const [
+      (StatisticsView.sourceIntentions, 0),
+      (StatisticsView.intermediateIntentions, 1),
+      (StatisticsView.selectedActions, 2),
+    ]) {
       final page = await first(view, pageSize: 2);
       expect(page.totalItems, 6);
       expect(page.items, hasLength(2));
@@ -310,11 +318,6 @@ void main() {
         items.addAll(continuation.items);
         cursor = continuation.nextCursor;
       }
-      final offset = switch (view) {
-        StatisticsView.sourceIntentions => 0,
-        StatisticsView.intermediateIntentions => 1,
-        StatisticsView.selectedActions => 2,
-      };
       expect(items.map((item) => item.id), [
         for (final number in [10, 20, 40, 30, 60, 50])
           durabilityIntention(number + offset),
@@ -348,6 +351,7 @@ void main() {
     for (final changed in [
       query(period: StatisticsYear(2026)),
       query(view: StatisticsView.sourceIntentions),
+      query(view: StatisticsView.throughRelations),
       query(localDate: CalendarDate.fromParts(2026, 10, 13)),
       query(pageSize: 2),
     ]) {

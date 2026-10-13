@@ -5,6 +5,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -31,7 +32,7 @@ void main() {
     StatisticsPeriod? period,
     CalendarDate? localDate,
     int pageSize = 2,
-    StatisticsView view = StatisticsView.sourceIntentions,
+    StatisticsView view = StatisticsView.throughRelations,
   }) => StatisticsQuery(
     period: period ?? StatisticsMonth(2026, 9),
     view: view,
@@ -74,8 +75,9 @@ void main() {
         await repository.execute(ArchiveIntention(durabilityIntention(2))),
         isA<GraphCommandSucceeded>(),
       );
+      final PersonalGraphRepository publicRepository = repository;
       final first = _page(
-        await repository.readThroughRelationsStatisticsPage(query()),
+        await publicRepository.getStatisticsPage(query()),
       ) as StatisticsFirstPage;
       expect(first.summary.counts.planned, 1);
       expect(first.summary.counts.contribution, 1);
@@ -89,9 +91,7 @@ void main() {
       expect(first.items.last.archiveState, IntentionArchiveState.archived);
       expect(first.items.last.title, 'Намерение 2');
       final last = _page(
-        await repository.readThroughRelationsStatisticsPage(
-          query(cursor: first.nextCursor),
-        ),
+        await repository.getStatisticsPage(query(cursor: first.nextCursor)),
       );
       expect(last, isA<StatisticsContinuationPage>());
       expect(last.items.single.id, durabilityIntention(1));
@@ -109,7 +109,7 @@ void main() {
 
   test('пустой период даёт подтверждённую нулевую первую порцию', () async {
     final page = _page(
-      await repository.readThroughRelationsStatisticsPage(
+      await repository.getStatisticsPage(
         query(period: StatisticsMonth(2026, 10)),
       ),
     ) as StatisticsFirstPage;
@@ -137,7 +137,7 @@ void main() {
         },
       );
       var completed = false;
-      final reading = repository.readThroughRelationsStatisticsPage(query())
+      final reading = repository.getStatisticsPage(query())
         ..then((_) => completed = true);
       final gate = await release as SendPort;
       addTearDown(() => gate.send(null));
@@ -174,7 +174,7 @@ void main() {
       );
 
       final fresh = _page(
-        await repository.readThroughRelationsStatisticsPage(query()),
+        await repository.getStatisticsPage(query()),
       ) as StatisticsFirstPage;
       expect(fresh.summary.counts.contribution, 0);
       expect(
@@ -190,17 +190,13 @@ void main() {
   test(
     'первая порция и продолжение переиспользуют количества на одной ревизии',
     () async {
-      final first = _page(
-        await repository.readThroughRelationsStatisticsPage(query()),
-      );
+      final first = _page(await repository.getStatisticsPage(query()));
       final cached = _page(
-        await repository.readThroughRelationsStatisticsPage(query(pageSize: 1)),
+        await repository.getStatisticsPage(query(pageSize: 1)),
       );
       expect(cached.items.single.id, first.items.first.id);
       final last = _page(
-        await repository.readThroughRelationsStatisticsPage(
-          query(cursor: first.nextCursor),
-        ),
+        await repository.getStatisticsPage(query(cursor: first.nextCursor)),
       );
       expect(last.items.single.id, durabilityIntention(1));
       expect(probe.sourceReads, 1);
@@ -211,33 +207,27 @@ void main() {
   );
 
   test('кэш ограничен двумя результатами, продолжение вытесненного не пересчитывается', () async {
-    final first = _page(
-      await repository.readThroughRelationsStatisticsPage(query()),
-    );
+    final first = _page(await repository.getStatisticsPage(query()));
     final year = _page(
-      await repository.readThroughRelationsStatisticsPage(
-        query(period: StatisticsYear(2026)),
-      ),
+      await repository.getStatisticsPage(query(period: StatisticsYear(2026))),
     );
-    await repository.readThroughRelationsStatisticsPage(
+    await repository.getStatisticsPage(
       query(period: StatisticsMonth(2026, 10)),
     );
     _expectExpired(
-      await repository.readThroughRelationsStatisticsPage(
-        query(cursor: first.nextCursor),
-      ),
+      await repository.getStatisticsPage(query(cursor: first.nextCursor)),
     );
     expect(probe.sourceReads, 3);
     expect(_computations(diagnostics), 3);
     final continued = _page(
-      await repository.readThroughRelationsStatisticsPage(
+      await repository.getStatisticsPage(
         query(period: StatisticsYear(2026), cursor: year.nextCursor),
       ),
     );
     expect(continued.items.single.id, durabilityIntention(1));
     expect(probe.sourceReads, 3);
     expect(_computations(diagnostics), 3);
-    await repository.readThroughRelationsStatisticsPage(query());
+    await repository.getStatisticsPage(query());
     expect(probe.sourceReads, 4);
     expect(_computations(diagnostics), 4);
   });
@@ -255,10 +245,10 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     final today = _page(
-      await repository.readThroughRelationsStatisticsPage(query()),
+      await repository.getStatisticsPage(query()),
     ) as StatisticsFirstPage;
     final tomorrow = _page(
-      await repository.readThroughRelationsStatisticsPage(
+      await repository.getStatisticsPage(
         query(localDate: CalendarDate.fromParts(2026, 9, 24)),
       ),
     ) as StatisticsFirstPage;
@@ -271,9 +261,7 @@ void main() {
   });
 
   test('курсор отклоняется при смене условий, вида чтения и эпохи', () async {
-    final first = _page(
-      await repository.readThroughRelationsStatisticsPage(query()),
-    );
+    final first = _page(await repository.getStatisticsPage(query()));
     final cursor = first.nextCursor;
     for (final changed in [
       query(cursor: cursor, period: StatisticsYear(2026)),
@@ -281,15 +269,10 @@ void main() {
       query(cursor: cursor, pageSize: 1),
       query(cursor: cursor, view: StatisticsView.selectedActions),
     ]) {
-      _expectExpired(
-        await repository.readThroughRelationsStatisticsPage(changed),
-      );
+      _expectExpired(await repository.getStatisticsPage(changed));
     }
-    _expectExpired(await repository.getStatisticsPage(query(cursor: cursor)));
     final newEpoch = createRepository();
-    _expectExpired(
-      await newEpoch.readThroughRelationsStatisticsPage(query(cursor: cursor)),
-    );
+    _expectExpired(await newEpoch.getStatisticsPage(query(cursor: cursor)));
     expect(probe.sourceReads, 1);
     expect(_computations(diagnostics), 1);
     expect(probe.titleRows, [2]);
@@ -298,23 +281,19 @@ void main() {
   test(
     'подтверждённая команда отклоняет продолжение до чтения названий',
     () async {
-      final first = _page(
-        await repository.readThroughRelationsStatisticsPage(query()),
-      );
+      final first = _page(await repository.getStatisticsPage(query()));
       expect(
         await repository.execute(ArchiveIntention(durabilityIntention(2))),
         isA<GraphCommandSucceeded>(),
       );
       _expectExpired(
-        await repository.readThroughRelationsStatisticsPage(
-          query(cursor: first.nextCursor),
-        ),
+        await repository.getStatisticsPage(query(cursor: first.nextCursor)),
       );
       expect(probe.titleRows, [2]);
       expect(probe.sourceReads, 1);
       expect(_computations(diagnostics), 1);
       final fresh = _page(
-        await repository.readThroughRelationsStatisticsPage(query()),
+        await repository.getStatisticsPage(query()),
       ) as StatisticsFirstPage;
       expect(fresh.totalItems, 3);
       expect(fresh.items.last.archiveState, IntentionArchiveState.archived);

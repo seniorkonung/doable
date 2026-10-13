@@ -1,8 +1,11 @@
 part of 'drift_personal_graph_repository.dart';
 
+enum _SavedPathStatisticsView { source, intermediate, selected }
+
 extension _StatisticsReading on DriftPersonalGraphRepository {
   Future<StatisticsPageResult> _readStatisticsPage(
     StatisticsQuery query,
+    _SavedPathStatisticsView view,
   ) async {
     var stage = StatisticsReadDiagnosticsStage.sourceData;
     final stopwatch = Stopwatch()..start();
@@ -30,7 +33,7 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
               ? await _readStatisticsSummary(query.period, query.localDate)
               : null;
           final aggregate = _statisticsAggregate(
-            query.view,
+            view,
             includeTotal: cursor == null,
           );
           final variables = _statisticsPeriodVariables(query.period);
@@ -245,17 +248,20 @@ List<Variable> _statisticsPeriodVariables(StatisticsPeriod period) => [
   Variable<String>(period.lastDate.toCanonicalString()),
 ];
 
-String _statisticsAggregate(StatisticsView view, {required bool includeTotal}) {
+String _statisticsAggregate(
+  _SavedPathStatisticsView view, {
+  required bool includeTotal,
+}) {
   final id = switch (view) {
-    StatisticsView.sourceIntentions => 'c.source_intention_id',
-    StatisticsView.intermediateIntentions => 'r.related_intention_id',
-    StatisticsView.selectedActions => 'c.selected_intention_id',
+    _SavedPathStatisticsView.source => 'c.source_intention_id',
+    _SavedPathStatisticsView.intermediate => 'r.related_intention_id',
+    _SavedPathStatisticsView.selected => 'c.selected_intention_id',
   };
-  final path = view == StatisticsView.intermediateIntentions
+  final path = view == _SavedPathStatisticsView.intermediate
       ? '''JOIN daily_choice_path_steps s ON s.daily_choice_id = c.id
          JOIN long_term_relations r ON r.id = s.long_term_relation_id'''
       : '';
-  final intermediate = view == StatisticsView.intermediateIntentions
+  final intermediate = view == _SavedPathStatisticsView.intermediate
       ? 'AND r.related_intention_id <> c.selected_intention_id'
       : '';
   // Простой сохранённый путь содержит промежуточное намерение один раз.

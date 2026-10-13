@@ -60,7 +60,25 @@ void main() {
         greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
       );
     }
-    expect(find.text('Через связи'), findsNothing);
+    final views = [
+      texts.statisticsSourceIntentions,
+      texts.statisticsIntermediateIntentions,
+      texts.statisticsSelectedActions,
+      texts.statisticsThroughRelations,
+    ];
+    for (var i = 1; i < views.length; ++i) {
+      final previous = tester.getTopLeft(
+        find.widgetWithText(TextButton, views[i - 1]),
+      );
+      final current = tester.getTopLeft(
+        find.widgetWithText(TextButton, views[i]),
+      );
+      expect(
+        current.dy > previous.dy ||
+            (current.dy == previous.dy && current.dx > previous.dx),
+        isTrue,
+      );
+    }
 
     await tester.tap(find.text(texts.statisticsIntermediateIntentions));
     await tester.pump();
@@ -72,6 +90,7 @@ void main() {
   ) async {
     final harness = _Harness(
       _data([_item(1, 'Читать книги', 0, 2)], summary: _summary(0, 2, 0, 2)),
+      view: StatisticsView.throughRelations,
     );
     await harness.pump(tester);
     final texts = harness.texts(tester);
@@ -85,22 +104,23 @@ void main() {
   });
 
   testWidgets(
-    'промежуточные намерения получают полный вклад без нормализации',
+    'через связи один выбор даёт каждому намерению полный вклад и долю 100%',
     (tester) async {
       final harness = _Harness(
         _data([
-          _item(1, 'Вечерний ритуал', 1, 1),
+          _item(1, 'Лечь до полуночи', 1, 1),
           _item(2, 'Высыпаться', 1, 1),
+          _item(3, 'Быть здоровым', 1, 1),
         ], summary: _summary(1, 1, 0, 0)),
-        view: StatisticsView.intermediateIntentions,
+        view: StatisticsView.throughRelations,
       );
       await harness.pump(tester);
       final texts = harness.texts(tester);
       expect(
         find.text(texts.statisticsContributionCounts(1, 1)),
-        findsNWidgets(2),
+        findsNWidgets(3),
       );
-      expect(find.text(texts.statisticsContributionShare(1)), findsNWidgets(2));
+      expect(find.text(texts.statisticsContributionShare(1)), findsNWidgets(3));
     },
   );
   testWidgets(
@@ -276,6 +296,7 @@ void main() {
       );
       addTearDown(subscription.close);
       final model = container.read(homeStatisticsViewModelProvider.notifier);
+      model.selectView(StatisticsView.throughRelations);
       model.setVisible(true);
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -566,11 +587,23 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pumpAndSettle();
+        expect(
+          find.text(texts.statisticsThroughRelations).hitTestable(),
+          findsOneWidget,
+        );
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pump();
+        expect(harness.selectedViews.last, StatisticsView.throughRelations);
         expect(
-          harness.selectedViews.last,
-          StatisticsView.intermediateIntentions,
+          tester
+              .getSemantics(find.text(texts.statisticsThroughRelations))
+              .getSemanticsData()
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue,
         );
 
         final selection = harness.state.value.selection;
@@ -584,10 +617,7 @@ void main() {
         texts = harness.texts(tester);
         expect(harness.state.value.selection.period, selection.period);
         expect(harness.state.value.selection.view, selection.view);
-        expect(
-          find.text(texts.statisticsIntermediateIntentions),
-          findsOneWidget,
-        );
+        expect(find.text(texts.statisticsThroughRelations), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );

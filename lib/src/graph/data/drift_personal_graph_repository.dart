@@ -135,7 +135,23 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   @override
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
-      _readStatisticsPage(query);
+      switch (query.view) {
+        StatisticsView.sourceIntentions => _readStatisticsPage(
+          query,
+          _SavedPathStatisticsView.source,
+        ),
+        StatisticsView.intermediateIntentions => _readStatisticsPage(
+          query,
+          _SavedPathStatisticsView.intermediate,
+        ),
+        StatisticsView.selectedActions => _readStatisticsPage(
+          query,
+          _SavedPathStatisticsView.selected,
+        ),
+        StatisticsView.throughRelations => _readThroughRelationsStatisticsPage(
+          query,
+        ),
+      };
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>

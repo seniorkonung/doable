@@ -111,7 +111,11 @@ void main() {
                 .single['n'],
             volume.steps,
           );
-          for (final view in StatisticsView.values) {
+          for (final view in const [
+            StatisticsView.sourceIntentions,
+            StatisticsView.intermediateIntentions,
+            StatisticsView.selectedActions,
+          ]) {
             final expected = fixture.expected(period, view);
             // Продолжение проверяется, если вид содержит больше одной порции.
             final offsets = [

@@ -194,6 +194,11 @@ final class ContributionStatisticsFixture {
     for (final MapEntry(key: (source, length), value: weight)
         in chains.entries) {
       final nodes = switch (view) {
+        StatisticsView.throughRelations => throw ArgumentError.value(
+          view,
+          'view',
+          'Для вида через связи используется отдельный эталон обхода графа',
+        ),
         StatisticsView.sourceIntentions => [source],
         StatisticsView.selectedActions => [source + length],
         StatisticsView.intermediateIntentions => [

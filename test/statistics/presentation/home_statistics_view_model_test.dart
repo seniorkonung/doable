@@ -40,7 +40,7 @@ void main() {
     addTearDown(harness.dispose);
 
     harness.model.selectPeriod(StatisticsMonth(2025, 3));
-    harness.model.selectView(StatisticsView.intermediateIntentions);
+    harness.model.selectView(StatisticsView.throughRelations);
     harness.model.selectTab(HomeStatisticsTab.year);
     harness.model.selectPeriod(StatisticsYear(2024));
     harness.model.selectTab(HomeStatisticsTab.month);
@@ -48,7 +48,7 @@ void main() {
     expect(harness.state.selection.isCurrentPeriod, isFalse);
     harness.model.selectTab(HomeStatisticsTab.year);
     expect(harness.state.selection.period, StatisticsYear(2024));
-    expect(harness.state.selection.view, StatisticsView.intermediateIntentions);
+    expect(harness.state.selection.view, StatisticsView.throughRelations);
     expect(harness.reader.queries.last.cursor, isNull);
 
     harness.reader.first(6, [_item(7)]);
@@ -56,7 +56,7 @@ void main() {
     final queryCount = harness.reader.queries.length;
     harness.model.selectTab(HomeStatisticsTab.year);
     harness.model.selectPeriod(StatisticsYear(2024));
-    harness.model.selectView(StatisticsView.intermediateIntentions);
+    harness.model.selectView(StatisticsView.throughRelations);
     expect(harness.reader.queries, hasLength(queryCount));
     expect(harness.loaded.items.single.id, _id(7));
   });
@@ -235,9 +235,10 @@ void main() {
       await pumpEventQueue();
       final oldLoad = harness.model.loadMore();
 
-      harness.model.selectView(StatisticsView.selectedActions);
+      harness.model.selectView(StatisticsView.throughRelations);
       expect(harness.state.read, isA<HomeStatisticsInitialLoad>());
       expect(harness.reader.queries.last.cursor, isNull);
+      expect(harness.reader.queries.last.view, StatisticsView.throughRelations);
       harness.reader.first(2, [_item(3)]);
       await pumpEventQueue();
       harness.reader.more(1, [_item(1)]);
