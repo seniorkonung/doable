@@ -9,13 +9,17 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/app_database.dart' hide LongTermRelation;
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +36,161 @@ import '../support/local_database_harness.dart';
 final _today = CalendarDate.fromParts(2026, 10, 12);
 
 void main() {
+  testWidgets('команды связей меняют вклад через связи за прошлый месяц', (
+    tester,
+  ) async {
+    final gate = _StatisticsRefreshGate();
+    final app = await _start(tester, reachabilityRunner: gate.compute);
+    addTearDown(gate.releaseComputation);
+    await _until(tester, find.text(app.texts.statisticsEmpty));
+    await app.choice(tester, durabilityCreate());
+    await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
+    await _until(tester, find.text(app.texts.statisticsContribution(1)));
+    await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+    await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
+
+    final relation = await app.relation(
+      tester,
+      CreateLongTermRelation(
+        sourceIntentionId: durabilityIntention(5),
+        relatedIntentionId: durabilityIntention(3),
+        type: LongTermRelationType.need,
+        priority: RelationPriority.p2,
+        description: null,
+      ),
+    );
+    await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
+    expect(find.text('Намерение 5'), findsOneWidget);
+    expect(
+      find.text(app.texts.statisticsContributionCounts(1, 1)),
+      findsNWidgets(4),
+    );
+
+    await app.relation(tester, ArchiveLongTermRelation(relation.id));
+    await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
+    expect(find.text('Намерение 5'), findsNothing);
+    await app.relation(tester, RestoreLongTermRelation(relation.id));
+    await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
+    expect(find.text('Намерение 5'), findsOneWidget);
+
+    await app.relation(
+      tester,
+      UpdateLongTermRelation(
+        relationId: relation.id,
+        patch: LongTermRelationPatch(
+          sourceIntentionId: LongTermRelationFieldSet(durabilityIntention(4)),
+        ),
+      ),
+    );
+    await _until(tester, find.text('Намерение 4'));
+    expect(find.text('Намерение 5'), findsNothing);
+    await app.relation(
+      tester,
+      UpdateLongTermRelation(
+        relationId: relation.id,
+        patch: LongTermRelationPatch(
+          relatedIntentionId: LongTermRelationFieldSet(durabilityIntention(5)),
+        ),
+      ),
+    );
+    await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
+    expect(find.text('Намерение 4'), findsNothing);
+    await app.relation(
+      tester,
+      UpdateLongTermRelation(
+        relationId: relation.id,
+        patch: LongTermRelationPatch(
+          relatedIntentionId: LongTermRelationFieldSet(durabilityIntention(2)),
+        ),
+      ),
+    );
+    await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
+    expect(find.text('Намерение 4'), findsOneWidget);
+    await app.relation(tester, DeleteLongTermRelation(relation.id));
+    await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
+    expect(find.text('Намерение 4'), findsNothing);
+    await app.relation(
+      tester,
+      CreateLongTermRelation(
+        sourceIntentionId: durabilityIntention(5),
+        relatedIntentionId: durabilityIntention(2),
+        type: LongTermRelationType.can,
+        priority: RelationPriority.p2,
+        description: null,
+      ),
+    );
+    await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
+    await app.intention(tester, ArchiveIntention(durabilityIntention(2)));
+    await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
+    for (final number in [1, 2, 3]) {
+      expect(find.text('Намерение $number'), findsOneWidget);
+    }
+    expect(find.text('Намерение 5'), findsNothing);
+    expect(find.text(app.texts.detailsArchived), findsOneWidget);
+    expect(
+      find.text(app.texts.statisticsContributionCounts(1, 1)),
+      findsNWidgets(3),
+    );
+
+    await app.coverHome(tester);
+    final reads = app.reads;
+    await app.intention(
+      tester,
+      UpdateIntention(
+        id: durabilityIntention(2),
+        title: 'Сохранённое основание',
+        description: null,
+      ),
+    );
+    await app.choice(
+      tester,
+      UpdateDailyChoiceFields(
+        choiceId: durabilityChoice(201),
+        patch: const DailyChoiceFieldsPatch(
+          isCompleted: DailyChoiceFieldSet(false),
+        ),
+      ),
+    );
+    expect(app.reads, reads);
+    await app.back(tester);
+    await _until(tester, find.text('Сохранённое основание'));
+    expect(app.reads, reads + 1);
+    expect(find.text(app.texts.statisticsContribution(0)), findsOneWidget);
+    expect(
+      find.text(app.texts.statisticsContributionCounts(0, 1)),
+      findsNWidgets(3),
+    );
+    expect(
+      find.text(app.texts.statisticsMonthPeriod(DateTime.utc(2026, 9))),
+      findsOneWidget,
+    );
+
+    gate.holdNextComputation();
+    await _tap(tester, find.text(app.texts.statisticsYearTab));
+    await _untilCondition(
+      tester,
+      () => gate.computationStarted.isCompleted,
+      'Подсчёт года не начался',
+    );
+    await _tap(tester, find.text(app.texts.statisticsSourceIntentions));
+    await _until(tester, find.text(app.texts.statisticsTotalItems(1)));
+    final readsAfterViewChange = app.reads;
+    final pagesBeforeOldResponse = app.completedPages;
+    gate.releaseComputation();
+    await _untilCondition(
+      tester,
+      () => app.completedPages == pagesBeforeOldResponse + 1,
+      'Ответ прежнего вида не получен',
+    );
+    await tester.pumpAndSettle();
+    expect(app.reads, readsAfterViewChange);
+    expect(find.text(app.texts.statisticsTotalItems(1)), findsOneWidget);
+    expect(find.text('Намерение 1'), findsOneWidget);
+    expect(find.text('Сохранённое основание'), findsNothing);
+    expect(find.text('2026'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'периоды, вид, раскрытие, порции и прокрутка сохраняются при навигации и смене языка',
     (tester) async {
@@ -142,33 +301,37 @@ void main() {
   );
 
   testWidgets(
-    'возврат после команды сохраняет глубокую прокрутку со статусом, отказом и повтором',
+    'скрытый подсчёт через связи не повторяется до возврата с глубокой прокруткой',
     (tester) async {
       final gate = _StatisticsRefreshGate();
       final app = await _start(
         tester,
         seedMore: _seedCatalog,
+        reachabilityRunner: gate.compute,
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openInMemoryLocalDatabase(),
           gate,
         ),
       );
-      addTearDown(gate.release);
+      addTearDown(() {
+        gate.release();
+        gate.releaseComputation();
+      });
       await _until(tester, find.text(app.texts.statisticsEmpty));
       await _tap(tester, find.text(app.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear));
       await _until(tester, find.text(app.texts.statisticsContribution(220)));
-      await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
-      await _until(tester, find.text(app.texts.statisticsTotalItems(220)));
+      await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+      await _until(tester, find.text(app.texts.statisticsTotalItems(222)));
       final row = find.text('Промежуточное 071');
       final oldCounts = find.descendant(
         of: find.ancestor(of: row, matching: find.byType(Card)),
-        matching: find.text(app.texts.statisticsContributionCounts(1, 1)),
+        matching: find.text(app.texts.statisticsContributionCounts(220, 220)),
       );
       await _scrollTo(tester, row);
       final offset = _homeScroll(tester).position.pixels;
       expect(row.hitTestable(), findsOneWidget);
-      await app.coverHome(tester);
+      gate.holdNextComputation();
       await app.choice(
         tester,
         UpdateDailyChoiceFields(
@@ -178,8 +341,66 @@ void main() {
           ),
         ),
       );
+      await _untilCondition(
+        tester,
+        () => gate.computationStarted.isCompleted,
+        'Подсчёт не начался',
+      );
+      expect(
+        find.text(app.texts.statisticsRefreshing).hitTestable(),
+        findsOneWidget,
+      );
+      expect(oldCounts.hitTestable(), findsOneWidget);
+      final reads = app.reads;
+      final sourceReads = gate.sourceReads;
+      final computations = gate.computations;
+
+      await openIntentionGraph(tester);
+      await app.intention(
+        tester,
+        UpdateIntention(
+          id: durabilityIntention(1),
+          title: 'Новое исходное намерение',
+          description: null,
+        ),
+      );
+      await app.relation(
+        tester,
+        ArchiveLongTermRelation(durabilityRelation(2143)),
+      );
+      expect(gate.computationFinished.isCompleted, isFalse);
+      gate.releaseComputation();
+      await _untilCondition(
+        tester,
+        () =>
+            gate.computationFinished.isCompleted &&
+            app.diagnostics.events
+                    .whereType<StatisticsReadDiagnosticsEvent>()
+                    .last
+                    .status
+                is DiagnosticsFailed,
+        'Старый подсчёт не завершился отказом устаревшего снимка',
+      );
+      await tester.pumpAndSettle();
+      expect(app.reads, reads);
+      expect(gate.sourceReads, sourceReads);
+      expect(gate.computations, computations);
+      expect(
+        app.diagnostics.events
+            .whereType<StatisticsReadDiagnosticsEvent>()
+            .last
+            .status,
+        isA<DiagnosticsFailed>().having(
+          (status) => status.code,
+          'устаревший снимок',
+          DiagnosticsFailureCode.conflict,
+        ),
+      );
+
       gate.holdNextRead();
-      await app.back(tester);
+      await openHome(tester);
+      await tester.pumpAndSettle();
+      expect(app.reads, reads + 1);
       expect(
         find.text(app.texts.statisticsRefreshing).hitTestable(),
         findsOneWidget,
@@ -211,12 +432,15 @@ void main() {
       expect(retry, findsNothing);
       expect(_homeScroll(tester).position.pixels, offset);
       expect(find.text('Промежуточное 070').hitTestable(), findsOneWidget);
+      expect(app.reads, reads + 2);
+      expect(gate.sourceReads, sourceReads + 1);
+      expect(gate.computations, computations + 1);
 
       _homeScroll(tester).position.jumpTo(0);
       await tester.pumpAndSettle();
       expect(find.text('2025'), findsOneWidget);
       expect(find.text(app.texts.statisticsContribution(219)), findsOneWidget);
-      expect(find.text(app.texts.statisticsTotalItems(220)), findsOneWidget);
+      expect(find.text(app.texts.statisticsTotalItems(222)), findsOneWidget);
       await _scrollTo(tester, row);
       final card = find.ancestor(of: row, matching: find.byType(Card));
       expect(
@@ -307,7 +531,8 @@ void main() {
       await _until(tester, find.text(first.texts.statisticsContribution(1)));
       await _tap(tester, find.text(first.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(first.texts.statisticsPreviousYear));
-      await _tap(tester, find.text(first.texts.statisticsSelectedActions));
+      await _tap(tester, find.text(first.texts.statisticsThroughRelations));
+      await _until(tester, find.text(first.texts.statisticsEmpty));
       await _tap(
         tester,
         find.byTooltip(first.texts.statisticsExpandPeriodSelector),
@@ -462,6 +687,41 @@ void main() {
 
 final class _StatisticsRefreshGate extends LocalDatabaseConnectionObserver {
   Completer<void>? _release;
+  Completer<void>? _releaseComputation;
+  var computationStarted = Completer<void>();
+  var computationFinished = Completer<void>();
+  var sourceReads = 0;
+  var computations = 0;
+
+  void holdNextComputation() {
+    _releaseComputation = Completer<void>();
+    computationStarted = Completer<void>();
+    computationFinished = Completer<void>();
+  }
+
+  void releaseComputation() {
+    final release = _releaseComputation;
+    if (release != null && !release.isCompleted) release.complete();
+  }
+
+  Future<List<ContributionReachabilityEntry>> compute(
+    ContributionRelationGraph graph,
+    List<ContributionSeedGroup> groups,
+  ) async {
+    computations++;
+    final release = _releaseComputation;
+    if (release == null) {
+      return runContributionReachabilityInIsolate(graph, groups);
+    }
+    computationStarted.complete();
+    await release.future;
+    _releaseComputation = null;
+    try {
+      return await runContributionReachabilityInIsolate(graph, groups);
+    } finally {
+      computationFinished.complete();
+    }
+  }
 
   void holdNextRead() => _release = Completer<void>();
 
@@ -475,6 +735,7 @@ final class _StatisticsRefreshGate extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) async {
+    if (statement.statements.single.contains('seed_key')) sourceReads++;
     final release = _release;
     if (release == null || rows.isEmpty || !rows.first.containsKey('planned')) {
       return rows;
@@ -495,6 +756,15 @@ final class _App {
   final ProviderContainer container;
   final InMemoryDiagnosticsSink diagnostics;
   final texts = lookupAppLocalizations(const Locale('ru'));
+
+  int get completedPages => diagnostics.events
+      .whereType<StatisticsReadDiagnosticsEvent>()
+      .where(
+        (event) =>
+            event.stage == StatisticsReadDiagnosticsStage.titles &&
+            event.status is DiagnosticsSucceeded,
+      )
+      .length;
 
   int get reads => diagnostics.events
       .whereType<StatisticsReadDiagnosticsEvent>()
@@ -544,6 +814,38 @@ final class _App {
     await tester.pump();
   }
 
+  Future<LongTermRelation> relation(
+    WidgetTester tester,
+    LongTermRelationCommand command,
+  ) async {
+    final relation = await tester.runAsync(() async {
+      final coordinator = runtime.commandCoordinator;
+      final start = switch (command) {
+        CreateLongTermRelation() => coordinator.acceptRelationCreation(
+          LongTermRelationCreationFormKey(),
+          command,
+        ),
+        UpdateLongTermRelation() => coordinator.acceptRelationUpdate(command),
+        ArchiveLongTermRelation() => coordinator.acceptRelationArchive(command),
+        RestoreLongTermRelation() => coordinator.acceptRelationRestore(command),
+        DeleteLongTermRelation() => coordinator.acceptRelationDelete(command),
+      };
+      if (start is! LongTermRelationCommandAccepted) {
+        fail('Команда связи не принята: $start');
+      }
+      return switch ((await start.future).result) {
+        GraphResultSuccess(value: LongTermRelationCreated(:final relation)) ||
+        GraphResultSuccess(value: LongTermRelationUpdated(:final relation)) ||
+        GraphResultSuccess(
+          value: LongTermRelationDeleted(:final relation),
+        ) => relation,
+        GraphResultFailure(:final failure) => fail('Отказ команды: $failure'),
+      };
+    });
+    await tester.pump();
+    return relation!;
+  }
+
   Future<void> coverHome(WidgetTester tester) async {
     unawaited(
       container
@@ -566,6 +868,8 @@ Future<_App> _start(
   LocalDataConnectionFactory connectionFactory = openInMemoryLocalDatabase,
   bool seed = true,
   Future<void> Function(AppDatabase)? seedMore,
+  ContributionReachabilityRunner reachabilityRunner =
+      runContributionReachabilityInIsolate,
 }) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
@@ -590,6 +894,7 @@ Future<_App> _start(
         diagnostics,
         dailyChoiceIdGenerator: FixedChoiceIds(durabilityChoice(201)),
         choicePathStepIdGenerator: SequentialStepIds(301),
+        statisticsReachabilityRunner: reachabilityRunner,
       );
     },
   );
@@ -683,20 +988,27 @@ Future<void> _until(
   WidgetTester tester,
   Finder finder, {
   bool absent = false,
-}) async {
+}) => _untilCondition(
+  tester,
+  () => finder.evaluate().isNotEmpty != absent,
+  absent
+      ? 'Элемент не исчез: $finder'
+      : 'Ожидаемый элемент не появился: $finder',
+);
+
+Future<void> _untilCondition(
+  WidgetTester tester,
+  bool Function() condition,
+  String failure,
+) async {
   for (var attempt = 0; attempt < 500; attempt++) {
-    final found = finder.evaluate().isNotEmpty;
-    if (found != absent) return;
+    if (condition()) return;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 2)),
     );
     await tester.pump(const Duration(milliseconds: 10));
   }
-  fail(
-    absent
-        ? 'Элемент не исчез: $finder'
-        : 'Ожидаемый элемент не появился: $finder',
-  );
+  fail(failure);
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
