@@ -223,6 +223,66 @@ final class ContributionStatisticsFixture {
     });
   }
 
+  /// Эталон обходит активные входящие связи от полного сохранённого пути.
+  /// Повторные цепочки переиспользуют обход, сохраняя вес каждого выбора;
+  /// опорные наборы и сжатие компонент производственного подсчёта не нужны.
+  List<FixtureContribution> expectedThroughRelations(
+    StatisticsPeriod period,
+    sqlite.Database database,
+  ) {
+    int node(Object? value) =>
+        int.parse((value as String).substring(24), radix: 16);
+    final parents = <int, List<int>>{};
+    for (final row in database.select(
+      '''SELECT source_intention_id,
+        related_intention_id FROM long_term_relations WHERE is_archived = 0''',
+    )) {
+      (parents[node(row['related_intention_id'])] ??= []).add(
+        node(row['source_intention_id']),
+      );
+    }
+    final weights = <(int, int), ({int planned, int contribution})>{};
+    for (final choice in _inPeriod(period)) {
+      final key = (choice.source, choice.length);
+      final previous = weights[key] ?? (planned: 0, contribution: 0);
+      weights[key] = (
+        planned: previous.planned + 1,
+        contribution: previous.contribution + (choice.completed ? 1 : 0),
+      );
+    }
+    final counts = <int, ({int planned, int contribution})>{};
+    for (final MapEntry(key: (source, length), value: weight)
+        in weights.entries) {
+      final pending = [for (var i = 0; i <= length; i++) source + i + 1];
+      final visited = <int>{};
+      while (pending.isNotEmpty) {
+        final current = pending.removeLast();
+        if (!visited.add(current)) continue;
+        pending.addAll(parents[current] ?? const []);
+      }
+      for (final current in visited) {
+        final previous = counts[current] ?? (planned: 0, contribution: 0);
+        counts[current] = (
+          planned: previous.planned + weight.planned,
+          contribution: previous.contribution + weight.contribution,
+        );
+      }
+    }
+    return [
+      for (final MapEntry(key: current, value: weight) in counts.entries)
+        (
+          id: id(current),
+          planned: weight.planned,
+          contribution: weight.contribution,
+        ),
+    ]..sort((a, b) {
+      final contribution = b.contribution.compareTo(a.contribution);
+      if (contribution != 0) return contribution;
+      final planned = b.planned.compareTo(a.planned);
+      return planned != 0 ? planned : b.id.compareTo(a.id);
+    });
+  }
+
   Iterable<_Choice> _inPeriod(StatisticsPeriod? period) => _choices.where(
     (choice) =>
         period == null ||

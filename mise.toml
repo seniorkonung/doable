@@ -17,7 +17,8 @@ check = [
     "flutter analyze",
     "flutter test --concurrency=2 --exclude-tags=statistics-performance",
     # Временные бюджеты измеряются без конкуренции с другими тестами.
-    "flutter test test/graph/data/drift_statistics_read_cost_test.dart --concurrency=1",
+    "mkdir -p .dart_tool/statistics-temp",
+    "TMPDIR=\"$PWD/.dart_tool/statistics-temp\" flutter test test/graph/data/drift_statistics_read_cost_test.dart test/graph/data/drift_through_relations_statistics_read_cost_test.dart --concurrency=1",
     "cd widgetbook && flutter test"
 ]
 check-fast = [
