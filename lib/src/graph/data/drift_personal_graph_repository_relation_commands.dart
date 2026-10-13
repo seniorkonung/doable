@@ -1,5 +1,30 @@
 part of 'drift_personal_graph_repository.dart';
 
+/// Состояние связи до каскада и её неизменившиеся разрешения из той же
+/// транзакции. Изменение получает ревизию только после подтверждения каскада.
+final class _CascadedRelationArchive {
+  const _CascadedRelationArchive(this.before, this.permissions);
+
+  final relation_domain.LongTermRelation before;
+  final LongTermRelationPermissions permissions;
+
+  LongTermRelationUpdatedChange toChange(GraphRevision revision) =>
+      LongTermRelationUpdatedChange(
+        revision: revision,
+        before: before,
+        after: relation_domain.LongTermRelation(
+          id: before.id,
+          sourceIntentionId: before.sourceIntentionId,
+          relatedIntentionId: before.relatedIntentionId,
+          type: before.type,
+          priority: before.priority,
+          scope: relation_domain.RelationScope.archived,
+          creationSequence: before.creationSequence,
+        ),
+        permissions: permissions,
+      );
+}
+
 extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
   Future<LongTermRelationCommandResult> _executeLongTermRelation(
     LongTermRelationCommand command,
