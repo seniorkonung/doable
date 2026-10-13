@@ -5,6 +5,7 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -315,24 +316,81 @@ void main() {
   });
 
   test('каскад архивирования делает загруженный снимок непригодным', () async {
+    await database.customStatement(
+      '''INSERT INTO long_term_relations
+         (id, source_intention_id, related_intention_id, type, priority)
+         VALUES (?, ?, ?, 'need', 4)''',
+      [durabilityUuid(105), durabilityUuid(4), durabilityUuid(2)],
+    );
+    await database.customStatement(
+      'UPDATE long_term_relations SET description = ?',
+      ['  Описание связи\n'],
+    );
     await repository.execute(durabilityCreate());
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
+    probe.cascadedRelationRows = [];
     final result = await repository.execute(
       ArchiveIntention(durabilityIntention(2)),
     );
     expect(result, isA<GraphCommandSucceeded>());
-    final changes = (result as GraphCommandSucceeded).value.changes
-        .whereType<LongTermRelationUpdatedChange>();
-    expect(changes.map((change) => change.id).toSet(), {
-      durabilityRelation(101),
-      durabilityRelation(102),
-    });
-    for (final change in changes) {
+    final rows = probe.cascadedRelationRows!;
+    probe.cascadedRelationRows = null;
+    expect(
+      rows.map((row) => row['id']),
+      unorderedEquals([
+        durabilityUuid(101),
+        durabilityUuid(102),
+        durabilityUuid(105),
+      ]),
+    );
+    expect(
+      rows.map((row) => row.keys),
+      everyElement(isNot(contains('description'))),
+      reason: 'Каскад не загружает описания для пакета метаданных',
+    );
+    final confirmed = (result as GraphCommandSucceeded).value;
+    expect(
+      confirmed.changes.map(
+        (change) => change.revision.compareTo(confirmed.revision),
+      ),
+      everyElement(GraphRevisionOrder.same),
+    );
+    final changes = confirmed.changes
+        .whereType<LongTermRelationUpdatedChange>()
+        .toList();
+    expect(
+      changes.map((change) => change.id),
+      unorderedEquals([
+        durabilityRelation(101),
+        durabilityRelation(102),
+        durabilityRelation(105),
+      ]),
+    );
+    for (final (number, source, related, type, priority, sequence, referenced)
+        in [
+          (101, 1, 2, LongTermRelationType.need, RelationPriority.p2, 1, true),
+          (102, 2, 3, LongTermRelationType.can, RelationPriority.p2, 2, true),
+          (105, 4, 2, LongTermRelationType.need, RelationPriority.p4, 5, false),
+        ]) {
+      final change = changes.singleWhere(
+        (change) => change.id == durabilityRelation(number),
+      );
+      for (final relation in [change.before, change.after]) {
+        expect(relation.id, durabilityRelation(number));
+        expect(relation.sourceIntentionId, durabilityIntention(source));
+        expect(relation.relatedIntentionId, durabilityIntention(related));
+        expect(relation.type, type);
+        expect(relation.priority, priority);
+        expect(relation.creationSequence.value, sequence);
+      }
       expect(change.before.scope, RelationScope.active);
       expect(change.after.scope, RelationScope.archived);
       expect(change.permissions.isConfirmed, isTrue);
-      expect(change.permissions.canDelete, isFalse);
+      expect(change.permissions.canDelete, !referenced);
+      expect(change.permissions.canChangeMeaning, !referenced);
+      expect(change.permissions.canEditDescriptionAndPriority, isTrue);
+      expect(change.permissions.canChangeArchiveState, isTrue);
     }
     expect(probe.reads, reads, reason: 'Пересборка ленивая');
     final graph = await repository.loadStatisticsRelationSnapshot();
@@ -398,6 +456,7 @@ Future<void> _addRelations(AppDatabase database, int count) async {
 }
 
 final class _SnapshotProbe extends LocalDatabaseConnectionObserver {
+  List<Map<String, Object?>>? cascadedRelationRows;
   var failNextRelationUpdate = false;
   var reads = 0;
   var largestPage = 0;
@@ -439,6 +498,16 @@ final class _SnapshotProbe extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) async {
+    if (cascadedRelationRows case final captured?) {
+      for (final row in rows) {
+        if (row.containsKey('source_intention_id') &&
+            row.containsKey('related_intention_id') &&
+            row.containsKey('is_referenced')) {
+          expect(_inTransaction, isTrue);
+          captured.add(Map.of(row));
+        }
+      }
+    }
     if (!statement.statements.single.startsWith(
       'SELECT creation_sequence, source_intention_id, related_intention_id',
     )) {
