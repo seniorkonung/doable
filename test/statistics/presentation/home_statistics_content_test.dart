@@ -15,11 +15,48 @@ import 'package:doable/src/statistics/presentation/home_statistics_content.dart'
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'строка открывает намерение клавиатурой и доступна диктору на RU/EN',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      for (final locale in ['ru', 'en']) {
+        final item = _item(1, 'Высыпаться', 3, 7, archived: true);
+        final harness = _Harness(_data([item], summary: _summary(4, 8, 3, 1)));
+        await harness.pump(tester, locale: Locale(locale), textScale: 3);
+        final texts = harness.texts(tester);
+        final row = find.bySemanticsLabel(RegExp('^Высыпаться'));
+        await tester.scrollUntilVisible(find.text('Высыпаться'), 400);
+        await tester.pumpAndSettle();
+        final data = tester.getSemantics(row).getSemanticsData();
+        expect(data.flagsCollection.isButton, isTrue);
+        expect(data.hasAction(SemanticsAction.tap), isTrue);
+        expect(data.label, contains(texts.detailsArchived));
+        expect(
+          data.label,
+          contains(texts.statisticsContributionCountsSemantics(3, 7)),
+        );
+        expect(data.label, contains(texts.statisticsContributionShare(.75)));
+        final button = find.widgetWithText(TextButton, 'Высыпаться');
+        Focus.of(tester.element(find.text('Высыпаться'))).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pump();
+        expect(harness.openedIntentions, [item.id]);
+        await tester.tap(button);
+        expect(harness.openedIntentions, hasLength(2));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+      semantics.dispose();
+    },
+  );
+
   testWidgets('каталог сохраняет порядок, точное число и доли периода', (
     tester,
   ) async {
@@ -311,6 +348,7 @@ void main() {
                   state: ref.watch(homeStatisticsViewModelProvider),
                   periodSelector: const SizedBox.shrink(),
                   onViewSelected: model.selectView,
+                  onOpenIntention: (_) {},
                   onLoadMoreIfNeeded: model.loadMoreIfNeeded,
                   onRetryFirstPage: model.retryFirstPage,
                   onRetryRefresh: model.retryRefresh,
@@ -391,7 +429,7 @@ void main() {
         await harness.pump(tester, locale: locale, textScale: 3);
         final texts = harness.texts(tester);
         final row = find.text('Намерение 60');
-        await tester.scrollUntilVisible(row, 1500, maxScrolls: 30);
+        await tester.scrollUntilVisible(row, 500, maxScrolls: 100);
         await tester.pumpAndSettle();
         final position = tester
             .state<ScrollableState>(find.byType(Scrollable))
@@ -711,6 +749,7 @@ final class _Harness {
 
   final ValueNotifier<HomeStatisticsState> state;
   final selectedViews = <StatisticsView>[];
+  final openedIntentions = <IntentionId>[];
   final retries = <String>[];
 
   void show(HomeStatisticsReadState read) =>
@@ -741,6 +780,7 @@ final class _Harness {
             builder: (context, value, _) => HomeStatisticsContent(
               state: value,
               periodSelector: const SizedBox.shrink(),
+              onOpenIntention: openedIntentions.add,
               onViewSelected: (view) {
                 selectedViews.add(view);
                 if (view == value.selection.view) return;

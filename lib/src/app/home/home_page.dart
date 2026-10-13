@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../statistics/application/intention_statistics_target.dart';
 import '../../statistics/presentation/home_statistics_content.dart';
 import '../../statistics/presentation/home_statistics_period_selector.dart';
 import '../../statistics/presentation/home_statistics_view_model.dart';
 import '../navigation/app_destination.dart';
+import '../routing/app_router.gr.dart';
 
 @RoutePage()
 final class HomePage extends ConsumerStatefulWidget {
@@ -82,6 +84,15 @@ final class _HomePageState extends ConsumerState<HomePage> {
             onBrowseNextYear: model.browseNextYear,
           ),
           onViewSelected: model.selectView,
+          onOpenIntention: (id) => context.router.push(
+            IntentionDetailsRoute(
+              intentionId: id,
+              statisticsTarget: IntentionStatisticsTarget(
+                view: state.selection.view,
+                period: state.selection.period,
+              ),
+            ),
+          ),
           onLoadMoreIfNeeded: model.loadMoreIfNeeded,
           onRetryFirstPage: model.retryFirstPage,
           onRetryRefresh: model.retryRefresh,

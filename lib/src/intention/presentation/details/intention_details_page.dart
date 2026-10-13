@@ -20,6 +20,8 @@ import '../../../long_term_relation/presentation/editor/relation_editor_state.da
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
+import '../../../tag/presentation/assignments/tag_assignments_state.dart';
+import '../../../tag/presentation/assignments/tag_assignments_view_model.dart';
 import '../../../tag/presentation/catalog/tag_selection_context.dart';
 import '../../../statistics/application/intention_statistics_target.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
@@ -110,6 +112,11 @@ final class _IntentionDetailsPageState
     if (widget.statisticsTarget == null ||
         _statisticsOpeningScheduled ||
         details is! IntentionDetailsLoaded) {
+      return;
+    }
+    // Высота тегов над разделом меняется после начальной загрузки.
+    if (ref.watch(tagAssignmentsViewModelProvider(widget.intentionId))
+        is TagAssignmentsInitialLoading) {
       return;
     }
     _statisticsOpeningScheduled = true;

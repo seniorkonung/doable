@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../intention/domain/intention.dart';
+import '../../intention/domain/intention_id.dart';
 import '../application/contribution_counts.dart';
 import '../application/statistics_read_contract.dart';
 import 'home_statistics_state.dart';
@@ -14,6 +15,7 @@ final class HomeStatisticsContent extends StatefulWidget {
     required this.state,
     required this.periodSelector,
     required this.onViewSelected,
+    required this.onOpenIntention,
     required this.onLoadMoreIfNeeded,
     required this.onRetryFirstPage,
     required this.onRetryRefresh,
@@ -24,6 +26,7 @@ final class HomeStatisticsContent extends StatefulWidget {
   final HomeStatisticsState state;
   final Widget periodSelector;
   final ValueChanged<StatisticsView> onViewSelected;
+  final ValueChanged<IntentionId> onOpenIntention;
   final ValueChanged<int> onLoadMoreIfNeeded;
   final VoidCallback onRetryFirstPage;
   final VoidCallback onRetryRefresh;
@@ -130,6 +133,8 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
                             item: read.items[index],
                             periodContribution:
                                 read.summary.counts.contribution,
+                            onPressed: () =>
+                                widget.onOpenIntention(read.items[index].id),
                           );
                         },
                       ),
@@ -302,10 +307,15 @@ final class _ViewButton extends StatelessWidget {
 }
 
 final class _StatisticsRow extends StatelessWidget {
-  const _StatisticsRow({required this.item, required this.periodContribution});
+  const _StatisticsRow({
+    required this.item,
+    required this.periodContribution,
+    required this.onPressed,
+  });
 
   final StatisticsItem item;
   final int periodContribution;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -316,21 +326,26 @@ final class _StatisticsRow extends StatelessWidget {
         : texts.statisticsContributionShare(
             item.counts.contribution / periodContribution,
           );
-    return Semantics(
-      container: true,
-      excludeSemantics: true,
-      label: [
-        item.title,
-        if (archived) texts.detailsArchived,
-        texts.statisticsContributionCountsSemantics(
-          item.counts.contribution,
-          item.counts.planned,
-        ),
-        share ?? texts.statisticsNoContributionShare,
-      ].join('\n'),
-      child: Card(
-        child: Padding(
+    // Стандартная кнопка обеспечивает фокус, клавиатуру и действие диктора.
+    // https://api.flutter.dev/flutter/material/TextButton-class.html
+    return Card(
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          alignment: Alignment.centerLeft,
           padding: const EdgeInsets.all(12),
+        ),
+        child: Semantics(
+          excludeSemantics: true,
+          label: [
+            item.title,
+            if (archived) texts.detailsArchived,
+            texts.statisticsContributionCountsSemantics(
+              item.counts.contribution,
+              item.counts.planned,
+            ),
+            share ?? texts.statisticsNoContributionShare,
+          ].join('\n'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

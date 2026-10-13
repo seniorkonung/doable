@@ -1,6 +1,9 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/routing/app_router.gr.dart';
+import '../application/intention_statistics_target.dart';
 import 'intention_statistics_breakdowns.dart';
 import 'intention_statistics_overview.dart';
 import 'intention_statistics_view_model.dart';
@@ -33,7 +36,15 @@ final class IntentionStatisticsSectionSliver extends ConsumerWidget {
           ),
           IntentionStatisticsBreakdownsSliver(
             state: state,
-            onOpenIntention: null,
+            onOpenIntention: (id, breakdown) => context.router.push(
+              IntentionDetailsRoute(
+                intentionId: id,
+                statisticsTarget: IntentionStatisticsTarget.forBreakdown(
+                  breakdown: breakdown,
+                  period: state.selection.period,
+                ),
+              ),
+            ),
             onLoadMoreIfNeeded: model.loadMoreIfNeeded,
             onRetry: model.retry,
             onRetryRefresh: model.retryRefresh,
