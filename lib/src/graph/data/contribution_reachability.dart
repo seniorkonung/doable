@@ -1,7 +1,10 @@
 import 'dart:typed_data';
 
 import '../../intention/domain/intention_id.dart';
+import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../statistics/application/contribution_counts.dart';
+
+part 'intention_contribution_computation.dart';
 
 /// Внутренний снимок только активных связей, без отображаемых данных.
 ///
@@ -174,8 +177,9 @@ final class _Components {
 
 _Components _condense(
   ContributionRelationGraph graph,
-  List<ContributionSeedGroup> groups,
-) {
+  List<ContributionSeedGroup> groups, {
+  IntentionId? excludedIntentionId,
+}) {
   final ids = [...graph.intentionIds];
   final indexes = {for (var i = 0; i < ids.length; i++) ids[i]: i};
   final seedNodes = <int>[];
@@ -191,8 +195,9 @@ _Components _condense(
 
   final affected = Uint8List(ids.length);
   final affectedNodes = <int>[];
+  final excluded = indexes[excludedIntentionId];
   void include(int node) {
-    if (affected[node] != 0) return;
+    if (node == excluded || affected[node] != 0) return;
     affected[node] = 1;
     affectedNodes.add(node);
   }

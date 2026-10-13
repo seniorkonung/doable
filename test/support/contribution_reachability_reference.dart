@@ -46,3 +46,59 @@ referenceContributionCounts({
   }
   return counts;
 }
+
+/// Эталон разбивки одного намерения: обходит полные пути каждого выбора
+/// без опорных групп, а неявное основание ищет отдельно от каждой связи.
+Map<ContributionReferenceRelation, ({int planned, int contribution})>
+referenceIntentionRelationCounts({
+  required IntentionId intentionId,
+  required List<ContributionReferenceRelation> relations,
+  required List<ContributionReferenceChoice> choices,
+}) {
+  final children = <IntentionId, List<IntentionId>>{};
+  for (final relation in relations) {
+    if (!relation.archived &&
+        relation.source != intentionId &&
+        relation.target != intentionId) {
+      (children[relation.source] ??= []).add(relation.target);
+    }
+  }
+  final counts =
+      <ContributionReferenceRelation, ({int planned, int contribution})>{};
+  for (final choice in choices) {
+    if (choice.path.last.target == intentionId ||
+        !referenceContributionCounts(
+          relations: relations,
+          choices: [choice],
+        ).containsKey(intentionId)) {
+      continue;
+    }
+    final pathIntentions = {
+      for (final step in choice.path) ...[step.source, step.target],
+    }..remove(intentionId);
+    for (final relation in relations) {
+      if (relation.source != intentionId) continue;
+      var included = choice.path.contains(relation);
+      if (!included && !relation.archived) {
+        final visited = <IntentionId>{};
+        final pending = [relation.target];
+        while (pending.isNotEmpty) {
+          final node = pending.removeLast();
+          if (node == intentionId || !visited.add(node)) continue;
+          if (pathIntentions.contains(node)) {
+            included = true;
+            break;
+          }
+          pending.addAll(children[node] ?? const []);
+        }
+      }
+      if (!included) continue;
+      final previous = counts[relation] ?? (planned: 0, contribution: 0);
+      counts[relation] = (
+        planned: previous.planned + 1,
+        contribution: previous.contribution + (choice.completed ? 1 : 0),
+      );
+    }
+  }
+  return counts;
+}
