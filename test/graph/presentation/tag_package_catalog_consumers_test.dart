@@ -1,4 +1,3 @@
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation, TagAssignment;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -117,7 +116,7 @@ void main() {
     container.read(intentionDetailsViewModelProvider(observed).notifier)
       ..beginEditing()
       ..changeTitle('Черновик названия');
-    container.read(dailyChoiceCatalogViewModelProvider.notifier)
+    container.read(probes.dailyCatalogProvider.notifier)
       ..selectDate(durabilityChoiceDate)
       ..selectCompletion(true);
     await settlePackageConsumersUntil(

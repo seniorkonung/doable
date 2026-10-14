@@ -19,7 +19,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -53,6 +52,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_catalog_controls.dart';
+import '../support/daily_choice_catalog_provider.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
@@ -893,7 +893,7 @@ Future<DailyChoiceCatalogLoaded> _catalogResult(
     () => find.byType(daily_page.DailyChoiceCatalogPage).evaluate().isNotEmpty,
   );
   DailyChoiceCatalogState current() =>
-      container.read(dailyChoiceCatalogViewModelProvider);
+      container.read(openedDailyChoiceCatalogProvider(container));
   DailyChoiceCatalogLoaded? result() => switch (current()) {
     final DailyChoiceCatalogLoaded loaded
         when loaded.selection.date == date &&
@@ -938,7 +938,7 @@ Map<String, Object?> _catalogView(
         .value,
     'сегодня': tester.widget<DailyChoiceCalendar>(calendar).today,
     'загруженные записи': switch (container.read(
-      dailyChoiceCatalogViewModelProvider,
+      openedDailyChoiceCatalogProvider(container),
     )) {
       final DailyChoiceCatalogLoaded loaded => [
         for (final item in loaded.items) item.id.toCanonicalString(),

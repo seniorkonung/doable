@@ -7,6 +7,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
@@ -408,12 +409,11 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
+      final catalogProvider = dailyChoiceCatalogViewModelProvider(
+        DailyChoiceCatalogInstance(initialDate: durabilityChoiceDate),
+      );
       final subscriptions = [
-        container.listen(
-          dailyChoiceCatalogViewModelProvider,
-          (_, _) {},
-          fireImmediately: true,
-        ),
+        container.listen(catalogProvider, (_, _) {}, fireImmediately: true),
         for (final number in [1, 2, 3, 4, 5])
           container.listen(
             intentionDetailsViewModelProvider(durabilityIntention(number)),
@@ -440,9 +440,7 @@ void main() {
       });
       // Каталог показывает день повторяемого выбора независимо от
       // первоначального охвата.
-      container
-          .read(dailyChoiceCatalogViewModelProvider.notifier)
-          .selectDate(durabilityChoiceDate);
+      container.read(catalogProvider.notifier).selectDate(durabilityChoiceDate);
       final details = DailyChoiceDetailsViewModel(repository, firstId);
       addTearDown(details.dispose);
 
@@ -459,8 +457,7 @@ void main() {
             );
       }
       DailyChoiceCatalogLoaded catalog() =>
-          container.read(dailyChoiceCatalogViewModelProvider)
-              as DailyChoiceCatalogLoaded;
+          container.read(catalogProvider) as DailyChoiceCatalogLoaded;
       DailyChoiceGroupLoaded group(int number) => container.read(
         relationNeighborhoodViewModelProvider(durabilityIntention(number)),
       ) as DailyChoiceGroupLoaded;
@@ -472,8 +469,7 @@ void main() {
       ) as RelationDetailsLoaded;
       await _settleUntil(
         () =>
-            container.read(dailyChoiceCatalogViewModelProvider)
-                is DailyChoiceCatalogLoaded &&
+            container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
             details.state is DailyChoiceDetailsLoaded &&
             [1, 3].every(
               (number) => container.read(
@@ -500,7 +496,7 @@ void main() {
               ) is RelationDetailsLoaded,
             ),
         diagnostics: () => [
-          container.read(dailyChoiceCatalogViewModelProvider).runtimeType,
+          container.read(catalogProvider).runtimeType,
           details.state.runtimeType,
           for (final number in [1, 3, 4, 5])
             container

@@ -9,6 +9,7 @@ import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_day_marks_view_model.dart';
 import 'daily_choice_calendar_viewport.dart';
+import 'daily_choice_catalog_instance.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
 import 'daily_choice_local_date_provider.dart';
@@ -33,8 +34,8 @@ final class _DailyChoiceCatalogPageState
   /// меняют.
   late DailyChoiceCalendarViewport _viewport;
 
-  /// Начальная дата удерживает одну модель отметок при выборе другого дня.
-  late final CalendarDate _initialDate;
+  /// Корневой каталог получает свой ключ при первом открытии в процессе.
+  late final DailyChoiceCatalogInstance _instance;
 
   /// Текущий местный день, отмеченный в календаре.
   ///
@@ -47,9 +48,11 @@ final class _DailyChoiceCatalogPageState
   @override
   void initState() {
     super.initState();
-    _initialDate = ref.read(dailyChoiceCatalogViewModelProvider).selection.date;
+    _instance = DailyChoiceCatalogInstance(
+      initialDate: ref.read(dailyChoiceLocalDateSourceProvider)().date,
+    );
     _viewport = DailyChoiceCalendarViewport(
-      focusedDate: _initialDate,
+      focusedDate: _instance.initialDate,
       mode: DailyChoiceCalendarMode.week,
     );
     _localDay = DailyChoiceLocalDayObserver(
@@ -67,10 +70,11 @@ final class _DailyChoiceCatalogPageState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final state = ref.watch(dailyChoiceCatalogViewModelProvider);
-    final model = ref.read(dailyChoiceCatalogViewModelProvider.notifier);
+    final provider = dailyChoiceCatalogViewModelProvider(_instance);
+    final state = ref.watch(provider);
+    final model = ref.read(provider.notifier);
     final dayMarks = ref.watch(
-      dailyChoiceCalendarDayMarksViewModelProvider(_initialDate),
+      dailyChoiceCalendarDayMarksViewModelProvider(_instance.initialDate),
     );
     return Scaffold(
       appBar: AppBar(title: Text(l10n.appDestinationDailyChoices)),
@@ -163,7 +167,8 @@ final class _DailyChoiceCatalogPageState
     setState(() => _viewport = viewport);
     ref
         .read(
-          dailyChoiceCalendarDayMarksViewModelProvider(_initialDate).notifier,
+          dailyChoiceCalendarDayMarksViewModelProvider(_instance.initialDate)
+              .notifier,
         )
         .setViewport(viewport);
   }

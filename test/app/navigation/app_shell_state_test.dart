@@ -19,7 +19,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -62,6 +61,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/daily_choice_catalog_provider.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -755,14 +755,14 @@ final class _App {
   };
 
   DailyChoiceCatalogLoaded get dailyChoiceCatalog =>
-      switch (container.read(dailyChoiceCatalogViewModelProvider)) {
+      switch (container.read(openedDailyChoiceCatalogProvider(container))) {
         final DailyChoiceCatalogLoaded loaded => loaded,
         final other => fail('Каталог дневных выборов без записей: $other'),
       };
 
   /// Каталог дневных выборов показывает полученную выдачу, в том числе пустую.
   bool get hasDailyChoiceCatalogResult =>
-      container.read(dailyChoiceCatalogViewModelProvider)
+      container.read(openedDailyChoiceCatalogProvider(container))
           is DailyChoiceCatalogLoaded;
 }
 
