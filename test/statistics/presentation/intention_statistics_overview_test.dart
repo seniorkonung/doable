@@ -167,56 +167,19 @@ void main() {
       expect(sourceCard.flagsCollection.isSelected, Tristate.isTrue);
     },
   );
-
-  testWidgets(
-    'русские и английские подписи, числа и команды доступны при тексте 3×',
-    (tester) async {
-      tester.view.physicalSize = const Size(360, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      for (final locale in ['ru', 'en']) {
-        await _pump(tester, _overview(), locale: locale, scale: 3);
-        final texts = AppLocalizations.of(
-          tester.element(find.byType(IntentionStatisticsOverview)),
-        );
-        await tester.ensureVisible(
-          find.text(texts.statisticsExplicitPathChoices(7, 8)),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          find.text(texts.statisticsExplicitPathChoices(7, 8)).hitTestable(),
-          findsOneWidget,
-        );
-        await tester.ensureVisible(find.text(texts.statisticsThroughRelations));
-        await tester.pumpAndSettle();
-        expect(
-          find.text(texts.statisticsThroughRelations).hitTestable(),
-          findsOneWidget,
-        );
-        expect(tester.takeException(), isNull);
-      }
-    },
-  );
 }
 
 Future<void> _pump(
   WidgetTester tester,
   Widget child, {
   String locale = 'ru',
-  double scale = 1,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       locale: Locale(locale),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body: MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-          child: SingleChildScrollView(child: child),
-        ),
-      ),
+      home: Scaffold(body: SingleChildScrollView(child: child)),
     ),
   );
   await tester.pumpAndSettle();

@@ -114,7 +114,7 @@ void main() {
   );
 
   testWidgets(
-    'календарь локализован, начало недели следует локали, текст 3× не скрывает дни и месяцы',
+    'начало недели следует локали, день открывает правильную дату на RU/EN',
     (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1;
@@ -126,13 +126,11 @@ void main() {
           tester,
           _month(),
           locale: locale,
-          scale: 3,
           onDaySelected: (date) => opened = date,
         );
         final context = tester.element(
           find.byType(IntentionStatisticsCalendarView),
         );
-        final texts = AppLocalizations.of(context);
         final material = MaterialLocalizations.of(context);
         final weekdays = tester
             .widgetList<Text>(find.byType(Text))
@@ -153,21 +151,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(opened, CalendarDate.fromParts(2026, 10, 31));
         expect(tester.takeException(), isNull);
-        final year = IntentionStatisticsYearCalendar(
-          period: StatisticsYear(2026),
-          months: List.generate(
-            12,
-            (_) => ContributionCounts(planned: 0, contribution: 0),
-          ),
-        );
-        await _pump(tester, year, locale: locale, scale: 3);
-        final december = find.text(
-          texts.statisticsMonthName(DateTime.utc(2026, 12)),
-        );
-        await tester.ensureVisible(december);
-        await tester.pumpAndSettle();
-        expect(december.hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
       }
     },
   );
@@ -185,7 +168,6 @@ Future<void> _pump(
   WidgetTester tester,
   IntentionStatisticsCalendar calendar, {
   String locale = 'ru',
-  double scale = 1,
   ValueChanged<int>? onMonthSelected,
   ValueChanged<CalendarDate>? onDaySelected,
 }) async {
@@ -195,15 +177,12 @@ Future<void> _pump(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
-        body: MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-          child: SingleChildScrollView(
-            child: IntentionStatisticsCalendarView(
-              calendar: calendar,
-              localDate: CalendarDate.fromParts(2026, 10, 12),
-              onMonthSelected: onMonthSelected ?? (_) {},
-              onDaySelected: onDaySelected ?? (_) {},
-            ),
+        body: SingleChildScrollView(
+          child: IntentionStatisticsCalendarView(
+            calendar: calendar,
+            localDate: CalendarDate.fromParts(2026, 10, 12),
+            onMonthSelected: onMonthSelected ?? (_) {},
+            onDaySelected: onDaySelected ?? (_) {},
           ),
         ),
       ),

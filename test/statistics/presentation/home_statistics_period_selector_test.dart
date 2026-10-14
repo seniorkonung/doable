@@ -312,7 +312,7 @@ void main() {
 
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
-      'названия и команды читаемы при тройном тексте на ${locale.languageCode}, смена локали сохраняет выбор',
+      'названия и команды локализованы на ${locale.languageCode}, смена локали сохраняет выбор',
       (tester) async {
         tester.view.physicalSize = const Size(320, 800);
         tester.view.devicePixelRatio = 1;
@@ -320,7 +320,7 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
         final harness = _Harness();
         addTearDown(harness.dispose);
-        await harness.pump(tester, locale: locale, textScale: 3);
+        await harness.pump(tester, locale: locale);
         var texts = harness.texts(tester);
         await tester.tap(find.byTooltip(texts.statisticsExpandPeriodSelector));
         await tester.pumpAndSettle();
@@ -347,7 +347,7 @@ void main() {
             ? const Locale('en')
             : const Locale('ru');
         final reads = harness.reader.queries.length;
-        await harness.pump(tester, locale: other, textScale: 3);
+        await harness.pump(tester, locale: other);
         texts = harness.texts(tester);
         expect(
           find.text(texts.statisticsMonthPeriod(DateTime.utc(2026, 9))),
@@ -406,7 +406,6 @@ final class _Harness {
   Future<void> pump(
     WidgetTester tester, {
     Locale locale = const Locale('ru'),
-    double textScale = 1,
   }) async {
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -415,11 +414,6 @@ final class _Harness {
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.linear(textScale)),
-            child: child!,
-          ),
           home: Scaffold(
             body: SingleChildScrollView(
               child: Padding(

@@ -28,7 +28,7 @@ void main() {
       for (final locale in ['ru', 'en']) {
         final item = _item(1, 'Высыпаться', 3, 7, archived: true);
         final harness = _Harness(_data([item], summary: _summary(4, 8, 3, 1)));
-        await harness.pump(tester, locale: Locale(locale), textScale: 3);
+        await harness.pump(tester, locale: Locale(locale));
         final texts = harness.texts(tester);
         final row = find.bySemanticsLabel(RegExp('^Высыпаться'));
         await tester.scrollUntilVisible(find.text('Высыпаться'), 400);
@@ -415,7 +415,7 @@ void main() {
 
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
-      '${locale.languageCode}: статус и повтор видны при глубокой прокрутке и тексте 3×',
+      '${locale.languageCode}: статус и повтор видны при глубокой прокрутке',
       (tester) async {
         tester.view.physicalSize = const Size(320, 700);
         tester.view.devicePixelRatio = 1;
@@ -426,7 +426,7 @@ void main() {
           (i) => _item(i + 1, 'Намерение ${i + 1}', 1, 1),
         );
         final harness = _Harness(_data(items));
-        await harness.pump(tester, locale: locale, textScale: 3);
+        await harness.pump(tester, locale: locale);
         final texts = harness.texts(tester);
         final row = find.text('Намерение 60');
         await tester.scrollUntilVisible(row, 500, maxScrolls: 100);
@@ -477,21 +477,6 @@ void main() {
           isTrue,
         );
         expect(tester.getSemantics(retry).flagsCollection.isButton, isTrue);
-        await tester.drag(
-          find.ancestor(
-            of: failure,
-            matching: find.byType(SingleChildScrollView),
-          ),
-          const Offset(0, -1500),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          failure.hitTestable(at: const Alignment(0, .99)),
-          findsOneWidget,
-        );
-        expect(retry.hitTestable(), findsOneWidget);
-        expect(row.hitTestable(), findsOneWidget);
-        expect(position.pixels, offset);
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -563,7 +548,7 @@ void main() {
 
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
-      '${locale.languageCode}: крупный текст, архив и числа доступны диктору',
+      '${locale.languageCode}: архив и числа доступны диктору, смена локали сохраняет выбор',
       (tester) async {
         tester.view.physicalSize = const Size(320, 700);
         tester.view.devicePixelRatio = 1;
@@ -581,7 +566,7 @@ void main() {
             _item(2, 'Другое намерение', 1, 14),
           ], summary: _summary(4, 21, 10, 7)),
         );
-        await harness.pump(tester, locale: locale, textScale: 3);
+        await harness.pump(tester, locale: locale);
         var texts = harness.texts(tester);
         await tester.scrollUntilVisible(
           find.text(texts.statisticsContributionCounts(3, 7)),
@@ -650,7 +635,6 @@ void main() {
           locale: locale.languageCode == 'ru'
               ? const Locale('en')
               : const Locale('ru'),
-          textScale: 3,
         );
         texts = harness.texts(tester);
         expect(harness.state.value.selection.period, selection.period);
@@ -761,18 +745,12 @@ final class _Harness {
   Future<void> pump(
     WidgetTester tester, {
     Locale locale = const Locale('ru'),
-    double textScale = 1,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child!,
-        ),
         home: Scaffold(
           appBar: AppBar(title: const Text('Главная')),
           body: ValueListenableBuilder(

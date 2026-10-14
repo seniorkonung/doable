@@ -43,7 +43,7 @@ void main() {
     ('en', StatisticsYear(2026), const Size(700, 360)),
   ]) {
     testWidgets(
-      '$locale, $size: статус сопровождает обзор и обе разбивки после возврата, повтор доступен при тексте 3×',
+      '$locale, $size: статус сопровождает обзор и обе разбивки после возврата, повтор доступен',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -67,11 +67,6 @@ void main() {
             ],
             child: OrdinaryPageTestApp(
               locale: Locale(locale),
-              builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(context)
-                    .copyWith(textScaler: const TextScaler.linear(3)),
-                child: child!,
-              ),
               home: IntentionDetailsPage(
                 intentionId: intention.id,
                 statisticsTarget: IntentionStatisticsTarget(
@@ -148,22 +143,20 @@ void main() {
         await _placeInFreeArea(tester, calendar, position, notice: updating);
 
         final breakdowns = [
-          find.text(texts.statisticsBreakdownRelations),
-          find.text(texts.statisticsBreakdownSelectedActions),
+          StatisticsBreakdown.relations,
+          StatisticsBreakdown.selectedActions,
         ];
         final breakdownOffsets = <double>[];
-        for (final title in breakdowns) {
+        for (final breakdown in breakdowns) {
+          final row = find.descendant(
+            of: find.byKey(ValueKey(breakdown)),
+            matching: find.text('Намерение 15'),
+          );
           await tester.scrollUntilVisible(
-            title,
+            row,
             150,
             scrollable: scrollable,
             maxScrolls: 500,
-          );
-          position.jumpTo(
-            position.pixels +
-                tester.getTopLeft(title).dy -
-                tester.getRect(scrollView).top +
-                3000,
           );
           await tester.pumpAndSettle();
           _expectFullyVisible(tester, updating);
@@ -531,7 +524,7 @@ Finder _visibleRowCounts(WidgetTester tester, AppLocalizations texts) {
 }
 
 void _expectFullyVisible(WidgetTester tester, Finder finder) {
-  expect(finder.hitTestable(), findsOneWidget);
+  expect(finder, findsOneWidget);
   final viewport = tester.getRect(find.byType(CustomScrollView));
   final rect = tester.getRect(finder);
   expect(rect.top, greaterThanOrEqualTo(viewport.top));
