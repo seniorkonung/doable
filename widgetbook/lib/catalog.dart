@@ -1,5 +1,6 @@
 import 'package:widgetbook/widgetbook.dart';
 
+import 'calendar/calendar_handle_use_cases.dart';
 import 'calendar/calendar_header_use_cases.dart';
 import 'calendar/month_grid_day_use_cases.dart';
 import 'calendar/week_strip_day_use_cases.dart';
@@ -39,6 +40,10 @@ List<WidgetbookNode> buildCatalog() => [
       WidgetbookComponent(
         name: 'Шапка месяца',
         useCases: calendarHeaderUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Ручка календаря',
+        useCases: calendarHandleUseCases(),
       ),
     ],
   ),

@@ -58,7 +58,7 @@
   - **Files likely touched:** `lib/src/design_system/components/calendar_header.dart` (новый), `widgetbook/lib/calendar/calendar_header_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
   - **Estimated scope:** S
 
-- [ ] 1.6 Ручка календаря показывает раскрытие и сворачивание по дизайн-системе в Widgetbook
+- [x] 1.6 Ручка календаря показывает раскрытие и сворачивание по дизайн-системе в Widgetbook
   - **Acceptance criteria:**
     - Ручка получает признак «раскрыт», доступное название и нажатие; для вспомогательных технологий это кнопка с этим названием и состоянием раскрытия.
     - В обеих темах вид совпадает с README `WeekStrip` и `MonthGrid` и разделом «Expanding and period picker» спек-доски `Parts` (Collapsed, Expanded); область нажатия занимает всю ширину и не ниже `tapMin`.
