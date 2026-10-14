@@ -17,13 +17,6 @@ check = [
     "flutter analyze",
     "flutter test --concurrency=2"
 ]
-check-fast = [
-    "dart format --output=none --set-exit-if-changed .",
-    "bash test/tool/check_ci_scope_test.sh",
-    "flutter pub get --enforce-lockfile --directory widgetbook",
-    "flutter analyze",
-    "flutter test --exclude-tags=slow"
-]
 codegen = [
     "flutter gen-l10n",
     "dart run build_runner build --delete-conflicting-outputs",
