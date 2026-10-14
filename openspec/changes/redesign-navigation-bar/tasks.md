@@ -12,7 +12,7 @@
   - **Files likely touched:** `lib/src/design_system/doable_metrics.dart`, `lib/src/design_system/components/nav_bar.dart` (новый), `lib/src/app/navigation/app_navigation_bar.dart`, `test/app/navigation/app_navigation_bar_test.dart`
   - **Estimated scope:** M
 
-- [ ] 1.2 Кнопка быстрого создания выглядит как простой плюс с мини-значком текущего режима, без подложки и стрелок
+- [x] 1.2 Кнопка быстрого создания выглядит как простой плюс с мини-значком текущего режима, без подложки и стрелок
   - **Acceptance criteria:**
     - Модуль основ содержит кнопку создания `NavBar`: `muted` плюс размера `iconSize` и мини-значок 14 у нижнего правого угла знака, без подложки. Кнопка получает мини-значок, доступное название и подсказку, название действия удержания, нажатие и удержание и никогда не показывается выбранной (решение 1, ADR-0030).
     - `QuickCreationButton` строит её из режима и локализации: плюс — `add_outlined`, мини-значок — прежний значок текущего режима. Стрелки, подложка и `quickCreationChangeModeIcon` удалены, долгое нажатие стандартное для Flutter (решения 2, 8 и 9).

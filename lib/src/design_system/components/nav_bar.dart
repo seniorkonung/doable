@@ -110,6 +110,90 @@ final class NavBar extends StatelessWidget {
   }
 }
 
+/// Действие создания: плюс с мини-значком без подложки и состояния выбора.
+/// Названия и обработчики нажатия и удержания задаёт потребитель.
+final class NavBarCreateButton extends StatelessWidget {
+  const NavBarCreateButton({
+    required this.icon,
+    required this.label,
+    required this.hint,
+    required this.longPressLabel,
+    required this.onPressed,
+    required this.onLongPress,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final String hint;
+  final String longPressLabel;
+  final VoidCallback onPressed;
+  final VoidCallback onLongPress;
+
+  // Действия кешируются по доступному названию согласно контракту Flutter:
+  // https://api.flutter.dev/flutter/semantics/CustomSemanticsAction-class.html
+  static final _longPressActions = <String, CustomSemanticsAction>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors =
+        theme.extension<DoableColors>() ??
+        switch (theme.brightness) {
+          Brightness.light => DoableColors.light,
+          Brightness.dark => DoableColors.dark,
+        };
+    final longPressAction = _longPressActions.putIfAbsent(
+      longPressLabel,
+      () => CustomSemanticsAction(label: longPressLabel),
+    );
+
+    return Semantics(
+      container: true,
+      button: true,
+      label: label,
+      hint: hint,
+      onLongPressHint: longPressLabel,
+      onTap: onPressed,
+      onLongPress: onLongPress,
+      customSemanticsActions: {longPressAction: onLongPress},
+      child: SizedBox(
+        height: 48,
+        // Отклик рисуется на Material панели без собственной подложки:
+        // https://api.flutter.dev/flutter/material/InkWell-class.html
+        child: InkWell(
+          onTap: onPressed,
+          onLongPress: onLongPress,
+          excludeFromSemantics: true,
+          customBorder: const StadiumBorder(),
+          child: Center(
+            child: IconTheme(
+              data: IconThemeData(color: colors.muted),
+              child: SizedBox.square(
+                dimension: 48,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(
+                      Icons.add_outlined,
+                      size: DoableMetrics.iconSize,
+                    ),
+                    Positioned(
+                      right: 4,
+                      bottom: 8,
+                      child: Icon(icon, size: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 final class _NavBarTab extends StatelessWidget {
   const _NavBarTab({
     required this.item,

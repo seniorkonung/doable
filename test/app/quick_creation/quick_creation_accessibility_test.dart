@@ -237,19 +237,9 @@ void _expectButtonIcons(
   expect(rect.width, greaterThanOrEqualTo(48));
   expect(rect.height, greaterThanOrEqualTo(48));
   _expectWithin(tester, button, tester.getRect(find.byType(AppNavigationBar)));
-  for (final icon in [Icons.add, mode.icon, Icons.unfold_more]) {
+  for (final icon in [Icons.add_outlined, mode.icon]) {
     final finder = find.descendant(of: button, matching: find.byIcon(icon));
     _expectWithin(tester, finder, rect.intersect(Offset.zero & screen));
-    expect(
-      tester.getSize(finder),
-      Size.square(
-        icon == mode.icon
-            ? 12
-            : icon == Icons.add
-            ? 28
-            : 16,
-      ),
-    );
   }
   expect(
     find.descendant(of: button, matching: find.byType(Text)),

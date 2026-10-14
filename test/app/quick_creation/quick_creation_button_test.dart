@@ -99,7 +99,7 @@ void main() {
 
   const locale = Locale('ru');
   const mode = QuickCreationMode.relation;
-  testWidgets('плюс, значок режима и стрелки видны целиком без подписи, '
+  testWidgets('плюс и значок режима доступны без подписи, '
       'вся зона доступна: '
       '${locale.languageCode}, ${mode.name}', (tester) async {
     final launches = await _pumpButton(tester, locale: locale, mode: mode);
@@ -112,7 +112,7 @@ void main() {
       find.descendant(of: button, matching: find.byType(Text)),
       findsNothing,
     );
-    for (final icon in [Icons.add, mode.icon, Icons.unfold_more]) {
+    for (final icon in [Icons.add_outlined, mode.icon]) {
       final finder = find.byIcon(icon);
       expect(finder.hitTestable(), findsOneWidget);
       final rect = tester.getRect(finder);

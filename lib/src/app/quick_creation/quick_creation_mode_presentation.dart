@@ -21,6 +21,3 @@ extension QuickCreationModePresentation on QuickCreationMode {
     QuickCreationMode.dailyChoiceFromAction => Icons.arrow_upward,
   };
 }
-
-/// Стрелки смены режима отличаются от направлений построения дневного пути.
-const IconData quickCreationChangeModeIcon = Icons.unfold_more;
