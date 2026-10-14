@@ -47,7 +47,7 @@
   - **Files likely touched:** `lib/src/design_system/components/month_grid_day.dart` (новый), `widgetbook/lib/calendar/month_grid_day_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
   - **Estimated scope:** S
 
-- [ ] 1.5 Шапка месяца показывает стрелки соседних месяцев и заголовок по дизайн-системе в Widgetbook
+- [x] 1.5 Шапка месяца показывает стрелки соседних месяцев и заголовок по дизайн-системе в Widgetbook
   - **Acceptance criteria:**
     - Шапка получает заголовок и команды предыдущего и следующего месяца с доступными названиями либо их недоступность. Заголовок пока не является командой: выбор года и месяца добавляет фаза 3.
     - В обеих темах вид совпадает с README `MonthGrid` и разделом «Month header» спек-доски `Parts`; область нажатия каждой стрелки не меньше `tapMin`.
