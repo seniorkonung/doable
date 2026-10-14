@@ -1,5 +1,7 @@
 import 'package:widgetbook/widgetbook.dart';
 
+import 'foundations/colors_use_cases.dart';
+import 'foundations/typography_use_cases.dart';
 import 'intention/intention_summary_view_use_cases.dart';
 import 'navigation/app_navigation_bar_use_cases.dart';
 
@@ -13,6 +15,13 @@ import 'navigation/app_navigation_bar_use_cases.dart';
 /// Узлы хранят ссылку на родителя, поэтому каждое обращение возвращает новое
 /// дерево, а не общее изменяемое состояние.
 List<WidgetbookNode> buildCatalog() => [
+  WidgetbookFolder(
+    name: 'Основы',
+    children: [
+      WidgetbookComponent(name: 'Цвета', useCases: colorsUseCases()),
+      WidgetbookComponent(name: 'Типографика', useCases: typographyUseCases()),
+    ],
+  ),
   WidgetbookFolder(
     name: 'Навигация',
     children: [
