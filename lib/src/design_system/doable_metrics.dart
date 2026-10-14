@@ -1,4 +1,4 @@
-/// Шкалы отступов, радиусов и минимальная высота кнопок Doable.
+/// Шкалы отступов, радиусов и минимальные размеры элементов управления Doable.
 abstract final class DoableMetrics {
   static const double space1 = 4;
   static const double space2 = 8;
@@ -17,4 +17,5 @@ abstract final class DoableMetrics {
   static const double radiusFull = 9999;
 
   static const double controlHeight = 40;
+  static const double tapMin = 44;
 }
