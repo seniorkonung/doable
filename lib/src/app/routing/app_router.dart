@@ -38,6 +38,7 @@ final class AppRouter extends RootStackRouter {
       reverseDuration: const Duration(milliseconds: 200),
     ),
     AutoRoute(page: IntentionDetailsRoute.page),
+    AutoRoute(page: DailyChoiceDateCatalogRoute.page),
     AutoRoute(page: ChoicePathRoute.page),
     AutoRoute(page: DailyChoiceCreationRoute.page),
     AutoRoute(page: DailyChoiceDetailsRoute.page),
