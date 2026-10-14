@@ -37,7 +37,7 @@
 - **Requirements and scenarios:** ["plan.md: Phase 1 — Widgetbook и сверка с макетами", "design.md: решение 8 — темы, раздел Основы, шрифт и проверка значков", "tasks.md: 1.7 — сверка цветов и типографики", "tasks.md: 1.8 — готовность фазы 1"]
 - **Affected boundary:** Локальный каталог компонентов: выбор светлой и тёмной тем, просмотр цветов и текстовых образцов, существующие примеры навигации и намерений.
 - **Implementation target:** ["lib/src/design_system/doable_colors.dart", "lib/src/design_system/doable_metrics.dart", "lib/src/design_system/doable_theme.dart", "lib/src/design_system/doable_type.dart", "lib/src/design_system/fonts/InterVariable.ttf", "widgetbook/lib/catalog.dart", "widgetbook/lib/foundations/colors_use_cases.dart", "widgetbook/lib/foundations/typography_use_cases.dart", "widgetbook/lib/widgetbook_app.dart", "widgetbook/pubspec.yaml"]
-- **Applicable constraints and non-goals:** Каталог получает значения из общего модуля, использует тот же файл Inter без копии, сохраняет локализацию и масштаб текста до 2.5. Приватные материалы и снимки не публикуются. Перевод раскладки экранов и новые компоненты в диапазон не входят.
+- **Applicable constraints and non-goals:** Каталог получает значения из общего модуля, использует тот же файл Inter без копии, сохраняет локализацию. Приватные материалы и снимки не публикуются. Перевод раскладки экранов и новые компоненты в диапазон не входят.
 
 ## Pass coverage
 
