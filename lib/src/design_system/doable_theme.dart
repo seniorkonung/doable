@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'doable_colors.dart';
 import 'doable_metrics.dart';
+import 'doable_shadows.dart';
 import 'doable_type.dart';
 
 /// Строит оформление Material из основ Doable для выбранной яркости.
@@ -87,7 +88,13 @@ ThemeData doableTheme(Brightness brightness) {
     ),
     fontFamily: 'Inter',
     textTheme: textTheme,
-    extensions: [colors],
+    extensions: [
+      colors,
+      switch (brightness) {
+        Brightness.light => DoableShadows.light,
+        Brightness.dark => DoableShadows.dark,
+      },
+    ],
     iconTheme: IconThemeData(color: colors.ink, size: 24),
     iconButtonTheme: IconButtonThemeData(
       style: ButtonStyle(
