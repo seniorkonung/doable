@@ -32,6 +32,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
@@ -1043,7 +1044,10 @@ IntentionCommandStart _acceptExisting(
 ) => coordinator.acceptExisting(command, presentationTitle: 'Намерение');
 
 final class _ControlledGraphRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
@@ -1160,7 +1164,10 @@ final class _ControlledGraphRepository
 }
 
 final class _ControlledPersonalGraphRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

@@ -170,7 +170,10 @@ void main() {
     );
     await _open(
       tester,
-      find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+      find.byKey(
+        const ValueKey('relation-neighborhood-create-relation'),
+        skipOffstage: false,
+      ),
       RelationEditorPage,
     );
     const draft = 'Сохранить пояснение после просмотра участника';

@@ -11,7 +11,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -27,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
+import '../../../support/daily_choice_catalog_provider.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'daily_choice_calendar_test_support.dart';
 
@@ -395,10 +395,12 @@ void _expectCatalogUnchanged(
   expect(now.selection.isCompleted, was.selection.isCompleted);
 }
 
-DailyChoiceCatalogState _catalogState(WidgetTester tester) =>
-    ProviderScope.containerOf(
-      tester.element(find.byType(DailyChoiceCatalogPage)),
-    ).read(dailyChoiceCatalogViewModelProvider);
+DailyChoiceCatalogState _catalogState(WidgetTester tester) {
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(DailyChoiceCatalogPage)),
+  );
+  return container.read(openedDailyChoiceCatalogProvider(container));
+}
 
 /// Общая вертикальная прокрутка каталога.
 ScrollPosition _catalogScroll(WidgetTester tester) => tester

@@ -11,6 +11,7 @@ import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
 import '../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
+import '../../statistics/application/statistics_read_contract.dart';
 import '../../tag/application/tag_read_result.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
@@ -24,7 +25,7 @@ abstract interface class GraphCommandRepository {
 }
 
 abstract interface class PersonalGraphRepository
-    implements GraphCommandRepository, TagReadContract {
+    implements GraphCommandRepository, TagReadContract, StatisticsReadContract {
   /// Проверяет весь направленный черновик на одном снимке графа. Ноль шагов
   /// допустим, но не подтверждаем. Для нижнего обхода начало — фиксированное
   /// активное готовое действие, а текущее намерение — возможное основание

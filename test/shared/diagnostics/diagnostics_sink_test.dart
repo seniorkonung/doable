@@ -6,6 +6,54 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('DiagnosticsSink', () {
+    test('успех чтения агрегатов статистики кодируется без данных графа', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      recordDiagnosticsSafely(
+        sink,
+        const StatisticsReadDiagnosticsEvent(
+          readType: StatisticsReadDiagnosticsType.homePage,
+          stage: StatisticsReadDiagnosticsStage.sourceData,
+          status: DiagnosticsSucceeded(Duration(microseconds: 1234)),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'statisticsRead',
+        'readType': 'homePage',
+        'stage': 'sourceData',
+        'outcome': 'succeeded',
+        'durationMicros': 1234,
+      });
+    });
+
+    test('отказ чтения названий статистики кодируется без данных графа', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      recordDiagnosticsSafely(
+        sink,
+        const StatisticsReadDiagnosticsEvent(
+          readType: StatisticsReadDiagnosticsType.homePage,
+          stage: StatisticsReadDiagnosticsStage.titles,
+          status: DiagnosticsFailed(
+            duration: Duration(microseconds: 5678),
+            code: DiagnosticsFailureCode.corruption,
+          ),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'statisticsRead',
+        'readType': 'homePage',
+        'stage': 'titles',
+        'outcome': 'failed',
+        'durationMicros': 5678,
+        'failureCode': 'corruption',
+      });
+    });
+
     test('начало чтения состояний дней кодируется без данных запроса', () {
       final messages = <String>[];
       final sink = DeveloperDiagnosticsSink(messages.add);

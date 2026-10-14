@@ -33,9 +33,10 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/statistics_read_contract_test_fallback.dart';
 
 final class ControlledCatalogRepository
-    with TagReadContractTestFallback
+    with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

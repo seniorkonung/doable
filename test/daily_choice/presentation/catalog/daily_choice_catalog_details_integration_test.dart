@@ -5,6 +5,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_id_generator.da
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
@@ -75,13 +76,12 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      final subscription = container.listen(
-        dailyChoiceCatalogViewModelProvider,
-        (_, _) {},
-      );
+      final instance = DailyChoiceCatalogInstance(initialDate: sourceDay);
+      final catalogProvider = dailyChoiceCatalogViewModelProvider(instance);
+      final subscription = container.listen(catalogProvider, (_, _) {});
       addTearDown(subscription.close);
       final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        sourceDay,
+        instance,
       );
       final marksSubscription = container.listen(marksProvider, (_, _) {});
       addTearDown(marksSubscription.close);
@@ -101,20 +101,15 @@ void main() {
       }
 
       DailyChoiceCatalogLoaded catalog() =>
-          container.read(dailyChoiceCatalogViewModelProvider)
-              as DailyChoiceCatalogLoaded;
-      final model = container.read(
-        dailyChoiceCatalogViewModelProvider.notifier,
-      );
+          container.read(catalogProvider) as DailyChoiceCatalogLoaded;
+      final model = container.read(catalogProvider.notifier);
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
 
       model.selectDate(sourceDay);
       await _until(
-        () =>
-            container.read(dailyChoiceCatalogViewModelProvider)
-                is DailyChoiceCatalogLoaded,
+        () => container.read(catalogProvider) is DailyChoiceCatalogLoaded,
       );
       expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 51);
@@ -219,8 +214,7 @@ void main() {
       model.selectDate(targetDay);
       await _until(
         () =>
-            container.read(dailyChoiceCatalogViewModelProvider)
-                is DailyChoiceCatalogLoaded &&
+            container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
             catalog().selection.date == targetDay,
       );
       expect(catalog().totalCount, 1);
@@ -298,16 +292,15 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      final subscription = container.listen(
-        dailyChoiceCatalogViewModelProvider,
-        (_, _) {},
+      final catalogProvider = dailyChoiceCatalogViewModelProvider(
+        DailyChoiceCatalogInstance(initialDate: day),
       );
+      final subscription = container.listen(catalogProvider, (_, _) {});
       addTearDown(subscription.close);
       DailyChoiceCatalogLoaded catalog() =>
-          container.read(dailyChoiceCatalogViewModelProvider)
-              as DailyChoiceCatalogLoaded;
+          container.read(catalogProvider) as DailyChoiceCatalogLoaded;
       bool shows(CalendarDate date, bool? isCompleted) =>
-          switch (container.read(dailyChoiceCatalogViewModelProvider)) {
+          switch (container.read(catalogProvider)) {
             final DailyChoiceCatalogLoaded loaded =>
               loaded.selection.date == date &&
                   loaded.selection.isCompleted == isCompleted &&
@@ -317,9 +310,7 @@ void main() {
       List<DailyChoiceId> ids() => [
         for (final item in catalog().items) item.id,
       ];
-      final model = container.read(
-        dailyChoiceCatalogViewModelProvider.notifier,
-      );
+      final model = container.read(catalogProvider.notifier);
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
@@ -334,8 +325,7 @@ void main() {
       Future<void> reconciled(DailyChoiceCommandCompletion completion) =>
           _until(
             () =>
-                container.read(dailyChoiceCatalogViewModelProvider)
-                    is DailyChoiceCatalogLoaded &&
+                container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
                 catalog().freshness == DailyChoiceCatalogFreshness.current &&
                 catalog().revision.compareTo(completion.revision!) ==
                     GraphRevisionOrder.same,

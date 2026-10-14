@@ -13,8 +13,8 @@ import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice.dart';
 import '../../domain/daily_choice_id.dart';
+import 'daily_choice_catalog_instance.dart';
 import 'daily_choice_catalog_state.dart';
-import 'daily_choice_local_date_provider.dart';
 
 part 'daily_choice_catalog_view_model.g.dart';
 
@@ -28,18 +28,19 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   StreamSubscription<GraphCommandCompletion>? _completions;
 
   /// Выбор появляется при первом построении, до первого чтения каталога:
-  /// локальное сегодня со всеми состояниями выполнения. Перестроения модели
-  /// сохраняют текущий выбор и часы не перечитывают.
-  late var _selection = DailyChoiceCatalogSelection(
-    date: ref.read(dailyChoiceLocalDateSourceProvider)().date,
-  );
+  /// начальная дата экземпляра со всеми состояниями выполнения.
+  /// Перестроения модели сохраняют текущий выбор.
+  late var _selection = DailyChoiceCatalogSelection(date: instance.initialDate);
   var _generation = 0;
   var _invalidation = 0;
   GraphRevision? _requiredRevision;
   Object? _activeRequest;
 
+  // Семейство с автоматическим освобождением хранит состояние экземпляра:
+  // https://riverpod.dev/docs/concepts2/family
+  // https://riverpod.dev/docs/concepts2/auto_dispose
   @override
-  DailyChoiceCatalogState build() {
+  DailyChoiceCatalogState build(DailyChoiceCatalogInstance instance) {
     unawaited(_completions?.cancel());
     _activeRequest = null;
     _requiredRevision = null;

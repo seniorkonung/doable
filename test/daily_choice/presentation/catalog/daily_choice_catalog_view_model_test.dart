@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -39,6 +40,121 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
+  test('экземпляры с одинаковой начальной датой независимо хранят условия и порции', () async {
+    final initialDate = CalendarDate.fromParts(2026, 9, 20);
+    final harness = _Harness(initialDate: initialDate);
+    addTearDown(harness.dispose);
+    final second = dailyChoiceCatalogViewModelProvider(
+      DailyChoiceCatalogInstance(initialDate: initialDate),
+    );
+    final subscription = harness.container.listen(second, (_, _) {});
+    addTearDown(subscription.close);
+    final secondModel = harness.container.read(second.notifier);
+    final secondCursor = _Cursor();
+    DailyChoiceCatalogLoaded secondState() =>
+        harness.container.read(second) as DailyChoiceCatalogLoaded;
+
+    expect(harness.repository.queries, hasLength(2));
+    for (final query in harness.repository.queries) {
+      _expectQuery(query, date: initialDate);
+    }
+    harness.repository.first(
+      0,
+      [_item(1, date: initialDate)],
+      total: 2,
+      cursor: _Cursor(),
+    );
+    harness.repository.first(
+      1,
+      [_item(10, date: initialDate)],
+      total: 2,
+      cursor: secondCursor,
+    );
+    await pumpEventQueue();
+
+    final load = harness.model.loadMore();
+    harness.repository.more(2, [_item(2, date: initialDate)]);
+    await load;
+    expect(
+      (harness.state as DailyChoiceCatalogLoaded).items.map((item) => item.id),
+      [_choiceId(1), _choiceId(2)],
+    );
+    expect(secondState().items.map((item) => item.id), [_choiceId(10)]);
+    expect(secondState().totalCount, 2);
+
+    harness.model.selectCompletion(false);
+    harness.repository.first(3, [_item(1, date: initialDate)], total: 1);
+    await pumpEventQueue();
+    harness.model.selectDate(_today);
+    harness.repository.first(4, [_item(3)], total: 1);
+    await pumpEventQueue();
+    expect(harness.state.selection.date, _today);
+    expect(harness.state.selection.isCompleted, false);
+    expect(secondState().selection.date, initialDate);
+    expect(secondState().selection.isCompleted, isNull);
+
+    final secondLoad = secondModel.loadMore();
+    _expectQuery(
+      harness.repository.queries[5],
+      date: initialDate,
+      cursor: secondCursor,
+    );
+    harness.repository.more(5, [_item(11, date: initialDate)]);
+    await secondLoad;
+    expect(secondState().items.map((item) => item.id), [
+      _choiceId(10),
+      _choiceId(11),
+    ]);
+    expect(
+      (harness.state as DailyChoiceCatalogLoaded).items.map((item) => item.id),
+      [_choiceId(3)],
+    );
+  });
+
+  test('закрытие экземпляра во время подгрузки прекращает повторы и согласование только у него', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    final second = dailyChoiceCatalogViewModelProvider(
+      DailyChoiceCatalogInstance(initialDate: _today),
+    );
+    final subscription = harness.container.listen(second, (_, _) {});
+    addTearDown(subscription.close);
+    final secondModel = harness.container.read(second.notifier);
+    harness.repository.first(0, [_item(1)], total: 2, cursor: _Cursor());
+    harness.repository.first(1, [_item(10)], total: 2, cursor: _Cursor());
+    await pumpEventQueue();
+
+    final lateLoad = harness.model.loadMore();
+    harness.subscription.close();
+    await harness.container.pump();
+    harness.repository.fail(2, const DailyChoiceCatalogSnapshotExpired());
+    await lateLoad;
+    expect(harness.repository.queries, hasLength(3));
+
+    final load = secondModel.loadMore();
+    harness.repository.more(3, [_item(11)]);
+    await load;
+    final completion = harness.createChoice(12, revision: 2);
+    harness.repository.succeedCreation(0, 12, revision: 2);
+    await completion.future;
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(5));
+    harness.repository.first(
+      4,
+      [_item(12), _item(10), _item(11)],
+      total: 3,
+      revision: 2,
+    );
+    await pumpEventQueue();
+    final current = harness.container.read(second) as DailyChoiceCatalogLoaded;
+    expect(current.items.map((item) => item.id), [
+      _choiceId(12),
+      _choiceId(10),
+      _choiceId(11),
+    ]);
+    expect(current.freshness, DailyChoiceCatalogFreshness.current);
+  });
+
   test('перестроение модели сохраняет выбранный день и охват, когда сегодня сменилось', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);
@@ -49,7 +165,7 @@ void main() {
     await pumpEventQueue();
 
     harness.localDate.today = CalendarDate.fromParts(2026, 9, 25);
-    harness.container.invalidate(dailyChoiceCatalogViewModelProvider);
+    harness.container.invalidate(harness.provider);
     final rebuilt = harness.state;
 
     expect(rebuilt, isA<DailyChoiceCatalogInitialLoad>());
@@ -104,7 +220,7 @@ void main() {
     await retryRefresh;
 
     // Перестроение модели.
-    harness.container.invalidate(dailyChoiceCatalogViewModelProvider);
+    harness.container.invalidate(harness.provider);
     expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
 
     final queries = harness.repository.queries;
@@ -1090,27 +1206,28 @@ void main() {
 final _today = CalendarDate.fromParts(2026, 9, 24);
 
 final class _Harness {
-  _Harness() {
+  _Harness({CalendarDate? initialDate})
+    : instance = DailyChoiceCatalogInstance(
+        initialDate: initialDate ?? _today,
+      ) {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
         localDate.override,
       ],
     );
-    subscription = container.listen(
-      dailyChoiceCatalogViewModelProvider,
-      (_, _) {},
-    );
+    subscription = container.listen(provider, (_, _) {});
   }
 
   final _Repository repository = _Repository();
+  final DailyChoiceCatalogInstance instance;
+  DailyChoiceCatalogViewModelProvider get provider =>
+      dailyChoiceCatalogViewModelProvider(instance);
   final localDate = ControlledDailyChoiceLocalDate(_today);
   late final ProviderContainer container;
   late final ProviderSubscription<DailyChoiceCatalogState> subscription;
-  DailyChoiceCatalogViewModel get model =>
-      container.read(dailyChoiceCatalogViewModelProvider.notifier);
-  DailyChoiceCatalogState get state =>
-      container.read(dailyChoiceCatalogViewModelProvider);
+  DailyChoiceCatalogViewModel get model => container.read(provider.notifier);
+  DailyChoiceCatalogState get state => container.read(provider);
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
 

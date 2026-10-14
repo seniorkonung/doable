@@ -47,6 +47,11 @@ abstract base class LocalDatabaseConnectionObserver {
 
   FutureOr<void> afterStatement(LocalDatabaseSqlStatement statement) {}
 
+  /// Границы транзакции позволяют отделять удержание очереди от ожидания.
+  void onTransactionStarted() {}
+
+  void onTransactionFinished() {}
+
   FutureOr<List<Map<String, Object?>>> afterSelect(
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
@@ -134,6 +139,33 @@ final class _LocalDatabaseObserverInterceptor extends QueryInterceptor {
   _LocalDatabaseObserverInterceptor(this._observer);
 
   final LocalDatabaseConnectionObserver _observer;
+
+  // Границы предоставлены QueryInterceptor установленной версии Drift:
+  // https://pub.dev/documentation/drift/2.34.3/drift/QueryInterceptor-class.html
+  @override
+  TransactionExecutor beginTransaction(QueryExecutor parent) {
+    final transaction = parent.beginTransaction();
+    _observer.onTransactionStarted();
+    return transaction;
+  }
+
+  @override
+  Future<void> commitTransaction(TransactionExecutor inner) async {
+    try {
+      await inner.send();
+    } finally {
+      _observer.onTransactionFinished();
+    }
+  }
+
+  @override
+  Future<void> rollbackTransaction(TransactionExecutor inner) async {
+    try {
+      await inner.rollback();
+    } finally {
+      _observer.onTransactionFinished();
+    }
+  }
 
   @override
   Future<bool> ensureOpen(

@@ -28,6 +28,303 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Граф намерений';
 
   @override
+  String get statisticsSourceIntentions => 'Исходные намерения';
+
+  @override
+  String get statisticsIntermediateIntentions => 'Промежуточные намерения';
+
+  @override
+  String get statisticsSelectedActions => 'Выбранные действия';
+
+  @override
+  String get statisticsThroughRelations => 'Через связи';
+
+  @override
+  String get statisticsMonthTab => 'Месяц';
+
+  @override
+  String get statisticsYearTab => 'Год';
+
+  @override
+  String statisticsMonthPeriod(DateTime date) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.yMMMM(localeName);
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString';
+  }
+
+  @override
+  String statisticsYearPeriod(DateTime date) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.y(localeName);
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString';
+  }
+
+  @override
+  String statisticsMonthName(DateTime date) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.MMMM(localeName);
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString';
+  }
+
+  @override
+  String get statisticsPreviousMonth => 'Предыдущий месяц';
+
+  @override
+  String get statisticsNextMonth => 'Следующий месяц';
+
+  @override
+  String get statisticsPreviousYear => 'Предыдущий год';
+
+  @override
+  String get statisticsNextYear => 'Следующий год';
+
+  @override
+  String get statisticsExpandPeriodSelector => 'Развернуть выбор периода';
+
+  @override
+  String get statisticsCollapsePeriodSelector => 'Свернуть выбор периода';
+
+  @override
+  String get statisticsCurrentPeriod => 'Текущий период';
+
+  @override
+  String get statisticsPeriodSummary => 'Сводка периода';
+
+  @override
+  String get statisticsViewLabel => 'Вид статистики';
+
+  @override
+  String statisticsTotalItems(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString элемента',
+      many: '$countString элементов',
+      few: '$countString элемента',
+      one: '$countString элемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statisticsPlannedContribution(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Запланированный вклад: $countString';
+  }
+
+  @override
+  String statisticsContribution(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Вклад: $countString';
+  }
+
+  @override
+  String statisticsMissed(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Пропущено: $countString';
+  }
+
+  @override
+  String statisticsUpcoming(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return 'Предстоит: $countString';
+  }
+
+  @override
+  String statisticsContributionCounts(int contribution, int planned) {
+    final intl.NumberFormat contributionNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String contributionString = contributionNumberFormat.format(
+      contribution,
+    );
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
+
+    return '$contributionString из $plannedString';
+  }
+
+  @override
+  String statisticsContributionCountsSemantics(int contribution, int planned) {
+    final intl.NumberFormat contributionNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String contributionString = contributionNumberFormat.format(
+      contribution,
+    );
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
+
+    return 'Вклад: $contributionString. Запланированный вклад: $plannedString';
+  }
+
+  @override
+  String statisticsContributionShare(num share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return 'Доля вклада периода: $shareString';
+  }
+
+  @override
+  String get statisticsNoContributionShare =>
+      'Доля отсутствует: вклад периода равен нулю';
+
+  @override
+  String get statisticsLoading => 'Загружаем статистику…';
+
+  @override
+  String get statisticsEmpty =>
+      'За выбранный период нет засчитанных дневных выборов для этого вида.';
+
+  @override
+  String get statisticsRefreshing => 'Обновляем статистику…';
+
+  @override
+  String get statisticsLoadingMore => 'Загружаем ещё элементы…';
+
+  @override
+  String get statisticsUnavailable =>
+      'Не удалось загрузить статистику. Повторите попытку.';
+
+  @override
+  String get statisticsCorruption =>
+      'Сохранённые данные повреждены. Статистика недоступна.';
+
+  @override
+  String get statisticsUnexpectedFailure =>
+      'Не удалось загрузить статистику из-за непредвиденной ошибки.';
+
+  @override
+  String get statisticsRefreshUnavailable =>
+      'Статистика не обновлена: не удалось получить изменения. Повторите попытку.';
+
+  @override
+  String get statisticsRefreshCorruption =>
+      'Статистика не обновлена: сохранённые данные повреждены.';
+
+  @override
+  String get statisticsRefreshUnexpectedFailure =>
+      'Статистика не обновлена из-за непредвиденной ошибки.';
+
+  @override
+  String get statisticsLoadMoreUnavailable =>
+      'Не удалось загрузить следующие элементы. Повторите попытку.';
+
+  @override
+  String get statisticsLoadMoreCorruption =>
+      'Следующие элементы недоступны: сохранённые данные повреждены.';
+
+  @override
+  String get statisticsLoadMoreUnexpectedFailure =>
+      'Не удалось загрузить следующие элементы из-за непредвиденной ошибки.';
+
+  @override
+  String get statisticsSectionTitle => 'Статистика';
+
+  @override
+  String get statisticsBreakdownSourceIntentions => 'По исходным намерениям';
+
+  @override
+  String get statisticsBreakdownSelectedActions => 'По выбранным действиям';
+
+  @override
+  String get statisticsBreakdownRelations => 'По связям';
+
+  @override
+  String statisticsExplicitPathChoices(int count, int planned) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
+
+    return 'Дневные выборы с намерением на сохранённом пути выбора: $countString из $plannedString';
+  }
+
+  @override
+  String statisticsBreakdownContributionShare(num share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return 'Доля вклада намерения в этом виде: $shareString';
+  }
+
+  @override
+  String get statisticsBreakdownNoContributionShare =>
+      'Доля отсутствует: вклад намерения в этом виде равен нулю';
+
+  @override
+  String get statisticsRefreshUnavailableShort => 'Нет обновления.';
+
+  @override
+  String get statisticsRefreshCorruptionShort => 'Данные повреждены.';
+
+  @override
+  String get statisticsRefreshUnexpectedShort => 'Ошибка обновления.';
+
+  @override
+  String get statisticsCalendarDayAllCompleted =>
+      'Все засчитанные дневные выборы выполнены';
+
+  @override
+  String get statisticsCalendarDayHasIncomplete =>
+      'Есть невыполненный засчитанный дневной выбор';
+
+  @override
+  String get statisticsCalendarDayNoChoices =>
+      'Нет засчитанных дневных выборов';
+
+  @override
+  String statisticsCalendarDaySemantics(DateTime date, String dayStatus) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.yMMMMEEEEd(
+      localeName,
+    );
+    final String dateString = dateDateFormat.format(date);
+
+    return '$dateString. $dayStatus';
+  }
+
+  @override
+  String statisticsMonthBarSemantics(DateTime month, String counts) {
+    final intl.DateFormat monthDateFormat = intl.DateFormat.yMMMM(localeName);
+    final String monthString = monthDateFormat.format(month);
+
+    return '$monthString. $counts';
+  }
+
+  @override
+  String statisticsViewCardSemantics(
+    String view,
+    String period,
+    String counts,
+  ) {
+    return '$view. $period. $counts';
+  }
+
+  @override
   String get quickCreationLabel => 'Быстрое создание';
 
   @override

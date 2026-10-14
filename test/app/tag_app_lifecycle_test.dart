@@ -11,6 +11,9 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
+import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
+import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -259,6 +262,20 @@ final class _ControlledRepository extends Fake
 
   void holdNextRename() => _heldRename = Completer<void>();
   void releaseRename() => _heldRename!.complete();
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      delegate.getStatisticsPage(query);
+
+  @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) => delegate.getIntentionStatisticsSection(query);
+
+  @override
+  Future<IntentionStatisticsBreakdownResult<T>>
+  getIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor) =>
+      delegate.getIntentionStatisticsBreakdown(cursor);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

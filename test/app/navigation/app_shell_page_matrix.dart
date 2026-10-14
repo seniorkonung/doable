@@ -104,6 +104,37 @@ enum _MatrixEntry {
 }
 
 void _registerPageMatrixTests() {
+  testWidgets('матрица: каталог на дату — обычная страница поверх намерения', (
+    tester,
+  ) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(
+      tester,
+      _summary(IntentionCatalogPage, 'Читать'),
+      IntentionDetailsPage,
+    );
+    unawaited(router.push(DailyChoiceDateCatalogRoute(date: _choiceDate)));
+    await _until(tester, find.byType(DailyChoiceDateCatalogPage));
+    await tester.pumpAndSettle();
+    _expectAboveShell(
+      tester,
+      DailyChoiceDateCatalogPage,
+      AppDestination.intentionGraph,
+      expectedPanel: true,
+    );
+    expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
+    await _close(tester, DailyChoiceDateCatalogPage);
+    _expectAboveShell(
+      tester,
+      IntentionDetailsPage,
+      AppDestination.intentionGraph,
+    );
+    await _close(tester, IntentionDetailsPage);
+    _expectRootPage(tester, router, AppDestination.intentionGraph);
+    expect(tester.takeException(), isNull);
+  });
+
   const read = _MatrixEntry.intention;
   const daily = _MatrixEntry.dailyChoice;
   const tags = _MatrixEntry.tags;

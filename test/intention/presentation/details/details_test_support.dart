@@ -28,8 +28,10 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 final class ControlledDetailRequest {
@@ -79,7 +81,10 @@ final class ControlledDetailRequest {
 }
 
 final class ControlledDetailsRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
@@ -148,6 +153,21 @@ final class ControlledDetailsRepository
   /// Запросы порций соседства в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
   final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
+
+  final statisticsQueries = <IntentionStatisticsQuery>[];
+  FutureOr<IntentionStatisticsSectionResult> Function(
+    IntentionStatisticsQuery query,
+  )?
+  onStatisticsSection;
+
+  @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) async {
+    statisticsQueries.add(query);
+    return onStatisticsSection?.call(query) ??
+        super.getIntentionStatisticsSection(query);
+  }
 
   /// Ответ соседства на конкретный запрос; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?

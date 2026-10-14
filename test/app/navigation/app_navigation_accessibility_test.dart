@@ -297,7 +297,12 @@ void _expectAnnounced(
   expect(
     [
       for (final node in traversal)
-        if (node.role == SemanticsRole.tab) node.label,
+        if (node.role == SemanticsRole.tab &&
+            AppDestination.values.any(
+              (destination) =>
+                  node.label == _destinationLabel(tester, names, destination),
+            ))
+          node.label,
     ],
     [
       for (final destination in AppDestination.values)

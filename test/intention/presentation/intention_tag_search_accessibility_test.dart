@@ -87,8 +87,8 @@ const _initialConditions = 6;
 
 void main() {
   for (final page in _pages) {
-    testWidgets('${page.name} и экран поиска тега доступны при увеличенном '
-        'тексте, открытой клавиатуре и многих условиях', (tester) async {
+    testWidgets('${page.name} и экран поиска тега доступны при открытой '
+        'клавиатуре и многих условиях', (tester) async {
       const locale = Locale('ru');
       tester.view.physicalSize = const Size(420, 900);
       tester.view.devicePixelRatio = 1;

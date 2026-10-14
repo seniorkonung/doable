@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
@@ -62,6 +63,10 @@ final class PackageConsumerProbe {
 /// наблюдения прикладной границы и модели открытых представлений.
 final class PackageConsumerProbes {
   PackageConsumerProbes(this._container, this._repository);
+
+  final dailyCatalogProvider = dailyChoiceCatalogViewModelProvider(
+    DailyChoiceCatalogInstance(initialDate: durabilityChoiceDate),
+  );
 
   final ProviderContainer _container;
   final DriftPersonalGraphRepository _repository;
@@ -318,13 +323,12 @@ final class PackageConsumerProbes {
     }
 
     _providerSubscriptions.add(
-      _container.listen<DailyChoiceCatalogState>(
-        dailyChoiceCatalogViewModelProvider,
-        (_, next) {
-          observe(next);
-        },
-        fireImmediately: true,
-      ),
+      _container.listen<DailyChoiceCatalogState>(dailyCatalogProvider, (
+        _,
+        next,
+      ) {
+        observe(next);
+      }, fireImmediately: true),
     );
   }
 
@@ -363,13 +367,10 @@ final class PackageConsumerProbes {
   /// фикстуры и охвата выполненных.
   bool get dailyCatalogSelected =>
       dailyCatalogSelection == (durabilityChoiceDate, true) &&
-      _container.read(dailyChoiceCatalogViewModelProvider)
-          is DailyChoiceCatalogLoaded;
+      _container.read(dailyCatalogProvider) is DailyChoiceCatalogLoaded;
 
   (Object?, bool?) get dailyCatalogSelection {
-    final selection = _container
-        .read(dailyChoiceCatalogViewModelProvider)
-        .selection;
+    final selection = _container.read(dailyCatalogProvider).selection;
     return (selection.date, selection.isCompleted);
   }
 

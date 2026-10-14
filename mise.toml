@@ -34,3 +34,7 @@ setup = [
 description = "Запустить Widgetbook на Linux-десктопе"
 dir = "{{config_root}}/widgetbook"
 run = "flutter run -d linux"
+
+[tasks.benchmark]
+description = "Бенчмарки: время, очередь и сравнение с бюджетами"
+run = "bash tool/benchmark.sh"

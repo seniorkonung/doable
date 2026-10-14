@@ -1,7 +1,6 @@
 @Tags(['slow'])
 library;
 
-import 'dart:io';
 import 'dart:math';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
@@ -15,14 +14,14 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_catalog_large_fixture.dart';
 import '../../support/local_database_harness.dart';
 
-const _fixtureSize = 50000;
+const _fixtureSize = intentionCatalogFixtureSize;
 const _pageSize = 100;
 const _jointMatchCount = 235;
 const _conditionCount = 1201;
@@ -62,12 +61,11 @@ void main() {
         InMemoryDiagnosticsSink(),
       );
 
-      await _populateFixture(database);
+      await populateIntentionCatalogFixture(database);
       trace.clear();
 
       await _expectBoundedPages(repository);
       await _expectFirstPageCounts(repository, trace);
-      await _expectWarmedShortFilterLatency(repository, trace);
       await _expectCompleteKeysetTraversal(repository);
     },
     timeout: const Timeout(Duration(minutes: 3)),
@@ -539,7 +537,7 @@ _openJointFixture() async {
     () => DateTime.utc(2026, 9, 3),
     InMemoryDiagnosticsSink(),
   );
-  await _populateFixture(database);
+  await populateIntentionCatalogFixture(database);
   _populateJointTagFixture(raw);
   trace.clear();
   trace.parameterLimit = 400;
@@ -834,25 +832,6 @@ void _expectJointPage(
   );
 }
 
-Future<void> _populateFixture(AppDatabase database) => database.batch((batch) {
-  final timestampBase = DateTime.utc(2026, 9, 1).microsecondsSinceEpoch;
-  for (var index = 0; index < _fixtureSize; index++) {
-    final timestamp =
-        timestampBase + (index % 7) * Duration.microsecondsPerMinute;
-    final title = 'ааа запись $index';
-    batch.insert(
-      database.intentions,
-      IntentionsCompanion.insert(
-        id: _fixtureId(index),
-        title: title,
-        isArchived: Value(index.isOdd),
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      ),
-    );
-  }
-});
-
 Future<void> _expectBoundedPages(PersonalGraphRepository repository) async {
   // Граница порции не зависит от текста фильтра: достаточно запроса без
   // фильтра и запроса с совпадением всех записей.
@@ -900,44 +879,6 @@ Future<void> _expectFirstPageCounts(
   }
 }
 
-Future<void> _expectWarmedShortFilterLatency(
-  PersonalGraphRepository repository,
-  _SelectTrace trace,
-) async {
-  for (final filter in _shortFilters) {
-    final query = _query(
-      scope: IntentionScope.active,
-      order: IntentionCatalogOrder.createdAtDescending,
-      titleFilter: filter,
-    );
-    trace.isRecording = false;
-    trace.clear();
-    final samples = <Duration>[];
-    try {
-      for (var index = 0; index < 5; index++) {
-        _page(await repository.getCatalogPage(query));
-      }
-
-      for (var index = 0; index < 30; index++) {
-        final stopwatch = Stopwatch()..start();
-        final page = _page(await repository.getCatalogPage(query));
-        samples.add(stopwatch.elapsed);
-        expect(page.items.length, lessThanOrEqualTo(_pageSize));
-      }
-    } finally {
-      trace.isRecording = true;
-    }
-
-    if (Platform.isLinux) {
-      expect(
-        _percentile95(samples),
-        lessThanOrEqualTo(const Duration(milliseconds: 100)),
-        reason: 'p95 полного repository path для фильтра «$filter»',
-      );
-    }
-  }
-}
-
 Future<void> _expectCompleteKeysetTraversal(
   PersonalGraphRepository repository,
 ) async {
@@ -979,12 +920,6 @@ Future<void> _expectCompleteKeysetTraversal(
   expect(pageCount, _fixtureSize ~/ _pageSize);
 }
 
-Duration _percentile95(List<Duration> samples) {
-  final sorted = [...samples]..sort();
-  final index = ((sorted.length * 95 + 99) ~/ 100) - 1;
-  return sorted[index];
-}
-
 IntentionCatalogPage _page(Result<IntentionCatalogPage> result) {
   expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
   return (result as ResultSuccess<IntentionCatalogPage>).value;
@@ -1003,11 +938,9 @@ IntentionCatalogQuery _query({
   cursor: cursor,
 );
 
-String _fixtureId(int index) =>
-    '018f0b5d-6b2e-7c80-8000-${index.toRadixString(16).padLeft(12, '0')}';
+String _fixtureId(int index) => intentionCatalogFixtureId(index);
 
 const _allFilters = <String?>[null, 'а', 'я', 'аа', 'яя', 'ааа'];
-const _shortFilters = <String>['а', 'я', 'аа', 'яя'];
 const _catalogOrders = <IntentionCatalogOrder>[
   IntentionCatalogOrder(
     field: IntentionCatalogSortField.createdAt,

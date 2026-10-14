@@ -15,11 +15,9 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -46,6 +44,9 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
+import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
+import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -59,6 +60,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/daily_choice_catalog_provider.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -309,9 +311,7 @@ void main() {
       await _prepareDailyChoiceCatalog(tester, app);
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
-      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        _today,
-      );
+      final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
         return app.container.read(marksProvider).dayStatuses != null;
@@ -326,7 +326,10 @@ void main() {
       await _open(tester, _catalogRow(_activeTitle(1)), IntentionDetailsPage);
       await _tap(
         tester,
-        find.byKey(const ValueKey('relation-neighborhood-daily-source')),
+        find.byKey(
+          const ValueKey('relation-neighborhood-daily-source'),
+          skipOffstage: false,
+        ),
       );
       await _open(
         tester,
@@ -502,9 +505,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-open')),
       );
-      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        CalendarDate.fromParts(2026, 9, 20),
-      );
+      final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
         return app.container
@@ -749,14 +750,14 @@ final class _App {
   };
 
   DailyChoiceCatalogLoaded get dailyChoiceCatalog =>
-      switch (container.read(dailyChoiceCatalogViewModelProvider)) {
+      switch (container.read(openedDailyChoiceCatalogProvider(container))) {
         final DailyChoiceCatalogLoaded loaded => loaded,
         final other => fail('Каталог дневных выборов без записей: $other'),
       };
 
   /// Каталог дневных выборов показывает полученную выдачу, в том числе пустую.
   bool get hasDailyChoiceCatalogResult =>
-      container.read(dailyChoiceCatalogViewModelProvider)
+      container.read(openedDailyChoiceCatalogProvider(container))
           is DailyChoiceCatalogLoaded;
 }
 
@@ -1360,6 +1361,20 @@ final class _ObservedRepository implements PersonalGraphRepository {
     final gate = _gate;
     if (gate != null && !gate.isCompleted) gate.complete();
   }
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      _delegate.getStatisticsPage(query);
+
+  @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) => _delegate.getIntentionStatisticsSection(query);
+
+  @override
+  Future<IntentionStatisticsBreakdownResult<T>>
+  getIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor) =>
+      _delegate.getIntentionStatisticsBreakdown(cursor);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

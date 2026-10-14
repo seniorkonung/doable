@@ -25,6 +25,9 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
+import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
+import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/shared/presentation/creation_exit_action.dart';
 import 'package:flutter/material.dart';
@@ -422,6 +425,20 @@ final class _Repository implements PersonalGraphRepository {
   final PersonalGraphRepository delegate;
   final result = Completer<bool>();
   var commands = 0;
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      delegate.getStatisticsPage(query);
+
+  @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) => delegate.getIntentionStatisticsSection(query);
+
+  @override
+  Future<IntentionStatisticsBreakdownResult<T>>
+  getIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor) =>
+      delegate.getIntentionStatisticsBreakdown(cursor);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

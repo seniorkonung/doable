@@ -12,7 +12,7 @@ part of 'daily_choice_catalog_view_model.dart';
 
 @ProviderFor(DailyChoiceCatalogViewModel)
 final dailyChoiceCatalogViewModelProvider =
-    DailyChoiceCatalogViewModelProvider._();
+    DailyChoiceCatalogViewModelFamily._();
 
 /// Согласовывает ограниченную загруженную часть с подтверждённым графом.
 final class DailyChoiceCatalogViewModelProvider
@@ -22,19 +22,26 @@ final class DailyChoiceCatalogViewModelProvider
           DailyChoiceCatalogState
         > {
   /// Согласовывает ограниченную загруженную часть с подтверждённым графом.
-  DailyChoiceCatalogViewModelProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'dailyChoiceCatalogViewModelProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  DailyChoiceCatalogViewModelProvider._({
+    required DailyChoiceCatalogViewModelFamily super.from,
+    required DailyChoiceCatalogInstance super.argument,
+  }) : super(
+         retry: null,
+         name: r'dailyChoiceCatalogViewModelProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$dailyChoiceCatalogViewModelHash();
+
+  @override
+  String toString() {
+    return r'dailyChoiceCatalogViewModelProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -47,16 +54,60 @@ final class DailyChoiceCatalogViewModelProvider
       providerOverride: $SyncValueProvider<DailyChoiceCatalogState>(value),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is DailyChoiceCatalogViewModelProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
 String _$dailyChoiceCatalogViewModelHash() =>
-    r'bcf85038a3fd6e44219e73f041eb082fb04fe4b4';
+    r'3be14cb3f36f8534be1ee8dd8432b05fc85b4339';
+
+/// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+
+final class DailyChoiceCatalogViewModelFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          DailyChoiceCatalogViewModel,
+          DailyChoiceCatalogState,
+          DailyChoiceCatalogState,
+          DailyChoiceCatalogState,
+          DailyChoiceCatalogInstance
+        > {
+  DailyChoiceCatalogViewModelFamily._()
+    : super(
+        retry: null,
+        name: r'dailyChoiceCatalogViewModelProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+
+  DailyChoiceCatalogViewModelProvider call(
+    DailyChoiceCatalogInstance instance,
+  ) => DailyChoiceCatalogViewModelProvider._(argument: instance, from: this);
+
+  @override
+  String toString() => r'dailyChoiceCatalogViewModelProvider';
+}
 
 /// Согласовывает ограниченную загруженную часть с подтверждённым графом.
 
 abstract class _$DailyChoiceCatalogViewModel
     extends $Notifier<DailyChoiceCatalogState> {
-  DailyChoiceCatalogState build();
+  late final _$args = ref.$arg as DailyChoiceCatalogInstance;
+  DailyChoiceCatalogInstance get instance => _$args;
+
+  DailyChoiceCatalogState build(DailyChoiceCatalogInstance instance);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
@@ -70,6 +121,6 @@ abstract class _$DailyChoiceCatalogViewModel
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, build);
+    return element.handleCreate(ref, () => build(_$args));
   }
 }

@@ -14,12 +14,10 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -37,6 +35,9 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
+import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
+import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -50,6 +51,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_catalog_controls.dart';
+import '../support/daily_choice_catalog_provider.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
@@ -293,10 +295,8 @@ void main() {
       // Уже существующая модель согласуется до возврата со страницы создания.
       // Скрытая страница откладывает перестроение, поэтому значок проверяется
       // после возврата, а здесь — её результат без создания нового провайдера.
-      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        durabilityChoiceDate,
-      );
       final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final marksProvider = openedDailyChoiceDayMarksProvider(ready.container);
       await _until(tester, () {
         expect(ready.container.exists(marksProvider), isTrue);
         return ready.container
@@ -890,7 +890,7 @@ Future<DailyChoiceCatalogLoaded> _catalogResult(
     () => find.byType(daily_page.DailyChoiceCatalogPage).evaluate().isNotEmpty,
   );
   DailyChoiceCatalogState current() =>
-      container.read(dailyChoiceCatalogViewModelProvider);
+      container.read(openedDailyChoiceCatalogProvider(container));
   DailyChoiceCatalogLoaded? result() => switch (current()) {
     final DailyChoiceCatalogLoaded loaded
         when loaded.selection.date == date &&
@@ -935,7 +935,7 @@ Map<String, Object?> _catalogView(
         .value,
     'сегодня': tester.widget<DailyChoiceCalendar>(calendar).today,
     'загруженные записи': switch (container.read(
-      dailyChoiceCatalogViewModelProvider,
+      openedDailyChoiceCatalogProvider(container),
     )) {
       final DailyChoiceCatalogLoaded loaded => [
         for (final item in loaded.items) item.id.toCanonicalString(),
@@ -983,6 +983,20 @@ final class _ObservedRepository implements PersonalGraphRepository {
 
   /// Команды, дошедшие до хранилища.
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      _delegate.getStatisticsPage(query);
+
+  @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) => _delegate.getIntentionStatisticsSection(query);
+
+  @override
+  Future<IntentionStatisticsBreakdownResult<T>>
+  getIntentionStatisticsBreakdown<T>(StatisticsBreakdownCursor<T> cursor) =>
+      _delegate.getIntentionStatisticsBreakdown(cursor);
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

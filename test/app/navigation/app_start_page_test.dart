@@ -28,7 +28,7 @@ const _readTitle = 'Читать';
 
 void main() {
   testWidgets('первый запуск в новой установке без намерений открывает '
-      'Главную с пустым содержимым', (tester) async {
+      'Главную с пустой статистикой', (tester) async {
     const locale = Locale('ru');
     final harness = await _harness(tester, locale);
     // Новая установка: хранилища ещё нет, его создаёт подготовка.
@@ -39,13 +39,13 @@ void main() {
     await tester.pumpAndSettle();
 
     _expectStartPage(tester);
-    _expectEmptyHome(tester);
+    await _expectEmptyHome(tester);
     expect(_intentionCount(app.raw), 0);
     expect(tester.takeException(), isNull);
   });
 
   group('начальная страница не зависит от намерений', () {
-    testWidgets('активное и архивированное намерения не заполняют Главную', (
+    testWidgets('намерения без дневных выборов оставляют статистику пустой', (
       tester,
     ) async {
       final harness = await _harness(tester, const Locale('ru'));
@@ -59,7 +59,7 @@ void main() {
       await tester.pumpAndSettle();
 
       _expectStartPage(tester);
-      _expectEmptyHome(tester);
+      await _expectEmptyHome(tester);
       expect(tester.takeException(), isNull);
     });
   });
@@ -110,7 +110,7 @@ void main() {
       await tester.pumpAndSettle();
 
       _expectStartPage(tester);
-      _expectEmptyHome(tester);
+      await _expectEmptyHome(tester);
       expect(tester.takeException(), isNull);
     });
   });
@@ -197,21 +197,19 @@ void _expectStartPage(WidgetTester tester) {
 AppDestination _selected(WidgetTester tester) =>
     tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected;
 
-void _expectEmptyHome(WidgetTester tester) {
+Future<void> _expectEmptyHome(WidgetTester tester) async {
   final home = find.byType(HomePage);
   final l10n = AppLocalizations.of(tester.element(home));
-  expect(
-    tester
-        .widgetList<Text>(
-          find.descendant(of: home, matching: find.byType(Text)),
-        )
-        .map((text) => text.data),
-    [AppDestination.home.title(l10n)],
+  await _until(tester, find.text(l10n.statisticsPlannedContribution(0)));
+  await tester.scrollUntilVisible(
+    find.text(l10n.statisticsEmpty),
+    200,
+    scrollable: find.descendant(of: home, matching: find.byType(Scrollable)),
   );
-  expect(
-    find.descendant(of: home, matching: find.byType(Scrollable)),
-    findsNothing,
-  );
+  expect(find.text(l10n.statisticsEmpty), findsOneWidget);
+  expect(find.text(l10n.statisticsPlannedContribution(0)), findsOneWidget);
+  expect(find.text(l10n.statisticsContribution(0)), findsOneWidget);
+  expect(find.text(l10n.statisticsTotalItems(0)), findsOneWidget);
 }
 
 void _storeIntention(

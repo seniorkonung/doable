@@ -175,7 +175,9 @@ final class _App {
         .read(intentionCatalogViewModelProvider(const BrowseIntentionCatalog()))
         .requireValue
         .selection;
-    final daily = container.read(dailyChoiceCatalogViewModelProvider).selection;
+    final daily = container
+        .read(openedDailyChoiceCatalogProvider(container))
+        .selection;
     return (
       intentions.scope,
       intentions.titleFilterText,
@@ -284,7 +286,7 @@ Future<_App> _start(
   await tester.pumpAndSettle();
   tabs.setActiveIndex(1);
   await tester.pumpAndSettle();
-  container.read(dailyChoiceCatalogViewModelProvider.notifier)
+  container.read(openedDailyChoiceCatalogProvider(container).notifier)
     ..selectDate(CalendarDate.fromParts(2026, 10, 7))
     ..selectCompletion(true);
   await tester.pumpAndSettle();

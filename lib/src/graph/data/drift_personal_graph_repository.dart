@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
@@ -38,6 +40,12 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../statistics/application/contribution_counts.dart';
+import '../../statistics/application/intention_statistics_breakdown.dart';
+import '../../statistics/application/intention_statistics_calendar.dart';
+import '../../statistics/application/intention_statistics_read_contract.dart';
+import '../../statistics/application/statistics_period.dart';
+import '../../statistics/application/statistics_read_contract.dart';
 import '../../tag/application/tag_catalog.dart';
 import '../../tag/application/tag_assignment_status.dart';
 import '../../tag/application/tag_assignments.dart';
@@ -59,6 +67,7 @@ import '../application/graph_revision.dart';
 import '../application/personal_graph_repository.dart';
 import '../application/selected_relations.dart';
 import 'drift_relation_count_aggregates.dart';
+import 'contribution_reachability.dart';
 
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -77,6 +86,12 @@ part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
+part 'drift_personal_graph_repository_statistics.dart';
+part 'drift_statistics_relation_snapshot.dart';
+part 'drift_statistics_seed_groups.dart';
+part 'drift_intention_statistics_source.dart';
+part 'drift_intention_statistics_reader.dart';
+part 'drift_through_relations_statistics_reader.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -88,6 +103,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     DailyChoiceIdGenerator? dailyChoiceIdGenerator,
     ChoicePathStepIdGenerator? choicePathStepIdGenerator,
     TagIdGenerator? tagIdGenerator,
+    this._statisticsReachabilityRunner = runContributionReachabilityInIsolate,
+    this._intentionStatisticsRunner = runIntentionContributionInIsolate,
   }) : _relationIdGenerator =
            relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
        _dailyChoiceIdGenerator =
@@ -114,9 +131,68 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final Set<_SelectedRelationsWatchRegistration> _selectedRelationsWatchers =
       {};
   var _mutationSequence = 0;
+  var _lastRelationChangeSequence = 0;
+  ContributionRelationGraph? _statisticsRelationSnapshot;
+  final ContributionReachabilityRunner _statisticsReachabilityRunner;
+  final List<_ThroughRelationsStatisticsResult> _throughRelationsResults = [];
+  final IntentionContributionRunner _intentionStatisticsRunner;
+  final List<_IntentionStatisticsResult> _intentionStatisticsResults = [];
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
+
+  @override
+  Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
+      switch (query.view) {
+        StatisticsView.sourceIntentions => _readStatisticsPage(
+          query,
+          _SavedPathStatisticsView.source,
+        ),
+        StatisticsView.intermediateIntentions => _readStatisticsPage(
+          query,
+          _SavedPathStatisticsView.intermediate,
+        ),
+        StatisticsView.selectedActions => _readStatisticsPage(
+          query,
+          _SavedPathStatisticsView.selected,
+        ),
+        StatisticsView.throughRelations => _readThroughRelationsStatisticsPage(
+          query,
+        ),
+      };
+
+  @override
+  Future<IntentionStatisticsSectionResult> getIntentionStatisticsSection(
+    IntentionStatisticsQuery query,
+  ) async {
+    try {
+      final section = await _readIntentionStatisticsSection(query);
+      return section == null
+          ? const IntentionStatisticsSectionError(
+              StatisticsIntentionNotFoundFailure(),
+            )
+          : IntentionStatisticsSectionSuccess(section);
+    } on Object catch (error) {
+      return IntentionStatisticsSectionError(
+        _classifyStatisticsReadFailure(error),
+      );
+    }
+  }
+
+  @override
+  Future<IntentionStatisticsBreakdownResult<T>> getIntentionStatisticsBreakdown<
+    T
+  >(StatisticsBreakdownCursor<T> cursor) async {
+    try {
+      return IntentionStatisticsBreakdownSuccess(
+        await _readIntentionStatisticsBreakdown(cursor),
+      );
+    } on Object catch (error) {
+      return IntentionStatisticsBreakdownError(
+        _classifyStatisticsReadFailure(error),
+      );
+    }
+  }
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
@@ -621,6 +697,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   void _notifyGraphWatchersFor(Iterable<GraphChange> changes) {
     final stableChanges = List<GraphChange>.unmodifiable(changes);
+    _invalidateStatisticsRelationSnapshot(stableChanges);
     _notifyIntentionWatchersFor(stableChanges);
     _notifyDailyChoiceWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
@@ -833,9 +910,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         archiveState == domain.IntentionArchiveState.archived
         ? await _readActiveRelationNeighborIds(id)
         : const <IntentionId>[];
-    if (cascadedNeighborIds.isNotEmpty) {
-      await _archiveActiveRelations(id);
-    }
+    final archivedRelations = cascadedNeighborIds.isNotEmpty
+        ? await _archiveActiveRelations(id)
+        : const <_CascadedRelationArchive>[];
 
     final updated = domain.Intention(
       id: existing.id,
@@ -866,6 +943,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       before: before,
       after: await _catalogEntrySnapshot(stored, affectedCounts[id] ?? counts),
       affectedCounts: affectedCounts,
+      archivedRelations: archivedRelations,
     );
   }
 
@@ -901,8 +979,41 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     ];
   }
 
-  Future<void> _archiveActiveRelations(IntentionId id) async {
+  Future<List<_CascadedRelationArchive>> _archiveActiveRelations(
+    IntentionId id,
+  ) async {
     final serializedId = id.toCanonicalString();
+    final rows = await _database
+        .customSelect(
+          '''SELECT relation.creation_sequence, relation.id,
+                relation.source_intention_id, relation.related_intention_id,
+                relation.type, relation.priority, relation.is_archived,
+                EXISTS(SELECT 1 FROM daily_choice_path_steps AS step
+                       WHERE step.long_term_relation_id = relation.id) AS is_referenced
+         FROM long_term_relations AS relation
+         WHERE relation.is_archived = 0 AND
+               (relation.source_intention_id = ? OR relation.related_intention_id = ?)''',
+          variables: [
+            Variable<String>(serializedId),
+            Variable<String>(serializedId),
+          ],
+          readsFrom: {
+            _database.longTermRelations,
+            _database.dailyChoicePathSteps,
+          },
+        )
+        .get();
+    final archived = [
+      for (final row in rows)
+        _CascadedRelationArchive(
+          _StoredRelationGroupRow.fromRawRow(row).toDomain(),
+          switch (_requiredStoredInteger(row.data, 'is_referenced')) {
+            0 => const LongTermRelationPermissions.unrestricted(),
+            1 => const LongTermRelationPermissions.referencedByDailyPath(),
+            _ => throw const _StoredIntentionCorruption(),
+          },
+        ),
+    ];
     await _database.customUpdate(
       '''
         UPDATE long_term_relations
@@ -917,6 +1028,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       ],
       updates: {_database.longTermRelations},
     );
+    return archived;
   }
 
   IntentionId _decodeStoredNeighborIntentionId(Object? value) {
@@ -1810,12 +1922,15 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
     required this.before,
     required this.after,
     Map<IntentionId, RelationCounts> affectedCounts = const {},
-  }) : affectedCounts = Map.unmodifiable(affectedCounts);
+    List<_CascadedRelationArchive> archivedRelations = const [],
+  }) : affectedCounts = Map.unmodifiable(affectedCounts),
+       archivedRelations = List.unmodifiable(archivedRelations);
 
   final domain.Intention intention;
   final IntentionCatalogEntrySnapshot before;
   final IntentionCatalogEntrySnapshot after;
   final Map<IntentionId, RelationCounts> affectedCounts;
+  final List<_CascadedRelationArchive> archivedRelations;
 
   @override
   IntentionId get intentionId => intention.id;
@@ -1832,6 +1947,7 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
       after: after,
     ),
     additionalChanges: [
+      for (final relation in archivedRelations) relation.toChange(revision),
       for (final entry in affectedCounts.entries)
         IntentionRelationCountsChanged(
           revision: revision,
