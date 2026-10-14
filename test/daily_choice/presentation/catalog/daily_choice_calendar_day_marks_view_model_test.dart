@@ -5,6 +5,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -20,6 +21,130 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'каталоги с одинаковой начальной датой независимо читают разные '
+    'месяцы и сохраняют отметки при задержке и отказе одного чтения',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final secondInstance = DailyChoiceCatalogInstance(
+        initialDate: _initialDate,
+      );
+      final secondProvider = dailyChoiceCalendarDayMarksViewModelProvider(
+        secondInstance,
+      );
+      final secondSubscription = harness.container.listen(
+        secondProvider,
+        (_, _) {},
+      );
+      addTearDown(secondSubscription.close);
+      expect(harness.repository.queries, hasLength(2));
+      for (final query in harness.repository.queries) {
+        expect(query.firstDate, _date(8, 31));
+        expect(query.lastDate, _date(12, 6));
+      }
+      harness.repository.succeed(0, {
+        _initialDate: DailyChoiceDayStatus.hasIncomplete,
+      });
+      harness.repository.succeed(1, {
+        _initialDate: DailyChoiceDayStatus.hasIncomplete,
+      });
+      await pumpEventQueue();
+
+      harness.model.setViewport(_viewport(11, 1));
+      harness.container
+          .read(secondProvider.notifier)
+          .setViewport(_viewport(12, 1));
+      expect(harness.repository.queries, hasLength(4));
+      expect(harness.repository.queries[2].firstDate, _date(9, 28));
+      expect(
+        harness.repository.queries[2].lastDate,
+        CalendarDate.fromParts(2027, 1, 3),
+      );
+      expect(harness.repository.queries[3].firstDate, _date(10, 26));
+      expect(
+        harness.repository.queries[3].lastDate,
+        CalendarDate.fromParts(2027, 1, 31),
+      );
+      harness.repository.succeed(3, {
+        _date(12, 15): DailyChoiceDayStatus.allCompleted,
+      });
+      await pumpEventQueue();
+      expect(harness.marks, {_initialDate: DailyChoiceDayStatus.hasIncomplete});
+      expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+        _date(12, 15): DailyChoiceDayStatus.allCompleted,
+      });
+
+      harness.repository.fail(2);
+      await pumpEventQueue();
+      expect(harness.state.hasReadFailure, isTrue);
+      expect(harness.marks, {_initialDate: DailyChoiceDayStatus.hasIncomplete});
+      expect(harness.container.read(secondProvider).hasReadFailure, isFalse);
+      expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+        _date(12, 15): DailyChoiceDayStatus.allCompleted,
+      });
+    },
+  );
+
+  test('новая ревизия обновляет оба каталога, закрытие одного прекращает '
+      'его чтения и не мешает согласованию другого', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    final secondInstance = DailyChoiceCatalogInstance(
+      initialDate: _initialDate,
+    );
+    final secondProvider = dailyChoiceCalendarDayMarksViewModelProvider(
+      secondInstance,
+    );
+    final secondSubscription = harness.container.listen(
+      secondProvider,
+      (_, _) {},
+    );
+    addTearDown(secondSubscription.close);
+    expect(harness.repository.queries, hasLength(2));
+    harness.repository.succeed(0, {});
+    harness.repository.succeed(1, {});
+    await pumpEventQueue();
+    harness.model.setViewport(_viewport(11, 1));
+    harness.repository.succeed(2, {});
+    await pumpEventQueue();
+
+    await harness.renameTag(2);
+    expect(harness.repository.queries, hasLength(5));
+    final firstRead = harness.repository.queries.indexWhere(
+      (query) => query.firstDate == _date(9, 28),
+      3,
+    );
+    final secondRead = harness.repository.queries.indexWhere(
+      (query) => query.firstDate == _date(8, 31),
+      3,
+    );
+    harness.repository.succeed(secondRead, {
+      _initialDate: DailyChoiceDayStatus.hasIncomplete,
+    }, revision: 2);
+    await pumpEventQueue();
+    expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+      _initialDate: DailyChoiceDayStatus.hasIncomplete,
+    });
+
+    harness.subscription.close();
+    await harness.container.pump();
+    await harness.renameTag(3);
+    expect(harness.repository.queries, hasLength(6));
+    expect(harness.repository.queries.last.firstDate, _date(8, 31));
+    harness.repository.succeed(firstRead, {
+      _date(11, 10): DailyChoiceDayStatus.allCompleted,
+    }, revision: 2);
+    harness.repository.succeed(5, {
+      _initialDate: DailyChoiceDayStatus.allCompleted,
+    }, revision: 3);
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(6));
+    expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+      _initialDate: DailyChoiceDayStatus.allCompleted,
+    });
+  });
+
   test('начальное окно задано выбранной датой, просмотр внутри месяца и '
       'смена представления после успеха не перечитывают отметки', () async {
     final harness = _Harness();
@@ -218,7 +343,9 @@ final class _Harness {
   }
 
   final repository = _Repository();
-  final provider = dailyChoiceCalendarDayMarksViewModelProvider(_initialDate);
+  final provider = dailyChoiceCalendarDayMarksViewModelProvider(
+    DailyChoiceCatalogInstance(initialDate: _initialDate),
+  );
   late final ProviderContainer container;
   late final ProviderSubscription<DailyChoiceCalendarDayMarksState>
   subscription;

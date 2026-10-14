@@ -1,3 +1,4 @@
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,3 +11,10 @@ DailyChoiceCatalogViewModelProvider openedDailyChoiceCatalogProvider(
     .map((reference) => reference.provider)
     .whereType<DailyChoiceCatalogViewModelProvider>()
     .single;
+
+/// Отметки того же экземпляра, что и уже открытый каталог.
+DailyChoiceCalendarDayMarksViewModelProvider openedDailyChoiceDayMarksProvider(
+  ProviderContainer container,
+) => dailyChoiceCalendarDayMarksViewModelProvider(
+  container.read(openedDailyChoiceCatalogProvider(container).notifier).instance,
+);

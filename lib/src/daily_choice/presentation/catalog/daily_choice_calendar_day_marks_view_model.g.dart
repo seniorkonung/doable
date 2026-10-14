@@ -9,7 +9,7 @@ part of 'daily_choice_calendar_day_marks_view_model.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Отметки периода, независимые от выбранного дня и выдачи каталога.
-/// Страница удерживает провайдер с её начальной выбранной датой всё время
+/// Страница удерживает провайдер с ключом своего экземпляра всё время
 /// своей жизни и передаёт изменения просмотра через [setViewport].
 
 @ProviderFor(DailyChoiceCalendarDayMarksViewModel)
@@ -17,7 +17,7 @@ final dailyChoiceCalendarDayMarksViewModelProvider =
     DailyChoiceCalendarDayMarksViewModelFamily._();
 
 /// Отметки периода, независимые от выбранного дня и выдачи каталога.
-/// Страница удерживает провайдер с её начальной выбранной датой всё время
+/// Страница удерживает провайдер с ключом своего экземпляра всё время
 /// своей жизни и передаёт изменения просмотра через [setViewport].
 final class DailyChoiceCalendarDayMarksViewModelProvider
     extends
@@ -26,11 +26,11 @@ final class DailyChoiceCalendarDayMarksViewModelProvider
           DailyChoiceCalendarDayMarksState
         > {
   /// Отметки периода, независимые от выбранного дня и выдачи каталога.
-  /// Страница удерживает провайдер с её начальной выбранной датой всё время
+  /// Страница удерживает провайдер с ключом своего экземпляра всё время
   /// своей жизни и передаёт изменения просмотра через [setViewport].
   DailyChoiceCalendarDayMarksViewModelProvider._({
     required DailyChoiceCalendarDayMarksViewModelFamily super.from,
-    required CalendarDate super.argument,
+    required DailyChoiceCatalogInstance super.argument,
   }) : super(
          retry: null,
          name: r'dailyChoiceCalendarDayMarksViewModelProvider',
@@ -78,10 +78,10 @@ final class DailyChoiceCalendarDayMarksViewModelProvider
 }
 
 String _$dailyChoiceCalendarDayMarksViewModelHash() =>
-    r'c5ef32e813d3df91ba6ce5132c717570714adc69';
+    r'4476c097e2239d0b72f7ddedff401a701a69c769';
 
 /// Отметки периода, независимые от выбранного дня и выдачи каталога.
-/// Страница удерживает провайдер с её начальной выбранной датой всё время
+/// Страница удерживает провайдер с ключом своего экземпляра всё время
 /// своей жизни и передаёт изменения просмотра через [setViewport].
 
 final class DailyChoiceCalendarDayMarksViewModelFamily extends $Family
@@ -91,7 +91,7 @@ final class DailyChoiceCalendarDayMarksViewModelFamily extends $Family
           DailyChoiceCalendarDayMarksState,
           DailyChoiceCalendarDayMarksState,
           DailyChoiceCalendarDayMarksState,
-          CalendarDate
+          DailyChoiceCatalogInstance
         > {
   DailyChoiceCalendarDayMarksViewModelFamily._()
     : super(
@@ -103,29 +103,30 @@ final class DailyChoiceCalendarDayMarksViewModelFamily extends $Family
       );
 
   /// Отметки периода, независимые от выбранного дня и выдачи каталога.
-  /// Страница удерживает провайдер с её начальной выбранной датой всё время
+  /// Страница удерживает провайдер с ключом своего экземпляра всё время
   /// своей жизни и передаёт изменения просмотра через [setViewport].
 
-  DailyChoiceCalendarDayMarksViewModelProvider call(CalendarDate initialDate) =>
-      DailyChoiceCalendarDayMarksViewModelProvider._(
-        argument: initialDate,
-        from: this,
-      );
+  DailyChoiceCalendarDayMarksViewModelProvider call(
+    DailyChoiceCatalogInstance instance,
+  ) => DailyChoiceCalendarDayMarksViewModelProvider._(
+    argument: instance,
+    from: this,
+  );
 
   @override
   String toString() => r'dailyChoiceCalendarDayMarksViewModelProvider';
 }
 
 /// Отметки периода, независимые от выбранного дня и выдачи каталога.
-/// Страница удерживает провайдер с её начальной выбранной датой всё время
+/// Страница удерживает провайдер с ключом своего экземпляра всё время
 /// своей жизни и передаёт изменения просмотра через [setViewport].
 
 abstract class _$DailyChoiceCalendarDayMarksViewModel
     extends $Notifier<DailyChoiceCalendarDayMarksState> {
-  late final _$args = ref.$arg as CalendarDate;
-  CalendarDate get initialDate => _$args;
+  late final _$args = ref.$arg as DailyChoiceCatalogInstance;
+  DailyChoiceCatalogInstance get instance => _$args;
 
-  DailyChoiceCalendarDayMarksState build(CalendarDate initialDate);
+  DailyChoiceCalendarDayMarksState build(DailyChoiceCatalogInstance instance);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {

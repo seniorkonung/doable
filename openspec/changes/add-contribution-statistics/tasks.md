@@ -588,7 +588,7 @@
   - **Вероятные файлы:** новый `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart`; `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, его generated-файл, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`; механическая адаптация существующих обращений к провайдеру в `test/daily_choice/presentation/catalog/` и `test/app/navigation/app_shell_state_test.dart`.
   - **Размер:** M; один совместимый переход модели и её потребителей.
 
-- [ ] 4.2 Разделить модели отметок дней между экземплярами каталога, включая страницы с одинаковой начальной датой
+- [x] 4.2 Разделить модели отметок дней между экземплярами каталога, включая страницы с одинаковой начальной датой
   - **Критерии приёмки:**
     - `DailyChoiceCalendarDayMarksViewModel` выбирается по ключу экземпляра из 4.1, а не по значению начальной даты. Каждая модель начинает с недели и окна своей начальной даты; страница передаёт ей изменения просмотра через существующую единственную точку.
     - Просмотр, окно чтения, подтверждённые отметки и отказ одной модели не изменяют другую. Сохраняются границы [ADR-0017](../../../docs/adr/0017-isolate-inline-calendar-behind-app-component.md) и [ADR-0025](../../../docs/adr/0025-load-calendar-day-marks-in-separate-viewport-model.md): просмотр может читать отметки, но не меняет выбранный день, фильтр и выдачу каталога.

@@ -15,7 +15,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
@@ -312,9 +311,7 @@ void main() {
       await _prepareDailyChoiceCatalog(tester, app);
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
-      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        _today,
-      );
+      final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
         return app.container.read(marksProvider).dayStatuses != null;
@@ -508,9 +505,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-open')),
       );
-      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        CalendarDate.fromParts(2026, 9, 20),
-      );
+      final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
         return app.container

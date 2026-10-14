@@ -8,15 +8,15 @@ import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/daily_choice_day_statuses.dart';
-import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day_marks_state.dart';
 import 'daily_choice_calendar_day_marks_window.dart';
 import 'daily_choice_calendar_viewport.dart';
+import 'daily_choice_catalog_instance.dart';
 
 part 'daily_choice_calendar_day_marks_view_model.g.dart';
 
 /// Отметки периода, независимые от выбранного дня и выдачи каталога.
-/// Страница удерживает провайдер с её начальной выбранной датой всё время
+/// Страница удерживает провайдер с ключом своего экземпляра всё время
 /// своей жизни и передаёт изменения просмотра через [setViewport].
 @riverpod
 final class DailyChoiceCalendarDayMarksViewModel
@@ -30,13 +30,13 @@ final class DailyChoiceCalendarDayMarksViewModel
   var _readAgain = false;
 
   @override
-  DailyChoiceCalendarDayMarksState build(CalendarDate initialDate) {
+  DailyChoiceCalendarDayMarksState build(DailyChoiceCatalogInstance instance) {
     _repository = ref.watch(personalGraphRepositoryProvider);
     _viewport = DailyChoiceCalendarViewport(
-      focusedDate: initialDate,
+      focusedDate: instance.initialDate,
       mode: DailyChoiceCalendarMode.week,
     );
-    _window = dailyChoiceCalendarDayMarksWindow(initialDate);
+    _window = dailyChoiceCalendarDayMarksWindow(instance.initialDate);
     _requiredRevision = null;
     final lifetime = _lifetime = Object();
     _isReading = false;

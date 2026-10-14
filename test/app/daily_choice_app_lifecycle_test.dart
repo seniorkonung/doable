@@ -14,7 +14,6 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
@@ -296,10 +295,8 @@ void main() {
       // Уже существующая модель согласуется до возврата со страницы создания.
       // Скрытая страница откладывает перестроение, поэтому значок проверяется
       // после возврата, а здесь — её результат без создания нового провайдера.
-      final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        durabilityChoiceDate,
-      );
       final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final marksProvider = openedDailyChoiceDayMarksProvider(ready.container);
       await _until(tester, () {
         expect(ready.container.exists(marksProvider), isTrue);
         return ready.container

@@ -76,13 +76,12 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      final catalogProvider = dailyChoiceCatalogViewModelProvider(
-        DailyChoiceCatalogInstance(initialDate: sourceDay),
-      );
+      final instance = DailyChoiceCatalogInstance(initialDate: sourceDay);
+      final catalogProvider = dailyChoiceCatalogViewModelProvider(instance);
       final subscription = container.listen(catalogProvider, (_, _) {});
       addTearDown(subscription.close);
       final marksProvider = dailyChoiceCalendarDayMarksViewModelProvider(
-        sourceDay,
+        instance,
       );
       final marksSubscription = container.listen(marksProvider, (_, _) {});
       addTearDown(marksSubscription.close);

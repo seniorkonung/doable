@@ -74,7 +74,7 @@ final class _DailyChoiceCatalogPageState
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
     final dayMarks = ref.watch(
-      dailyChoiceCalendarDayMarksViewModelProvider(_instance.initialDate),
+      dailyChoiceCalendarDayMarksViewModelProvider(_instance),
     );
     return Scaffold(
       appBar: AppBar(title: Text(l10n.appDestinationDailyChoices)),
@@ -166,10 +166,7 @@ final class _DailyChoiceCatalogPageState
   void _setViewport(DailyChoiceCalendarViewport viewport) {
     setState(() => _viewport = viewport);
     ref
-        .read(
-          dailyChoiceCalendarDayMarksViewModelProvider(_instance.initialDate)
-              .notifier,
-        )
+        .read(dailyChoiceCalendarDayMarksViewModelProvider(_instance).notifier)
         .setViewport(viewport);
   }
 
