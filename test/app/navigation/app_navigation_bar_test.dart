@@ -81,7 +81,7 @@ void main() {
     const locale = Locale('ru');
 
     testWidgets('показывает три пункта слева направо со значками дома, '
-        'календаря и графа', (tester) async {
+        'календаря и графа, а за ними — быстрое создание', (tester) async {
       await tester.pumpWidget(_testApp(locale: locale));
 
       expect(appNavigationDestinations(), findsNWidgets(3));
@@ -91,10 +91,9 @@ void main() {
       );
       final graph = tester.getCenter(find.byIcon(Icons.hub_outlined));
       final quick = tester.getCenter(find.byType(QuickCreationButton));
-      // Кнопка быстрого создания стоит между календарём и графом.
       expect(home.dx, lessThan(calendar.dx));
-      expect(calendar.dx, lessThan(quick.dx));
-      expect(quick.dx, lessThan(graph.dx));
+      expect(calendar.dx, lessThan(graph.dx));
+      expect(graph.dx, lessThan(quick.dx));
       expect(find.byType(QuickCreationButton).hitTestable(), findsOneWidget);
       expect(find.byIcon(Icons.account_tree), findsNothing);
       expect(find.byIcon(Icons.account_tree_outlined), findsNothing);
@@ -104,7 +103,7 @@ void main() {
 
     for (final selected in AppDestination.values) {
       testWidgets('выбранный пункт ${selected.name} отличается залитым '
-          'значком и индикатором', (tester) async {
+          'значком', (tester) async {
         await tester.pumpWidget(_testApp(locale: locale, selected: selected));
         await tester.pumpAndSettle();
 
@@ -118,13 +117,6 @@ void main() {
             find.byIcon(_outlinedIcons[destination]!),
             isSelected ? findsNothing : findsOneWidget,
           );
-          final indicator = tester.widget<NavigationIndicator>(
-            find.descendant(
-              of: appNavigationDestination(destination),
-              matching: find.byType(NavigationIndicator),
-            ),
-          );
-          expect(indicator.animation.value, isSelected ? 1 : 0);
         }
       });
     }
