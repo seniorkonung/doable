@@ -22,7 +22,7 @@ accepted ADRs are immutable.
 
 ## Additional Context
 
-- [ADR-0024](../../../docs/adr/0024-derive-calendar-day-states-from-saved-daily-choices.md) — proposed, originating change `add-daily-choice-calendar-day-marks`. Состояния дней по-прежнему вычисляются из сохранённых дневных выборов; изменение меняет только их вид.
+- [ADR-0024](../../../docs/adr/0024-derive-calendar-day-states-from-saved-daily-choices.md) — proposed, originating change `add-daily-choice-calendar-day-marks`. Состояния дней по-прежнему вычисляются из сохранённых дневных выборов одним ограниченным чтением на общей ревизии. Решение 2 дизайна расширяет окно и предел чтения для шестинедельных сеток в этих границах; отдельной ADR это уточнение не требует.
 - [ADR-0014](../../../docs/adr/0014-host-primary-navigation-in-root-page-shell.md) — proposed, originating change `add-home-navigation-and-favorites`. Исторический контекст оболочки корневых страниц; в части размещения панели её пересматривает ADR-0020.
 
 ## ADRs Owned by This Change
