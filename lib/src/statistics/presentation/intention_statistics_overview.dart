@@ -3,6 +3,7 @@ import 'dart:ui' show SemanticsRole;
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../daily_choice/domain/calendar_date.dart';
 import '../application/intention_statistics_read_contract.dart';
 import '../application/statistics_period.dart';
 import '../application/statistics_read_contract.dart';
@@ -18,6 +19,7 @@ final class IntentionStatisticsOverview extends StatelessWidget {
     required this.onNextPeriod,
     required this.onViewSelected,
     required this.onMonthSelected,
+    required this.onDaySelected,
     super.key,
   });
 
@@ -27,6 +29,7 @@ final class IntentionStatisticsOverview extends StatelessWidget {
   final VoidCallback onNextPeriod;
   final ValueChanged<StatisticsView> onViewSelected;
   final ValueChanged<int> onMonthSelected;
+  final ValueChanged<CalendarDate> onDaySelected;
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +138,7 @@ final class IntentionStatisticsOverview extends StatelessWidget {
             calendar: section.calendar,
             localDate: selection.localDate,
             onMonthSelected: onMonthSelected,
+            onDaySelected: onDaySelected,
           ),
         ],
       ],

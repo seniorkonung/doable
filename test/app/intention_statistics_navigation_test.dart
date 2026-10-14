@@ -8,6 +8,7 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -198,7 +199,7 @@ void main() {
   );
 
   testWidgets(
-    'повторное намерение получает отдельную цель, смена языка сохраняет историю и состояние',
+    'повторное намерение получает свою цель, день открывает каталог, язык и возврат сохраняют состояние',
     (tester) async {
       final app = await _start(tester);
       app.homeModel.selectPeriod(StatisticsMonth(2025, 9));
@@ -263,16 +264,52 @@ void main() {
       expect(app.container.read(first).selection, same(original.selection));
       final depth = app.router.stack.length;
       final english = lookupAppLocalizations(const Locale('en'));
-      await _tap(
-        tester,
-        find.bySemanticsLabel(
-          english.statisticsCalendarDaySemantics(
-            DateTime.utc(2025, 8, 1),
-            english.statisticsCalendarDayNoChoices,
-          ),
+      final day = find.bySemanticsLabel(
+        english.statisticsCalendarDaySemantics(
+          DateTime.utc(2025, 8, 1),
+          english.statisticsCalendarDayNoChoices,
         ),
       );
+      await tester.ensureVisible(day);
+      await tester.pumpAndSettle();
+      final calendarOffset = _scroll(
+        tester,
+        find.byType(IntentionDetailsPage),
+      ).position.pixels;
+      await _tap(tester, day);
+      await _untilFound(tester, find.byType(DailyChoiceDateCatalogPage));
+      expect(app.router.stack, hasLength(depth + 1));
+      expect(
+        tester
+            .widget<DailyChoiceDateCatalogPage>(
+              find.byType(DailyChoiceDateCatalogPage),
+            )
+            .date,
+        CalendarDate.fromParts(2025, 8, 1),
+      );
+      expect(
+        tester
+            .getSemantics(appNavigationDestination(AppDestination.home))
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      await _tap(tester, find.byTooltip('Back'));
+      await tester.pumpAndSettle();
       expect(app.router.stack, hasLength(depth));
+      expect(
+        app.container.read(second).selection.period,
+        topState.selection.period,
+      );
+      expect(
+        app.container.read(second).selection.view,
+        topState.selection.view,
+      );
+      expect(
+        _scroll(tester, find.byType(IntentionDetailsPage)).position.pixels,
+        calendarOffset,
+      );
+      expect(day.hitTestable(), findsOneWidget);
       for (var i = 0; i < 2; i++) {
         app.router.pop();
         await tester.pumpAndSettle();

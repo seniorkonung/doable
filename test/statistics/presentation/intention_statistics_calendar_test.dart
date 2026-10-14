@@ -13,43 +13,61 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('месяц отмечает только засчитанные дни и не выбирает день', (
-    tester,
-  ) async {
-    await _pump(tester, _month());
-    final texts = AppLocalizations.of(
-      tester.element(find.byType(IntentionStatisticsCalendarView)),
-    );
-    for (final (day, status, icon) in [
-      (5, texts.statisticsCalendarDayAllCompleted, Icons.check),
-      (7, texts.statisticsCalendarDayHasIncomplete, Icons.circle_outlined),
-      (9, texts.statisticsCalendarDayNoChoices, null),
-    ]) {
-      final label = texts.statisticsCalendarDaySemantics(
-        DateTime.utc(2026, 10, day),
-        status,
+  testWidgets(
+    'месяц отмечает только засчитанные дни и предоставляет действие дня',
+    (tester) async {
+      final opened = <CalendarDate>[];
+      await _pump(tester, _month(), onDaySelected: opened.add);
+      final texts = AppLocalizations.of(
+        tester.element(find.byType(IntentionStatisticsCalendarView)),
       );
-      final cell = find.bySemanticsLabel(label);
-      expect(cell, findsOneWidget);
-      final node = tester.getSemantics(cell);
-      expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
-      expect(node.flagsCollection.isSelected, Tristate.none);
-      expect(
-        find.descendant(of: cell, matching: find.byType(Icon)),
-        icon == null ? findsNothing : findsOneWidget,
-      );
-      if (icon != null) {
-        expect(
-          find.descendant(of: cell, matching: find.byIcon(icon)),
-          findsOneWidget,
+      for (final (day, status, icon) in [
+        (5, texts.statisticsCalendarDayAllCompleted, Icons.check),
+        (7, texts.statisticsCalendarDayHasIncomplete, Icons.circle_outlined),
+        (9, texts.statisticsCalendarDayNoChoices, null),
+      ]) {
+        final label = texts.statisticsCalendarDaySemantics(
+          DateTime.utc(2026, 10, day),
+          status,
         );
+        final cell = find.bySemanticsLabel(label);
+        expect(cell, findsOneWidget);
+        final node = tester.getSemantics(cell);
+        expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+        expect(node.flagsCollection.isButton, isTrue);
+        expect(node.flagsCollection.isSelected, Tristate.none);
+        expect(
+          find.descendant(of: cell, matching: find.byType(Icon)),
+          icon == null ? findsNothing : findsOneWidget,
+        );
+        if (icon != null) {
+          expect(
+            find.descendant(of: cell, matching: find.byIcon(icon)),
+            findsOneWidget,
+          );
+        }
       }
-    }
-    await tester.tap(find.text('7'));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-    expect(find.text('31'), findsOneWidget);
-  });
+      expect(
+        tester.semantics.simulatedAccessibilityTraversal().where(
+          (node) => node.getSemanticsData().hasAction(SemanticsAction.tap),
+        ),
+        hasLength(31),
+      );
+      for (var i = 0; i < 7; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(opened, [CalendarDate.fromParts(2026, 10, 7)]);
+      for (final day in [5, 7, 9]) {
+        await tester.tap(find.text('$day'));
+        await tester.pumpAndSettle();
+        expect(opened.last, CalendarDate.fromParts(2026, 10, day));
+      }
+      expect(tester.takeException(), isNull);
+      expect(find.text('31'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'год содержит все 12 месяцев с мерами и позволяет выбрать месяц клавиатурой',
@@ -103,7 +121,14 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       for (final locale in ['ru', 'en']) {
-        await _pump(tester, _month(), locale: locale, scale: 3);
+        CalendarDate? opened;
+        await _pump(
+          tester,
+          _month(),
+          locale: locale,
+          scale: 3,
+          onDaySelected: (date) => opened = date,
+        );
         final context = tester.element(
           find.byType(IntentionStatisticsCalendarView),
         );
@@ -124,6 +149,9 @@ void main() {
         await tester.ensureVisible(find.text('31'));
         await tester.pumpAndSettle();
         expect(find.text('31').hitTestable(), findsOneWidget);
+        await tester.tap(find.text('31'));
+        await tester.pumpAndSettle();
+        expect(opened, CalendarDate.fromParts(2026, 10, 31));
         expect(tester.takeException(), isNull);
         final year = IntentionStatisticsYearCalendar(
           period: StatisticsYear(2026),
@@ -159,6 +187,7 @@ Future<void> _pump(
   String locale = 'ru',
   double scale = 1,
   ValueChanged<int>? onMonthSelected,
+  ValueChanged<CalendarDate>? onDaySelected,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -173,6 +202,7 @@ Future<void> _pump(
               calendar: calendar,
               localDate: CalendarDate.fromParts(2026, 10, 12),
               onMonthSelected: onMonthSelected ?? (_) {},
+              onDaySelected: onDaySelected ?? (_) {},
             ),
           ),
         ),

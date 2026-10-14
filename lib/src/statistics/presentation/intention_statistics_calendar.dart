@@ -14,16 +14,21 @@ final class IntentionStatisticsCalendarView extends StatelessWidget {
     required this.calendar,
     required this.localDate,
     required this.onMonthSelected,
+    required this.onDaySelected,
     super.key,
   });
 
   final IntentionStatisticsCalendar calendar;
   final CalendarDate localDate;
   final ValueChanged<int> onMonthSelected;
+  final ValueChanged<CalendarDate> onDaySelected;
 
   @override
   Widget build(BuildContext context) => switch (calendar) {
-    final IntentionStatisticsMonthCalendar month => _MonthGrid(calendar: month),
+    final IntentionStatisticsMonthCalendar month => _MonthGrid(
+      calendar: month,
+      onDaySelected: onDaySelected,
+    ),
     final IntentionStatisticsYearCalendar year => _YearBars(
       calendar: year,
       localDate: localDate,
@@ -33,8 +38,9 @@ final class IntentionStatisticsCalendarView extends StatelessWidget {
 }
 
 final class _MonthGrid extends StatelessWidget {
-  const _MonthGrid({required this.calendar});
+  const _MonthGrid({required this.calendar, required this.onDaySelected});
   final IntentionStatisticsMonthCalendar calendar;
+  final ValueChanged<CalendarDate> onDaySelected;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +76,7 @@ final class _MonthGrid extends StatelessWidget {
                 if (row * 7 + column - offset + 1 case final day
                     when day >= 1 && day <= days)
                   _Day(
+                    onDaySelected: onDaySelected,
                     date: CalendarDate.fromParts(
                       period.year,
                       period.month,
@@ -92,28 +99,38 @@ final class _MonthGrid extends StatelessWidget {
 }
 
 final class _Day extends StatelessWidget {
-  const _Day({required this.date, required this.status});
+  const _Day({
+    required this.date,
+    required this.status,
+    required this.onDaySelected,
+  });
   final CalendarDate date;
   final DailyChoiceDayStatus? status;
+  final ValueChanged<CalendarDate> onDaySelected;
 
   @override
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
-    return Semantics(
-      container: true,
-      excludeSemantics: true,
-      label: texts.statisticsCalendarDaySemantics(
-        DateTime.utc(date.year, date.month, date.day),
-        switch (status) {
-          DailyChoiceDayStatus.allCompleted =>
-            texts.statisticsCalendarDayAllCompleted,
-          DailyChoiceDayStatus.hasIncomplete =>
-            texts.statisticsCalendarDayHasIncomplete,
-          null => texts.statisticsCalendarDayNoChoices,
-        },
-      ),
-      child: Padding(
+    // Одна кнопка для касания, клавиатуры и экранного диктора:
+    // https://api.flutter.dev/flutter/material/TextButton-class.html
+    return TextButton(
+      onPressed: () => onDaySelected(date),
+      style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+        minimumSize: const Size(48, 48),
+      ),
+      child: Semantics(
+        excludeSemantics: true,
+        label: texts.statisticsCalendarDaySemantics(
+          DateTime.utc(date.year, date.month, date.day),
+          switch (status) {
+            DailyChoiceDayStatus.allCompleted =>
+              texts.statisticsCalendarDayAllCompleted,
+            DailyChoiceDayStatus.hasIncomplete =>
+              texts.statisticsCalendarDayHasIncomplete,
+            null => texts.statisticsCalendarDayNoChoices,
+          },
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

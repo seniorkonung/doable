@@ -88,6 +88,9 @@ final class IntentionStatisticsSectionSliver extends ConsumerWidget {
                         onNextPeriod: model.selectNextPeriod,
                         onViewSelected: model.selectView,
                         onMonthSelected: model.selectMonth,
+                        onDaySelected: (date) => context.router.push(
+                          DailyChoiceDateCatalogRoute(date: date),
+                        ),
                       ),
                     ),
                     IntentionStatisticsBreakdownsSliver(

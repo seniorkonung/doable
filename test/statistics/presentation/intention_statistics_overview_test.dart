@@ -102,6 +102,7 @@ void main() {
             onNextPeriod: page.model.selectNextPeriod,
             onViewSelected: page.model.selectView,
             onMonthSelected: page.model.selectMonth,
+            onDaySelected: (_) {},
           ),
         ),
       );
@@ -291,5 +292,6 @@ Widget _overview({bool zero = false}) {
     onNextPeriod: () {},
     onViewSelected: (_) {},
     onMonthSelected: (_) {},
+    onDaySelected: (_) {},
   );
 }
