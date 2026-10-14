@@ -3,9 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/text_metrics.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
-import 'daily_choice_calendar_text_metrics.dart';
 
 /// Ячейка допустимого дня встроенного календаря каталога.
 ///

@@ -1,4 +1,4 @@
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_text_metrics.dart';
+import 'package:doable/src/design_system/text_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

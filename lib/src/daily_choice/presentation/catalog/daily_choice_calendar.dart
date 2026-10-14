@@ -6,10 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/text_metrics.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
-import 'daily_choice_calendar_text_metrics.dart';
 import 'daily_choice_calendar_viewport.dart';
 
 /// Встроенный недельный и месячный календарь каталога дневных выборов.
