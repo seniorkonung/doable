@@ -17,7 +17,6 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
     required this.onOpenIntention,
     required this.onLoadMoreIfNeeded,
     required this.onRetry,
-    required this.onRetryRefresh,
     required this.onRetryLoadMore,
     super.key,
   });
@@ -26,7 +25,6 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
   final void Function(IntentionId, StatisticsBreakdown)? onOpenIntention;
   final void Function(StatisticsBreakdown, int) onLoadMoreIfNeeded;
   final VoidCallback onRetry;
-  final VoidCallback onRetryRefresh;
   final ValueChanged<StatisticsBreakdown> onRetryLoadMore;
 
   @override
@@ -83,8 +81,12 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
             : () => onOpenIntention!(item.id, kind),
       ),
     );
-    final rows = SliverMainAxisGroup(
+    return SliverMainAxisGroup(
       slivers: [
+        if (read is IntentionStatisticsEmpty)
+          SliverToBoxAdapter(
+            child: StatisticsReadNotice(message: texts.statisticsEmpty),
+          ),
         if (breakdowns.sourceIntentions case final sources?)
           intentions(StatisticsBreakdown.sourceIntentions, sources),
         if (breakdowns.relations case final relations?)
@@ -111,63 +113,6 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
         if (breakdowns.selectedActions case final actions?)
           intentions(StatisticsBreakdown.selectedActions, actions),
       ],
-    );
-    // Размер закреплённого сообщения следует тексту; группа ограничивает его
-    // разбивками, чтобы оно не оставалось поверх групп связей страницы.
-    // https://api.flutter.dev/flutter/widgets/PinnedHeaderSliver-class.html
-    // https://api.flutter.dev/flutter/widgets/SliverMainAxisGroup-class.html
-    return FocusTraversalGroup(
-      // Повтор доступен раньше прокрученных строк, без возврата к началу.
-      // https://api.flutter.dev/flutter/widgets/OrderedTraversalPolicy-class.html
-      policy: OrderedTraversalPolicy(),
-      child: SliverMainAxisGroup(
-        slivers: [
-          FocusTraversalOrder(
-            order: const NumericFocusOrder(0),
-            child: FocusTraversalGroup(
-              child: PinnedHeaderSliver(
-                child: Material(
-                  child: DefaultTextStyle.merge(
-                    style: Theme.of(context).textTheme.bodySmall,
-                    child: switch (read.refreshStatus) {
-                      IntentionStatisticsRefreshIdle() =>
-                        const SizedBox.shrink(),
-                      IntentionStatisticsRefreshing() => StatisticsReadNotice(
-                        message: texts.statisticsRefreshing,
-                      ),
-                      IntentionStatisticsRefreshFailure(
-                        :final failure,
-                        :final canRetry,
-                      ) =>
-                        StatisticsReadNotice(
-                          message: switch (failure) {
-                            StatisticsReadUnavailableFailure() =>
-                              texts.statisticsRefreshUnavailableShort,
-                            StatisticsReadCorruptionFailure() =>
-                              texts.statisticsRefreshCorruptionShort,
-                            StatisticsReadUnexpectedFailure() ||
-                            StatisticsSnapshotExpired() ||
-                            StatisticsIntentionNotFoundFailure() =>
-                              texts.statisticsRefreshUnexpectedShort,
-                          },
-                          onRetry: canRetry ? onRetryRefresh : null,
-                        ),
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (read is IntentionStatisticsEmpty)
-            SliverToBoxAdapter(
-              child: StatisticsReadNotice(message: texts.statisticsEmpty),
-            ),
-          FocusTraversalOrder(
-            order: const NumericFocusOrder(1),
-            child: FocusTraversalGroup(child: rows),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -327,245 +327,6 @@ void main() {
       isTrue,
     );
   });
-
-  testWidgets(
-    'статус обновления и повтор видны при глубокой прокрутке на RU/EN с текстом 3×',
-    (tester) async {
-      tester.view.physicalSize = const Size(360, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final initial = _state(length: 100);
-      final updates = ValueNotifier(initial);
-      final controller = ScrollController();
-      addTearDown(updates.dispose);
-      addTearDown(controller.dispose);
-      var retries = 0;
-      for (final locale in ['ru', 'en']) {
-        updates.value = initial;
-        await _pump(
-          tester,
-          initial,
-          updates: updates,
-          controller: controller,
-          locale: locale,
-          scale: 3,
-          onRetryRefresh: () => retries++,
-        );
-        await tester.scrollUntilVisible(
-          find.text('Связь 10'),
-          500,
-          maxScrolls: 100,
-        );
-        await tester.ensureVisible(find.text('Связь 10'));
-        await tester.pumpAndSettle();
-        final offset = controller.offset;
-        final loaded = initial.read as IntentionStatisticsLoaded;
-        updates.value = initial.withRead(
-          loaded.copyWith(refreshStatus: const IntentionStatisticsRefreshing()),
-        );
-        await tester.pumpAndSettle();
-        final texts = _texts(tester);
-        expect(
-          find.text(texts.statisticsRefreshing).hitTestable(),
-          findsOneWidget,
-        );
-        expect(
-          find.text(texts.statisticsContributionCounts(1, 1)).hitTestable(),
-          findsWidgets,
-        );
-        expect(controller.offset, offset);
-        updates.value = initial.withRead(
-          loaded.copyWith(
-            refreshStatus: const IntentionStatisticsRefreshFailure(
-              StatisticsReadUnavailableFailure(),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        final message = find.text(texts.statisticsRefreshUnavailableShort);
-        final retry = find.text(texts.commonRetry);
-        expect(message.hitTestable(), findsOneWidget);
-        expect(retry.hitTestable(), findsOneWidget);
-        expect(tester.getRect(message).top, greaterThanOrEqualTo(0));
-        expect(tester.getRect(retry).bottom, lessThanOrEqualTo(800));
-        expect(
-          find.text(texts.statisticsContributionCounts(1, 1)).hitTestable(),
-          findsWidgets,
-        );
-        expect(controller.offset, offset);
-        final data = tester.getSemantics(message).getSemanticsData();
-        expect(data.flagsCollection.isLiveRegion, isTrue);
-        FocusManager.instance.primaryFocus?.unfocus();
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pump();
-        expect(retries, locale == 'ru' ? 1 : 2);
-        for (final (failure, message) in [
-          (
-            const StatisticsReadCorruptionFailure(),
-            texts.statisticsRefreshCorruptionShort,
-          ),
-          (
-            const StatisticsReadUnexpectedFailure(),
-            texts.statisticsRefreshUnexpectedShort,
-          ),
-        ]) {
-          updates.value = initial.withRead(
-            loaded.copyWith(
-              refreshStatus: IntentionStatisticsRefreshFailure(failure),
-            ),
-          );
-          await tester.pumpAndSettle();
-          expect(find.text(message).hitTestable(), findsOneWidget);
-          expect(find.text(texts.commonRetry), findsNothing);
-          expect(controller.offset, offset);
-        }
-        updates.value = initial;
-        await tester.pumpAndSettle();
-        expect(
-          find.text(texts.statisticsRefreshUnavailableShort),
-          findsNothing,
-        );
-        expect(controller.offset, offset);
-        expect(tester.takeException(), isNull);
-      }
-    },
-  );
-
-  for (final size in [const Size(320, 700), const Size(700, 360)]) {
-    testWidgets(
-      'окно $size: сообщение, повтор и числа целиком читаемы при тексте 3×',
-      (tester) async {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final initial = _state(length: 100);
-        final updates = ValueNotifier(initial);
-        final controller = ScrollController();
-        addTearDown(updates.dispose);
-        addTearDown(controller.dispose);
-        var retries = 0;
-        for (final locale in ['ru', 'en']) {
-          updates.value = initial;
-          await _pump(
-            tester,
-            initial,
-            updates: updates,
-            controller: controller,
-            locale: locale,
-            scale: 3,
-            chrome: true,
-            onRetryRefresh: () => retries++,
-          );
-          await tester.scrollUntilVisible(
-            find.text('Связь 10'),
-            500,
-            maxScrolls: 100,
-          );
-          await tester.ensureVisible(find.text('Связь 10'));
-          await tester.pumpAndSettle();
-          final offset = controller.offset;
-          updates.value = initial.withRead(
-            (initial.read as IntentionStatisticsLoaded).copyWith(
-              refreshStatus: const IntentionStatisticsRefreshFailure(
-                StatisticsReadUnavailableFailure(),
-              ),
-            ),
-          );
-          await tester.pumpAndSettle();
-          final texts = _texts(tester);
-          final viewport = tester.getRect(find.byType(CustomScrollView));
-          final message = find.text(texts.statisticsRefreshUnavailableShort);
-          final retry = find.text(texts.commonRetry);
-          expect(
-            tester.getRect(message).top,
-            greaterThanOrEqualTo(viewport.top),
-          );
-          expect(
-            tester.getRect(message).bottom,
-            lessThanOrEqualTo(viewport.bottom),
-          );
-          expect(retry.hitTestable(), findsOneWidget);
-          expect(
-            tester.getRect(retry).bottom,
-            lessThanOrEqualTo(viewport.bottom),
-          );
-          expect(controller.offset, offset);
-          FocusManager.instance.primaryFocus?.unfocus();
-          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-          await tester.pumpAndSettle();
-          expect(retries, locale == 'ru' ? 1 : 2);
-          final counts = find.descendant(
-            of: find.bySemanticsLabel(RegExp(r'^Связь 10\n')),
-            matching: find.text(texts.statisticsContributionCounts(1, 1)),
-          );
-          final noticeBottom = tester.getRect(retry).bottom + 8;
-          controller.jumpTo(
-            controller.offset + tester.getRect(counts).top - noticeBottom,
-          );
-          await tester.pumpAndSettle();
-          expect(counts.hitTestable(), findsOneWidget);
-          expect(
-            tester.getRect(counts).top,
-            greaterThanOrEqualTo(noticeBottom),
-          );
-          expect(
-            tester.getRect(counts).bottom,
-            lessThanOrEqualTo(viewport.bottom),
-          );
-          expect(message.hitTestable(), findsOneWidget);
-          expect(tester.takeException(), isNull);
-        }
-      },
-    );
-  }
-
-  testWidgets(
-    'закреплённый статус уходит вместе с разбивками перед группами связей',
-    (tester) async {
-      final initial = _state();
-      final state = initial.withRead(
-        (initial.read as IntentionStatisticsLoaded).copyWith(
-          refreshStatus: const IntentionStatisticsRefreshing(),
-        ),
-      );
-      final controller = ScrollController();
-      addTearDown(controller.dispose);
-      await _pump(
-        tester,
-        state,
-        controller: controller,
-        following: const [
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 1500,
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: Text('Группы связей'),
-              ),
-            ),
-          ),
-        ],
-      );
-      final texts = _texts(tester);
-      expect(
-        find.text(texts.statisticsRefreshing).hitTestable(),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(find.text('Группы связей'), 300);
-      controller.jumpTo(
-        controller.offset + tester.getTopLeft(find.text('Группы связей')).dy,
-      );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Группы связей'));
-      await tester.pumpAndSettle();
-      expect(find.text('Группы связей').hitTestable(), findsOneWidget);
-      expect(find.text(texts.statisticsRefreshing).hitTestable(), findsNothing);
-    },
-  );
 }
 
 AppLocalizations _texts(WidgetTester tester) => AppLocalizations.of(
@@ -578,14 +339,9 @@ Future<void> _pump(
   void Function(IntentionId, StatisticsBreakdown)? onOpen,
   void Function(StatisticsBreakdown, int)? onLoadMore,
   VoidCallback? onRetry,
-  VoidCallback? onRetryRefresh,
   ValueChanged<StatisticsBreakdown>? onRetryMore,
   ValueNotifier<IntentionStatisticsState>? updates,
   ScrollController? controller,
-  String locale = 'ru',
-  double scale = 1,
-  bool chrome = false,
-  List<Widget> following = const [],
 }) async {
   Widget sliver(IntentionStatisticsState current) =>
       IntentionStatisticsBreakdownsSliver(
@@ -593,32 +349,25 @@ Future<void> _pump(
         onOpenIntention: onOpen ?? (_, _) {},
         onLoadMoreIfNeeded: onLoadMore ?? (_, _) {},
         onRetry: onRetry ?? () {},
-        onRetryRefresh: onRetryRefresh ?? () {},
         onRetryLoadMore: onRetryMore ?? (_) {},
       );
   await tester.pumpWidget(
     MaterialApp(
-      locale: Locale(locale),
+      locale: const Locale('ru'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
-        appBar: chrome ? AppBar(title: const Text('Намерение')) : null,
-        bottomNavigationBar: chrome ? const SizedBox(height: 64) : null,
-        body: MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-          child: CustomScrollView(
-            controller: controller,
-            slivers: [
-              if (updates == null)
-                sliver(state)
-              else
-                ValueListenableBuilder<IntentionStatisticsState>(
-                  valueListenable: updates,
-                  builder: (context, value, _) => sliver(value),
-                ),
-              ...following,
-            ],
-          ),
+        body: CustomScrollView(
+          controller: controller,
+          slivers: [
+            if (updates == null)
+              sliver(state)
+            else
+              ValueListenableBuilder<IntentionStatisticsState>(
+                valueListenable: updates,
+                builder: (context, value, _) => sliver(value),
+              ),
+          ],
         ),
       ),
     ),
