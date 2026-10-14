@@ -24,7 +24,7 @@
   - **Files likely touched:** `lib/src/design_system/components/nav_bar.dart`, `lib/src/app/quick_creation/quick_creation_button.dart`, `lib/src/app/quick_creation/quick_creation_mode_presentation.dart`, `test/app/quick_creation/quick_creation_button_test.dart`, `test/app/quick_creation/quick_creation_accessibility_test.dart`
   - **Estimated scope:** M
 
-- [ ] 1.3 Проверить готовность фазы 1: панель на всех обычных страницах выглядит по дизайну, а поведение навигации и быстрого создания не изменилось
+- [x] 1.3 Проверить готовность фазы 1: панель на всех обычных страницах выглядит по дизайну, а поведение навигации и быстрого создания не изменилось
   - **Acceptance criteria:**
     - Положение и вид кнопки подтверждены проверками.
     - Прежнее поведение панели сохранилось: выбор пункта, сброс истории, подсказки, объявления экранного диктора, содержимое и сообщения над панелью, все потоки создания.
