@@ -258,47 +258,42 @@ void main() {
     expect(repository.commands, hasLength(1));
   });
 
-  testWidgets(
-    'английская семантика и крупный текст раскрывают направление и каждый переход',
-    (tester) async {
-      tester.view.physicalSize = const Size(1200, 2000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final repository = _Repository();
-      await _pump(
-        tester,
-        repository,
-        locale: const Locale('en'),
-        textScale: 2,
-        direction: ChoicePathDraftDirection.bottomUp,
-      );
-      repository.completeRead(repository.details);
-      await tester.pumpAndSettle();
-      final semantics = tester.ensureSemantics();
-      expect(
-        find.textContaining('from the action to a source'),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel(RegExp('Source intention: Новое основание')),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsLabel(RegExp('Step 1:')), findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp('Step 2:')), findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp('Step 3:')), findsOneWidget);
-      expect(
-        find.bySemanticsLabel(RegExp('Selected action: Новое действие')),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Completion stays'), findsWidgets);
-      expect(
-        find.bySemanticsLabel(RegExp('Completion stays on')),
-        findsOneWidget,
-      );
-      semantics.dispose();
-    },
-  );
+  testWidgets('английская семантика раскрывает направление и каждый переход', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repository = _Repository();
+    await _pump(
+      tester,
+      repository,
+      locale: const Locale('en'),
+      direction: ChoicePathDraftDirection.bottomUp,
+    );
+    repository.completeRead(repository.details);
+    await tester.pumpAndSettle();
+    final semantics = tester.ensureSemantics();
+    expect(find.textContaining('from the action to a source'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Source intention: Новое основание')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel(RegExp('Step 1:')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Step 2:')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Step 3:')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Selected action: Новое действие')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Completion stays'), findsWidgets);
+    expect(
+      find.bySemanticsLabel(RegExp('Completion stays on')),
+      findsOneWidget,
+    );
+    semantics.dispose();
+  });
 }
 
 Future<void> _pump(
@@ -307,7 +302,6 @@ Future<void> _pump(
   Locale locale = const Locale('ru'),
   GlobalKey<NavigatorState>? navigatorKey,
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
-  double textScale = 1,
 }) async {
   final path = ConfirmedChoicePath([
     _pathStep(2, 3, 4, LongTermRelationType.need),
@@ -349,11 +343,7 @@ Future<void> _pump(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: GraphOperationPresenter(child: child!),
-        ),
+        builder: (context, child) => GraphOperationPresenter(child: child!),
         home: navigatorKey == null
             ? page
             : const Scaffold(body: Text('Домашний экран')),

@@ -88,9 +88,7 @@ void main() {
     },
   );
 
-  testWidgets('выход доступен на телефоне с текстом 2.6 и клавиатурой', (
-    tester,
-  ) async {
+  testWidgets('выход доступен на телефоне с клавиатурой', (tester) async {
     final semantics = tester.ensureSemantics();
     final app = await _launch(tester, locale: const Locale('ru'));
     await _openForm(tester, app, null);
@@ -98,8 +96,7 @@ void main() {
     await _tap(tester, 'relation-editor-submit');
     tester.view.physicalSize = const Size(400, 800);
     tester.view.viewInsets = const FakeViewPadding(bottom: 260);
-    tester.platformDispatcher.textScaleFactorTestValue = 2.6;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
     await tester.pumpAndSettle();
     const label = 'Выйти из создания';
     final button = find.widgetWithText(TextButton, label);

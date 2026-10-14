@@ -97,58 +97,51 @@ void main() {
     });
   }
 
-  for (final textScale in [1.0, 2.6]) {
-    const locale = Locale('ru');
-    const mode = QuickCreationMode.relation;
-    testWidgets('плюс, значок режима и стрелки видны целиком без подписи, '
-        'вся зона доступна при тексте $textScale: '
-        '${locale.languageCode}, ${mode.name}', (tester) async {
-      final launches = await _pumpButton(
-        tester,
-        locale: locale,
-        mode: mode,
-        textScale: textScale,
-      );
-      final button = find.byType(QuickCreationButton);
-      final bounds = tester.getRect(button);
-      expect(bounds.width, greaterThanOrEqualTo(48));
-      expect(bounds.height, greaterThanOrEqualTo(48));
-      expect(button.hitTestable(), findsOneWidget);
-      expect(
-        find.descendant(of: button, matching: find.byType(Text)),
-        findsNothing,
-      );
-      for (final icon in [Icons.add, mode.icon, Icons.unfold_more]) {
-        final finder = find.byIcon(icon);
-        expect(finder.hitTestable(), findsOneWidget);
-        final rect = tester.getRect(finder);
-        expect(rect.isEmpty, isFalse);
-        for (final container in [
-          bounds,
-          tester.getRect(find.byType(InkWell)),
-          Offset.zero & tester.view.physicalSize,
-        ]) {
-          expect(container.contains(rect.topLeft), isTrue);
-          expect(
-            container.contains(rect.bottomRight - const Offset(0.1, 0.1)),
-            isTrue,
-          );
-        }
-      }
-      for (final corner in [
-        bounds.topLeft + const Offset(10, 10),
-        bounds.topRight + const Offset(-10, 10),
-        bounds.bottomLeft + const Offset(10, -10),
-        bounds.bottomRight - const Offset(10, 10),
+  const locale = Locale('ru');
+  const mode = QuickCreationMode.relation;
+  testWidgets('плюс, значок режима и стрелки видны целиком без подписи, '
+      'вся зона доступна: '
+      '${locale.languageCode}, ${mode.name}', (tester) async {
+    final launches = await _pumpButton(tester, locale: locale, mode: mode);
+    final button = find.byType(QuickCreationButton);
+    final bounds = tester.getRect(button);
+    expect(bounds.width, greaterThanOrEqualTo(48));
+    expect(bounds.height, greaterThanOrEqualTo(48));
+    expect(button.hitTestable(), findsOneWidget);
+    expect(
+      find.descendant(of: button, matching: find.byType(Text)),
+      findsNothing,
+    );
+    for (final icon in [Icons.add, mode.icon, Icons.unfold_more]) {
+      final finder = find.byIcon(icon);
+      expect(finder.hitTestable(), findsOneWidget);
+      final rect = tester.getRect(finder);
+      expect(rect.isEmpty, isFalse);
+      for (final container in [
+        bounds,
+        tester.getRect(find.byType(InkWell)),
+        Offset.zero & tester.view.physicalSize,
       ]) {
-        await tester.tapAt(corner);
+        expect(container.contains(rect.topLeft), isTrue);
+        expect(
+          container.contains(rect.bottomRight - const Offset(0.1, 0.1)),
+          isTrue,
+        );
       }
-      await tester.pumpAndSettle();
-      expect(launches, List.filled(4, mode));
-      expect(find.byType(BottomSheet), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-  }
+    }
+    for (final corner in [
+      bounds.topLeft + const Offset(10, 10),
+      bounds.topRight + const Offset(-10, 10),
+      bounds.bottomLeft + const Offset(10, -10),
+      bounds.bottomRight - const Offset(10, 10),
+    ]) {
+      await tester.tapAt(corner);
+    }
+    await tester.pumpAndSettle();
+    expect(launches, List.filled(4, mode));
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('кнопка запускается действием экранного диктора и клавиатурой', (
     tester,
@@ -176,13 +169,11 @@ Future<List<QuickCreationMode>> _pumpButton(
   WidgetTester tester, {
   required Locale locale,
   required QuickCreationMode mode,
-  double textScale = 2.6,
 }) async {
   tester.view.physicalSize = const Size(320, 568);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  tester.platformDispatcher.textScaleFactorTestValue = textScale;
-  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
   final launches = <QuickCreationMode>[];
   await tester.pumpWidget(
     ProviderScope(

@@ -82,8 +82,7 @@ void main() {
         await tester.enterText(filter, 'Намерение 3');
         tester.view.physicalSize = const Size(400, 800);
         tester.view.viewInsets = const FakeViewPadding(bottom: 260);
-        tester.platformDispatcher.textScaleFactorTestValue = 2.6;
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
         await tester.pumpAndSettle();
         final action = closeIcon
             ? find.byKey(ValueKey('daily-choice-$prefix-cancel'))

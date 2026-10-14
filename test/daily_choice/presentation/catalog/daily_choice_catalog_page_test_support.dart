@@ -38,8 +38,8 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 ///
 /// Приложение собрано с делегатами локализации и правилами выбора локали
 /// приложения, поэтому [locale] — системная локаль устройства, а
-/// неподдерживаемый язык даёт английский. [textScale] — системный размер
-/// текста, [size] — логический размер экрана; [today] — локальное сегодня.
+/// неподдерживаемый язык даёт английский. [size] — логический размер экрана;
+/// [today] — локальное сегодня.
 /// Чтения каталога завершает сценарий через [repository].
 Future<void> pumpCatalogPage(
   WidgetTester tester,
@@ -47,12 +47,10 @@ Future<void> pumpCatalogPage(
   required CalendarDate today,
   required Locale locale,
   required Size size,
-  double textScale = 1,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
-  tester.platformDispatcher.textScaleFactorTestValue = textScale;
-  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);

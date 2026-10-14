@@ -3,6 +3,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/bootstrap/app_bootstrap_shell.dart';
 import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,6 +31,9 @@ final class _ReadyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
+      theme: doableTheme(Brightness.light),
+      darkTheme: doableTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       onGenerateTitle: _appTitle,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

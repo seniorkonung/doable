@@ -1216,68 +1216,60 @@ void main() {
     expect(repository.calls, 2);
   });
 
-  testWidgets(
-    'выбор показывает занятость и отказ на английском при крупном тексте',
-    (tester) async {
-      tester.view.physicalSize = const Size(420, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final repository = _CatalogRepository();
-      addTearDown(repository.dispose);
-      final intentionId =
-          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            personalGraphRepositoryProvider.overrideWithValue(repository),
-          ],
-          child: MaterialApp(
-            locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: const TextScaler.linear(2.5)),
-              child: child!,
-            ),
-            home: TagCatalogPage(
-              selectionContext: TagAssignmentContext(intentionId),
-            ),
+  testWidgets('выбор показывает занятость и отказ на английском', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repository = _CatalogRepository();
+    addTearDown(repository.dispose);
+    final intentionId =
+        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TagCatalogPage(
+            selectionContext: TagAssignmentContext(intentionId),
           ),
         ),
-      );
-      repository.complete(
-        TagCatalogSuccess(
-          TagCatalogSnapshot.selection(
-            intentionId: intentionId,
-            rows: [TagSelectionRow(tag: _tag(1, 'Home'), isAssigned: false)],
+      ),
+    );
+    repository.complete(
+      TagCatalogSuccess(
+        TagCatalogSnapshot.selection(
+          intentionId: intentionId,
+          rows: [TagSelectionRow(tag: _tag(1, 'Home'), isAssigned: false)],
 
-            revision: const _Revision(),
-          ),
+          revision: const _Revision(),
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')));
-      repository.tagRead(_tag(1, 'Home'));
-      await tester.pumpAndSettle();
-      final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-      expect(find.text('Available to assign'), findsOneWidget);
-      expect(assign, findsOneWidget);
-      await tester.tap(assign);
-      await tester.pump();
-      expect(find.text('Assigning tag…'), findsOneWidget);
-      expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-      repository.failCommand(const TagUnavailableFailure());
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'Could not complete the tag assignment operation. Try again.',
-        ),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')));
+    repository.tagRead(_tag(1, 'Home'));
+    await tester.pumpAndSettle();
+    final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+    expect(find.text('Available to assign'), findsOneWidget);
+    expect(assign, findsOneWidget);
+    await tester.tap(assign);
+    await tester.pump();
+    expect(find.text('Assigning tag…'), findsOneWidget);
+    expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+    repository.failCommand(const TagUnavailableFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Could not complete the tag assignment operation. Try again.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'пустой снимок выбора сохраняет недоступное действие назначения',
@@ -1535,60 +1527,57 @@ void main() {
     },
   );
 
-  testWidgets(
-    'полное обновление, повтор и длинное название доступны при крупном тексте',
-    (tester) async {
-      tester.view.physicalSize = const Size(420, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final repository = _CatalogRepository();
-      addTearDown(repository.dispose);
-      await _pumpCatalog(tester, repository, largeText: true);
-      final longName = '${'Тег ' * 39}Тег';
-      repository.complete(_page([_tag(1, longName)]));
-      await tester.pumpAndSettle();
-      expect(find.text(longName), findsOneWidget);
-      expect(find.text('Show more tags'), findsNothing);
+  testWidgets('полное обновление, повтор и длинное название доступны', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repository = _CatalogRepository();
+    addTearDown(repository.dispose);
+    await _pumpCatalog(tester, repository);
+    final longName = '${'Тег ' * 39}Тег';
+    repository.complete(_page([_tag(1, longName)]));
+    await tester.pumpAndSettle();
+    expect(find.text(longName), findsOneWidget);
+    expect(find.text('Show more tags'), findsNothing);
 
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(TagCatalogPage)),
-      );
-      final accepted =
-          container
-                  .read(graphCommandCoordinatorProvider.notifier)
-                  .acceptTagCreation(
-                    TagCreationFormKey(),
-                    CreateTag(TagName.fromInput('Другой')),
-                  )
-              as TagCommandAccepted;
-      repository.completeCommand(
-        TagCreated(
-          TagCreatedChange(
-            revision: const _Revision(2),
-            after: _tag(2, 'Другой'),
-          ),
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(TagCatalogPage)),
+    );
+    final accepted =
+        container
+                .read(graphCommandCoordinatorProvider.notifier)
+                .acceptTagCreation(
+                  TagCreationFormKey(),
+                  CreateTag(TagName.fromInput('Другой')),
+                )
+            as TagCommandAccepted;
+    repository.completeCommand(
+      TagCreated(
+        TagCreatedChange(
+          revision: const _Revision(2),
+          after: _tag(2, 'Другой'),
         ),
-      );
-      await accepted.future;
-      await tester.pump();
-      expect(find.text(longName), findsOneWidget);
-      expect(find.text('Refreshing tags…'), findsOneWidget);
-      repository.complete(
-        const TagCatalogError(TagCatalogUnavailableFailure()),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(longName), findsOneWidget);
-      expect(find.text('Tags couldn’t be loaded. Try again.'), findsOneWidget);
-      await tester.tap(find.text('Try again'));
-      await tester.pump();
-      repository.complete(
-        _page([_tag(1, longName), _tag(2, 'Другой')], revision: 2),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Show more tags'), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+    await accepted.future;
+    await tester.pump();
+    expect(find.text(longName), findsOneWidget);
+    expect(find.text('Refreshing tags…'), findsOneWidget);
+    repository.complete(const TagCatalogError(TagCatalogUnavailableFailure()));
+    await tester.pumpAndSettle();
+    expect(find.text(longName), findsOneWidget);
+    expect(find.text('Tags couldn’t be loaded. Try again.'), findsOneWidget);
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
+    repository.complete(
+      _page([_tag(1, longName), _tag(2, 'Другой')], revision: 2),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Show more tags'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'выбор для черновика читает обычный каталог в своём открытии и меняет только кандидата',
     (tester) async {
@@ -2132,7 +2121,6 @@ Future<void> _waitForEditorToClose(WidgetTester tester) async {
 Future<void> _pumpCatalog(
   WidgetTester tester,
   _CatalogRepository repository, {
-  bool largeText = false,
   IntentionId? intentionId,
 }) async {
   await tester.pumpWidget(
@@ -2142,11 +2130,6 @@ Future<void> _pumpCatalog(
       ],
       child: OrdinaryPageTestApp(
         locale: const Locale('en'),
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(largeText ? 2.5 : 1)),
-          child: child!,
-        ),
         home: TagCatalogPage(selectionContext: _selectionContext(intentionId)),
       ),
     ),

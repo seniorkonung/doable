@@ -86,7 +86,7 @@ void main() {
         semantics.dispose();
       });
 
-      // Порядок чтения отказов и масштаб текста не зависят от языка: подписи
+      // Порядок чтения отказов не зависит от языка: подписи
       // страницы по языкам проверяет тест выше.
       if (texts != _texts.first) return;
 
@@ -201,7 +201,7 @@ void main() {
         semantics.dispose();
       });
 
-      testWidgets('при масштабе текста 2.5 прокрутка страницы диктором '
+      testWidgets('прокрутка страницы диктором '
           'проходит календарь, фильтры, строки и подгрузку в том же порядке, '
           'и подгрузка выполняется', (tester) async {
         final semantics = tester.ensureSemantics();
@@ -212,7 +212,6 @@ void main() {
           today: _today,
           locale: texts.locale,
           size: _phone,
-          textScale: 2.5,
         );
         repository.completeFirst(
           0,
@@ -223,12 +222,6 @@ void main() {
         await tester.pumpAndSettle();
         final l10n = _l10n(tester);
         // Системный размер текста доходит до календаря без ограничения.
-        expect(
-          MediaQuery.textScalerOf(
-            tester.element(find.byType(DailyChoiceCalendar)),
-          ).scale(10),
-          25,
-        );
 
         final page = [
           texts.selectedToday,

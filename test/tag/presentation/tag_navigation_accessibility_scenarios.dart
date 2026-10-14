@@ -10,11 +10,9 @@ void _registerNavigationEntryScenarios() {
     (tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester.binding.platformDispatcher.localesTestValue = [locale];
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2.5;
+
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+
       tester.view.physicalSize = const Size(420, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../design_system/doable_theme.dart';
 import '../app_runtime.dart';
 import '../localization/app_locale_resolution.dart';
 
@@ -101,6 +102,9 @@ final class _BootstrapStatusApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: doableTheme(Brightness.light),
+      darkTheme: doableTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       onGenerateTitle: _appTitle,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

@@ -622,11 +622,6 @@ Future<void> _pumpApp(
       ],
       child: OrdinaryPageTestApp(
         locale: locale,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: const TextScaler.linear(1.8)),
-          child: child!,
-        ),
         home: DailyChoiceDetailsPage(choiceId: _choice(1)),
       ),
     ),

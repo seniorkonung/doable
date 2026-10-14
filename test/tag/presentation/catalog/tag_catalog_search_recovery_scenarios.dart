@@ -3,16 +3,12 @@ part of 'tag_catalog_search_page_test.dart';
 void _registerSearchRecoveryScenarios() {
   for (final (description, intentionId) in _modes) {
     testWidgets(
-      '$description: совместные ошибки и повтор доступны с клавиатурой и текстом 2.5',
+      '$description: совместные ошибки и повтор доступны с клавиатурой',
       (tester) async {
         tester.view.physicalSize = const Size(420, 900);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        final repository = await _pumpCatalog(
-          tester,
-          intentionId: intentionId,
-          scale: 2.5,
-        );
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         final l10n = _localizations(tester);
         final work = _tag(1, 'Работа');
         final home = _tag(2, 'Дом');

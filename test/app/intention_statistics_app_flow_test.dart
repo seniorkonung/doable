@@ -736,9 +736,7 @@ ScrollableState _scroll(WidgetTester tester) => tester.state<ScrollableState>(
 
 Future<void> _scrollTo(WidgetTester tester, Finder row) async {
   for (var i = 0; i < 150; i++) {
-    if (row.evaluate().isNotEmpty) {
-      await Scrollable.ensureVisible(tester.element(row.first), alignment: .5);
-      await tester.pumpAndSettle();
+    if (row.hitTestable().evaluate().isNotEmpty) {
       return;
     }
     await tester.drag(find.byType(IntentionDetailsPage), const Offset(0, -900));

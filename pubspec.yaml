@@ -36,3 +36,9 @@ dev_dependencies:
 flutter:
   generate: true
   uses-material-design: true
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: lib/src/design_system/fonts/InterVariable.ttf
+  licenses:
+    - lib/src/design_system/fonts/LICENSE.txt

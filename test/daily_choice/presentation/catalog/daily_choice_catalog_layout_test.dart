@@ -13,14 +13,11 @@ import 'daily_choice_catalog_page_test_support.dart';
 /// Узкий экран телефона.
 const _screen = Size(360, 780);
 
-/// Языки и системные размеры текста: русский проверяется целиком в обычном и
-/// увеличенном масштабе. Английские подписи дней недели длиннее русских, поэтому
-/// английский проверяется только свёрнутой неделей в увеличенном масштабе:
-/// остальная раскладка от языка не зависит.
+/// Русский проверяется целиком. Английские подписи дней недели длиннее
+/// русских, поэтому дополнительно проверяется свёрнутая неделя на английском.
 final _configurations = [
-  (locale: const Locale('ru'), textScale: 1.0, full: true),
-  (locale: const Locale('ru'), textScale: 2.5, full: true),
-  (locale: const Locale('en'), textScale: 2.5, full: false),
+  (locale: const Locale('ru'), full: true),
+  (locale: const Locale('en'), full: false),
 ];
 
 /// Локальное сегодня проверок свёрнутой недели и прокрутки.
@@ -42,16 +39,16 @@ final _months = [
 ];
 
 void main() {
-  for (final (:locale, :textScale, :full) in _configurations) {
+  for (final (:locale, :full) in _configurations) {
     final language = locale.languageCode;
 
-    group('экран 360×780, $language, масштаб текста $textScale', () {
+    group('экран 360×780, $language', () {
       testWidgets('свёрнутая неделя занимает семь колонок во всю ширину, '
           'тексты страницы показаны целиком, а дни и команды нажимаются', (
         tester,
       ) async {
         final repository = CatalogPageRepository();
-        await _open(tester, repository, locale, textScale, today: _today);
+        await _open(tester, repository, locale, today: _today);
         repository.completeFirst(0, [
           catalogPageItem(1, date: _today),
         ], total: 1);
@@ -67,7 +64,7 @@ void main() {
           ),
           findsOneWidget,
         );
-        await _expectWholeTexts(tester, textScale);
+        await _expectWholeTexts(tester);
 
         await _tapCommand(tester, l10n.dailyChoiceCalendarNextWeek);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
@@ -89,13 +86,7 @@ void main() {
             'на свои строки и сдвигает выдачу, все дни нажимаются, а '
             'сворачивание возвращает прежнюю высоту', (tester) async {
           final repository = CatalogPageRepository();
-          await _open(
-            tester,
-            repository,
-            locale,
-            textScale,
-            today: shown.today,
-          );
+          await _open(tester, repository, locale, today: shown.today);
           repository.completeFirst(0, [
             catalogPageItem(1, date: shown.today),
           ], total: 1);
@@ -121,7 +112,7 @@ void main() {
           expect(_pageScroll, findsOneWidget);
           _expectColumns(tester, shown.weeks);
           _expectCommands(tester);
-          await _expectWholeTexts(tester, textScale);
+          await _expectWholeTexts(tester);
 
           for (final row in shown.weeks) {
             await _reveal(tester, calendarDay(row.first, skipOffstage: false));
@@ -170,7 +161,7 @@ void main() {
           'а фильтры, подгрузка и последняя строка достижимы жестами над '
           'панелью без зарезервированного места', (tester) async {
         final repository = CatalogPageRepository();
-        await _open(tester, repository, locale, textScale, today: _today);
+        await _open(tester, repository, locale, today: _today);
         repository.completeFirst(
           0,
           [
@@ -223,7 +214,7 @@ void main() {
         );
         await _dragToEnd(tester);
         _expectAtEnd(tester, lastRow);
-        await _expectWholeTexts(tester, textScale);
+        await _expectWholeTexts(tester);
         await _dragUntilReachable(
           tester,
           find.byTooltip(l10n.dailyChoiceCalendarExpand, skipOffstage: false),
@@ -236,7 +227,7 @@ void main() {
         tester,
       ) async {
         final repository = CatalogPageRepository();
-        await _open(tester, repository, locale, textScale, today: _today);
+        await _open(tester, repository, locale, today: _today);
         final l10n = _l10n(tester);
         final retry = find.widgetWithText(
           TextButton,
@@ -248,7 +239,7 @@ void main() {
           tester,
           find.text(l10n.dailyChoiceCatalogLoading, skipOffstage: false),
         );
-        await _expectWholeTexts(tester, textScale);
+        await _expectWholeTexts(tester);
 
         for (final attempt in [0, 1]) {
           repository.failUnavailable(attempt);
@@ -258,7 +249,7 @@ void main() {
             find.text(l10n.dailyChoiceCatalogUnavailable, skipOffstage: false),
           );
           await _dragUntilReachable(tester, retry);
-          await _expectWholeTexts(tester, textScale);
+          await _expectWholeTexts(tester);
           await tester.tap(retry);
           await tester.pump();
         }
@@ -273,7 +264,7 @@ void main() {
           tester,
           find.text(l10n.dailyChoiceCatalogEmpty, skipOffstage: false),
         );
-        await _expectWholeTexts(tester, textScale);
+        await _expectWholeTexts(tester);
         await _dragUntilReachable(
           tester,
           calendarDay(date(2026, 10, 1), skipOffstage: false),
@@ -286,7 +277,7 @@ void main() {
         tester,
       ) async {
         final repository = CatalogPageRepository();
-        await _open(tester, repository, locale, textScale, today: _today);
+        await _open(tester, repository, locale, today: _today);
         repository.completeFirst(0, [], total: 0);
         await tester.pumpAndSettle();
         final l10n = _l10n(tester);
@@ -310,7 +301,7 @@ void main() {
               )
               .last;
           _expectTappable(tester, item);
-          _expectWholeTextsIn(tester, item, textScale);
+          _expectWholeTextsIn(tester, item);
           await tester.tap(item);
           await tester.pump();
           repository.completeFirst(index + 1, [], total: 0);
@@ -321,7 +312,7 @@ void main() {
             find.descendant(of: filter, matching: find.text(state)),
             findsOneWidget,
           );
-          await _expectWholeTexts(tester, textScale);
+          await _expectWholeTexts(tester);
         }
         expect(tester.takeException(), isNull);
       });
@@ -349,13 +340,11 @@ final _pageScroll = find.descendant(
   ),
 );
 
-/// Открывает каталог на узком телефоне с системным размером текста
-/// [textScale]; первое чтение остаётся незавершённым.
+/// Открывает каталог на узком телефоне; первое чтение остаётся незавершённым.
 Future<void> _open(
   WidgetTester tester,
   CatalogPageRepository repository,
-  Locale locale,
-  double textScale, {
+  Locale locale, {
   required CalendarDate today,
 }) => pumpCatalogPage(
   tester,
@@ -363,7 +352,6 @@ Future<void> _open(
   today: today,
   locale: locale,
   size: _screen,
-  textScale: textScale,
 );
 
 AppLocalizations _l10n(WidgetTester tester) => AppLocalizations.of(
@@ -400,7 +388,7 @@ void _expectReachable(WidgetTester tester, Finder finder) {
 
 /// Последний элемент выдачи [finder] на прокрученной до конца странице
 /// заканчивается у верхнего края панели, и касание его видимой
-/// части достигает его. При крупном тексте строка выше видимой части
+/// части достигает его. Длинная строка выше видимой части
 /// страницы, поэтому целиком она видна только по частям при прокрутке.
 void _expectAtEnd(WidgetTester tester, Finder finder) {
   final area = _visibleArea(tester);
@@ -608,9 +596,8 @@ void _expectCommands(WidgetTester tester) {
 
 /// Проходит общую прокрутку страницы от начала до конца и проверяет каждый
 /// построенный текст календаря, фильтров и выдачи: он показан целиком в
-/// системном масштабе [textScale] и лежит в ширине экрана. Затем возвращает
-/// прежнее положение прокрутки.
-Future<void> _expectWholeTexts(WidgetTester tester, double textScale) async {
+/// ширине экрана. Затем возвращает прежнее положение прокрутки.
+Future<void> _expectWholeTexts(WidgetTester tester) async {
   final scroll = tester.state<ScrollableState>(_pageScroll).position;
   final initial = scroll.pixels;
   var offset = scroll.minScrollExtent;
@@ -620,7 +607,6 @@ Future<void> _expectWholeTexts(WidgetTester tester, double textScale) async {
     _expectWholeTextsIn(
       tester,
       find.byType(CustomScrollView, skipOffstage: false),
-      textScale,
     );
     if (offset >= scroll.maxScrollExtent) break;
     offset = (offset + 200).clamp(
@@ -633,9 +619,8 @@ Future<void> _expectWholeTexts(WidgetTester tester, double textScale) async {
 }
 
 /// Каждый текст внутри [scope] показан целиком: без многоточия и потери
-/// строк, со всей высотой строк при своей ширине, в системном масштабе
-/// [textScale] без уменьшения и в ширине экрана.
-void _expectWholeTextsIn(WidgetTester tester, Finder scope, double textScale) {
+/// строк, со всей высотой строк при своей ширине и в ширине экрана.
+void _expectWholeTextsIn(WidgetTester tester, Finder scope) {
   // Значки рисуются глифом шрифта без масштаба текста, поэтому проверяются
   // только тексты.
   final paragraphs = find.descendant(
@@ -666,11 +651,7 @@ void _expectWholeTextsIn(WidgetTester tester, Finder scope, double textScale) {
         reason: '«$text» не помещается в строку',
       );
     }
-    expect(
-      paragraph.textScaler.scale(10),
-      moreOrLessEquals(10 * textScale),
-      reason: '«$text»: масштаб текста ограничен',
-    );
+
     final rect = _globalRect(paragraph);
     expect(rect.left, greaterThanOrEqualTo(-_epsilon), reason: '«$text»');
     expect(

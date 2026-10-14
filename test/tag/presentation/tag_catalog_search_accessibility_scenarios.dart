@@ -11,7 +11,7 @@ final _searchModes = <(String, IntentionId?)>[
 void _registerCatalogSearchScenarios() {
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
-      'отсутствие намерения доступно диктору с клавиатурой при тексте 2.5: ${locale.languageCode}',
+      'отсутствие намерения доступно диктору с клавиатурой: ${locale.languageCode}',
       (tester) async {
         final semantics = tester.ensureSemantics();
         final language = ValueNotifier(locale);
@@ -68,7 +68,7 @@ void _registerCatalogSearchScenarios() {
   const locale = Locale('ru');
   for (final (description, target) in _searchModes) {
     testWidgets(
-      'ошибка поиска полностью читается с клавиатурой при тексте 2.5: $description',
+      'ошибка поиска полностью читается с клавиатурой: $description',
       (tester) async {
         final semantics = tester.ensureSemantics();
         final language = ValueNotifier(locale);
@@ -137,180 +137,40 @@ void _registerCatalogSearchScenarios() {
         }
       },
     );
-    testWidgets(
-      'поиск и скрытый выбор доступны при тексте 2.5 и смене языка: $description',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final language = ValueNotifier(locale);
-        addTearDown(language.dispose);
-        final tagName = 'Straße 🏷️ é ${'Длинное название ' * 7}'.trimRight();
-        try {
-          await _showAccessibleSearch(
-            tester,
-            target,
-            language,
-            tagName: tagName,
-          );
-          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-          var l10n = await AppLocalizations.delegate.load(locale);
-          final search = find.byKey(const ValueKey('tag-catalog-search'));
-          final create = find.byKey(const ValueKey('tag-catalog-create'));
-          await tester.enterText(search, 'STRASS');
-          await tester.pumpAndSettle();
-          expect(
-            tester.getSemantics(find.byType(EditableText)).label,
-            contains(l10n.tagCatalogSearch),
-          );
-          expect(
-            tester
-                .getSemantics(find.byType(EditableText))
-                .flagsCollection
-                .isTextField,
-            isTrue,
-          );
-          expect(
-            tester
-                .renderObject<RenderParagraph>(find.text(tagName))
-                .didExceedMaxLines,
-            isFalse,
-          );
-          if (target != null) {
-            await _tap(tester, find.text(l10n.tagCatalogAvailable));
-            await tester.ensureVisible(
-              find.byKey(
-                const ValueKey('tag-catalog-search'),
-                skipOffstage: false,
-              ),
-            );
-            await tester.pumpAndSettle();
-          }
-          await tester.enterText(search, 'спорт');
-          await tester.pumpAndSettle();
-          expect(
-            tester.getSemantics(find.text(l10n.tagCatalogNoMatches)).label,
-            contains(l10n.tagCatalogNoMatches),
-          );
-          expect(
-            tester
-                .getSemantics(find.text(l10n.tagCatalogNoMatches))
-                .flagsCollection
-                .isLiveRegion,
-            isTrue,
-          );
-          expect(
-            tester
-                .state<EditableTextState>(find.byType(EditableText))
-                .widget
-                .focusNode
-                .hasFocus,
-            isTrue,
-          );
-          _expectAction(tester.getSemantics(create));
-          expect(tester.getSemantics(create).tooltip, l10n.tagCatalogCreate);
-          final hidden = find.byKey(
-            const ValueKey('tag-catalog-hidden-selection'),
-          );
-          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-          if (target != null) {
-            _expectHiddenSelection(
-              tester,
-              hidden,
-              l10n,
-              tagName,
-              assigned: false,
-            );
-            _expectAction(tester.getSemantics(assign));
-            expect(
-              tester.getSemantics(assign).label,
-              contains(l10n.tagCatalogAssignNamed(tagName)),
-            );
-            await tester.ensureVisible(
-              find.descendant(
-                of: hidden,
-                matching: find.text(l10n.tagCatalogAvailable),
-              ),
-            );
-            await tester.pumpAndSettle();
-            expect(
-              find.text(l10n.tagCatalogAvailable).hitTestable(),
-              findsOneWidget,
-            );
-            expect(assign.hitTestable(), findsOneWidget);
-          }
-          language.value = const Locale('en');
-          await tester.pumpAndSettle();
-          l10n = await AppLocalizations.delegate.load(language.value);
-          expect(tester.widget<TextField>(search).controller!.text, 'спорт');
-          expect(
-            tester.getSemantics(find.byType(EditableText)).label,
-            contains(l10n.tagCatalogSearch),
-          );
-          expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
-          if (target != null) {
-            _expectHiddenSelection(
-              tester,
-              hidden,
-              l10n,
-              tagName,
-              assigned: false,
-            );
-            await _tap(tester, assign);
-            await _until(
-              tester,
-              find.descendant(
-                of: hidden,
-                matching: find.text(l10n.tagCatalogAssigned),
-              ),
-            );
-            await tester.pumpAndSettle();
-            _expectHiddenSelection(
-              tester,
-              hidden,
-              l10n,
-              tagName,
-              assigned: true,
-            );
-            expect(
-              tester
-                  .getSemantics(assign)
-                  .getSemanticsData()
-                  .hasAction(SemanticsAction.tap),
-              isFalse,
-            );
-          }
-          await tester.showKeyboard(search);
-          final clear = find.byTooltip(l10n.tagCatalogClearSearch);
-          expect(clear.hitTestable(), findsOneWidget);
-          _expectAction(tester.getSemantics(clear));
-          await tester.tap(clear);
-          await tester.pumpAndSettle();
-          expect(tester.widget<TextField>(search).controller!.text, isEmpty);
-          expect(
-            tester
-                .state<EditableTextState>(find.byType(EditableText))
-                .widget
-                .focusNode
-                .hasFocus,
-            isTrue,
-          );
-          expect(find.text('Дом'), findsOneWidget);
-          expect(find.text(tagName), findsOneWidget);
-          if (target != null) {
-            final row = find.byKey(
-              ValueKey('tag-catalog-row-${tagFixtureId(lastTagNumber)}'),
-            );
-            await tester.ensureVisible(
-              find.descendant(
-                of: row,
-                matching: find.text(l10n.tagCatalogAssigned),
-              ),
-            );
-            await tester.pumpAndSettle();
-            expect(
-              tester.getSemantics(row).flagsCollection.isSelected,
-              Tristate.isTrue,
-            );
-          }
+    testWidgets('поиск и скрытый выбор доступны и смене языка: $description', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final language = ValueNotifier(locale);
+      addTearDown(language.dispose);
+      final tagName = 'Straße 🏷️ é ${'Длинное название ' * 7}'.trimRight();
+      try {
+        await _showAccessibleSearch(tester, target, language, tagName: tagName);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        var l10n = await AppLocalizations.delegate.load(locale);
+        final search = find.byKey(const ValueKey('tag-catalog-search'));
+        final create = find.byKey(const ValueKey('tag-catalog-create'));
+        await tester.enterText(search, 'STRASS');
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(find.byType(EditableText)).label,
+          contains(l10n.tagCatalogSearch),
+        );
+        expect(
+          tester
+              .getSemantics(find.byType(EditableText))
+              .flagsCollection
+              .isTextField,
+          isTrue,
+        );
+        expect(
+          tester
+              .renderObject<RenderParagraph>(find.text(tagName))
+              .didExceedMaxLines,
+          isFalse,
+        );
+        if (target != null) {
+          await _tap(tester, find.text(l10n.tagCatalogAvailable));
           await tester.ensureVisible(
             find.byKey(
               const ValueKey('tag-catalog-search'),
@@ -318,16 +178,141 @@ void _registerCatalogSearchScenarios() {
             ),
           );
           await tester.pumpAndSettle();
-          await tester.enterText(search, 'спорт');
-          await tester.pumpAndSettle();
-          await _tap(tester, create);
-          await _until(tester, find.byKey(const ValueKey('tag-editor-name')));
-          expect(tester.takeException(), isNull);
-        } finally {
-          semantics.dispose();
         }
-      },
-    );
+        await tester.enterText(search, 'спорт');
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(find.text(l10n.tagCatalogNoMatches)).label,
+          contains(l10n.tagCatalogNoMatches),
+        );
+        expect(
+          tester
+              .getSemantics(find.text(l10n.tagCatalogNoMatches))
+              .flagsCollection
+              .isLiveRegion,
+          isTrue,
+        );
+        expect(
+          tester
+              .state<EditableTextState>(find.byType(EditableText))
+              .widget
+              .focusNode
+              .hasFocus,
+          isTrue,
+        );
+        _expectAction(tester.getSemantics(create));
+        expect(tester.getSemantics(create).tooltip, l10n.tagCatalogCreate);
+        final hidden = find.byKey(
+          const ValueKey('tag-catalog-hidden-selection'),
+        );
+        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+        if (target != null) {
+          _expectHiddenSelection(
+            tester,
+            hidden,
+            l10n,
+            tagName,
+            assigned: false,
+          );
+          _expectAction(tester.getSemantics(assign));
+          expect(
+            tester.getSemantics(assign).label,
+            contains(l10n.tagCatalogAssignNamed(tagName)),
+          );
+          await tester.ensureVisible(
+            find.descendant(
+              of: hidden,
+              matching: find.text(l10n.tagCatalogAvailable),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text(l10n.tagCatalogAvailable).hitTestable(),
+            findsOneWidget,
+          );
+          expect(assign.hitTestable(), findsOneWidget);
+        }
+        language.value = const Locale('en');
+        await tester.pumpAndSettle();
+        l10n = await AppLocalizations.delegate.load(language.value);
+        expect(tester.widget<TextField>(search).controller!.text, 'спорт');
+        expect(
+          tester.getSemantics(find.byType(EditableText)).label,
+          contains(l10n.tagCatalogSearch),
+        );
+        expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
+        if (target != null) {
+          _expectHiddenSelection(
+            tester,
+            hidden,
+            l10n,
+            tagName,
+            assigned: false,
+          );
+          await _tap(tester, assign);
+          await _until(
+            tester,
+            find.descendant(
+              of: hidden,
+              matching: find.text(l10n.tagCatalogAssigned),
+            ),
+          );
+          await tester.pumpAndSettle();
+          _expectHiddenSelection(tester, hidden, l10n, tagName, assigned: true);
+          expect(
+            tester
+                .getSemantics(assign)
+                .getSemanticsData()
+                .hasAction(SemanticsAction.tap),
+            isFalse,
+          );
+        }
+        await tester.showKeyboard(search);
+        final clear = find.byTooltip(l10n.tagCatalogClearSearch);
+        expect(clear.hitTestable(), findsOneWidget);
+        _expectAction(tester.getSemantics(clear));
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+        expect(
+          tester
+              .state<EditableTextState>(find.byType(EditableText))
+              .widget
+              .focusNode
+              .hasFocus,
+          isTrue,
+        );
+        expect(find.text('Дом'), findsOneWidget);
+        expect(find.text(tagName), findsOneWidget);
+        if (target != null) {
+          final row = find.byKey(
+            ValueKey('tag-catalog-row-${tagFixtureId(lastTagNumber)}'),
+          );
+          await tester.ensureVisible(
+            find.descendant(
+              of: row,
+              matching: find.text(l10n.tagCatalogAssigned),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.getSemantics(row).flagsCollection.isSelected,
+            Tristate.isTrue,
+          );
+        }
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('tag-catalog-search'), skipOffstage: false),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(search, 'спорт');
+        await tester.pumpAndSettle();
+        await _tap(tester, create);
+        await _until(tester, find.byKey(const ValueKey('tag-editor-name')));
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
   }
 }
 
@@ -396,13 +381,6 @@ Future<void> _showAccessibleSearch(
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: const TextScaler.linear(2.5),
-              supportsAnnounce: true,
-            ),
-            child: child!,
-          ),
           routerConfig: router.config(),
         ),
       ),

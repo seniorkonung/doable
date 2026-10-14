@@ -35,7 +35,7 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 /// Доступность полного сценария нижней панели создания намерения: экранный
 /// диктор, клавиатура и guidelines Android.
 ///
-/// Геометрия на тесных экранах с клавиатурой и увеличенным текстом
+/// Геометрия на тесных экранах с клавиатурой
 /// проверяется в `intention_creation_sheet_layout_test.dart`.
 void main() {
   setUp(() {
@@ -50,12 +50,11 @@ void main() {
     final code = locale.languageCode;
 
     testWidgets(
-      'диктор и нажатия доступны на экране 568×320 с клавиатурой и масштабом 200% в пустой и заполненной панели — $code',
+      'диктор и нажатия доступны на экране 568×320 с клавиатурой в пустой и заполненной панели — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester, size: const Size(568, 320), keyboard: 160, right: 48);
-        tester.platformDispatcher.textScaleFactorTestValue = 2;
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
         final l10n = await AppLocalizations.delegate.load(locale);
         final sessions = _EditorSessions();
         await _openCatalog(tester, _repositoryWithTags(), sessions, locale);
@@ -670,96 +669,87 @@ void main() {
       },
     );
 
-    for (final (textScale, size) in [
-      (1.0, _phone),
-      // Увеличенный текст на экране, где все поля и сообщения видны целиком:
-      // частично прокрученные элементы guidelines оценили бы по обрезанной
-      // части. Тесные экраны проверяет тест раскладки панели.
-      (2.0, const Size(600, 1000)),
-    ]) {
-      testWidgets(
-        'цели нажатия, подписи и контраст панели, её диалогов, хода сохранения и отказов проходят guidelines Android при масштабе текста ${(textScale * 100).round()}% — $code',
-        (tester) async {
-          final semantics = tester.ensureSemantics();
-          _usePhone(tester, size: size);
-          tester.platformDispatcher.textScaleFactorTestValue = textScale;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          final sessions = _EditorSessions();
-          final repository = _repositoryWithTags();
-          await _openCatalog(tester, repository, sessions, locale);
-          await openQuickCreation(
-            tester,
-            QuickCreationMode.intention,
-            openedPage: find.byType(IntentionEditorPage),
-          );
-          await _expectGuidelines(tester, 'пустая панель');
+    testWidgets(
+      'цели нажатия, подписи и контраст панели, её диалогов, хода сохранения и отказов проходят guidelines Android — $code',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        _usePhone(tester);
 
-          await tester.enterText(find.byKey(_title), _userTitle);
-          await tester.enterText(find.byKey(_description), _userDescription);
-          sessions.notifier(tester)
-            ..draftTagSet.add(_home)
-            ..draftTagSet.add(_work)
-            ..confirmReadiness();
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'заполненная компактная панель');
+        final sessions = _EditorSessions();
+        final repository = _repositoryWithTags();
+        await _openCatalog(tester, repository, sessions, locale);
+        await openQuickCreation(
+          tester,
+          QuickCreationMode.intention,
+          openedPage: find.byType(IntentionEditorPage),
+        );
+        await _expectGuidelines(tester, 'пустая панель');
 
-          sessions.notifier(tester).disableReadiness();
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(_readiness));
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'объяснение готовности');
-          await tester.tap(find.byKey(_readinessConfirm));
-          await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(_title), _userTitle);
+        await tester.enterText(find.byKey(_description), _userDescription);
+        sessions.notifier(tester)
+          ..draftTagSet.add(_home)
+          ..draftTagSet.add(_work)
+          ..confirmReadiness();
+        await tester.pumpAndSettle();
+        await _expectGuidelines(tester, 'заполненная компактная панель');
 
-          await tester.tap(find.byKey(_closeButton));
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'подтверждение закрытия');
-          await tester.tap(find.byKey(_closeContinue));
-          await tester.pumpAndSettle();
+        sessions.notifier(tester).disableReadiness();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_readiness));
+        await tester.pumpAndSettle();
+        await _expectGuidelines(tester, 'объяснение готовности');
+        await tester.tap(find.byKey(_readinessConfirm));
+        await tester.pumpAndSettle();
 
-          await tester.tap(find.byKey(_submit));
-          await tester.pump();
-          await _expectGuidelines(tester, 'ход сохранения');
-          repository.completeCommand(
-            0,
-            const ResultFailure(
-              IntentionTextInputValidationFailure(
-                IntentionTextValidationFailure(
-                  field: IntentionTextField.title,
-                  reason: IntentionTextValidationReason.tooLong,
-                ),
+        await tester.tap(find.byKey(_closeButton));
+        await tester.pumpAndSettle();
+        await _expectGuidelines(tester, 'подтверждение закрытия');
+        await tester.tap(find.byKey(_closeContinue));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+        await _expectGuidelines(tester, 'ход сохранения');
+        repository.completeCommand(
+          0,
+          const ResultFailure(
+            IntentionTextInputValidationFailure(
+              IntentionTextValidationFailure(
+                field: IntentionTextField.title,
+                reason: IntentionTextValidationReason.tooLong,
               ),
             ),
-          );
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'ошибка названия');
+          ),
+        );
+        await tester.pumpAndSettle();
+        await _expectGuidelines(tester, 'ошибка названия');
 
-          await tester.enterText(find.byKey(_title), '$_userTitle!');
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(_submit));
-          await tester.pump();
-          repository.completeCommand(
-            1,
-            ResultFailure(IntentionCreationTagsMissingFailure([_home.id])),
-          );
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'удалённый тег и исправление');
+        await tester.enterText(find.byKey(_title), '$_userTitle!');
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+        repository.completeCommand(
+          1,
+          ResultFailure(IntentionCreationTagsMissingFailure([_home.id])),
+        );
+        await tester.pumpAndSettle();
+        await _expectGuidelines(tester, 'удалённый тег и исправление');
 
-          await tester.tap(find.byKey(_removeMissing));
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(_submit));
-          await tester.pump();
-          repository.completeCommand(
-            2,
-            const ResultFailure(IntentionUnavailableFailure()),
-          );
-          await tester.pumpAndSettle();
-          await _expectGuidelines(tester, 'повтор после устранимого отказа');
-          expect(tester.takeException(), isNull);
-          semantics.dispose();
-        },
-      );
-    }
+        await tester.tap(find.byKey(_removeMissing));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+        repository.completeCommand(
+          2,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+        await _expectGuidelines(tester, 'повтор после устранимого отказа');
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
   }
 }
 

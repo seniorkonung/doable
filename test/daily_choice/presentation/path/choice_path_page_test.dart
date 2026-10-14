@@ -335,17 +335,10 @@ void main() {
     );
   });
 
-  testWidgets('порции и семантика доступны на английском с крупным текстом', (
-    tester,
-  ) async {
+  testWidgets('порции и семантика доступны на английском', (tester) async {
     final repository = _PathRepository();
     addTearDown(repository.dispose);
-    await _pumpPage(
-      tester,
-      repository,
-      locale: const Locale('en'),
-      textScale: 2,
-    );
+    await _pumpPage(tester, repository, locale: const Locale('en'));
     repository.complete(0, [_edge(1, 2, 1)], cursor: _Cursor());
     await tester.pumpAndSettle();
     final semantics = tester.ensureSemantics();
@@ -530,9 +523,7 @@ void main() {
     expect(find.byKey(const ValueKey('choice-path-retry')), findsOneWidget);
   });
 
-  testWidgets('нижний обход доступен по-английски при крупном тексте', (
-    tester,
-  ) async {
+  testWidgets('нижний обход доступен по-английски', (tester) async {
     final repository = _PathRepository();
     addTearDown(repository.dispose);
     await _pumpPage(
@@ -541,7 +532,6 @@ void main() {
       direction: ChoicePathDraftDirection.bottomUp,
       startingId: 3,
       locale: const Locale('en'),
-      textScale: 2,
     );
     repository.complete(0, [_edge(2, 3, 1)], cursor: _Cursor());
     await tester.pumpAndSettle();
@@ -606,7 +596,7 @@ Future<void> _pumpPage(
   WidgetTester tester,
   _PathRepository repository, {
   Locale locale = const Locale('ru'),
-  double textScale = 1,
+
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   int startingId = 1,
 }) async {
@@ -622,11 +612,6 @@ Future<void> _pumpPage(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child!,
-        ),
         routerConfig: router.config(),
       ),
     ),

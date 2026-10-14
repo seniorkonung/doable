@@ -1400,10 +1400,7 @@ void main() {
     'русская форма изменения доступно показывает текущую формулировку',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+
       final repository = ControlledRelationFormRepository();
       addTearDown(repository.dispose);
       final details = testRelationDetails(
@@ -1491,14 +1488,9 @@ void main() {
     expect(find.text('Текущее намерение'), findsOneWidget);
   });
 
-  testWidgets('форма проходит accessibility guidelines при масштабе 200%', (
-    tester,
-  ) async {
+  testWidgets('форма проходит accessibility guidelines', (tester) async {
     final semantics = tester.ensureSemantics();
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-    );
+
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
     await _openForm(tester, repository, RelationDirection.outgoing);

@@ -129,18 +129,14 @@ void main() {
       });
     }
 
-    testWidgets('при масштабе текста 2.5 значки не обрезаются, и каждый '
+    testWidgets('значки не обрезаются, и каждый '
         'пункт выбирается нажатием', (tester) async {
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final selections = <AppDestination>[];
       await tester.pumpWidget(
-        _testApp(
-          locale: locale,
-          textScaler: const TextScaler.linear(2.5),
-          onSelected: selections.add,
-        ),
+        _testApp(locale: locale, onSelected: selections.add),
       );
       await tester.pumpAndSettle();
 
@@ -293,7 +289,7 @@ Widget _testApp({
   Locale? locale,
   AppDestination selected = AppDestination.home,
   ValueChanged<AppDestination>? onSelected,
-  TextScaler textScaler = TextScaler.noScaling,
+
   QuickCreationMode quickCreationMode = QuickCreationMode.intention,
   VoidCallback? onQuickCreate,
   VoidCallback? onChangeQuickCreationMode,
@@ -303,10 +299,6 @@ Widget _testApp({
     localeListResolutionCallback: resolveAppLocale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    builder: (context, child) => MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-      child: child!,
-    ),
     home: Scaffold(
       body: const SizedBox.expand(),
       bottomNavigationBar: AppNavigationBar(

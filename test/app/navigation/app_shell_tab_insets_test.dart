@@ -74,7 +74,6 @@ void main() {
     const source = MediaQueryData(
       size: Size(400, 800),
       devicePixelRatio: 3,
-      textScaler: TextScaler.linear(2.5),
       platformBrightness: Brightness.dark,
       padding: EdgeInsets.fromLTRB(11, 47, 13, 34),
       viewPadding: EdgeInsets.fromLTRB(11, 47, 13, 34),

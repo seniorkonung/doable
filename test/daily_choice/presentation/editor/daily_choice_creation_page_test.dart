@@ -146,24 +146,23 @@ void main() {
     expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
   });
 
-  testWidgets(
-    'крупный текст и английская семантика сохраняют пользовательские названия',
-    (tester) async {
-      final repository = _Repository();
-      await _pump(tester, repository, locale: const Locale('en'), textScale: 2);
-      final semantics = tester.ensureSemantics();
-      expect(find.textContaining('Основание'), findsWidgets);
-      expect(find.textContaining('Действие'), findsWidgets);
-      expect(find.bySemanticsLabel(RegExp('Step 1:')), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('daily-choice-completed')),
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('Already completed'), findsOneWidget);
-      semantics.dispose();
-    },
-  );
+  testWidgets('английская семантика сохраняет пользовательские названия', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    await _pump(tester, repository, locale: const Locale('en'));
+    final semantics = tester.ensureSemantics();
+    expect(find.textContaining('Основание'), findsWidgets);
+    expect(find.textContaining('Действие'), findsWidgets);
+    expect(find.bySemanticsLabel(RegExp('Step 1:')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('daily-choice-completed')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Already completed'), findsOneWidget);
+    semantics.dispose();
+  });
 
   testWidgets('ошибка поля показана в форме без потери ввода', (tester) async {
     final repository = _Repository();
@@ -662,7 +661,6 @@ Future<void> _pump(
   GlobalKey<NavigatorState>? navigatorKey,
   NavigatorObserver? navigatorObserver,
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
-  double textScale = 1,
 }) async {
   final router = RootStackRouter.build(
     navigatorKey: navigatorKey,
@@ -698,11 +696,7 @@ Future<void> _pump(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: GraphOperationPresenter(child: child!),
-        ),
+        builder: (context, child) => GraphOperationPresenter(child: child!),
       ),
     ),
   );

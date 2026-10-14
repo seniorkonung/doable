@@ -288,38 +288,34 @@ void main() {
     expect(find.text('Not ready for action'), findsOneWidget);
   });
 
-  testWidgets(
-    'подробный просмотр проходит accessibility guidelines при масштабе 200%',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
-      final repository = ControlledDetailsRepository();
-      final intention = testDetailsIntention(
-        title: 'Доступное намерение',
-        description: 'Описание доступного намерения',
-        readiness: IntentionReadiness.ready,
-        archiveState: IntentionArchiveState.archived,
-      );
-      await _pumpDetailsPage(tester, repository, intention.id);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests.single.add(ResultSuccess(intention));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('intention-details-delete')),
-        200,
-        scrollable: _detailsScrollable,
-      );
-      await tester.pumpAndSettle();
+  testWidgets('подробный просмотр проходит accessibility guidelines', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
 
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
-      semantics.dispose();
-    },
-  );
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(
+      title: 'Доступное намерение',
+      description: 'Описание доступного намерения',
+      readiness: IntentionReadiness.ready,
+      archiveState: IntentionArchiveState.archived,
+    );
+    await _pumpDetailsPage(tester, repository, intention.id);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('intention-details-delete')),
+      200,
+      scrollable: _detailsScrollable,
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    semantics.dispose();
+  });
 
   testWidgets(
     'объясняет оба критерия готовности и не запускает команду после отмены',

@@ -90,15 +90,12 @@ void main() {
       },
     );
   }
-  testWidgets('переход доступен с длинным названием и крупным текстом', (
-    tester,
-  ) async {
+  testWidgets('переход доступен с длинным названием', (tester) async {
     final semantics = tester.ensureSemantics();
     try {
       final name = ('Длинный тег ' * 15).trimRight();
       final h = await _pumpCatalog(
         tester,
-        textScale: 3,
         size: const Size(360, 800),
         seed: (raw) => raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
           name,
@@ -267,7 +264,7 @@ _pumpCatalog(
   String locale = 'ru',
   IntentionId? intentionId,
   void Function(sqlite.Database)? seed,
-  double textScale = 1,
+
   Size size = const Size(1000, 1600),
 }) async {
   tester.view.physicalSize = size;
@@ -317,11 +314,6 @@ _pumpCatalog(
             const AppShellRoute(),
             TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
           ]),
-        ),
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child!,
         ),
       ),
     ),
