@@ -23,7 +23,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_text_metrics.dart` (переносится в `lib/src/design_system/text_metrics.dart`), `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_text_metrics_test.dart` (переносится в `test/design_system/text_metrics_test.dart`)
   - **Estimated scope:** S
 
-- [ ] 1.3 Ячейка дня `WeekStrip` с отметкой дня показывает все состояния дня недели по дизайн-системе в Widgetbook
+- [x] 1.3 Ячейка дня `WeekStrip` с отметкой дня показывает все состояния дня недели по дизайн-системе в Widgetbook
   - **Acceptance criteria:**
     - Ячейка получает тексты числа и дня недели, признаки «выбран» и «сегодня», отметку дня (нет; есть невыполненный; всё выполнено), доступное название и нажатие. Предметных типов и строк локализации приложения в ней нет (ADR-0030).
     - В обеих темах вид совпадает с README `WeekStrip` и разделами «Day in the week strip» и «Mark for a day with choices» спек-доски `Parts`. При крупном тексте ячейка растёт от размеров дизайна и сообщает высоту строки для текущего масштаба текста.

@@ -1,5 +1,6 @@
 import 'package:widgetbook/widgetbook.dart';
 
+import 'calendar/week_strip_day_use_cases.dart';
 import 'foundations/colors_use_cases.dart';
 import 'foundations/typography_use_cases.dart';
 import 'intention/intention_summary_view_use_cases.dart';
@@ -20,6 +21,15 @@ List<WidgetbookNode> buildCatalog() => [
     children: [
       WidgetbookComponent(name: 'Цвета', useCases: colorsUseCases()),
       WidgetbookComponent(name: 'Типографика', useCases: typographyUseCases()),
+    ],
+  ),
+  WidgetbookFolder(
+    name: 'Календарь',
+    children: [
+      WidgetbookComponent(
+        name: 'День недельной полосы',
+        useCases: weekStripDayUseCases(),
+      ),
     ],
   ),
   WidgetbookFolder(
