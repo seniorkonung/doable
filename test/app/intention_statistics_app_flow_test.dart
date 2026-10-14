@@ -9,6 +9,15 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
@@ -39,13 +48,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/daily_choice_durability_fixture.dart';
+import '../support/app_root_pages.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
+part 'intention_statistics_catalog_scenarios.dart';
+
 final _today = CalendarDate.fromParts(2026, 10, 12);
 
 void main() {
+  _catalogNavigationScenarios();
+
   testWidgets(
     'возврат после команд атомарно заменяет карточки, календарь и две порционные разбивки',
     (tester) async {
@@ -603,8 +617,10 @@ final class _StatisticsProbe extends LocalDatabaseConnectionObserver {
   var computations = 0;
   _ComputationHold? _nextComputation;
   _ReadHold? _nextContinuation;
+  _ReadHold? _nextCatalogRead;
 
   _ReadHold holdNextContinuation() => _nextContinuation = _ReadHold();
+  _ReadHold holdNextCatalogRead() => _nextCatalogRead = _ReadHold();
   final _holds = <_ComputationHold>[];
 
   _ComputationHold holdNextComputation() {
@@ -615,6 +631,10 @@ final class _StatisticsProbe extends LocalDatabaseConnectionObserver {
   }
 
   void releaseAll() {
+    final catalog = _nextCatalogRead;
+    if (catalog != null && !catalog.release.isCompleted) {
+      catalog.release.complete();
+    }
     final read = _nextContinuation;
     if (read != null && !read.release.isCompleted) read.release.complete();
     for (final hold in _holds) {
@@ -629,6 +649,15 @@ final class _StatisticsProbe extends LocalDatabaseConnectionObserver {
   ) async {
     if (rows.isNotEmpty && rows.first.containsKey('archived_seed_key')) {
       sourceReads++;
+    }
+    final catalog = _nextCatalogRead;
+    if (catalog != null &&
+        rows.isNotEmpty &&
+        rows.first.containsKey('choice_date') &&
+        rows.first.containsKey('creation_sequence')) {
+      catalog.started.complete();
+      await catalog.release.future;
+      _nextCatalogRead = null;
     }
     final hold = _nextContinuation;
     if (hold != null &&
