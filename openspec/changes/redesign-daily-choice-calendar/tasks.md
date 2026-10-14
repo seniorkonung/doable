@@ -35,7 +35,7 @@
   - **Files likely touched:** `lib/src/design_system/components/day_mark.dart` (новый), `lib/src/design_system/components/week_strip_day.dart` (новый), `widgetbook/lib/calendar/week_strip_day_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
   - **Estimated scope:** M
 
-- [ ] 1.4 Части сетки `MonthGrid` — ячейка дня и подпись дня недели — показывают все состояния месяца по дизайн-системе в Widgetbook
+- [x] 1.4 Части сетки `MonthGrid` — ячейка дня и подпись дня недели — показывают все состояния месяца по дизайн-системе в Widgetbook
   - **Acceptance criteria:**
     - Ячейка получает текст числа, признаки «выбран», «сегодня» и «соседний месяц», отметку дня, доступное название и нажатие; подпись получает текст. Предметных типов и строк локализации приложения в них нет.
     - В обеих темах вид совпадает с README `MonthGrid` и разделами «Day in the month grid» и «Mark for a day with choices» спек-доски `Parts`, включая отметку на выбранном дне.

@@ -1,5 +1,6 @@
 import 'package:widgetbook/widgetbook.dart';
 
+import 'calendar/month_grid_day_use_cases.dart';
 import 'calendar/week_strip_day_use_cases.dart';
 import 'foundations/colors_use_cases.dart';
 import 'foundations/typography_use_cases.dart';
@@ -29,6 +30,10 @@ List<WidgetbookNode> buildCatalog() => [
       WidgetbookComponent(
         name: 'День недельной полосы',
         useCases: weekStripDayUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'День месячной сетки',
+        useCases: monthGridDayUseCases(),
       ),
     ],
   ),

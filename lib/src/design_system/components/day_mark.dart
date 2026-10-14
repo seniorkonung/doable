@@ -8,9 +8,16 @@ enum DayMark { none, todo, done }
 /// Отметка с постоянным местом под неё, в том числе у пустого дня.
 /// Доступное описание состояния входит в название кнопки дня.
 final class DayMarkIndicator extends StatelessWidget {
-  const DayMarkIndicator({super.key, required this.mark});
+  const DayMarkIndicator({
+    super.key,
+    required this.mark,
+    this.onAccent = false,
+  });
 
   final DayMark mark;
+
+  /// Отметка на акцентной заливке выбранного дня месяца.
+  final bool onAccent;
 
   static const double height = 5;
 
@@ -27,7 +34,7 @@ final class DayMarkIndicator extends StatelessWidget {
             width: 5,
             height: 5,
             decoration: BoxDecoration(
-              color: colors.muted,
+              color: onAccent ? colors.onAccent : colors.muted,
               shape: BoxShape.circle,
             ),
           ),
@@ -35,7 +42,7 @@ final class DayMarkIndicator extends StatelessWidget {
         DayMark.done => Center(
           child: CustomPaint(
             size: const Size(7, 5),
-            painter: _CheckPainter(colors.grip),
+            painter: _CheckPainter(onAccent ? colors.onAccent : colors.grip),
           ),
         ),
       },
