@@ -55,3 +55,6 @@ apm_modules/
 .claude/
 .agents/
 .mcp.json
+
+# Приватные материалы дизайна: не публикуются
+/context/

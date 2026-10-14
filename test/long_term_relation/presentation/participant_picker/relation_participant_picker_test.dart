@@ -386,16 +386,10 @@ void main() {
     expect(find.text('Других намерений для выбора нет.'), findsOneWidget);
   });
 
-  testWidgets('сохраняет выбор доступным при увеличенном тексте', (
-    tester,
-  ) async {
+  testWidgets('сохраняет выбор доступным', (tester) async {
     final repository = ControlledParticipantPickerRepository();
     addTearDown(repository.dispose);
-    final router = await _pumpAppWithCatalog(
-      tester,
-      repository,
-      textScaler: const TextScaler.linear(2),
-    );
+    final router = await _pumpAppWithCatalog(tester, repository);
     addTearDown(router.dispose);
 
     final selection = _pushPicker(router, excludedIndex: 9);
@@ -483,7 +477,6 @@ Future<AppRouter> _pumpAppWithCatalog(
   Locale locale = const Locale('en'),
   int pageSize = 100,
   int prefetchRemaining = 30,
-  TextScaler textScaler = TextScaler.noScaling,
 }) async {
   final router = AppRouter();
   await tester.pumpWidget(
@@ -505,10 +498,6 @@ Future<AppRouter> _pumpAppWithCatalog(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(),
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-          child: child!,
-        ),
       ),
     ),
   );

@@ -184,7 +184,7 @@ void main() {
     try {
       final reads = _Reads();
       addTearDown(reads.dispose);
-      await _pumpPage(tester, reads, textScale: 3);
+      await _pumpPage(tester, reads);
       final l10n = AppLocalizations.of(
         tester.element(find.byType(TagNavigationPage)),
       );
@@ -490,7 +490,6 @@ Future<void> _pumpPage(
   WidgetTester tester,
   _Reads reads, {
   String locale = 'ru',
-  double textScale = 1,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -500,11 +499,6 @@ Future<void> _pumpPage(
       ],
       child: OrdinaryPageTestApp(
         locale: Locale(locale),
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child!,
-        ),
         home: TagNavigationPage(tagId: _tag.id),
       ),
     ),

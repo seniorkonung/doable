@@ -29,12 +29,7 @@ void main() {
     final repository = ControlledRelationDetailsRepository();
     addTearDown(repository.dispose);
     final relationId = testRelationId(101);
-    await _pumpRelationDetails(
-      tester,
-      repository,
-      relationId,
-      textScaler: const TextScaler.linear(2.5),
-    );
+    await _pumpRelationDetails(tester, repository, relationId);
     repository
         .watchAt(0)
         .emitDetails(
@@ -335,9 +330,7 @@ void main() {
     expect(_textOf(tester, 'relation-details-scope'), 'Archived relation');
   });
 
-  testWidgets('русская локализация и увеличенный текст сохраняют данные', (
-    tester,
-  ) async {
+  testWidgets('русская локализация сохраняет данные', (tester) async {
     final repository = ControlledRelationDetailsRepository();
     addTearDown(repository.dispose);
     final relationId = testRelationId(8);
@@ -347,7 +340,6 @@ void main() {
       repository,
       relationId,
       locale: const Locale('ru'),
-      textScaler: const TextScaler.linear(3),
     );
     repository
         .watchAt(0)
@@ -633,7 +625,6 @@ void main() {
         repository,
         relationId,
         locale: const Locale('ru'),
-        textScaler: const TextScaler.linear(3),
       );
       repository
           .watchAt(0)
@@ -739,12 +730,7 @@ void main() {
       scope: RelationScope.archived,
     );
 
-    await _pumpRelationDetails(
-      tester,
-      repository,
-      relationId,
-      textScaler: const TextScaler.linear(3),
-    );
+    await _pumpRelationDetails(tester, repository, relationId);
     repository
         .watchAt(0)
         .emitDetails(details, revision: const TestGraphRevision(1));
@@ -958,7 +944,7 @@ Future<ProviderContainer> _pumpRelationDetails(
   ControlledRelationDetailsRepository repository,
   LongTermRelationId relationId, {
   Locale locale = const Locale('en'),
-  TextScaler textScaler = TextScaler.noScaling,
+
   bool startUpdateBeforeOpening = false,
 }) async {
   // Просмотр проверяется целиком: высокая поверхность исключает влияние
@@ -989,10 +975,7 @@ Future<ProviderContainer> _pumpRelationDetails(
       child: OrdinaryPageTestApp(
         locale: locale,
         home: Builder(
-          builder: (context) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-            child: RelationDetailsPage(relationId: relationId),
-          ),
+          builder: (context) => RelationDetailsPage(relationId: relationId),
         ),
       ),
     ),

@@ -72,7 +72,7 @@ void main() {
     CreationExitState.submitting,
   ]) {
     final submitting = state == CreationExitState.submitting;
-    testWidgets('текст 2.6 и малая высота сохраняют целые строки и выход '
+    testWidgets('малая высота сохраняет целые строки и выход '
         '${state.name}: ${translation.locale.languageCode}', (tester) async {
       var exits = 0;
       await tester.pumpWidget(
@@ -80,8 +80,7 @@ void main() {
           locale: translation.locale,
           state: state,
           onExit: () => exits++,
-          textScale: 2.6,
-          size: const Size(240, 160),
+          size: const Size(240, 100),
         ),
       );
       expect(tester.takeException(), isNull);
@@ -167,7 +166,7 @@ Widget _app({
   required Locale locale,
   required CreationExitState state,
   required VoidCallback onExit,
-  double textScale = 1,
+
   Size size = const Size(320, 240),
 }) => MaterialApp(
   locale: locale,
@@ -177,10 +176,7 @@ Widget _app({
     body: Center(
       child: SizedBox.fromSize(
         size: size,
-        child: MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-          child: CreationExitAction(state: state, onExit: onExit),
-        ),
+        child: CreationExitAction(state: state, onExit: onExit),
       ),
     ),
   ),

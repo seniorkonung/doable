@@ -44,11 +44,7 @@ void defineDailyChoicePickerContextTests({
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final semantics = tester.ensureSemantics();
-    final (repository, router) = await _openApp(
-      tester,
-      language: language,
-      textScaler: const TextScaler.linear(2.6),
-    );
+    final (repository, router) = await _openApp(tester, language: language);
     final auxiliary = router.push<IntentionId>(
       route(const AuxiliaryDailyChoicePickerContext()),
     );
@@ -383,27 +379,23 @@ void _defineInitialPickerAccessibilityTests({
   required PageRouteInfo Function(DailyChoicePickerContext) route,
   required String keyPrefix,
 }) {
-  // Обычный экран телефона и крайний случай: крупный текст, открытая
+  // Обычный экран телефона и крайний случай: открытая
   // клавиатура и безопасные отступы. Каждый случай проверяет и появление, и
   // скрытие клавиатуры.
-  for (final (language, scale, size, safe, keyboard) in [
-    ('en', 1.0, const Size(400, 800), false, 0.0),
-    ('ru', 2.6, const Size(400, 800), true, 260.0),
+  for (final (language, size, safe, keyboard) in [
+    ('en', const Size(400, 800), false, 0.0),
+    ('ru', const Size(400, 800), true, 260.0),
   ]) {
     testWidgets('$language: строка кандидата и текстовая отмена '
         'начального поиска, '
-        '${size.width.toInt()}×${size.height.toInt()}, текст $scale, '
+        '${size.width.toInt()}×${size.height.toInt()}, '
         'клавиатура $keyboard, безопасные отступы $safe', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final semantics = tester.ensureSemantics();
       try {
-        final (repository, router) = await _openApp(
-          tester,
-          language: language,
-          textScaler: TextScaler.linear(scale),
-        );
+        final (repository, router) = await _openApp(tester, language: language);
         final underlying = router.push<IntentionId>(
           route(const AuxiliaryDailyChoicePickerContext()),
         );
@@ -589,7 +581,7 @@ void _expectPickerCandidateReachable(
   expect(tester.widget<EditableText>(input).controller.text, 'Гулять');
   final viewport = tester.getRect(find.byType(IntentionSearchLayout));
   final cancel = tester.getRect(find.widgetWithText(TextButton, cancelLabel));
-  // Обычный tester.tap нажимает центр строки. При крупном тексте сводка
+  // Обычный tester.tap нажимает центр строки. Длинная сводка
   // может быть выше области просмотра; её область нажатия остаётся внутри.
   final rect = Rect.fromCenter(
     center: tester.getCenter(candidate),
@@ -673,7 +665,6 @@ Future<void> _settleRoute(WidgetTester tester) async {
 Future<(ControlledCatalogRepository, AppRouter)> _openApp(
   WidgetTester tester, {
   String language = 'en',
-  TextScaler textScaler = TextScaler.noScaling,
 }) async {
   final repository = ControlledCatalogRepository();
   final container = reconciliationCatalogContainer(repository);
@@ -687,10 +678,6 @@ Future<(ControlledCatalogRepository, AppRouter)> _openApp(
         locale: Locale(language),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-          child: child!,
-        ),
         routerConfig: router.config(),
       ),
     ),

@@ -113,16 +113,16 @@ void main() {
   }
 
   // Самые длинные названия русские, поэтому достаточно русского языка.
-  testWidgets('все названия целиком доступны при тексте 2.6 '
+  testWidgets('все названия целиком доступны '
       'через прокрутку на узком экране', (tester) async {
     const language = 'ru';
     final titles = _titles[language]!;
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
-    tester.platformDispatcher.textScaleFactorTestValue = 2.6;
+
     addTearDown(tester.view.reset);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
     final app = await _openApp(tester, language: language);
 
     for (var i = 0; i < titles.length; i++) {

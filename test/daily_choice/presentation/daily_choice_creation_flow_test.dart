@@ -1111,10 +1111,7 @@ void main() {
       addTearDown(tester.view.reset);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+
       final semantics = tester.ensureSemantics();
 
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;

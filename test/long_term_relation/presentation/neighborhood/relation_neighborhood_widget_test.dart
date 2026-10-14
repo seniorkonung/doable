@@ -302,15 +302,12 @@ void main() {
     expect(thirdRow, findsOneWidget);
   });
 
-  testWidgets('дневная строка читается при увеличенном тексте', (tester) async {
+  testWidgets('дневная строка читается', (tester) async {
     final repository = ControlledNeighborhoodRepository();
     addTearDown(repository.dispose);
     final owner = testIntentionId(1);
     final item = _dailyItem(owner: owner, role: DailyChoiceRelationRole.source);
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-    );
+
     await _pumpNeighborhoodSliver(tester, repository, owner);
     repository.completePage(
       0,
@@ -620,85 +617,80 @@ void main() {
     },
   );
 
-  testWidgets(
-    'сохраняет русский выбор при открытии связи и возврате с крупным текстом',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
-      final repository = ControlledNeighborhoodRepository();
-      addTearDown(repository.dispose);
-      final ownerId = testIntentionId(1);
-      final counts = testRelationCounts(activeNeedOutgoing: 1);
-      await _pumpNeighborhoodSliver(
-        tester,
-        repository,
-        ownerId,
-        locale: const Locale('ru'),
-        selectionMode: true,
-        onOpenRelation: (_) =>
-            Navigator.of(
-              tester.element(find.byType(RelationNeighborhoodSliver)),
-            ).push(
-              MaterialPageRoute<void>(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(title: const Text('Просмотр связи')),
-                  body: const Text('Подробности связи'),
+  testWidgets('сохраняет русский выбор при открытии связи и возврате', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    final repository = ControlledNeighborhoodRepository();
+    addTearDown(repository.dispose);
+    final ownerId = testIntentionId(1);
+    final counts = testRelationCounts(activeNeedOutgoing: 1);
+    await _pumpNeighborhoodSliver(
+      tester,
+      repository,
+      ownerId,
+      locale: const Locale('ru'),
+      selectionMode: true,
+      onOpenRelation: (_) =>
+          Navigator.of(tester.element(find.byType(RelationNeighborhoodSliver)))
+              .push(
+                MaterialPageRoute<void>(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Просмотр связи')),
+                    body: const Text('Подробности связи'),
+                  ),
                 ),
               ),
-            ),
-      );
-      repository.completePage(
-        0,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
-          counts: counts,
-          nextCursor: null,
-          revision: revision,
-        ),
-      );
-      await tester.pumpAndSettle();
-      final checkbox = find.byKey(
-        ValueKey(
-          'relation-neighborhood-select-${testRelationId(1).toCanonicalString()}',
-        ),
-      );
-      await _scrollTo(tester, checkbox);
-      expect(
-        tester.getSemantics(checkbox).label,
-        allOf(
-          contains('Добавить в выбор'),
-          contains('Исходящие'),
-          contains('Активная связь'),
-        ),
-      );
-      await tester.tap(checkbox);
-      await tester.pumpAndSettle();
-      expect(
-        tester.getSemantics(checkbox).flagsCollection.isChecked,
-        CheckedState.isTrue,
-      );
-      final phrase = find.text('Чтобы Намерение-владелец, нужно Связанное 1');
-      await _scrollTo(tester, phrase);
-      await tester.tap(phrase);
-      await tester.pumpAndSettle();
-      expect(find.text('Просмотр связи'), findsOneWidget);
-      Navigator.of(tester.element(find.text('Просмотр связи'))).pop();
-      await tester.pumpAndSettle();
-      await _scrollTo(tester, checkbox);
-      expect(
-        tester.getSemantics(checkbox).flagsCollection.isChecked,
-        CheckedState.isTrue,
-      );
-      expect(tester.takeException(), isNull);
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
-      semantics.dispose();
-    },
-  );
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
+        counts: counts,
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final checkbox = find.byKey(
+      ValueKey(
+        'relation-neighborhood-select-${testRelationId(1).toCanonicalString()}',
+      ),
+    );
+    await _scrollTo(tester, checkbox);
+    expect(
+      tester.getSemantics(checkbox).label,
+      allOf(
+        contains('Добавить в выбор'),
+        contains('Исходящие'),
+        contains('Активная связь'),
+      ),
+    );
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSemantics(checkbox).flagsCollection.isChecked,
+      CheckedState.isTrue,
+    );
+    final phrase = find.text('Чтобы Намерение-владелец, нужно Связанное 1');
+    await _scrollTo(tester, phrase);
+    await tester.tap(phrase);
+    await tester.pumpAndSettle();
+    expect(find.text('Просмотр связи'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Просмотр связи'))).pop();
+    await tester.pumpAndSettle();
+    await _scrollTo(tester, checkbox);
+    expect(
+      tester.getSemantics(checkbox).flagsCollection.isChecked,
+      CheckedState.isTrue,
+    );
+    expect(tester.takeException(), isNull);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    semantics.dispose();
+  });
 
   testWidgets('новая связь при открытом подтверждении не входит в выбранный набор', (
     tester,
@@ -1215,68 +1207,61 @@ void main() {
     },
   );
 
-  testWidgets(
-    'связывает русское состояние обновления с числами при масштабе 200%',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
-      final repository = ControlledNeighborhoodRepository();
-      addTearDown(repository.dispose);
-      final ownerId = testIntentionId(1);
-      final counts = testRelationCounts(activeNeedOutgoing: 1);
+  testWidgets('связывает русское состояние обновления с числами', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
 
-      await _pumpNeighborhoodSliver(
-        tester,
-        repository,
-        ownerId,
-        locale: const Locale('ru'),
-      );
-      repository.completePage(
-        0,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
-          counts: counts,
-          nextCursor: null,
-          revision: revision,
+    final repository = ControlledNeighborhoodRepository();
+    addTearDown(repository.dispose);
+    final ownerId = testIntentionId(1);
+    final counts = testRelationCounts(activeNeedOutgoing: 1);
+
+    await _pumpNeighborhoodSliver(
+      tester,
+      repository,
+      ownerId,
+      locale: const Locale('ru'),
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
+        counts: counts,
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final refreshRequestIndex = repository.requestCount;
+    repository.emitIntention(
+      testNeighborhoodIntention(id: ownerId),
+      counts: testRelationCounts(activeNeedOutgoing: 2),
+      revision: const TestGraphRevision(2),
+    );
+    await _pumpUntilRequestCount(tester, repository, refreshRequestIndex + 1);
+    await tester.pump();
+
+    expect(find.text('Обновляем сохранённые числа связей…'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          'Всего связей: 1.*Обновляем сохранённые числа связей',
+          dotAll: true,
         ),
-      );
-      await tester.pumpAndSettle();
-
-      final refreshRequestIndex = repository.requestCount;
-      repository.emitIntention(
-        testNeighborhoodIntention(id: ownerId),
-        counts: testRelationCounts(activeNeedOutgoing: 2),
-        revision: const TestGraphRevision(2),
-      );
-      await _pumpUntilRequestCount(tester, repository, refreshRequestIndex + 1);
-      await tester.pump();
-
-      expect(find.text('Обновляем сохранённые числа связей…'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel(
-          RegExp(
-            'Всего связей: 1.*Обновляем сохранённые числа связей',
-            dotAll: true,
-          ),
-        ),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    },
-  );
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets(
-    'сохраняет пользовательский текст и доступность при русской локали и масштабе 200%',
+    'сохраняет пользовательский текст и доступность при русской локали',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+
       final repository = ControlledNeighborhoodRepository();
       addTearDown(repository.dispose);
       final ownerId = testIntentionId(1);

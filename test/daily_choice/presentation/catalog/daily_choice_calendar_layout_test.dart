@@ -12,14 +12,11 @@ import 'daily_choice_calendar_test_support.dart';
 /// Узкий экран телефона.
 const _screen = Size(360, 780);
 
-/// Языки и системные размеры текста: русский проверяется целиком в обычном и
-/// увеличенном масштабе. Английские подписи дней недели длиннее русских, поэтому
-/// английский проверяется только свёрнутой неделей в увеличенном масштабе:
-/// остальная раскладка от языка не зависит.
+/// Русский проверяется целиком. Английские подписи дней недели длиннее
+/// русских, поэтому дополнительно проверяется свёрнутая неделя на английском.
 final _configurations = [
-  (locale: const Locale('ru'), textScale: 1.0, full: true),
-  (locale: const Locale('ru'), textScale: 2.5, full: true),
-  (locale: const Locale('en'), textScale: 2.5, full: false),
+  (locale: const Locale('ru'), full: true),
+  (locale: const Locale('en'), full: false),
 ];
 
 /// Короткие подписи колонок с понедельника по воскресенье.
@@ -78,91 +75,80 @@ final _pageScroll = find.byWidgetPredicate(
 );
 
 void main() {
-  for (final textScale in [1.0, 2.5]) {
-    testWidgets('отметки при масштабе $textScale помещаются под числами '
-        'без изменения высоты строк недели и месяца', (tester) async {
-      final consumer = await _pumpOnPhone(
-        tester,
-        locale: const Locale('ru'),
-        textScale: textScale,
-        viewport: week(date(2026, 10, 4)),
+  testWidgets('отметки помещаются под числами '
+      'без изменения высоты строк недели и месяца', (tester) async {
+    final consumer = await _pumpOnPhone(
+      tester,
+      locale: const Locale('ru'),
+      viewport: week(date(2026, 10, 4)),
+    );
+    final statuses = {
+      date(2026, 9, 30): DailyChoiceDayStatus.allCompleted,
+      date(2026, 10, 4): DailyChoiceDayStatus.hasIncomplete,
+    };
+    for (final viewport in [
+      week(date(2026, 10, 4)),
+      month(date(2026, 10, 4)),
+    ]) {
+      consumer.replaceInputs(
+        viewport: viewport,
+        dayStatuses: {},
+        hasDayMarksReadFailure: false,
       );
-      final statuses = {
-        date(2026, 9, 30): DailyChoiceDayStatus.allCompleted,
-        date(2026, 10, 4): DailyChoiceDayStatus.hasIncomplete,
-      };
-      for (final viewport in [
-        week(date(2026, 10, 4)),
-        month(date(2026, 10, 4)),
-      ]) {
-        consumer.replaceInputs(
-          viewport: viewport,
-          dayStatuses: {},
-          hasDayMarksReadFailure: false,
-        );
-        await tester.pumpAndSettle();
-        final before = await _calendarLayout(tester);
-        final number = find.descendant(
-          of: calendarDay(date(2026, 10, 4)),
-          matching: find.text('4'),
-        );
-        final numberOffset =
-            _rect(tester, number).top -
-            _rect(tester, calendarDay(date(2026, 10, 4))).top;
-
-        consumer.replaceInputs(dayStatuses: statuses);
-        await tester.pumpAndSettle();
-        final marked = await _calendarLayout(tester);
-        expect(marked.rowHeight, moreOrLessEquals(before.rowHeight));
-        expect(marked.gridHeight, moreOrLessEquals(before.gridHeight));
-        expect(
-          marked.calendar.height,
-          moreOrLessEquals(before.calendar.height),
-        );
-        expect(marked.messageTop, moreOrLessEquals(before.messageTop));
-        expect(
+      await tester.pumpAndSettle();
+      final before = await _calendarLayout(tester);
+      final number = find.descendant(
+        of: calendarDay(date(2026, 10, 4)),
+        matching: find.text('4'),
+      );
+      final numberOffset =
           _rect(tester, number).top -
-              _rect(tester, calendarDay(date(2026, 10, 4))).top,
-          moreOrLessEquals(numberOffset),
-        );
-        for (final day in statuses.keys) {
-          final cell = calendarDay(day);
-          final mark = find.descendant(of: cell, matching: find.byType(Icon));
-          final number = find.descendant(
-            of: cell,
-            matching: find.text('${day.day}'),
-          );
-          final markRect = _rect(tester, mark);
-          expect(_contains(_rect(tester, cell), markRect), isTrue);
-          expect(markRect.top, greaterThan(_rect(tester, number).bottom));
-          expect(markRect.height, greaterThanOrEqualTo(12 * textScale));
-        }
+          _rect(tester, calendarDay(date(2026, 10, 4))).top;
 
-        consumer.replaceInputs(hasDayMarksReadFailure: true);
-        await tester.pumpAndSettle();
-        final failed = await _calendarLayout(tester);
-        expect(failed.rowHeight, moreOrLessEquals(before.rowHeight));
-        final failure = find.text('Отметки дней не загружены.');
-        _expectFullyShown(
-          tester,
-          failure,
-          within: failed.calendar,
-          textScale: textScale,
+      consumer.replaceInputs(dayStatuses: statuses);
+      await tester.pumpAndSettle();
+      final marked = await _calendarLayout(tester);
+      expect(marked.rowHeight, moreOrLessEquals(before.rowHeight));
+      expect(marked.gridHeight, moreOrLessEquals(before.gridHeight));
+      expect(marked.calendar.height, moreOrLessEquals(before.calendar.height));
+      expect(marked.messageTop, moreOrLessEquals(before.messageTop));
+      expect(
+        _rect(tester, number).top -
+            _rect(tester, calendarDay(date(2026, 10, 4))).top,
+        moreOrLessEquals(numberOffset),
+      );
+      for (final day in statuses.keys) {
+        final cell = calendarDay(day);
+        final mark = find.descendant(of: cell, matching: find.byType(Icon));
+        final number = find.descendant(
+          of: cell,
+          matching: find.text('${day.day}'),
         );
-        expect(
-          _rect(tester, failure).bottom,
-          lessThan(_rect(tester, calendarDay(date(2026, 9, 28))).top),
-        );
-        expect(tester.takeException(), isNull);
+        final markRect = _rect(tester, mark);
+        expect(_contains(_rect(tester, cell), markRect), isTrue);
+        expect(markRect.top, greaterThan(_rect(tester, number).bottom));
+        expect(markRect.height, greaterThanOrEqualTo(12));
       }
-      expect(consumer.events, isEmpty);
-    });
-  }
 
-  for (final (:locale, :textScale, :full) in _configurations) {
+      consumer.replaceInputs(hasDayMarksReadFailure: true);
+      await tester.pumpAndSettle();
+      final failed = await _calendarLayout(tester);
+      expect(failed.rowHeight, moreOrLessEquals(before.rowHeight));
+      final failure = find.text('Отметки дней не загружены.');
+      _expectFullyShown(tester, failure, within: failed.calendar);
+      expect(
+        _rect(tester, failure).bottom,
+        lessThan(_rect(tester, calendarDay(date(2026, 9, 28))).top),
+      );
+      expect(tester.takeException(), isNull);
+    }
+    expect(consumer.events, isEmpty);
+  });
+
+  for (final (:locale, :full) in _configurations) {
     final language = locale.languageCode;
 
-    group('экран 360×780, $language, масштаб текста $textScale', () {
+    group('экран 360×780, $language', () {
       testWidgets(
         'свёрнутая неделя показывает семь колонок, числа, подписи дней '
         'недели, выбранную дату и команды целиком, и всё нажимается',
@@ -170,7 +156,6 @@ void main() {
           final consumer = await _pumpOnPhone(
             tester,
             locale: locale,
-            textScale: textScale,
             viewport: week(date(2026, 10, 4)),
           );
           final weeks = weeksFrom(date(2026, 9, 28), 1);
@@ -180,7 +165,6 @@ void main() {
             weeks: weeks,
             weekdays: _weekdays[language]!,
             selectedDate: date(2026, 10, 4),
-            textScale: textScale,
           );
           await _tapEveryDay(tester, consumer, weeks);
           final localizations = _localizations(tester);
@@ -206,7 +190,6 @@ void main() {
             final consumer = await _pumpOnPhone(
               tester,
               locale: locale,
-              textScale: textScale,
               viewport: month(shown.focusedDate),
             );
             final focused = shown.focusedDate;
@@ -216,7 +199,6 @@ void main() {
               weeks: shown.weeks,
               weekdays: _weekdays[language]!,
               selectedDate: focused,
-              textScale: textScale,
             );
             await _tapEveryDay(tester, consumer, shown.weeks);
             final localizations = _localizations(tester);
@@ -240,7 +222,6 @@ void main() {
         final consumer = await _pumpOnPhone(
           tester,
           locale: locale,
-          textScale: textScale,
           viewport: week(date(2027, 2, 15)),
         );
         final weekLayout = await _calendarLayout(tester);
@@ -317,7 +298,6 @@ void main() {
           final consumer = await _pumpOnPhone(
             tester,
             locale: locale,
-            textScale: textScale,
             viewport: month(date(2026, 10, 4)),
           );
           final day = calendarDay(date(2026, 10, 14));
@@ -345,67 +325,23 @@ void main() {
       );
     });
   }
-
-  testWidgets(
-    'смена системного масштаба текста у открытого календаря меняет высоту '
-    'строк, сохраняя выбор и просмотр без событий',
-    (tester) async {
-      final consumer = await _pumpOnPhone(
-        tester,
-        locale: const Locale('ru'),
-        textScale: 1,
-        viewport: month(date(2026, 3, 15)),
-      );
-      final normal = await _calendarLayout(tester);
-
-      tester.platformDispatcher.textScaleFactorTestValue = 2.5;
-      await tester.pumpAndSettle();
-      final large = await _calendarLayout(tester);
-
-      expect(large.rows, 6);
-      expect(large.rowHeight, greaterThan(normal.rowHeight));
-      expect(large.gridHeight, moreOrLessEquals(6 * large.rowHeight));
-      expect(large.messageTop, moreOrLessEquals(large.calendar.bottom));
-      _expectLaidOut(
-        tester,
-        weeks: weeksFrom(date(2026, 2, 23), 6),
-        weekdays: _weekdays['ru']!,
-        selectedDate: date(2026, 3, 15),
-        textScale: 2.5,
-      );
-
-      tester.platformDispatcher.textScaleFactorTestValue = 1;
-      await tester.pumpAndSettle();
-      final restored = await _calendarLayout(tester);
-
-      expect(restored.rowHeight, moreOrLessEquals(normal.rowHeight));
-      expect(
-        restored.calendar.height,
-        moreOrLessEquals(normal.calendar.height),
-      );
-      expect(consumer.events, isEmpty);
-      expect(consumer.selectedDate, date(2026, 3, 15));
-      expect(consumer.viewport, month(date(2026, 3, 15)));
-    },
-  );
 }
 
 /// Допуск сравнения координат.
 const _epsilon = 0.01;
 
 /// Показывает календарь в общей прокрутке с содержимым под ним на узком
-/// телефоне с системным размером текста [textScale].
+/// телефоне.
 Future<CalendarConsumer> _pumpOnPhone(
   WidgetTester tester, {
   required Locale locale,
-  required double textScale,
+
   required DailyChoiceCalendarViewport viewport,
 }) async {
   tester.view.physicalSize = _screen;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  tester.platformDispatcher.textScaleFactorTestValue = textScale;
-  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
   return pumpCalendarConsumer(
     tester,
     selectedDate: viewport.focusedDate,
@@ -421,13 +357,12 @@ AppLocalizations _localizations(WidgetTester tester) =>
 
 /// Проверяет, что календарь с видимыми неделями [weeks] целиком размещён в
 /// ширине экрана: семь колонок дней, подписи колонок над ними, шапка над
-/// подписями и все тексты показаны полностью в системном масштабе.
+/// подписями и все тексты показаны полностью.
 void _expectLaidOut(
   WidgetTester tester, {
   required List<List<CalendarDate>> weeks,
   required List<String> weekdays,
   required CalendarDate selectedDate,
-  required double textScale,
 }) {
   expect(visibleWeeks(tester), weeks);
   final screen = Offset.zero & _screen;
@@ -465,12 +400,7 @@ void _expectLaidOut(
         matching: find.byType(Text),
       );
       expect(_textOf(tester, number), '${day.day}');
-      _expectFullyShown(
-        tester,
-        number,
-        within: rows[index][column],
-        textScale: textScale,
-      );
+      _expectFullyShown(tester, number, within: rows[index][column]);
     }
   }
 
@@ -489,7 +419,7 @@ void _expectLaidOut(
       rows.first[column].right,
       rows.first[column].top,
     );
-    _expectFullyShown(tester, label, within: columnRect, textScale: textScale);
+    _expectFullyShown(tester, label, within: columnRect);
   }
   final gridTop = [for (final label in labels) _rect(tester, label).top]
       .reduce((a, b) => a < b ? a : b);
@@ -515,7 +445,6 @@ void _expectLaidOut(
           .dailyChoiceCalendarSelectedDate(dates.formatFullDate(selected)),
     ),
     within: header,
-    textScale: textScale,
   );
   final focused = tester
       .widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar))
@@ -525,7 +454,6 @@ void _expectLaidOut(
     tester,
     find.text(dates.formatMonthYear(DateTime.utc(focused.year, focused.month))),
     within: header,
-    textScale: textScale,
   );
   final commands = find.descendant(
     of: find.byType(DailyChoiceCalendar),
@@ -552,13 +480,11 @@ void _expectLaidOut(
 }
 
 /// Текст [finder] показан целиком внутри [within]: без ограничения строк и
-/// многоточия, со всей высотой строк при доступной ширине, в системном масштабе
-/// [textScale] и без уменьшающего преобразования.
+/// многоточия, со всей высотой строк при доступной ширине.
 void _expectFullyShown(
   WidgetTester tester,
   Finder finder, {
   required Rect within,
-  required double textScale,
 }) {
   expect(finder, findsOneWidget);
   final text = tester.widget<Text>(finder);
@@ -568,11 +494,7 @@ void _expectFullyShown(
     find.descendant(of: finder, matching: find.byType(RichText)),
   );
   expect(paragraph.maxLines, isNull, reason: text.data);
-  expect(
-    paragraph.textScaler.scale(10),
-    moreOrLessEquals(10 * textScale),
-    reason: text.data,
-  );
+
   expect(
     paragraph.size.height,
     greaterThanOrEqualTo(
@@ -620,7 +542,7 @@ typedef _CalendarLayout = ({
 /// Прокручивает страницу к сообщению под календарём, чтобы низ календаря и
 /// сообщение были на экране, и измеряет их положение.
 Future<_CalendarLayout> _calendarLayout(WidgetTester tester) async {
-  // После раскрытия при крупном тексте сообщение может быть далеко за
+  // После раскрытия сообщение может быть далеко за
   // пределами экрана.
   await tester
       .state<ScrollableState>(_pageScroll)

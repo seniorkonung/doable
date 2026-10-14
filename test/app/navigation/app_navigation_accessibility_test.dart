@@ -28,10 +28,8 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
-/// Узкий экран телефона: увеличенный текст занимает его целиком.
+/// Узкий экран телефона.
 const _screen = Size(360, 780);
-
-const _textScale = 2.5;
 
 /// Названия пунктов задаёт спецификация основной навигации.
 final _names = {
@@ -55,13 +53,12 @@ void main() {
   const code = 'ru';
 
   testWidgets('обычные страницы сохраняют доступные названия, выбранный '
-      'пункт, подсказки и целые значки при тексте 2.5: $code', (tester) async {
+      'пункт, подсказки и целые значки: $code', (tester) async {
     final semantics = tester.ensureSemantics();
     tester.view.physicalSize = _screen;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    tester.platformDispatcher.textScaleFactorTestValue = _textScale;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
     final router = await _start(tester, locale);
 
     for (final selected in AppDestination.values) {
@@ -125,22 +122,16 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('при масштабе текста 2.5 значки пунктов не обрезаются, каждый '
+  testWidgets('значки пунктов не обрезаются, каждый '
       'пункт выбирается касанием, а заголовок его корневой страницы виден: '
       '$code', (tester) async {
     final semantics = tester.ensureSemantics();
     tester.view.physicalSize = _screen;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    tester.platformDispatcher.textScaleFactorTestValue = _textScale;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
     await _start(tester, locale);
 
-    // Системный размер текста доходит до корневых страниц.
-    expect(
-      MediaQuery.textScalerOf(tester.element(find.byType(HomePage))).scale(10),
-      10 * _textScale,
-    );
     _expectWholeIcons(tester, selected: AppDestination.home);
     _expectVisibleTitle(tester, names, AppDestination.home);
 

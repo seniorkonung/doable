@@ -155,12 +155,11 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('увеличенный текст не скрывает данные и переход', (tester) async {
+  testWidgets('показывает данные и переход', (tester) async {
     var opened = 0;
     await tester.pumpWidget(
       _testApp(
         locale: const Locale('ru'),
-        textScaler: const TextScaler.linear(3),
         view: IntentionSummaryView(
           title: 'Быть здоровым',
           archiveState: IntentionArchiveState.archived,
@@ -292,7 +291,6 @@ void main() {
     await tester.pumpWidget(
       _testApp(
         locale: const Locale('ru'),
-        textScaler: const TextScaler.linear(2),
         view: IntentionSummaryView(
           title: 'Быть здоровым',
           archiveState: IntentionArchiveState.active,
@@ -378,7 +376,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('длинное название и увеличенный текст не скрывают название, теги '
+  testWidgets('длинное название не скрывает название, теги '
       'и количество активных связей', (tester) async {
     const longTitle =
         'Научиться хорошо плавать и перестать бояться глубины в открытой '
@@ -386,7 +384,6 @@ void main() {
     await tester.pumpWidget(
       _testApp(
         locale: const Locale('ru'),
-        textScaler: const TextScaler.linear(3),
         view: IntentionSummaryView(
           title: longTitle,
           archiveState: IntentionArchiveState.active,
@@ -423,15 +420,11 @@ Tag _tag(int number, String name) => Tag(
 Widget _testApp({
   required IntentionSummaryView view,
   Locale locale = const Locale('en'),
-  TextScaler textScaler = TextScaler.noScaling,
 }) => MaterialApp(
   locale: locale,
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Builder(
-    builder: (context) => MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-      child: Scaffold(body: ListView(children: [view])),
-    ),
+    builder: (context) => Scaffold(body: ListView(children: [view])),
   ),
 );

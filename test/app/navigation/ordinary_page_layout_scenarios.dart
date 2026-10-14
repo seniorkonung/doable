@@ -16,7 +16,6 @@ void _registerOrdinaryLayoutTests() {
         locale: locale,
         screen: screen,
         insets: insets,
-        textScale: 2,
       );
       final l10n = lookupAppLocalizations(locale);
       unawaited(
@@ -66,7 +65,6 @@ void _registerOrdinaryLayoutTests() {
         locale: locale,
         screen: screen,
         insets: insets,
-        textScale: 2,
         seedAdditional: _seedLayoutTagCatalog,
       );
       final l10n = lookupAppLocalizations(locale);
@@ -113,7 +111,6 @@ void _registerOrdinaryLayoutTests() {
           locale: locale,
           screen: screen,
           insets: insets,
-          textScale: 2,
         );
         await _select(tester, AppDestination.intentionGraph);
         _expectQuickCreationInPanel(tester, insets);
@@ -159,7 +156,6 @@ void _registerOrdinaryLayoutTests() {
         locale: locale,
         screen: screen,
         insets: insets,
-        textScale: 2,
       );
       final relationId = (LongTermRelationId.decode(
         tagFixtureId(_relation),

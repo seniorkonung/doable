@@ -71,7 +71,20 @@ final class _GraphOperationPresenterState
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    final theme = SnackBarTheme.of(context);
+    // Клавиатура сокращает область Scaffold: плавающее сообщение может
+    // выйти за её пределы. Тема меняет размещение и уже показанного сообщения.
+    // https://api.flutter.dev/flutter/material/ScaffoldMessengerState/showSnackBar.html
+    return SnackBarTheme(
+      data: theme.copyWith(
+        behavior: MediaQuery.viewInsetsOf(context).bottom > 0
+            ? SnackBarBehavior.fixed
+            : theme.behavior,
+      ),
+      child: widget.child,
+    );
+  }
 
   void _requestNext() {
     if (_isDisposed || _isRequesting || _surface != null) {

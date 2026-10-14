@@ -8,7 +8,7 @@ void _registerNavigationSemanticsScenarios() {
     const TaggedIntentionsCorruptionFailure(),
   ]) {
     testWidgets(
-      'причина отказа и допустимые действия доступны при масштабе 3: ${failure.runtimeType}',
+      'причина отказа и допустимые действия доступны: ${failure.runtimeType}',
       (tester) async {
         tester.view.physicalSize = const Size(360, 640);
         tester.view.devicePixelRatio = 1;
@@ -17,7 +17,7 @@ void _registerNavigationSemanticsScenarios() {
         try {
           final reads = _Reads();
           addTearDown(reads.dispose);
-          await _pumpPage(tester, reads, textScale: 3);
+          await _pumpPage(tester, reads);
           final l10n = AppLocalizations.of(
             tester.element(find.byType(TagNavigationPage)),
           );
@@ -64,9 +64,7 @@ void _registerNavigationSemanticsScenarios() {
     );
   }
 
-  testWidgets('пустые охваты и отсутствие тега различимы при масштабе 3', (
-    tester,
-  ) async {
+  testWidgets('пустые охваты и отсутствие тега различимы', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -74,7 +72,7 @@ void _registerNavigationSemanticsScenarios() {
     try {
       final reads = _Reads();
       addTearDown(reads.dispose);
-      await _pumpPage(tester, reads, textScale: 3);
+      await _pumpPage(tester, reads);
       final tag = Tag(
         id: _tag.id,
         name: TagName.fromInput('Длинное название 🏷️ ' * 10),

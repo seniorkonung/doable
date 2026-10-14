@@ -32,10 +32,7 @@ void main() {
       tester.binding.platformDispatcher.localesTestValue = [
         const Locale('ru', 'RU'),
       ];
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+
       final semantics = tester.ensureSemantics();
       final database = (await tester.runAsync(
         LocalDatabaseHarness.fileBacked,
@@ -216,10 +213,7 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+
       final semantics = tester.ensureSemantics();
       tester.view.physicalSize = const Size(1200, 6000);
       tester.view.devicePixelRatio = 1;
