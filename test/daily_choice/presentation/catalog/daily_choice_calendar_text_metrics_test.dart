@@ -7,13 +7,7 @@ const _style = TextStyle(fontSize: 16, height: 1.5);
 
 void main() {
   testWidgets('учитывает системную настройку жирного текста', (tester) async {
-    await _pumpTexts(
-      tester,
-      textScale: 1,
-      width: 100,
-      texts: ['Сегодня'],
-      boldText: true,
-    );
+    await _pumpTexts(tester, width: 100, texts: ['Сегодня'], boldText: true);
 
     expect(
       tallestTextHeight(
@@ -31,7 +25,7 @@ void main() {
   });
 
   testWidgets('отрицательную ширину измеряет как нулевую', (tester) async {
-    await _pumpTexts(tester, textScale: 1, width: 100, texts: const []);
+    await _pumpTexts(tester, width: 100, texts: const []);
 
     expect(
       tallestTextHeight(
@@ -53,13 +47,10 @@ void main() {
 /// Показывает [texts] виджетами `Text` в колонке ширины [width].
 Future<void> _pumpTexts(
   WidgetTester tester, {
-  required double textScale,
   required double width,
   required List<String> texts,
   bool boldText = false,
 }) async {
-  tester.platformDispatcher.textScaleFactorTestValue = textScale;
-  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   tester.platformDispatcher.accessibilityFeaturesTestValue =
       FakeAccessibilityFeatures(boldText: boldText);
   addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);

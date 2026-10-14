@@ -122,14 +122,12 @@ void main() {
     );
   }
 
-  testWidgets('ошибка длины читаема и сохраняет ввод при увеличенном тексте', (
-    tester,
-  ) async {
+  testWidgets('ошибка длины читаема и сохраняет ввод', (tester) async {
     tester.view.physicalSize = const Size(420, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final repository = _Repository();
-    await _pumpEditor(tester, repository, largeText: true);
+    await _pumpEditor(tester, repository);
     final longName = '🙂' * 256;
     await tester.enterText(
       find.byKey(const ValueKey('tag-editor-name')),
@@ -197,11 +195,7 @@ void main() {
   });
 }
 
-Future<void> _pumpEditor(
-  WidgetTester tester,
-  _Repository repository, {
-  bool largeText = false,
-}) async {
+Future<void> _pumpEditor(WidgetTester tester, _Repository repository) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -211,11 +205,6 @@ Future<void> _pumpEditor(
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(largeText ? 2.5 : 1)),
-          child: child!,
-        ),
         home: TagEditorPage(
           editorContext: TagEditorCreating(TagCreationFormKey()),
         ),

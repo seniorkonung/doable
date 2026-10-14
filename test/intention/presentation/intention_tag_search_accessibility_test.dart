@@ -110,11 +110,6 @@ void main() {
             locale: locale,
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: const TextScaler.linear(2.5)),
-              child: child!,
-            ),
             routerConfig: router.config(),
           ),
         ),

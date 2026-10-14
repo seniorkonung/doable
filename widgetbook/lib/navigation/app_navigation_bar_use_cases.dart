@@ -7,7 +7,6 @@ import 'package:widgetbook/widgetbook.dart';
 
 /// Состояния панели основной навигации — [AppNavigationBar] приложения:
 /// по одному на каждый выбранный пункт в раскладке обычной страницы.
-/// Масштаб текста меняется дополнением Widgetbook вплоть до 2.5.
 List<WidgetbookUseCase> appNavigationBarUseCases() => [
   for (final destination in AppDestination.values)
     WidgetbookUseCase(

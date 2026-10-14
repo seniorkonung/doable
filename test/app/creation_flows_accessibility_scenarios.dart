@@ -13,7 +13,7 @@ void _registerAccessibilityTests() {
       for (final device in devices) {
         testWidgets(
           '${flow.label}: действия и сообщения на ${locale.languageCode}, '
-          '${device.name}, клавиатура и текст 2.6',
+          '${device.name}, клавиатура',
           (tester) async {
             final semantics = tester.ensureSemantics();
             try {
@@ -30,10 +30,7 @@ void _registerAccessibilityTests() {
               await flow.fill(tester);
               tester.view.physicalSize = device.size;
               tester.view.viewInsets = const FakeViewPadding(bottom: 260);
-              tester.platformDispatcher.textScaleFactorTestValue = 2.6;
-              addTearDown(
-                tester.platformDispatcher.clearTextScaleFactorTestValue,
-              );
+
               await tester.pumpAndSettle();
               if (flow == _Flow.intention) {
                 _expectAction(

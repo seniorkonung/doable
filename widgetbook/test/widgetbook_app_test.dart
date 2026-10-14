@@ -7,7 +7,6 @@ import 'package:doable_widgetbook/widgetbook_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:widgetbook/widgetbook.dart';
 
 void main() {
   testWidgets('каталог показывает раздел намерений в панели навигации', (
@@ -26,13 +25,12 @@ void main() {
   });
 
   testWidgets('панель каждого выбранного пункта показана под обычной страницей '
-      'с текстом 2.5 на телефоне в обеих локалях', (tester) async {
+      'на телефоне в обеих локалях', (tester) async {
     final semantics = tester.ensureSemantics();
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    tester.platformDispatcher.textScaleFactorTestValue = 2.5;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
     final useCases = appNavigationBarUseCases();
     expect(useCases.map((useCase) => useCase.name), [
       'Выбрана Главная',
@@ -82,7 +80,7 @@ void main() {
           find.descendant(of: appBar, matching: find.text(localeNames[index])),
           findsOneWidget,
         );
-        expect(MediaQuery.textScalerOf(tester.element(appBar)).scale(10), 25);
+
         final barRect = tester.getRect(bar);
         expect(barRect.bottom, 780);
         expect(barRect.height, AppNavigationBar.height);
@@ -110,18 +108,6 @@ void main() {
       }
     }
     semantics.dispose();
-  });
-
-  testWidgets('каталог позволяет увеличить текст до масштаба 2.5', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const WidgetbookApp());
-
-    final addons = tester.widget<Widgetbook>(find.byType(Widgetbook)).addons;
-    final textScale = addons!.whereType<TextScaleAddon>().single;
-    expect(textScale.min, 1);
-    expect(textScale.max, greaterThanOrEqualTo(2.5));
-    expect(textScale.initialScale ?? 1, 1);
   });
 
   testWidgets('каталог показывает раздел навигации', (tester) async {

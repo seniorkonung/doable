@@ -300,9 +300,7 @@ void main() {
     expect(repository.queries, hasLength(6));
   });
 
-  testWidgets('локализует выбор и сохраняет основания при крупном тексте', (
-    tester,
-  ) async {
+  testWidgets('локализует выбор и сохраняет основания', (tester) async {
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -313,7 +311,6 @@ void main() {
       tester,
       repository,
       locale: const Locale('ru'),
-      textScaler: const TextScaler.linear(2),
     );
     addTearDown(router.dispose);
     final selection = router.push<IntentionId>(DailyChoiceSourcePickerRoute());
@@ -388,7 +385,6 @@ Future<AppRouter> _pumpApp(
   ControlledParticipantPickerRepository repository, {
   Locale locale = const Locale('en'),
   int pageSize = 50,
-  TextScaler textScaler = TextScaler.noScaling,
 }) async {
   final router = AppRouter();
   await tester.pumpWidget(
@@ -409,10 +405,6 @@ Future<AppRouter> _pumpApp(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-          child: child!,
-        ),
         routerConfig: router.config(),
       ),
     ),

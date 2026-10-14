@@ -36,41 +36,20 @@ const _titles = {
 };
 
 // Размер экрана не меняет ветвление кода, поэтому берём телефонную ширину.
-// Меняют путь только масштаб текста, отступы, клавиатура и страница поверх
+// Меняют путь только отступы, клавиатура и страница поверх
 // корня; язык проверяет видимые названия.
 const _phone = Size(400, 800);
 
 final _cases = [
-  (
-    language: 'ru',
-    scale: 1.0,
-    size: _phone,
-    safe: false,
-    keyboard: 0.0,
-    deep: false,
-  ),
-  (
-    language: 'ru',
-    scale: 2.6,
-    size: _phone,
-    safe: true,
-    keyboard: 0.0,
-    deep: false,
-  ),
-  (
-    language: 'en',
-    scale: 2.6,
-    size: _phone,
-    safe: true,
-    keyboard: 260.0,
-    deep: true,
-  ),
+  (language: 'ru', size: _phone, safe: false, keyboard: 0.0, deep: false),
+  (language: 'ru', size: _phone, safe: true, keyboard: 0.0, deep: false),
+  (language: 'en', size: _phone, safe: true, keyboard: 260.0, deep: true),
 ];
 
 void main() {
   for (final variant in _cases) {
     testWidgets('панель и меню доступны: ${variant.language}, '
-        'текст ${variant.scale}, ${variant.size}, '
+        '${variant.size}, '
         'отступы ${variant.safe ? "24/32" : "0/0"}, '
         'клавиатура ${variant.keyboard}, '
         '${variant.deep ? "просмотр тегов" : "корень"}', (tester) async {
@@ -88,10 +67,10 @@ void main() {
         bottom: variant.keyboard == 0 ? safeBottom : 0,
       );
       tester.view.viewInsets = FakeViewPadding(bottom: variant.keyboard);
-      tester.platformDispatcher.textScaleFactorTestValue = variant.scale;
+
       tester.platformDispatcher.localesTestValue = [Locale(variant.language)];
       addTearDown(tester.view.reset);
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
       addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       final runtime = AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),

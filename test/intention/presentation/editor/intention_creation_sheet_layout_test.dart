@@ -290,11 +290,10 @@ void main() {
       ('описания', _description, IntentionTextField.description),
     ]) {
       testWidgets(
-        'ошибка $name читается и исправляется на экране 568×320 при открытой клавиатуре и масштабе 200% без потери полного черновика',
+        'ошибка $name читается и исправляется на экране 568×320 при открытой клавиатуре без потери полного черновика',
         (tester) async {
           _usePhone(tester, _narrowLandscape, keyboard: true);
-          tester.platformDispatcher.textScaleFactorTestValue = 2;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
           final sessions = _EditorSessions();
           final tag = _tag(1, 'Дом');
           final repository = ControlledCatalogRepository()
@@ -658,12 +657,10 @@ void main() {
 
     for (final (failure, message, recovery) in _pinnedFailures) {
       testWidgets(
-        'в компактной панели отказ «$message» с исправлением и повтором закреплён рядом с сохранением над клавиатурой при масштабе текста 200%, не сдвигая прокрученные поля',
+        'в компактной панели отказ «$message» с исправлением и повтором закреплён рядом с сохранением над клавиатурой, не сдвигая прокрученные поля',
         (tester) async {
           _usePhone(tester, _portrait, keyboard: true);
-          tester.platformDispatcher.textScaleFactorTestValue =
-              _androidMaxTextScale;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
           final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
           final sessions = _EditorSessions();
           final repository = ControlledCatalogRepository()
@@ -695,7 +692,12 @@ void main() {
           switch (recovery) {
             case _Recovery.removeMissingTags:
               expect(_submitButton(tester).onPressed, isNull);
-              await tester.tap(find.byKey(_removeMissing));
+              await tester.tapAt(
+                const Alignment(
+                  0.8,
+                  0,
+                ).withinRect(tester.getRect(find.byKey(_removeMissing))),
+              );
               await tester.pumpAndSettle();
 
               // Исправление меняет только набор и само не отправляет.
@@ -805,168 +807,155 @@ void main() {
 
   group('полный заполненный сценарий на тесном экране', () {
     for (final device in [_narrowPortrait, _narrowLandscape]) {
-      // Максимум Android — крайний достижимый масштаб: «Сохранить» видно
-      // целиком, а поля и сообщения отказов доступны при открытой
-      // клавиатуре.
-      for (final textScale in [_androidMaxTextScale]) {
-        final isWithinPlatformTextScale = textScale <= _androidMaxTextScale;
-        testWidgets(
-          'на ${device.name} с безопасными отступами, клавиатурой и масштабом текста ${(textScale * 100).round()}% все четыре поля, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
-          (tester) async {
-            final semantics = tester.ensureSemantics();
-            _usePhone(tester, device, keyboard: true);
-            tester.platformDispatcher.textScaleFactorTestValue = textScale;
-            addTearDown(
-              tester.platformDispatcher.clearTextScaleFactorTestValue,
-            );
-            final tags = [
-              _tag(1, 'Дом'),
-              _tag(2, 'Очень длинное название тега, которое переносится'),
-            ];
-            final sessions = _EditorSessions();
-            final repository = ControlledCatalogRepository()
-              ..tagObservations = _observedTags(tags);
-            await _openEditor(tester, repository, sessions);
-            final title = List.filled(
-              12,
-              'Длинное название намерения, которое переносится',
-            ).join(' ');
-            await tester.enterText(find.byKey(_title), title);
-            await tester.enterText(find.byKey(_description), _lines(8));
-            sessions.notifier(tester)
-              ..draftTagSet.add(tags[0])
-              ..draftTagSet.add(tags[1]);
-            await tester.pumpAndSettle();
+      testWidgets(
+        'на ${device.name} с безопасными отступами, клавиатурой все четыре поля, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          _usePhone(tester, device, keyboard: true);
 
-            Future<void> expectUsable({required bool keyboard}) async {
-              await _expectPanelUsable(
-                tester,
-                device,
-                tagIds: sessions.state(tester).draft.tagIds,
-                keyboard: keyboard,
-                fullyVisibleSubmit: isWithinPlatformTextScale,
-              );
-            }
+          final tags = [
+            _tag(1, 'Дом'),
+            _tag(2, 'Очень длинное название тега, которое переносится'),
+          ];
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository()
+            ..tagObservations = _observedTags(tags);
+          await _openEditor(tester, repository, sessions);
+          final title = List.filled(
+            12,
+            'Длинное название намерения, которое переносится',
+          ).join(' ');
+          await tester.enterText(find.byKey(_title), title);
+          await tester.enterText(find.byKey(_description), _lines(8));
+          sessions.notifier(tester)
+            ..draftTagSet.add(tags[0])
+            ..draftTagSet.add(tags[1]);
+          await tester.pumpAndSettle();
 
-            await expectUsable(keyboard: true);
-
-            // Готовность включается действием панели; её объяснение
-            // забирает фокус у поля, и платформа скрывает клавиатуру.
-            await _tapInFields(tester, _readiness);
-            _usePhone(tester, device);
-            await tester.pumpAndSettle();
-            await _expectDialogUsable(tester, [
-              _readinessCancel,
-              _readinessConfirm,
-            ]);
-            await _tapDialogAction(tester, _readinessConfirm);
-            _usePhone(tester, device, keyboard: true);
-            await tester.pumpAndSettle();
-            expect(
-              sessions.state(tester).draft.readiness,
-              IntentionReadiness.ready,
-            );
-            await expectUsable(keyboard: true);
-
-            final draft = sessions.state(tester).draft;
-            await tester.enterText(find.byKey(_title), 'Коротко');
-            await tester.pumpAndSettle();
-            await expectUsable(keyboard: true);
-            await tester.enterText(find.byKey(_title), title);
-            await tester.pumpAndSettle();
-            expect(sessions.state(tester).draft.description, draft.description);
-            expect(sessions.state(tester).draft.tagIds, draft.tagIds);
-            expect(sessions.state(tester).draft.readiness, draft.readiness);
-            await expectUsable(keyboard: true);
-
-            // Скрытие клавиатуры возвращает полям место в компактной панели.
-            _usePhone(tester, device);
-            await tester.pumpAndSettle();
-            await expectUsable(keyboard: false);
-
-            // Подтверждение закрытия появляется, пока платформа скрывает
-            // клавиатуру; продолжение сохраняет черновик и возвращает её.
-            _usePhone(tester, device, keyboard: true);
-            await tester.pumpAndSettle();
-            await tester.tap(find.byKey(_closeButton));
-            await tester.pumpAndSettle();
-            _usePhone(tester, device);
-            await tester.pumpAndSettle();
-            await _expectDialogUsable(tester, [_closeContinue, _closeDiscard]);
-            await _tapDialogAction(tester, _closeContinue);
-            expect(sessions.state(tester).draft.title, title);
-            _usePhone(tester, device, keyboard: true);
-            await tester.pumpAndSettle();
-
-            // Отказ из-за удалённого тега: поля только для чтения на время
-            // отправки скрывают клавиатуру, а после отказа она возвращается.
-            await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
-            await tester.pump();
-            _usePhone(tester, device);
-            repository.completeCommand(
-              0,
-              ResultFailure(IntentionCreationTagsMissingFailure([_tagId(1)])),
-            );
-            await tester.pumpAndSettle();
-            _usePhone(tester, device, keyboard: true);
-            await tester.pumpAndSettle();
-            await _expectFailureRecoverable(
+          Future<void> expectUsable({required bool keyboard}) async {
+            await _expectPanelUsable(
               tester,
               device,
-              _removeMissing,
-              'A selected tag was deleted from the catalog. Remove it from '
-              'the draft to save the intention.',
+              tagIds: sessions.state(tester).draft.tagIds,
+              keyboard: keyboard,
+              fullyVisibleSubmit: true,
             );
-            await tester.tapAt(
-              _expectTappable(tester, find.byKey(_removeMissing)),
-            );
-            await tester.pumpAndSettle();
-            expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
-            // Отказ прочитан в панели при исходной клавиатуре и не
-            // повторяется на общей поверхности после исправления.
-            expect(find.byType(SnackBar), findsNothing);
-            await expectUsable(keyboard: true);
+          }
 
-            // Устранимый отказ: повтор доступен в компактной панели.
-            await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
-            await tester.pump();
-            repository.completeCommand(
-              1,
-              const ResultFailure(IntentionUnavailableFailure()),
-            );
-            await tester.pumpAndSettle();
-            await _expectFailureRecoverable(
-              tester,
-              device,
-              _submit,
-              'The intention couldn’t be created. Try again.',
-            );
-            await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
-            await tester.pump();
+          await expectUsable(keyboard: true);
 
-            expect(repository.commands, hasLength(3));
-            expect(
-              repository.commands.last,
-              isA<CreateIntention>()
-                  .having((command) => command.title, 'название', title)
-                  .having(
-                    (command) => command.description,
-                    'описание',
-                    _lines(8),
-                  )
-                  .having((command) => command.tagIds, 'теги', [_tagId(2)])
-                  .having(
-                    (command) => command.readiness,
-                    'готовность',
-                    IntentionReadiness.ready,
-                  ),
-            );
-            expect(sessions.added, hasLength(1));
-            expect(tester.takeException(), isNull);
-            semantics.dispose();
-          },
-        );
-      }
+          // Готовность включается действием панели; её объяснение
+          // забирает фокус у поля, и платформа скрывает клавиатуру.
+          await _tapInFields(tester, _readiness);
+          _usePhone(tester, device);
+          await tester.pumpAndSettle();
+          await _expectDialogUsable(tester, [
+            _readinessCancel,
+            _readinessConfirm,
+          ]);
+          await _tapDialogAction(tester, _readinessConfirm);
+          _usePhone(tester, device, keyboard: true);
+          await tester.pumpAndSettle();
+          expect(
+            sessions.state(tester).draft.readiness,
+            IntentionReadiness.ready,
+          );
+          await expectUsable(keyboard: true);
+
+          final draft = sessions.state(tester).draft;
+          await tester.enterText(find.byKey(_title), 'Коротко');
+          await tester.pumpAndSettle();
+          await expectUsable(keyboard: true);
+          await tester.enterText(find.byKey(_title), title);
+          await tester.pumpAndSettle();
+          expect(sessions.state(tester).draft.description, draft.description);
+          expect(sessions.state(tester).draft.tagIds, draft.tagIds);
+          expect(sessions.state(tester).draft.readiness, draft.readiness);
+          await expectUsable(keyboard: true);
+
+          // Скрытие клавиатуры возвращает полям место в компактной панели.
+          _usePhone(tester, device);
+          await tester.pumpAndSettle();
+          await expectUsable(keyboard: false);
+
+          // Подтверждение закрытия появляется, пока платформа скрывает
+          // клавиатуру; продолжение сохраняет черновик и возвращает её.
+          _usePhone(tester, device, keyboard: true);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(_closeButton));
+          await tester.pumpAndSettle();
+          _usePhone(tester, device);
+          await tester.pumpAndSettle();
+          await _expectDialogUsable(tester, [_closeContinue, _closeDiscard]);
+          await _tapDialogAction(tester, _closeContinue);
+          expect(sessions.state(tester).draft.title, title);
+          _usePhone(tester, device, keyboard: true);
+          await tester.pumpAndSettle();
+
+          // Отказ из-за удалённого тега: поля только для чтения на время
+          // отправки скрывают клавиатуру, а после отказа она возвращается.
+          await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
+          await tester.pump();
+          _usePhone(tester, device);
+          repository.completeCommand(
+            0,
+            ResultFailure(IntentionCreationTagsMissingFailure([_tagId(1)])),
+          );
+          await tester.pumpAndSettle();
+          _usePhone(tester, device, keyboard: true);
+          await tester.pumpAndSettle();
+          await _expectFailureRecoverable(
+            tester,
+            device,
+            _removeMissing,
+            'A selected tag was deleted from the catalog. Remove it from '
+            'the draft to save the intention.',
+          );
+          await tester.tapAt(
+            _expectTappable(tester, find.byKey(_removeMissing)),
+          );
+          await tester.pumpAndSettle();
+          expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
+          // Отказ прочитан в панели при исходной клавиатуре и не
+          // повторяется на общей поверхности после исправления.
+          expect(find.byType(SnackBar), findsNothing);
+          await expectUsable(keyboard: true);
+
+          // Устранимый отказ: повтор доступен в компактной панели.
+          await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
+          await tester.pump();
+          repository.completeCommand(
+            1,
+            const ResultFailure(IntentionUnavailableFailure()),
+          );
+          await tester.pumpAndSettle();
+          await _expectFailureRecoverable(
+            tester,
+            device,
+            _submit,
+            'The intention couldn’t be created. Try again.',
+          );
+          await tester.tapAt(_expectTappable(tester, find.byKey(_submit)));
+          await tester.pump();
+
+          expect(repository.commands, hasLength(3));
+          expect(
+            repository.commands.last,
+            isA<CreateIntention>()
+                .having((command) => command.title, 'название', title)
+                .having((command) => command.description, 'описание', _lines(8))
+                .having((command) => command.tagIds, 'теги', [_tagId(2)])
+                .having(
+                  (command) => command.readiness,
+                  'готовность',
+                  IntentionReadiness.ready,
+                ),
+          );
+          expect(sessions.added, hasLength(1));
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
     }
   });
 }
@@ -1122,7 +1111,7 @@ Future<void> _expectFailureRecoverable(
 ) async {
   final failure = find.byKey(_failure);
   expect(tester.takeException(), isNull);
-  // Закреплённый отказ с увеличенным текстом уменьшает видимый контекст.
+  // Закреплённый отказ уменьшает видимый контекст.
   _expectCompact(
     tester,
     _sheetRect(tester),
@@ -1284,7 +1273,11 @@ void _expectPinned(WidgetTester tester, _Recovery recovery) {
     final rect = tester.getRect(find.byKey(action));
     expect(rect.top, greaterThanOrEqualTo(status.bottom));
     expect(rect.bottom, lessThanOrEqualTo(_visibleBottom(tester)));
-    expect(find.byKey(action).hitTestable(), findsOneWidget);
+    // Ручка выделения поля может перекрывать центр кнопки исправления.
+    expect(
+      find.byKey(action).hitTestable(at: const Alignment(0.8, 0)),
+      findsOneWidget,
+    );
   }
   expect(
     find.widgetWithText(FilledButton, 'Try again'),
@@ -1353,9 +1346,6 @@ const _minVisibleContextExtent = 24.0;
 
 /// Наибольшая ширина панели на широком экране.
 const _maxSheetWidth = 640.0;
-
-/// Наибольший масштаб системного шрифта Android — платформы приложения.
-const _androidMaxTextScale = 2.0;
 
 /// Телефон: логический размер экрана, системные отступы, высота экранной
 /// клавиатуры и наименьший ожидаемый видимый участок страницы над

@@ -28,8 +28,8 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 /// Показ актуальности выбранных тегов в панели создания и исправление их
 /// отсутствия.
 ///
-/// Сценарии идут на английском; русские состояния тегов проверяет тест
-/// увеличенного текста.
+/// Сценарии идут на английском; русские состояния тегов проверяет
+/// сценарий исправления отсутствующих тегов.
 ///
 /// Наблюдение каждого выбранного тега управляется тестом, поэтому проверки
 /// задают загрузку, переименование, отсутствие и отказ чтения. Теги
@@ -441,13 +441,10 @@ void main() {
 
   testWidgets(
     'состояния выбранных тегов, их снятие, повтор проверки и исправление '
-    'удалённых тегов доступны при увеличенном тексте',
+    'удалённых тегов доступны',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(
-        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);

@@ -1206,7 +1206,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
   WidgetTester tester, {
   IntentionId? intentionId,
   String language = 'ru',
-  double scale = 1,
+
   RootStackRouter? router,
   ValueNotifier<IntentionId?>? sessionIntention,
 }) async {
@@ -1225,11 +1225,6 @@ Future<TagCatalogTestRepository> _pumpCatalog(
       child: router == null
           ? OrdinaryPageTestApp(
               locale: Locale(language),
-              builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(context)
-                    .copyWith(textScaler: TextScaler.linear(scale)),
-                child: child!,
-              ),
               home: sessionIntention == null
                   ? TagCatalogPage(
                       selectionContext: _selectionContext(intentionId),

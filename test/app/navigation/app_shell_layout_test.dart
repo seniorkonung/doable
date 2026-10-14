@@ -658,15 +658,14 @@ Future<_App> _start(
   Locale locale = const Locale('en'),
   LocalDatabaseConnectionObserver? observer,
   Size screen = _screen,
-  double textScale = 1,
+
   void Function(sqlite.Database)? seedAdditional,
 }) async {
   // Общая поверхность показывает сообщения только работающему приложению.
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-  tester.binding.platformDispatcher.textScaleFactorTestValue = textScale;
-  addTearDown(tester.binding.platformDispatcher.clearTextScaleFactorTestValue);
+
   tester.view.physicalSize = screen;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);

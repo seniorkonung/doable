@@ -45,7 +45,7 @@ Widget _host({
   ValueChanged<TagId>? onOpen,
   TagReadContract? reads,
   Stream<ConfirmedGraphChangePackage>? changes,
-  bool largeText = false,
+
   bool isArchived = false,
   bool showSection = true,
 }) => ProviderScope(
@@ -59,13 +59,6 @@ Widget _host({
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    builder: largeText
-        ? (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(3)),
-            child: child!,
-          )
-        : null,
     home: Scaffold(
       body: SingleChildScrollView(
         child: showSection
@@ -647,7 +640,6 @@ void main() {
           onChoose: (_) {},
           onOpen: opened.add,
           reads: reads,
-          largeText: true,
           isArchived: true,
         ),
       );

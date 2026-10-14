@@ -90,7 +90,15 @@ ThemeData doableTheme(Brightness brightness) {
     extensions: [colors],
     iconTheme: IconThemeData(color: colors.ink, size: 24),
     iconButtonTheme: IconButtonThemeData(
-      style: ButtonStyle(foregroundColor: unselectedMuted),
+      style: ButtonStyle(
+        foregroundColor: unselectedMuted,
+        // ListTile во Flutter 3.47.1 заменяет foregroundColor постоянным
+        // цветом строки. iconColor сохраняет выключенное состояние Material 3.
+        // https://api.flutter.dev/flutter/material/ButtonStyle/iconColor.html
+        iconColor: WidgetStateProperty<Color?>.fromMap({
+          WidgetState.disabled: colors.ink.withValues(alpha: 0.38),
+        }),
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(

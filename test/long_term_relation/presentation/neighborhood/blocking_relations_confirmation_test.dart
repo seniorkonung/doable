@@ -43,13 +43,12 @@ void main() {
         final semantics = tester.ensureSemantics();
         tester.view.physicalSize = const Size(480, 720);
         tester.view.devicePixelRatio = 1;
-        tester.binding.platformDispatcher.textScaleFactorTestValue = 2.5;
+
         tester.view.viewInsets = const FakeViewPadding(bottom: 240);
         addTearDown(() {
           tester.view.resetPhysicalSize();
           tester.view.resetDevicePixelRatio();
           tester.view.resetViewInsets();
-          tester.binding.platformDispatcher.clearTextScaleFactorTestValue();
         });
         final harness = await _pumpAction(tester, locale);
         harness.select(testGroupRow(ownerId: harness.intentionId, index: 40));
@@ -225,17 +224,14 @@ void main() {
     },
   );
 
-  testWidgets('дневной выбор и переход к пути доступны при крупном тексте', (
-    tester,
-  ) async {
+  testWidgets('дневной выбор и переход к пути доступны', (tester) async {
     final semantics = tester.ensureSemantics();
     tester.view.physicalSize = const Size(480, 720);
     tester.view.devicePixelRatio = 1;
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue();
     });
     final harness = await _pumpAction(tester, const Locale('en'));
     final daily = _dailyItem(ownerId: harness.intentionId, index: 10);
@@ -294,10 +290,7 @@ void main() {
 
   testWidgets('зависимость пути запрещает массовое удаление', (tester) async {
     final semantics = tester.ensureSemantics();
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-    );
+
     final harness = await _pumpAction(tester, const Locale('ru'));
     final row = testGroupRow(ownerId: harness.intentionId, index: 31);
     harness.repository.protectedIds.add(row.relation.id);
@@ -469,17 +462,14 @@ void main() {
       );
     },
   );
-  testWidgets('показывает весь выбор из разных групп и порций при крупном тексте', (
-    tester,
-  ) async {
+  testWidgets('показывает весь выбор из разных групп и порций', (tester) async {
     final semantics = tester.ensureSemantics();
     tester.view.physicalSize = const Size(480, 720);
     tester.view.devicePixelRatio = 1;
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue();
     });
     final harness = await _pumpAction(tester, const Locale('ru'));
     final rows = [

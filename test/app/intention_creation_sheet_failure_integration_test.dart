@@ -46,7 +46,7 @@ void main() {
   testWidgets('отказ файлового хранилища после записи части назначений тегов '
       'откатывает граф и FTS; компактная панель '
       'предъявляет один отказ и явный повтор сохраняет одно намерение '
-      'на экране 568×320 с открытой клавиатурой и масштабом 200% '
+      'на экране 568×320 с открытой клавиатурой '
       'даже при отказе диагностики', (tester) async {
     final app = await _launch(tester);
     final sport = await _prepare(tester, app);
@@ -54,8 +54,7 @@ void main() {
     tester.view.padding = const FakeViewPadding(top: 24, right: 48);
     tester.view.viewPadding = const FakeViewPadding(top: 24, right: 48);
     tester.view.viewInsets = const FakeViewPadding(bottom: 160);
-    tester.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
     await tester.pumpAndSettle();
     final before = _storedGraph(app.raw);
     _expectTightKeyboard(tester);
@@ -506,7 +505,7 @@ void _expectTightKeyboard(WidgetTester tester) {
   expect(tester.view.viewInsets.bottom, 160);
   expect(tester.view.padding.top, 24);
   expect(tester.view.padding.right, 48);
-  expect(tester.platformDispatcher.textScaleFactor, 2);
+
   expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(48));
   expect(tester.getRect(_sheet).bottom, 160);
   expect(

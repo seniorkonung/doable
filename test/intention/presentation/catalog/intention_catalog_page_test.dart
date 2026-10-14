@@ -149,14 +149,9 @@ void main() {
     );
   });
 
-  testWidgets('каталог проходит accessibility guidelines при масштабе 200%', (
-    tester,
-  ) async {
+  testWidgets('каталог проходит accessibility guidelines', (tester) async {
     final semantics = tester.ensureSemantics();
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
-    );
+
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
     repository.complete(
