@@ -1,4 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 
@@ -12,11 +13,21 @@ final class WidgetbookApp extends StatelessWidget {
   Widget build(BuildContext context) => Widgetbook.material(
     directories: buildCatalog(),
     addons: [
-      // Приложение свою тему не задаёт и рисуется темой Material по умолчанию.
-      // Дополнение красит фон примера её цветом: без него фон берётся из темы
-      // самого Widgetbook, которая следует тёмному режиму устройства.
+      // Примеры и их фон используют темы из модуля основ оформления.
+      // https://docs.widgetbook.io/addons/theme-addon#material-theme
       MaterialThemeAddon(
-        themes: [WidgetbookTheme(name: 'Приложение', data: ThemeData())],
+        themes: [
+          WidgetbookTheme(name: 'Светлая', data: doableTheme(Brightness.light)),
+          WidgetbookTheme(name: 'Тёмная', data: doableTheme(Brightness.dark)),
+        ],
+      ),
+      // Поверхность под примерами сохраняет эффекты нажатия ListTile
+      // над фоном дополнения темы.
+      // https://docs.widgetbook.io/addons/builder-addon
+      BuilderAddon(
+        name: 'Поверхность Material',
+        builder: (context, child) =>
+            Material(type: MaterialType.transparency, child: child),
       ),
       // Виджеты приложения берут системные строки из его локализации.
       LocalizationAddon(
