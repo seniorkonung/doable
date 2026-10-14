@@ -420,10 +420,12 @@ void _registerAssignmentScenarios() {
         final recipientDelete = find.byKey(
           const ValueKey('intention-details-delete'),
         );
+        // Пятьдесят назначений с увеличенным текстом требуют больше 50 шагов.
         await tester.scrollUntilVisible(
           recipientDelete,
           -300,
           scrollable: detailsScroll,
+          maxScrolls: 100,
         );
         await _tap(tester, recipientDelete);
         await tester.pumpAndSettle();
