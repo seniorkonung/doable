@@ -8,6 +8,51 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('команда заголовка сообщает раскрытие и доступна без жеста', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    var presses = 0;
+    for (final isExpanded in [false, true]) {
+      final label = isExpanded
+          ? 'Вернуться к дням месяца'
+          : 'Выбрать год и месяц';
+      await tester.pumpWidget(
+        _host(
+          CalendarHeader(
+            title: 'Октябрь 2026',
+            titleAction: (
+              semanticLabel: label,
+              isExpanded: isExpanded,
+              onTap: () => presses++,
+            ),
+            previousLabel: 'Предыдущий месяц',
+            nextLabel: 'Следующий месяц',
+            onPrevious: null,
+            onNext: null,
+          ),
+        ),
+      );
+      final button = find.bySemanticsLabel(label);
+      final node = tester.getSemantics(button);
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(
+        node.flagsCollection.isExpanded,
+        isExpanded ? Tristate.isTrue : Tristate.isFalse,
+      );
+      expect(node.rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
+      tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+        node.id,
+        SemanticsAction.tap,
+      );
+      await tester.pumpAndSettle();
+      await tester.tapAt(tester.getTopLeft(button) + const Offset(1, 1));
+      await tester.pumpAndSettle();
+    }
+    expect(presses, 4);
+    semantics.dispose();
+  });
+
   testWidgets('стрелки вызывают свои команды по всей области нажатия', (
     tester,
   ) async {

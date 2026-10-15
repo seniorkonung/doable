@@ -8,7 +8,51 @@ List<WidgetbookUseCase> calendarHeaderUseCases() => [
     name: 'Соседние месяцы и границы',
     builder: (context) => const _HeaderPreview(),
   ),
+  WidgetbookUseCase(
+    name: 'Команда заголовка и открытый выбор',
+    builder: (context) => const _TitleActionPreview(),
+  ),
 ];
+
+class _TitleActionPreview extends StatefulWidget {
+  const _TitleActionPreview();
+
+  @override
+  State<_TitleActionPreview> createState() => _TitleActionPreviewState();
+}
+
+class _TitleActionPreviewState extends State<_TitleActionPreview> {
+  var _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Align(
+      alignment: Alignment.topCenter,
+      child: SizedBox(
+        width: 390,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
+          children: [
+            CalendarHeader(
+              title: _isExpanded ? '2026' : 'Октябрь 2026',
+              titleAction: (
+                semanticLabel: _isExpanded
+                    ? 'Вернуться к дням месяца'
+                    : 'Выбрать год и месяц',
+                isExpanded: _isExpanded,
+                onTap: () => setState(() => _isExpanded = !_isExpanded),
+              ),
+              previousLabel: 'Предыдущий период',
+              nextLabel: 'Следующий период',
+              onPrevious: null,
+              onNext: null,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
 class _HeaderPreview extends StatefulWidget {
   const _HeaderPreview();

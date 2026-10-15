@@ -4,6 +4,7 @@ import 'calendar/calendar_handle_use_cases.dart';
 import 'calendar/calendar_header_use_cases.dart';
 import 'calendar/day_heading_use_cases.dart';
 import 'calendar/month_grid_day_use_cases.dart';
+import 'calendar/period_picker_use_cases.dart';
 import 'calendar/week_strip_day_use_cases.dart';
 import 'foundations/colors_use_cases.dart';
 import 'foundations/typography_use_cases.dart';
@@ -42,6 +43,10 @@ List<WidgetbookNode> buildCatalog() => [
       WidgetbookComponent(
         name: 'Шапка месяца',
         useCases: calendarHeaderUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Выбор года и месяца',
+        useCases: periodPickerUseCases(),
       ),
       WidgetbookComponent(
         name: 'Ручка календаря',

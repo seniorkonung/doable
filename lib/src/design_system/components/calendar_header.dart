@@ -4,10 +4,11 @@ import '../doable_colors.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
 
-/// Шапка месяца с готовым заголовком и командами соседних месяцев.
+/// Шапка периода с готовым заголовком и командами соседних периодов.
 ///
 /// Отсутствие обработчика делает соответствующую стрелку недоступной.
-/// Названия команд задаёт потребитель; заголовок не является командой.
+/// Без [titleAction] заголовок остаётся текстом. Названия команд и состояние
+/// выбора задаёт потребитель.
 final class CalendarHeader extends StatelessWidget {
   const CalendarHeader({
     super.key,
@@ -16,6 +17,7 @@ final class CalendarHeader extends StatelessWidget {
     required this.nextLabel,
     required this.onPrevious,
     required this.onNext,
+    this.titleAction,
   });
 
   final String title;
@@ -23,45 +25,90 @@ final class CalendarHeader extends StatelessWidget {
   final String nextLabel;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
+  final ({String semanticLabel, bool isExpanded, VoidCallback onTap})?
+  titleAction;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
+    const radius = BorderRadius.all(Radius.circular(DoableMetrics.radiusSm));
+    final action = titleAction;
+    final titleBox = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Ink(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: action?.isExpanded == true
+                ? colors.hairline
+                : Colors.transparent,
+          ),
+          borderRadius: radius,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 10, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: DoableType.title.copyWith(
+                    color: colors.ink,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: DoableMetrics.space1),
+              CustomPaint(
+                size: const Size.square(16),
+                painter: _ChevronPainter(
+                  action?.isExpanded == true ? _Chevron.up : _Chevron.down,
+                  colors.muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
     return Row(
       children: [
-        _MonthArrow(
+        _PeriodArrow(
           direction: _Chevron.previous,
           label: previousLabel,
           onPressed: onPrevious,
         ),
         Expanded(
           child: Center(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(15, 7, 11, 7),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: DoableType.title.copyWith(
-                        color: colors.ink,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+            child: Material(
+              type: MaterialType.transparency,
+              child: action == null
+                  ? titleBox
+                  // Одна команда с отдельным состоянием раскрытия:
+                  // https://api.flutter.dev/flutter/semantics/SemanticsProperties/expanded.html
+                  : Semantics(
+                      container: true,
+                      excludeSemantics: true,
+                      button: true,
+                      expanded: action.isExpanded,
+                      label: action.semanticLabel,
+                      onTap: action.onTap,
+                      child: InkWell(
+                        borderRadius: radius,
+                        onTap: action.onTap,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: DoableMetrics.tapMin,
+                          ),
+                          child: titleBox,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: DoableMetrics.space1),
-                  CustomPaint(
-                    size: const Size.square(16),
-                    painter: _ChevronPainter(_Chevron.down, colors.muted),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
-        _MonthArrow(
+        _PeriodArrow(
           direction: _Chevron.next,
           label: nextLabel,
           onPressed: onNext,
@@ -71,8 +118,8 @@ final class CalendarHeader extends StatelessWidget {
   }
 }
 
-final class _MonthArrow extends StatelessWidget {
-  const _MonthArrow({
+final class _PeriodArrow extends StatelessWidget {
+  const _PeriodArrow({
     required this.direction,
     required this.label,
     required this.onPressed,
@@ -111,7 +158,7 @@ final class _MonthArrow extends StatelessWidget {
   }
 }
 
-enum _Chevron { previous, next, down }
+enum _Chevron { previous, next, down, up }
 
 final class _ChevronPainter extends CustomPainter {
   const _ChevronPainter(this.direction, this.color);
@@ -137,6 +184,7 @@ final class _ChevronPainter extends CustomPainter {
         Offset(12, 15.5),
         Offset(18, 9.5),
       ],
+      _Chevron.up => const [Offset(6, 14.5), Offset(12, 8.5), Offset(18, 14.5)],
     };
     // Координаты и толщина штриха из значков макета с viewBox 24×24.
     canvas
@@ -147,7 +195,10 @@ final class _ChevronPainter extends CustomPainter {
         Paint()
           ..color = color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = direction == _Chevron.down ? 2 : 1.75
+          ..strokeWidth = switch (direction) {
+            _Chevron.down || _Chevron.up => 2,
+            _ => 1.75,
+          }
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       )
