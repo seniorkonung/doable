@@ -92,7 +92,7 @@
   - **Files likely touched:** `lib/src/app/quick_creation/quick_creation_mode_menu.dart`, `lib/src/app/quick_creation/quick_creation_mode_presentation.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые локализации; `test/support/quick_creation.dart`, `test/app/quick_creation/quick_creation_mode_menu_test.dart`, `test/app/quick_creation/quick_creation_accessibility_test.dart`, `test/app/quick_creation/quick_creation_mode_presentation_test.dart`, `test/app/quick_creation/quick_creation_runtime_restart_test.dart`, `test/app/quick_creation/quick_creation_navigation_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.5 Widgetbook показывает оба листа, состояния строк и панель с тремя режимами для сверки дизайна
+- [x] 2.5 Widgetbook показывает оба листа, состояния строк и панель с тремя режимами для сверки дизайна
   - **Acceptance criteria:**
     - В каталог добавлены меню режимов, лист выбора начала и нужные состояния `OptionRow`: обычное, выбранное, ведущее дальше; они доступны в обеих темах без маршрутизатора и хранилища приложения. Примеры используют те же компоненты и данные представления, что потребители.
     - Существующие примеры панели позволяют увидеть каждый выбранный пункт с каждым из трёх мини-значков режима. Ручная сверка в Widgetbook с README компонентов и состояниями `ActionMenu`, `ChoiceSheet` и доской `Parts` не выявила непринятых расхождений.
