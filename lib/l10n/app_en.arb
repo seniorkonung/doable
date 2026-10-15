@@ -30,7 +30,7 @@
   "@statisticsIntermediateIntentions": {"description": "Вид статистики по промежуточным намерениям сохранённого пути"},
   "statisticsSelectedActions": "Selected actions",
   "@statisticsSelectedActions": {"description": "Вид статистики по выбранным действиям"},
-  "statisticsThroughRelations": "Through relations",
+  "statisticsThroughRelations": "Total contribution",
   "@statisticsThroughRelations": {"description": "Вид статистики по сохранённому пути и текущим активным связям"},
   "statisticsMonthTab": "Month",
   "@statisticsMonthTab": {"description": "Вкладка статистики календарного месяца"},
@@ -113,7 +113,7 @@
   "statisticsBreakdownRelations": "By relations",
   "@statisticsBreakdownRelations": {"description": "Заголовок разбивки вклада по исходящим связям намерения; архивная отметка связи использует relationNeighborhoodRelationArchived, намерения — detailsArchived"},
   "statisticsExplicitPathChoices": "Daily choices with this intention on the saved selection path: {count} of {planned}",
-  "@statisticsExplicitPathChoices": {"description": "Число запланированных выборов вида «Через связи», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы", "placeholders": {"count": {"type": "int", "format": "decimalPattern"}, "planned": {"type": "int", "format": "decimalPattern"}}},
+  "@statisticsExplicitPathChoices": {"description": "Число запланированных выборов вида «Весь вклад», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы", "placeholders": {"count": {"type": "int", "format": "decimalPattern"}, "planned": {"type": "int", "format": "decimalPattern"}}},
   "statisticsBreakdownContributionShare": "Share of this intention’s contribution in this view: {share}",
   "@statisticsBreakdownContributionShare": {"description": "Доля строки разбивки относительно вклада намерения в выбранном виде, а не всего периода; отношение передаётся без умножения на 100", "placeholders": {"share": {"type": "num", "format": "percentPattern"}}},
   "statisticsBreakdownNoContributionShare": "No share: this intention’s contribution in this view is zero",
@@ -144,9 +144,13 @@
   "@quickCreationChangeMode": {
     "description": "Отдельное доступное действие открытия меню режимов быстрого создания"
   },
-  "quickCreationMenuTitle": "Quick creation mode",
+  "quickCreationMenuTitle": "What the button creates",
   "@quickCreationMenuTitle": {
     "description": "Заголовок меню выбора режима быстрого создания"
+  },
+  "quickCreationMenuPrompt": "A tap on plus will create the selected item",
+  "@quickCreationMenuPrompt": {
+    "description": "Пояснение меню выбора режима кнопки быстрого создания"
   },
   "quickCreationLongPressHint": "Touch and hold to change mode",
   "@quickCreationLongPressHint": {
@@ -156,17 +160,45 @@
   "@quickCreationModeIntention": {
     "description": "Название режима создания намерения"
   },
+  "quickCreationModeIntentionHint": "Something you want to do or change",
+  "@quickCreationModeIntentionHint": {
+    "description": "Пояснение режима создания намерения"
+  },
   "quickCreationModeRelation": "New relation",
   "@quickCreationModeRelation": {
     "description": "Название режима создания долговременной связи"
   },
-  "quickCreationModeDailyChoiceFromIntention": "Daily choice from an intention",
-  "@quickCreationModeDailyChoiceFromIntention": {
-    "description": "Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз"
+  "quickCreationModeRelationHint": "To …, you need or can …",
+  "@quickCreationModeRelationHint": {
+    "description": "Пояснение режима создания долговременной связи"
   },
-  "quickCreationModeDailyChoiceFromAction": "Daily choice from an action",
-  "@quickCreationModeDailyChoiceFromAction": {
-    "description": "Название режима дневного выбора с поиском действия и построением пути снизу вверх"
+  "quickCreationModeDailyChoice": "New daily choice",
+  "@quickCreationModeDailyChoice": {
+    "description": "Название режима и заголовок листа нового дневного выбора"
+  },
+  "quickCreationModeDailyChoiceHint": "An action for an intention on a chosen day",
+  "@quickCreationModeDailyChoiceHint": {
+    "description": "Пояснение режима создания дневного выбора"
+  },
+  "quickCreationDailyChoiceStartPrompt": "Choose where to start",
+  "@quickCreationDailyChoiceStartPrompt": {
+    "description": "Пояснение листа выбора начала дневного выбора"
+  },
+  "quickCreationDailyChoiceFromIntention": "From an intention",
+  "@quickCreationDailyChoiceFromIntention": {
+    "description": "Вариант начала дневного выбора с исходного намерения"
+  },
+  "quickCreationDailyChoiceFromIntentionHint": "Pick an intention, then an action for it",
+  "@quickCreationDailyChoiceFromIntentionHint": {
+    "description": "Пояснение выбора от исходного намерения к действию"
+  },
+  "quickCreationDailyChoiceFromAction": "From an action",
+  "@quickCreationDailyChoiceFromAction": {
+    "description": "Вариант начала дневного выбора с действия"
+  },
+  "quickCreationDailyChoiceFromActionHint": "Pick an action, then the intention it serves",
+  "@quickCreationDailyChoiceFromActionHint": {
+    "description": "Пояснение выбора от действия к исходному намерению"
   },
   "commonLoading": "Loading…",
   "@commonLoading": {

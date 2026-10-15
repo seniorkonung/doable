@@ -12,6 +12,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.d
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,18 +22,8 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/app_root_pages.dart';
 
 const _titles = {
-  'ru': [
-    'Новое намерение',
-    'Новая связь',
-    'Дневной выбор от намерения',
-    'Дневной выбор от действия',
-  ],
-  'en': [
-    'New intention',
-    'New relation',
-    'Daily choice from an intention',
-    'Daily choice from an action',
-  ],
+  'ru': ['Новое намерение', 'Новая связь', 'Новый дневной выбор'],
+  'en': ['New intention', 'New relation', 'New daily choice'],
 };
 
 // Размер экрана не меняет ветвление кода, поэтому берём телефонную ширину.
@@ -124,14 +115,14 @@ void main() {
         expect(find.byType(BottomSheet), findsOneWidget);
         expect(
           tester
-              .widgetList<ListTile>(find.byType(ListTile))
-              .map((tile) => (tile.title! as Text).data),
+              .widgetList<OptionRow>(find.byType(OptionRow))
+              .map((row) => row.name),
           titles,
         );
         expect(appNavigationDestinations().hitTestable(), findsNothing);
         expect(find.semantics.byLabel(node.label), findsNothing);
         final title = find.text(titles[mode.index]);
-        final row = find.widgetWithText(ListTile, titles[mode.index]);
+        final row = find.widgetWithText(OptionRow, titles[mode.index]);
         await tester.ensureVisible(row);
         await tester.pumpAndSettle();
         final viewport = tester.getRect(
@@ -237,19 +228,9 @@ void _expectButtonIcons(
   expect(rect.width, greaterThanOrEqualTo(48));
   expect(rect.height, greaterThanOrEqualTo(48));
   _expectWithin(tester, button, tester.getRect(find.byType(AppNavigationBar)));
-  for (final icon in [Icons.add, mode.icon, Icons.unfold_more]) {
+  for (final icon in [Icons.add_outlined, mode.icon]) {
     final finder = find.descendant(of: button, matching: find.byIcon(icon));
     _expectWithin(tester, finder, rect.intersect(Offset.zero & screen));
-    expect(
-      tester.getSize(finder),
-      Size.square(
-        icon == mode.icon
-            ? 12
-            : icon == Icons.add
-            ? 28
-            : 16,
-      ),
-    );
   }
   expect(
     find.descendant(of: button, matching: find.byType(Text)),

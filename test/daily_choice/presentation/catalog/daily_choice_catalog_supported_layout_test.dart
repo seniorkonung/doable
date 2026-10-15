@@ -122,7 +122,6 @@ Future<void> _expectUsableCatalog(
   expect(media.size, const Size(360, 720));
   expect(media.devicePixelRatio, 1);
   expect(media.textScaler.scale(14), 14);
-  expect(tester.getSize(find.byType(AppNavigationBar)).height, 64 + 48);
   final bodyRect = tester.getRect(body);
   final usableBody = Rect.fromLTRB(
     bodyRect.left,

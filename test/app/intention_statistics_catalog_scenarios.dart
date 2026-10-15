@@ -413,6 +413,7 @@ Future<void> _prepareCatalog(
   await tester.pumpAndSettle();
   final footer = find.byKey(const ValueKey('daily-choice-load-more'));
   await tester.scrollUntilVisible(footer, 500, scrollable: _catalogScrollable);
+  await tester.pumpAndSettle();
   await tester.tap(footer);
   await _wait(tester, () => _catalogData(app, provider).items.length == 100);
   await tester.scrollUntilVisible(

@@ -2,15 +2,13 @@
 enum QuickCreationMode {
   intention,
   relation,
-  dailyChoiceFromIntention,
-  dailyChoiceFromAction;
+  dailyChoice;
 
   /// Постоянный формат настройки установки, независимый от имени и индекса.
   String get storageKey => switch (this) {
     QuickCreationMode.intention => 'intention',
     QuickCreationMode.relation => 'relation',
-    QuickCreationMode.dailyChoiceFromIntention => 'daily-choice-from-intention',
-    QuickCreationMode.dailyChoiceFromAction => 'daily-choice-from-action',
+    QuickCreationMode.dailyChoice => 'daily-choice',
   };
 
   /// Проверяет внешнее значение; неизвестный ключ не получает режим по умолчанию.

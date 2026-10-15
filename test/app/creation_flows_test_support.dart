@@ -1,6 +1,6 @@
 part of 'creation_flows_integration_test.dart';
 
-/// Четыре режима общей кнопки с настоящими потоками и локальным графом.
+/// Четыре потока общей кнопки с настоящим локальным графом.
 enum _Flow {
   intention(
     'намерение',
@@ -59,22 +59,36 @@ enum _Flow {
       switch (this) {
         intention => QuickCreationMode.intention,
         relation => QuickCreationMode.relation,
-        topDown => QuickCreationMode.dailyChoiceFromIntention,
-        bottomUp => QuickCreationMode.dailyChoiceFromAction,
+        topDown || bottomUp => QuickCreationMode.dailyChoice,
       },
-      openedPage: _key(switch (this) {
-        intention => 'intention-editor-title',
-        relation => 'relation-editor-description',
-        topDown => 'daily-choice-source-filter',
-        bottomUp => 'daily-choice-action-filter',
-      }),
+      openedPage: switch (this) {
+        intention => _key('intention-editor-title'),
+        relation => _key('relation-editor-description'),
+        topDown || bottomUp => find.byType(QuickCreationDailyChoiceStartSheet),
+      },
       wait: (tester, finder) =>
           _until(tester, () => finder.evaluate().isNotEmpty),
       activate: (tester, button) async {
-        await tester.tap(button);
-        await tester.tap(button);
+        final position = tester.getCenter(button);
+        await tester.tapAt(position);
+        await tester.tapAt(position);
       },
     );
+    if (this == topDown || this == bottomUp) {
+      await chooseQuickCreationDailyChoiceStart(
+        tester,
+        this == topDown
+            ? ChoicePathDraftDirection.topDown
+            : ChoicePathDraftDirection.bottomUp,
+        openedPage: _key(
+          this == topDown
+              ? 'daily-choice-source-filter'
+              : 'daily-choice-action-filter',
+        ),
+        wait: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
+      );
+    }
     expect(app.router.stackData, hasLength(history.length + 1));
     expect(
       app.router.stackData.take(history.length).map((route) => route.matchId),

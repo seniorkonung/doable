@@ -80,14 +80,14 @@ void main() {
 
       directoryAvailable = true;
       expect(
-        await controller.select(QuickCreationMode.dailyChoiceFromAction),
+        await controller.select(QuickCreationMode.dailyChoice),
         isA<QuickCreationModeSaved>(),
       );
       await first.shutdown();
       final restored = await runtime(store()).bootstrap() as AppRuntimeReady;
       expect(
         restored.container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoiceFromAction,
+        QuickCreationMode.dailyChoice,
       );
       expect(_modeFailures(diagnostics).map((event) => event.stage), [
         QuickCreationModeDiagnosticsStage.read,
@@ -119,18 +119,18 @@ void main() {
     await graphOpening.started.future;
 
     graphOpening.release();
-    modeStore.completeRead(QuickCreationMode.dailyChoiceFromAction);
+    modeStore.completeRead(QuickCreationMode.dailyChoice);
     final ready = await bootstrapping as AppRuntimeReady;
 
     expect(
       ready.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.dailyChoiceFromAction,
+      QuickCreationMode.dailyChoice,
     );
     // Повторный запрос готового запуска сохраняет прочитанный режим.
     final repeated = await runtime.bootstrap() as AppRuntimeReady;
     expect(
       repeated.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.dailyChoiceFromAction,
+      QuickCreationMode.dailyChoice,
     );
   });
 
@@ -169,10 +169,8 @@ void main() {
       );
       await ready.container
           .read(quickCreationModeControllerProvider.notifier)
-          .select(QuickCreationMode.dailyChoiceFromIntention);
-      expect(modeStore.savedModes, [
-        QuickCreationMode.dailyChoiceFromIntention,
-      ]);
+          .select(QuickCreationMode.dailyChoice);
+      expect(modeStore.savedModes, [QuickCreationMode.dailyChoice]);
     },
   );
 
@@ -231,7 +229,7 @@ void main() {
     // Пропускаем продолжение bootstrap до ожидания настройки после open().
     await Future<void>(() {});
     await runtime.shutdown();
-    modeStore.completeRead(QuickCreationMode.dailyChoiceFromIntention);
+    modeStore.completeRead(QuickCreationMode.dailyChoice);
 
     await rejected;
     expect(() => runtime.commandCoordinator, throwsStateError);
@@ -253,7 +251,7 @@ void main() {
         final ready = await first.bootstrap() as AppRuntimeReady;
         final saving = ready.container
             .read(quickCreationModeControllerProvider.notifier)
-            .select(QuickCreationMode.dailyChoiceFromAction);
+            .select(QuickCreationMode.dailyChoice);
         addTearDown(() async {
           if (!attempt.release.isCompleted) attempt.release.complete();
           await saving;
@@ -287,9 +285,7 @@ void main() {
         final after = await runtime(store()).bootstrap() as AppRuntimeReady;
         expect(
           after.container.read(quickCreationModeControllerProvider),
-          fails
-              ? QuickCreationMode.relation
-              : QuickCreationMode.dailyChoiceFromAction,
+          fails ? QuickCreationMode.relation : QuickCreationMode.dailyChoice,
         );
       });
     });

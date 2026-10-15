@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 /// Тени, используемые компонентами Doable.
 enum DoableShadowToken {
-  sm;
+  sm,
+  float;
 
   // Пара обязательна для каждого токена: светлое и тёмное значения.
   (List<BoxShadow>, List<BoxShadow>) get _palette => switch (this) {
@@ -24,6 +25,32 @@ enum DoableShadowToken {
           color: Color(0x80000000),
           offset: Offset(0, 1),
           blurRadius: 2,
+        ),
+      ],
+    ),
+    float => (
+      const [
+        BoxShadow(
+          color: Color(0x1a111114),
+          offset: Offset(0, 10),
+          blurRadius: 30,
+        ),
+        BoxShadow(
+          color: Color(0x0f111114),
+          offset: Offset(0, 1),
+          blurRadius: 3,
+        ),
+      ],
+      const [
+        BoxShadow(
+          color: Color(0x8c000000),
+          offset: Offset(0, 10),
+          blurRadius: 30,
+        ),
+        BoxShadow(
+          color: Color(0x80000000),
+          offset: Offset(0, 1),
+          blurRadius: 3,
         ),
       ],
     ),
@@ -50,6 +77,9 @@ final class DoableShadows extends ThemeExtension<DoableShadows> {
 
   /// `shadow-sm`: тень выбранного дня недели.
   List<BoxShadow> get sm => this[DoableShadowToken.sm];
+
+  /// `shadow-float`: тень плавающих листов.
+  List<BoxShadow> get shadowFloat => this[DoableShadowToken.float];
 
   /// Заменяет тени, для которых [shadowsFor] возвращает ненулевое значение.
   @override

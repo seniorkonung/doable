@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
@@ -132,18 +133,18 @@ void main() {
           expect(bar.bottom, _screen.height, reason: insets.name);
           expect(bar.height, insets.barExtent, reason: insets.name);
           expect(tester.getRect(page).bottom, bar.top, reason: insets.name);
-          // Значки центрированы в самой панели, без верхнего системного
-          // отступа и нижней безопасной области.
+          // Области пунктов остаются внутри панели и не занимают нижнюю
+          // системную область при смене безопасных отступов и клавиатуры.
           for (final item in AppDestination.values) {
-            final icon = find.descendant(
-              of: appNavigationDestination(item),
-              matching: find.byIcon(
-                item == destination ? item.selectedIcon : item.icon,
-              ),
+            final itemRect = tester.getRect(appNavigationDestination(item));
+            expect(
+              itemRect.top,
+              greaterThanOrEqualTo(bar.top),
+              reason: '${insets.name}: ${_names[item]}',
             );
             expect(
-              tester.getCenter(icon).dy,
-              bar.top + AppNavigationBar.height / 2,
+              itemRect.bottom,
+              lessThanOrEqualTo(bar.top + AppNavigationBar.height),
               reason: '${insets.name}: ${_names[item]}',
             );
           }
@@ -467,15 +468,19 @@ void main() {
             greaterThanOrEqualTo(message.bottom),
           );
           expect(create.hitTestable(), findsOneWidget);
-          await openQuickCreation(
-            tester,
-            destination == AppDestination.dailyChoices
-                ? QuickCreationMode.dailyChoiceFromAction
-                : QuickCreationMode.intention,
-            openedPage: destination == AppDestination.dailyChoices
-                ? find.byType(DailyChoiceActionPickerPage)
-                : find.byType(IntentionEditorPage),
-          );
+          if (destination == AppDestination.dailyChoices) {
+            await openDailyChoiceQuickCreation(
+              tester,
+              ChoicePathDraftDirection.bottomUp,
+              openedPage: find.byType(DailyChoiceActionPickerPage),
+            );
+          } else {
+            await openQuickCreation(
+              tester,
+              QuickCreationMode.intention,
+              openedPage: find.byType(IntentionEditorPage),
+            );
+          }
         }
         expect(tester.takeException(), isNull);
       });

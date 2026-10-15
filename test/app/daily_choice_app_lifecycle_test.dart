@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
@@ -218,9 +218,9 @@ void main() {
       );
       expect(dailyChoiceCatalogDay(createdDate), findsOneWidget);
       expect(createdDayMark, findsNothing);
-      await openQuickCreation(
+      await openDailyChoiceQuickCreation(
         tester,
-        QuickCreationMode.dailyChoiceFromAction,
+        ChoicePathDraftDirection.bottomUp,
         openedPage: find.byType(DailyChoiceActionPickerPage),
         wait: (tester, finder) =>
             _until(tester, () => finder.evaluate().isNotEmpty),

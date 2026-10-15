@@ -155,7 +155,7 @@ abstract class AppLocalizations {
   /// Вид статистики по сохранённому пути и текущим активным связям
   ///
   /// In en, this message translates to:
-  /// **'Through relations'**
+  /// **'Total contribution'**
   String get statisticsThroughRelations;
 
   /// Вкладка статистики календарного месяца
@@ -398,7 +398,7 @@ abstract class AppLocalizations {
   /// **'By relations'**
   String get statisticsBreakdownRelations;
 
-  /// Число запланированных выборов вида «Через связи», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы
+  /// Число запланированных выборов вида «Весь вклад», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы
   ///
   /// In en, this message translates to:
   /// **'Daily choices with this intention on the saved selection path: {count} of {planned}'**
@@ -485,8 +485,14 @@ abstract class AppLocalizations {
   /// Заголовок меню выбора режима быстрого создания
   ///
   /// In en, this message translates to:
-  /// **'Quick creation mode'**
+  /// **'What the button creates'**
   String get quickCreationMenuTitle;
+
+  /// Пояснение меню выбора режима кнопки быстрого создания
+  ///
+  /// In en, this message translates to:
+  /// **'A tap on plus will create the selected item'**
+  String get quickCreationMenuPrompt;
 
   /// Подсказка долгого нажатия на кнопку быстрого создания для экранного диктора
   ///
@@ -500,23 +506,65 @@ abstract class AppLocalizations {
   /// **'New intention'**
   String get quickCreationModeIntention;
 
+  /// Пояснение режима создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Something you want to do or change'**
+  String get quickCreationModeIntentionHint;
+
   /// Название режима создания долговременной связи
   ///
   /// In en, this message translates to:
   /// **'New relation'**
   String get quickCreationModeRelation;
 
-  /// Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз
+  /// Пояснение режима создания долговременной связи
   ///
   /// In en, this message translates to:
-  /// **'Daily choice from an intention'**
-  String get quickCreationModeDailyChoiceFromIntention;
+  /// **'To …, you need or can …'**
+  String get quickCreationModeRelationHint;
 
-  /// Название режима дневного выбора с поиском действия и построением пути снизу вверх
+  /// Название режима и заголовок листа нового дневного выбора
   ///
   /// In en, this message translates to:
-  /// **'Daily choice from an action'**
-  String get quickCreationModeDailyChoiceFromAction;
+  /// **'New daily choice'**
+  String get quickCreationModeDailyChoice;
+
+  /// Пояснение режима создания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'An action for an intention on a chosen day'**
+  String get quickCreationModeDailyChoiceHint;
+
+  /// Пояснение листа выбора начала дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Choose where to start'**
+  String get quickCreationDailyChoiceStartPrompt;
+
+  /// Вариант начала дневного выбора с исходного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'From an intention'**
+  String get quickCreationDailyChoiceFromIntention;
+
+  /// Пояснение выбора от исходного намерения к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an intention, then an action for it'**
+  String get quickCreationDailyChoiceFromIntentionHint;
+
+  /// Вариант начала дневного выбора с действия
+  ///
+  /// In en, this message translates to:
+  /// **'From an action'**
+  String get quickCreationDailyChoiceFromAction;
+
+  /// Пояснение выбора от действия к исходному намерению
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an action, then the intention it serves'**
+  String get quickCreationDailyChoiceFromActionHint;
 
   /// Общее состояние загрузки
   ///

@@ -4,23 +4,18 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../design_system/components/action_sheet.dart';
+import '../../design_system/components/option_row.dart';
+import '../../design_system/components/sheet.dart';
 import 'quick_creation_mode.dart';
 import 'quick_creation_mode_controller.dart';
 import 'quick_creation_mode_presentation.dart';
 
 /// Открывает выбор режима над всей текущей страницей, включая её навигацию.
 /// Выбор применяется без ожидания записи и не запускает создание.
-///
-/// Корневой модальный маршрут изолирует фон и забирает фокус:
-/// https://api.flutter.dev/flutter/material/showModalBottomSheet.html
 Future<void> showQuickCreationModeMenu(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showDoableSheet<void>(
     context: context,
-    useRootNavigator: true,
-    useSafeArea: true,
-    isScrollControlled: true,
-    requestFocus: true,
-    showDragHandle: true,
     builder: (_) => const _QuickCreationModeMenu(),
   );
 }
@@ -32,47 +27,29 @@ final class _QuickCreationModeMenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final localizations = AppLocalizations.of(context);
     final selected = ref.watch(quickCreationModeControllerProvider);
-    // SafeArea не учитывает клавиатуру: её область задаёт viewInsets.
-    // https://api.flutter.dev/flutter/widgets/MediaQueryData/viewInsets.html
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    localizations.quickCreationMenuTitle,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-              ),
-              for (final mode in QuickCreationMode.values)
-                ListTile(
-                  leading: Icon(mode.icon),
-                  title: Text(mode.title(localizations)),
-                  selected: mode == selected,
-                  autofocus: mode == selected,
-                  trailing: mode == selected ? const Icon(Icons.check) : null,
-                  onTap: () {
-                    unawaited(
-                      ref
-                          .read(quickCreationModeControllerProvider.notifier)
-                          .select(mode),
-                    );
-                    Navigator.of(context).pop();
-                  },
-                ),
-            ],
+    return ActionSheet(
+      title: localizations.quickCreationMenuTitle,
+      text: localizations.quickCreationMenuPrompt,
+      options: [
+        for (final mode in QuickCreationMode.values)
+          OptionRow(
+            icon: mode.icon,
+            name: mode.title(localizations),
+            hint: mode.hint(localizations),
+            trailing: mode == selected
+                ? OptionRowTrailing.selected
+                : OptionRowTrailing.none,
+            autofocus: mode == selected,
+            onPressed: () {
+              unawaited(
+                ref
+                    .read(quickCreationModeControllerProvider.notifier)
+                    .select(mode),
+              );
+              Navigator.of(context).pop();
+            },
           ),
-        ),
-      ),
+      ],
     );
   }
 }

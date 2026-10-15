@@ -125,9 +125,9 @@ void _registerOrdinaryLayoutTests() {
         await tester.pumpAndSettle();
         await _select(tester, AppDestination.dailyChoices);
         _expectQuickCreationInPanel(tester, insets);
-        await openQuickCreation(
+        await openDailyChoiceQuickCreation(
           tester,
-          QuickCreationMode.dailyChoiceFromAction,
+          ChoicePathDraftDirection.bottomUp,
           openedPage: find.byType(DailyChoiceActionPickerPage),
           wait: _until,
         );
@@ -138,7 +138,7 @@ void _registerOrdinaryLayoutTests() {
         final l10n = lookupAppLocalizations(locale);
         final name =
             '${l10n.quickCreationLabel}, '
-            '${l10n.quickCreationModeDailyChoiceFromAction}';
+            '${l10n.quickCreationModeDailyChoice}';
         expect(
           find.semantics.byPredicate((node) => node.label == name),
           findsOneWidget,

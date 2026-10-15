@@ -11,47 +11,64 @@ enum _Origin {
   final Type page;
 }
 
-const _dailyModes = [
-  QuickCreationMode.dailyChoiceFromIntention,
-  QuickCreationMode.dailyChoiceFromAction,
-];
+String _label(QuickCreationMode mode, ChoicePathDraftDirection? direction) =>
+    switch (mode) {
+      QuickCreationMode.intention => 'Намерение',
+      QuickCreationMode.relation => 'Связь',
+      QuickCreationMode.dailyChoice =>
+        'Дневной выбор: ${_directionLabel(direction!)}',
+    };
 
-String _label(QuickCreationMode mode) => switch (mode) {
-  QuickCreationMode.intention => 'Намерение',
-  QuickCreationMode.relation => 'Связь',
-  QuickCreationMode.dailyChoiceFromIntention => 'Дневной выбор от намерения',
-  QuickCreationMode.dailyChoiceFromAction => 'Дневной выбор от действия',
-};
+String _directionLabel(ChoicePathDraftDirection direction) =>
+    switch (direction) {
+      ChoicePathDraftDirection.topDown => 'от намерения',
+      ChoicePathDraftDirection.bottomUp => 'от действия',
+    };
 
-String _firstRoute(QuickCreationMode mode) => switch (mode) {
+String _firstRoute(
+  QuickCreationMode mode,
+  ChoicePathDraftDirection? direction,
+) => switch (mode) {
   QuickCreationMode.intention => IntentionEditorRoute.name,
   QuickCreationMode.relation => RelationEditorRoute.name,
-  QuickCreationMode.dailyChoiceFromIntention =>
-    DailyChoiceSourcePickerRoute.name,
-  QuickCreationMode.dailyChoiceFromAction => DailyChoiceActionPickerRoute.name,
+  QuickCreationMode.dailyChoice => switch (direction!) {
+    ChoicePathDraftDirection.topDown => DailyChoiceSourcePickerRoute.name,
+    ChoicePathDraftDirection.bottomUp => DailyChoiceActionPickerRoute.name,
+  },
 };
 
-ChoicePathDraftDirection _direction(QuickCreationMode mode) =>
-    mode == QuickCreationMode.dailyChoiceFromIntention
-    ? ChoicePathDraftDirection.topDown
-    : ChoicePathDraftDirection.bottomUp;
+String _prefix(ChoicePathDraftDirection direction) => switch (direction) {
+  ChoicePathDraftDirection.topDown => 'source',
+  ChoicePathDraftDirection.bottomUp => 'action',
+};
 
-String _prefix(QuickCreationMode mode) =>
-    mode == QuickCreationMode.dailyChoiceFromIntention ? 'source' : 'action';
+int _candidate(ChoicePathDraftDirection direction) => switch (direction) {
+  ChoicePathDraftDirection.topDown => 1,
+  ChoicePathDraftDirection.bottomUp => 3,
+};
 
-int _candidate(QuickCreationMode mode) =>
-    mode == QuickCreationMode.dailyChoiceFromIntention ? 1 : 3;
+Future<void> _selectStart(
+  WidgetTester tester,
+  ChoicePathDraftDirection direction,
+) => chooseQuickCreationDailyChoiceStart(
+  tester,
+  direction,
+  openedPage: _key('daily-choice-${_prefix(direction)}-filter'),
+);
 
 Finder _key(String key) => find.byKey(ValueKey(key));
 List<LocalKey> _history(RootStackRouter router) => [
   for (final data in router.stackData) data.matchId,
 ];
 
-Future<void> _choose(WidgetTester tester, QuickCreationMode mode) async {
+Future<void> _choose(
+  WidgetTester tester,
+  ChoicePathDraftDirection direction,
+) async {
   await tester.tap(
     find.descendant(
       of: _key(
-        'daily-choice-${_prefix(mode)}-${durabilityUuid(_candidate(mode))}',
+        'daily-choice-${_prefix(direction)}-${durabilityUuid(_candidate(direction))}',
       ),
       matching: find.byType(IntentionSummaryView),
     ),

@@ -11,6 +11,7 @@ import 'foundations/typography_use_cases.dart';
 import 'intention/intention_summary_view_use_cases.dart';
 import 'messages/notice_use_cases.dart';
 import 'navigation/app_navigation_bar_use_cases.dart';
+import 'navigation/quick_creation_sheets_use_cases.dart';
 
 /// Строит дерево каталога.
 ///
@@ -73,6 +74,14 @@ List<WidgetbookNode> buildCatalog() => [
       WidgetbookComponent(
         name: 'Панель основной навигации',
         useCases: appNavigationBarUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Листы быстрого создания',
+        useCases: quickCreationSheetsUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Строка варианта',
+        useCases: optionRowUseCases(),
       ),
     ],
   ),

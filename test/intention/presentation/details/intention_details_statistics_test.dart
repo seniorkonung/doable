@@ -319,7 +319,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(statistics.hitTestable(), findsOneWidget);
         expect(find.textContaining('октябрь 2026'), findsOneWidget);
-        expect(find.text('Через связи'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       }

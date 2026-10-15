@@ -8,19 +8,19 @@ extension QuickCreationModePresentation on QuickCreationMode {
   String title(AppLocalizations localizations) => switch (this) {
     QuickCreationMode.intention => localizations.quickCreationModeIntention,
     QuickCreationMode.relation => localizations.quickCreationModeRelation,
-    QuickCreationMode.dailyChoiceFromIntention =>
-      localizations.quickCreationModeDailyChoiceFromIntention,
-    QuickCreationMode.dailyChoiceFromAction =>
-      localizations.quickCreationModeDailyChoiceFromAction,
+    QuickCreationMode.dailyChoice => localizations.quickCreationModeDailyChoice,
+  };
+
+  String hint(AppLocalizations localizations) => switch (this) {
+    QuickCreationMode.intention => localizations.quickCreationModeIntentionHint,
+    QuickCreationMode.relation => localizations.quickCreationModeRelationHint,
+    QuickCreationMode.dailyChoice =>
+      localizations.quickCreationModeDailyChoiceHint,
   };
 
   IconData get icon => switch (this) {
-    QuickCreationMode.intention => Icons.circle_outlined,
-    QuickCreationMode.relation => Icons.link,
-    QuickCreationMode.dailyChoiceFromIntention => Icons.arrow_downward,
-    QuickCreationMode.dailyChoiceFromAction => Icons.arrow_upward,
+    QuickCreationMode.intention => Icons.adjust_outlined,
+    QuickCreationMode.relation => Icons.route_outlined,
+    QuickCreationMode.dailyChoice => Icons.calendar_today_outlined,
   };
 }
-
-/// Стрелки смены режима отличаются от направлений построения дневного пути.
-const IconData quickCreationChangeModeIcon = Icons.unfold_more;

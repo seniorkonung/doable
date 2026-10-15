@@ -37,7 +37,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statisticsSelectedActions => 'Выбранные действия';
 
   @override
-  String get statisticsThroughRelations => 'Через связи';
+  String get statisticsThroughRelations => 'Весь вклад';
 
   @override
   String get statisticsMonthTab => 'Месяц';
@@ -331,7 +331,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get quickCreationChangeMode => 'Сменить режим';
 
   @override
-  String get quickCreationMenuTitle => 'Режим быстрого создания';
+  String get quickCreationMenuTitle => 'Что создаёт кнопка';
+
+  @override
+  String get quickCreationMenuPrompt => 'Нажатие на плюс создаст выбранное';
 
   @override
   String get quickCreationLongPressHint =>
@@ -341,15 +344,38 @@ class AppLocalizationsRu extends AppLocalizations {
   String get quickCreationModeIntention => 'Новое намерение';
 
   @override
+  String get quickCreationModeIntentionHint =>
+      'То, что вы хотите сделать или изменить';
+
+  @override
   String get quickCreationModeRelation => 'Новая связь';
 
   @override
-  String get quickCreationModeDailyChoiceFromIntention =>
-      'Дневной выбор от намерения';
+  String get quickCreationModeRelationHint => 'Чтобы …, нужно или можно …';
 
   @override
-  String get quickCreationModeDailyChoiceFromAction =>
-      'Дневной выбор от действия';
+  String get quickCreationModeDailyChoice => 'Новый дневной выбор';
+
+  @override
+  String get quickCreationModeDailyChoiceHint =>
+      'Действие для намерения в выбранный день';
+
+  @override
+  String get quickCreationDailyChoiceStartPrompt => 'С чего начать';
+
+  @override
+  String get quickCreationDailyChoiceFromIntention => 'От намерения';
+
+  @override
+  String get quickCreationDailyChoiceFromIntentionHint =>
+      'Сначала намерение, затем действие для него';
+
+  @override
+  String get quickCreationDailyChoiceFromAction => 'От действия';
+
+  @override
+  String get quickCreationDailyChoiceFromActionHint =>
+      'Сначала действие, затем намерение, которому оно служит';
 
   @override
   String get commonLoading => 'Загрузка…';

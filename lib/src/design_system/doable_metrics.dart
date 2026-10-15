@@ -1,4 +1,4 @@
-/// Шкалы отступов, радиусов и минимальные размеры элементов управления Doable.
+/// Шкалы отступов, радиусов и размеры компонентов Doable.
 abstract final class DoableMetrics {
   static const double space1 = 4;
   static const double space2 = 8;
@@ -18,4 +18,6 @@ abstract final class DoableMetrics {
 
   static const double controlHeight = 40;
   static const double tapMin = 44;
+  static const double navHeight = 55;
+  static const double iconSize = 24;
 }
