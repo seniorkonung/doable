@@ -15,15 +15,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/app_root_pages.dart';
+
 const _titles = {
   'ru': ['Новое намерение', 'Новая связь', 'Новый дневной выбор'],
   'en': ['New intention', 'New relation', 'New daily choice'],
 };
-const _icons = [
-  Icons.adjust_outlined,
-  Icons.route_outlined,
-  Icons.calendar_today_outlined,
-];
 const _hints = {
   'ru': [
     'То, что вы хотите сделать или изменить',
@@ -80,16 +77,8 @@ void main() {
           i == initial.index ? Tristate.isTrue : Tristate.isFalse,
         );
         expect(
-          find.descendant(of: row, matching: find.byIcon(_icons[i])),
-          findsOneWidget,
-        );
-        expect(
           tester.getSemantics(row).flagsCollection.isSelected,
           i == initial.index ? Tristate.isTrue : Tristate.isFalse,
-        );
-        expect(
-          find.descendant(of: row, matching: find.byIcon(Icons.check_outlined)),
-          i == initial.index ? findsOneWidget : findsNothing,
         );
         if (i > 0) {
           expect(
@@ -120,6 +109,27 @@ void main() {
       expect(app.mode, next);
       expect(app.store.writes.map((write) => write.mode), [next, next]);
       app.expectOrigin(tester);
+    });
+    testWidgets('$language: меню показывает значки режимов и галочку '
+        'у «${titles[initial.index]}»', (tester) async {
+      await _openApp(tester, language: language, initial: initial);
+      await _openMenu(tester);
+      const icons = [
+        Icons.adjust_outlined,
+        Icons.route_outlined,
+        Icons.calendar_today_outlined,
+      ];
+      for (final (index, title) in titles.indexed) {
+        final row = find.widgetWithText(OptionRow, title);
+        expect(
+          find.descendant(of: row, matching: find.byIcon(icons[index])),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: row, matching: find.byIcon(Icons.check_outlined)),
+          index == initial.index ? findsOneWidget : findsNothing,
+        );
+      }
     });
   }
 
@@ -212,7 +222,9 @@ void main() {
     app.expectOrigin(tester);
 
     await _openMenu(tester);
-    await tester.tapAt(tester.getCenter(find.byIcon(Icons.home_outlined)));
+    await tester.tapAt(
+      tester.getCenter(appNavigationDestination(AppDestination.home)),
+    );
     await tester.pumpAndSettle();
     expect(app.selected.value, AppDestination.dailyChoices);
     if (find.byType(BottomSheet).evaluate().isNotEmpty) {

@@ -10,6 +10,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/app_root_pages.dart';
+
 const _russianOptions = [
   ('От намерения', 'Сначала намерение, затем действие для него'),
   ('От действия', 'Сначала действие, затем намерение, которому оно служит'),
@@ -101,7 +103,9 @@ void main() {
       'от нажатий, клавиатуры и экранного диктора', (tester) async {
     final app = await _openApp(tester);
     final clearPosition = tester.getCenter(find.text('Очистить ввод'));
-    final homePosition = tester.getCenter(find.byIcon(Icons.home_outlined));
+    final homePosition = tester.getCenter(
+      appNavigationDestination(AppDestination.home),
+    );
     await _openSheet(tester);
 
     expect(find.semantics.byLabel('Очистить ввод'), findsNothing);

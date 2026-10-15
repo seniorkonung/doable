@@ -18,6 +18,30 @@ typedef QuickCreationWait = Future<void> Function(
 /// Общая кнопка создания на текущей обычной странице.
 Finder quickCreationAction() => find.byType(QuickCreationButton);
 
+/// Проверяет режим по доступному названию кнопки, независимо от её иконок.
+/// Читает описание виджета и под модальным листом, исключающим панель
+/// из дерева семантики, пока сценарий проверяет отложенное сохранение режима.
+void expectQuickCreationMode(WidgetTester tester, QuickCreationMode mode) {
+  final button = quickCreationAction();
+  expect(button, findsOneWidget);
+  final localizations = AppLocalizations.of(tester.element(button));
+  final label =
+      '${localizations.quickCreationLabel}, ${mode.title(localizations)}';
+  expect(
+    find.descendant(
+      of: button,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.button == true &&
+            widget.properties.label == label,
+        description: 'кнопка «$label»',
+      ),
+    ),
+    findsOneWidget,
+  );
+}
+
 /// Выбирает режим через меню, проверяет отсутствие запуска от выбора
 /// и отдельно активирует кнопку. Способ активации и ожидание результата
 /// могут принадлежать сценарию доступности или управляемой отправки.
