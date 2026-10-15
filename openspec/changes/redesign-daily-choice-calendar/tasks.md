@@ -315,3 +315,33 @@
   - **Dependencies:** 2.15, 2.16
   - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DisplayHostActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`, `tool/` (сценарий переноса из 2.16)
   - **Estimated scope:** M
+
+- [ ] 2.18 Холодный запуск на большом дисплее сохраняет выбранное системой размещение окна
+  - **Acceptance criteria:**
+    - По решению 6 дизайна холодный вход без существующего хоста сохраняет размещение, с которым система запустила MainActivity: при выборе приложения второй стороной Split screen на большом дисплее LargeDisplayActivity остаётся в выбранной половине. Передача управления сохраняет связь с исходной Activity/task; используемый механизм подтверждён первичными источниками Android и действует в границах ADR-0031 на поддерживаемых API начиная с 24.
+    - Холодный запуск разграничен с отделением от прежней многооконной task при переходе в телефонную категорию. Существующие гарантии переноса, сохранения двигателя, повторного launcher и системного возврата из 2.15–2.17 сохраняются; измерение полного дисплея и граница 600 dp не меняются.
+    - Нативная регрессионная проверка запуска без существующего хоста обнаруживает потерю связи с исходной Activity/task и проходит после исправления. Проверки переноса и повторного входа остаются действующими; нативные проверки сами по себе не объявляются доказательством фактической половины Split screen, которую проверяет 2.19.
+  - **Verification:**
+    - С установленным JDK 21 или новее: `mise exec --no-deps -- android/gradlew -p android :app:testDebugUnitTest --console=plain`.
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Сообщить, какая нативная проверка обнаруживает исходную регрессию и проходит после исправления; сопоставить выбранный механизм с первичными источниками запуска Activity и многооконного режима, не подменяя наблюдение окна проверкой Intent-флагов.
+  - **Dependencies:** 2.15, 2.17
+  - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`; при необходимости — `android/app/src/main/AndroidManifest.xml`
+  - **Estimated scope:** M
+
+- [ ] 2.19 Сценарий Android подтверждает выбранную половину Split screen при холодном запуске
+  - **Acceptance criteria:**
+    - Автоматизированная проверка на Android API 36 и полном дисплее 600×900 dp подтверждает отсутствие процесса и task приложения до выбора его второй стороной обычного Split screen рядом с Settings. Предварительный полноэкранный запуск и последующее перемещение существующей task не заменяют холодный вход; неустановленное предусловие завершает проверку неуспехом. Настройки принудительной многооконности не включаются.
+    - После холодного входа наблюдаются LargeDisplayActivity в выбранной половине, фактические режим и границы окна и видимое соседнее приложение. Проверка обнаруживает потерю размещения до исправления 2.18 и проходит после него. Существующий сценарий переноса 600×900 → 390×844 dp и жестов из 2.16–2.17 также проходит; изменённые параметры эмулятора восстанавливаются после проверки.
+    - Итоговые проверки затронутых модулей и строгая OpenSpec validation проходят. Условия Ready to advance фазы 2 повторно оценены после исправления и сообщены в сессии вместе с непроведёнными проверками; перед объявлением фазы завершённой выполнен `mise run check`. Физическая проверка остаётся за владельцем по решению 6 дизайна, а успешный сценарий не заменяет её подтверждения и не означает готовности фазы 3 или всего изменения.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Дополнить `tool/check_android_display_transfer.py` отдельным холодным входом и выполнить `python3 tool/check_android_display_transfer.py --serial <серийный номер эмулятора API 36>`. Сообщить точную команду, сборки до/после исправления, наблюдения предусловия, выбранной половины и соседнего приложения; сопоставить режим и границы с `adb shell dumpsys activity activities` и `adb shell dumpsys window windows`. Отдельно подтвердить сохранность сценариев 2.16–2.17 и восстановление параметров эмулятора.
+    - С установленным JDK 21 или новее: `mise exec --no-deps -- android/gradlew -p android :app:testDebugUnitTest --console=plain`.
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - При завершении фазы: `mise run check` и условия Ready to advance из Phase 2 в `plan.md`; результаты сообщить в сессии без нового отчётного документа.
+  - **Dependencies:** 2.16, 2.17, 2.18
+  - **Files likely touched:** `tool/check_android_display_transfer.py`
+  - **Estimated scope:** M
