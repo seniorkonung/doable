@@ -439,7 +439,7 @@
   - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`; при необходимости — `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/design_system/components/period_picker.dart`, `lib/src/design_system/components/calendar_header.dart`
   - **Estimated scope:** M
 
-- [ ] 3.9 Подтвердить готовность фазы 3: выбор года и месяца соответствует спецификации и сохраняет поведение фазы 2
+- [x] 3.9 Подтвердить готовность фазы 3: выбор года и месяца соответствует спецификации и сохраняет поведение фазы 2
   - **Acceptance criteria:**
     - Сценарии выбора, сохранение состояния и доступность подтверждены; проверки 3.6 доказывают восстановление отметок и отсутствие лишних чтений. Поведение фазы 2, включая закрепление, выбор дня, выдачу, отметки и нижнюю границу поддержки, сохраняется.
     - Компоненты выбора в Widgetbook и оба каталога на устройстве сверены с макетами лет и месяцев в обеих темах; непринятых расхождений нет.
