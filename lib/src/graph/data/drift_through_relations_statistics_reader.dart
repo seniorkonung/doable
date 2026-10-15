@@ -18,7 +18,7 @@ runContributionReachabilityInIsolate(
   List<ContributionSeedGroup> groups,
 ) => Isolate.run(() => computeContributionReachability(graph, groups));
 
-/// Внутренняя сборка чтения вида «Через связи» за общей границей репозитория.
+/// Внутренняя сборка чтения вида «Весь вклад» за общей границей репозитория.
 extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
   /// Одна попытка: подготовка и названия идут через общую очередь, подсчёт —
   /// вне неё. Устаревание, включая вытеснение кэша, требует новой первой порции.

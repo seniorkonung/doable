@@ -37,7 +37,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statisticsSelectedActions => 'Selected actions';
 
   @override
-  String get statisticsThroughRelations => 'Through relations';
+  String get statisticsThroughRelations => 'Total contribution';
 
   @override
   String get statisticsMonthTab => 'Month';
