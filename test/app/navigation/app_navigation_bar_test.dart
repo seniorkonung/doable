@@ -80,6 +80,30 @@ void main() {
   group('устройство панели', () {
     const locale = Locale('ru');
 
+    for (final bottomPadding in [0.0, 34.0]) {
+      testWidgets('сохраняет кнопки 48 dp и собственные отступы 6 dp '
+          'при системном отступе $bottomPadding dp', (tester) async {
+        tester.view.padding = FakeViewPadding(
+          bottom: bottomPadding * tester.view.devicePixelRatio,
+        );
+        addTearDown(tester.view.resetPadding);
+        await tester.pumpWidget(_testApp(locale: locale));
+
+        final barRect = tester.getRect(find.byType(AppNavigationBar));
+        expect(barRect.height, 61 + bottomPadding);
+        for (final button in [
+          for (final destination in AppDestination.values)
+            appNavigationDestination(destination),
+          find.byType(QuickCreationButton),
+        ]) {
+          final buttonRect = tester.getRect(button);
+          expect(buttonRect.height, 48);
+          expect(buttonRect.top - barRect.top, 1 + 6);
+          expect(barRect.bottom - buttonRect.bottom, 6 + bottomPadding);
+        }
+      });
+    }
+
     testWidgets('показывает три пункта слева направо со значками дома, '
         'календаря и графа, а за ними — быстрое создание', (tester) async {
       await tester.pumpWidget(_testApp(locale: locale));
