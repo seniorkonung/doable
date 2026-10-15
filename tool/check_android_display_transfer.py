@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Проверка переноса Split screen → телефон на AOSP-эмуляторе API 36.
+"""Проверка переноса Split screen → телефон и жеста «Назад» на API 36.
 
 Запуск: python3 tool/check_android_display_transfer.py --serial emulator-5554
 Нужны Python 3, adb и готовый debug APK. Используйте тестовый эмулятор:
-сценарий переустанавливает APK без удаления данных и открывает каталог.
+сценарий переустанавливает APK без удаления данных, открывает каталог
+и создаёт намерения. Нужна включённая жестовая навигация (navigation_mode=2).
 Размер, плотность и настройки поворота восстанавливаются даже при отказе.
 Дампы Android, семантика и снимки экрана сохраняются вне репозитория.
 """
@@ -59,7 +60,7 @@ class Device:
         (self.evidence / "last-ui.xml").write_text(xml)
         return list(ET.fromstring(xml).iter("node"))
 
-    def tap(self, predicate):
+    def tap(self, predicate, long_press=False):
         def locate():
             nodes = [node for node in self.ui() if predicate(node.attrib)]
             require(len(nodes) == 1, f"Ожидался один элемент, найдено {len(nodes)}")
@@ -67,7 +68,11 @@ class Device:
         node = eventually(locate, "Элемент интерфейса не найден")
         left, top, right, bottom = map(int, re.findall(r"\d+", node["bounds"]))
         require(right > left and bottom > top, f"Элемент вне окна: {node}")
-        self.shell("input", "tap", str((left + right) // 2), str((top + bottom) // 2))
+        x, y = str((left + right) // 2), str((top + bottom) // 2)
+        if long_press:
+            self.shell("input", "swipe", x, y, x, y, "800")
+        else:
+            self.shell("input", "tap", x, y)
 
     def tap_label(self, *labels):
         self.tap(lambda a: a.get("content-desc", "").split("\n")[0] in labels
@@ -76,6 +81,15 @@ class Device:
     def launcher(self):
         self.shell("am", "start", "-W", "-a", "android.intent.action.MAIN",
                    "-c", "android.intent.category.LAUNCHER", "-n", f"{PACKAGE}/.MainActivity")
+
+    def back_gesture(self):
+        require(self.shell("settings", "get", "secure", "navigation_mode") == "2",
+                "Системный жест требует navigation_mode=2")
+        size = re.search(r"(?:Override|Physical) size: (\d+)x(\d+)$", self.shell("wm", "size"))
+        require(size is not None, "Размер дисплея не найден")
+        width, height = map(int, size.groups())
+        self.shell("input", "swipe", "1", str(height // 2), str(width * 3 // 4),
+                   str(height // 2), "500")
 
     def capture(self, name):
         for service in ("activity activities", "window windows", "activity recents"):
@@ -253,6 +267,107 @@ def check_recents(device):
     return len(cards)
 
 
+def shown(device, *labels):
+    actual = {node.attrib.get(key, "") for node in device.ui()
+              if node.attrib.get("package") == PACKAGE for key in ("text", "content-desc")}
+    require(any(label in actual for label in labels), f"Экран не показывает {labels}")
+
+
+def home_state(device, host):
+    state = host_state(device, host)
+    require(state["resumed"], f"{host} не активна: {state}")
+    shown(device, "Сводка периода", "Period summary")
+    return state
+
+
+def prepare_draft(device, title):
+    device.tap(lambda a: a.get("content-desc", "").startswith(("Быстрое создание", "Quick creation")),
+               long_press=True)
+    device.tap_label("Новое намерение", "New intention")
+    device.tap(lambda a: a.get("content-desc", "").startswith(("Быстрое создание", "Quick creation")))
+    device.tap(lambda a: a.get("class") == "android.widget.EditText"
+               and a.get("package") == PACKAGE and a.get("enabled") == "true"
+               and a.get("hint") in ("Название", "Title"))
+    device.shell("input", "text", title)
+    device.back_gesture()
+    eventually(lambda: keyboard_hidden(device), "Клавиатура не скрылась")
+    shown(device, title)
+
+
+def keyboard_hidden(device):
+    require("mInputShown=false" in device.shell("dumpsys", "input_method"),
+            "Клавиатура должна быть скрыта перед проверкой закрытия")
+
+
+def prepare_details(device, title):
+    prepare_draft(device, title)
+    device.tap_label("Сохранить", "Save")
+    eventually(lambda: shown(device, "Подробности намерения", "Intention details"),
+               "Подробности не открылись над Главной")
+    shown(device, title)
+
+
+def check_back_navigation(device):
+    title = f"BackGesture{time.time_ns()}"
+    device.shell("am", "force-stop", PACKAGE)
+    device.launcher()
+    eventually(lambda: home_state(device, "PhoneActivity"), "Контроль: Главная не открылась")
+    prepare_details(device, title)
+    device.capture("back-control-details")
+    device.back_gesture()
+    eventually(lambda: home_state(device, "PhoneActivity"), "Контроль: жест не вернул Главную")
+    device.capture("back-control-home")
+    print("Контроль без переноса: первый жест с подробностей вернул Главную", flush=True)
+
+    for screen in ("details", "draft"):
+        device.shell("wm", "size", "600x900")
+        device.shell("am", "force-stop", PACKAGE)
+        device.launcher()
+        eventually(lambda: home_state(device, "LargeDisplayActivity"), "Нет Главной большого хоста")
+        current_title = f"{title}-{screen}"
+        if screen == "details":
+            prepare_details(device, current_title)
+        else:
+            prepare_draft(device, current_title)
+        pid = device.shell("pidof", PACKAGE)
+        device.capture(f"back-{screen}-before")
+        device.shell("wm", "size", "390x844")
+        eventually(lambda: phone_state(device), "Нет PhoneActivity после переноса")
+        require(device.shell("pidof", PACKAGE) == pid, "Перенос перезапустил процесс")
+        shown(device, current_title)
+        keyboard_hidden(device)
+        device.capture(f"back-{screen}-transferred")
+        device.back_gesture()
+        if screen == "details":
+            eventually(lambda: home_state(device, "PhoneActivity"), "Первый жест закрыл хост вместо подробностей")
+            print("После переноса: первый жест с подробностей вернул Главную; PhoneActivity активна", flush=True)
+        else:
+            eventually(lambda: shown(device, "Сбросить черновик?", "Discard the draft?"),
+                       "Жест обошёл подтверждение закрытия черновика")
+            device.capture("back-draft-confirmation")
+            device.tap_label("Продолжить ввод", "Keep editing")
+            shown(device, current_title)
+            phone_state(device)
+            print("После переноса: жест запросил подтверждение; продолжение сохранило черновик", flush=True)
+            # Продолжение возвращает фокус и клавиатуру; завершаем форму её командой.
+            device.tap(lambda a: a.get("class") == "android.widget.Button"
+                       and a.get("content-desc") in ("Закрыть форму", "Close the form"))
+            eventually(lambda: shown(device, "Сбросить черновик?", "Discard the draft?"), "Нет подтверждения сброса")
+            device.tap_label("Сбросить", "Discard")
+            eventually(lambda: home_state(device, "PhoneActivity"), "Сброс не вернул Главную")
+        device.capture(f"back-{screen}-home")
+        device.back_gesture()
+        def exited():
+            dump = device.shell("dumpsys", "activity", "activities")
+            require(not any(f"{PACKAGE}/" in record and "state=RESUMED" in body
+                            for record, body in activity_blocks(dump)), "Главная перехватила выход")
+            require(any(node.attrib.get("package") == "com.android.launcher3" for node in device.ui()),
+                    "Жест не показал launcher")
+        eventually(exited, "Жест с Главной не вышел из приложения")
+        device.capture(f"back-{screen}-exit")
+        print("Главная после переноса: системный жест вышел в launcher", flush=True)
+
+
 def interrupted(_signum, _frame):
     raise KeyboardInterrupt("Проверка прервана")
 
@@ -270,6 +385,8 @@ def main():
     require(device.shell("getprop", "ro.kernel.qemu") == "1", "Нужен тестовый эмулятор")
     require(device.shell("getprop", "ro.build.version.sdk") == "36", "Нужен Android API 36")
     require(device.shell("getprop", "sys.boot_completed") == "1", "Эмулятор ещё загружается")
+    require(device.shell("settings", "get", "secure", "navigation_mode") == "2",
+            "Включите жестовую навигацию: нужен navigation_mode=2")
 
     for key in ("force_resizable_activities", "enable_non_resizable_multi_window"):
         require(device.shell("settings", "get", "global", key) in ("0", "null"),
@@ -324,6 +441,7 @@ def main():
         cards = eventually(lambda: check_recents(device), "Launcher добавил карточку приложения")
         device.capture("launcher")
         print(f"Launcher вернул ту же сессию; карточек приложения: {cards}", flush=True)
+        check_back_navigation(device)
     except BaseException:
         try:
             device.capture("failure")

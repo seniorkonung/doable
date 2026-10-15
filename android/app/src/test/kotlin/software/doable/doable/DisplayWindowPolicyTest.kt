@@ -103,7 +103,7 @@ class DisplayWindowPolicyTest {
         val policy = DisplayWindowPolicy(activity)
         policy.replaceIfNeeded(DisplayCategory.PHONE) {
             transfers++
-            "engine"
+            RetainedDisplayEngine("engine", frameworkHandlesBack = true)
         }
         val launch = shadowOf(activity).nextStartedActivity
         assertEquals(LargeDisplayActivity::class.java.name, launch.component!!.className)
@@ -133,6 +133,37 @@ class DisplayWindowPolicyTest {
             throw AssertionError("Одинаковая категория не переносит двигатель")
         }
         assertNull(shadowOf(activity).nextStartedActivity)
+        controller.destroy()
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1200dp-mdpi")
+    fun `Перенос передаёт готовность Flutter вместе с двигателем только первому созданию хоста`() {
+        val controller = Robolectric.buildActivity(Activity::class.java).create()
+        val activity = controller.get()
+        val policy = DisplayWindowPolicy(activity)
+
+        for (handlesBack in listOf(true, false)) {
+            policy.replaceIfNeeded(DisplayCategory.PHONE) {
+                RetainedDisplayEngine("engine", frameworkHandlesBack = handlesBack)
+            }
+            val launch = shadowOf(activity).nextStartedActivity
+            assertEquals("engine", launch.getStringExtra("cached_engine_id"))
+            val target = Robolectric.buildActivity(Activity::class.java, launch).create()
+            val targetPolicy = DisplayWindowPolicy(target.get())
+
+            assertEquals(handlesBack, targetPolicy.takeTransferredFrameworkHandlesBack())
+            // При пересоздании используется свежий savedInstanceState самого Flutter.
+            assertNull(targetPolicy.takeTransferredFrameworkHandlesBack())
+            target.destroy()
+        }
+
+        policy.launch(DisplayCategory.LARGE)
+        val cold = Robolectric.buildActivity(
+            Activity::class.java, shadowOf(activity).nextStartedActivity,
+        ).create()
+        assertNull(DisplayWindowPolicy(cold.get()).takeTransferredFrameworkHandlesBack())
+        cold.destroy()
         controller.destroy()
     }
 
@@ -202,7 +233,9 @@ class DisplayWindowPolicyTest {
         RuntimeEnvironment.setQualifiers("w599dp-h900dp-mdpi")
         policy.invalidateDisplay()
 
-        policy.replaceIfNeeded(DisplayCategory.LARGE) { "engine" }
+        policy.replaceIfNeeded(DisplayCategory.LARGE) {
+            RetainedDisplayEngine("engine", frameworkHandlesBack = false)
+        }
         assertEquals(
             PhoneActivity::class.java.name,
             shadowOf(activity).nextStartedActivity.component!!.className,

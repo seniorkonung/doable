@@ -12,6 +12,7 @@ abstract class DisplayHostActivity internal constructor(
     private val displayCategory: DisplayCategory,
 ) : FlutterActivity(), DisplayManager.DisplayListener {
     private var replacingHost = false
+    private var frameworkHandlesBack = false
     private val displayPolicy = DisplayWindowPolicy(this)
 
     override fun onStart() {
@@ -27,6 +28,12 @@ abstract class DisplayHostActivity internal constructor(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val transferredHandlesBack = displayPolicy.takeTransferredFrameworkHandlesBack()
+        // Применяем состояние после подключения прежнего двигателя; пересоздание
+        // Activity уже восстановило более свежее значение из savedInstanceState.
+        if (savedInstanceState == null && cachedEngineId != null && transferredHandlesBack != null) {
+            setFrameworkHandlesBack(transferredHandlesBack)
+        }
         displayPolicy.completeTransfer()
         // Проверяем также восстановленный системой корень до первого кадра Flutter.
         updateDisplayPolicy()
@@ -57,6 +64,13 @@ abstract class DisplayHostActivity internal constructor(
     override fun shouldDestroyEngineWithHost(): Boolean =
         !replacingHost && super.shouldDestroyEngineWithHost()
 
+    // Готовность задаёт Flutter, включая PopScope; регистрация принадлежит хосту.
+    // https://api.flutter.dev/javadoc/io/flutter/embedding/android/FlutterActivity.html#setFrameworkHandlesBack(boolean)
+    override fun setFrameworkHandlesBack(frameworkHandlesBack: Boolean) {
+        this.frameworkHandlesBack = frameworkHandlesBack
+        super.setFrameworkHandlesBack(frameworkHandlesBack)
+    }
+
     override fun getCachedEngineId(): String? {
         // После гибели процесса Intent сохраняется, а кэш двигателя — нет.
         val id = super.getCachedEngineId()
@@ -68,7 +82,7 @@ abstract class DisplayHostActivity internal constructor(
         displayPolicy.replaceIfNeeded(displayCategory) {
             replacingHost = true
             FlutterEngineCache.getInstance().put(TRANSFER_ENGINE_ID, requireNotNull(flutterEngine))
-            TRANSFER_ENGINE_ID
+            RetainedDisplayEngine(TRANSFER_ENGINE_ID, frameworkHandlesBack)
         }
     }
 

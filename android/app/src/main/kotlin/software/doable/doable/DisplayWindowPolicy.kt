@@ -20,6 +20,8 @@ internal enum class DisplayCategory(val activityClass: Class<out FlutterActivity
     }
 }
 
+internal data class RetainedDisplayEngine(val id: String, val frameworkHandlesBack: Boolean)
+
 internal class DisplayWindowPolicy(private val activity: Activity) {
     private var windowContext: Context? = null
     private var windowDisplayId: Int? = null
@@ -60,11 +62,18 @@ internal class DisplayWindowPolicy(private val activity: Activity) {
 
     fun replaceIfNeeded(
         current: DisplayCategory,
-        retainEngine: () -> String,
+        retainEngine: () -> RetainedDisplayEngine,
     ) {
         val target = category()
         if (target == current) return
-        launch(target, engineId = retainEngine())
+        launch(target, engine = retainEngine())
+    }
+
+    fun takeTransferredFrameworkHandlesBack(): Boolean? {
+        if (!activity.intent.hasExtra(FRAMEWORK_HANDLES_BACK)) return null
+        val handlesBack = activity.intent.getBooleanExtra(FRAMEWORK_HANDLES_BACK, false)
+        activity.intent.removeExtra(FRAMEWORK_HANDLES_BACK)
+        return handlesBack
     }
 
     @Suppress("DEPRECATION")
@@ -81,16 +90,17 @@ internal class DisplayWindowPolicy(private val activity: Activity) {
 
     fun launch(
         target: DisplayCategory,
-        engineId: String? = null,
+        engine: RetainedDisplayEngine? = null,
         task: ActivityManager.AppTask? = null,
     ) {
-        val intent = if (engineId == null) {
+        val intent = if (engine == null) {
             FlutterActivity.NewEngineIntentBuilder(target.activityClass).build(activity)
         } else {
-            FlutterActivity.CachedEngineIntentBuilder(target.activityClass, engineId)
+            FlutterActivity.CachedEngineIntentBuilder(target.activityClass, engine.id)
                 .destroyEngineWithActivity(true)
                 .build(activity)
                 .putExtra(PREVIOUS_TASK_ID, activity.taskId)
+                .putExtra(FRAMEWORK_HANDLES_BACK, engine.frameworkHandlesBack)
         }
         // Разные affinity хостов не дают NEW_TASK унаследовать разделённое окно.
         // https://developer.android.com/guide/components/activities/tasks-and-back-stack#HandleAffinities
@@ -111,5 +121,6 @@ internal class DisplayWindowPolicy(private val activity: Activity) {
 
     private companion object {
         const val PREVIOUS_TASK_ID = "software.doable.doable.previousTaskId"
+        const val FRAMEWORK_HANDLES_BACK = "software.doable.doable.frameworkHandlesBack"
     }
 }
