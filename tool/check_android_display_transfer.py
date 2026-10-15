@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Проверка переноса Split screen → телефон и жеста «Назад» на API 36.
+"""Проверка холодного Split screen, переноса в телефон и жеста «Назад» на API 36.
 
 Запуск: python3 tool/check_android_display_transfer.py --serial emulator-5554
 Нужны Python 3, adb и готовый debug APK. Используйте тестовый эмулятор:
@@ -10,6 +10,7 @@
 """
 
 import argparse
+import hashlib
 import json
 import re
 import shlex
@@ -54,8 +55,9 @@ class Device:
     def shell(self, *args):
         return self.adb("shell", shlex.join(args))
 
-    def ui(self):
-        self.shell("uiautomator", "dump", "/data/local/tmp/doable-transfer.xml")
+    def ui(self, all_windows=False):
+        self.shell("uiautomator", "dump", *(["--windows"] if all_windows else []),
+                   "/data/local/tmp/doable-transfer.xml")
         xml = self.shell("cat", "/data/local/tmp/doable-transfer.xml")
         (self.evidence / "last-ui.xml").write_text(xml)
         return list(ET.fromstring(xml).iter("node"))
@@ -91,11 +93,11 @@ class Device:
         self.shell("input", "swipe", "1", str(height // 2), str(width * 3 // 4),
                    str(height // 2), "500")
 
-    def capture(self, name):
+    def capture(self, name, all_windows=False):
         for service in ("activity activities", "window windows", "activity recents"):
             text = self.shell("dumpsys", *service.split())
             (self.evidence / f"{name}-{service.replace(' ', '-')}.txt").write_text(text)
-        self.ui()
+        self.ui(all_windows)
         (self.evidence / f"{name}-ui.xml").write_bytes((self.evidence / "last-ui.xml").read_bytes())
         (self.evidence / f"{name}.png").write_bytes(self.adb("exec-out", "screencap", "-p", binary=True))
 
@@ -107,10 +109,10 @@ def activity_blocks(dump):
     )
 
 
-def host_state(device, host):
+def host_state(device, host, package=PACKAGE):
     dump = device.shell("dumpsys", "activity", "activities")
     matches = [(record, body) for record, body in activity_blocks(dump)
-               if f"{PACKAGE}/.{host} " in record and "mVisible=true" in body]
+               if f"{package}/.{host} " in record and "mVisible=true" in body]
     require(len(matches) == 1, f"Нет единственной видимой {host}")
     record, body = matches[0]
     task_id = re.search(r" t(\d+)", record).group(1)
@@ -143,6 +145,18 @@ def split_state(device):
     return state
 
 
+def window_frame(device, component):
+    windows = device.shell("dumpsys", "window", "windows")
+    window = re.search(rf"Window #\d+ Window\{{[^\n]+{re.escape(component)}\}}:(.*?)"
+                       r"(?=\n  Window #|\Z)", windows, re.S)
+    require(window is not None, f"Нет окна {component}")
+    body = window.group(1)
+    require("isVisible=true" in body and "mHasSurface=true" in body, "Окно ещё не показано")
+    frame = re.search(r"Frames:.*? frame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]", body)
+    require(frame is not None, "Не найдены фактические границы окна")
+    return list(map(int, frame.groups()))
+
+
 def phone_state(device):
     state = host_state(device, "PhoneActivity")
     require(state["mode"] == "fullscreen" and not state["multi_window"],
@@ -151,17 +165,85 @@ def phone_state(device):
             f"Нет полного портретного окна: {state}")
     require(state["display"] == state["bounds"] and state["density"] == 160,
             f"Конечный полный дисплей не равен 390×844 dp: {state}")
-    windows = device.shell("dumpsys", "window", "windows")
-    window = re.search(rf"Window #\d+ Window\{{[^\n]+{re.escape(PACKAGE)}\.PhoneActivity\}}:(.*?)"
-                       r"(?=\n  Window #|\Z)", windows, re.S)
-    require(window is not None, "Нет окна PhoneActivity")
-    body = window.group(1)
-    require("isVisible=true" in body and "mHasSurface=true" in body, "Окно ещё не показано")
-    frame = re.search(r"Frames:.*? frame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]", body)
-    require(frame is not None, "Не найдены фактические границы окна")
-    state["frame"] = list(map(int, frame.groups()))
+    state["frame"] = window_frame(device, f"{PACKAGE}/{PACKAGE}.PhoneActivity")
     require(state["frame"] == [0, 0, 390, 844], f"Окно обрезано: {state}")
     return state
+
+
+def cold_precondition(device):
+    process_dump = device.shell("ps", "-A", "-o", "NAME")
+    (device.evidence / "cold-processes-before.txt").write_text(process_dump)
+    processes = process_dump.splitlines()
+    require(not any(name == PACKAGE or name.startswith(PACKAGE + ":") for name in processes),
+            "Перед холодным выбором уже существует процесс приложения")
+    for service in ("activities", "recents"):
+        dump = device.shell("dumpsys", "activity", service)
+        require(not any(PACKAGE in line for line in dump.splitlines()
+                        if re.search(r"\* (?:Task\{|Recent #\d+: Task\{|Hist\s+#)", line)),
+                f"Перед холодным выбором уже существует task приложения: {service}")
+    return {"process": False, "task": False}
+
+
+def cold_split_state(device):
+    state = split_state(device)
+    settings = host_state(device, "homepage.SettingsHomepageActivity", "com.android.settings")
+    require(state["resumed"] and settings["mode"] == "multi-window" and settings["multi_window"],
+            f"Оба приложения должны оставаться в Split screen: {state}, {settings}")
+    left, top, right, bottom = state["bounds"]
+    require(left == 0 and right == 600 and bottom == 900 and abs(top - 450) <= 24,
+            f"Холодный вход потерял выбранную нижнюю половину: {state}")
+    require(settings["bounds"][:2] == [0, 0] and settings["bounds"][2] == 600
+            and abs(settings["bounds"][3] - 450) <= 24
+            and settings["bounds"][3] <= top, f"Settings потерял верхнюю половину: {settings}")
+    for current, component in ((state, f"{PACKAGE}/{PACKAGE}.LargeDisplayActivity"),
+                               (settings, "com.android.settings/com.android.settings.homepage.SettingsHomepageActivity")):
+        current["frame"] = window_frame(device, component)
+        require(current["frame"] == current["bounds"], f"Границы окна расходятся с task: {current}")
+    nodes = device.ui(all_windows=True)
+    for package in (PACKAGE, "com.android.settings"):
+        require(any(node.attrib.get("package") == package
+                    and (node.attrib.get("text") or node.attrib.get("content-desc"))
+                    for node in nodes), f"Нет видимого содержимого {package}")
+    return {"app": state, "settings": settings}
+
+
+def check_cold_split(device):
+    device.shell("am", "force-stop", PACKAGE)
+    recents = device.shell("dumpsys", "activity", "recents")
+    for line in recents.splitlines():
+        if re.search(r"\* Recent #\d+: Task\{", line) and PACKAGE in line:
+            device.shell("am", "stack", "remove", re.search(r" #(\d+) ", line).group(1))
+    eventually(lambda: cold_precondition(device), "Не установлен холодный вход")
+    device.shell("input", "keyevent", "KEYCODE_HOME")
+    device.shell("am", "start", "-W", "-a", "android.settings.SETTINGS")
+    settings = eventually(
+        lambda: host_state(device, "homepage.SettingsHomepageActivity", "com.android.settings"),
+        "Settings не открыт перед холодным Split screen")
+    require(settings["display"] == [0, 0, 600, 900] and settings["density"] == 160,
+            f"Полный дисплей перед выбором не равен 600×900 dp: {settings}")
+    device.shell("input", "keyevent", "KEYCODE_HOME")
+    device.ui()
+    device.shell("input", "swipe", "300", "820", "300", "200", "400")
+    device.tap(lambda a: a.get("resource-id") == "com.android.launcher3:id/icon"
+               and a.get("text") in ("Settings", "Настройки"), long_press=True)
+    device.tap_label("Split screen", "Разделить экран")
+    def selection():
+        nodes = device.ui()
+        require(any(node.attrib.get("resource-id") == "com.android.launcher3:id/split_instructions_text"
+                    for node in nodes), "Система не ожидает выбора второй стороны Split screen")
+        require(any(node.attrib.get("content-desc") in ("Settings", "Настройки")
+                    and node.attrib.get("resource-id") == ""
+                    and list(map(int, re.findall(r"\d+", node.attrib["bounds"])))[3] < 450
+                    for node in nodes), "Settings не выбран верхней стороной")
+    eventually(selection, "Предусловие выбора второй стороны не установлено")
+    device.capture("cold-selection", all_windows=True)
+    precondition = cold_precondition(device)
+    print(f"Холодный вход перед выбором второй стороны: {precondition}", flush=True)
+    device.tap(lambda a: a.get("resource-id") == "com.android.launcher3:id/icon"
+               and a.get("text") == "doable")
+    state = eventually(lambda: cold_split_state(device), "Холодный Split screen не сохранил размещение")
+    device.capture("cold-split", all_windows=True)
+    print(f"Холодный вход сохранил нижнюю половину, Settings виден сверху: {state}", flush=True)
 
 
 def save_settings(device):
@@ -382,6 +464,12 @@ def main():
     evidence = Path(tempfile.mkdtemp(prefix="doable-display-transfer-"))
     print(f"Наблюдения Android: {evidence}", flush=True)
     device = Device(args.serial, evidence)
+    digest = hashlib.sha256()
+    with args.apk.open("rb") as apk:
+        for chunk in iter(lambda: apk.read(1024 * 1024), b""):
+            digest.update(chunk)
+    print(f"APK: {args.apk.resolve()}; SHA-256={digest.hexdigest()}", flush=True)
+    print(f"Android: {device.shell('getprop', 'ro.build.fingerprint')}", flush=True)
     require(device.shell("getprop", "ro.kernel.qemu") == "1", "Нужен тестовый эмулятор")
     require(device.shell("getprop", "ro.build.version.sdk") == "36", "Нужен Android API 36")
     require(device.shell("getprop", "sys.boot_completed") == "1", "Эмулятор ещё загружается")
@@ -402,6 +490,8 @@ def main():
         device.shell("am", "force-stop", PACKAGE)
         device.shell("input", "keyevent", "KEYCODE_WAKEUP")
         device.shell("wm", "dismiss-keyguard")
+        check_cold_split(device)
+        device.shell("am", "force-stop", PACKAGE)
         device.shell("input", "keyevent", "KEYCODE_HOME")
         device.shell("am", "start", "-W", "-a", "android.settings.SETTINGS")
         device.launcher()
@@ -450,7 +540,7 @@ def main():
         raise
     finally:
         restore_settings(device, saved)
-    print("Проверка переноса Split screen → телефон пройдена", flush=True)
+    print("Проверки холодного Split screen, переноса в телефон и жестов пройдены", flush=True)
 
 
 if __name__ == "__main__":

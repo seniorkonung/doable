@@ -330,7 +330,7 @@
   - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`; при необходимости — `android/app/src/main/AndroidManifest.xml`
   - **Estimated scope:** M
 
-- [ ] 2.19 Сценарий Android подтверждает выбранную половину Split screen при холодном запуске
+- [x] 2.19 Сценарий Android подтверждает выбранную половину Split screen при холодном запуске
   - **Acceptance criteria:**
     - Автоматизированная проверка на Android API 36 и полном дисплее 600×900 dp подтверждает отсутствие процесса и task приложения до выбора его второй стороной обычного Split screen рядом с Settings. Предварительный полноэкранный запуск и последующее перемещение существующей task не заменяют холодный вход; неустановленное предусловие завершает проверку неуспехом. Настройки принудительной многооконности не включаются.
     - После холодного входа наблюдаются LargeDisplayActivity в выбранной половине, фактические режим и границы окна и видимое соседнее приложение. Проверка обнаруживает потерю размещения до исправления 2.18 и проходит после него. Существующий сценарий переноса 600×900 → 390×844 dp и жестов из 2.16–2.17 также проходит; изменённые параметры эмулятора восстанавливаются после проверки.
