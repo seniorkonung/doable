@@ -2401,6 +2401,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCalendarNextMonth => 'Следующий месяц';
 
   @override
+  String get dailyChoiceCalendarChooseYearAndMonth => 'Выбрать год и месяц';
+
+  @override
+  String get dailyChoiceCalendarBackToMonthDays => 'Вернуться к дням месяца';
+
+  @override
+  String get dailyChoiceCalendarPreviousYears => 'Предыдущие годы';
+
+  @override
+  String get dailyChoiceCalendarNextYears => 'Следующие годы';
+
+  @override
+  String get dailyChoiceCalendarPreviousYear => 'Предыдущий год';
+
+  @override
+  String get dailyChoiceCalendarNextYear => 'Следующий год';
+
+  @override
   String get dailyChoiceCatalogCompletionFilter => 'Выполнение';
 
   @override

@@ -2395,6 +2395,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCalendarNextMonth => 'Next month';
 
   @override
+  String get dailyChoiceCalendarChooseYearAndMonth => 'Choose year and month';
+
+  @override
+  String get dailyChoiceCalendarBackToMonthDays =>
+      'Back to the days of the month';
+
+  @override
+  String get dailyChoiceCalendarPreviousYears => 'Previous years';
+
+  @override
+  String get dailyChoiceCalendarNextYears => 'Next years';
+
+  @override
+  String get dailyChoiceCalendarPreviousYear => 'Previous year';
+
+  @override
+  String get dailyChoiceCalendarNextYear => 'Next year';
+
+  @override
   String get dailyChoiceCatalogCompletionFilter => 'Completion';
 
   @override

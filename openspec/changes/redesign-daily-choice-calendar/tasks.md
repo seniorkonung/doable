@@ -360,7 +360,7 @@
   - **Files likely touched:** `lib/src/design_system/components/calendar_header.dart`, `lib/src/design_system/components/period_picker.dart` (новый), `widgetbook/lib/calendar/calendar_header_use_cases.dart`, `widgetbook/lib/calendar/period_picker_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
   - **Estimated scope:** M
 
-- [ ] 3.2 Локализация предоставляет русские и английские названия команд выбора года и месяца
+- [x] 3.2 Локализация предоставляет русские и английские названия команд выбора года и месяца
   - **Acceptance criteria:**
     - ARB содержат шесть пар названий команд из решения 8 дизайна: открыть выбор, вернуться к дням, предыдущие и следующие годы, предыдущий и следующий год.
     - Сгенерированная локализация соответствует ARB; названия месяцев берутся из существующего механизма форматирования дат, а английский fallback сохраняется.

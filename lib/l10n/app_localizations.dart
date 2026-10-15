@@ -3929,6 +3929,42 @@ abstract class AppLocalizations {
   /// **'Next month'**
   String get dailyChoiceCalendarNextMonth;
 
+  /// Доступное название команды заголовка месяца, открывающей выбор года и месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Choose year and month'**
+  String get dailyChoiceCalendarChooseYearAndMonth;
+
+  /// Доступное название команды заголовка, закрывающей выбор года и месяца и возвращающей сетку дней месяца просмотра
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the days of the month'**
+  String get dailyChoiceCalendarBackToMonthDays;
+
+  /// Доступное название команды перехода к предыдущей странице из двенадцати лет в выборе года
+  ///
+  /// In en, this message translates to:
+  /// **'Previous years'**
+  String get dailyChoiceCalendarPreviousYears;
+
+  /// Доступное название команды перехода к следующей странице из двенадцати лет в выборе года
+  ///
+  /// In en, this message translates to:
+  /// **'Next years'**
+  String get dailyChoiceCalendarNextYears;
+
+  /// Доступное название команды перехода к месяцам предыдущего года в выборе месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Previous year'**
+  String get dailyChoiceCalendarPreviousYear;
+
+  /// Доступное название команды перехода к месяцам следующего года в выборе месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Next year'**
+  String get dailyChoiceCalendarNextYear;
+
   /// Фильтр по выполнению
   ///
   /// In en, this message translates to:
