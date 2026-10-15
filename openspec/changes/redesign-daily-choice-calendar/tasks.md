@@ -127,7 +127,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_navigation_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.3 Недельная строка календаря показывает дни компонентом WeekStripDay
+- [x] 2.3 Недельная строка календаря показывает дни компонентом WeekStripDay
   - **Acceptance criteria:**
     - DailyChoiceCalendarDay переводит CalendarDate и DailyChoiceDayStatus в готовые тексты, признаки и DayMark для WeekStripDay; локализация и семантика остаются у потребителя по ADR-0030. День недели с заглавной буквы находится внутри ячейки, отдельной строки подписей в неделе нет.
     - TableCalendarBase сохраняет семь дней с понедельника, горизонтальный свайп и выбор дня. Высоту строки задаёт контракт компонента, минимум 54 dp; выбранность, «сегодня» и состояние дня доступны как прежде, включая совпадение выбранного и сегодняшнего дня.

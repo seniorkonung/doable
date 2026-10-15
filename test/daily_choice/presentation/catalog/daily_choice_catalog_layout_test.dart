@@ -99,14 +99,11 @@ void main() {
           final month = _measure(tester);
           expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
           expect(month.rows, shown.weeks.length);
-          expect(month.rowHeight, moreOrLessEquals(week.rowHeight));
-          // Шапка прежняя, поэтому календарь вырастает ровно на строки
-          // месяца, и выдача сдвигается вниз на столько же.
-          final grown = (shown.weeks.length - 1) * week.rowHeight;
-          expect(
-            month.calendar.height - week.calendar.height,
-            moreOrLessEquals(grown),
-          );
+          expect(week.rowHeight, greaterThanOrEqualTo(54));
+          // Неделя и месяц используют разные высоты строк и подписи.
+          // Выдача сдвигается ровно на прирост высоты календаря.
+          final grown = month.calendar.height - week.calendar.height;
+          expect(grown, greaterThan(0));
           expect(month.countOffset - week.countOffset, moreOrLessEquals(grown));
           // Месяц раскрывается внутри страницы: прокрутка остаётся одной.
           expect(_pageScroll, findsOneWidget);

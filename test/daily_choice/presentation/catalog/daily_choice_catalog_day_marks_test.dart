@@ -1,11 +1,13 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
@@ -76,14 +78,20 @@ void main() {
     expect(repository.dayStatusQueries.last.firstDate, date(2026, 8, 31));
     expect(repository.dayStatusQueries.last.lastDate, date(2026, 12, 6));
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
-    expect(_mark(nextWeekDay, Icons.circle_outlined), findsNothing);
+    expect(
+      _mark(nextWeekDay, DailyChoiceDayStatus.hasIncomplete),
+      findsNothing,
+    );
     repository.completeDayStatuses(2, {
       today: DailyChoiceDayStatus.allCompleted,
       selectedDay: DailyChoiceDayStatus.allCompleted,
       nextWeekDay: DailyChoiceDayStatus.hasIncomplete,
     });
     await tester.pumpAndSettle();
-    expect(_mark(nextWeekDay, Icons.circle_outlined), findsOneWidget);
+    expect(
+      _mark(nextWeekDay, DailyChoiceDayStatus.hasIncomplete),
+      findsOneWidget,
+    );
     expect(find.text('Отметки дней не загружены.'), findsNothing);
     expect(find.textContaining('среда, 7 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
@@ -127,13 +135,13 @@ void main() {
     await repository.confirmTagRename(coordinator, revision: 1);
     await tester.pumpAndSettle();
     expect(repository.dayStatusQueries, hasLength(2));
-    expect(_mark(today, Icons.circle_outlined), findsOneWidget);
+    expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
     repository.failDayStatuses(1);
     await tester.pumpAndSettle();
-    expect(_mark(today, Icons.circle_outlined), findsOneWidget);
+    expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
     expect(find.textContaining('вторник, 6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
@@ -145,13 +153,13 @@ void main() {
     await repository.confirmTagRename(coordinator, revision: 2);
     await tester.pumpAndSettle();
     expect(repository.dayStatusQueries, hasLength(3));
-    expect(_mark(today, Icons.circle_outlined), findsOneWidget);
+    expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
     repository.completeDayStatuses(2, {
       today: DailyChoiceDayStatus.hasIncomplete,
     }, revision: 2);
     await tester.pumpAndSettle();
-    expect(_mark(today, Icons.circle_outlined), findsOneWidget);
+    expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
     expect(find.textContaining('вторник, 6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
@@ -182,8 +190,11 @@ void main() {
         date(2026, 10, 5): DailyChoiceDayStatus.allCompleted,
       });
       await tester.pumpAndSettle();
-      expect(_mark(today, Icons.circle_outlined), findsOneWidget);
-      expect(_mark(date(2026, 10, 5), Icons.check), findsOneWidget);
+      expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
+      expect(
+        _mark(date(2026, 10, 5), DailyChoiceDayStatus.allCompleted),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byType(DropdownButtonFormField<bool?>));
       await tester.pumpAndSettle();
@@ -195,7 +206,7 @@ void main() {
         catalogPageItem(2, date: today, isCompleted: true),
       ], total: 1);
       await tester.pumpAndSettle();
-      expect(_mark(today, Icons.circle_outlined), findsOneWidget);
+      expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
       expect(repository.dayStatusQueries, hasLength(1));
       expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
 
@@ -229,7 +240,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final gesture = await _beginNextPeriod(tester);
-    _expectVisibleMark(tester, nextTuesday, Icons.circle_outlined);
+    _expectVisibleMark(tester, nextTuesday, DailyChoiceDayStatus.hasIncomplete);
     expect(find.textContaining('Выбранная дата:'), findsOneWidget);
     await gesture.up();
     await tester.pumpAndSettle();
@@ -242,7 +253,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('October 2026'), findsOneWidget);
     expect(find.byTooltip('Collapse calendar'), findsOneWidget);
-    _expectVisibleMark(tester, nextTuesday, Icons.circle_outlined);
+    _expectVisibleMark(tester, nextTuesday, DailyChoiceDayStatus.hasIncomplete);
     expect(find.text('Total daily choices: 1'), findsOneWidget);
     expect(find.text('To Основание, today I Действие'), findsOneWidget);
 
@@ -288,16 +299,23 @@ void main() {
     await tester.pumpAndSettle();
 
     final toNovember = await _beginNextPeriod(tester);
-    _expectVisibleMark(tester, novemberDay, Icons.check);
+    _expectVisibleMark(tester, novemberDay, DailyChoiceDayStatus.allCompleted);
     await toNovember.up();
     await tester.pumpAndSettle();
     expect(find.text('ноябрь 2026\u202Fг.'), findsOneWidget);
     expect(repository.dayStatusQueries, hasLength(2));
 
     final toDecember = await _beginNextPeriod(tester);
-    _expectVisibleMark(tester, novemberLastDay, Icons.circle_outlined);
+    _expectVisibleMark(
+      tester,
+      novemberLastDay,
+      DailyChoiceDayStatus.hasIncomplete,
+    );
     expect(calendarDay(decemberDay), findsOneWidget);
-    expect(_mark(decemberDay, Icons.circle_outlined), findsNothing);
+    expect(
+      _mark(decemberDay, DailyChoiceDayStatus.hasIncomplete),
+      findsNothing,
+    );
     await toDecember.up();
     await tester.pumpAndSettle();
     expect(find.text('декабрь 2026\u202Fг.'), findsOneWidget);
@@ -311,16 +329,26 @@ void main() {
     expect(repository.dayStatusQueries, hasLength(3));
     expect(repository.dayStatusQueries.last.firstDate, date(2026, 10, 26));
     expect(repository.dayStatusQueries.last.lastDate, date(2027, 2, 7));
-    _expectVisibleMark(tester, novemberLastDay, Icons.circle_outlined);
-    expect(_mark(novemberLastDay, Icons.check), findsNothing);
-    expect(_mark(decemberDay, Icons.circle_outlined), findsNothing);
+    _expectVisibleMark(
+      tester,
+      novemberLastDay,
+      DailyChoiceDayStatus.hasIncomplete,
+    );
+    expect(
+      _mark(novemberLastDay, DailyChoiceDayStatus.allCompleted),
+      findsNothing,
+    );
+    expect(
+      _mark(decemberDay, DailyChoiceDayStatus.hasIncomplete),
+      findsNothing,
+    );
 
     repository.completeDayStatuses(2, {
       novemberLastDay: DailyChoiceDayStatus.hasIncomplete,
       decemberDay: DailyChoiceDayStatus.hasIncomplete,
     });
     await tester.pumpAndSettle();
-    _expectVisibleMark(tester, decemberDay, Icons.circle_outlined);
+    _expectVisibleMark(tester, decemberDay, DailyChoiceDayStatus.hasIncomplete);
     expect(find.textContaining('вторник, 6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
@@ -338,8 +366,14 @@ void main() {
   });
 }
 
-Finder _mark(CalendarDate value, IconData icon) =>
-    find.descendant(of: calendarDay(value), matching: find.byIcon(icon));
+Finder _mark(CalendarDate value, DailyChoiceDayStatus status) =>
+    dailyChoiceCatalogDayMark(
+      value,
+      mark: switch (status) {
+        DailyChoiceDayStatus.hasIncomplete => DayMark.todo,
+        DailyChoiceDayStatus.allCompleted => DayMark.done,
+      },
+    );
 
 Future<TestGesture> _beginNextPeriod(WidgetTester tester) async {
   final gesture = await tester.startGesture(
@@ -355,10 +389,10 @@ Future<TestGesture> _beginNextPeriod(WidgetTester tester) async {
 void _expectVisibleMark(
   WidgetTester tester,
   CalendarDate value,
-  IconData icon,
+  DailyChoiceDayStatus status,
 ) {
   final bounds = Offset.zero & tester.view.physicalSize;
-  final isVisible = _mark(value, icon).evaluate().any((element) {
+  final isVisible = _mark(value, status).evaluate().any((element) {
     final box = element.renderObject! as RenderBox;
     return bounds.overlaps(box.localToGlobal(Offset.zero) & box.size);
   });

@@ -39,9 +39,9 @@ import 'daily_choice_calendar_viewport.dart';
 ///
 /// Шапка называет месяц и год даты просмотра, а отдельная подпись — полную
 /// выбранную дату, даже если её нет в видимом периоде.
-/// Под числом дня [dayStatusForDate] задаёт галочку для всех выполненных
-/// дневных выборов, пустой кружок для невыполненного или отсутствие отметки.
-/// Место под отметку резервируется всегда и масштабируется вместе с текстом.
+/// [dayStatusForDate] задаёт галочку для всех выполненных дневных выборов,
+/// кружок для невыполненного или отсутствие отметки. В неделе отметка стоит
+/// под подписью дня недели внутри ячейки. Место под отметку резервируется всегда.
 /// [hasDayMarksReadFailure] добавляет под шапкой пассивную строку отказа,
 /// не меняя отметок, выбора или просмотра и не предлагая действий.
 ///
@@ -166,7 +166,11 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
               rowHeight: DailyChoiceCalendarDay.rowHeight(
                 context,
                 columnWidth: columnWidth,
+                mode: viewport.mode,
               ),
+              // В неделе подпись дня входит в ячейку:
+              // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase-class.html
+              dowVisible: viewport.mode == DailyChoiceCalendarMode.month,
               dowHeight: _weekdayHeight(context, columnWidth: columnWidth),
               dowBuilder: _buildWeekday,
               dayBuilder: _buildDay,
@@ -255,6 +259,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
       status: widget.dayStatusForDate?.call(date),
       isSelected: date == widget.selectedDate,
       isToday: date == widget.today,
+      mode: widget.viewport.mode,
       isOutsideMonth:
           widget.viewport.mode == DailyChoiceCalendarMode.month &&
           (day.year != focusedDay.year || day.month != focusedDay.month),

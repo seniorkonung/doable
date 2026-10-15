@@ -3,6 +3,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.da
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,7 +20,7 @@ final _configurations = [
   (locale: const Locale('en'), full: false),
 ];
 
-/// Короткие подписи колонок с понедельника по воскресенье.
+/// Короткие подписи дней с понедельника по воскресенье.
 const _weekdays = {
   'ru': ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'],
   'en': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -119,7 +120,12 @@ void main() {
       );
       for (final day in statuses.keys) {
         final cell = calendarDay(day);
-        final mark = find.descendant(of: cell, matching: find.byType(Icon));
+        final mark = find.descendant(
+          of: cell,
+          matching: viewport.mode == DailyChoiceCalendarMode.week
+              ? find.byType(DayMarkIndicator)
+              : find.byType(Icon),
+        );
         final number = find.descendant(
           of: cell,
           matching: find.text('${day.day}'),
@@ -127,7 +133,6 @@ void main() {
         final markRect = _rect(tester, mark);
         expect(_contains(_rect(tester, cell), markRect), isTrue);
         expect(markRect.top, greaterThan(_rect(tester, number).bottom));
-        expect(markRect.height, greaterThanOrEqualTo(12));
       }
 
       consumer.replaceInputs(hasDayMarksReadFailure: true);
@@ -252,15 +257,18 @@ void main() {
 
         expect(layouts.map((layout) => layout.rows), [1, 4, 5, 6]);
         final rowHeight = weekLayout.rowHeight;
-        expect(rowHeight, greaterThanOrEqualTo(kMinInteractiveDimension));
+        expect(rowHeight, greaterThanOrEqualTo(54));
+        final monthRowHeight = layouts[1].rowHeight;
         for (final layout in layouts) {
           // Сетка занимает ровно свои строки одинаковой высоты, а каталог
           // начинается сразу под календарём: ничего не обрезано и не
           // перекрыто.
-          expect(layout.rowHeight, moreOrLessEquals(rowHeight));
+          if (layout.rows > 1) {
+            expect(layout.rowHeight, moreOrLessEquals(monthRowHeight));
+          }
           expect(
             layout.gridHeight,
-            moreOrLessEquals(layout.rows * rowHeight),
+            moreOrLessEquals(layout.rows * layout.rowHeight),
             reason: '${layout.rows} строк',
           );
           expect(
@@ -269,11 +277,9 @@ void main() {
             reason: '${layout.rows} строк',
           );
         }
-        // Высота шапки зависит от длины названия месяца, поэтому
-        // раскрытие сравнивается на одном и том же феврале 2027 года.
         expect(
-          layouts[1].calendar.height - weekLayout.calendar.height,
-          moreOrLessEquals(3 * rowHeight),
+          layouts[1].calendar.height,
+          greaterThan(weekLayout.calendar.height),
         );
 
         await tester.scrollUntilVisible(
@@ -359,8 +365,8 @@ AppLocalizations _localizations(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(DailyChoiceCalendar)));
 
 /// Проверяет, что календарь с видимыми неделями [weeks] целиком размещён в
-/// ширине экрана: семь колонок дней, подписи колонок над ними, шапка над
-/// подписями и все тексты показаны полностью.
+/// ширине экрана: семь колонок дней, подписи внутри недели или над месяцем,
+/// все тексты показаны полностью.
 void _expectLaidOut(
   WidgetTester tester, {
   required List<List<CalendarDate>> weeks,
@@ -368,6 +374,12 @@ void _expectLaidOut(
   required CalendarDate selectedDate,
 }) {
   expect(visibleWeeks(tester), weeks);
+  final isWeek =
+      tester
+          .widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar))
+          .viewport
+          .mode ==
+      DailyChoiceCalendarMode.week;
   final screen = Offset.zero & _screen;
   final calendar = _rect(tester, find.byType(DailyChoiceCalendar));
   expect(calendar.left, moreOrLessEquals(screen.left));
@@ -385,6 +397,7 @@ void _expectLaidOut(
     for (final (column, cell) in row.indexed) {
       expect(cell.width, greaterThanOrEqualTo(kMinInteractiveDimension));
       expect(cell.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+      if (isWeek) expect(cell.height, greaterThanOrEqualTo(54));
       expect(cell.top, moreOrLessEquals(row.first.top));
       expect(cell.height, moreOrLessEquals(row.first.height));
       if (column > 0) {
@@ -400,32 +413,38 @@ void _expectLaidOut(
     for (final (column, day) in week.indexed) {
       final number = find.descendant(
         of: calendarDay(day),
-        matching: find.byType(Text),
+        matching: find.text('${day.day}'),
       );
       expect(_textOf(tester, number), '${day.day}');
       _expectFullyShown(tester, number, within: rows[index][column]);
     }
   }
 
-  // Подписи дней недели — над своими колонками.
+  // В неделе подписи находятся в ячейках дней, в месяце — над колонками.
   final labels = [
     for (final weekday in weekdays)
       find.descendant(
         of: find.byType(DailyChoiceCalendar),
-        matching: find.text(weekday),
+        matching: find.text(
+          isWeek ? weekday[0].toUpperCase() + weekday.substring(1) : weekday,
+        ),
       ),
   ];
   for (final (column, label) in labels.indexed) {
-    final columnRect = Rect.fromLTRB(
-      rows.first[column].left,
-      calendar.top,
-      rows.first[column].right,
-      rows.first[column].top,
-    );
+    final columnRect = isWeek
+        ? rows.first[column]
+        : Rect.fromLTRB(
+            rows.first[column].left,
+            calendar.top,
+            rows.first[column].right,
+            rows.first[column].top,
+          );
     _expectFullyShown(tester, label, within: columnRect);
   }
-  final gridTop = [for (final label in labels) _rect(tester, label).top]
-      .reduce((a, b) => a < b ? a : b);
+  final gridTop = isWeek
+      ? rows.first.first.top
+      : [for (final label in labels) _rect(tester, label).top]
+            .reduce((a, b) => a < b ? a : b);
 
   // Шапка над подписями: выбранная дата, месяц просмотра и команды.
   final header = Rect.fromLTRB(

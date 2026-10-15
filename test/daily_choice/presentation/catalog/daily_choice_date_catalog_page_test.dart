@@ -10,6 +10,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -198,6 +199,11 @@ void main() {
     expect(dayCell(tester, today).isSelected, isTrue);
     expect(find.text('Не выполненные'), findsOneWidget);
     expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Всего дневных выборов: 1'),
+      100,
+      scrollable: _verticalScroll,
+    );
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
 
@@ -265,6 +271,7 @@ Future<AppRouter> _start(
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

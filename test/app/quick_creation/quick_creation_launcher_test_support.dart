@@ -132,6 +132,7 @@ Future<RootStackRouter> _openApp(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

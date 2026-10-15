@@ -16,6 +16,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -34,11 +35,20 @@ Finder dailyChoiceCatalogDay(CalendarDate date) => find.byKey(
   ValueKey('daily-choice-calendar-day-${date.toCanonicalString()}'),
 );
 
-/// Значок отметки показанного дня. У дня без выборов значка нет.
-Finder dailyChoiceCatalogDayMark(CalendarDate date) => find.descendant(
-  of: dailyChoiceCatalogDay(date),
-  matching: find.byType(Icon),
-);
+/// Отметка показанного дня. У дня без выборов отметки нет.
+Finder dailyChoiceCatalogDayMark(CalendarDate date, {DayMark? mark}) =>
+    find.descendant(
+      of: dailyChoiceCatalogDay(date),
+      matching: find.byWidgetPredicate((widget) {
+        final shown = switch (widget) {
+          DayMarkIndicator(:final mark) => mark,
+          Icon(icon: Icons.check) => DayMark.done,
+          Icon(icon: Icons.circle_outlined) => DayMark.todo,
+          _ => DayMark.none,
+        };
+        return shown != DayMark.none && (mark == null || shown == mark);
+      }),
+    );
 
 /// Выбирает [date] днём открытого каталога дневных выборов.
 ///

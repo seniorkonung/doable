@@ -192,6 +192,10 @@ void main() {
         );
 
         _expectDay(tester, texts.todayOctober4, isSelected: true);
+        expect(_dayNodes(tester), hasLength(7));
+        for (final node in _dayNodes(tester)) {
+          _expectSingleSelectAction(node);
+        }
         expect(
           find.semantics.byLabel(_dayLabel(tester, date(2026, 10, 4))),
           findsNothing,
@@ -372,28 +376,6 @@ void main() {
       semantics.dispose();
     },
   );
-
-  group('признаки дня на экране', () {
-    testWidgets('выбранный день залит, сегодняшний обведён, и при совпадении '
-        'видны оба признака', (tester) async {
-      final consumer = await pumpCalendarConsumer(
-        tester,
-        selectedDate: date(2026, 10, 5),
-        viewport: week(date(2026, 10, 5)),
-        today: date(2026, 10, 6),
-      );
-
-      expect(_mark(tester, date(2026, 10, 5)), (disc: true, ring: false));
-      expect(_mark(tester, date(2026, 10, 6)), (disc: false, ring: true));
-      expect(_mark(tester, date(2026, 10, 7)), (disc: false, ring: false));
-
-      consumer.replaceInputs(selectedDate: date(2026, 10, 6));
-      await tester.pumpAndSettle();
-
-      expect(_mark(tester, date(2026, 10, 6)), (disc: true, ring: true));
-      expect(_mark(tester, date(2026, 10, 5)), (disc: false, ring: false));
-    });
-  });
 }
 
 /// Узлы, которые экранный диктор читает в порядке обхода: доступное название
@@ -522,24 +504,4 @@ Future<List<CalendarEvent>> _controlWithoutSwipes(
   final events = List.of(consumer.events);
   await tester.pumpWidget(const SizedBox.shrink());
   return events;
-}
-
-/// Признаки выбранности и «сегодня», различимые формой, а не только цветом:
-/// заливка выделения и его контур.
-({bool disc, bool ring}) _mark(WidgetTester tester, CalendarDate value) {
-  final decoration =
-      tester
-              .widget<DecoratedBox>(
-                find.descendant(
-                  of: calendarDay(value),
-                  matching: find.byType(DecoratedBox),
-                ),
-              )
-              .decoration
-          as ShapeDecoration;
-  final shape = decoration.shape as StadiumBorder;
-  return (
-    disc: decoration.color != null,
-    ring: shape.side.style != BorderStyle.none,
-  );
 }

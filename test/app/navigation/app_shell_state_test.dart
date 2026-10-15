@@ -20,6 +20,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -421,8 +422,8 @@ void main() {
       );
       await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
       expect(
-        tester.widget<Icon>(dailyChoiceCatalogDayMark(_viewedDate)).icon,
-        Icons.check,
+        dailyChoiceCatalogDayMark(_viewedDate, mark: DayMark.done),
+        findsOneWidget,
       );
       expect(tester.takeException(), isNull);
     });
@@ -465,8 +466,8 @@ void main() {
       await _selectDay(tester, app, _choiceDate, total: _choiceCount);
       await _until(tester, dailyChoiceCatalogDayMark(_choiceDate));
       expect(
-        tester.widget<Icon>(dailyChoiceCatalogDayMark(_choiceDate)).icon,
-        Icons.circle_outlined,
+        dailyChoiceCatalogDayMark(_choiceDate, mark: DayMark.todo),
+        findsOneWidget,
       );
       // Раскрытый календарь показывает следующий месяц.
       await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
@@ -528,9 +529,10 @@ void main() {
       await showDailyChoiceCatalogPeriod(tester, _choiceDate, tap: _tap);
       await _waitFor(
         tester,
-        () =>
-            tester.widget<Icon>(dailyChoiceCatalogDayMark(_choiceDate)).icon ==
-            Icons.check,
+        () => dailyChoiceCatalogDayMark(
+          _choiceDate,
+          mark: DayMark.done,
+        ).evaluate().isNotEmpty,
       );
       expect(tester.takeException(), isNull);
     });

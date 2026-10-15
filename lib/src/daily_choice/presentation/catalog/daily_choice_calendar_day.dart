@@ -1,25 +1,23 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/day_mark.dart';
+import '../../../design_system/components/week_strip_day.dart';
 import '../../../design_system/text_metrics.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
+import 'daily_choice_calendar_viewport.dart';
 
 /// Ячейка допустимого дня встроенного календаря каталога.
 ///
 /// Часть реализации `DailyChoiceCalendar`: признаки ячейки вычисляет календарь
 /// из своих входов, а нажатие ячейка передаёт в [onSelected]. Выбранность и
 /// «сегодня» отмечаются независимо, поэтому при совпадении дней сохраняются оба
-/// признака: на экране выбранный день залит, а сегодняшний обведён, то есть
-/// признаки различаются формой, а не только цветом.
-///
-/// Выделение занимает ячейку за вычетом небольшого зазора и скруглено по
-/// короткой стороне: на телефоне при обычном тексте это круг, а когда крупное
-/// число переносится на несколько строк, выделение вытягивается по высоте
-/// вместе со строкой дней и число остаётся на нём. Высоту строки задаёт
-/// [rowHeight].
+/// признака. В неделе тексты и состояние переводятся в контракт [WeekStripDay],
+/// в месяце сохраняется ячейка Material. Высоту строки задаёт [rowHeight].
 ///
 /// Для вспомогательных технологий ячейка — одна кнопка выбора с полной датой
 /// и днём недели, состоянием выбранности, отдельной отметкой «сегодня» и
@@ -32,6 +30,7 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
     required this.isSelected,
     required this.isToday,
     required this.isOutsideMonth,
+    required this.mode,
     required this.onSelected,
     this.status,
   });
@@ -40,6 +39,7 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
   final DailyChoiceDayStatus? status;
   final bool isSelected;
   final bool isToday;
+  final DailyChoiceCalendarMode mode;
 
   /// День соседнего месяца в месячном представлении.
   final bool isOutsideMonth;
@@ -52,7 +52,22 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
   /// помещается в ячейку целиком в текущем масштабе текста: если ширины не
   /// хватает, число переносится, а строка становится выше. Ячейка не ниже
   /// области нажатия. Место под отметку резервируется и при её отсутствии.
-  static double rowHeight(BuildContext context, {required double columnWidth}) {
+  static double rowHeight(
+    BuildContext context, {
+    required double columnWidth,
+    required DailyChoiceCalendarMode mode,
+  }) {
+    if (mode == DailyChoiceCalendarMode.week) {
+      return WeekStripDay.rowHeight(
+        context,
+        dayTexts: [for (var day = 1; day <= 31; day++) '$day'],
+        weekdayTexts: [
+          for (var day = 1; day <= DateTime.daysPerWeek; day++)
+            _weekdayLabel(context, DateTime.utc(2024, 1, day)),
+        ],
+        columnWidth: columnWidth,
+      );
+    }
     final theme = Theme.of(context);
     final numbers = [for (var day = 1; day <= 31; day++) '$day'];
     final numberHeight = [
@@ -76,6 +91,24 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (mode == DailyChoiceCalendarMode.week) {
+      return WeekStripDay(
+        dayText: '${date.day}',
+        weekdayText: _weekdayLabel(
+          context,
+          DateTime.utc(date.year, date.month, date.day),
+        ),
+        isSelected: isSelected,
+        isToday: isToday,
+        mark: switch (status) {
+          null => DayMark.none,
+          DailyChoiceDayStatus.hasIncomplete => DayMark.todo,
+          DailyChoiceDayStatus.allCompleted => DayMark.done,
+        },
+        semanticLabel: _label(context),
+        onTap: onSelected,
+      );
+    }
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final foreground = isSelected
@@ -168,6 +201,12 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
       },
     ].join(', ');
   }
+}
+
+String _weekdayLabel(BuildContext context, DateTime day) {
+  final label = DateFormat.E(Localizations.localeOf(context).toLanguageTag())
+      .format(day);
+  return label[0].toUpperCase() + label.substring(1);
 }
 
 /// Наименьшая высота строки дней: при обычном тексте выделение на телефоне —
