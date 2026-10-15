@@ -93,7 +93,7 @@ void main() {
         today: date(2026, 10, 4),
       );
 
-      await tester.tap(find.byTooltip('Развернуть календарь'));
+      await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
       await tester.pumpAndSettle();
       await tester.tap(calendarDay(date(2026, 10, 15)));
       await tester.pumpAndSettle();
@@ -105,9 +105,9 @@ void main() {
       expect(consumer.viewport, month(date(2026, 10, 15)));
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
       expect(dayCell(tester, date(2026, 10, 15)).isSelected, isTrue);
-      expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+      expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Свернуть календарь'));
+      await tester.tap(find.bySemanticsLabel('Свернуть календарь'));
       await tester.pumpAndSettle();
 
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));

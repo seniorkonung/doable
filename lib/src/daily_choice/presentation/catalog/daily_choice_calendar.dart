@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/calendar_handle.dart';
+import '../../../design_system/components/calendar_header.dart';
 import '../../../design_system/components/month_grid_weekday.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
@@ -26,17 +28,19 @@ import 'daily_choice_calendar_viewport.dart';
 /// ячейки, в том числе при повторном нажатии выбранного дня. Потребитель
 /// синхронно делает этот день и выбранной датой, и датой просмотра, сохраняя
 /// представление. Перелистывание периода горизонтальным свайпом или кнопками
-/// шапки сообщает только [onViewportChanged] и не выбирает день; за первую и
-/// последнюю неделю или месяц диапазона [CalendarDate] перелистать нельзя.
+/// шапки месяца сообщает только [onViewportChanged] и не выбирает день;
+/// за первую и последнюю неделю или месяц диапазона [CalendarDate]
+/// перелистать нельзя.
 /// При перелистывании месяца датой просмотра становится [selectedDate], если она
 /// входит в этот месяц, иначе его первое число.
-/// Команда раскрытия или сворачивания шапки также сообщает только
+/// Ручка раскрытия или сворачивания также сообщает только
 /// [onViewportChanged]: меняется представление, а дата просмотра сохраняется
 /// точно, поэтому раскрывается месяц и сворачивается неделя этой даты.
 /// Вертикальные жесты представление не переключают. Изменения входов
 /// потребителем отражаются без обратных событий.
 ///
-/// Шапка называет месяц и год даты просмотра, а отдельная подпись — полную
+/// Шапка только месячного представления называет месяц и год даты просмотра;
+/// у недели шапки и команд соседней недели нет. Отдельная подпись называет полную
 /// выбранную дату, даже если её нет в видимом периоде.
 /// [dayStatusForDate] задаёт галочку для всех выполненных дневных выборов,
 /// кружок для невыполненного или отсутствие отметки. В неделе отметка стоит
@@ -61,10 +65,10 @@ import 'daily_choice_calendar_viewport.dart';
 /// Для вспомогательных технологий каждый допустимый день — одна кнопка выбора
 /// с полной датой, днём недели, состоянием выбранности и отдельной отметкой
 /// «сегодня», а у дня с отметкой — состоянием дня; дни читаются в календарном
-/// порядке после шапки и строки отказа. Команды шапки
-/// названы по текущему представлению и сообщают свою доступность; все действия
-/// выполнимы доступной активацией без жестов. Подписи следуют локали
-/// приложения и меняются вместе с ней без событий.
+/// порядке после шапки и строки отказа, перед ручкой. Команды месяца
+/// сообщают свою доступность; раскрытие, сворачивание, смена месяца и выбор дня
+/// выполнимы доступной активацией без жестов. Недели листаются только свайпом.
+/// Подписи следуют локали приложения и меняются вместе с ней без событий.
 ///
 /// `table_calendar`, его форматы, контроллер страниц и технические `DateTime`
 /// остаются деталями реализации и не входят в контракт (ADR-0017).
@@ -120,17 +124,34 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   @override
   Widget build(BuildContext context) {
     final viewport = widget.viewport;
+    final localizations = AppLocalizations.of(context);
+    final isExpanded = viewport.mode == DailyChoiceCalendarMode.month;
     final calendar = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _DailyChoiceCalendarHeader(
-          selectedDate: widget.selectedDate,
-          viewport: viewport,
-          onPrevious: _hasPreviousPeriod(viewport) ? _showPreviousPeriod : null,
-          onNext: _hasNextPeriod(viewport) ? _showNextPeriod : null,
-          onToggleMode: _toggleMode,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            localizations.dailyChoiceCalendarSelectedDate(
+              MaterialLocalizations.of(context)
+                  .formatFullDate(_technicalDate(widget.selectedDate)),
+            ),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
         ),
+        if (isExpanded)
+          CalendarHeader(
+            title: _monthTitle(context, viewport.focusedDate),
+            previousLabel: localizations.dailyChoiceCalendarPreviousMonth,
+            nextLabel: localizations.dailyChoiceCalendarNextMonth,
+            onPrevious: _hasPreviousMonth(viewport.focusedDate)
+                ? _showPreviousPeriod
+                : null,
+            onNext: _hasNextMonth(viewport.focusedDate)
+                ? _showNextPeriod
+                : null,
+          ),
         if (widget.hasDayMarksReadFailure)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -182,6 +203,13 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
               onPageChanged: _reportFocusedDay,
             );
           },
+        ),
+        CalendarHandle(
+          isExpanded: isExpanded,
+          semanticLabel: isExpanded
+              ? localizations.dailyChoiceCalendarCollapse
+              : localizations.dailyChoiceCalendarExpand,
+          onTap: _toggleMode,
         ),
       ],
     );
@@ -347,132 +375,19 @@ DateTime _clampToRange(DateTime day) => day.isBefore(_firstDay)
     ? _lastDay
     : day;
 
-/// Есть ли в диапазоне [CalendarDate] период перед видимым.
-bool _hasPreviousPeriod(DailyChoiceCalendarViewport viewport) =>
-    _firstDay.isBefore(_visiblePeriodStart(viewport));
+/// Есть ли допустимый месяц перед показанным или после него.
+bool _hasPreviousMonth(CalendarDate focusedDate) =>
+    _firstDay.isBefore(DateTime.utc(focusedDate.year, focusedDate.month));
 
-/// Есть ли в диапазоне [CalendarDate] период после видимого.
-bool _hasNextPeriod(DailyChoiceCalendarViewport viewport) =>
-    _lastDay.isAfter(_visiblePeriodEnd(viewport));
+bool _hasNextMonth(CalendarDate focusedDate) =>
+    _lastDay.isAfter(DateTime.utc(focusedDate.year, focusedDate.month + 1, 0));
 
-/// Первый день видимой недели или месяца.
-DateTime _visiblePeriodStart(DailyChoiceCalendarViewport viewport) {
-  final focusedDay = _technicalDate(viewport.focusedDate);
-  return switch (viewport.mode) {
-    DailyChoiceCalendarMode.week => DateTime.utc(
-      focusedDay.year,
-      focusedDay.month,
-      focusedDay.day - (focusedDay.weekday - DateTime.monday),
-    ),
-    DailyChoiceCalendarMode.month => DateTime.utc(
-      focusedDay.year,
-      focusedDay.month,
-    ),
-  };
-}
-
-/// Последний день видимой недели или месяца; крайняя неделя может
-/// заканчиваться за пределом диапазона.
-DateTime _visiblePeriodEnd(DailyChoiceCalendarViewport viewport) {
-  final start = _visiblePeriodStart(viewport);
-  return switch (viewport.mode) {
-    DailyChoiceCalendarMode.week => DateTime.utc(
-      start.year,
-      start.month,
-      start.day + DateTime.daysPerWeek - 1,
-    ),
-    DailyChoiceCalendarMode.month => DateTime.utc(
-      start.year,
-      start.month + 1,
-      0,
-    ),
-  };
-}
-
-/// Шапка календаря: полная выбранная дата, месяц и год даты просмотра,
-/// команды соседних периодов текущего представления и команда раскрытия или
-/// сворачивания.
-final class _DailyChoiceCalendarHeader extends StatelessWidget {
-  const _DailyChoiceCalendarHeader({
-    required this.selectedDate,
-    required this.viewport,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onToggleMode,
-  });
-
-  final CalendarDate selectedDate;
-  final DailyChoiceCalendarViewport viewport;
-
-  /// `null`, когда соседнего периода нет в диапазоне [CalendarDate].
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-
-  final VoidCallback onToggleMode;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final dates = MaterialLocalizations.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    final (
-      previousLabel,
-      nextLabel,
-      toggleLabel,
-      toggleIcon,
-    ) = switch (viewport.mode) {
-      DailyChoiceCalendarMode.week => (
-        localizations.dailyChoiceCalendarPreviousWeek,
-        localizations.dailyChoiceCalendarNextWeek,
-        localizations.dailyChoiceCalendarExpand,
-        Icons.expand_more,
-      ),
-      DailyChoiceCalendarMode.month => (
-        localizations.dailyChoiceCalendarPreviousMonth,
-        localizations.dailyChoiceCalendarNextMonth,
-        localizations.dailyChoiceCalendarCollapse,
-        Icons.expand_less,
-      ),
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            localizations.dailyChoiceCalendarSelectedDate(
-              dates.formatFullDate(_technicalDate(selectedDate)),
-            ),
-            style: textTheme.titleSmall,
-          ),
-        ),
-        Row(
-          children: [
-            IconButton(
-              onPressed: onPrevious,
-              tooltip: previousLabel,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Expanded(
-              child: Text(
-                dates.formatMonthYear(_technicalDate(viewport.focusedDate)),
-                textAlign: TextAlign.center,
-                style: textTheme.titleMedium,
-              ),
-            ),
-            IconButton(
-              onPressed: onNext,
-              tooltip: nextLabel,
-              icon: const Icon(Icons.chevron_right),
-            ),
-            IconButton(
-              onPressed: onToggleMode,
-              tooltip: toggleLabel,
-              icon: Icon(toggleIcon),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+String _monthTitle(BuildContext context, CalendarDate date) {
+  // L — самостоятельная форма названия месяца, без суффикса года:
+  // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+  final title = DateFormat(
+    'LLLL y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(_technicalDate(date));
+  return title[0].toUpperCase() + title.substring(1);
 }

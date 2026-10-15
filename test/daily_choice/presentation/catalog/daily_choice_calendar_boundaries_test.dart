@@ -325,7 +325,7 @@ void main() {
       expect(consumer.selectedDate, date(1, 1, 15));
       expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 6));
 
-      await tester.tap(find.byTooltip('Свернуть календарь'));
+      await tester.tap(find.bySemanticsLabel('Свернуть календарь'));
       await tester.pumpAndSettle();
       expect(visibleWeeks(tester), weeksFrom(date(1, 1, 15), 1));
       expect(dayCell(tester, date(1, 1, 15)).isSelected, isTrue);
@@ -361,7 +361,7 @@ void main() {
         expect(consumer.selectedDate, date(9999, 12, 31));
         expect(visibleWeeks(tester), lastMonth);
 
-        await tester.tap(find.byTooltip('Свернуть календарь'));
+        await tester.tap(find.bySemanticsLabel('Свернуть календарь'));
         await tester.pumpAndSettle();
         expect(visibleWeeks(tester), [_lastWeekPositions]);
         expect(dayCell(tester, date(9999, 12, 31)).isSelected, isTrue);

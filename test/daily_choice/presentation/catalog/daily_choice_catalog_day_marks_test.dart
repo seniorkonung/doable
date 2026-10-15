@@ -71,7 +71,7 @@ void main() {
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Следующая неделя'));
+    await swipeToNextPeriod(tester);
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
     expect(repository.dayStatusQueries, hasLength(3));
@@ -246,18 +246,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
 
-    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
     tester.platformDispatcher.localesTestValue = const [Locale('en')];
     await tester.pumpAndSettle();
     expect(find.text('October 2026'), findsOneWidget);
-    expect(find.byTooltip('Collapse calendar'), findsOneWidget);
+    expect(find.bySemanticsLabel('Collapse calendar'), findsOneWidget);
     _expectVisibleMark(tester, nextTuesday, DailyChoiceDayStatus.hasIncomplete);
     expect(find.text('Total daily choices: 1'), findsOneWidget);
     expect(find.text('To Основание, today I Действие'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Collapse calendar'));
+    await tester.tap(find.bySemanticsLabel('Collapse calendar'));
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
     expect(find.textContaining('Tuesday, October 6, 2026'), findsOneWidget);
@@ -282,7 +282,7 @@ void main() {
       juneDay: DailyChoiceDayStatus.hasIncomplete,
     });
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 3, 30), 6));
     expect(repository.dayStatusQueries, hasLength(1));
@@ -342,14 +342,14 @@ void main() {
       catalogPageItem(2, date: today, isCompleted: true),
     ], total: 1);
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
 
     final toNovember = await _beginNextPeriod(tester);
     _expectVisibleMark(tester, novemberDay, DailyChoiceDayStatus.allCompleted);
     await toNovember.up();
     await tester.pumpAndSettle();
-    expect(find.text('ноябрь 2026\u202Fг.'), findsOneWidget);
+    expect(find.text('Ноябрь 2026'), findsOneWidget);
     expect(repository.dayStatusQueries, hasLength(2));
 
     final toDecember = await _beginNextPeriod(tester);
@@ -365,7 +365,7 @@ void main() {
     );
     await toDecember.up();
     await tester.pumpAndSettle();
-    expect(find.text('декабрь 2026\u202Fг.'), findsOneWidget);
+    expect(find.text('Декабрь 2026'), findsOneWidget);
     expect(repository.dayStatusQueries, hasLength(2));
 
     repository.completeDayStatuses(1, {

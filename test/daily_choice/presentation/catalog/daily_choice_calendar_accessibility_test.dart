@@ -16,7 +16,7 @@ final _localizedTexts = [
   (
     locale: const Locale('ru'),
     selectedDate: 'Выбранная дата: воскресенье, 4 октября 2026 г.',
-    october: 'октябрь 2026 г.',
+    october: 'Октябрь 2026',
     todayOctober4: 'воскресенье, 4 октября 2026 г., Сегодня',
     october5: 'понедельник, 5 октября 2026 г.',
     september28: 'понедельник, 28 сентября 2026 г.',
@@ -75,10 +75,13 @@ void main() {
             texts.previousMonth,
             texts.october,
             texts.nextMonth,
-            texts.collapse,
             for (final day in days)
               _dayLabel(tester, day, isToday: day == date(2026, 10, 4)),
+            texts.collapse,
           ]);
+          final title = find.semantics.byLabel(texts.october).evaluate().single;
+          expect(title.flagsCollection.isButton, isFalse);
+          expect(title.getSemanticsData().actions, 0);
           // День соседнего месяца назван своей полной датой.
           expect(_announced(tester), contains(texts.september28));
           expect(_announced(tester), contains(texts.todayOctober4));
@@ -115,11 +118,11 @@ void main() {
         expect(
           _announced(tester),
           containsAllInOrder([
-            texts.collapse,
             texts.marksUnavailable,
             texts.september28,
             completed,
             incomplete,
+            texts.collapse,
           ]),
         );
         final failure = find.semantics.byLabel(texts.marksUnavailable);
@@ -216,9 +219,12 @@ void main() {
             locale: texts.locale,
           );
 
-          _expectCommand(tester, texts.previousWeek, isEnabled: true);
-          _expectCommand(tester, texts.nextWeek, isEnabled: false);
-          _expectCommand(tester, texts.expand, isEnabled: true);
+          _expectNoWeekCommands(tester, texts.previousWeek, texts.nextWeek);
+
+          expect(
+            _command(texts.expand).evaluate().single.flagsCollection.isExpanded,
+            Tristate.isFalse,
+          );
           // Суббота и воскресенье за 9999-12-31 сохраняют место в строке, но
           // не объявляются и не предлагают выбор.
           expect(unavailableCalendarDays, findsNWidgets(2));
@@ -229,9 +235,8 @@ void main() {
             for (final day in lastDays) _dayLabel(tester, day),
           ]);
           expect(_actionable(tester), [
-            texts.previousWeek,
-            texts.expand,
             for (final day in lastDays) _dayLabel(tester, day),
+            texts.expand,
           ]);
           _expectDay(
             tester,
@@ -243,7 +248,14 @@ void main() {
           await tester.pumpAndSettle();
           _expectCommand(tester, texts.previousMonth, isEnabled: true);
           _expectCommand(tester, texts.nextMonth, isEnabled: false);
-          _expectCommand(tester, texts.collapse, isEnabled: true);
+          expect(
+            _command(texts.collapse)
+                .evaluate()
+                .single
+                .flagsCollection
+                .isExpanded,
+            Tristate.isTrue,
+          );
           expect(unavailableCalendarDays, findsNWidgets(9));
           expect(_dayNodes(tester), hasLength(33));
 
@@ -252,8 +264,8 @@ void main() {
             viewport: week(date(1, 1, 1)),
           );
           await tester.pumpAndSettle();
-          _expectCommand(tester, texts.previousWeek, isEnabled: false);
-          _expectCommand(tester, texts.nextWeek, isEnabled: true);
+          _expectNoWeekCommands(tester, texts.previousWeek, texts.nextWeek);
+
           final firstDays = weeksFrom(date(1, 1, 1), 1).single;
           expect(_dayNodes(tester).map((node) => node.label), [
             for (final day in firstDays) _dayLabel(tester, day),
@@ -282,7 +294,7 @@ void main() {
           final byTouch = await _controlWithoutSwipes(
             tester,
             texts.locale,
-            activateCommand: (name) => tester.tap(find.byTooltip(name)),
+            activateCommand: (name) => tester.tap(find.bySemanticsLabel(name)),
             activateDay: (value) => tester.tap(calendarDay(value)),
           );
           final byScreenReader = await _controlWithoutSwipes(
@@ -297,9 +309,8 @@ void main() {
 
           expect(byScreenReader, byTouch);
           expect(byScreenReader, [
-            ViewportChanged(week(date(2026, 10, 11))),
+            ViewportChanged(month(date(2026, 10, 4))),
             DateSelected(date(2026, 10, 7)),
-            ViewportChanged(month(date(2026, 10, 7))),
             ViewportChanged(month(date(2026, 11, 1))),
             ViewportChanged(week(date(2026, 11, 1))),
           ]);
@@ -324,12 +335,9 @@ void main() {
 
     expect(_announced(tester), [
       'Selected date: Monday, October 5, 2026',
-      english.previousWeek,
-      english.october,
-      english.nextWeek,
-      english.expand,
       for (final day in weeksFrom(date(2026, 9, 28), 1).single)
         _dayLabel(tester, day, isToday: day == date(2026, 10, 4)),
+      english.expand,
     ]);
     expect(_announced(tester), contains(english.todayOctober4));
     for (final weekday in english.weekdays) {
@@ -439,8 +447,7 @@ void _expectSingleSelectAction(SemanticsNode node) {
   );
 }
 
-SemanticsFinder _command(String name) =>
-    find.semantics.byPredicate((node) => node.tooltip == name);
+SemanticsFinder _command(String name) => find.semantics.byLabel(name);
 
 /// Команда шапки — кнопка с названием, сообщающая доступность; недоступная
 /// команда не предлагает касания.
@@ -463,7 +470,7 @@ void _expectCommand(
   );
 }
 
-/// Управляет календарём без свайпа: следующая неделя, выбор дня, раскрытие,
+/// Управляет календарём без свайпа: раскрытие, выбор дня,
 /// следующий месяц и сворачивание. Возвращает журнал событий потребителя.
 Future<List<CalendarEvent>> _controlWithoutSwipes(
   WidgetTester tester,
@@ -480,17 +487,13 @@ Future<List<CalendarEvent>> _controlWithoutSwipes(
     locale: locale,
   );
 
-  await activateCommand(texts.nextWeek);
+  await activateCommand(texts.expand);
   await tester.pumpAndSettle();
-  expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+  expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
 
   await activateDay(date(2026, 10, 7));
   await tester.pumpAndSettle();
   expect(consumer.selectedDate, date(2026, 10, 7));
-
-  await activateCommand(texts.expand);
-  await tester.pumpAndSettle();
-  expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
 
   await activateCommand(texts.nextMonth);
   await tester.pumpAndSettle();
@@ -504,4 +507,10 @@ Future<List<CalendarEvent>> _controlWithoutSwipes(
   final events = List.of(consumer.events);
   await tester.pumpWidget(const SizedBox.shrink());
   return events;
+}
+
+void _expectNoWeekCommands(WidgetTester tester, String previous, String next) {
+  expect(_command(previous), findsNothing);
+  expect(_command(next), findsNothing);
+  expect(find.byType(IconButton), findsNothing);
 }

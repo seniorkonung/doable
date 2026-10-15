@@ -579,7 +579,7 @@ void main() {
             expect(
               find.descendant(
                 of: page,
-                matching: find.byTooltip(command, skipOffstage: false),
+                matching: find.bySemanticsLabel(command, skipOffstage: false),
                 skipOffstage: false,
               ),
               locale == resolved ? findsOneWidget : findsNothing,
@@ -1074,9 +1074,9 @@ Map<String, Object?> _languageIndependent(Map<String, Object?> view) =>
 final _catalogLabels = {
   Locale('ru'): [
     'Выбранная дата: пятница, 25 сентября 2026\u202Fг.',
-    'август 2026\u202Fг.',
-    'пн',
-    'вс',
+    'Август 2026',
+    'Пн',
+    'Вс',
     'Выполнение',
     'Всего дневных выборов: 120',
   ],

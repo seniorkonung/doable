@@ -64,7 +64,7 @@ void main() {
     expect(repository.queries, hasLength(2));
     repository.completeFirst(_items(date(2026, 10, 6)), index: 1, total: 40);
     await tester.pump();
-    await tester.tap(find.byTooltip(_l10n.dailyChoiceCalendarExpand));
+    await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
     await _settle(tester);
     _catalogScroll(tester).jumpTo(300);
     await tester.pump();
@@ -107,7 +107,7 @@ void main() {
     repository.completeFirst([], total: 0);
     await tester.pump();
     // Месяц показывает и сутки перехода, и следующую за ними дату.
-    await tester.tap(find.byTooltip(_l10n.dailyChoiceCalendarExpand));
+    await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
     await _settle(tester);
     _expectSelected(tester, date(2026, 3, 7));
 

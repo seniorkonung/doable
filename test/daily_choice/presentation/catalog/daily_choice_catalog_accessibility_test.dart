@@ -61,12 +61,9 @@ void main() {
         final page = [
           l10n.appDestinationDailyChoices,
           texts.selectedToday,
-          l10n.dailyChoiceCalendarPreviousWeek,
-          _monthTitle(tester, _today),
-          l10n.dailyChoiceCalendarNextWeek,
-          l10n.dailyChoiceCalendarExpand,
           for (final day in weeksFrom(date(2026, 9, 28), 1).single)
             day == _today ? texts.today : _fullDate(tester, day),
+          l10n.dailyChoiceCalendarExpand,
           _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
           l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(3),
@@ -225,12 +222,9 @@ void main() {
 
         final page = [
           texts.selectedToday,
-          l10n.dailyChoiceCalendarPreviousWeek,
-          _monthTitle(tester, _today),
-          l10n.dailyChoiceCalendarNextWeek,
-          l10n.dailyChoiceCalendarExpand,
           for (final day in weeksFrom(date(2026, 9, 28), 1).single)
             day == _today ? texts.today : _fullDate(tester, day),
+          l10n.dailyChoiceCalendarExpand,
           _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
           l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(3),
@@ -304,20 +298,21 @@ List<String> _announcedInScroll(WidgetTester tester) {
   ];
 }
 
-/// Названия после последнего дня календаря: фильтры, выдача и сообщения,
+/// Названия после ручки календаря: фильтры, выдача и сообщения,
 /// без панели основной навигации.
 List<String> _afterCalendar(WidgetTester tester) {
   final nodes = tester.semantics.simulatedAccessibilityTraversal().toList();
-  final lastDay = nodes.lastIndexWhere(
+  final texts = _l10n(tester);
+  final handle = nodes.lastIndexWhere(
     (node) =>
-        node.flagsCollection.isSelected != Tristate.none &&
-        node.getSemanticsData().role != SemanticsRole.tab,
+        node.label == texts.dailyChoiceCalendarExpand ||
+        node.label == texts.dailyChoiceCalendarCollapse,
   );
   final navigation = nodes.indexWhere(
     (node) => node.getSemanticsData().role == SemanticsRole.tab,
   );
   return [
-    for (final node in nodes.sublist(lastDay + 1, navigation)) ?_name(node),
+    for (final node in nodes.sublist(handle + 1, navigation)) ?_name(node),
   ];
 }
 
@@ -357,11 +352,6 @@ void _expectLiveRegion(WidgetTester tester, String message) {
 String _fullDate(WidgetTester tester, CalendarDate value) =>
     MaterialLocalizations.of(tester.element(find.byType(DailyChoiceCalendar)))
         .formatFullDate(DateTime.utc(value.year, value.month, value.day));
-
-/// Месяц и год по текущей локали.
-String _monthTitle(WidgetTester tester, CalendarDate value) =>
-    MaterialLocalizations.of(tester.element(find.byType(DailyChoiceCalendar)))
-        .formatMonthYear(DateTime.utc(value.year, value.month));
 
 /// Фильтр выполнения читается своим названием и выбранным состоянием.
 String _completionFilter(AppLocalizations l10n, String state) =>

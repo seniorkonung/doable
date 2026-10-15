@@ -92,9 +92,9 @@ void main() {
       cursor: const CatalogPageCursor(),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Следующий месяц'));
+    await tester.tap(find.bySemanticsLabel('Следующий месяц'));
     await tester.pumpAndSettle();
     final marked = date(2026, 11, 7);
     repository.completeDayStatuses(1, {
@@ -150,7 +150,7 @@ void main() {
     await tester.drag(_verticalScroll, const Offset(0, 5000));
     await tester.pumpAndSettle();
     expect(find.text('Выполненные'), findsOneWidget);
-    expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+    expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
     expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
     await tester.scrollUntilVisible(
@@ -182,7 +182,7 @@ void main() {
     await _selectCompletion(tester, 'Не выполненные');
     repository.completeFirst(1, [catalogPageItem(1, date: today)], total: 1);
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
 
     await _pushDate(tester, router, selected);
@@ -198,7 +198,7 @@ void main() {
     expectDailyChoicesRootPage(router);
     expect(dayCell(tester, today).isSelected, isTrue);
     expect(find.text('Не выполненные'), findsOneWidget);
-    expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+    expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Всего дневных выборов: 1'),
       100,

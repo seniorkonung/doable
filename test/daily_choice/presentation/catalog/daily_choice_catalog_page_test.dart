@@ -144,7 +144,7 @@ void main() {
 
     // Просмотр другой недели не меняет условий выдачи, а смена охвата и сброс
     // не меняют просматриваемую неделю.
-    await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+    await _swipeCalendar(tester, toNext: true);
     final viewed = weeksFrom(date(2026, 9, 28), 1);
     expect(visibleWeeks(tester), viewed);
     expect(repository.queries, hasLength(3));
@@ -286,7 +286,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
-      expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(l10n.dailyChoiceCalendarCollapse),
+        findsOneWidget,
+      );
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
       // Выбранный день вне просматриваемого месяца остаётся названным.
@@ -301,7 +304,10 @@ void main() {
       await _settleCalendar(tester);
       _expectSelected(tester, selectedDay);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
-      expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(l10n.dailyChoiceCalendarCollapse),
+        findsOneWidget,
+      );
       expect(
         find.text(_selectedDateLabel(tester, selectedDay)),
         findsOneWidget,
@@ -318,11 +324,11 @@ void main() {
 
       // Первое чтение ещё не завершено: просмотр его не отменяет и не
       // повторяет.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
+      await _swipeCalendar(tester, toNext: false);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
       expect(repository.queries, hasLength(1));
@@ -337,9 +343,9 @@ void main() {
 
       // Неделя с датой просмотра в ноябре раскрывается в ноябрь, сдвигая
       // выдачу вниз.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
       await _swipeCalendar(tester, toNext: true);
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
+      await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
       final weekCountTop = tester.getRect(count).top;
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
@@ -355,8 +361,8 @@ void main() {
       expect(tester.getRect(count).top, moreOrLessEquals(weekCountTop));
 
       // Свёрнутая неделя показывает точную дату просмотра из середины месяца.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
+      await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
@@ -521,7 +527,7 @@ void main() {
       expect(repository.queries, hasLength(2));
 
       // Первая порция выбранного дня ещё читается.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
@@ -694,7 +700,7 @@ Future<void> _settleCalendar(WidgetTester tester) async {
 
 /// Выполняет команду шапки календаря по её доступному названию.
 Future<void> _tapCalendarCommand(WidgetTester tester, String label) async {
-  await tester.tap(find.byTooltip(label));
+  await tester.tap(find.bySemanticsLabel(label));
   await _settleCalendar(tester);
 }
 

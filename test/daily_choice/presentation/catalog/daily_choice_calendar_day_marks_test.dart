@@ -73,7 +73,7 @@ void main() {
 
     await tester.tap(calendarDay(date(2026, 10, 7)));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Следующая неделя'));
+    await swipeToNextPeriod(tester);
     await tester.pumpAndSettle();
     expect(consumer.events, [
       DateSelected(date(2026, 10, 7)),

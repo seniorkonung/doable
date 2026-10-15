@@ -5,9 +5,11 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/components/month_grid_weekday.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 
@@ -176,10 +178,6 @@ void main() {
           await _tapEveryDay(tester, consumer, weeks);
           final localizations = _localizations(tester);
           await _tapEveryCommand(tester, consumer, {
-            localizations.dailyChoiceCalendarPreviousWeek: week(
-              date(2026, 9, 27),
-            ),
-            localizations.dailyChoiceCalendarNextWeek: week(date(2026, 10, 11)),
             localizations.dailyChoiceCalendarExpand: month(date(2026, 10, 4)),
           });
         },
@@ -237,7 +235,7 @@ void main() {
         final weekLayout = await _calendarLayout(tester);
         expect(weekLayout.rows, 1);
 
-        final expand = find.byTooltip(
+        final expand = find.bySemanticsLabel(
           _localizations(tester).dailyChoiceCalendarExpand,
         );
         await _reveal(tester, expand);
@@ -485,21 +483,38 @@ void _expectLaidOut(
       .widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar))
       .viewport
       .focusedDate;
-  _expectFullyShown(
-    tester,
-    find.text(dates.formatMonthYear(DateTime.utc(focused.year, focused.month))),
-    within: header,
+  final monthLabel = DateFormat(
+    'LLLL y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(focused.year, focused.month));
+  final title = find.text(
+    monthLabel[0].toUpperCase() + monthLabel.substring(1),
   );
+  if (isWeek) {
+    expect(title, findsNothing);
+  } else {
+    _expectFullyShown(tester, title, within: header);
+  }
+  final toggle = find.bySemanticsLabel(
+    isWeek
+        ? AppLocalizations.of(context).dailyChoiceCalendarExpand
+        : AppLocalizations.of(context).dailyChoiceCalendarCollapse,
+  );
+  final handle = _rect(tester, toggle);
+  expect(handle.top, greaterThanOrEqualTo(rows.last.first.bottom));
+  expect(handle.bottom, lessThanOrEqualTo(calendar.bottom));
+  expect(handle.width, calendar.width);
+  expect(handle.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
   final commands = find.descendant(
     of: find.byType(DailyChoiceCalendar),
     matching: find.byType(IconButton),
   );
-  expect(commands, findsNWidgets(3));
+  expect(commands, findsNWidgets(isWeek ? 0 : 2));
   for (final command in commands.evaluate()) {
     final rect = _rect(tester, find.byWidget(command.widget));
     expect(_contains(header, rect), isTrue, reason: '$rect вне $header');
-    expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
-    expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+    expect(rect.width, greaterThanOrEqualTo(DoableMetrics.tapMin));
+    expect(rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
   }
 
   // Других текстов у календаря нет, и ни один не обрезан.
@@ -509,7 +524,9 @@ void _expectLaidOut(
   );
   expect(
     texts,
-    findsNWidgets(weeks.expand((week) => week).length + weekdays.length + 2),
+    findsNWidgets(
+      weeks.expand((week) => week).length + weekdays.length + (isWeek ? 1 : 2),
+    ),
   );
   expect(tester.takeException(), isNull);
 }
@@ -597,7 +614,12 @@ Future<_CalendarLayout> _calendarLayout(WidgetTester tester) async {
     calendar: calendar,
     rows: weeks.length,
     rowHeight: firstDay.height,
-    gridHeight: calendar.bottom - firstDay.top,
+    gridHeight:
+        _rect(
+          tester,
+          calendarDay(weeks.last.lastWhere((day) => day != null)!),
+        ).bottom -
+        firstDay.top,
     messageTop: _rect(tester, find.byKey(_message)).top,
   );
 }
@@ -673,7 +695,7 @@ Future<void> _tapEveryCommand(
 ) async {
   final viewport = consumer.viewport;
   for (final MapEntry(key: name, value: changed) in expected.entries) {
-    final command = find.byTooltip(name);
+    final command = find.bySemanticsLabel(name);
     await _reveal(tester, command);
     _expectTappable(tester, command);
     await tester.tap(command);

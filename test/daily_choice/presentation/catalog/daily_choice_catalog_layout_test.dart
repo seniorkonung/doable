@@ -2,7 +2,9 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,9 +68,9 @@ void main() {
         );
         await _expectWholeTexts(tester);
 
-        await _tapCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+        await swipeToNextPeriod(tester);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-        await _tapCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
+        await swipeToPreviousPeriod(tester);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
 
         final day = date(2026, 10, 1);
@@ -132,7 +134,7 @@ void main() {
           await _settle(tester);
           expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
           expect(
-            find.byTooltip(l10n.dailyChoiceCalendarCollapse),
+            find.bySemanticsLabel(l10n.dailyChoiceCalendarCollapse),
             findsOneWidget,
           );
 
@@ -215,7 +217,10 @@ void main() {
         await _expectWholeTexts(tester);
         await _dragUntilReachable(
           tester,
-          find.byTooltip(l10n.dailyChoiceCalendarExpand, skipOffstage: false),
+          find.bySemanticsLabel(
+            l10n.dailyChoiceCalendarExpand,
+            skipOffstage: false,
+          ),
         );
         expect(tester.takeException(), isNull);
       });
@@ -468,8 +473,8 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
 
 /// Выполняет команду шапки календаря касанием после прокрутки к ней.
 Future<void> _tapCommand(WidgetTester tester, String name) async {
-  await _reveal(tester, find.byTooltip(name, skipOffstage: false));
-  final command = find.byTooltip(name);
+  await _reveal(tester, find.bySemanticsLabel(name, skipOffstage: false));
+  final command = find.bySemanticsLabel(name);
   _expectTappable(tester, command);
   await tester.tap(command);
   await _settle(tester);
@@ -576,19 +581,30 @@ void _expectColumns(WidgetTester tester, List<List<CalendarDate>> weeks) {
   expect(rows.last.last.bottom, lessThanOrEqualTo(calendar.bottom + _epsilon));
 }
 
-/// Команды шапки календаря лежат в ширине экрана и не меньше области нажатия.
+/// Команды месяца и ручка лежат в ширине экрана и не меньше области нажатия.
 void _expectCommands(WidgetTester tester) {
-  final commands = find.descendant(
-    of: find.byType(DailyChoiceCalendar, skipOffstage: false),
-    matching: find.byType(IconButton, skipOffstage: false),
-  );
-  expect(commands, findsNWidgets(3));
-  for (final command in commands.evaluate()) {
-    final rect = _globalRect(command.renderObject! as RenderBox);
+  final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
+  final isExpanded =
+      tester.widget<DailyChoiceCalendar>(calendar).viewport.mode ==
+      DailyChoiceCalendarMode.month;
+  final texts = AppLocalizations.of(tester.element(calendar));
+  final names = [
+    if (isExpanded) ...[
+      texts.dailyChoiceCalendarPreviousMonth,
+      texts.dailyChoiceCalendarNextMonth,
+    ],
+    isExpanded
+        ? texts.dailyChoiceCalendarCollapse
+        : texts.dailyChoiceCalendarExpand,
+  ];
+  for (final name in names) {
+    final command = find.bySemanticsLabel(name, skipOffstage: false);
+    expect(command, findsOneWidget);
+    final rect = _globalRect(tester.renderObject<RenderBox>(command));
     expect(rect.left, greaterThanOrEqualTo(-_epsilon));
     expect(rect.right, lessThanOrEqualTo(_screen.width + _epsilon));
-    expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
-    expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+    expect(rect.width, greaterThanOrEqualTo(DoableMetrics.tapMin));
+    expect(rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
   }
 }
 

@@ -85,13 +85,19 @@ Finder get calendarPeriodArea => find.byType(DailyChoiceCalendarDay).first;
 
 /// Перелистывает календарь горизонтальным свайпом к следующему периоду.
 Future<void> swipeToNextPeriod(WidgetTester tester) async {
-  await tester.drag(calendarPeriodArea, const Offset(-600, 0));
+  await tester.drag(
+    calendarPeriodArea,
+    Offset(-tester.getSize(find.byType(DailyChoiceCalendar)).width * 0.8, 0),
+  );
   await tester.pumpAndSettle();
 }
 
 /// Перелистывает календарь горизонтальным свайпом к предыдущему периоду.
 Future<void> swipeToPreviousPeriod(WidgetTester tester) async {
-  await tester.drag(calendarPeriodArea, const Offset(600, 0));
+  await tester.drag(
+    calendarPeriodArea,
+    Offset(tester.getSize(find.byType(DailyChoiceCalendar)).width * 0.8, 0),
+  );
   await tester.pumpAndSettle();
 }
 
