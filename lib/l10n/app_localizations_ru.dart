@@ -2391,6 +2391,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
 
   @override
+  String get dailyChoiceScheduleLabel => 'Запланированное время';
+
+  @override
+  String get dailyChoiceAllDay => 'Весь день';
+
+  @override
+  String get dailyChoiceSetTime => 'Указать время';
+
+  @override
+  String dailyChoiceTimeLabel(String time) {
+    return 'Время: $time';
+  }
+
+  @override
+  String get dailyChoicePriorityLabel => 'Приоритет';
+
+  @override
+  String dailyChoicePriorityOption(String priority) {
+    return 'Приоритет $priority';
+  }
+
+  @override
   String get dailyChoiceCatalogTitle => 'Дневные выборы';
 
   @override

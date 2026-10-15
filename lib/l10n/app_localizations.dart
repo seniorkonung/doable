@@ -3911,6 +3911,42 @@ abstract class AppLocalizations {
   /// **'Confirm daily choice'**
   String get dailyChoiceCreationTitle;
 
+  /// Подпись запланированного времени дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled time'**
+  String get dailyChoiceScheduleLabel;
+
+  /// Планирование на весь день без конкретного времени
+  ///
+  /// In en, this message translates to:
+  /// **'All day'**
+  String get dailyChoiceAllDay;
+
+  /// Открыть выбор конкретного времени
+  ///
+  /// In en, this message translates to:
+  /// **'Set time'**
+  String get dailyChoiceSetTime;
+
+  /// Подтверждённое время дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Time: {time}'**
+  String dailyChoiceTimeLabel(String time);
+
+  /// Собственный приоритет дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get dailyChoicePriorityLabel;
+
+  /// Вариант приоритета дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String dailyChoicePriorityOption(String priority);
+
   /// Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено
   ///
   /// In en, this message translates to:

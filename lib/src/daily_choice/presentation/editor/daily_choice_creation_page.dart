@@ -21,6 +21,7 @@ import '../path/choice_path_page.dart';
 import '../path/choice_path_view_model.dart';
 import 'daily_choice_creation_state.dart';
 import 'daily_choice_creation_view_model.dart';
+import 'daily_choice_planning_fields.dart';
 
 /// Данные шага, которые нужны форме для показа подтверждаемого маршрута.
 final class DailyChoiceCreationStep {
@@ -256,6 +257,14 @@ final class DailyChoiceCreationPageState
                     : null,
               ),
               onChanged: (text) => _changeDate(text, model),
+            ),
+            const SizedBox(height: 16),
+            DailyChoicePlanningFields(
+              schedule: state.schedule,
+              priority: state.priority,
+              enabled: canEdit,
+              onScheduleChanged: model.changeSchedule,
+              onPriorityChanged: model.changePriority,
             ),
             const SizedBox(height: 16),
             TextField(

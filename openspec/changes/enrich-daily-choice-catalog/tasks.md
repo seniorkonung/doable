@@ -96,7 +96,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; соответствующий сгенерированный файл модели при необходимости.
   - **Estimated scope:** M.
 
-- [ ] 1.10 Дать форме создания доступный ввод времени и приоритета
+- [x] 1.10 Дать форме создания доступный ввод времени и приоритета
   - **Acceptance criteria:**
     - Форма позволяет выбрать весь день либо подтвердить конкретное время и выбрать P1–P4. Отмена ввода времени сохраняет прежнее значение; состояние без заданных часов и минут не становится конкретным временем черновика.
     - Общие для создания и редактирования элементы ввода получают текущие типизированные значения, признак доступности и обработчики изменения; команды и состояние формы остаются у существующих моделей. Выбор выполнения при создании сохраняется.

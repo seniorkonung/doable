@@ -2386,6 +2386,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Confirm daily choice';
 
   @override
+  String get dailyChoiceScheduleLabel => 'Scheduled time';
+
+  @override
+  String get dailyChoiceAllDay => 'All day';
+
+  @override
+  String get dailyChoiceSetTime => 'Set time';
+
+  @override
+  String dailyChoiceTimeLabel(String time) {
+    return 'Time: $time';
+  }
+
+  @override
+  String get dailyChoicePriorityLabel => 'Priority';
+
+  @override
+  String dailyChoicePriorityOption(String priority) {
+    return 'Priority $priority';
+  }
+
+  @override
   String get dailyChoiceCatalogTitle => 'Daily choices';
 
   @override
