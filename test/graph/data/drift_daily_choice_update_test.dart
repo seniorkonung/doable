@@ -5,6 +5,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -112,6 +114,8 @@ void main() {
             ? null
             : DailyChoiceDescription.fromInput(description),
         isCompleted: true,
+        schedule: DailyChoiceTime(hour: 18, minute: 0),
+        priority: DailyChoicePriority.p2,
       ),
     );
     return ((result as GraphCommandSucceeded).value.value as DailyChoiceCreated)
@@ -159,6 +163,8 @@ void main() {
       expect(updated.choice.date.toCanonicalString(), '2027-01-02');
       expect(after.choice.description, before.choice.description);
       expect(after.choice.isCompleted, isTrue);
+      expect(after.choice.schedule, before.choice.schedule);
+      expect(after.choice.priority, before.choice.priority);
       expect(after.choice.sourceIntentionId, before.choice.sourceIntentionId);
       expect(
         after.choice.selectedIntentionId,
@@ -190,6 +196,99 @@ void main() {
       );
     },
   );
+
+  test('время и приоритет меняются независимо при архивном пути', () async {
+    final id = await createChoice();
+    final other = await createChoice();
+    final original = (await read(id)).value!;
+    final originalRow = Map<String, Object?>.of(
+      raw.select('SELECT * FROM daily_choices WHERE id = ?', [
+        id.toCanonicalString(),
+      ]).single,
+    );
+    raw.execute('UPDATE long_term_relations SET is_archived = 1 WHERE id = ?', [
+      _uuid(101),
+    ]);
+    raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
+      _uuid(2),
+    ]);
+
+    final midnight = DailyChoiceTime(hour: 0, minute: 0);
+    for (final (patch, schedule, priority, storedMinute) in [
+      (
+        DailyChoiceFieldsPatch(schedule: DailyChoiceFieldSet(midnight)),
+        midnight,
+        DailyChoicePriority.p2,
+        0,
+      ),
+      (
+        const DailyChoiceFieldsPatch(
+          priority: DailyChoiceFieldSet(DailyChoicePriority.p1),
+        ),
+        midnight,
+        DailyChoicePriority.p1,
+        0,
+      ),
+      (
+        const DailyChoiceFieldsPatch(
+          schedule: DailyChoiceFieldSet(DailyChoiceAllDay()),
+        ),
+        const DailyChoiceAllDay(),
+        DailyChoicePriority.p1,
+        null,
+      ),
+    ]) {
+      final before = await read(id);
+      final result = await repository.execute(
+        UpdateDailyChoiceFields(choiceId: id, patch: patch),
+      );
+      final confirmed = (result as GraphCommandSucceeded).value;
+      final updated = confirmed.value as DailyChoiceFieldsUpdated;
+      final change = updated.changes.single as DailyChoiceChange;
+      final after = await read(id);
+      for (final previous in [updated.before, change.before!]) {
+        expect(previous.schedule, before.value!.choice.schedule);
+        expect(previous.priority, before.value!.choice.priority);
+      }
+      for (final current in [
+        updated.choice,
+        change.after!,
+        after.value!.choice,
+      ]) {
+        expect(current.schedule, schedule);
+        expect(current.priority, priority);
+      }
+      expect(
+        confirmed.revision.compareTo(before.revision),
+        GraphRevisionOrder.newer,
+      );
+      expect(
+        after.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(
+        raw.select('SELECT * FROM daily_choices WHERE id = ?', [
+          id.toCanonicalString(),
+        ]).single,
+        {
+          ...originalRow,
+          'scheduled_minute': storedMinute,
+          'priority': priority.level,
+        },
+      );
+      expect(
+        after.value!.path.map((item) => item.step.id),
+        original.path.map((item) => item.step.id),
+      );
+    }
+    final unchanged = (await read(other)).value!.choice;
+    expect(unchanged.schedule, original.choice.schedule);
+    expect(unchanged.priority, original.choice.priority);
+    expect(
+      raw.select('SELECT priority FROM long_term_relations').single['priority'],
+      2,
+    );
+  });
 
   test('дата не зависит от часового пояса часов репозитория', () async {
     final id = await createChoice();
@@ -238,6 +337,8 @@ void main() {
       expect(after.choice.description!.value, text);
       expect(after.choice.isCompleted, isFalse);
       expect(after.choice.date, CalendarDate.fromParts(2026, 9, 23));
+      expect(after.choice.schedule, otherBefore.choice.schedule);
+      expect(after.choice.priority, otherBefore.choice.priority);
 
       final second = await repository.execute(
         UpdateDailyChoiceFields(
@@ -252,6 +353,8 @@ void main() {
       after = (await read(id)).value!;
       expect(after.choice.description, isNull);
       expect(after.choice.isCompleted, isTrue);
+      expect(after.choice.schedule, otherBefore.choice.schedule);
+      expect(after.choice.priority, otherBefore.choice.priority);
       expect(
         (await read(other)).value!.choice.description,
         otherBefore.choice.description,
@@ -274,6 +377,8 @@ void main() {
           DailyChoiceDescription.fromInput(' Прежнее\nописание ')!,
         ),
         isCompleted: const DailyChoiceFieldSet(true),
+        schedule: DailyChoiceFieldSet(DailyChoiceTime(hour: 18, minute: 0)),
+        priority: const DailyChoiceFieldSet(DailyChoicePriority.p2),
       ),
     ]) {
       final result = await repository.execute(
@@ -383,6 +488,8 @@ void main() {
             date: DailyChoiceFieldSet(CalendarDate.fromParts(2027, 1, 1)),
             description: const DailyChoiceDescriptionCleared(),
             isCompleted: const DailyChoiceFieldSet(false),
+            schedule: const DailyChoiceFieldSet(DailyChoiceAllDay()),
+            priority: const DailyChoiceFieldSet(DailyChoicePriority.p1),
           ),
         ),
       );
@@ -399,6 +506,8 @@ void main() {
       expect(after.value!.choice.date, before.value!.choice.date);
       expect(after.value!.choice.description, before.value!.choice.description);
       expect(after.value!.choice.isCompleted, before.value!.choice.isCompleted);
+      expect(after.value!.choice.schedule, before.value!.choice.schedule);
+      expect(after.value!.choice.priority, before.value!.choice.priority);
       final last = diagnostics.events
           .whereType<DailyChoiceCommandDiagnosticsEvent>()
           .last;

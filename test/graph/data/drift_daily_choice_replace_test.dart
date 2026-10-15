@@ -5,6 +5,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -126,6 +128,8 @@ void main() {
         date: CalendarDate.fromParts(2026, 9, 23),
         description: DailyChoiceDescription.fromInput(' Описание\nвыбора '),
         isCompleted: true,
+        schedule: DailyChoiceTime(hour: 18, minute: 0),
+        priority: DailyChoicePriority.p2,
       ),
     );
     return ((result as GraphCommandSucceeded).value.value as DailyChoiceCreated)
@@ -150,6 +154,19 @@ void main() {
 
   test('заменяет участников и шаги архивного выполненного выбора', () async {
     final id = await createChoice();
+    final replacement = replace(id);
+    expect(
+      await repository.execute(
+        UpdateDailyChoiceFields(
+          choiceId: id,
+          patch: DailyChoiceFieldsPatch(
+            schedule: DailyChoiceFieldSet(DailyChoiceTime(hour: 7, minute: 45)),
+            priority: const DailyChoiceFieldSet(DailyChoicePriority.p1),
+          ),
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
     final before = await read(id);
     final sequence = raw.select(
       'SELECT creation_sequence FROM daily_choices WHERE id = ?',
@@ -159,7 +176,7 @@ void main() {
       _uuid(102),
     ]);
 
-    final result = await repository.execute(replace(id));
+    final result = await repository.execute(replacement);
 
     final confirmed = (result as GraphCommandSucceeded).value;
     final replaced = confirmed.value as DailyChoicePathReplaced;
@@ -190,6 +207,16 @@ void main() {
       1,
     );
     final change = replaced.changes.single as DailyChoiceChange;
+    for (final choice in [
+      replaced.before,
+      replaced.choice,
+      change.before!,
+      change.after!,
+      after.choice,
+    ]) {
+      expect(choice.schedule, DailyChoiceTime(hour: 7, minute: 45));
+      expect(choice.priority, DailyChoicePriority.p1);
+    }
     expect(change.releasedRelationIds, {_relation(101), _relation(102)});
     expect(change.occupiedRelationIds, {_relation(104)});
     expect(change.intentionCounts[_intention(1)]!.dailySource, 0);
@@ -280,6 +307,8 @@ void main() {
         ),
       );
       final after = await read(id);
+      expect(after.value!.choice.schedule, before.value!.choice.schedule);
+      expect(after.value!.choice.priority, before.value!.choice.priority);
       expect(
         after.revision.compareTo(before.revision),
         GraphRevisionOrder.same,
@@ -344,6 +373,8 @@ void main() {
       isA<DailyChoiceUnexpectedFailure>(),
     );
     final after = await read(id);
+    expect(after.value!.choice.schedule, before.value!.choice.schedule);
+    expect(after.value!.choice.priority, before.value!.choice.priority);
     expect(after.revision.compareTo(before.revision), GraphRevisionOrder.same);
     expect(
       after.value!.choice.sourceIntentionId,

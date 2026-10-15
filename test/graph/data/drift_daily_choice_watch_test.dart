@@ -6,6 +6,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -125,6 +127,8 @@ void main() {
         date: CalendarDate.fromParts(2026, 9, 23),
         description: null,
         isCompleted: false,
+        schedule: DailyChoiceTime(hour: 18, minute: 0),
+        priority: DailyChoicePriority.p2,
       ),
     );
     expect(result, isA<GraphCommandSucceeded>());
@@ -146,6 +150,32 @@ void main() {
       GraphRevisionOrder.newer,
     );
 
+    final result = await repository.execute(
+      UpdateDailyChoiceFields(
+        choiceId: _choice(201),
+        patch: const DailyChoiceFieldsPatch(
+          schedule: DailyChoiceFieldSet(DailyChoiceAllDay()),
+          priority: DailyChoiceFieldSet(DailyChoicePriority.p1),
+        ),
+      ),
+    );
+    expect(result, isA<GraphCommandSucceeded>());
+    expect(await events.moveNext(), isTrue);
+    final updated = _snapshot(events.current);
+    expect(updated.value!.choice.isCompleted, isFalse);
+    expect(updated.value!.choice.schedule, const DailyChoiceAllDay());
+    expect(updated.value!.choice.priority, DailyChoicePriority.p1);
+    expect(
+      updated.revision.compareTo(
+        (result as GraphCommandSucceeded).value.revision,
+      ),
+      GraphRevisionOrder.same,
+    );
+    expect(
+      updated.revision.compareTo(created.revision),
+      GraphRevisionOrder.newer,
+    );
+
     expect(
       await repository.execute(
         UpdateDailyChoiceFields(
@@ -158,10 +188,12 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     expect(await events.moveNext(), isTrue);
-    final updated = _snapshot(events.current);
-    expect(updated.value!.choice.isCompleted, isTrue);
+    final completed = _snapshot(events.current);
+    expect(completed.value!.choice.isCompleted, isTrue);
+    expect(completed.value!.choice.schedule, const DailyChoiceAllDay());
+    expect(completed.value!.choice.priority, DailyChoicePriority.p1);
     expect(
-      updated.revision.compareTo(created.revision),
+      completed.revision.compareTo(updated.revision),
       GraphRevisionOrder.newer,
     );
 
@@ -173,7 +205,7 @@ void main() {
     final deleted = _snapshot(events.current);
     expect(deleted.value, isNull);
     expect(
-      deleted.revision.compareTo(updated.revision),
+      deleted.revision.compareTo(completed.revision),
       GraphRevisionOrder.newer,
     );
   });
@@ -219,6 +251,11 @@ void main() {
     );
     await waitFor(4);
     expect(events.last.value!.path.single.relation.id, _relation(103));
+    expect(
+      events.last.value!.choice.schedule,
+      DailyChoiceTime(hour: 18, minute: 0),
+    );
+    expect(events.last.value!.choice.priority, DailyChoicePriority.p2);
 
     await repository.execute(
       UpdateIntention(

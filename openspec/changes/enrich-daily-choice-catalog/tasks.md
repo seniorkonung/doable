@@ -65,7 +65,7 @@
   - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `test/graph/data/drift_daily_choice_create_test.dart`, `test/graph/data/file_backed_daily_choice_durability_test.dart`, `test/support/daily_choice_durability_fixture.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.7 Сохранять независимость новых полей при правках и замене пути
+- [x] 1.7 Сохранять независимость новых полей при правках и замене пути
   - **Acceptance criteria:**
     - Изменение времени или приоритета применяет только заданные поля, включая переход на весь день; дата, описание, выполнение, идентичность, порядок создания и путь сохраняются. Архивирование шагов или утрата готовности после создания не препятствуют такой правке.
     - Изменение прежних полей и атомарная замена пути сохраняют актуальные время и приоритет. Отказ оставляет прежние данные целиком; правка без фактических изменений не продвигает ревизию.
