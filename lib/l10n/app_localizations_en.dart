@@ -2368,11 +2368,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogLoading => 'Loading daily choices…';
 
   @override
-  String dailyChoiceCalendarSelectedDate(String date) {
-    return 'Selected date: $date';
-  }
-
-  @override
   String get dailyChoiceCalendarToday => 'Today';
 
   @override
@@ -2392,12 +2387,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyChoiceCalendarCollapse => 'Collapse calendar';
-
-  @override
-  String get dailyChoiceCalendarPreviousWeek => 'Previous week';
-
-  @override
-  String get dailyChoiceCalendarNextWeek => 'Next week';
 
   @override
   String get dailyChoiceCalendarPreviousMonth => 'Previous month';

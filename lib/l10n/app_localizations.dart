@@ -3881,12 +3881,6 @@ abstract class AppLocalizations {
   /// **'Loading daily choices…'**
   String get dailyChoiceCatalogLoading;
 
-  /// Подпись выбранной даты фильтра календаря, видимая и при просмотре другого периода
-  ///
-  /// In en, this message translates to:
-  /// **'Selected date: {date}'**
-  String dailyChoiceCalendarSelectedDate(String date);
-
   /// Доступное состояние дня календаря, совпадающего с текущим локальным днём устройства, а не с выбранной датой
   ///
   /// In en, this message translates to:
@@ -3922,18 +3916,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Collapse calendar'**
   String get dailyChoiceCalendarCollapse;
-
-  /// Команда просмотра предыдущей недели в свёрнутом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Previous week'**
-  String get dailyChoiceCalendarPreviousWeek;
-
-  /// Команда просмотра следующей недели в свёрнутом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Next week'**
-  String get dailyChoiceCalendarNextWeek;
 
   /// Команда просмотра предыдущего месяца в раскрытом календаре без выбора дня
   ///

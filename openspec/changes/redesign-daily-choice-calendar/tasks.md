@@ -206,7 +206,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/support/app_root_pages.dart`; проверки заголовков в `test/app/navigation/` и `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.10 Локализация больше не содержит строк выбранной даты и команд соседней недели
+- [x] 2.10 Локализация больше не содержит строк выбранной даты и команд соседней недели
   - **Acceptance criteria:**
     - Из app_ru.arb и app_en.arb удалены dailyChoiceCalendarSelectedDate, dailyChoiceCalendarPreviousWeek и dailyChoiceCalendarNextWeek вместе с метаданными; потребителей старых ключей нет.
     - Сгенерированная локализация соответствует ARB. Русские и английские форматы календаря и DayHeading, английский fallback и сохранение состояния при смене локали подтверждены существующими проверками; строки выбора года и месяца не добавляются.
