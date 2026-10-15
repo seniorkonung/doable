@@ -1,10 +1,10 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
-import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -37,6 +37,7 @@ import '../../long_term_relation/presentation/details/relation_details_test_supp
     show ControlledRelationWatch, testRelationDetails;
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
     show testRelationId;
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -482,10 +483,7 @@ Future<void> _select(
   AppDestination destination, {
   bool settle = true,
 }) async {
-  final l10n = AppLocalizations.of(
-    tester.element(find.byType(AppNavigationBar)),
-  );
-  await tester.tap(find.byTooltip(destination.title(l10n)));
+  await tester.tap(appNavigationDestination(destination));
   if (settle) await tester.pumpAndSettle();
 }
 
@@ -501,14 +499,14 @@ void _expectRoot(
   expect(tester.takeException(), isNull);
 }
 
-/// Панель показывает выбранным пункт [destination]: у него залитый значок.
+/// Панель объявляет пункт [destination] выбранным.
 void _expectSelected(WidgetTester tester, AppDestination destination) {
   expect(
-    find.descendant(
-      of: find.byType(AppNavigationBar),
-      matching: find.byIcon(destination.selectedIcon),
-    ),
-    findsOneWidget,
+    tester
+        .getSemantics(appNavigationDestination(destination))
+        .flagsCollection
+        .isSelected,
+    Tristate.isTrue,
   );
 }
 

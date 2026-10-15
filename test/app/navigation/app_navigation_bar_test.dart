@@ -6,6 +6,8 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -26,15 +28,15 @@ const _englishNames = {
 };
 
 const _outlinedIcons = {
-  AppDestination.home: Icons.home_outlined,
-  AppDestination.dailyChoices: Icons.calendar_month_outlined,
-  AppDestination.intentionGraph: Icons.hub_outlined,
+  AppDestination.home: DoableIconData.home,
+  AppDestination.dailyChoices: DoableIconData.calendarDays,
+  AppDestination.intentionGraph: DoableIconData.graph,
 };
 
 const _filledIcons = {
-  AppDestination.home: Icons.home,
-  AppDestination.dailyChoices: Icons.calendar_month,
-  AppDestination.intentionGraph: Icons.hub,
+  AppDestination.home: DoableIconData.homeFilled,
+  AppDestination.dailyChoices: DoableIconData.calendarDaysFilled,
+  AppDestination.intentionGraph: DoableIconData.graphFilled,
 };
 
 final _locales = {
@@ -71,7 +73,7 @@ void main() {
     expect(launches, 1);
     expect(menus, 1);
     expect(selections, isEmpty);
-    expect(find.byIcon(Icons.home), findsOneWidget);
+    expect(_icon(DoableIconData.homeFilled), findsOneWidget);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
@@ -85,40 +87,53 @@ void main() {
       await tester.pumpWidget(_testApp(locale: locale));
 
       expect(appNavigationDestinations(), findsNWidgets(3));
-      final home = tester.getCenter(find.byIcon(Icons.home));
-      final calendar = tester.getCenter(
-        find.byIcon(Icons.calendar_month_outlined),
-      );
-      final graph = tester.getCenter(find.byIcon(Icons.hub_outlined));
+      final home = tester.getCenter(_icon(DoableIconData.homeFilled));
+      final calendar = tester.getCenter(_icon(DoableIconData.calendarDays));
+      final graph = tester.getCenter(_icon(DoableIconData.graph));
       final quick = tester.getCenter(find.byType(QuickCreationButton));
       expect(home.dx, lessThan(calendar.dx));
       expect(calendar.dx, lessThan(graph.dx));
       expect(graph.dx, lessThan(quick.dx));
       expect(find.byType(QuickCreationButton).hitTestable(), findsOneWidget);
-      expect(find.byIcon(Icons.account_tree), findsNothing);
-      expect(find.byIcon(Icons.account_tree_outlined), findsNothing);
-      expect(find.byIcon(Icons.schema), findsNothing);
-      expect(find.byIcon(Icons.schema_outlined), findsNothing);
     });
 
-    for (final selected in AppDestination.values) {
-      testWidgets('выбранный пункт ${selected.name} отличается залитым '
-          'значком', (tester) async {
-        await tester.pumpWidget(_testApp(locale: locale, selected: selected));
-        await tester.pumpAndSettle();
+    for (final brightness in Brightness.values) {
+      final colors = brightness == Brightness.light
+          ? DoableColors.light
+          : DoableColors.dark;
+      for (final selected in AppDestination.values) {
+        testWidgets('пункт ${selected.name} показывает исходные варианты '
+            'и цвета значков в теме ${brightness.name}', (tester) async {
+          await tester.pumpWidget(
+            _testApp(
+              locale: locale,
+              selected: selected,
+              brightness: brightness,
+            ),
+          );
+          await tester.pumpAndSettle();
 
-        for (final destination in AppDestination.values) {
-          final isSelected = destination == selected;
-          expect(
-            find.byIcon(_filledIcons[destination]!),
-            isSelected ? findsOneWidget : findsNothing,
-          );
-          expect(
-            find.byIcon(_outlinedIcons[destination]!),
-            isSelected ? findsNothing : findsOneWidget,
-          );
-        }
-      });
+          for (final destination in AppDestination.values) {
+            final isSelected = destination == selected;
+            expect(
+              _icon(_filledIcons[destination]!),
+              isSelected ? findsOneWidget : findsNothing,
+            );
+            expect(
+              _icon(_outlinedIcons[destination]!),
+              isSelected ? findsNothing : findsOneWidget,
+            );
+            final icon = tester.widget<DoableIcon>(
+              _icon(
+                isSelected
+                    ? _filledIcons[destination]!
+                    : _outlinedIcons[destination]!,
+              ),
+            );
+            expect(icon.color, isSelected ? colors.ink : colors.muted);
+          }
+        });
+      }
     }
 
     testWidgets('значки не обрезаются, и каждый '
@@ -138,7 +153,7 @@ void main() {
         final icon = destination == AppDestination.home
             ? _filledIcons[destination]!
             : _outlinedIcons[destination]!;
-        final iconRect = tester.getRect(find.byIcon(icon));
+        final iconRect = tester.getRect(_icon(icon));
         expect(iconRect.width, moreOrLessEquals(24));
         expect(iconRect.height, moreOrLessEquals(24));
         expect(
@@ -148,7 +163,7 @@ void main() {
           reason: 'значок $destination выходит за панель',
         );
 
-        await tester.tap(find.byIcon(icon));
+        await tester.tap(appNavigationDestination(destination));
       }
       expect(selections, AppDestination.values);
     });
@@ -247,9 +262,9 @@ void main() {
       await tester.pumpWidget(_testApp(locale: locale));
       await tester.pumpAndSettle();
       layouts.add([
-        tester.getCenter(find.byIcon(Icons.home)),
-        tester.getCenter(find.byIcon(Icons.calendar_month_outlined)),
-        tester.getCenter(find.byIcon(Icons.hub_outlined)),
+        tester.getCenter(_icon(DoableIconData.homeFilled)),
+        tester.getCenter(_icon(DoableIconData.calendarDays)),
+        tester.getCenter(_icon(DoableIconData.graph)),
       ]);
     }
 
@@ -264,21 +279,26 @@ void main() {
       _testApp(locale: const Locale('ru'), onSelected: selections.add),
     );
 
-    await tester.tap(find.byIcon(Icons.hub_outlined));
+    await tester.tap(appNavigationDestination(AppDestination.intentionGraph));
     await tester.pumpAndSettle();
 
     expect(selections, [AppDestination.intentionGraph]);
     // Выбранный пункт задаёт владелец панели: без его решения он прежний.
-    expect(find.byIcon(Icons.home), findsOneWidget);
-    expect(find.byIcon(Icons.hub_outlined), findsOneWidget);
+    expect(_icon(DoableIconData.homeFilled), findsOneWidget);
+    expect(_icon(DoableIconData.graph), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.home));
+    await tester.tap(appNavigationDestination(AppDestination.home));
     expect(selections, [AppDestination.intentionGraph, AppDestination.home]);
   });
 }
 
+Finder _icon(DoableIconData icon) => find.byWidgetPredicate(
+  (widget) => widget is DoableIcon && widget.icon == icon,
+);
+
 Widget _testApp({
   Locale? locale,
+  Brightness brightness = Brightness.light,
   AppDestination selected = AppDestination.home,
   ValueChanged<AppDestination>? onSelected,
 
@@ -288,6 +308,7 @@ Widget _testApp({
 }) {
   return MaterialApp(
     locale: locale,
+    theme: ThemeData(brightness: brightness),
     localeListResolutionCallback: resolveAppLocale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
