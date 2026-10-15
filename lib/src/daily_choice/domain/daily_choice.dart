@@ -4,6 +4,8 @@ import 'calendar_date.dart';
 import 'choice_path_step_id.dart';
 import 'daily_choice_description.dart';
 import 'daily_choice_id.dart';
+import 'daily_choice_priority.dart';
+import 'daily_choice_schedule.dart';
 
 final class DailyChoice {
   factory DailyChoice({
@@ -13,6 +15,8 @@ final class DailyChoice {
     required CalendarDate date,
     required DailyChoiceDescription? description,
     required bool isCompleted,
+    DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+    DailyChoicePriority priority = DailyChoicePriority.p4,
   }) {
     if (sourceIntentionId == selectedIntentionId) {
       throw ArgumentError.value(selectedIntentionId, 'selectedIntentionId');
@@ -24,6 +28,8 @@ final class DailyChoice {
       date: date,
       description: description,
       isCompleted: isCompleted,
+      schedule: schedule,
+      priority: priority,
     );
   }
 
@@ -34,6 +40,8 @@ final class DailyChoice {
     required this.date,
     required this.description,
     required this.isCompleted,
+    required this.schedule,
+    required this.priority,
   });
 
   final DailyChoiceId id;
@@ -42,6 +50,8 @@ final class DailyChoice {
   final CalendarDate date;
   final DailyChoiceDescription? description;
   final bool isCompleted;
+  final DailyChoiceSchedule schedule;
+  final DailyChoicePriority priority;
 }
 
 final class ChoicePathStep {

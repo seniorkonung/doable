@@ -3,6 +3,8 @@ import '../../intention/domain/intention_id.dart';
 import '../domain/calendar_date.dart';
 import '../domain/daily_choice_description.dart';
 import '../domain/daily_choice_id.dart';
+import '../domain/daily_choice_priority.dart';
+import '../domain/daily_choice_schedule.dart';
 import 'confirmed_choice_path.dart';
 import 'daily_choice_result.dart';
 
@@ -25,6 +27,8 @@ final class CreateDailyChoice extends DailyChoiceCommand {
     required CalendarDate date,
     required DailyChoiceDescription? description,
     required bool isCompleted,
+    DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+    DailyChoicePriority priority = DailyChoicePriority.p4,
   }) {
     if (sourceIntentionId == selectedIntentionId) {
       throw ArgumentError.value(selectedIntentionId, 'selectedIntentionId');
@@ -36,6 +40,8 @@ final class CreateDailyChoice extends DailyChoiceCommand {
       date: date,
       description: description,
       isCompleted: isCompleted,
+      schedule: schedule,
+      priority: priority,
     );
   }
 
@@ -46,6 +52,8 @@ final class CreateDailyChoice extends DailyChoiceCommand {
     required this.date,
     required this.description,
     required this.isCompleted,
+    required this.schedule,
+    required this.priority,
   });
 
   final IntentionId sourceIntentionId;
@@ -54,6 +62,8 @@ final class CreateDailyChoice extends DailyChoiceCommand {
   final CalendarDate date;
   final DailyChoiceDescription? description;
   final bool isCompleted;
+  final DailyChoiceSchedule schedule;
+  final DailyChoicePriority priority;
 }
 
 sealed class DailyChoiceFieldPatch<T extends Object> {
@@ -96,11 +106,15 @@ final class DailyChoiceFieldsPatch {
     this.date = const DailyChoiceFieldUnchanged<CalendarDate>(),
     this.description = const DailyChoiceDescriptionUnchanged(),
     this.isCompleted = const DailyChoiceFieldUnchanged<bool>(),
+    this.schedule = const DailyChoiceFieldUnchanged<DailyChoiceSchedule>(),
+    this.priority = const DailyChoiceFieldUnchanged<DailyChoicePriority>(),
   });
 
   final DailyChoiceFieldPatch<CalendarDate> date;
   final DailyChoiceDescriptionPatch description;
   final DailyChoiceFieldPatch<bool> isCompleted;
+  final DailyChoiceFieldPatch<DailyChoiceSchedule> schedule;
+  final DailyChoiceFieldPatch<DailyChoicePriority> priority;
 }
 
 final class UpdateDailyChoiceFields extends DailyChoiceCommand {
