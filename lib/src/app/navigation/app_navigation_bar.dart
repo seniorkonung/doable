@@ -1,8 +1,10 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/design_system/components/nav_bar.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../quick_creation/quick_creation_button.dart';
 import '../quick_creation/quick_creation_mode.dart';
@@ -40,21 +42,41 @@ final class AppNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    return NavBar(
-      items: [
-        for (final destination in AppDestination.values)
-          NavBarItem(
-            icon: destination.icon,
-            selectedIcon: destination.selectedIcon,
-            title: destination.title(localizations),
-          ),
-      ],
-      selectedIndex: selected.index,
-      onSelected: (index) => onSelected(AppDestination.values[index]),
-      action: QuickCreationButton(
-        mode: quickCreationMode,
-        onPressed: onQuickCreate,
-        onChangeMode: onChangeQuickCreationMode,
+    final theme = Theme.of(context);
+    final colors =
+        theme.extension<DoableColors>() ??
+        switch (theme.brightness) {
+          Brightness.light => DoableColors.light,
+          Brightness.dark => DoableColors.dark,
+        };
+    // Нижняя аннотация охватывает SafeArea панели, верхнюю задаёт страница:
+    // https://api.flutter.dev/flutter/services/SystemChrome/setSystemUIOverlayStyle.html
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        systemNavigationBarColor: colors.raised,
+        systemNavigationBarDividerColor: colors.raised,
+        systemNavigationBarIconBrightness: switch (theme.brightness) {
+          Brightness.light => Brightness.dark,
+          Brightness.dark => Brightness.light,
+        },
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: NavBar(
+        items: [
+          for (final destination in AppDestination.values)
+            NavBarItem(
+              icon: destination.icon,
+              selectedIcon: destination.selectedIcon,
+              title: destination.title(localizations),
+            ),
+        ],
+        selectedIndex: selected.index,
+        onSelected: (index) => onSelected(AppDestination.values[index]),
+        action: QuickCreationButton(
+          mode: quickCreationMode,
+          onPressed: onQuickCreate,
+          onChangeMode: onChangeQuickCreationMode,
+        ),
       ),
     );
   }

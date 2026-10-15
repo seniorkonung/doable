@@ -5,10 +5,18 @@ import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    // На API 29–34 edge-to-edge включается явно; API 24–28 его игнорируют.
+    // https://api.flutter.dev/flutter/services/SystemUiMode.html
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
   final runtime = AppRuntime.production();
   runApp(MainApp(runtime: runtime));
 }

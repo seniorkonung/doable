@@ -10,7 +10,7 @@
   - **Вероятные файлы:** `lib/src/design_system/components/nav_bar.dart`, `lib/src/design_system/doable_metrics.dart`, `test/app/navigation/app_navigation_bar_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 1.2 Связать оформление системной навигации Android с темой общей панели приложения
+- [x] 1.2 Связать оформление системной навигации Android с темой общей панели приложения
   - **Критерии приёмки:**
     - `AppNavigationBar` задаёт стиль нижней системной области по решению 2 в [дизайне](design.md): цвет панели и разделителя равен `raised` текущей темы, светлые системные элементы на тёмном фоне и тёмные на светлом, `systemNavigationBarContrastEnforced: false`. Стиль охватывает безопасную область и обновляется при смене темы без пересоздания открытой страницы. Применимость полей по API обеспечивает Flutter; дополнительный канал определения версии Android в Dart не вводится.
     - Верхняя системная строка сохраняет оформление своего владельца — `AppBar` или страницы. Нижний стиль применяется общим компонентом как в оболочке, так и на обычных страницах, в границах [ADR-0020](../../../docs/adr/0020-host-persistent-navigation-in-ordinary-page-scaffolds.md) и [ADR-0030](../../../docs/adr/0030-keep-design-system-components-presentational.md).
