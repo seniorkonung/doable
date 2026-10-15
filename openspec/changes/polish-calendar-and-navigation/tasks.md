@@ -98,7 +98,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_period_picker.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 2.4 Подтвердить сохранение страницы выбора периода, выдачи и доступной раскладки в обоих каталогах
+- [x] 2.4 Подтвердить сохранение страницы выбора периода, выдачи и доступной раскладки в обоих каталогах
   - **Критерии приёмки:**
     - Пролистанные страницы лет и месяцев сохраняются при перестроении живого экземпляра календаря, смене локали и темы, обновлении текущей даты и отметок, уходе с корневого пункта и возврате из страницы поверх каталога. Состояние принадлежит своему экземпляру по [ADR-0028](../../../docs/adr/0028-scope-opening-parameter-state-to-page-instances.md); новый каталог начинает со своего просмотра, а контроллеры не читают и не портят смещение внешнего `PageStorage`.
     - В корневом каталоге и каталоге на заданную дату новые жесты и стрелки сохраняют выбранную дату, фильтр выполнения и выдачу без новых чтений каталога. До выбора месяца промежуточные страницы не передаются модели отметок; завершённый выбор сохраняет существующее обновление отметок по [ADR-0025](../../../docs/adr/0025-load-calendar-day-marks-in-separate-viewport-model.md).

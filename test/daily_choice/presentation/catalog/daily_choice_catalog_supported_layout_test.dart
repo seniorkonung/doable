@@ -9,6 +9,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/notice.dart';
+import 'package:doable/src/design_system/components/period_picker.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:flutter/material.dart';
@@ -27,22 +28,20 @@ void main() {
   for (final onDate in [false, true]) {
     for (final locale in const [Locale('ru'), Locale('en')]) {
       final name = onDate ? 'каталог на дату' : 'корневой каталог';
-      testWidgets(
-        '$name на границе 360×720 сохраняет доступность '
-        'месяца, сообщения и выдачи при отказе отметок (${locale.languageCode})',
-        (tester) async {
-          await _setSupportBoundary(tester);
-          final repository = CatalogPageRepository();
-          final selected = date(2026, 10, 8);
-          await _open(tester, repository, selected, locale, onDate: onDate);
-          if (onDate) {
-            expect(tester.getSize(find.byType(AppBar)).height, 56 + 24);
-          } else {
-            expect(find.byType(AppBar), findsNothing);
-          }
-          await _expectUsableCatalog(tester, repository, initialDate: selected);
-        },
-      );
+      testWidgets('$name на границе 360×720 сохраняет доступность '
+          'дней, выбора периода, сообщения и выдачи при отказе отметок '
+          '(${locale.languageCode})', (tester) async {
+        await _setSupportBoundary(tester);
+        final repository = CatalogPageRepository();
+        final selected = date(2026, 10, 8);
+        await _open(tester, repository, selected, locale, onDate: onDate);
+        if (onDate) {
+          expect(tester.getSize(find.byType(AppBar)).height, 56 + 24);
+        } else {
+          expect(find.byType(AppBar), findsNothing);
+        }
+        await _expectUsableCatalog(tester, repository, initialDate: selected);
+      });
     }
   }
 }
@@ -180,6 +179,63 @@ Future<void> _expectUsableCatalog(
   await _scrollToLastRow(tester, list);
   expect(tester.getRect(calendar), calendarRect);
   expect(tester.getRect(notice), noticeRect);
+
+  await tester.tap(
+    find.bySemanticsLabel(l10n.dailyChoiceCalendarChooseYearAndMonth),
+  );
+  await tester.pumpAndSettle();
+  await tester.drag(find.text('2025'), const Offset(-280, 0));
+  await tester.pumpAndSettle();
+  expect(find.text('2032–2043'), findsOneWidget);
+  for (final fromMonths in [false, true]) {
+    if (fromMonths) {
+      await tester.tap(find.text('2035'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel(l10n.dailyChoiceCalendarNextYear));
+      await tester.pumpAndSettle();
+      expect(find.text('2036'), findsOneWidget);
+    }
+    final periodRect = tester.getRect(calendar);
+    final periodListRect = tester.getRect(list);
+    expect(periodRect.intersect(usableBody.inflate(0.01)), periodRect);
+    expect(periodListRect.height, greaterThanOrEqualTo(48));
+    expect(periodListRect.bottom, usableBody.bottom);
+    final cells = find.descendant(
+      of: find.byType(PeriodPicker),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.button == true,
+      ),
+    );
+    expect(cells, findsNWidgets(12));
+    for (final cell in cells.evaluate()) {
+      expect(find.byWidget(cell.widget).hitTestable(), findsOneWidget);
+    }
+    for (final label in [
+      fromMonths
+          ? l10n.dailyChoiceCalendarPreviousYear
+          : l10n.dailyChoiceCalendarPreviousYears,
+      fromMonths
+          ? l10n.dailyChoiceCalendarNextYear
+          : l10n.dailyChoiceCalendarNextYears,
+      l10n.dailyChoiceCalendarBackToMonthDays,
+      l10n.dailyChoiceCalendarCollapse,
+    ]) {
+      expect(find.bySemanticsLabel(label).hitTestable(), findsOneWidget);
+    }
+    final periodNoticeRect = tester.getRect(notice);
+    expect(periodNoticeRect.bottom, lessThanOrEqualTo(periodListRect.top));
+    _expectCalendarTextsWhole(tester, calendar, usableBody);
+    await tester.drag(list, const Offset(0, 10000));
+    await tester.pumpAndSettle();
+    await _scrollToLastRow(tester, list);
+    expect(tester.getRect(calendar), periodRect);
+    expect(tester.getRect(notice), periodNoticeRect);
+  }
+  await tester.tap(
+    find.bySemanticsLabel(l10n.dailyChoiceCalendarBackToMonthDays),
+  );
+  await tester.pumpAndSettle();
+  expect(visibleWeeks(tester), weeks);
 
   final selected = date(2026, 10, 31);
   await tester.tap(calendarDay(selected));

@@ -245,6 +245,7 @@ Future<CalendarConsumer> pumpCalendarConsumer(
   await tester.pumpWidget(
     MaterialApp(
       theme: doableTheme(Brightness.light),
+      darkTheme: doableTheme(Brightness.dark),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       localeListResolutionCallback: resolveAppLocale,

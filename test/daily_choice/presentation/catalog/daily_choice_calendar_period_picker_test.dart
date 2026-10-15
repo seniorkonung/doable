@@ -265,8 +265,9 @@ void main() {
 
   for (final fromMonths in [false, true]) {
     final level = fromMonths ? 'месяцев' : 'лет';
-    testWidgets('смена локали сохраняет открытую страницу $level и просмотр '
-        'без событий календаря', (tester) async {
+    testWidgets('перестроение, отметки, сегодня, тема и локаль сохраняют '
+        'пролистанную страницу $level без событий календаря', (tester) async {
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       final selected = date(2026, 10, 8);
       final viewport = month(date(2026, 11, 1));
       final consumer = await pumpCalendarConsumer(
@@ -276,11 +277,32 @@ void main() {
         today: selected,
       );
       await _command(tester, 'Выбрать год и месяц');
-      await _command(tester, 'Следующие годы');
+      await tester.drag(find.text('2025'), const Offset(-600, 0));
+      await tester.pumpAndSettle();
       if (fromMonths) {
         await tester.tap(find.text('2035'));
         await tester.pumpAndSettle();
+        await _command(tester, 'Следующий год');
       }
+      final title = fromMonths ? '2036' : '2032–2043';
+      consumer.rebuild();
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsOneWidget);
+      consumer.replaceInputs(
+        today: date(2026, 10, 9),
+        dayStatuses: {selected: DailyChoiceDayStatus.allCompleted},
+        hasDayMarksReadFailure: true,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsOneWidget);
+      expect(find.text('Отметки дней не загружены.'), findsOneWidget);
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      await tester.pumpAndSettle();
+      expect(
+        Theme.of(tester.element(find.text(title))).brightness,
+        Brightness.dark,
+      );
+      expect(find.text(title), findsOneWidget);
 
       for (final (locale, january, back) in const [
         (Locale('en'), 'January', 'Back to the days of the month'),
@@ -288,8 +310,12 @@ void main() {
       ]) {
         tester.platformDispatcher.localesTestValue = [locale];
         await tester.pumpAndSettle();
-        expect(find.text(fromMonths ? '2035' : '2032–2043'), findsOneWidget);
+        expect(find.text(title), findsOneWidget);
         expect(find.text(january), fromMonths ? findsOneWidget : findsNothing);
+        expect(
+          find.bySemanticsLabel(fromMonths ? '$january 2036' : '2032'),
+          findsOneWidget,
+        );
         expect(find.bySemanticsLabel(back), findsOneWidget);
         expect(visibleWeeks(tester), isEmpty);
         expect(consumer.viewport, viewport);
@@ -517,8 +543,10 @@ void main() {
 
   for (final onDate in [false, true]) {
     final catalog = onDate ? 'каталог на дату' : 'корневой каталог';
-    testWidgets('$catalog сохраняет выбранную дату, фильтр и выдачу при '
-        'выборе далёкого месяца', (tester) async {
+    testWidgets('$catalog не читает выдачу и отметки при перелистывании '
+        'выбора периода, а после выбора месяца обновляет только отметки', (
+      tester,
+    ) async {
       final selected = date(2026, 10, 8);
       final repository = CatalogPageRepository();
       await pumpCatalogPage(
@@ -547,11 +575,22 @@ void main() {
 
       await _command(tester, 'Развернуть календарь');
       await _command(tester, 'Выбрать год и месяц');
-      await tester.tap(find.text('2028'));
+      await tester.drag(find.text('2025'), const Offset(-300, 0));
       await tester.pumpAndSettle();
+      expect(find.text('2032–2043'), findsOneWidget);
+      await _command(tester, 'Следующие годы');
+      expect(find.text('2044–2055'), findsOneWidget);
+      await tester.tap(find.text('2046'));
+      await tester.pumpAndSettle();
+      await _command(tester, 'Следующий год');
+      expect(find.text('2047'), findsOneWidget);
+      expect(repository.queries, hasLength(2));
+      expect(repository.dayStatusQueries, hasLength(1));
+      expect(find.text('8 октября 2026'), findsOneWidget);
+      expect(find.text('Не выполненные'), findsOneWidget);
       await tester.tap(find.text('Март'));
       await tester.pumpAndSettle();
-      expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 6));
+      expect(visibleWeeks(tester), weeksFrom(date(2047, 2, 25), 6));
       expect(find.text('8 октября 2026'), findsOneWidget);
       expect(find.text('Не выполненные'), findsOneWidget);
       expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
@@ -559,14 +598,15 @@ void main() {
       expect(repository.queries.last.date, selected);
       expect(repository.queries.last.isCompleted, isFalse);
 
-      final marked = date(2028, 3, 7);
+      expect(repository.dayStatusQueries, hasLength(2));
+      final marked = date(2047, 3, 7);
       repository.completeDayStatuses(1, {
         marked: DailyChoiceDayStatus.allCompleted,
       });
       await tester.pumpAndSettle();
       expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
       await _command(tester, 'Свернуть календарь');
-      expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 1));
+      expect(visibleWeeks(tester), weeksFrom(date(2047, 2, 25), 1));
       expect(find.text('8 октября 2026'), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(repository.queries, hasLength(2));

@@ -27,7 +27,7 @@ final _pageScroll = find.byWidgetPredicate(
 );
 
 ScrollPosition _pageScrollPosition(WidgetTester tester) =>
-    tester.state<ScrollableState>(_pageScroll).position;
+    tester.state<ScrollableState>(_pageScroll.first).position;
 
 Future<CalendarConsumer> _pumpUnderStoredScroll(
   WidgetTester tester, {
@@ -226,7 +226,7 @@ void main() {
 
     testWidgets(
       'пересозданная прокрутка страницы восстанавливает своё смещение после '
-      'перелистывания, смены представления и пересоздания календаря',
+      'перелистывания дней, лет и месяцев и пересоздания календаря',
       (tester) async {
         final consumer = await _pumpUnderStoredScroll(tester, viewport: week);
         // Небольшое смещение оставляет команды и дни календаря на экране.
@@ -247,6 +247,20 @@ void main() {
         ]);
         expect(_pageScrollPosition(tester).pixels, 12);
 
+        await tester.tap(find.bySemanticsLabel('Выбрать год и месяц'));
+        await tester.pumpAndSettle();
+        expect(find.text('2020–2031'), findsOneWidget);
+        await tester.drag(find.text('2025'), const Offset(-600, 0));
+        await tester.pumpAndSettle();
+        expect(find.text('2032–2043'), findsOneWidget);
+        await tester.tap(find.text('2035'));
+        await tester.pumpAndSettle();
+        expect(find.text('2035'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Следующий год'));
+        await tester.pumpAndSettle();
+        expect(find.text('2036'), findsOneWidget);
+        expect(_pageScrollPosition(tester).pixels, 12);
+
         consumer.removeScrollView();
         await tester.pump();
         consumer.restoreScrollView();
@@ -255,6 +269,13 @@ void main() {
         expect(_pageScrollPosition(tester).pixels, 12);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
         expect(find.text('Ноябрь 2026'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Выбрать год и месяц'));
+        await tester.pumpAndSettle();
+        expect(find.text('2020–2031'), findsOneWidget);
+        expect(find.text('Январь'), findsNothing);
+        expect(_pageScrollPosition(tester).pixels, 12);
+        expect(consumer.events, hasLength(3));
+        expect(tester.takeException(), isNull);
       },
     );
   });
