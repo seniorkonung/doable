@@ -265,6 +265,53 @@ void main() {
     expect(repository.dayStatusQueries, hasLength(1));
   });
 
+  testWidgets('первый свайп апреля к маю показывает отметку 7 июня в шестой '
+      'строке до завершения нового чтения', (tester) async {
+    final today = date(2026, 4, 15);
+    final juneDay = date(2026, 6, 7);
+    final repository = CatalogPageRepository();
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: today,
+      locale: const Locale('ru'),
+      size: const Size(1200, 2400),
+    );
+    repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 1);
+    repository.completeDayStatuses(0, {
+      juneDay: DailyChoiceDayStatus.hasIncomplete,
+    });
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.pumpAndSettle();
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 3, 30), 6));
+    expect(repository.dayStatusQueries, hasLength(1));
+    expect(calendarDay(juneDay), findsNothing);
+
+    final gesture = await _beginNextPeriod(tester);
+    // Воскресенье входит в экран последним: жест продолжается, пока видна
+    // правая колонка соседнего месяца, но палец ещё не отпущен.
+    await gesture.moveBy(Offset(-tester.view.physicalSize.width * 0.15, 0));
+    await tester.pump();
+    _expectVisibleMark(tester, juneDay, DailyChoiceDayStatus.hasIncomplete);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 4, 27), 6));
+    expect(repository.dayStatusQueries, hasLength(2));
+    _expectVisibleMark(tester, juneDay, DailyChoiceDayStatus.hasIncomplete);
+
+    repository.completeDayStatuses(1, {
+      juneDay: DailyChoiceDayStatus.allCompleted,
+    });
+    await tester.pumpAndSettle();
+    _expectVisibleMark(tester, juneDay, DailyChoiceDayStatus.allCompleted);
+    expect(_mark(juneDay, DailyChoiceDayStatus.hasIncomplete), findsNothing);
+    expect(shownDailyChoiceCatalogDate(tester), today);
+    expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+    expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
+    expect(repository.queries, hasLength(1));
+  });
+
   testWidgets('переход в декабрь до ответа ноября сохраняет полученные отметки '
       'и выдачу; только ответ текущего окна добавляет новые отметки', (
     tester,

@@ -151,7 +151,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_boundaries_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.5 Подтвердить отметки дополнительной строки соседнего месяца до завершения первого свайпа
+- [x] 2.5 Подтвердить отметки дополнительной строки соседнего месяца до завершения первого свайпа
   - **Acceptance criteria:**
     - Интеграционная проверка календаря с моделью отметок сначала успешно получает окно апреля 2026 года, затем начинает свайп к маю: отметка на 7 июня видна в шестой строке мая до завершения нового чтения. Проверка использует настоящую сетку TableCalendarBase.
     - Проверки единого снимка и общей ревизии, отбрасывания устаревшего ответа, сохранения отметок при отказе и независимости выдачи проходят с новым окном; стоимость чтения проверена на 105 днях.

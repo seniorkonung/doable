@@ -104,22 +104,33 @@ final class CatalogPageRepository
     return request.future;
   }
 
-  /// Завершает отдельное чтение отметок без изменения выдачи каталога.
+  /// Завершает отдельное чтение отметками только запрошенного диапазона,
+  /// без изменения выдачи каталога.
   void completeDayStatuses(
     int index,
     Map<CalendarDate, DailyChoiceDayStatus> statuses, {
     int revision = 0,
-  }) => _dayStatusRequests[index].complete(
-    GraphResultSuccess(
-      GraphSnapshot(
-        value: DailyChoiceDayStatuses(
-          query: dayStatusQueries[index],
-          statuses: statuses,
+  }) {
+    final query = dayStatusQueries[index];
+    final first = query.firstDate.toCanonicalString();
+    final last = query.lastDate.toCanonicalString();
+    _dayStatusRequests[index].complete(
+      GraphResultSuccess(
+        GraphSnapshot(
+          value: DailyChoiceDayStatuses(
+            query: query,
+            statuses: {
+              for (final entry in statuses.entries)
+                if (entry.key.toCanonicalString().compareTo(first) >= 0 &&
+                    entry.key.toCanonicalString().compareTo(last) <= 0)
+                  entry.key: entry.value,
+            },
+          ),
+          revision: _Revision(revision),
         ),
-        revision: _Revision(revision),
       ),
-    ),
-  );
+    );
+  }
 
   /// Завершает отдельное чтение отметок отказом, не затрагивая выдачу.
   void failDayStatuses(int index) => _dayStatusRequests[index].complete(
