@@ -19,6 +19,7 @@
         </activity>
         <activity
             android:name=".PhoneActivity"
+            android:taskAffinity="${applicationId}.phone"
             android:screenOrientation="portrait"
             android:resizeableActivity="false"
             android:exported="false"
@@ -38,6 +39,7 @@
         </activity>
         <activity
             android:name=".LargeDisplayActivity"
+            android:taskAffinity="${applicationId}.large"
             android:screenOrientation="unspecified"
             android:resizeableActivity="true"
             android:exported="false"

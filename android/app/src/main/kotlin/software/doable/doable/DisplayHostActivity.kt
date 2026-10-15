@@ -27,6 +27,7 @@ abstract class DisplayHostActivity internal constructor(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        displayPolicy.completeTransfer()
         // Проверяем также восстановленный системой корень до первого кадра Flutter.
         updateDisplayPolicy()
     }

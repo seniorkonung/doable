@@ -1,6 +1,7 @@
 package software.doable.doable
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Point
@@ -64,13 +65,24 @@ internal class DisplayWindowPolicy(private val activity: Activity) {
         val target = category()
         if (target == current) return
         launch(target, engineId = retainEngine())
-        activity.finish()
+    }
+
+    @Suppress("DEPRECATION")
+    fun completeTransfer() {
+        if (!activity.intent.hasExtra(PREVIOUS_TASK_ID)) return
+        val previousTaskId = activity.intent.getIntExtra(PREVIOUS_TASK_ID, -1)
+        activity.intent.removeExtra(PREVIOUS_TASK_ID)
+        // Новый хост уже подключил двигатель; удаляем и старую карточку в недавних.
+        // https://developer.android.com/reference/android/app/ActivityManager.AppTask#finishAndRemoveTask()
+        activity.getSystemService(ActivityManager::class.java).appTasks
+            .firstOrNull { it.taskInfo?.id == previousTaskId }
+            ?.finishAndRemoveTask()
     }
 
     fun launch(
         target: DisplayCategory,
         engineId: String? = null,
-        replaceTask: Boolean = true,
+        task: ActivityManager.AppTask? = null,
     ) {
         val intent = if (engineId == null) {
             FlutterActivity.NewEngineIntentBuilder(target.activityClass).build(activity)
@@ -78,13 +90,26 @@ internal class DisplayWindowPolicy(private val activity: Activity) {
             FlutterActivity.CachedEngineIntentBuilder(target.activityClass, engineId)
                 .destroyEngineWithActivity(true)
                 .build(activity)
+                .putExtra(PREVIOUS_TASK_ID, activity.taskId)
         }
-        // Режим окна принадлежит корню задачи: перенос обязан заменить и этот корень.
-        // https://developer.android.com/develop/ui/views/layout/support-multi-window-mode#configure
+        // Разные affinity хостов не дают NEW_TASK унаследовать разделённое окно.
+        // https://developer.android.com/guide/components/activities/tasks-and-back-stack#HandleAffinities
         intent.addFlags(
-            if (replaceTask) Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            if (task == null) Intent.FLAG_ACTIVITY_NEW_TASK
             else Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
         )
-        activity.startActivity(intent)
+        if (task == null) {
+            // Независимый контекст сохраняет дисплей, исключая размеры исходной Activity.
+            // https://developer.android.com/reference/android/content/Context#startActivity(android.content.Intent)
+            activity.createDisplayContext(activity.windowManager.defaultDisplay).startActivity(intent)
+        } else {
+            // AppTask направляет Intent в найденную задачу, независимо от задачи launcher.
+            // https://developer.android.com/reference/android/app/ActivityManager.AppTask#startActivity(android.content.Context,android.content.Intent,android.os.Bundle)
+            task.startActivity(activity, intent, null)
+        }
+    }
+
+    private companion object {
+        const val PREVIOUS_TASK_ID = "software.doable.doable.previousTaskId"
     }
 }

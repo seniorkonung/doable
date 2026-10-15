@@ -9,6 +9,7 @@ import android.os.Build
 import android.view.Display
 import io.flutter.embedding.android.FlutterActivity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,6 +28,18 @@ import org.robolectric.util.ReflectionHelpers.ClassParameter
 @Config(sdk = [24, 30, 35, 36])
 class DisplayWindowPolicyTest {
     @Test
+    fun `Хосты и временный launcher принадлежат разным задачам`() {
+        val context = RuntimeEnvironment.getApplication()
+        val affinities = listOf(
+            MainActivity::class.java, PhoneActivity::class.java, LargeDisplayActivity::class.java,
+        ).map {
+            context.packageManager.getActivityInfo(ComponentName(context, it), 0).taskAffinity
+        }
+
+        assertEquals(3, affinities.toSet().size)
+    }
+
+    @Test
     fun `Граница дисплея учитывает плотность и не зависит от поворота`() {
         assertEquals(DisplayCategory.PHONE, DisplayCategory.fromPixels(1199, 1800, 320))
         assertEquals(DisplayCategory.LARGE, DisplayCategory.fromPixels(1200, 1800, 320))
@@ -42,7 +55,7 @@ class DisplayWindowPolicyTest {
         val launch = shadowOf(activity).nextStartedActivity
 
         assertEquals(PhoneActivity::class.java.name, launch.component!!.className)
-        assertTrue(launch.flags and Intent.FLAG_ACTIVITY_CLEAR_TASK != 0)
+        assertEquals(0, launch.flags and Intent.FLAG_ACTIVITY_CLEAR_TASK)
         assertTrue(launch.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
         assertTrue(activity.isFinishing)
         controller.destroy()
@@ -82,7 +95,7 @@ class DisplayWindowPolicyTest {
 
     @Test
     @Config(qualifiers = "w800dp-h1200dp-mdpi")
-    fun `Смена категории заменяет корень задачи и переносит двигатель один раз`() {
+    fun `Смена категории передаёт двигатель в отдельную задачу до удаления исходной`() {
         val controller = Robolectric.buildActivity(Activity::class.java).create()
         val activity = controller.get()
         var transfers = 0
@@ -96,9 +109,25 @@ class DisplayWindowPolicyTest {
         assertEquals(LargeDisplayActivity::class.java.name, launch.component!!.className)
         assertEquals("engine", launch.getStringExtra("cached_engine_id"))
         assertTrue(launch.getBooleanExtra("destroy_engine_with_activity", false))
-        assertTrue(launch.flags and Intent.FLAG_ACTIVITY_CLEAR_TASK != 0)
+        assertEquals(0, launch.flags and Intent.FLAG_ACTIVITY_CLEAR_TASK)
         assertTrue(launch.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertFalse(activity.isFinishing)
         assertEquals(1, transfers)
+
+        val sourceTask = ShadowAppTask.newInstance()
+        shadowOf(sourceTask).setTaskInfo(ActivityManager.RecentTaskInfo().apply {
+            id = activity.taskId
+            baseActivity = ComponentName(activity, PhoneActivity::class.java)
+        })
+        val targetController = Robolectric.buildActivity(Activity::class.java, launch).create()
+        val targetActivity = targetController.get()
+        shadowOf(targetActivity.getSystemService(ActivityManager::class.java))
+            .setAppTasks(listOf(sourceTask))
+        assertFalse(shadowOf(sourceTask).isFinishedAndRemoved)
+
+        DisplayWindowPolicy(targetActivity).completeTransfer()
+        assertTrue(shadowOf(sourceTask).isFinishedAndRemoved)
+        targetController.destroy()
 
         policy.replaceIfNeeded(DisplayCategory.LARGE) {
             throw AssertionError("Одинаковая категория не переносит двигатель")
@@ -115,7 +144,7 @@ class DisplayWindowPolicyTest {
         val activity = controller.get()
         val task = ShadowAppTask.newInstance()
         shadowOf(task).setTaskInfo(ActivityManager.RecentTaskInfo().apply {
-            id = activity.taskId
+            id = activity.taskId + 1
             baseActivity = ComponentName(activity, PhoneActivity::class.java)
         })
         shadowOf(activity.getSystemService(ActivityManager::class.java)).setAppTasks(listOf(task))
@@ -138,6 +167,26 @@ class DisplayWindowPolicyTest {
         val activity = Robolectric.buildActivity(PhoneActivity::class.java, intent).get()
 
         assertNull(activity.cachedEngineId)
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1200dp-mdpi")
+    fun `Launcher восстанавливает прежнюю задачу без живой Activity после гибели процесса`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java)
+        val activity = controller.get()
+        val task = ShadowAppTask.newInstance()
+        shadowOf(task).setTaskInfo(ActivityManager.RecentTaskInfo().apply {
+            id = -1
+            baseIntent = Intent(activity, PhoneActivity::class.java)
+        })
+        shadowOf(activity.getSystemService(ActivityManager::class.java)).setAppTasks(listOf(task))
+
+        controller.create()
+        val launch = shadowOf(activity).nextStartedActivity
+        assertEquals(PhoneActivity::class.java.name, launch.component!!.className)
+        assertEquals(0, launch.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
+        assertNull(launch.getStringExtra("cached_engine_id"))
+        controller.destroy()
     }
 
     @Test
