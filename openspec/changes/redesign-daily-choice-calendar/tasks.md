@@ -267,3 +267,33 @@
   - **Dependencies:** 2.13
   - **Files likely touched:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `test/android/orientation_policy_test.dart`; при необходимости — ресурсы и новые нативные проверки в `android/app/src/`, конфигурация их запуска в `android/app/build.gradle.kts`, уточнение решения 6 в `design.md` и согласованные ADR-0031 / `docs/adr/README.md`
   - **Estimated scope:** M
+
+- [ ] 2.15 Переход из разделённого экрана большого дисплея в телефонную категорию сохраняет сессию в полном портретном окне
+  - **Acceptance criteria:**
+    - Нативная политика по решению 6 запускает целевой хост в отдельной task с отличающейся affinity и удаляет исходную task после передачи того же FlutterEngine. Переход полного дисплея из 600×900 dp с действующим Split screen в 390×844 dp завершается полноэкранной портретной PhoneActivity без наследования многооконного размещения; одно лишь NEW_TASK | CLEAR_TASK при общей affinity не считается исправлением.
+    - Открытый экран и состояние каталога сохраняются без повторной подготовки хранилища. Launcher находит действующую task независимо от временной MainActivity и возвращает ту же сессию; после переноса и повторного входа в недавних остаётся одна карточка приложения. Холодный запуск и восстановление после гибели процесса сохраняют прежний контракт.
+    - Нативные проверки защищают разделение task, передачу двигателя, удаление исходной task и повторный launcher. Существующие проверки обеих категорий, границы 600 dp и отсутствия ограничений больших дисплеев проходят; изменение остаётся внутри нативной оконной политики по ADR-0031.
+  - **Verification:**
+    - `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - На API 36 выполнить переход 600×900 → 390×844 dp из подтверждённого Split screen и проверить фактические режим и границы окна через `adb shell dumpsys activity activities` и `adb shell dumpsys window windows`; сравнить экран и состояние каталога до/после, затем повторить вход через launcher. Повторяемую автоматизированную защиту закрепляет 2.16.
+  - **Dependencies:** 2.14
+  - **Files likely touched:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayHostActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`
+  - **Estimated scope:** M
+
+- [ ] 2.16 Регрессионная проверка на Android подтверждает полноэкранный перенос в телефонную категорию с сохранением сессии
+  - **Acceptance criteria:**
+    - Автоматизированный сценарий на API 36 устанавливает обычный Split screen приложения и Settings на полном дисплее 600×900 dp, затем меняет полный дисплей на 390×844 dp без перезапуска процесса. Исходный multi-window подтверждается наблюдением; отсутствие этого предусловия завершает проверку неуспехом. Обходные настройки принудительной многооконности не включаются.
+    - Проверка наблюдает PhoneActivity в task режима fullscreen, отсутствие multi-window, портретную ориентацию и полное окно с учётом системных отступов; открытый экран и состояние каталога сохраняются, повторный launcher возвращает ту же сессию с одной карточкой приложения. Сценарий обнаруживает дефект механизма общей affinity и проходит с исправлением 2.15; фиксация Intent-флагов или task ID не подменяет результат. Изменённые параметры эмулятора восстанавливаются после проверки.
+    - Команда запуска и результаты сообщены в сессии; проверки затронутых нативных модулей и строгая OpenSpec validation проходят. При завершении фазы 2 повторяются её условия Ready to advance и `mise run check`; успешный сценарий переноса сам по себе не подтверждает физическое складывание, не закрывает другие замечания ревью и не означает готовности всей фазы.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Выполнить добавленный сценарий на эмуляторе API 36 и сообщить точную команду запуска. Подтвердить, что он обнаруживает исходную регрессию и проходит после исправления; наблюдения режима и границ окна сопоставить с `adb shell dumpsys activity activities` и `adb shell dumpsys window windows`.
+    - `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - При завершении фазы: `mise run check` и условия Ready to advance из Phase 2 в `plan.md`.
+  - **Dependencies:** 2.15
+  - **Files likely touched:** `tool/` (новый сценарий проверки переноса на эмуляторе); при необходимости — нативный сценарий в `android/app/src/androidTest/` и конфигурация его запуска в `android/app/build.gradle.kts`
+  - **Estimated scope:** M
