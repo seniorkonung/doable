@@ -40,7 +40,7 @@ final class _DailyChoiceCalendarPeriodPickerState
 
   @override
   void dispose() {
-    _disposeYearPages();
+    _page.controller.dispose();
     super.dispose();
   }
 
@@ -70,11 +70,6 @@ final class _DailyChoiceCalendarPeriodPickerState
         year < CalendarDate.latest.year,
       ),
     };
-    final monthCells = [
-      if (_page case _MonthsPage(:final year))
-        for (var month = 1; month <= 12; month++)
-          _monthCell(context, year, month, l10n),
-    ];
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,13 +96,18 @@ final class _DailyChoiceCalendarPeriodPickerState
                 // задаёт размер всех страниц, включая крайние блоки.
                 // https://api.flutter.dev/flutter/dart-ui/FontFeature/FontFeature.tabularFigures.html
                 _YearsPage() => ['${CalendarDate.latest.year}'],
-                _MonthsPage() => monthCells.map((cell) => cell.text),
+                _MonthsPage(:final year) => _monthCells(
+                  context,
+                  year,
+                  l10n,
+                ).map((cell) => cell.text),
               },
             );
             return SizedBox(
               height: layout.height,
               child: switch (_page) {
                 final _YearsPage page => PageView.builder(
+                  key: ObjectKey(page),
                   controller: page.controller,
                   itemCount: _yearPageCount,
                   onPageChanged: (index) =>
@@ -117,9 +117,22 @@ final class _DailyChoiceCalendarPeriodPickerState
                     layout: layout,
                   ),
                 ),
-                _MonthsPage() => PeriodPicker(
-                  cells: monthCells,
-                  layout: layout,
+                final _MonthsPage page => PageView.builder(
+                  key: ObjectKey(page),
+                  controller: page.controller,
+                  itemCount: _monthPageCount,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (index) => setState(
+                    () => page.year = CalendarDate.earliest.year + index,
+                  ),
+                  itemBuilder: (context, index) => PeriodPicker(
+                    cells: _monthCells(
+                      context,
+                      CalendarDate.earliest.year + index,
+                      l10n,
+                    ),
+                    layout: layout,
+                  ),
                 ),
               },
             );
@@ -130,26 +143,22 @@ final class _DailyChoiceCalendarPeriodPickerState
   }
 
   void _shiftPage(int direction) {
-    switch (_page) {
-      case _YearsPage(:final controller):
-        final target = (controller.page!.round() + direction).clamp(
-          0,
-          _yearPageCount - 1,
-        );
-        unawaited(
-          controller.animateToPage(
-            target,
-            duration: calendarPageAnimationDuration,
-            curve: calendarPageAnimationCurve,
-          ),
-        );
-      case _MonthsPage(:final year):
-        setState(() => _page = _MonthsPage(year + direction));
-    }
-  }
-
-  void _disposeYearPages() {
-    if (_page case _YearsPage(:final controller)) controller.dispose();
+    final controller = _page.controller;
+    final pageCount = switch (_page) {
+      _YearsPage() => _yearPageCount,
+      _MonthsPage() => _monthPageCount,
+    };
+    final target = (controller.page!.round() + direction).clamp(
+      0,
+      pageCount - 1,
+    );
+    unawaited(
+      controller.animateToPage(
+        target,
+        duration: calendarPageAnimationDuration,
+        curve: calendarPageAnimationCurve,
+      ),
+    );
   }
 
   List<PeriodPickerCell?> _yearCells(int firstYear, AppLocalizations l10n) => [
@@ -168,11 +177,20 @@ final class _DailyChoiceCalendarPeriodPickerState
       isShown: year == widget.focusedDate.year,
       isCurrent: isCurrent,
       onTap: () {
-        _disposeYearPages();
+        _page.controller.dispose();
         setState(() => _page = _MonthsPage(year));
       },
     );
   }
+
+  List<PeriodPickerCell> _monthCells(
+    BuildContext context,
+    int year,
+    AppLocalizations l10n,
+  ) => [
+    for (var month = 1; month <= 12; month++)
+      _monthCell(context, year, month, l10n),
+  ];
 
   PeriodPickerCell _monthCell(
     BuildContext context,
@@ -205,6 +223,8 @@ String _periodLabel(String title, bool isCurrent, AppLocalizations l10n) =>
 
 sealed class _PickerPage {
   const _PickerPage();
+
+  PageController get controller;
 }
 
 final class _YearsPage extends _PickerPage {
@@ -217,6 +237,7 @@ final class _YearsPage extends _PickerPage {
 
   // Страница принадлежит открытому выбору, без чтения и записи PageStorage:
   // https://api.flutter.dev/flutter/widgets/PageController/keepPage.html
+  @override
   late final controller = PageController(
     initialPage: (firstYear - _firstYear) ~/ 12,
     keepPage: false,
@@ -230,7 +251,16 @@ final _yearPageCount =
     1;
 
 final class _MonthsPage extends _PickerPage {
-  const _MonthsPage(this.year);
+  _MonthsPage(this.year);
 
-  final int year;
+  int year;
+
+  @override
+  late final controller = PageController(
+    initialPage: year - CalendarDate.earliest.year,
+    keepPage: false,
+  );
 }
+
+final _monthPageCount =
+    CalendarDate.latest.year - CalendarDate.earliest.year + 1;

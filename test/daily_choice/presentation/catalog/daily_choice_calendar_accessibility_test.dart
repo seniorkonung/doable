@@ -307,9 +307,9 @@ void main() {
           );
         }
 
-        await _activate(tester, texts.backToDays);
-        await _activate(tester, texts.choosePeriod);
-        await _activate(tester, '2028');
+        await _activate(tester, texts.nextYear);
+        await _activate(tester, texts.nextYear);
+        _expectPickerTitle(tester, texts.backToDays, '2028');
         for (var index = 0; index < 12; index++) {
           _expectSelection(
             tester,

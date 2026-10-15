@@ -98,8 +98,8 @@ void main() {
     expect(consumer.events, isEmpty);
   });
 
-  testWidgets('повторная стрелка и смена направления во время перехода '
-      'оставляют страницу последней команды', (tester) async {
+  testWidgets('стрелки плавно перемещают месяцы 2028 → 2029 и обратно '
+      'без изменения высоты и просмотра', (tester) async {
     final selected = date(2026, 10, 8);
     final consumer = await pumpCalendarConsumer(
       tester,
@@ -108,21 +108,84 @@ void main() {
       today: selected,
     );
     await _command(tester, 'Выбрать год и месяц');
-    await tester.tap(find.bySemanticsLabel('Следующие годы'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 30));
-    await tester.tap(find.bySemanticsLabel('Следующие годы'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('2032–2043'), findsOneWidget);
-    await _command(tester, 'Предыдущие годы');
-    expect(find.text('2020–2031'), findsOneWidget);
+    await tester.tap(find.text('2028'));
+    await tester.pumpAndSettle();
+    final handle = find.bySemanticsLabel('Свернуть календарь');
+    final handleTop = tester.getTopLeft(handle).dy;
+    final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+
+    for (final (outgoing, incoming, direction, command, title) in const [
+      ('Апрель 2028', 'Январь 2029', -1, 'Следующий год', '2029'),
+      ('Январь 2029', 'Декабрь 2028', 1, 'Предыдущий год', '2028'),
+    ]) {
+      final cell = find.bySemanticsLabel(outgoing);
+      final initialX = tester.getCenter(cell).dx;
+      await tester.tap(find.bySemanticsLabel(command));
+      await tester.pump();
+      expect(tester.getCenter(cell).dx, initialX);
+      await tester.pump(const Duration(milliseconds: 60));
+      final movedX = tester.getCenter(cell).dx;
+      expect((movedX - initialX) * direction, greaterThan(0));
+      expect(
+        tester.getCenter(find.bySemanticsLabel(incoming)).dx,
+        inExclusiveRange(0, width),
+      );
+      expect(tester.getTopLeft(handle).dy, handleTop);
+      await tester.pump(const Duration(milliseconds: 60));
+      expect((tester.getCenter(cell).dx - movedX) * direction, greaterThan(0));
+      expect(tester.getTopLeft(handle).dy, handleTop);
+      expect(find.text(title), findsOneWidget);
+      expect(consumer.events, isEmpty);
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsOneWidget);
+    }
+    expect(consumer.viewport, month(selected));
+    expect(consumer.selectedDate, selected);
     expect(consumer.events, isEmpty);
-    expect(tester.takeException(), isNull);
   });
 
-  for (final action in ['заголовок', 'ручка', 'выбор года']) {
-    testWidgets('$action прерывает переход лет без поздних событий '
+  for (final fromMonths in [false, true]) {
+    final level = fromMonths ? 'месяцев' : 'лет';
+    testWidgets('повторная стрелка и смена направления во время перехода '
+        '$level оставляют страницу последней команды', (tester) async {
+      final selected = date(2026, 10, 8);
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: selected,
+        viewport: month(selected),
+        today: selected,
+      );
+      await _command(tester, 'Выбрать год и месяц');
+      if (fromMonths) {
+        await tester.tap(find.text('2028'));
+        await tester.pumpAndSettle();
+      }
+      final next = fromMonths ? 'Следующий год' : 'Следующие годы';
+      await tester.tap(find.bySemanticsLabel(next));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 30));
+      await tester.tap(find.bySemanticsLabel(next));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(find.text(fromMonths ? '2029' : '2032–2043'), findsOneWidget);
+      await _command(tester, fromMonths ? 'Предыдущий год' : 'Предыдущие годы');
+      expect(find.text(fromMonths ? '2028' : '2020–2031'), findsOneWidget);
+      expect(consumer.events, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final (fromMonths, action) in [
+    (false, 'заголовок'),
+    (false, 'ручка'),
+    (false, 'выбор года'),
+    (true, 'заголовок'),
+    (true, 'ручка'),
+    (true, 'выбор месяца'),
+  ]) {
+    final level = fromMonths ? 'месяцев' : 'лет';
+    final selectPeriod = action == 'выбор года' || action == 'выбор месяца';
+    testWidgets('$action прерывает переход $level без поздних событий '
         'и исключений', (tester) async {
       final semantics = tester.ensureSemantics();
       final selected = date(2026, 10, 8);
@@ -134,24 +197,31 @@ void main() {
         today: selected,
       );
       await _command(tester, 'Выбрать год и месяц');
-      if (action == 'выбор года') {
+      if (fromMonths) {
+        await tester.tap(find.text('2028'));
+        await tester.pumpAndSettle();
+      }
+      if (selectPeriod) {
+        final cell = find.text(fromMonths ? 'Март' : '2028');
         for (var tab = 0; tab < 16; tab++) {
           await tester.sendKeyEvent(LogicalKeyboardKey.tab);
           await tester.pump();
-          if (Focus.of(tester.element(find.text('2028'))).hasFocus) {
+          if (Focus.of(tester.element(cell)).hasFocus) {
             break;
           }
         }
       }
-      final next = tester.getSemantics(find.bySemanticsLabel('Следующие годы'));
+      final next = tester.getSemantics(
+        find.bySemanticsLabel(fromMonths ? 'Следующий год' : 'Следующие годы'),
+      );
       tester.binding.pipelineOwner.semanticsOwner!.performAction(
         next.id,
         SemanticsAction.tap,
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 120));
-      expect(find.text('2032–2043'), findsOneWidget);
-      if (action == 'выбор года') {
+      expect(find.text(fromMonths ? '2029' : '2032–2043'), findsOneWidget);
+      if (selectPeriod) {
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       } else {
         final command = action == 'заголовок'
@@ -172,6 +242,8 @@ void main() {
         expect(find.text('2028'), findsOneWidget);
         expect(find.text('Январь'), findsOneWidget);
         expect(visibleWeeks(tester), isEmpty);
+      } else if (action == 'выбор месяца') {
+        expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 6));
       } else {
         expect(
           visibleWeeks(tester),
@@ -180,12 +252,11 @@ void main() {
               : weeksFrom(date(2026, 10, 26), 6),
         );
       }
-      expect(
-        consumer.events,
-        action == 'ручка'
-            ? [ViewportChanged(week(viewport.focusedDate))]
-            : isEmpty,
-      );
+      expect(consumer.events, switch (action) {
+        'ручка' => [ViewportChanged(week(viewport.focusedDate))],
+        'выбор месяца' => [MonthSelectionCompleted(month(date(2028, 3, 1)))],
+        _ => isEmpty,
+      });
       expect(consumer.selectedDate, selected);
       expect(tester.takeException(), isNull);
       semantics.dispose();
@@ -417,6 +488,19 @@ void main() {
         isSemantics(isButton: true, isEnabled: false),
       );
       await _command(tester, disabledYear);
+      await _command(tester, year == 1 ? 'Следующий год' : 'Предыдущий год');
+      expect(find.text('${year == 1 ? 2 : 9998}'), findsOneWidget);
+      final backToBoundary = find.bySemanticsLabel(disabledYear);
+      await tester.tap(backToBoundary);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 30));
+      await tester.tap(backToBoundary);
+      await tester.pumpAndSettle();
+      expect(find.text('$year'), findsOneWidget);
+      expect(
+        tester.getSemantics(backToBoundary),
+        isSemantics(isButton: true, isEnabled: false),
+      );
       expect(consumer.events, isEmpty);
       await tester.tap(find.text('Июнь'));
       await tester.pumpAndSettle();

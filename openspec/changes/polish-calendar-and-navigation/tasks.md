@@ -86,7 +86,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_period_picker.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, новый внутренний файл общих параметров перелистывания в `lib/src/daily_choice/presentation/catalog/`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 2.3 Анимировать переключение года стрелками в режиме выбора месяца с сохранением прежнего результата выбора
+- [x] 2.3 Анимировать переключение года стрелками в режиме выбора месяца с сохранением прежнего результата выбора
   - **Критерии приёмки:**
     - Режим месяцев использует конечный `PageView.builder` по годам и отдельный `PageController(keepPage: false)`, создаваемый при входе в режим и освобождаемый при его закрытии. Стрелки плавно перемещают сетку на соседний допустимый год с общими параметрами из задачи 2.2; горизонтальный жест на месяцах остаётся отключённым.
     - По [спецификации календаря](specs/daily-choice-management/spec.md) промежуточная смена года не меняет дату просмотра, выбранную дату и фильтр. Выбор месяца через календарь вызывает прежний `onMonthSelectionCompleted`: датой просмотра становится выбранная дата, если она входит в месяц, иначе его первый день. Повторный выбор того же месяца сообщает одно завершение.
