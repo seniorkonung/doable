@@ -1,6 +1,7 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/components/notice.dart';
@@ -14,6 +15,150 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  testWidgets('повторный выбор ноября после отказа восстанавливает отметки; '
+      'перестройка, промежуточные шаги, закрытие заголовком и повтор после '
+      'успеха не читают', (tester) async {
+    final markedDay = date(2026, 11, 1);
+    final repository = CatalogPageRepository();
+    await _pumpFilteredNovember(tester, repository, hasReadFailure: true);
+    expect(
+      _mark(markedDay, DailyChoiceDayStatus.hasIncomplete),
+      findsOneWidget,
+    );
+
+    tester.element(find.byType(DailyChoiceCatalogBody)).markNeedsBuild();
+    await tester.pumpAndSettle();
+    expect(repository.dayStatusQueries, hasLength(2));
+
+    await _browseAndClosePicker(tester, repository, dayStatusReads: 2);
+    expect(find.byType(Notice), findsOneWidget);
+    expect(
+      _mark(markedDay, DailyChoiceDayStatus.hasIncomplete),
+      findsOneWidget,
+    );
+
+    await _command(tester, 'Выбрать год и месяц');
+    await tester.tap(find.text('2026'));
+    await tester.pumpAndSettle();
+    expect(repository.dayStatusQueries, hasLength(2));
+    await tester.tap(find.text('Ноябрь'));
+    await tester.pumpAndSettle();
+    expect(repository.dayStatusQueries, hasLength(3));
+    expect(repository.dayStatusQueries.last.firstDate, date(2026, 9, 28));
+    expect(repository.dayStatusQueries.last.lastDate, date(2027, 1, 10));
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+    expect(find.byType(Notice), findsOneWidget);
+    expect(
+      _mark(markedDay, DailyChoiceDayStatus.hasIncomplete),
+      findsOneWidget,
+    );
+    _expectFilteredOctoberCatalog(repository);
+
+    repository.completeDayStatuses(2, {
+      markedDay: DailyChoiceDayStatus.allCompleted,
+    });
+    await tester.pumpAndSettle();
+    expect(_mark(markedDay, DailyChoiceDayStatus.allCompleted), findsOneWidget);
+    expect(_mark(markedDay, DailyChoiceDayStatus.hasIncomplete), findsNothing);
+    expect(find.byType(Notice), findsNothing);
+    expect(repository.dayStatusQueries, hasLength(3));
+    _expectFilteredOctoberCatalog(repository);
+
+    await _browseAndClosePicker(tester, repository, dayStatusReads: 3);
+    expect(_mark(markedDay, DailyChoiceDayStatus.allCompleted), findsOneWidget);
+    await _command(tester, 'Выбрать год и месяц');
+    await tester.tap(find.text('2026'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ноябрь'));
+    await tester.pumpAndSettle();
+    expect(repository.dayStatusQueries, hasLength(3));
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+    expect(_mark(markedDay, DailyChoiceDayStatus.allCompleted), findsOneWidget);
+    expect(find.byType(Notice), findsNothing);
+    _expectFilteredOctoberCatalog(repository);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('выбор другого месяца после отказа читает его окно один раз '
+      'и восстанавливает отметки без смены выдачи', (tester) async {
+    final markedDay = date(2026, 12, 1);
+    final repository = CatalogPageRepository();
+    await _pumpFilteredNovember(tester, repository, hasReadFailure: true);
+
+    await _command(tester, 'Выбрать год и месяц');
+    await tester.tap(find.text('2026'));
+    await tester.pumpAndSettle();
+    expect(repository.dayStatusQueries, hasLength(2));
+    await tester.tap(find.text('Декабрь'));
+    await tester.pumpAndSettle();
+    expect(repository.dayStatusQueries, hasLength(3));
+    expect(repository.dayStatusQueries.last.firstDate, date(2026, 10, 26));
+    expect(repository.dayStatusQueries.last.lastDate, date(2027, 2, 7));
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 6));
+    expect(find.byType(Notice), findsOneWidget);
+    _expectFilteredOctoberCatalog(repository);
+
+    repository.completeDayStatuses(2, {
+      markedDay: DailyChoiceDayStatus.allCompleted,
+    });
+    await tester.pumpAndSettle();
+    expect(_mark(markedDay, DailyChoiceDayStatus.allCompleted), findsOneWidget);
+    expect(find.byType(Notice), findsNothing);
+    expect(repository.dayStatusQueries, hasLength(3));
+    _expectFilteredOctoberCatalog(repository);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final hasReadFailure in [true, false]) {
+    final outcome = hasReadFailure ? 'отказа' : 'успеха';
+    testWidgets('ручка закрывает выбор после $outcome к неделе прежней даты; '
+        'чтение повторяется только после отказа', (tester) async {
+      final markedDay = date(2026, 11, 1);
+      final repository = CatalogPageRepository();
+      await _pumpFilteredNovember(
+        tester,
+        repository,
+        hasReadFailure: hasReadFailure,
+      );
+      await _command(tester, 'Выбрать год и месяц');
+      await tester.tap(find.text('2030'));
+      await tester.pumpAndSettle();
+      expect(repository.dayStatusQueries, hasLength(2));
+      expect(
+        find.byType(Notice),
+        hasReadFailure ? findsOneWidget : findsNothing,
+      );
+      _expectFilteredOctoberCatalog(repository);
+
+      await _command(tester, 'Свернуть календарь');
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
+      final reads = hasReadFailure ? 3 : 2;
+      expect(repository.dayStatusQueries, hasLength(reads));
+      expect(
+        _mark(markedDay, DailyChoiceDayStatus.hasIncomplete),
+        findsOneWidget,
+      );
+      _expectFilteredOctoberCatalog(repository);
+      if (hasReadFailure) {
+        expect(find.byType(Notice), findsOneWidget);
+        expect(repository.dayStatusQueries.last.firstDate, date(2026, 9, 28));
+        expect(repository.dayStatusQueries.last.lastDate, date(2027, 1, 10));
+        repository.completeDayStatuses(2, {
+          markedDay: DailyChoiceDayStatus.allCompleted,
+        });
+        await tester.pumpAndSettle();
+        expect(
+          _mark(markedDay, DailyChoiceDayStatus.allCompleted),
+          findsOneWidget,
+        );
+      }
+      expect(find.byType(Notice), findsNothing);
+      expect(repository.dayStatusQueries, hasLength(reads));
+      _expectFilteredOctoberCatalog(repository);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('Notice под ручкой остаётся над прокрученной выдачей; '
       'отказ сохраняет отметки и смещение, успех убирает сообщение', (
     tester,
@@ -478,6 +623,95 @@ void main() {
     expect(repository.queries.last.date, novemberLastDay);
     expect(repository.queries.last.isCompleted, isTrue);
   });
+}
+
+Future<void> _pumpFilteredNovember(
+  WidgetTester tester,
+  CatalogPageRepository repository, {
+  required bool hasReadFailure,
+}) async {
+  final selected = date(2026, 10, 8);
+  final markedDay = date(2026, 11, 1);
+  await pumpCatalogPage(
+    tester,
+    repository,
+    today: selected,
+    locale: const Locale('ru'),
+    size: const Size(1200, 2400),
+  );
+  repository.completeFirst(0, [
+    catalogPageItem(1, date: selected, isCompleted: true),
+  ], total: 1);
+  repository.completeDayStatuses(0, {
+    markedDay: DailyChoiceDayStatus.hasIncomplete,
+  });
+  await tester.pumpAndSettle();
+  await tester.tap(find.byType(DropdownButtonFormField<bool?>));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Выполненные').last);
+  await tester.pump();
+  repository.completeFirst(1, [
+    catalogPageItem(1, date: selected, isCompleted: true),
+  ], total: 1);
+  await tester.pumpAndSettle();
+  await _command(tester, 'Развернуть календарь');
+  await _command(tester, 'Следующий месяц');
+  expect(repository.dayStatusQueries, hasLength(2));
+  if (hasReadFailure) {
+    repository.failDayStatuses(1);
+  } else {
+    repository.completeDayStatuses(1, {
+      markedDay: DailyChoiceDayStatus.hasIncomplete,
+    });
+  }
+  await tester.pumpAndSettle();
+  expect(find.text('Ноябрь 2026'), findsOneWidget);
+  expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+  _expectFilteredOctoberCatalog(repository);
+}
+
+Future<void> _browseAndClosePicker(
+  WidgetTester tester,
+  CatalogPageRepository repository, {
+  required int dayStatusReads,
+}) async {
+  for (final label in [
+    'Выбрать год и месяц',
+    'Следующие годы',
+    'Предыдущие годы',
+  ]) {
+    await _command(tester, label);
+    expect(repository.dayStatusQueries, hasLength(dayStatusReads));
+  }
+  await tester.tap(find.text('2026'));
+  await tester.pumpAndSettle();
+  expect(repository.dayStatusQueries, hasLength(dayStatusReads));
+  for (final label in [
+    'Следующий год',
+    'Предыдущий год',
+    'Вернуться к дням месяца',
+  ]) {
+    await _command(tester, label);
+    expect(repository.dayStatusQueries, hasLength(dayStatusReads));
+  }
+  expect(find.text('Ноябрь 2026'), findsOneWidget);
+  expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+  _expectFilteredOctoberCatalog(repository);
+}
+
+void _expectFilteredOctoberCatalog(CatalogPageRepository repository) {
+  expect(find.text('8 октября 2026'), findsOneWidget);
+  expect(find.text('Выполненные'), findsOneWidget);
+  expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+  expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
+  expect(repository.queries, hasLength(2));
+  expect(repository.queries.last.date, date(2026, 10, 8));
+  expect(repository.queries.last.isCompleted, isTrue);
+}
+
+Future<void> _command(WidgetTester tester, String label) async {
+  await tester.tap(find.bySemanticsLabel(label));
+  await tester.pumpAndSettle();
 }
 
 Finder _mark(CalendarDate value, DailyChoiceDayStatus status) =>
