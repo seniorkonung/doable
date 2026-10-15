@@ -8,6 +8,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/calendar_handle.dart';
 import '../../../design_system/components/calendar_header.dart';
 import '../../../design_system/components/month_grid_weekday.dart';
+import '../../../design_system/components/notice.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
@@ -45,16 +46,16 @@ import 'daily_choice_calendar_viewport.dart';
 /// [dayStatusForDate] задаёт галочку для всех выполненных дневных выборов,
 /// кружок для невыполненного или отсутствие отметки. В неделе отметка стоит
 /// под подписью дня недели внутри ячейки. Место под отметку резервируется всегда.
-/// [hasDayMarksReadFailure] добавляет под шапкой пассивную строку отказа,
+/// [hasDayMarksReadFailure] добавляет под ручкой пассивный [Notice],
 /// не меняя отметок, выбора или просмотра и не предлагая действий.
 ///
-/// Календарь рассчитан на размещение элементом общей вертикальной прокрутки
-/// страницы: он занимает доступную ширину, а высоту определяет сам по шапке,
+/// Календарь закрепляется потребителем над прокруткой выдачи:
+/// он занимает доступную ширину, а высоту определяет сам по шапке,
 /// шести неделям месяца и системному масштабу текста. Раскрытие
 /// увеличивает эту высоту и сдвигает последующее содержимое; собственной
-/// вертикальной прокрутки у календаря нет, и вертикальные жесты по нему
-/// прокручивают страницу. Семь колонок дней всегда занимают всю ширину: при
-/// крупном тексте шапка, числа и подписи дней недели переносятся, а строки
+/// вертикальной прокрутки у календаря нет. Семь колонок дней всегда занимают
+/// всю ширину: при крупном тексте шапка, числа и подписи дней недели
+/// переносятся, а строки
 /// становятся выше, без уменьшения текста.
 ///
 /// Созданный или пересозданный календарь показывает период [viewport] при
@@ -65,7 +66,7 @@ import 'daily_choice_calendar_viewport.dart';
 /// Для вспомогательных технологий каждый допустимый день — одна кнопка выбора
 /// с полной датой, днём недели, состоянием выбранности и отдельной отметкой
 /// «сегодня», а у дня с отметкой — состоянием дня; дни читаются в календарном
-/// порядке после шапки и строки отказа, перед ручкой. Команды месяца
+/// порядке после шапки, перед ручкой и сообщением об отказе. Команды месяца
 /// сообщают свою доступность; раскрытие, сворачивание, смена месяца и выбор дня
 /// выполнимы доступной активацией без жестов. Недели листаются только свайпом.
 /// Подписи следуют локали приложения и меняются вместе с ней без событий.
@@ -93,7 +94,7 @@ final class DailyChoiceCalendar extends StatefulWidget {
   /// окна и ревизии остаются у потребителя.
   final DailyChoiceDayStatus? Function(CalendarDate date)? dayStatusForDate;
 
-  /// Показывать под шапкой пассивную строку отказа получения отметок.
+  /// Показывать под ручкой пассивное сообщение об отказе получения отметок.
   /// Переданные состояния дней при этом сохраняются.
   final bool hasDayMarksReadFailure;
 
@@ -142,15 +143,6 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
                 ? _showNextPeriod
                 : null,
           ),
-        if (widget.hasDayMarksReadFailure)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Text(
-              AppLocalizations.of(context)
-                  .dailyChoiceCalendarDayMarksUnavailable,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
         // Библиотека задаёт строкам фиксированную высоту, поэтому её
         // рассчитывает календарь: по ширине колонки и масштабу текста.
         LayoutBuilder(
@@ -174,7 +166,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
               // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase/sixWeekMonthsEnforced.html
               sixWeekMonthsEnforced: true,
               // Представление переключает только потребитель, поэтому
-              // вертикальные жесты остаются общей прокрутке страницы.
+              // вертикальные жесты не управляют календарём.
               availableGestures: AvailableGestures.horizontalSwipe,
               rowHeight: DailyChoiceCalendarDay.rowHeight(
                 context,
@@ -201,6 +193,13 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
               : localizations.dailyChoiceCalendarExpand,
           onTap: _toggleMode,
         ),
+        if (widget.hasDayMarksReadFailure)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Notice(
+              message: localizations.dailyChoiceCalendarDayMarksUnavailable,
+            ),
+          ),
       ],
     );
     return PageStorage(bucket: _pageStorage, child: calendar);

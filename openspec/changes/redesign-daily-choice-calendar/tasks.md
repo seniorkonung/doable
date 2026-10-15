@@ -184,7 +184,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/support/daily_choice_catalog_controls.dart`; проверки заголовка и локальной даты в `test/daily_choice/presentation/catalog/` и `test/app/navigation/app_shell_state_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.8 Календарь с Notice закреплён над выдачей, а выбор другого дня возвращает список к началу
+- [x] 2.8 Календарь с Notice закреплён над выдачей, а выбор другого дня возвращает список к началу
   - **Acceptance criteria:**
     - Общее тело обоих каталогов размещает календарь над единственной прокруткой списка: DayHeading, фильтр, количество и выдача. Вертикальный жест по календарю не прокручивает список; раскрытие сохраняет закрепление. Контроллер списка принадлежит телу и освобождается вместе с ним.
     - Выбор другого дня возвращает список к заголовку и началу выдачи; просмотр периода, обновление отметок и возврат между разделами сохраняют смещение списка. Состояние и прокрутка экземпляров каталогов остаются независимыми.

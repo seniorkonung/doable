@@ -94,25 +94,6 @@ Future<void> selectDailyChoiceCatalogDate(
       await _turnUntilShown(tester, date, tap, previous: null, next: null);
     }
   }
-  // Нажатие сценария доводит до видимости сам элемент через все объемлющие
-  // прокрутки, и прокрутка к дню перелистнула бы заодно страницы календаря.
-  // Поэтому к дню прокручивается только страница каталога. Ближайший к дню
-  // viewport — страницы календаря, поэтому смещение страницы каталога
-  // считается от календаря с областью дня, и только когда день не виден.
-  final page = Scrollable.of(tester.element(dailyChoiceCatalogDateControl))
-      .position;
-  final calendar = dailyChoiceCatalogDateControl.evaluate().single;
-  for (final policy in [
-    ScrollPositionAlignmentPolicy.keepVisibleAtStart,
-    ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-  ]) {
-    await page.ensureVisible(
-      calendar.renderObject!,
-      targetRenderObject: day.evaluate().single.renderObject,
-      alignmentPolicy: policy,
-    );
-  }
-  await tester.pump();
   await tester.tap(day);
   await tester.pump();
 }
@@ -144,15 +125,14 @@ CalendarDate shownDailyChoiceCatalogDate(WidgetTester tester) {
 /// Перелистывает календарь открытого каталога: недели свайпом, месяцы
 /// командами шапки, пока он не покажет [date], и день не выбирает.
 ///
-/// Календарь прокручивается вместе с выдачей, поэтому шаг сначала возвращает
-/// его на экран. [tap] — нажатие сценария для команд календаря; по умолчанию
-/// [tapWhenFound].
+/// Календарь закреплён над выдачей. [tap] — нажатие сценария для команд;
+/// по умолчанию [tapWhenFound].
 Future<void> showDailyChoiceCatalogPeriod(
   WidgetTester tester,
   CalendarDate date, {
   RootPageTap tap = tapWhenFound,
 }) async {
-  await _revealCalendar(tester);
+  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
   final texts = AppLocalizations.of(
     tester.element(dailyChoiceCatalogDateControl),
   );
@@ -172,14 +152,13 @@ Future<void> showDailyChoiceCatalogPeriod(
 /// Раскрывает свёрнутый календарь открытого каталога дневных выборов в месяц
 /// просматриваемой даты.
 ///
-/// Календарь прокручивается вместе с выдачей, поэтому шаг сначала возвращает
-/// его на экран. [tap] — нажатие сценария для команды календаря; по умолчанию
-/// [tapWhenFound].
+/// Календарь закреплён над выдачей. [tap] — нажатие сценария для команды;
+/// по умолчанию [tapWhenFound].
 Future<void> expandDailyChoiceCatalogCalendar(
   WidgetTester tester, {
   RootPageTap tap = tapWhenFound,
 }) async {
-  await _revealCalendar(tester);
+  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
   final texts = AppLocalizations.of(
     tester.element(dailyChoiceCatalogDateControl),
   );
@@ -262,18 +241,6 @@ DailyChoiceCalendarViewport shownDailyChoiceCatalogViewport(
   return viewport;
 }
 
-/// Возвращает на экран календарь, ушедший с выдачей за верхний край страницы.
-Future<void> _revealCalendar(WidgetTester tester) async {
-  final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
-  await pumpUntilFound(tester, calendar);
-  await Scrollable.of(tester.element(calendar)).position.ensureVisible(
-    calendar.evaluate().single.renderObject!,
-    alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
-  );
-  await tester.pump();
-  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
-}
-
 /// Наибольшее число перелистываний к одному дню: далёкий день календарь
 /// находит по месяцам.
 const _maxTurns = 240;
@@ -287,7 +254,7 @@ Future<void> _turnUntilShown(
   required String? previous,
   required String? next,
 }) async {
-  await _revealCalendar(tester);
+  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
   for (var turn = 0; turn < _maxTurns; turn++) {
     final shown = [
       for (final element in find.byType(DailyChoiceCalendarDay).evaluate())

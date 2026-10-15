@@ -45,6 +45,11 @@ final class _DailyChoiceCatalogBodyState
   /// Изолирует смещение прокрутки от других экземпляров каталога.
   final _pageStorage = PageStorageBucket();
 
+  /// Единственная прокрутка выдачи; календарь стоит над ней.
+  /// Контроллер живёт с телом:
+  /// https://api.flutter.dev/flutter/widgets/ScrollController-class.html
+  final _scrollController = ScrollController();
+
   /// Текущий местный день, отмеченный в календаре и заголовке дня.
   ///
   /// Тело перечитывает его при создании, возвращении приложения в
@@ -68,6 +73,7 @@ final class _DailyChoiceCatalogBodyState
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _localDay.dispose();
     super.dispose();
   }
@@ -76,6 +82,16 @@ final class _DailyChoiceCatalogBodyState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final provider = dailyChoiceCatalogViewModelProvider(widget.instance);
+    // Только новый выбранный день возвращает выдачу к началу:
+    // https://riverpod.dev/docs/concepts2/refs#reflisten
+    ref.listen(provider.select((state) => state.selection.date), (
+      previous,
+      next,
+    ) {
+      if (previous != next && _scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+    });
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
     final selectedDate = state.selection.date;
@@ -91,90 +107,94 @@ final class _DailyChoiceCatalogBodyState
     );
     return PageStorage(
       bucket: _pageStorage,
-      // Календарь, фильтры, количество, полосы обновления и выдача
-      // прокручиваются вместе: прокрученная до конца выдача получает всю
-      // высоту тела страницы. Календарь стоит вне ветвления по состоянию выдачи и
-      // доступен при загрузке, пустоте и любом отказе.
       child: SafeArea(
-        child: CustomScrollView(
-          // Постоянный ключ используется в хранилище этого тела каталога.
-          // Страницы календаря хранятся в его собственном хранилище и эту
-          // запись не заменяют.
-          key: const PageStorageKey<String>('daily-choice-catalog'),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: DailyChoiceCalendar(
-                  selectedDate: state.selection.date,
-                  viewport: _viewport,
-                  today: _localDay.today,
-                  dayStatusForDate: (date) =>
-                      dayMarks.dayStatuses?.statuses[date],
-                  hasDayMarksReadFailure: dayMarks.hasReadFailure,
-                  onDateSelected: (date) => _selectDate(model, date),
-                  onViewportChanged: _setViewport,
-                ),
+        // Календарь определяет свою высоту; выдаче остаётся остальное место:
+        // https://api.flutter.dev/flutter/widgets/Column-class.html
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: DailyChoiceCalendar(
+                selectedDate: state.selection.date,
+                viewport: _viewport,
+                today: _localDay.today,
+                dayStatusForDate: (date) =>
+                    dayMarks.dayStatuses?.statuses[date],
+                hasDayMarksReadFailure: dayMarks.hasReadFailure,
+                onDateSelected: (date) => _selectDate(model, date),
+                onViewportChanged: _setViewport,
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: DayHeading(
-                  weekday: weekday[0].toUpperCase() + weekday.substring(1),
-                  // Явный формат сохраняет порядок и не добавляет «г.»:
-                  // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
-                  date: DateFormat('d MMMM y', locale).format(date),
-                  todayLabel: selectedDate == _localDay.today
-                      ? l10n.dailyChoiceCalendarToday
-                      : null,
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _CompletionFilter(
-                      label: l10n.dailyChoiceCatalogCompletionFilter,
-                      field: DropdownButtonFormField<bool?>(
-                        key: ValueKey(state.selection.isCompleted),
-                        initialValue: state.selection.isCompleted,
-                        isExpanded: true,
-                        // Выбранное состояние переносится и растягивает поле
-                        // по высоте вместо обрезки по одной строке.
-                        isDense: false,
-                        items: [
-                          DropdownMenuItem<bool?>(
-                            value: null,
-                            child: Text(l10n.dailyChoiceCatalogAllStates),
-                          ),
-                          DropdownMenuItem<bool?>(
-                            value: false,
-                            child: Text(l10n.dailyChoiceCatalogIncomplete),
-                          ),
-                          DropdownMenuItem<bool?>(
-                            value: true,
-                            child: Text(l10n.dailyChoiceCatalogCompleted),
-                          ),
-                        ],
-                        onChanged: model.selectCompletion,
+            Expanded(
+              child: CustomScrollView(
+                controller: _scrollController,
+                key: const PageStorageKey<String>('daily-choice-catalog'),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: DayHeading(
+                        weekday:
+                            weekday[0].toUpperCase() + weekday.substring(1),
+                        // Явный формат сохраняет порядок и не добавляет «г.»:
+                        // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+                        date: DateFormat('d MMMM y', locale).format(date),
+                        todayLabel: selectedDate == _localDay.today
+                            ? l10n.dailyChoiceCalendarToday
+                            : null,
                       ),
                     ),
-                    TextButton(
-                      key: const ValueKey('daily-choice-clear-filters'),
-                      onPressed: model.clearFilters,
-                      child: Text(l10n.dailyChoiceCatalogClearFilters),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _CompletionFilter(
+                            label: l10n.dailyChoiceCatalogCompletionFilter,
+                            field: DropdownButtonFormField<bool?>(
+                              key: ValueKey(state.selection.isCompleted),
+                              initialValue: state.selection.isCompleted,
+                              isExpanded: true,
+                              // Выбранное состояние переносится и растягивает поле
+                              // по высоте вместо обрезки по одной строке.
+                              isDense: false,
+                              items: [
+                                DropdownMenuItem<bool?>(
+                                  value: null,
+                                  child: Text(l10n.dailyChoiceCatalogAllStates),
+                                ),
+                                DropdownMenuItem<bool?>(
+                                  value: false,
+                                  child: Text(
+                                    l10n.dailyChoiceCatalogIncomplete,
+                                  ),
+                                ),
+                                DropdownMenuItem<bool?>(
+                                  value: true,
+                                  child: Text(l10n.dailyChoiceCatalogCompleted),
+                                ),
+                              ],
+                              onChanged: model.selectCompletion,
+                            ),
+                          ),
+                          TextButton(
+                            key: const ValueKey('daily-choice-clear-filters'),
+                            onPressed: model.clearFilters,
+                            child: Text(l10n.dailyChoiceCatalogClearFilters),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  ..._content(state, model, l10n),
+                ],
               ),
             ),
-            ..._content(state, model, l10n),
           ],
         ),
       ),

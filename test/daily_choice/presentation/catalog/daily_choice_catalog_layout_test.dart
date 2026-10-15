@@ -76,7 +76,7 @@ void main() {
         expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
 
         final day = date(2026, 10, 1);
-        await _reveal(tester, calendarDay(day));
+        _expectReachable(tester, calendarDay(day));
         _expectTappable(tester, calendarDay(day));
         await tester.tap(calendarDay(day));
         await tester.pump();
@@ -117,7 +117,10 @@ void main() {
           await _expectWholeTexts(tester);
 
           for (final row in shown.weeks) {
-            await _reveal(tester, calendarDay(row.first, skipOffstage: false));
+            _expectReachable(
+              tester,
+              calendarDay(row.first, skipOffstage: false),
+            );
             for (final day in row) {
               _expectTappable(tester, calendarDay(day));
             }
@@ -127,7 +130,7 @@ void main() {
           final lastDay = shown.weeks
               .expand((week) => week)
               .lastWhere((day) => day.month == shown.today.month);
-          await _reveal(tester, calendarDay(lastDay, skipOffstage: false));
+          _expectReachable(tester, calendarDay(lastDay, skipOffstage: false));
           await tester.tap(calendarDay(lastDay));
           await tester.pump();
           repository.completeFirst(1, [
@@ -158,8 +161,8 @@ void main() {
         });
       }
 
-      testWidgets('у страницы одна вертикальная прокрутка: жест из '
-          'календаря прокручивает страницу, горизонтальный листает неделю, '
+      testWidgets('календарь закреплён над единственной прокруткой: '
+          'вертикальный жест по нему не двигает выдачу, горизонтальный листает неделю, '
           'а фильтры, подгрузка и последняя строка достижимы жестами над '
           'панелью без зарезервированного места', (tester) async {
         final repository = CatalogPageRepository();
@@ -179,23 +182,30 @@ void main() {
         final scroll = tester.state<ScrollableState>(_pageScroll).position;
 
         final day = calendarDay(date(2026, 10, 1), skipOffstage: false);
-        await _reveal(tester, day);
+        _expectReachable(tester, day);
         final before = scroll.pixels;
+        final calendarRect = tester.getRect(find.byType(DailyChoiceCalendar));
         await tester.drag(day, const Offset(0, -150));
         await tester.pumpAndSettle();
-        expect(scroll.pixels, greaterThan(before + 100));
+        expect(scroll.pixels, before);
         expect(
           visibleWeeks(tester, skipOffstage: false),
           weeksFrom(date(2026, 9, 28), 1),
         );
 
-        await _reveal(tester, day);
+        _expectReachable(tester, day);
         final scrolled = scroll.pixels;
         // Больше половины, но меньше ширины недели.
         await tester.drag(day, const Offset(-200, 0));
         await tester.pumpAndSettle();
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
         expect(scroll.pixels, scrolled);
+
+        await tester.drag(_pageScroll, const Offset(0, -300));
+        await tester.pumpAndSettle();
+        expect(scroll.pixels, greaterThan(scrolled));
+        expect(tester.getRect(find.byType(DailyChoiceCalendar)), calendarRect);
+        expect(find.byType(DayHeading).hitTestable(), findsNothing);
 
         for (final key in _filterKeys) {
           await _dragUntilReachable(
@@ -227,6 +237,62 @@ void main() {
             skipOffstage: false,
           ),
         );
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('смена выбранного дня возвращает выдачу к заголовку, '
+          'а повторный выбор, просмотр и раскрытие сохраняют смещение', (
+        tester,
+      ) async {
+        final repository = CatalogPageRepository();
+        await _open(tester, repository, locale, today: _today);
+        final items = [
+          for (var number = 1; number <= 20; number++)
+            catalogPageItem(number, date: _today),
+        ];
+        repository.completeFirst(0, items, total: 20);
+        await tester.pumpAndSettle();
+        final headingTop = tester.getTopLeft(find.byType(DayHeading)).dy;
+        final scroll = tester.state<ScrollableState>(_pageScroll).position;
+        await tester.drag(_pageScroll, const Offset(0, -350));
+        await tester.pumpAndSettle();
+        final offset = scroll.pixels;
+        expect(offset, greaterThan(0));
+
+        await tester.tap(calendarDay(_today));
+        await tester.pumpAndSettle();
+        expect(scroll.pixels, offset);
+        expect(repository.queries, hasLength(1));
+        await swipeToNextPeriod(tester);
+        expect(scroll.pixels, offset);
+        await _tapCommand(tester, _l10n(tester).dailyChoiceCalendarExpand);
+        expect(scroll.pixels, offset);
+        final expandedTop = tester.getTopLeft(find.byType(DailyChoiceCalendar));
+        await tester.drag(_pageScroll, const Offset(0, -100));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getTopLeft(find.byType(DailyChoiceCalendar)),
+          expandedTop,
+        );
+        await _tapCommand(tester, _l10n(tester).dailyChoiceCalendarCollapse);
+
+        final nextDay = date(2026, 10, 9);
+        await tester.tap(calendarDay(nextDay));
+        // Быстрый ответ не оставляет кадра с короткой загрузкой, который
+        // сам ограничил бы смещение прокрутки до нуля.
+        repository.completeFirst(1, [
+          for (var number = 1; number <= 20; number++)
+            catalogPageItem(number, date: nextDay),
+        ], total: 20);
+        await tester.pumpAndSettle();
+        expect(find.byType(DayHeading).hitTestable(), findsOneWidget);
+        expect(tester.getTopLeft(find.byType(DayHeading)).dy, headingTop);
+        expect(find.text('9 октября 2026'), findsOneWidget);
+        _expectReachable(
+          tester,
+          find.byKey(const ValueKey('daily-choice-row-1')),
+        );
+        expect(scroll.pixels, 0);
         expect(tester.takeException(), isNull);
       });
 
@@ -337,8 +403,7 @@ const _filterKeys = [
   'daily-choice-clear-filters',
 ];
 
-/// Общая вертикальная прокрутка страницы каталога. Перелистывание периодов
-/// календаря — горизонтальная прокрутка внутри неё.
+/// Единственная вертикальная прокрутка выдачи под календарём.
 final _pageScroll = find.descendant(
   of: find.byType(DailyChoiceCatalogPage),
   matching: find.byWidgetPredicate(
@@ -383,6 +448,13 @@ Rect _visibleArea(WidgetTester tester) {
   return Rect.fromLTRB(0, appBar.bottom, _screen.width, bar.top);
 }
 
+/// Область жестов по выдаче исключает закреплённый календарь.
+Rect _listArea(WidgetTester tester) {
+  final area = _visibleArea(tester);
+  final calendar = tester.getRect(find.byType(DailyChoiceCalendar));
+  return Rect.fromLTRB(area.left, calendar.bottom, area.right, area.bottom);
+}
+
 /// Элемент [finder] целиком лежит над панелью, и касание его середины достигает его.
 void _expectReachable(WidgetTester tester, Finder finder) {
   final rect = tester.getRect(finder);
@@ -425,8 +497,9 @@ Future<void> _dragUntilReachable(WidgetTester tester, Finder finder) async {
         : tester.getRect(finder).bottom > area.bottom
         ? -120
         : 120;
+    final listArea = _listArea(tester);
     await tester.dragFrom(
-      Offset(area.left + 24, area.center.dy),
+      Offset(listArea.left + 24, listArea.center.dy),
       Offset(0, shift),
     );
     await _settle(tester);
@@ -439,7 +512,7 @@ Future<void> _dragToEnd(WidgetTester tester) async {
   final scroll = tester.state<ScrollableState>(_pageScroll).position;
   for (var step = 0; step < 200; step++) {
     if (scroll.pixels >= scroll.maxScrollExtent - _epsilon) return;
-    final area = _visibleArea(tester);
+    final area = _listArea(tester);
     await tester.dragFrom(
       Offset(area.left + 24, area.center.dy),
       const Offset(0, -300),
@@ -458,27 +531,9 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump();
 }
 
-/// Прокручивает страницу так, чтобы элемент календаря [finder] оказался
-/// посередине экрана. Перелистывание календаря при этом не меняется.
-Future<void> _reveal(WidgetTester tester, Finder finder) async {
-  // Ближайшая прокрутка дня — горизонтальная страница периода, поэтому
-  // положение в общей прокрутке определяется через календарь целиком.
-  await tester
-      .state<ScrollableState>(_pageScroll)
-      .position
-      .ensureVisible(
-        tester.renderObject(
-          find.byType(DailyChoiceCalendar, skipOffstage: false),
-        ),
-        alignment: 0.5,
-        targetRenderObject: tester.renderObject(finder),
-      );
-  await tester.pump();
-}
-
-/// Выполняет команду шапки календаря касанием после прокрутки к ней.
+/// Выполняет команду закреплённого календаря касанием.
 Future<void> _tapCommand(WidgetTester tester, String name) async {
-  await _reveal(tester, find.bySemanticsLabel(name, skipOffstage: false));
+  _expectReachable(tester, find.bySemanticsLabel(name, skipOffstage: false));
   final command = find.bySemanticsLabel(name);
   _expectTappable(tester, command);
   await tester.tap(command);
@@ -619,6 +674,7 @@ void _expectCommands(WidgetTester tester) {
 Future<void> _expectWholeTexts(WidgetTester tester) async {
   final scroll = tester.state<ScrollableState>(_pageScroll).position;
   final initial = scroll.pixels;
+  _expectWholeTextsIn(tester, find.byType(DailyChoiceCalendar));
   var offset = scroll.minScrollExtent;
   while (true) {
     scroll.jumpTo(offset);

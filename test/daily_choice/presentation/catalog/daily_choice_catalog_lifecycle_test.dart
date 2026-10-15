@@ -67,10 +67,10 @@ void main() {
     await tester.pump();
     await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
     await _settle(tester);
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsOneWidget);
     _catalogScroll(tester).jumpTo(300);
     await tester.pump();
 
-    expect(find.text(_l10n.dailyChoiceCalendarToday), findsOneWidget);
     final catalog = _catalogState(tester);
     expect(catalog, isA<DailyChoiceCatalogLoaded>());
     expect(catalog.selection.isCompleted, false);
@@ -87,12 +87,15 @@ void main() {
     expect(_todayMarker(tester, date(2026, 10, 6)), findsNothing);
     // Новый сегодняшний день не выбирается сам: выбор, охват, просмотр,
     // загруженная выдача и прокрутка остаются прежними, чтений нет.
-    expect(find.text(_l10n.dailyChoiceCalendarToday), findsNothing);
-    _expectSelected(tester, date(2026, 10, 6));
     expect(visibleWeeks(tester), shownWeeks);
     _expectCatalogUnchanged(tester, catalog);
     expect(repository.queries, hasLength(2));
     expect(_catalogScroll(tester).pixels, 300);
+    // Заголовок дня строится лениво и возвращается вместе с началом выдачи.
+    _catalogScroll(tester).jumpTo(0);
+    await tester.pump();
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsNothing);
+    _expectSelected(tester, date(2026, 10, 6));
     semantics.dispose();
   });
 
@@ -414,13 +417,17 @@ DailyChoiceCatalogState _catalogState(WidgetTester tester) {
   return container.read(openedDailyChoiceCatalogProvider(container));
 }
 
-/// Общая вертикальная прокрутка каталога.
+/// Вертикальная прокрутка выдачи под закреплённым календарём.
 ScrollPosition _catalogScroll(WidgetTester tester) => tester
     .state<ScrollableState>(
       find
           .descendant(
             of: find.byType(DailyChoiceCatalogPage),
-            matching: find.byType(Scrollable),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            ),
           )
           .first,
     )

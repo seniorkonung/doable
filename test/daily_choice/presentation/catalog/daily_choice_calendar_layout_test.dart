@@ -3,6 +3,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.da
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/components/month_grid_weekday.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
@@ -146,8 +147,8 @@ void main() {
       final failure = find.text('Отметки дней не загружены.');
       _expectFullyShown(tester, failure, within: failed.calendar);
       expect(
-        _rect(tester, failure).bottom,
-        lessThan(_rect(tester, calendarDay(date(2026, 9, 28))).top),
+        _rect(tester, failure).top,
+        greaterThanOrEqualTo(_rect(tester, find.byType(CalendarHandle)).bottom),
       );
       expect(tester.takeException(), isNull);
     }

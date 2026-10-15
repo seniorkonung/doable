@@ -212,7 +212,7 @@ void main() {
       });
 
       testWidgets('прокрутка страницы диктором '
-          'проходит календарь, фильтры, строки и подгрузку в том же порядке, '
+          'проходит заголовок дня, фильтры, строки и подгрузку по порядку, '
           'и подгрузка выполняется', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
@@ -225,8 +225,11 @@ void main() {
         );
         repository.completeFirst(
           0,
-          [catalogPageItem(1, date: _today), catalogPageItem(2, date: _today)],
-          total: 3,
+          [
+            for (var number = 1; number <= 20; number++)
+              catalogPageItem(number, date: _today),
+          ],
+          total: 21,
           cursor: const CatalogPageCursor(),
         );
         await tester.pumpAndSettle();
@@ -234,16 +237,12 @@ void main() {
         // Системный размер текста доходит до календаря без ограничения.
 
         final page = [
-          for (final day in weeksFrom(date(2026, 9, 28), 1).single)
-            day == _today ? texts.today : _fullDate(tester, day),
-          l10n.dailyChoiceCalendarExpand,
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
           _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
           l10n.dailyChoiceCatalogClearFilters,
-          l10n.dailyChoiceCatalogTotalCount(3),
-          _rowLabel(l10n, 1),
-          _rowLabel(l10n, 2),
+          l10n.dailyChoiceCatalogTotalCount(21),
+          for (var number = 1; number <= 20; number++) _rowLabel(l10n, number),
           l10n.dailyChoiceCatalogLoadMore,
         ];
 

@@ -87,7 +87,7 @@ void main() {
       );
 
       testWidgets('состояние дня дополняет дату и «сегодня», сохраняя '
-          'выбранность; строка отказа читается под шапкой без действий', (
+          'выбранность; Notice читается после ручки без действий', (
         tester,
       ) async {
         final semantics = tester.ensureSemantics();
@@ -115,16 +115,17 @@ void main() {
         expect(
           _announced(tester),
           containsAllInOrder([
-            texts.marksUnavailable,
             texts.september28,
             completed,
             incomplete,
             texts.collapse,
+            texts.marksUnavailable,
           ]),
         );
         final failure = find.semantics.byLabel(texts.marksUnavailable);
         expect(failure, findsOne);
         expect(failure.evaluate().single.getSemanticsData().actions, 0);
+        expect(failure.evaluate().single.flagsCollection.isLiveRegion, isTrue);
         expect(find.byType(SnackBar), findsNothing);
 
         tester.semantics.tap(find.semantics.byLabel(completed));

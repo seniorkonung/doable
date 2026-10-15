@@ -1,7 +1,9 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +14,71 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  testWidgets('Notice под ручкой остаётся над прокрученной выдачей; '
+      'отказ сохраняет отметки и смещение, успех убирает сообщение', (
+    tester,
+  ) async {
+    final today = date(2026, 10, 6);
+    final repository = CatalogPageRepository();
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: today,
+      locale: const Locale('ru'),
+      size: const Size(360, 780),
+    );
+    repository.completeFirst(0, [
+      for (var number = 1; number <= 20; number++)
+        catalogPageItem(number, date: today),
+    ], total: 20);
+    repository.completeDayStatuses(0, {
+      today: DailyChoiceDayStatus.hasIncomplete,
+    });
+    await tester.pumpAndSettle();
+    final list = find.byType(CustomScrollView);
+    await tester.drag(list, const Offset(0, -350));
+    await tester.pumpAndSettle();
+    final scroll = tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)).first,
+        )
+        .position;
+    final offset = scroll.pixels;
+    expect(offset, greaterThan(0));
+    final coordinator = ProviderScope.containerOf(
+      tester.element(calendarDay(today)),
+    ).read(graphCommandCoordinatorProvider.notifier);
+    await repository.confirmTagRename(coordinator, revision: 1);
+    repository.failDayStatuses(1);
+    await tester.pumpAndSettle();
+
+    final notice = find.byType(Notice);
+    expect(notice.hitTestable(), findsOneWidget);
+    expect(
+      tester.getRect(notice).top,
+      greaterThanOrEqualTo(tester.getRect(find.byType(CalendarHandle)).bottom),
+    );
+    expect(scroll.pixels, offset);
+    expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
+    expect(find.text('Отметки дней не загружены.'), findsOneWidget);
+    expect(find.text('Повторить'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+    final noticeRect = tester.getRect(notice);
+    await tester.drag(list, const Offset(0, -100));
+    await tester.pumpAndSettle();
+    expect(scroll.pixels, greaterThan(offset));
+    expect(tester.getRect(notice), noticeRect);
+
+    final afterScroll = scroll.pixels;
+    await swipeToNextPeriod(tester);
+    repository.completeDayStatuses(2, {}, revision: 1);
+    await tester.pumpAndSettle();
+    expect(notice, findsNothing);
+    expect(scroll.pixels, afterScroll);
+    expect(repository.queries, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('отказ первого чтения отметок не мешает фильтру и выбору дня; '
       'перелистывание внутри окна восстанавливает отметки без смены выдачи', (
     tester,
