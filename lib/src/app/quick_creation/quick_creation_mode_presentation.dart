@@ -1,5 +1,4 @@
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
 
 import '../../design_system/doable_icon.dart';
 
@@ -20,10 +19,10 @@ extension QuickCreationModePresentation on QuickCreationMode {
       localizations.quickCreationModeDailyChoiceHint,
   };
 
-  IconData get icon => switch (this) {
-    QuickCreationMode.intention => Icons.adjust_outlined,
-    QuickCreationMode.relation => Icons.route_outlined,
-    QuickCreationMode.dailyChoice => Icons.calendar_today_outlined,
+  DoableIconData get icon => switch (this) {
+    QuickCreationMode.intention => DoableIconData.intention,
+    QuickCreationMode.relation => DoableIconData.relation,
+    QuickCreationMode.dailyChoice => DoableIconData.calendar,
   };
 
   DoableIconData get miniIcon => switch (this) {

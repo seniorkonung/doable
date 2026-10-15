@@ -5,6 +5,7 @@ import '../../daily_choice/application/choice_path_draft.dart';
 import '../../design_system/components/action_sheet.dart';
 import '../../design_system/components/option_row.dart';
 import '../../design_system/components/sheet.dart';
+import '../../design_system/doable_icon.dart';
 
 /// Возвращает направление либо null при отмене, не запуская создание.
 /// Результат передаётся через закрытие маршрута листа:
@@ -36,14 +37,14 @@ final class QuickCreationDailyChoiceStartSheet extends StatelessWidget {
       text: localizations.quickCreationDailyChoiceStartPrompt,
       options: [
         OptionRow(
-          icon: Icons.arrow_downward_outlined,
+          icon: DoableIconData.fromIntention,
           name: localizations.quickCreationDailyChoiceFromIntention,
           hint: localizations.quickCreationDailyChoiceFromIntentionHint,
           trailing: OptionRowTrailing.forward,
           onPressed: () => onSelected(ChoicePathDraftDirection.topDown),
         ),
         OptionRow(
-          icon: Icons.arrow_upward_outlined,
+          icon: DoableIconData.fromAction,
           name: localizations.quickCreationDailyChoiceFromAction,
           hint: localizations.quickCreationDailyChoiceFromActionHint,
           trailing: OptionRowTrailing.forward,

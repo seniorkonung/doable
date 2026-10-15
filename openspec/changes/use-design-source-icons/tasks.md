@@ -66,7 +66,7 @@
   - **Вероятные файлы:** `lib/src/design_system/components/nav_bar.dart`, `lib/src/app/quick_creation/quick_creation_button.dart`, `quick_creation_mode_presentation.dart`, `test/app/quick_creation/quick_creation_button_test.dart`, `quick_creation_accessibility_test.dart`.
   - **Размер:** M — один путь отображения кнопки и адаптация его существующих проверок.
 
-- [ ] 1.8 Перевести обе панели создания на исходные ведущие и служебные значки
+- [x] 1.8 Перевести обе панели создания на исходные ведущие и служебные значки
   - **Критерии приёмки:**
     - `OptionRow` принимает `DoableIconData`; все ведущие значки меню, галочка текущего режима и шевроны используют исходную графику.
     - Панель начала дневного выбора показывает `fromIntention` и `fromAction` с ромбом и кругом; направления, возвращаемые при выборе, и отмена сохраняются.

@@ -141,7 +141,12 @@ void main() {
         for (final element in [
           row,
           title,
-          find.descendant(of: row, matching: find.byIcon(mode.icon)),
+          find.descendant(
+            of: row,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is DoableIcon && widget.icon == mode.icon,
+            ),
+          ),
         ]) {
           _expectWithin(tester, element, viewport.intersect(available));
         }
