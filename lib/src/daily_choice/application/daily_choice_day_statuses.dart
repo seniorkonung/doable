@@ -10,7 +10,7 @@ final class DailyChoiceDayStatusQueryValidationException implements Exception {
   final DailyChoiceDayStatusQueryValidationFailure failure;
 }
 
-/// Включительный диапазон чтения не длиннее 14 недель.
+/// Включительный диапазон чтения не длиннее 15 недель.
 final class DailyChoiceDayStatusQuery {
   factory DailyChoiceDayStatusQuery({
     required CalendarDate firstDate,
@@ -34,7 +34,7 @@ final class DailyChoiceDayStatusQuery {
 
   const DailyChoiceDayStatusQuery._(this.firstDate, this.lastDate);
 
-  static const maxDays = 14 * 7;
+  static const maxDays = 15 * 7;
 
   final CalendarDate firstDate;
   final CalendarDate lastDate;

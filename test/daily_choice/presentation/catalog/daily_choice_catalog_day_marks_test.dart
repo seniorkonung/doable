@@ -310,7 +310,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.dayStatusQueries, hasLength(3));
     expect(repository.dayStatusQueries.last.firstDate, date(2026, 10, 26));
-    expect(repository.dayStatusQueries.last.lastDate, date(2027, 1, 31));
+    expect(repository.dayStatusQueries.last.lastDate, date(2027, 2, 7));
     _expectVisibleMark(tester, novemberLastDay, Icons.circle_outlined);
     expect(_mark(novemberLastDay, Icons.check), findsNothing);
     expect(_mark(decemberDay, Icons.circle_outlined), findsNothing);
@@ -331,7 +331,7 @@ void main() {
     await tester.pump();
     expect(repository.dayStatusQueries, hasLength(4));
     expect(repository.dayStatusQueries.last.firstDate, date(2026, 9, 28));
-    expect(repository.dayStatusQueries.last.lastDate, date(2027, 1, 3));
+    expect(repository.dayStatusQueries.last.lastDate, date(2027, 1, 10));
     expect(repository.queries, hasLength(3));
     expect(repository.queries.last.date, novemberLastDay);
     expect(repository.queries.last.isCompleted, isTrue);

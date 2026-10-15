@@ -59,12 +59,12 @@ void main() {
       expect(harness.repository.queries[2].firstDate, _date(9, 28));
       expect(
         harness.repository.queries[2].lastDate,
-        CalendarDate.fromParts(2027, 1, 3),
+        CalendarDate.fromParts(2027, 1, 10),
       );
       expect(harness.repository.queries[3].firstDate, _date(10, 26));
       expect(
         harness.repository.queries[3].lastDate,
-        CalendarDate.fromParts(2027, 1, 31),
+        CalendarDate.fromParts(2027, 2, 7),
       );
       harness.repository.succeed(3, {
         _date(12, 15): DailyChoiceDayStatus.allCompleted,
@@ -191,7 +191,7 @@ void main() {
       expect(harness.repository.queries.last.firstDate, _date(10, 26));
       expect(
         harness.repository.queries.last.lastDate,
-        CalendarDate.fromParts(2027, 1, 31),
+        CalendarDate.fromParts(2027, 2, 7),
       );
       expect(harness.marks, {novemberMark: DailyChoiceDayStatus.hasIncomplete});
 
