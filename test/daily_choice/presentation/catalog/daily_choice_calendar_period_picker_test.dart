@@ -214,7 +214,7 @@ void main() {
       final next = tester.getSemantics(
         find.bySemanticsLabel(fromMonths ? 'Следующий год' : 'Следующие годы'),
       );
-      tester.binding.pipelineOwner.semanticsOwner!.performAction(
+      tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
         next.id,
         SemanticsAction.tap,
       );
@@ -229,7 +229,7 @@ void main() {
             : 'Свернуть календарь';
         final node = tester.getSemantics(find.bySemanticsLabel(command));
         expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-        tester.binding.pipelineOwner.semanticsOwner!.performAction(
+        tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
           node.id,
           SemanticsAction.tap,
         );
