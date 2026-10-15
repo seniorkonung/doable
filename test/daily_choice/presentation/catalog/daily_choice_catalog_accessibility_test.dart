@@ -1,5 +1,3 @@
-import 'dart:ui' show Tristate;
-
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';

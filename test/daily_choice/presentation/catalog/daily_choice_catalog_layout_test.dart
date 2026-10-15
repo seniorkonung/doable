@@ -57,8 +57,6 @@ void main() {
           catalogPageItem(1, date: _today),
         ], total: 1);
         await tester.pumpAndSettle();
-        final l10n = _l10n(tester);
-
         _expectColumns(tester, weeksFrom(date(2026, 9, 28), 1));
         _expectCommands(tester);
         expect(

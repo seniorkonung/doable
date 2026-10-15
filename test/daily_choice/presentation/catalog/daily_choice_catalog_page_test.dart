@@ -148,7 +148,6 @@ void main() {
       'календаря', (tester) async {
     final repository = _Repository();
     await _open(tester, repository);
-    final l10n = lookupAppLocalizations(const Locale('ru'));
     expect(repository.queries.single.date, _today);
     expect(repository.queries.single.isCompleted, isNull);
     repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());

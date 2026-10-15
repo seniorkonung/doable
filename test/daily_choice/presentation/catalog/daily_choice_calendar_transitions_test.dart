@@ -1,5 +1,4 @@
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'daily_choice_calendar_test_support.dart';

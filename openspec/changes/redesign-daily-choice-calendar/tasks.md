@@ -242,7 +242,7 @@
   - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`; при необходимости поправки бюджета в `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart` и `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`
   - **Estimated scope:** M
 
-- [ ] 2.13 Проверить готовность фазы 2: оба каталога сохраняют поведение с закреплённым календарём дизайна
+- [x] 2.13 Проверить готовность фазы 2: оба каталога сохраняют поведение с закреплённым календарём дизайна
   - **Acceptance criteria:**
     - Сценарии спецификаций объёма фазы 2 подтверждены: выбор дня, фильтр, выдача, отметки, сохранение состояния и независимость каталога на заданную дату работают; результаты проверок окна, первого свайпа и нижней границы поддержки из 2.1, 2.5 и 2.12 подтверждены.
     - Ручная сверка обоих каталогов с Main.dc.html и Parts.dc.html в обеих темах на устройстве не выявила непринятых расхождений; подтверждены строка состояния, поворот и попытка разделить экран. Заголовок месяца пока не открывает выбор года и месяца.
