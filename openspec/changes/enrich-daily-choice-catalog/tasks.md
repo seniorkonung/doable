@@ -11,7 +11,7 @@
   - **Files likely touched:** `lib/src/daily_choice/domain/daily_choice_schedule.dart` (новый), `lib/src/daily_choice/domain/daily_choice_priority.dart` (новый), `lib/src/daily_choice/domain/daily_choice.dart`, `lib/src/daily_choice/application/daily_choice_command.dart`, `test/daily_choice/application/daily_choice_contract_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.2 Добавить схему версии 2 и атомарный переход с версии 1
+- [x] 1.2 Добавить схему версии 2 и атомарный переход с версии 1
   - **Acceptance criteria:**
     - Новая схема содержит nullable `scheduled_minute` с допустимыми целыми 0–1439 и `priority` с целыми 1–4, `NOT NULL DEFAULT 4`; ограничения проверяют тип и диапазон. Индекс имеет ключ `(choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)` по решению 2 дизайна.
     - Переход 1 → 2 добавляет столбцы и индекс через существующий `runAtomicMigration`, сохраняя проверки внешних ключей и FTS. Порядок и определения столбцов совпадают с новой установкой; destructive recovery и downgrade не добавляются согласно [ADR-0002](../../../docs/adr/0002-use-drift-sqlite-for-local-graph.md).
