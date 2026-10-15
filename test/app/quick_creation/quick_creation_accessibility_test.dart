@@ -21,18 +21,8 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/app_root_pages.dart';
 
 const _titles = {
-  'ru': [
-    'Новое намерение',
-    'Новая связь',
-    'Дневной выбор от намерения',
-    'Дневной выбор от действия',
-  ],
-  'en': [
-    'New intention',
-    'New relation',
-    'Daily choice from an intention',
-    'Daily choice from an action',
-  ],
+  'ru': ['Новое намерение', 'Новая связь', 'Новый дневной выбор'],
+  'en': ['New intention', 'New relation', 'New daily choice'],
 };
 
 // Размер экрана не меняет ветвление кода, поэтому берём телефонную ширину.

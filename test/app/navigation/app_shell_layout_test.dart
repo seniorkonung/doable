@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
@@ -461,15 +462,19 @@ void main() {
             greaterThanOrEqualTo(message.bottom),
           );
           expect(create.hitTestable(), findsOneWidget);
-          await openQuickCreation(
-            tester,
-            destination == AppDestination.dailyChoices
-                ? QuickCreationMode.dailyChoiceFromAction
-                : QuickCreationMode.intention,
-            openedPage: destination == AppDestination.dailyChoices
-                ? find.byType(DailyChoiceActionPickerPage)
-                : find.byType(IntentionEditorPage),
-          );
+          if (destination == AppDestination.dailyChoices) {
+            await openDailyChoiceQuickCreation(
+              tester,
+              ChoicePathDraftDirection.bottomUp,
+              openedPage: find.byType(DailyChoiceActionPickerPage),
+            );
+          } else {
+            await openQuickCreation(
+              tester,
+              QuickCreationMode.intention,
+              openedPage: find.byType(IntentionEditorPage),
+            );
+          }
         }
         expect(tester.takeException(), isNull);
       });

@@ -8,16 +8,12 @@ extension QuickCreationModePresentation on QuickCreationMode {
   String title(AppLocalizations localizations) => switch (this) {
     QuickCreationMode.intention => localizations.quickCreationModeIntention,
     QuickCreationMode.relation => localizations.quickCreationModeRelation,
-    QuickCreationMode.dailyChoiceFromIntention =>
-      localizations.quickCreationModeDailyChoiceFromIntention,
-    QuickCreationMode.dailyChoiceFromAction =>
-      localizations.quickCreationModeDailyChoiceFromAction,
+    QuickCreationMode.dailyChoice => localizations.quickCreationModeDailyChoice,
   };
 
   IconData get icon => switch (this) {
-    QuickCreationMode.intention => Icons.circle_outlined,
-    QuickCreationMode.relation => Icons.link,
-    QuickCreationMode.dailyChoiceFromIntention => Icons.arrow_downward,
-    QuickCreationMode.dailyChoiceFromAction => Icons.arrow_upward,
+    QuickCreationMode.intention => Icons.adjust_outlined,
+    QuickCreationMode.relation => Icons.route_outlined,
+    QuickCreationMode.dailyChoice => Icons.calendar_today_outlined,
   };
 }

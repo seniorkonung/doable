@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
@@ -131,9 +130,9 @@ Future<void> _restartPath(
         find.byKey(const ValueKey('intention-details-choose-path')),
       );
     case ChoicePathDraftDirection.bottomUp:
-      await openQuickCreation(
+      await openDailyChoiceQuickCreation(
         tester,
-        QuickCreationMode.dailyChoiceFromAction,
+        ChoicePathDraftDirection.bottomUp,
         openedPage: find.byType(DailyChoiceActionPickerPage),
         wait: _waitFor,
       );
@@ -464,9 +463,9 @@ void main() {
 
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
-      await openQuickCreation(
+      await openDailyChoiceQuickCreation(
         tester,
-        QuickCreationMode.dailyChoiceFromAction,
+        ChoicePathDraftDirection.bottomUp,
         openedPage: find.byType(DailyChoiceActionPickerPage),
         wait: _waitFor,
       );
@@ -721,9 +720,9 @@ void main() {
 
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
-      await openQuickCreation(
+      await openDailyChoiceQuickCreation(
         tester,
-        QuickCreationMode.dailyChoiceFromAction,
+        ChoicePathDraftDirection.bottomUp,
         openedPage: find.byType(DailyChoiceActionPickerPage),
         wait: _waitFor,
       );

@@ -15,24 +15,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _titles = {
-  'ru': [
-    'Новое намерение',
-    'Новая связь',
-    'Дневной выбор от намерения',
-    'Дневной выбор от действия',
-  ],
-  'en': [
-    'New intention',
-    'New relation',
-    'Daily choice from an intention',
-    'Daily choice from an action',
-  ],
+  'ru': ['Новое намерение', 'Новая связь', 'Новый дневной выбор'],
+  'en': ['New intention', 'New relation', 'New daily choice'],
 };
 const _icons = [
-  Icons.circle_outlined,
-  Icons.link,
-  Icons.arrow_downward,
-  Icons.arrow_upward,
+  Icons.adjust_outlined,
+  Icons.route_outlined,
+  Icons.calendar_today_outlined,
 ];
 
 void main() {
@@ -40,76 +29,68 @@ void main() {
   // по одному режиму на язык.
   for (final (language, initial) in [
     ('ru', QuickCreationMode.intention),
-    ('en', QuickCreationMode.dailyChoiceFromAction),
+    ('en', QuickCreationMode.dailyChoice),
   ]) {
     final titles = _titles[language]!;
-    testWidgets(
-      '$language: четыре режима и выбор из «${titles[initial.index]}» '
-      'без запуска создания и изменения исходной истории',
-      (tester) async {
-        final app = await _openApp(
-          tester,
-          language: language,
-          initial: initial,
-        );
-        await _openMenu(tester);
+    testWidgets('$language: три режима и выбор из «${titles[initial.index]}» '
+        'без запуска создания и изменения исходной истории', (tester) async {
+      final app = await _openApp(tester, language: language, initial: initial);
+      await _openMenu(tester);
 
-        expect(find.byType(ListTile), findsNWidgets(4));
+      expect(find.byType(ListTile), findsNWidgets(3));
+      expect(
+        find.text(
+          language == 'ru' ? 'Режим быстрого создания' : 'Quick creation mode',
+        ),
+        findsOneWidget,
+      );
+      for (var i = 0; i < titles.length; i++) {
+        final row = find.ancestor(
+          of: find.text(titles[i]),
+          matching: find.byType(ListTile),
+        );
         expect(
-          find.text(
-            language == 'ru'
-                ? 'Режим быстрого создания'
-                : 'Quick creation mode',
-          ),
+          find.descendant(of: row, matching: find.byIcon(_icons[i])),
           findsOneWidget,
         );
-        for (var i = 0; i < titles.length; i++) {
-          final row = find.ancestor(
-            of: find.text(titles[i]),
-            matching: find.byType(ListTile),
-          );
-          expect(
-            find.descendant(of: row, matching: find.byIcon(_icons[i])),
-            findsOneWidget,
-          );
-          expect(
-            tester.getSemantics(row).flagsCollection.isSelected,
-            i == initial.index ? Tristate.isTrue : Tristate.isFalse,
-          );
-          expect(
-            find.descendant(of: row, matching: find.byIcon(Icons.check)),
-            i == initial.index ? findsOneWidget : findsNothing,
-          );
-          if (i > 0) {
-            expect(
-              tester.getTopLeft(find.text(titles[i])).dy,
-              greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
-            );
-          }
-        }
-
-        final next = QuickCreationMode.values[(initial.index + 1) % 4];
-        await tester.tap(find.text(titles[next.index]));
-        expect(app.mode, next);
-        expect(app.store.writes.single.mode, next);
-        await tester.pumpAndSettle();
-        app.expectOrigin(tester);
-
-        await _openMenu(tester);
         expect(
-          tester
-              .getSemantics(find.text(titles[next.index]))
-              .flagsCollection
-              .isSelected,
-          Tristate.isTrue,
+          tester.getSemantics(row).flagsCollection.isSelected,
+          i == initial.index ? Tristate.isTrue : Tristate.isFalse,
         );
-        await tester.tap(find.text(titles[next.index]));
-        await tester.pumpAndSettle();
-        expect(app.mode, next);
-        expect(app.store.writes.map((write) => write.mode), [next, next]);
-        app.expectOrigin(tester);
-      },
-    );
+        expect(
+          find.descendant(of: row, matching: find.byIcon(Icons.check)),
+          i == initial.index ? findsOneWidget : findsNothing,
+        );
+        if (i > 0) {
+          expect(
+            tester.getTopLeft(find.text(titles[i])).dy,
+            greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
+          );
+        }
+      }
+
+      final next = QuickCreationMode
+          .values[(initial.index + 1) % QuickCreationMode.values.length];
+      await tester.tap(find.text(titles[next.index]));
+      expect(app.mode, next);
+      expect(app.store.writes.single.mode, next);
+      await tester.pumpAndSettle();
+      app.expectOrigin(tester);
+
+      await _openMenu(tester);
+      expect(
+        tester
+            .getSemantics(find.text(titles[next.index]))
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      await tester.tap(find.text(titles[next.index]));
+      await tester.pumpAndSettle();
+      expect(app.mode, next);
+      expect(app.store.writes.map((write) => write.mode), [next, next]);
+      app.expectOrigin(tester);
+    });
   }
 
   // Самые длинные названия русские, поэтому достаточно русского языка.
@@ -152,7 +133,7 @@ void main() {
         'точную историю, выбранный пункт и ввод', (tester) async {
       final app = await _openApp(
         tester,
-        initial: QuickCreationMode.dailyChoiceFromAction,
+        initial: QuickCreationMode.dailyChoice,
       );
       await _openMenu(tester);
       if (byBack) {
@@ -161,7 +142,7 @@ void main() {
         await tester.tapAt(const Offset(10, 10));
       }
       await tester.pumpAndSettle();
-      expect(app.mode, QuickCreationMode.dailyChoiceFromAction);
+      expect(app.mode, QuickCreationMode.dailyChoice);
       expect(app.store.writes, isEmpty);
       app.expectOrigin(tester);
     });

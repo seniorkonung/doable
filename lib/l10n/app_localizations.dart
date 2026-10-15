@@ -542,18 +542,6 @@ abstract class AppLocalizations {
   /// **'Pick an action, then the intention it serves'**
   String get quickCreationDailyChoiceFromActionHint;
 
-  /// Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice from an intention'**
-  String get quickCreationModeDailyChoiceFromIntention;
-
-  /// Название режима дневного выбора с поиском действия и построением пути снизу вверх
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice from an action'**
-  String get quickCreationModeDailyChoiceFromAction;
-
   /// Общее состояние загрузки
   ///
   /// In en, this message translates to:

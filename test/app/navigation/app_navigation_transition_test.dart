@@ -46,12 +46,12 @@ void main() {
         await tester.pumpAndSettle();
         final nextTitle = title == 'Первая страница'
             ? 'Новая связь'
-            : 'Дневной выбор от действия';
+            : 'Новый дневной выбор';
         await tester.tap(find.widgetWithText(ListTile, nextTitle));
         await tester.pumpAndSettle();
         mode = title == 'Первая страница'
             ? QuickCreationMode.relation
-            : QuickCreationMode.dailyChoiceFromAction;
+            : QuickCreationMode.dailyChoice;
         expect(tester.getRect(_bar), rect);
       }
       if (platform == TargetPlatform.iOS) {

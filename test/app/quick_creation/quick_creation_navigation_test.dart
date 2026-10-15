@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
@@ -18,23 +19,34 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 void main() {
   testWidgets(
     'режим общий для оболочки и глубокой страницы; поиски независимы',
     (tester) async {
       final router = await _start(tester);
-      await _selectMode(tester, QuickCreationMode.dailyChoiceFromAction);
+      await _selectMode(tester, QuickCreationMode.dailyChoice);
       await tester.tap(find.byType(QuickCreationButton));
       await tester.pumpAndSettle();
+      await chooseQuickCreationDailyChoiceStart(
+        tester,
+        ChoicePathDraftDirection.bottomUp,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+      );
       await tester.enterText(_key('daily-choice-action-filter'), 'Намерение 3');
       unawaited(
         router.push(IntentionDetailsRoute(intentionId: durabilityIntention(3))),
       );
       await tester.pumpAndSettle();
-      _expectMode(QuickCreationMode.dailyChoiceFromAction);
+      _expectMode(QuickCreationMode.dailyChoice);
       await tester.tap(find.byType(QuickCreationButton));
       await tester.pumpAndSettle();
+      await chooseQuickCreationDailyChoiceStart(
+        tester,
+        ChoicePathDraftDirection.bottomUp,
+        openedPage: find.byType(DailyChoiceActionPickerPage),
+      );
       expect(find.byType(DailyChoiceActionPickerPage), findsOneWidget);
       expect(
         tester

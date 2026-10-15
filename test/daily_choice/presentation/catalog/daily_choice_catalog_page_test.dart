@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -32,18 +33,18 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
 
 void main() {
-  // Режим и язык независимы: диагональ покрывает оба режима и оба языка.
-  for (final (locale, mode, route, cancelKey, name) in const [
+  // Направление и язык независимы: диагональ покрывает оба направления и языка.
+  for (final (locale, direction, route, cancelKey, name) in const [
     (
       Locale('ru'),
-      QuickCreationMode.dailyChoiceFromIntention,
+      ChoicePathDraftDirection.topDown,
       DailyChoiceSourcePickerRoute.name,
       'daily-choice-source-cancel',
       'дневной выбор от намерения',
     ),
     (
       Locale('en'),
-      QuickCreationMode.dailyChoiceFromAction,
+      ChoicePathDraftDirection.bottomUp,
       DailyChoiceActionPickerRoute.name,
       'daily-choice-action-cancel',
       'дневной выбор от действия',
@@ -66,9 +67,9 @@ void main() {
           find.bySemanticsLabel(l10n.dailyChoiceCreateFromAction),
           findsNothing,
         );
-        await openQuickCreation(
+        await openDailyChoiceQuickCreation(
           tester,
-          mode,
+          direction,
           openedPage: find.byKey(ValueKey(cancelKey)),
         );
         expect(router.current.name, route);
@@ -79,7 +80,7 @@ void main() {
         expect(quickCreationAction().hitTestable(), findsOneWidget);
         expect(
           find.bySemanticsLabel(
-            '${l10n.quickCreationLabel}, ${mode.title(l10n)}',
+            '${l10n.quickCreationLabel}, ${QuickCreationMode.dailyChoice.title(l10n)}',
           ),
           findsOneWidget,
         );

@@ -359,14 +359,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pick an action, then the intention it serves';
 
   @override
-  String get quickCreationModeDailyChoiceFromIntention =>
-      'Daily choice from an intention';
-
-  @override
-  String get quickCreationModeDailyChoiceFromAction =>
-      'Daily choice from an action';
-
-  @override
   String get commonLoading => 'Loading…';
 
   @override

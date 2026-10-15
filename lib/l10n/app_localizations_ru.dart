@@ -364,14 +364,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сначала действие, затем намерение, которому оно служит';
 
   @override
-  String get quickCreationModeDailyChoiceFromIntention =>
-      'Дневной выбор от намерения';
-
-  @override
-  String get quickCreationModeDailyChoiceFromAction =>
-      'Дневной выбор от действия';
-
-  @override
   String get commonLoading => 'Загрузка…';
 
   @override

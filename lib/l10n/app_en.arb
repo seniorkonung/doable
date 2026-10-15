@@ -184,14 +184,6 @@
   "@quickCreationDailyChoiceFromActionHint": {
     "description": "Пояснение выбора от действия к исходному намерению"
   },
-  "quickCreationModeDailyChoiceFromIntention": "Daily choice from an intention",
-  "@quickCreationModeDailyChoiceFromIntention": {
-    "description": "Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз"
-  },
-  "quickCreationModeDailyChoiceFromAction": "Daily choice from an action",
-  "@quickCreationModeDailyChoiceFromAction": {
-    "description": "Название режима дневного выбора с поиском действия и построением пути снизу вверх"
-  },
   "commonLoading": "Loading…",
   "@commonLoading": {
     "description": "Общее состояние загрузки"
