@@ -4,6 +4,8 @@ import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
 import '../../domain/daily_choice_id.dart';
+import '../../domain/daily_choice_priority.dart';
+import '../../domain/daily_choice_schedule.dart';
 
 sealed class DailyChoiceCreationOperation {
   const DailyChoiceCreationOperation();
@@ -59,6 +61,8 @@ final class DailyChoiceCreationState {
   const DailyChoiceCreationState({
     required this.path,
     required this.date,
+    required this.schedule,
+    required this.priority,
     required this.description,
     required this.isCompleted,
     required this.operation,
@@ -67,7 +71,9 @@ final class DailyChoiceCreationState {
   });
 
   DailyChoiceCreationState.initial({required this.path, required this.date})
-    : description = '',
+    : schedule = const DailyChoiceAllDay(),
+      priority = DailyChoicePriority.p4,
+      description = '',
       isCompleted = false,
       operation = const DailyChoiceCreationIdle(),
       event = null,
@@ -75,6 +81,8 @@ final class DailyChoiceCreationState {
 
   final ConfirmedChoicePath path;
   final CalendarDate date;
+  final DailyChoiceSchedule schedule;
+  final DailyChoicePriority priority;
   final String description;
   final bool isCompleted;
   final DailyChoiceCreationOperation operation;
@@ -111,6 +119,12 @@ final class DailyChoiceCreationState {
   DailyChoiceCreationState withDate(CalendarDate value) =>
       _withField(date: value, corrects: DailyChoiceValidationField.date);
 
+  DailyChoiceCreationState withSchedule(DailyChoiceSchedule value) =>
+      _withField(schedule: value);
+
+  DailyChoiceCreationState withPriority(DailyChoicePriority value) =>
+      _withField(priority: value);
+
   DailyChoiceCreationState withDescription(String value) => _withField(
     description: value,
     corrects: DailyChoiceValidationField.description,
@@ -126,6 +140,8 @@ final class DailyChoiceCreationState {
     return DailyChoiceCreationState(
       path: value,
       date: date,
+      schedule: schedule,
+      priority: priority,
       description: description,
       isCompleted: isCompleted,
       operation: const DailyChoiceCreationIdle(),
@@ -141,6 +157,8 @@ final class DailyChoiceCreationState {
   }) => DailyChoiceCreationState(
     path: path,
     date: date,
+    schedule: schedule,
+    priority: priority,
     description: description,
     isCompleted: isCompleted,
     operation: value,
@@ -151,6 +169,8 @@ final class DailyChoiceCreationState {
   DailyChoiceCreationState withoutEvent() => DailyChoiceCreationState(
     path: path,
     date: date,
+    schedule: schedule,
+    priority: priority,
     description: description,
     isCompleted: isCompleted,
     operation: operation,
@@ -160,6 +180,8 @@ final class DailyChoiceCreationState {
 
   DailyChoiceCreationState _withField({
     CalendarDate? date,
+    DailyChoiceSchedule? schedule,
+    DailyChoicePriority? priority,
     String? description,
     bool? isCompleted,
     DailyChoiceValidationField? corrects,
@@ -186,6 +208,8 @@ final class DailyChoiceCreationState {
     return DailyChoiceCreationState(
       path: path,
       date: date ?? this.date,
+      schedule: schedule ?? this.schedule,
+      priority: priority ?? this.priority,
       description: description ?? this.description,
       isCompleted: isCompleted ?? this.isCompleted,
       operation: nextOperation,

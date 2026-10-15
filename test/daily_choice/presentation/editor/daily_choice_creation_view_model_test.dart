@@ -7,6 +7,8 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_state.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart';
@@ -28,7 +30,11 @@ void main() {
   test('успех публикует событие перехода к созданному выбору', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);
+    expect(harness.state.schedule, const DailyChoiceAllDay());
+    expect(harness.state.priority, DailyChoicePriority.p4);
     harness.model.submit();
+    expect(harness.repository.commands.single.schedule, harness.state.schedule);
+    expect(harness.repository.commands.single.priority, harness.state.priority);
     harness.repository.succeed(0);
     await pumpEventQueue();
     expect(harness.state.event, isA<DailyChoiceCreationCreated>());
@@ -81,7 +87,11 @@ void main() {
   test('конфликт пути сохраняет ввод и требует нового подтверждения', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);
+    final schedule = DailyChoiceTime(hour: 18, minute: 0);
     harness.model
+      ..changeDate(CalendarDate.fromParts(2024, 3, 2))
+      ..changeSchedule(schedule)
+      ..changePriority(DailyChoicePriority.p2)
       ..changeDescription('Моё описание')
       ..changeCompletion(true)
       ..submit();
@@ -95,8 +105,9 @@ void main() {
 
     expect(harness.state.description, 'Моё описание');
     expect(harness.state.isCompleted, isTrue);
+    expect(harness.state.schedule, schedule);
+    expect(harness.state.priority, DailyChoicePriority.p2);
     expect(harness.state.needsPathRefresh, isTrue);
-    harness.model.changeDate(CalendarDate.fromParts(2024, 3, 2));
     harness.model.submit();
     expect(harness.repository.commands, hasLength(1));
 
@@ -105,6 +116,9 @@ void main() {
     expect(harness.model.confirmRefreshedPath(_path()), isFalse);
     expect(harness.state.path.steps.single.type, LongTermRelationType.can);
     expect(harness.state.canSubmit, isTrue);
+    expect(harness.state.schedule, schedule);
+    expect(harness.state.priority, DailyChoicePriority.p2);
+    expect(harness.repository.commands, hasLength(1));
     harness.model.submit();
     expect(harness.repository.commands, hasLength(2));
     expect(
@@ -117,6 +131,8 @@ void main() {
       CalendarDate.fromParts(2024, 3, 2),
     );
     expect(harness.repository.commands.last.isCompleted, isTrue);
+    expect(harness.repository.commands.last.schedule, schedule);
+    expect(harness.repository.commands.last.priority, DailyChoicePriority.p2);
 
     harness.repository.fail(
       1,
@@ -129,7 +145,13 @@ void main() {
     expect(harness.state.description, 'Моё описание');
     expect(harness.state.isCompleted, isTrue);
     expect(harness.state.date, CalendarDate.fromParts(2024, 3, 2));
-    harness.model.changeDescription('После второго конфликта');
+    final midnight = DailyChoiceTime(hour: 0, minute: 0);
+    harness.model
+      ..changeSchedule(midnight)
+      ..changePriority(DailyChoicePriority.p1)
+      ..changeDescription('После второго конфликта');
+    expect(harness.state.needsPathRefresh, isTrue);
+    expect(harness.state.canSubmit, isFalse);
     harness.model.confirmRefreshedPath(_path());
     expect(harness.repository.commands, hasLength(2));
     harness.model.submit();
@@ -143,6 +165,17 @@ void main() {
       harness.repository.commands.last.date,
       CalendarDate.fromParts(2024, 3, 2),
     );
+    expect(harness.repository.commands.last.schedule, midnight);
+    expect(harness.repository.commands.last.priority, DailyChoicePriority.p1);
+
+    harness.repository.succeed(2);
+    await pumpEventQueue();
+    harness.model
+      ..consumeEvent()
+      ..changeSchedule(const DailyChoiceAllDay())
+      ..changePriority(DailyChoicePriority.p4);
+    expect(harness.state.schedule, midnight);
+    expect(harness.state.priority, DailyChoicePriority.p1);
   });
 
   test(
@@ -150,12 +183,38 @@ void main() {
     () async {
       final harness = _Harness();
       addTearDown(harness.dispose);
-      harness.model.submit();
+      final schedule = DailyChoiceTime(hour: 18, minute: 0);
+      harness.model
+        ..changeSchedule(schedule)
+        ..changePriority(DailyChoicePriority.p2)
+        ..submit()
+        ..changeSchedule(const DailyChoiceAllDay())
+        ..changePriority(DailyChoicePriority.p3)
+        ..submit();
+      expect(harness.state.schedule, schedule);
+      expect(harness.state.priority, DailyChoicePriority.p2);
+      expect(harness.repository.commands, hasLength(1));
+      expect(harness.repository.commands.single.schedule, schedule);
+      expect(
+        harness.repository.commands.single.priority,
+        DailyChoicePriority.p2,
+      );
       harness.repository.fail(0, const DailyChoiceUnavailableFailure());
       await pumpEventQueue();
       expect(harness.state.canRetry, isTrue);
+      harness.model
+        ..changeSchedule(const DailyChoiceAllDay())
+        ..changePriority(DailyChoicePriority.p3);
+      expect(harness.state.schedule, const DailyChoiceAllDay());
+      expect(harness.state.priority, DailyChoicePriority.p3);
+      expect(harness.repository.commands, hasLength(1));
       harness.model.submit();
       expect(harness.repository.commands, hasLength(2));
+      expect(
+        harness.repository.commands.last.schedule,
+        const DailyChoiceAllDay(),
+      );
+      expect(harness.repository.commands.last.priority, DailyChoicePriority.p3);
       harness.repository.fail(1, const DailyChoiceUnexpectedFailure());
       await pumpEventQueue();
       expect(harness.state.canSubmit, isFalse);
@@ -245,6 +304,8 @@ final class _Repository
       date: command.date,
       description: command.description,
       isCompleted: command.isCompleted,
+      schedule: command.schedule,
+      priority: command.priority,
     );
     _requests[index].complete(
       GraphCommandSucceeded(

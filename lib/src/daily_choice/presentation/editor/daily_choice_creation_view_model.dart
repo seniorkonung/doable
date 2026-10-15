@@ -9,6 +9,8 @@ import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
+import '../../domain/daily_choice_priority.dart';
+import '../../domain/daily_choice_schedule.dart';
 import '../daily_choice_creation_flow_session.dart';
 import 'daily_choice_creation_state.dart';
 
@@ -44,6 +46,22 @@ final class DailyChoiceCreationViewModel
     if (!ref.mounted || !_session.canContinue) return;
     if (state.date == value) return;
     final next = state.withDate(value);
+    _releaseDroppedClaim(next);
+    state = next;
+  }
+
+  void changeSchedule(DailyChoiceSchedule value) {
+    if (!ref.mounted || !_session.canContinue) return;
+    if (state.schedule == value) return;
+    final next = state.withSchedule(value);
+    _releaseDroppedClaim(next);
+    state = next;
+  }
+
+  void changePriority(DailyChoicePriority value) {
+    if (!ref.mounted || !_session.canContinue) return;
+    if (state.priority == value) return;
+    final next = state.withPriority(value);
     _releaseDroppedClaim(next);
     state = next;
   }
@@ -99,6 +117,8 @@ final class DailyChoiceCreationViewModel
       selectedIntentionId: path.steps.last.relatedIntentionId,
       path: path,
       date: state.date,
+      schedule: state.schedule,
+      priority: state.priority,
       description: description,
       isCompleted: state.isCompleted,
     );
