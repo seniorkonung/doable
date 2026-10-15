@@ -82,7 +82,7 @@ void main() {
   });
 
   for (final (name, view) in [
-    ('через связи', StatisticsView.throughRelations),
+    ('вида «Весь вклад»', StatisticsView.throughRelations),
     ('по промежуточным намерениям', StatisticsView.intermediateIntentions),
   ]) {
     test(

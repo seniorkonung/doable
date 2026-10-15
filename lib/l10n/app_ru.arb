@@ -9,7 +9,7 @@
   "statisticsSourceIntentions": "Исходные намерения",
   "statisticsIntermediateIntentions": "Промежуточные намерения",
   "statisticsSelectedActions": "Выбранные действия",
-  "statisticsThroughRelations": "Через связи",
+  "statisticsThroughRelations": "Весь вклад",
   "statisticsMonthTab": "Месяц",
   "statisticsYearTab": "Год",
   "statisticsMonthPeriod": "{date}",

@@ -23,7 +23,7 @@ final class IntentionStatisticsSourceSnapshot {
   final ContributionCounts intermediateIntentions;
   final ContributionCounts selectedActions;
 
-  /// null для вида «Через связи»: его данные вычисляются по активному графу.
+  /// null для вида «Весь вклад»: его данные вычисляются по активному графу.
   final IntentionSavedPathStatistics? savedPathDetails;
   final List<IntentionContributionGroup<CalendarDate>> groups;
   final List<ContributionOutgoingRelation> activeOutgoingRelations;

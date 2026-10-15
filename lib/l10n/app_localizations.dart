@@ -155,7 +155,7 @@ abstract class AppLocalizations {
   /// Вид статистики по сохранённому пути и текущим активным связям
   ///
   /// In en, this message translates to:
-  /// **'Through relations'**
+  /// **'Total contribution'**
   String get statisticsThroughRelations;
 
   /// Вкладка статистики календарного месяца
@@ -398,7 +398,7 @@ abstract class AppLocalizations {
   /// **'By relations'**
   String get statisticsBreakdownRelations;
 
-  /// Число запланированных выборов вида «Через связи», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы
+  /// Число запланированных выборов вида «Весь вклад», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы
   ///
   /// In en, this message translates to:
   /// **'Daily choices with this intention on the saved selection path: {count} of {planned}'**
