@@ -327,7 +327,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickCreationChangeMode => 'Change mode';
 
   @override
-  String get quickCreationMenuTitle => 'Quick creation mode';
+  String get quickCreationMenuTitle => 'What the button creates';
+
+  @override
+  String get quickCreationMenuPrompt =>
+      'A tap on plus will create the selected item';
 
   @override
   String get quickCreationLongPressHint => 'Touch and hold to change mode';
@@ -336,10 +340,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickCreationModeIntention => 'New intention';
 
   @override
+  String get quickCreationModeIntentionHint =>
+      'Something you want to do or change';
+
+  @override
   String get quickCreationModeRelation => 'New relation';
 
   @override
+  String get quickCreationModeRelationHint => 'To …, you need or can …';
+
+  @override
   String get quickCreationModeDailyChoice => 'New daily choice';
+
+  @override
+  String get quickCreationModeDailyChoiceHint =>
+      'An action for an intention on a chosen day';
 
   @override
   String get quickCreationDailyChoiceStartPrompt => 'Choose where to start';

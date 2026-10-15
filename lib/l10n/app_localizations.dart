@@ -485,8 +485,14 @@ abstract class AppLocalizations {
   /// Заголовок меню выбора режима быстрого создания
   ///
   /// In en, this message translates to:
-  /// **'Quick creation mode'**
+  /// **'What the button creates'**
   String get quickCreationMenuTitle;
+
+  /// Пояснение меню выбора режима кнопки быстрого создания
+  ///
+  /// In en, this message translates to:
+  /// **'A tap on plus will create the selected item'**
+  String get quickCreationMenuPrompt;
 
   /// Подсказка долгого нажатия на кнопку быстрого создания для экранного диктора
   ///
@@ -500,17 +506,35 @@ abstract class AppLocalizations {
   /// **'New intention'**
   String get quickCreationModeIntention;
 
+  /// Пояснение режима создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Something you want to do or change'**
+  String get quickCreationModeIntentionHint;
+
   /// Название режима создания долговременной связи
   ///
   /// In en, this message translates to:
   /// **'New relation'**
   String get quickCreationModeRelation;
 
+  /// Пояснение режима создания долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'To …, you need or can …'**
+  String get quickCreationModeRelationHint;
+
   /// Название режима и заголовок листа нового дневного выбора
   ///
   /// In en, this message translates to:
   /// **'New daily choice'**
   String get quickCreationModeDailyChoice;
+
+  /// Пояснение режима создания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'An action for an intention on a chosen day'**
+  String get quickCreationModeDailyChoiceHint;
 
   /// Пояснение листа выбора начала дневного выбора
   ///

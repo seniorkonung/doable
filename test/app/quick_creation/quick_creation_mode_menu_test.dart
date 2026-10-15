@@ -8,6 +8,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_controller.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_menu.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -23,6 +24,18 @@ const _icons = [
   Icons.route_outlined,
   Icons.calendar_today_outlined,
 ];
+const _hints = {
+  'ru': [
+    'То, что вы хотите сделать или изменить',
+    'Чтобы …, нужно или можно …',
+    'Действие для намерения в выбранный день',
+  ],
+  'en': [
+    'Something you want to do or change',
+    'To …, you need or can …',
+    'An action for an intention on a chosen day',
+  ],
+};
 
 void main() {
   // Выбранная строка определяется индексом режима, а названия — языком: берём
@@ -37,17 +50,34 @@ void main() {
       final app = await _openApp(tester, language: language, initial: initial);
       await _openMenu(tester);
 
-      expect(find.byType(ListTile), findsNWidgets(3));
+      expect(find.byType(OptionRow), findsNWidgets(3));
       expect(
         find.text(
-          language == 'ru' ? 'Режим быстрого создания' : 'Quick creation mode',
+          language == 'ru' ? 'Что создаёт кнопка' : 'What the button creates',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          language == 'ru'
+              ? 'Нажатие на плюс создаст выбранное'
+              : 'A tap on plus will create the selected item',
         ),
         findsOneWidget,
       );
       for (var i = 0; i < titles.length; i++) {
-        final row = find.ancestor(
-          of: find.text(titles[i]),
-          matching: find.byType(ListTile),
+        final row = find.widgetWithText(OptionRow, titles[i]);
+        final hint = _hints[language]![i];
+        expect(
+          find.descendant(of: row, matching: find.text(hint)),
+          findsOneWidget,
+        );
+        final semantics = tester.getSemantics(row);
+        expect(semantics.label, '${titles[i]}\n$hint');
+        expect(semantics.flagsCollection.isButton, isTrue);
+        expect(
+          semantics.flagsCollection.isFocused,
+          i == initial.index ? Tristate.isTrue : Tristate.isFalse,
         );
         expect(
           find.descendant(of: row, matching: find.byIcon(_icons[i])),
@@ -58,7 +88,7 @@ void main() {
           i == initial.index ? Tristate.isTrue : Tristate.isFalse,
         );
         expect(
-          find.descendant(of: row, matching: find.byIcon(Icons.check)),
+          find.descendant(of: row, matching: find.byIcon(Icons.check_outlined)),
           i == initial.index ? findsOneWidget : findsNothing,
         );
         if (i > 0) {
@@ -85,7 +115,7 @@ void main() {
             .isSelected,
         Tristate.isTrue,
       );
-      await tester.tap(find.text(titles[next.index]));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(app.mode, next);
       expect(app.store.writes.map((write) => write.mode), [next, next]);
@@ -94,8 +124,8 @@ void main() {
   }
 
   // Самые длинные названия русские, поэтому достаточно русского языка.
-  testWidgets('все названия целиком доступны '
-      'через прокрутку на узком экране', (tester) async {
+  testWidgets('все названия и пояснения целиком доступны '
+      'через прокрутку на узком экране с увеличенным текстом', (tester) async {
     const language = 'ru';
     final titles = _titles[language]!;
     tester.view.physicalSize = const Size(320, 568);
@@ -104,23 +134,33 @@ void main() {
 
     addTearDown(tester.view.reset);
 
-    final app = await _openApp(tester, language: language);
+    final app = await _openApp(tester, language: language, textScale: 2);
 
     for (var i = 0; i < titles.length; i++) {
       await _openMenu(tester);
       final title = find.text(titles[i]);
+      final hint = find.text(_hints[language]![i]);
       final scrollable = find.descendant(
         of: find.byType(BottomSheet),
         matching: find.byType(Scrollable),
       );
-      await tester.scrollUntilVisible(title, 100, scrollable: scrollable);
+      for (final text in [title, hint]) {
+        await tester.scrollUntilVisible(text, 100, scrollable: scrollable);
+        await tester.pumpAndSettle();
+        expect(
+          tester.renderObject<RenderParagraph>(text).didExceedMaxLines,
+          isFalse,
+        );
+        final rect = tester.getRect(text);
+        expect(rect.top, greaterThanOrEqualTo(24));
+        expect(rect.top, lessThan(568 - 34));
+        await Scrollable.ensureVisible(tester.element(text), alignment: 1);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(text).bottom, lessThanOrEqualTo(568 - 34));
+        expect(text.hitTestable(), findsOneWidget);
+      }
+      await Scrollable.ensureVisible(tester.element(title), alignment: 0.5);
       await tester.pumpAndSettle();
-      final text = tester.renderObject<RenderParagraph>(title);
-      expect(text.didExceedMaxLines, isFalse);
-      final rect = tester.getRect(title);
-      expect(rect.top, greaterThanOrEqualTo(24));
-      expect(rect.bottom, lessThanOrEqualTo(568 - 34));
-      expect(title.hitTestable(), findsOneWidget);
       await tester.tap(title);
       await tester.pumpAndSettle();
       expect(app.mode, QuickCreationMode.values[i]);
@@ -197,13 +237,14 @@ Future<_TestApp> _openApp(
   WidgetTester tester, {
   String language = 'ru',
   QuickCreationMode initial = QuickCreationMode.intention,
+  double textScale = 1,
 }) async {
   final app = _TestApp(initial);
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
   });
-  await tester.pumpWidget(app.build(Locale(language)));
+  await tester.pumpWidget(app.build(Locale(language), textScale));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Открыть страницу'));
   await tester.pumpAndSettle();
@@ -232,12 +273,17 @@ final class _TestApp {
   QuickCreationMode get mode =>
       container.read(quickCreationModeControllerProvider);
 
-  Widget build(Locale locale) => UncontrolledProviderScope(
+  Widget build(Locale locale, double textScale) => UncontrolledProviderScope(
     container: container,
     child: MaterialApp(
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Scaffold(
         bottomNavigationBar: ValueListenableBuilder(
           valueListenable: selected,

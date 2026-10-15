@@ -11,6 +11,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.d
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,7 +48,7 @@ void main() {
         final nextTitle = title == 'Первая страница'
             ? 'Новая связь'
             : 'Новый дневной выбор';
-        await tester.tap(find.widgetWithText(ListTile, nextTitle));
+        await tester.tap(find.widgetWithText(OptionRow, nextTitle));
         await tester.pumpAndSettle();
         mode = title == 'Первая страница'
             ? QuickCreationMode.relation

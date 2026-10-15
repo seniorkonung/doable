@@ -12,6 +12,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.d
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -114,14 +115,14 @@ void main() {
         expect(find.byType(BottomSheet), findsOneWidget);
         expect(
           tester
-              .widgetList<ListTile>(find.byType(ListTile))
-              .map((tile) => (tile.title! as Text).data),
+              .widgetList<OptionRow>(find.byType(OptionRow))
+              .map((row) => row.name),
           titles,
         );
         expect(appNavigationDestinations().hitTestable(), findsNothing);
         expect(find.semantics.byLabel(node.label), findsNothing);
         final title = find.text(titles[mode.index]);
-        final row = find.widgetWithText(ListTile, titles[mode.index]);
+        final row = find.widgetWithText(OptionRow, titles[mode.index]);
         await tester.ensureVisible(row);
         await tester.pumpAndSettle();
         final viewport = tester.getRect(

@@ -11,6 +11,13 @@ extension QuickCreationModePresentation on QuickCreationMode {
     QuickCreationMode.dailyChoice => localizations.quickCreationModeDailyChoice,
   };
 
+  String hint(AppLocalizations localizations) => switch (this) {
+    QuickCreationMode.intention => localizations.quickCreationModeIntentionHint,
+    QuickCreationMode.relation => localizations.quickCreationModeRelationHint,
+    QuickCreationMode.dailyChoice =>
+      localizations.quickCreationModeDailyChoiceHint,
+  };
+
   IconData get icon => switch (this) {
     QuickCreationMode.intention => Icons.adjust_outlined,
     QuickCreationMode.relation => Icons.route_outlined,

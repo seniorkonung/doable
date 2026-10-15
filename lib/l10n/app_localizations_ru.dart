@@ -331,7 +331,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get quickCreationChangeMode => 'Сменить режим';
 
   @override
-  String get quickCreationMenuTitle => 'Режим быстрого создания';
+  String get quickCreationMenuTitle => 'Что создаёт кнопка';
+
+  @override
+  String get quickCreationMenuPrompt => 'Нажатие на плюс создаст выбранное';
 
   @override
   String get quickCreationLongPressHint =>
@@ -341,10 +344,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get quickCreationModeIntention => 'Новое намерение';
 
   @override
+  String get quickCreationModeIntentionHint =>
+      'То, что вы хотите сделать или изменить';
+
+  @override
   String get quickCreationModeRelation => 'Новая связь';
 
   @override
+  String get quickCreationModeRelationHint => 'Чтобы …, нужно или можно …';
+
+  @override
   String get quickCreationModeDailyChoice => 'Новый дневной выбор';
+
+  @override
+  String get quickCreationModeDailyChoiceHint =>
+      'Действие для намерения в выбранный день';
 
   @override
   String get quickCreationDailyChoiceStartPrompt => 'С чего начать';

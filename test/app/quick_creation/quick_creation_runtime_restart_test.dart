@@ -18,6 +18,7 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_page.d
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -167,11 +168,14 @@ void main() {
         tester.element(find.byType(BottomSheet)),
       );
       final selected = find.widgetWithText(
-        ListTile,
+        OptionRow,
         modes.last.title(localizations),
       );
       expect(
-        find.descendant(of: selected, matching: find.byIcon(Icons.check)),
+        find.descendant(
+          of: selected,
+          matching: find.byIcon(Icons.check_outlined),
+        ),
         findsOneWidget,
       );
 
@@ -195,7 +199,10 @@ void main() {
         );
         _expectVisiblePanel(tester, modes.last);
         expect(
-          find.descendant(of: selected, matching: find.byIcon(Icons.check)),
+          find.descendant(
+            of: selected,
+            matching: find.byIcon(Icons.check_outlined),
+          ),
           findsOneWidget,
         );
         expect(find.byType(SnackBar), findsNothing);
@@ -315,7 +322,7 @@ Future<void> _choose(WidgetTester tester, QuickCreationMode mode) async {
     tester.element(find.byType(QuickCreationButton)),
   );
   await _openMenu(tester);
-  await tester.tap(find.widgetWithText(ListTile, mode.title(localizations)));
+  await tester.tap(find.widgetWithText(OptionRow, mode.title(localizations)));
   await tester.pumpAndSettle();
   expect(find.byType(BottomSheet), findsNothing);
   expect(

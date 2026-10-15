@@ -5,6 +5,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -38,7 +39,7 @@ Future<void> openQuickCreation(
 
   await tester.longPress(button);
   await tester.pumpAndSettle();
-  final option = find.widgetWithText(ListTile, mode.title(localizations));
+  final option = find.widgetWithText(OptionRow, mode.title(localizations));
   // При строке выше области прокрутки центр остаётся целью обычного нажатия.
   await Scrollable.ensureVisible(tester.element(option), alignment: 0.5);
   await tester.pumpAndSettle();

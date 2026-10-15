@@ -144,9 +144,13 @@
   "@quickCreationChangeMode": {
     "description": "Отдельное доступное действие открытия меню режимов быстрого создания"
   },
-  "quickCreationMenuTitle": "Quick creation mode",
+  "quickCreationMenuTitle": "What the button creates",
   "@quickCreationMenuTitle": {
     "description": "Заголовок меню выбора режима быстрого создания"
+  },
+  "quickCreationMenuPrompt": "A tap on plus will create the selected item",
+  "@quickCreationMenuPrompt": {
+    "description": "Пояснение меню выбора режима кнопки быстрого создания"
   },
   "quickCreationLongPressHint": "Touch and hold to change mode",
   "@quickCreationLongPressHint": {
@@ -156,13 +160,25 @@
   "@quickCreationModeIntention": {
     "description": "Название режима создания намерения"
   },
+  "quickCreationModeIntentionHint": "Something you want to do or change",
+  "@quickCreationModeIntentionHint": {
+    "description": "Пояснение режима создания намерения"
+  },
   "quickCreationModeRelation": "New relation",
   "@quickCreationModeRelation": {
     "description": "Название режима создания долговременной связи"
   },
+  "quickCreationModeRelationHint": "To …, you need or can …",
+  "@quickCreationModeRelationHint": {
+    "description": "Пояснение режима создания долговременной связи"
+  },
   "quickCreationModeDailyChoice": "New daily choice",
   "@quickCreationModeDailyChoice": {
     "description": "Название режима и заголовок листа нового дневного выбора"
+  },
+  "quickCreationModeDailyChoiceHint": "An action for an intention on a chosen day",
+  "@quickCreationModeDailyChoiceHint": {
+    "description": "Пояснение режима создания дневного выбора"
   },
   "quickCreationDailyChoiceStartPrompt": "Choose where to start",
   "@quickCreationDailyChoiceStartPrompt": {

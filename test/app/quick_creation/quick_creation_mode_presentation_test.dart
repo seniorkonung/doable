@@ -12,7 +12,7 @@ void main() {
     'Новая связь',
     'Новый дневной выбор',
     'Сменить режим',
-    'Режим быстрого создания',
+    'Что создаёт кнопка',
     'Нажмите и удерживайте, чтобы сменить режим',
   ];
   const englishMessages = [
@@ -21,7 +21,7 @@ void main() {
     'New relation',
     'New daily choice',
     'Change mode',
-    'Quick creation mode',
+    'What the button creates',
     'Touch and hold to change mode',
   ];
 

@@ -13,6 +13,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -83,7 +84,7 @@ Future<void> _selectMode(WidgetTester tester, QuickCreationMode mode) async {
   );
   await tester.longPress(find.byType(QuickCreationButton));
   await tester.pumpAndSettle();
-  await tester.tap(find.widgetWithText(ListTile, mode.title(localizations)));
+  await tester.tap(find.widgetWithText(OptionRow, mode.title(localizations)));
   await tester.pumpAndSettle();
   _expectMode(mode);
 }
