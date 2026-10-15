@@ -114,6 +114,63 @@ const _dailyChoicePageSize = 50;
 const _message = ValueKey('graph-operation-message');
 
 void main() {
+  for (final fromMonths in [false, true]) {
+    final level = fromMonths ? 'месяцев' : 'лет';
+    testWidgets('открытая страница $level сохраняется вместе с каталогом '
+        'при смене пункта, повторном выборе и возврате из подробностей', (
+      tester,
+    ) async {
+      final app = await _start(tester);
+      await _prepareDailyChoiceCatalog(tester, app);
+      final before = _dailyChoiceCatalogView(tester, app);
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarChooseYearAndMonth),
+      );
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarNextYears),
+      );
+      if (fromMonths) {
+        await _tap(tester, find.text('2035'));
+        await _tap(
+          tester,
+          find.bySemanticsLabel(app.l10n.dailyChoiceCalendarNextYear),
+        );
+      }
+      final title = fromMonths ? '2036' : '2032–2043';
+      final position = _dailyChoicePosition(tester).pixels;
+
+      void expectPreserved() {
+        expect(find.text(title), findsOneWidget);
+        expect(_dailyChoicePosition(tester).pixels, position);
+        expect(app.dailyChoiceCatalog.selection.date, _choiceDate);
+        expect(app.dailyChoiceCatalog.selection.isCompleted, isFalse);
+        expect(_dailyChoiceIds(app), before['загруженные записи']);
+        expect(app.repository.dailyChoiceCatalogReads, before['чтения выдачи']);
+      }
+
+      await _select(tester, AppDestination.home);
+      await _select(tester, AppDestination.dailyChoices);
+      expectPreserved();
+      await _select(tester, AppDestination.dailyChoices);
+      expectPreserved();
+      await tester.tap(_dailyChoiceRows.hitTestable().first);
+      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await tester.pumpAndSettle();
+      await _closeTop(tester, DailyChoiceDetailsPage);
+      expectPreserved();
+
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarBackToMonthDays),
+      );
+      await tester.pumpAndSettle();
+      expect(_dailyChoiceCatalogView(tester, app), before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   group('повторный выбор уже выбранного пункта', () {
     for (final destination in _rootPageStates.keys) {
       testWidgets('«${_names[destination]}»: состояние страницы не меняется', (
@@ -312,6 +369,11 @@ void main() {
       await _prepareDailyChoiceCatalog(tester, app);
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarChooseYearAndMonth),
+      );
+      await _tap(tester, find.text('2028'));
       final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
@@ -382,6 +444,12 @@ void main() {
         for (var choice = changed - 1; choice >= _firstChoice; choice--)
           if (!_isCompleted(choice)) tagFixtureId(choice),
       ];
+      expect(find.text('2028'), findsOneWidget);
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarBackToMonthDays),
+      );
+      await tester.pumpAndSettle();
       expect(_dailyChoiceParameters(tester, app), before);
       expect(
         find.text(

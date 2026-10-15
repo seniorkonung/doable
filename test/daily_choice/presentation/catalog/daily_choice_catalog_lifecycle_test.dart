@@ -44,6 +44,66 @@ void main() {
     );
   });
 
+  for (final fromMonths in [false, true]) {
+    final level = fromMonths ? 'месяцев' : 'лет';
+    testWidgets('местная полночь обновляет текущий период, сохраняя открытую '
+        'страницу $level, выбранный день и выдачу', (tester) async {
+      final selected = fromMonths ? date(2026, 9, 30) : date(2026, 12, 31);
+      final clock = _LocalClock(
+        tester,
+        start: _local(selected.year, selected.month, selected.day, 23, 30),
+      );
+      final repository = _Repository();
+      await _openCatalog(tester, repository, clock);
+      repository.completeFirst(_items(selected), total: 40);
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
+      await _settle(tester);
+      await tester.tap(
+        find.bySemanticsLabel(_l10n.dailyChoiceCalendarChooseYearAndMonth),
+      );
+      await tester.pumpAndSettle();
+      if (fromMonths) {
+        await tester.tap(find.text('2026'));
+        await tester.pumpAndSettle();
+      }
+      final previous = fromMonths ? 'Сентябрь 2026' : '2026';
+      final current = fromMonths ? 'Октябрь 2026' : '2027';
+      expect(
+        find.bySemanticsLabel('$previous, ${_l10n.statisticsCurrentPeriod}'),
+        findsOneWidget,
+      );
+      _catalogScroll(tester).jumpTo(200);
+      await tester.pump();
+      final catalog = _catalogState(tester);
+
+      await tester.pump(clock.untilNextDate);
+
+      expect(find.text(fromMonths ? '2026' : '2020–2031'), findsOneWidget);
+      expect(visibleWeeks(tester), isEmpty);
+      expect(find.bySemanticsLabel(previous), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('$current, ${_l10n.statisticsCurrentPeriod}'),
+        findsOneWidget,
+      );
+      _expectCatalogUnchanged(tester, catalog);
+      expect(_catalogScroll(tester).pixels, 200);
+      expect(repository.queries, hasLength(1));
+
+      await tester.tap(
+        find.bySemanticsLabel(_l10n.dailyChoiceCalendarBackToMonthDays),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        visibleWeeks(tester),
+        weeksFrom(fromMonths ? date(2026, 8, 31) : date(2026, 11, 30), 6),
+      );
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      expect(repository.queries, hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('в местную полночь отмечает новый сегодняшний день, не меняя '
       'выбор, просмотр, выдачу и прокрутку', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -422,12 +482,10 @@ ScrollPosition _catalogScroll(WidgetTester tester) => tester
     .state<ScrollableState>(
       find
           .descendant(
-            of: find.byType(DailyChoiceCatalogPage),
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.down,
+            of: find.byKey(
+              const PageStorageKey<String>('daily-choice-catalog'),
             ),
+            matching: find.byType(Scrollable),
           )
           .first,
     )

@@ -6,6 +6,47 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  for (final fromMonths in [false, true]) {
+    final level = fromMonths ? 'месяцев' : 'лет';
+    testWidgets('смена локали сохраняет открытую страницу $level и просмотр '
+        'без событий календаря', (tester) async {
+      final selected = date(2026, 10, 8);
+      final viewport = month(date(2026, 11, 1));
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: selected,
+        viewport: viewport,
+        today: selected,
+      );
+      await _command(tester, 'Выбрать год и месяц');
+      await _command(tester, 'Следующие годы');
+      if (fromMonths) {
+        await tester.tap(find.text('2035'));
+        await tester.pumpAndSettle();
+      }
+
+      for (final (locale, january, back) in const [
+        (Locale('en'), 'January', 'Back to the days of the month'),
+        (Locale('ru'), 'Январь', 'Вернуться к дням месяца'),
+      ]) {
+        tester.platformDispatcher.localesTestValue = [locale];
+        await tester.pumpAndSettle();
+        expect(find.text(fromMonths ? '2035' : '2032–2043'), findsOneWidget);
+        expect(find.text(january), fromMonths ? findsOneWidget : findsNothing);
+        expect(find.bySemanticsLabel(back), findsOneWidget);
+        expect(visibleWeeks(tester), isEmpty);
+        expect(consumer.viewport, viewport);
+        expect(consumer.selectedDate, selected);
+        expect(consumer.events, isEmpty);
+      }
+
+      await _command(tester, 'Вернуться к дням месяца');
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+      expect(consumer.events, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('выбор марта 2028 из октября 2026 сообщает только итоговый '
       'просмотр и сворачивается к 28 февраля — 5 марта', (tester) async {
     final selected = date(2026, 10, 8);

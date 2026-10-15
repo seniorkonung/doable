@@ -23,6 +23,86 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  testWidgets('выбор года и месяца независим у двух каталогов одной даты '
+      'и корневого; новый экземпляр начинает с недели', (tester) async {
+    final repository = CatalogPageRepository();
+    final today = date(2026, 10, 12);
+    final selected = date(2026, 10, 7);
+    final router = await _start(
+      tester,
+      repository,
+      ControlledDailyChoiceLocalDate(today),
+    );
+    await openDailyChoices(tester);
+    repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 1);
+    repository.completeDayStatuses(0, {});
+    await tester.pumpAndSettle();
+    await _calendarCommand(tester, 'Развернуть календарь');
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    await tester.tap(find.text('2028'));
+    await tester.pumpAndSettle();
+
+    await _pushDate(tester, router, selected);
+    repository.completeFirst(1, [catalogPageItem(2, date: selected)], total: 1);
+    repository.completeDayStatuses(1, {});
+    await tester.pumpAndSettle();
+    await _calendarCommand(tester, 'Развернуть календарь');
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    await _calendarCommand(tester, 'Следующие годы');
+    expect(find.text('2032–2043'), findsOneWidget);
+
+    await _pushDate(tester, router, selected);
+    repository.completeFirst(2, [catalogPageItem(3, date: selected)], total: 1);
+    repository.completeDayStatuses(2, {});
+    await tester.pumpAndSettle();
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+    await _calendarCommand(tester, 'Развернуть календарь');
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    expect(find.text('2020–2031'), findsOneWidget);
+    await tester.tap(find.text('2029'));
+    await tester.pumpAndSettle();
+    expect(find.text('2029'), findsOneWidget);
+    expect(find.text('7 октября 2026'), findsOneWidget);
+
+    await _back(tester);
+    expect(find.text('2032–2043'), findsOneWidget);
+    expect(find.text('Январь'), findsNothing);
+    expect(find.text('7 октября 2026'), findsOneWidget);
+    await _calendarCommand(tester, 'Вернуться к дням месяца');
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
+    expect(dayCell(tester, selected).isSelected, isTrue);
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    await tester.tap(find.text('2030'));
+    await tester.pumpAndSettle();
+
+    await _back(tester);
+    expectDailyChoicesRootPage(router);
+    expect(find.text('2028'), findsOneWidget);
+    expect(find.text('Январь'), findsOneWidget);
+    expect(find.text('12 октября 2026'), findsOneWidget);
+    expect(repository.queries, hasLength(3));
+    expect(repository.dayStatusQueries, hasLength(3));
+
+    await _pushDate(tester, router, selected);
+    expect(repository.queries, hasLength(4));
+    expect(repository.queries.last.date, selected);
+    expect(repository.queries.last.isCompleted, isNull);
+    expect(repository.queries.last.cursor, isNull);
+    repository.completeFirst(3, [], total: 0);
+    repository.completeDayStatuses(3, {});
+    await tester.pumpAndSettle();
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+    expect(dayCell(tester, selected).isSelected, isTrue);
+    expect(find.bySemanticsLabel('Развернуть календарь'), findsOneWidget);
+    expect(find.text('Все состояния'), findsOneWidget);
+    await _back(tester);
+    expect(find.text('2028'), findsOneWidget);
+    await _calendarCommand(tester, 'Вернуться к дням месяца');
+    expect(dayCell(tester, today).isSelected, isTrue);
+    expect(repository.queries, hasLength(4));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final (locale, weekday, heading, todayLabel, allStates, back) in const [
     (
       Locale('ru'),
@@ -272,6 +352,11 @@ final _verticalScroll = find.byWidgetPredicate(
   (widget) =>
       widget is Scrollable && widget.axisDirection == AxisDirection.down,
 );
+
+Future<void> _calendarCommand(WidgetTester tester, String label) async {
+  await tester.tap(find.bySemanticsLabel(label));
+  await tester.pumpAndSettle();
+}
 
 Future<void> _pushDate(
   WidgetTester tester,
