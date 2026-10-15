@@ -344,6 +344,26 @@ class AppLocalizationsRu extends AppLocalizations {
   String get quickCreationModeRelation => 'Новая связь';
 
   @override
+  String get quickCreationModeDailyChoice => 'Новый дневной выбор';
+
+  @override
+  String get quickCreationDailyChoiceStartPrompt => 'С чего начать';
+
+  @override
+  String get quickCreationDailyChoiceFromIntention => 'От намерения';
+
+  @override
+  String get quickCreationDailyChoiceFromIntentionHint =>
+      'Сначала намерение, затем действие для него';
+
+  @override
+  String get quickCreationDailyChoiceFromAction => 'От действия';
+
+  @override
+  String get quickCreationDailyChoiceFromActionHint =>
+      'Сначала действие, затем намерение, которому оно служит';
+
+  @override
   String get quickCreationModeDailyChoiceFromIntention =>
       'Дневной выбор от намерения';
 

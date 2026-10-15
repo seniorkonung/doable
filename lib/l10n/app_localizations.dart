@@ -506,6 +506,42 @@ abstract class AppLocalizations {
   /// **'New relation'**
   String get quickCreationModeRelation;
 
+  /// Название режима и заголовок листа нового дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice'**
+  String get quickCreationModeDailyChoice;
+
+  /// Пояснение листа выбора начала дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Choose where to start'**
+  String get quickCreationDailyChoiceStartPrompt;
+
+  /// Вариант начала дневного выбора с исходного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'From an intention'**
+  String get quickCreationDailyChoiceFromIntention;
+
+  /// Пояснение выбора от исходного намерения к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an intention, then an action for it'**
+  String get quickCreationDailyChoiceFromIntentionHint;
+
+  /// Вариант начала дневного выбора с действия
+  ///
+  /// In en, this message translates to:
+  /// **'From an action'**
+  String get quickCreationDailyChoiceFromAction;
+
+  /// Пояснение выбора от действия к исходному намерению
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an action, then the intention it serves'**
+  String get quickCreationDailyChoiceFromActionHint;
+
   /// Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз
   ///
   /// In en, this message translates to:

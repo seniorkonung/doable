@@ -339,6 +339,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickCreationModeRelation => 'New relation';
 
   @override
+  String get quickCreationModeDailyChoice => 'New daily choice';
+
+  @override
+  String get quickCreationDailyChoiceStartPrompt => 'Choose where to start';
+
+  @override
+  String get quickCreationDailyChoiceFromIntention => 'From an intention';
+
+  @override
+  String get quickCreationDailyChoiceFromIntentionHint =>
+      'Pick an intention, then an action for it';
+
+  @override
+  String get quickCreationDailyChoiceFromAction => 'From an action';
+
+  @override
+  String get quickCreationDailyChoiceFromActionHint =>
+      'Pick an action, then the intention it serves';
+
+  @override
   String get quickCreationModeDailyChoiceFromIntention =>
       'Daily choice from an intention';
 

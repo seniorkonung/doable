@@ -160,6 +160,30 @@
   "@quickCreationModeRelation": {
     "description": "Название режима создания долговременной связи"
   },
+  "quickCreationModeDailyChoice": "New daily choice",
+  "@quickCreationModeDailyChoice": {
+    "description": "Название режима и заголовок листа нового дневного выбора"
+  },
+  "quickCreationDailyChoiceStartPrompt": "Choose where to start",
+  "@quickCreationDailyChoiceStartPrompt": {
+    "description": "Пояснение листа выбора начала дневного выбора"
+  },
+  "quickCreationDailyChoiceFromIntention": "From an intention",
+  "@quickCreationDailyChoiceFromIntention": {
+    "description": "Вариант начала дневного выбора с исходного намерения"
+  },
+  "quickCreationDailyChoiceFromIntentionHint": "Pick an intention, then an action for it",
+  "@quickCreationDailyChoiceFromIntentionHint": {
+    "description": "Пояснение выбора от исходного намерения к действию"
+  },
+  "quickCreationDailyChoiceFromAction": "From an action",
+  "@quickCreationDailyChoiceFromAction": {
+    "description": "Вариант начала дневного выбора с действия"
+  },
+  "quickCreationDailyChoiceFromActionHint": "Pick an action, then the intention it serves",
+  "@quickCreationDailyChoiceFromActionHint": {
+    "description": "Пояснение выбора от действия к исходному намерению"
+  },
   "quickCreationModeDailyChoiceFromIntention": "Daily choice from an intention",
   "@quickCreationModeDailyChoiceFromIntention": {
     "description": "Название режима дневного выбора с поиском исходного намерения и построением пути сверху вниз"
