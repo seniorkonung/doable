@@ -62,6 +62,20 @@ final class _DailyChoiceCalendarPeriodPickerState
         year < CalendarDate.latest.year,
       ),
     };
+    final cells = switch (_page) {
+      _YearsPage(:final firstYear) => [
+        for (var year = firstYear; year < firstYear + 12; year++)
+          if (year < CalendarDate.earliest.year ||
+              year > CalendarDate.latest.year)
+            null
+          else
+            _yearCell(year, l10n),
+      ],
+      _MonthsPage(:final year) => [
+        for (var month = 1; month <= 12; month++)
+          _monthCell(context, year, month, l10n),
+      ],
+    };
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -78,20 +92,23 @@ final class _DailyChoiceCalendarPeriodPickerState
             onTap: widget.onClose,
           ),
         ),
-        PeriodPicker(
-          cells: switch (_page) {
-            _YearsPage(:final firstYear) => [
-              for (var year = firstYear; year < firstYear + 12; year++)
-                if (year < CalendarDate.earliest.year ||
-                    year > CalendarDate.latest.year)
-                  null
-                else
-                  _yearCell(year, l10n),
-            ],
-            _MonthsPage(:final year) => [
-              for (var month = 1; month <= 12; month++)
-                _monthCell(context, year, month, l10n),
-            ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final layout = PeriodPicker.layoutFor(
+              context,
+              width: constraints.maxWidth,
+              texts: switch (_page) {
+                // Цифры PeriodPicker равноширинные: самый длинный год
+                // задаёт размер всех страниц, включая крайние блоки.
+                // https://api.flutter.dev/flutter/dart-ui/FontFeature/FontFeature.tabularFigures.html
+                _YearsPage() => ['${CalendarDate.latest.year}'],
+                _MonthsPage() => cells.nonNulls.map((cell) => cell.text),
+              },
+            );
+            return SizedBox(
+              height: layout.height,
+              child: PeriodPicker(cells: cells, layout: layout),
+            );
           },
         ),
       ],
