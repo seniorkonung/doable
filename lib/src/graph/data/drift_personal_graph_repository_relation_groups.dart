@@ -239,7 +239,8 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     return _database
         .customSelect(
           '''SELECT creation_sequence, id, source_intention_id,
-              selected_intention_id, choice_date, description, is_completed
+              selected_intention_id, choice_date, description, is_completed,
+              scheduled_minute, priority
            FROM daily_choices INDEXED BY $indexName
            WHERE $ownerColumn = ? $continuation
            ORDER BY choice_date DESC, creation_sequence DESC LIMIT ?''',

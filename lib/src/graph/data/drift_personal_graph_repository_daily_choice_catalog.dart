@@ -99,7 +99,8 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
     final rawRows = await _database
         .customSelect(
           '''SELECT creation_sequence, id, source_intention_id,
-                selected_intention_id, choice_date, description, is_completed
+                selected_intention_id, choice_date, description, is_completed,
+                scheduled_minute, priority
          FROM daily_choices $pageWhere
          ORDER BY choice_date DESC, creation_sequence DESC LIMIT ?''',
           variables: [...pageVariables, Variable<int>(query.pageSize + 1)],

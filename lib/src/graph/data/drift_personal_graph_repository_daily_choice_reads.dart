@@ -155,7 +155,8 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
     final choiceRow = await _database
         .customSelect(
           '''SELECT creation_sequence, id, source_intention_id,
-                selected_intention_id, choice_date, description, is_completed
+                selected_intention_id, choice_date, description, is_completed,
+                scheduled_minute, priority
          FROM daily_choices WHERE id = ?''',
           variables: [Variable<String>(id.toCanonicalString())],
           readsFrom: {_database.dailyChoices},
@@ -307,6 +308,21 @@ DailyChoice _decodeStoredDailyChoice(QueryRow row, DailyChoiceId requestedId) {
     1 => true,
     _ => throw const _StoredIntentionCorruption(),
   };
+  final schedule = switch (data['scheduled_minute']) {
+    null => const DailyChoiceAllDay(),
+    final int minute when minute >= 0 && minute <= 1439 => DailyChoiceTime(
+      hour: minute ~/ 60,
+      minute: minute % 60,
+    ),
+    _ => throw const _StoredIntentionCorruption(),
+  };
+  final priority = switch (_requiredStoredInteger(data, 'priority')) {
+    1 => DailyChoicePriority.p1,
+    2 => DailyChoicePriority.p2,
+    3 => DailyChoicePriority.p3,
+    4 => DailyChoicePriority.p4,
+    _ => throw const _StoredIntentionCorruption(),
+  };
   try {
     return DailyChoice(
       id: id,
@@ -319,6 +335,8 @@ DailyChoice _decodeStoredDailyChoice(QueryRow row, DailyChoiceId requestedId) {
           ? null
           : DailyChoiceDescription.fromStored(description),
       isCompleted: completed,
+      schedule: schedule,
+      priority: priority,
     );
   } on CalendarDateValidationException catch (_) {
     throw const _StoredIntentionCorruption();
