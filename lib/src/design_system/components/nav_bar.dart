@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import '../doable_colors.dart';
+import '../doable_icon.dart';
 import '../doable_metrics.dart';
 
 /// Готовое представление пункта нижней панели.
@@ -12,8 +13,8 @@ final class NavBarItem {
     required this.title,
   });
 
-  final IconData icon;
-  final IconData selectedIcon;
+  final DoableIconData icon;
+  final DoableIconData selectedIcon;
   final String title;
 }
 
@@ -233,7 +234,7 @@ final class _NavBarTab extends StatelessWidget {
             excludeFromSemantics: true,
             customBorder: const StadiumBorder(),
             child: Center(
-              child: Icon(
+              child: DoableIcon(
                 selected ? item.selectedIcon : item.icon,
                 size: DoableMetrics.iconSize,
                 color: selected ? colors.ink : colors.muted,
