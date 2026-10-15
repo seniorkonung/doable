@@ -1,0 +1,142 @@
+## Phase 1: Дневной выбор сохраняет запланированное время и собственный приоритет
+
+- [ ] 1.1 Выразить время и приоритет в предметной модели и контрактах команд дневного выбора
+  - **Acceptance criteria:**
+    - По [спецификации](specs/daily-choice-management/spec.md) и решению 1 [дизайна](design.md) `DailyChoiceSchedule` допускает только весь день либо проверенные часы и минуты; `00:00` отличается от всего дня. `DailyChoicePriority` задаёт P1–P4 независимо от `RelationPriority`.
+    - `DailyChoice` и создание несут оба значения, включая согласованные значения по умолчанию «Весь день»/P4; снимки результатов используют эту же модель. Прикладной контракт не зависит от `TimeOfDay`, строк времени или представления SQLite.
+    - `DailyChoiceFieldsPatch` различает отсутствие правки и явную установку всего дня; существующие вызовы и проверки остаются работоспособны.
+  - **Verification:**
+    - Расширить контрактные проверки различия всего дня и полуночи, допустимых границ времени и независимой правки; выполнить `mise exec -- flutter test test/daily_choice/application/daily_choice_contract_test.dart test/daily_choice/application/daily_choice_change_test.dart`.
+  - **Dependencies:** Нет.
+  - **Files likely touched:** `lib/src/daily_choice/domain/daily_choice_schedule.dart` (новый), `lib/src/daily_choice/domain/daily_choice_priority.dart` (новый), `lib/src/daily_choice/domain/daily_choice.dart`, `lib/src/daily_choice/application/daily_choice_command.dart`, `test/daily_choice/application/daily_choice_contract_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 1.2 Добавить схему версии 2 и атомарный переход с версии 1
+  - **Acceptance criteria:**
+    - Новая схема содержит nullable `scheduled_minute` с допустимыми целыми 0–1439 и `priority` с целыми 1–4, `NOT NULL DEFAULT 4`; ограничения проверяют тип и диапазон. Индекс имеет ключ `(choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)` по решению 2 дизайна.
+    - Переход 1 → 2 добавляет столбцы и индекс через существующий `runAtomicMigration`, сохраняя проверки внешних ключей и FTS. Порядок и определения столбцов совпадают с новой установкой; destructive recovery и downgrade не добавляются согласно [ADR-0002](../../../docs/adr/0002-use-drift-sqlite-for-local-graph.md).
+    - Добавлен снимок версии 2 и обновлён сгенерированный код; `drift_schema_v1.json` сохранён без изменений.
+  - **Verification:**
+    - Выполнить `mise run codegen`, проверить изменения генерации и неизменность снимка версии 1.
+    - Дополнить проверки ограничений обоих полей; выполнить `mise exec -- flutter test test/data/local/daily_choice_schema_test.dart test/data/local/app_database_schema_test.dart test/data/local/schema_verifier_test.dart test/data/local/migrations/migration_test.dart`.
+  - **Dependencies:** Нет.
+  - **Files likely touched:** `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/data/local/app_database.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/daily_choice_schema_test.dart`; результаты генерации `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v2.json` (новый).
+  - **Estimated scope:** M.
+
+- [ ] 1.3 Доказать сохранность существующей установки при переходе на схему 2
+  - **Acceptance criteria:**
+    - Постоянный файл, созданный из сохранённой схемы 1, после обновления сохраняет идентификаторы, даты, полные описания, выполнение, участников и шаги разных выборов; новые поля получают весь день/P4. Схема проходит существующий verifier и эквивалентна новой установке.
+    - Сохраняются `creation_sequence` и состояние `sqlite_sequence`, включая ранее удалённый максимальный номер; следующий выбор после повторного открытия получает новый номер.
+    - Прерывание именно перехода 1 → 2 оставляет целостную прежнюю версию, после чего обновление успешно повторяется. Существующая проверка несовместимой более новой версии продолжает подтверждать отказ без изменения файла.
+  - **Verification:**
+    - Дополнить файловые проверки настоящим переходом 1 → 2, используя существующие средства прерывания миграции и настроенное соединение; выполнить `mise exec -- flutter test test/data/local/migrations/file_backed_migration_test.dart test/data/local/migrations/fault_injection_test.dart`.
+  - **Dependencies:** 1.2.
+  - **Files likely touched:** `test/data/local/migrations/file_backed_migration_test.dart`, `test/data/local/migrations/fault_injection_test.dart`, `test/support/migration_process_worker.dart`; при необходимости отдельная фикстура схемы 1 рядом с существующими помощниками в `test/support/` (новый файл).
+  - **Estimated scope:** M.
+
+- [ ] 1.4 Подтвердить готовность схемы и контрактов к подключению чтения и записи
+  - **Acceptance criteria:**
+    - Контракты выражают оба варианта времени и собственный приоритет; новая установка и файловое обновление дают одинаковую схему, а проверки сохранности и прерывания проходят.
+    - Обновление использует существующую границу соединений и диагностику миграций; пользовательские значения не попадают в события, ошибки не приводят к пересозданию базы.
+  - **Verification:**
+    - Проверить актуальные результаты команд задач 1.1–1.3 и выполнить `mise exec -- flutter analyze`. Если после проверок менялись соответствующие файлы, повторить затронутые проверки из этих задач.
+  - **Dependencies:** 1.1, 1.2, 1.3.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
+
+- [ ] 1.5 Читать сохранённые время и приоритет через все существующие вызовы общего декодера
+  - **Acceptance criteria:**
+    - Подробности и все SQL-проекции, использующие `_decodeStoredDailyChoice`, передают оба столбца; декодер возвращает типизированные значения, различая `NULL` и минуту 0. Неверные хранимые значения дают существующий отказ повреждения, без подстановки значений по умолчанию.
+    - Каталог, группы и выбранные связи продолжают читать допустимые записи через общий декодер с прежними границами порций и проверкой пути. Новая организация каталога в эту задачу не входит.
+  - **Verification:**
+    - Дополнить проверку чтения записью с конкретным временем и нестандартным приоритетом и проверкой повреждённых новых полей через существующий тестовый обход ограничений.
+    - Выполнить `mise exec -- flutter test test/graph/data/drift_daily_choice_read_test.dart test/graph/data/drift_daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_groups_test.dart test/graph/data/drift_daily_choice_read_cost_test.dart`.
+  - **Dependencies:** 1.4.
+  - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `test/graph/data/drift_daily_choice_read_test.dart`; необходимые импорты в `lib/src/graph/data/drift_personal_graph_repository.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 1.6 Сохранять время и приоритет при создании вместе с подтверждённым путём
+  - **Acceptance criteria:**
+    - Команда создания атомарно записывает оба поля и путь, возвращает их в подтверждённом результате и публикует изменение через существующую ревизию графа по [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md).
+    - После закрытия и повторного открытия постоянного хранилища доступны конкретное время, приоритет, полное описание, выполнение и все шаги. Приоритет выбора не наследуется от связей пути и не меняет их.
+  - **Verification:**
+    - Расширить существующие проверки создания и файловой долговечности; выполнить `mise exec -- flutter test test/graph/data/drift_daily_choice_create_test.dart test/graph/data/file_backed_daily_choice_durability_test.dart`.
+  - **Dependencies:** 1.5.
+  - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `test/graph/data/drift_daily_choice_create_test.dart`, `test/graph/data/file_backed_daily_choice_durability_test.dart`, `test/support/daily_choice_durability_fixture.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 1.7 Сохранять независимость новых полей при правках и замене пути
+  - **Acceptance criteria:**
+    - Изменение времени или приоритета применяет только заданные поля, включая переход на весь день; дата, описание, выполнение, идентичность, порядок создания и путь сохраняются. Архивирование шагов или утрата готовности после создания не препятствуют такой правке.
+    - Изменение прежних полей и атомарная замена пути сохраняют актуальные время и приоритет. Отказ оставляет прежние данные целиком; правка без фактических изменений не продвигает ревизию.
+    - Снимки до/после и наблюдение подробностей отражают подтверждённые значения через существующие механизмы команд, без нового канала обновлений или диагностики пользовательских данных.
+  - **Verification:**
+    - Расширить проверки независимых правок и замены пути, в том числе последовательного изменения разных полей; выполнить `mise exec -- flutter test test/graph/data/drift_daily_choice_update_test.dart test/graph/data/drift_daily_choice_replace_test.dart test/graph/data/drift_daily_choice_watch_test.dart test/graph/data/drift_daily_choice_concurrency_test.dart test/graph/data/drift_daily_choice_diagnostics_test.dart`.
+  - **Dependencies:** 1.6.
+  - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `test/graph/data/drift_daily_choice_update_test.dart`, `test/graph/data/drift_daily_choice_replace_test.dart`, `test/graph/data/drift_daily_choice_watch_test.dart`, `test/graph/data/drift_daily_choice_concurrency_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 1.8 Подтвердить сквозной контракт хранения до подключения форм
+  - **Acceptance criteria:**
+    - Через прикладную границу можно создать выбор на 18:00/P2, прочитать его, заменить путь, изменить только приоритет, установить весь день и снова открыть хранилище без потери независимых данных.
+    - Чтения существующих потребителей и подтверждённые результаты согласованы с расширенной моделью; границы транзакций, порций и классификации отказов сохранены.
+  - **Verification:**
+    - Сопоставить результаты проверок задач 1.5–1.7 с указанным контрактом; выполнить `mise exec -- flutter analyze`. Недостающую проверку добавить в соответствующий существующий набор из этих задач и запустить только его.
+  - **Dependencies:** 1.5, 1.6, 1.7.
+  - **Files likely touched:** Нет при достаточном покрытии; при выявленном пробеле — соответствующий тест из задач 1.5–1.7.
+  - **Estimated scope:** XS.
+
+- [ ] 1.9 Сохранить новые поля черновика при актуализации пути и повторном подтверждении создания
+  - **Acceptance criteria:**
+    - Черновик начинается со всего дня/P4, принимает типизированные изменения и отправляет видимые значения в команду через существующий координатор.
+    - Конфликт и новое подтверждение пути сохраняют время и приоритет вместе с остальными независимыми полями. Отказ позволяет исправить значения для явного повтора; принятая операция сохраняет прежние правила блокировки формы и жизненного цикла.
+  - **Verification:**
+    - Расширить сценарий конфликта пути значениями 18:00/P2 и проверить команду после повторного подтверждения; выполнить `mise exec -- flutter test test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Dependencies:** 1.8.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; соответствующий сгенерированный файл модели при необходимости.
+  - **Estimated scope:** M.
+
+- [ ] 1.10 Дать форме создания доступный ввод времени и приоритета
+  - **Acceptance criteria:**
+    - Форма позволяет выбрать весь день либо подтвердить конкретное время и выбрать P1–P4. Отмена ввода времени сохраняет прежнее значение; состояние без заданных часов и минут не становится конкретным временем черновика.
+    - Общие для создания и редактирования элементы ввода получают текущие типизированные значения, признак доступности и обработчики изменения; команды и состояние формы остаются у существующих моделей. Выбор выполнения при создании сохраняется.
+    - Подписи и значения доступны на русском и английском, понятны экранному диктору и помещаются при поддерживаемом крупном тексте; смена локали сохраняет черновик.
+  - **Verification:**
+    - В проверках формы проверить подтверждение и отмену выбора времени, весь день/полночь, выбор приоритета, блокировку при отправке, семантику и обе локали. Выполнить `mise run codegen` и `mise exec -- flutter test test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`.
+  - **Dependencies:** 1.9.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_planning_fields.dart` (новый компонент приложения для двух форм), `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`; сгенерированная локализация.
+  - **Estimated scope:** M.
+
+- [ ] 1.11 Редактировать сохранённые время и приоритет правкой только изменённых полей
+  - **Acceptance criteria:**
+    - Редактор инициализируется сохранёнными значениями и использует элементы ввода задачи 1.10. Можно изменить конкретное время, вернуть весь день и выбрать любой приоритет.
+    - `hasEdits` и `toPatch` учитывают новые поля; возврат к исходным значениям снимает правку. Сохранение только описания или приоритета не отправляет остальные поля и не затирает их независимые подтверждённые изменения.
+    - Новые элементы следуют существующим состояниям отправки и отказа и доступны в обеих локалях. Поле выполнения остаётся в редакторе до этапа 3 согласно [плану](plan.md).
+  - **Verification:**
+    - Дополнить проверки состава правки и добавить проверку подключения элементов к редактору с сохранённым 18:00/P2 и переходом на весь день. Повторно проверять внутренний механизм выбора времени из задачи 1.10 не требуется.
+    - Выполнить `mise exec -- flutter test test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`.
+  - **Dependencies:** 1.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart` (новый).
+  - **Estimated scope:** M.
+
+- [ ] 1.12 Показывать сохранённые время и приоритет в подробностях дневного выбора
+  - **Acceptance criteria:**
+    - Подробности показывают конкретное время либо весь день и приоритет из подтверждённой модели, включая значения существующего выбора после миграции.
+    - После создания, правки и замены пути значения соответствуют сохранённым данным; полное описание и путь остаются доступны. Новые подписи локализованы и читаются вспомогательными технологиями.
+  - **Verification:**
+    - Дополнить проверки подробностей отображением обоих вариантов времени, приоритета и подтверждённой правки; выполнить `mise exec -- flutter test test/daily_choice/presentation/details/daily_choice_details_page_test.dart test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`.
+  - **Dependencies:** 1.8, 1.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`; общие подписи в `lib/l10n/app_ru.arb` и `lib/l10n/app_en.arb`, если их не добавила задача 1.10.
+  - **Estimated scope:** M.
+
+- [ ] 1.13 Подтвердить готовность этапа: новые поля доступны человеку и переживают обновление и перезапуск
+  - **Acceptance criteria:**
+    - Условие Ready to advance этапа 1 из [плана](plan.md) подтверждено: создание, редактирование и подробности работают сквозным образом; обновлённая установка сохраняет прежние данные, а новые значения долговечны и независимы от пути и выполнения.
+    - Проверки изменённых модулей и прямых потребителей, генерация и полные проверки проекта проходят; реализация соблюдает применимые архитектурные ограничения и не содержит незавершённых частей этого этапа.
+  - **Verification:**
+    - Проверить на уровне существующего сценария создания переход от формы с 18:00/P2 к подробностям, последующую правку на весь день и сохранение при замене пути; при необходимости дополнить соответствующие проверки из задач 1.9–1.12. Сохранность после перезапуска и обновления подтвердить файловыми проверками задач 1.3 и 1.6.
+    - Выполнить `mise run codegen`, проверить согласованность сгенерированных файлов и сохранность снимка версии 1; выполнить `mise run check` и `openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart и проверить новые поля и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 1.4, 1.8, 1.9, 1.10, 1.11, 1.12.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в соответствующих файлах задач этапа.
+  - **Estimated scope:** XS.
