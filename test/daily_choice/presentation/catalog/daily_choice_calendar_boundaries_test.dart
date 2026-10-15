@@ -302,7 +302,7 @@ void main() {
     ) async {
       final consumer = await pumpCalendarConsumer(
         tester,
-        selectedDate: date(2026, 10, 4),
+        selectedDate: date(1, 1, 15),
         viewport: month(date(1, 1, 15)),
         today: date(2026, 10, 4),
       );
@@ -317,10 +317,15 @@ void main() {
 
       expect(consumer.events, [
         ViewportChanged(month(date(1, 2, 1))),
-        ViewportChanged(month(date(1, 1, 1))),
+        ViewportChanged(month(date(1, 1, 15))),
       ]);
-      expect(consumer.selectedDate, date(2026, 10, 4));
+      expect(consumer.selectedDate, date(1, 1, 15));
       expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 5));
+
+      await tester.tap(find.byTooltip('Свернуть календарь'));
+      await tester.pumpAndSettle();
+      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 15), 1));
+      expect(dayCell(tester, date(1, 1, 15)).isSelected, isTrue);
     });
 
     testWidgets(
@@ -328,7 +333,7 @@ void main() {
       (tester) async {
         final consumer = await pumpCalendarConsumer(
           tester,
-          selectedDate: date(2026, 10, 4),
+          selectedDate: date(9999, 12, 31),
           viewport: month(date(9999, 12, 31)),
           today: date(2026, 10, 4),
         );
@@ -347,10 +352,15 @@ void main() {
 
         expect(consumer.events, [
           ViewportChanged(month(date(9999, 11, 1))),
-          ViewportChanged(month(date(9999, 12, 1))),
+          ViewportChanged(month(date(9999, 12, 31))),
         ]);
-        expect(consumer.selectedDate, date(2026, 10, 4));
+        expect(consumer.selectedDate, date(9999, 12, 31));
         expect(visibleWeeks(tester), lastMonth);
+
+        await tester.tap(find.byTooltip('Свернуть календарь'));
+        await tester.pumpAndSettle();
+        expect(visibleWeeks(tester), [_lastWeekPositions]);
+        expect(dayCell(tester, date(9999, 12, 31)).isSelected, isTrue);
       },
     );
   });

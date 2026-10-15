@@ -367,6 +367,40 @@ void main() {
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
     });
 
+    testWidgets('стрелки месяца возвращают неделю выбранного дня, сохраняя '
+        'фильтр и выдачу без чтения', (tester) async {
+      final selected = date(2026, 10, 15);
+      final repository = _Repository();
+      await _open(tester, repository, today: selected);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      repository.completeFirst([_item(1, date: selected)], total: 1);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-completion-filter')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Не выполненные').last);
+      await tester.pump();
+      repository.completeFirst([_item(1, date: selected)], index: 1, total: 1);
+      await tester.pumpAndSettle();
+
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
+
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      _expectSelected(tester, selected);
+      expect(find.text('Не выполненные'), findsOneWidget);
+      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries.last.date, selected);
+      expect(repository.queries.last.isCompleted, isFalse);
+    });
+
     testWidgets('повторное нажатие выбранного дня возвращает к нему просмотр '
         'без чтения', (tester) async {
       final repository = _Repository();

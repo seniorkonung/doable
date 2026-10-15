@@ -18,6 +18,32 @@ void main() {
   // по событиям календаря. Отсутствие лишних чтений каталога проверяется при
   // подключении к странице.
   group('сценарии спецификации', () {
+    testWidgets('сворачивание прерывает возврат к месяцу выбранного дня '
+        'и показывает его неделю', (tester) async {
+      final selected = date(2026, 10, 15);
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: selected,
+        viewport: month(date(2026, 11, 1)),
+        today: selected,
+      );
+
+      await tester.tap(find.byTooltip('Предыдущий месяц'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.hasRunningAnimations, isTrue);
+      await tester.tap(find.byTooltip('Свернуть календарь'));
+      await tester.pumpAndSettle();
+
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      expect(consumer.events, [
+        ViewportChanged(month(selected)),
+        ViewportChanged(week(selected)),
+      ]);
+      expect(consumer.selectedDate, selected);
+    });
+
     testWidgets('раскрытие сохраняет просмотр соседнего периода', (
       tester,
     ) async {

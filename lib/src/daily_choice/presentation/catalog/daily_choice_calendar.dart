@@ -29,6 +29,8 @@ import 'daily_choice_calendar_viewport.dart';
 /// представление. Перелистывание периода горизонтальным свайпом или кнопками
 /// шапки сообщает только [onViewportChanged] и не выбирает день; за первую и
 /// последнюю неделю или месяц диапазона [CalendarDate] перелистать нельзя.
+/// При перелистывании месяца датой просмотра становится [selectedDate], если она
+/// входит в этот месяц, иначе его первое число.
 /// Команда раскрытия или сворачивания шапки также сообщает только
 /// [onViewportChanged]: меняется представление, а дата просмотра сохраняется
 /// точно, поэтому раскрывается месяц и сворачивается неделя этой даты.
@@ -264,11 +266,22 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   void _reportFocusedDay(DateTime focusedDay) {
     // Технический фокус крайней недели может выйти за предел диапазона;
     // ближайший допустимый день принадлежит той же неделе.
-    final focusedDate = _calendarDate(_clampToRange(focusedDay));
+    var focusedDate = _calendarDate(_clampToRange(focusedDay));
+    final viewport = widget.viewport;
+    if (viewport.mode == DailyChoiceCalendarMode.month &&
+        (focusedDate.year != viewport.focusedDate.year ||
+            focusedDate.month != viewport.focusedDate.month)) {
+      final selected = widget.selectedDate;
+      focusedDate =
+          selected.year == focusedDate.year &&
+              selected.month == focusedDate.month
+          ? selected
+          : CalendarDate.fromParts(focusedDate.year, focusedDate.month, 1);
+    }
     // Библиотека сообщает о смене страницы и после синхронизации с входами
     // потребителя; повтор текущего просмотра не является его изменением.
-    if (focusedDate != widget.viewport.focusedDate) {
-      widget.onViewportChanged(widget.viewport.withFocusedDate(focusedDate));
+    if (focusedDate != viewport.focusedDate) {
+      widget.onViewportChanged(viewport.withFocusedDate(focusedDate));
     }
   }
 }

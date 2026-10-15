@@ -117,7 +117,7 @@
   - **Files likely touched:** `lib/src/daily_choice/application/daily_choice_day_statuses.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_window.dart`, `test/daily_choice/application/daily_choice_day_statuses_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_window_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.2 Свайп и стрелки месяца сохраняют выбранный день при возврате к его месяцу
+- [x] 2.2 Свайп и стрелки месяца сохраняют выбранный день при возврате к его месяцу
   - **Acceptance criteria:**
     - DailyChoiceCalendar применяет правило требования «Встроенный недельный и месячный календарь каталога»: при смене месяца дата просмотра равна выбранной дате, если она входит в этот месяц, иначе первому числу; правило одинаково для свайпа и стрелок.
     - Возврат из ноября к октябрю при выбранном 15 октября и последующее сворачивание показывают неделю 12–18 октября. Просмотр не выбирает день, не меняет фильтр и не запрашивает выдачу; переходы на границах CalendarDate и прерывание анимации сохраняют корректный просмотр.

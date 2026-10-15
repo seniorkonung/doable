@@ -182,7 +182,10 @@ void main() {
 
       // Крайние месяцы: строки сетки не ветвят раскладку, пять недель
       // лежат между ними и проверяются вместе с высотами ниже.
-      for (final shown in [_months.first, _months.last]) {
+      for (final (shown, nextFocusedDate) in [
+        (_months.first, date(2027, 3, 1)),
+        (_months.last, date(2026, 4, 5)),
+      ]) {
         testWidgets(
           'раскрытый ${shown.name} размещается целиком, а все его дни и '
           'команды нажимаются',
@@ -207,7 +210,7 @@ void main() {
                 date(focused.year, focused.month - 1, 1),
               ),
               localizations.dailyChoiceCalendarNextMonth: month(
-                date(focused.year, focused.month + 1, 1),
+                nextFocusedDate,
               ),
               localizations.dailyChoiceCalendarCollapse: week(focused),
             });

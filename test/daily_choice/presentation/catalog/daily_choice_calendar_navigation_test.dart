@@ -70,8 +70,8 @@ void main() {
     ) async {
       final consumer = await pumpCalendarConsumer(
         tester,
-        selectedDate: date(2026, 10, 4),
-        viewport: month(date(2026, 10, 4)),
+        selectedDate: date(2026, 10, 15),
+        viewport: month(date(2026, 10, 15)),
         today: date(2026, 10, 4),
         locale: texts.locale,
       );
@@ -92,14 +92,19 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
       expect(find.text(texts.october), findsOneWidget);
 
+      await tester.tap(find.byTooltip(texts.collapse));
+      await tester.pumpAndSettle();
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
+      expect(dayCell(tester, date(2026, 10, 15)).isSelected, isTrue);
+
       expect(consumer.events, [
         ViewportChanged(month(date(2026, 11, 1))),
         ViewportChanged(month(date(2026, 12, 1))),
         ViewportChanged(month(date(2026, 11, 1))),
-        ViewportChanged(month(date(2026, 10, 1))),
+        ViewportChanged(month(date(2026, 10, 15))),
+        ViewportChanged(week(date(2026, 10, 15))),
       ]);
-      expect(consumer.selectedDate, date(2026, 10, 4));
-      expect(find.text(texts.selectedDate), findsOneWidget);
+      expect(consumer.selectedDate, date(2026, 10, 15));
     });
   });
 
