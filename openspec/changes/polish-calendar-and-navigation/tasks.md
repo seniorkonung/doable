@@ -59,3 +59,64 @@
   - **Зависимости:** 1.1, 1.2, 1.3, 1.4.
   - **Вероятные файлы:** Нет, проверка и сборка; используется существующий `widgetbook/lib/navigation/app_navigation_bar_use_cases.dart`.
   - **Оценка объёма:** S.
+
+## Phase 2: Выбор периода перелистывается плавно
+
+- [ ] 2.1 Сделать размеры выбора периода пригодными для постраничного размещения без обрезки подписей
+  - **Критерии приёмки:**
+    - По решению 5 [дизайна](design.md) расчёт высоты строки остаётся у `PeriodPicker` и доступен его потребителю. `DailyChoiceCalendarPeriodPicker` использует этот расчёт для ограниченной высоты четырёх строк и верхнего отступа; геометрия не дублируется в календаре. Граница представления по [ADR-0030](../../../docs/adr/0030-keep-design-system-components-presentational.md) сохраняется.
+    - Размер учитывает ширину, локаль и масштаб текста: в режиме лет помещаются допустимые подписи лет, в режиме месяцев — все двенадцать локализованных названий. Высота внутри режима не зависит от доли видимой соседней страницы; пустые позиции крайних блоков сохраняются.
+    - Показанный и текущий периоды, доступные действия и естественная раскладка самостоятельного `PeriodPicker` сохраняются, включая существующие примеры Widgetbook.
+  - **Проверка:**
+    - Выполнить `mise exec -- flutter test test/design_system/period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart`.
+    - Дополнить существующие проверки отсутствием обрезки подписей лет и месяцев на ширине 360 dp в русской и английской локалях при обычном и увеличенном масштабе текста; проверить соответствие высоты контейнера фактической сетке. Переходы с соседней страницей проверяются в задачах 2.2 и 2.3.
+  - **Зависимости:** 1.5.
+  - **Вероятные файлы:** `lib/src/design_system/components/period_picker.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_period_picker.dart`, `test/design_system/period_picker_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart`.
+  - **Оценка объёма:** M.
+
+- [ ] 2.2 Добавить следование страниц лет за горизонтальным жестом и плавное переключение стрелками
+  - **Критерии приёмки:**
+    - Режим лет использует конечный `PageView.builder` и собственный `PageController(keepPage: false)` по решению 5 дизайна. Сохраняются блоки по двенадцать лет с привязкой к 2020 году, начальная страница года просмотра и пустые позиции вне диапазона `CalendarDate`. При удерживаемом жесте содержимое следует за пальцем; более поздние годы появляются справа, более ранние — слева.
+    - Стрелки и жест используют один контроллер; шапка и доступность команд соответствуют его текущей странице. Переход стрелкой использует общие с месячным календарём 300 мс и `Curves.easeOut`; параметры вынесены в общую внутреннюю часть календаря. Повторные команды остаются в допустимом диапазоне, а завершение прежней анимации не назначает страницу отдельно от `PageView`.
+    - Промежуточные страницы остаются состоянием выбора периода и не создают событий изменения просмотра или выбора даты по [ADR-0017](../../../docs/adr/0017-isolate-inline-calendar-behind-app-component.md). Контроллер освобождается при закрытии или переходе к месяцам; прекращённый переход не создаёт поздних событий. Доступная активация стрелок и выбор года сохраняются.
+  - **Проверка:**
+    - Выполнить `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`.
+    - Заменить существующее ожидание запрета свайпа лет проверкой нового поведения. Удерживаемым указателем проверить промежуточный сдвиг и появление соседней страницы, а отдельными кадрами — анимацию стрелок в обе стороны и постоянную высоту. Проверить крайние блоки, повторную команду и закрытие либо выбор года до завершения анимации без исключений и лишних событий.
+  - **Зависимости:** 2.1.
+  - **Вероятные файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_period_picker.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, новый внутренний файл общих параметров перелистывания в `lib/src/daily_choice/presentation/catalog/`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`.
+  - **Оценка объёма:** M.
+
+- [ ] 2.3 Анимировать переключение года стрелками в режиме выбора месяца с сохранением прежнего результата выбора
+  - **Критерии приёмки:**
+    - Режим месяцев использует конечный `PageView.builder` по годам и отдельный `PageController(keepPage: false)`, создаваемый при входе в режим и освобождаемый при его закрытии. Стрелки плавно перемещают сетку на соседний допустимый год с общими параметрами из задачи 2.2; горизонтальный жест на месяцах остаётся отключённым.
+    - По [спецификации календаря](specs/daily-choice-management/spec.md) промежуточная смена года не меняет дату просмотра, выбранную дату и фильтр. Выбор месяца через календарь вызывает прежний `onMonthSelectionCompleted`: датой просмотра становится выбранная дата, если она входит в месяц, иначе его первый день. Повторный выбор того же месяца сообщает одно завершение.
+    - Шапка, признаки показанного и текущего периода и доступные команды согласованы с видимой страницей. Высота сетки стабильна во время анимации. Повторные команды, закрытие заголовком и сворачивание ручкой во время перехода не оставляют работающий прежний контроллер и не меняют просмотр поздним событием.
+  - **Проверка:**
+    - Выполнить `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart`.
+    - Проверить промежуточные кадры перехода 2028 → 2029 и обратно, отсутствие свайпа месяцев, границы годов и закрытие во время анимации. Сохранить проверки итогового выбора месяца, возврата к месяцу выбранной даты и доступной активации команд в обеих локалях.
+  - **Зависимости:** 2.2.
+  - **Вероятные файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_period_picker.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart`.
+  - **Оценка объёма:** M.
+
+- [ ] 2.4 Подтвердить сохранение страницы выбора периода, выдачи и доступной раскладки в обоих каталогах
+  - **Критерии приёмки:**
+    - Пролистанные страницы лет и месяцев сохраняются при перестроении живого экземпляра календаря, смене локали и темы, обновлении текущей даты и отметок, уходе с корневого пункта и возврате из страницы поверх каталога. Состояние принадлежит своему экземпляру по [ADR-0028](../../../docs/adr/0028-scope-opening-parameter-state-to-page-instances.md); новый каталог начинает со своего просмотра, а контроллеры не читают и не портят смещение внешнего `PageStorage`.
+    - В корневом каталоге и каталоге на заданную дату новые жесты и стрелки сохраняют выбранную дату, фильтр выполнения и выдачу без новых чтений каталога. До выбора месяца промежуточные страницы не передаются модели отметок; завершённый выбор сохраняет существующее обновление отметок по [ADR-0025](../../../docs/adr/0025-load-calendar-day-marks-in-separate-viewport-model.md).
+    - Оба режима выбора периода сохраняют доступность команд и подписей. На нижней границе поддержки по `app-appearance` выбор периода, ручка и сообщение об отказе отметок доступны над панелью, а выдачу можно прокручивать. Перестроение сохранённого экземпляра не сбрасывает его режим и страницу — это необходимое свойство для последующего управляемого раскрытия.
+  - **Проверка:**
+    - Выполнить `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_page_storage_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_lifecycle_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart test/app/navigation/app_shell_state_test.dart`.
+    - Дополнить существующие проверки только недостающими случаями новых страниц: сохранение состояния после перелистывания, счётчики чтений в обоих каталогах, изоляция хранилища прокрутки и размещение выбора периода на 360×720 dp. Проверку возврата после вертикального перетягивания выполняет следующая фаза, которая вводит этот жест.
+  - **Зависимости:** 2.2, 2.3.
+  - **Вероятные файлы:** `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_page_storage_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart`, `test/app/navigation/app_shell_state_test.dart`; `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_period_picker.dart` — только при выявленном нарушении времени жизни состояния.
+  - **Оценка объёма:** M.
+
+- [ ] 2.5 Проверить готовность второй фазы и собрать APK для пользовательской проверки перелистывания
+  - **Критерии приёмки:**
+    - Выполнено условие перехода фазы 2 из [плана](plan.md): оба режима выбора периода работают в обоих каталогах, сохраняют доступность и корректность выбора; промежуточные переходы не меняют выбранную дату и выдачу, а состояние живого выбора периода сохраняется при перестроении.
+    - Полные проверки проекта и строгая валидация изменения проходят; release APK подготовлен. Результаты и путь к сборке сообщены в сессии. Оценка плавности на телефоне явно остаётся пользовательской проверкой: автоматические проверки не подтверждают её, а отсутствие устройства не блокирует завершение задачи.
+  - **Проверка:**
+    - Выполнить `mise run check` и `mise exec --no-deps -- openspec validate polish-calendar-and-navigation --strict`.
+    - Выполнить `mise exec -- flutter build apk --release`; сообщить путь к полученному APK и оставшиеся ручные проверки горизонтального жеста лет и стрелок обоих режимов в обоих каталогах, без отдельного отчётного документа.
+  - **Зависимости:** 2.1, 2.2, 2.3, 2.4.
+  - **Вероятные файлы:** Нет, проверка и сборка.
+  - **Оценка объёма:** S.
