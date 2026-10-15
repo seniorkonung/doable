@@ -1,6 +1,8 @@
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -21,13 +23,19 @@ void main() {
       addTearDown(harness.dispose);
       var database = await harness.openReadyDatabase();
       await seedDurabilityGraph(database);
+      final schedule = DailyChoiceTime(hour: 18, minute: 0);
       for (final (choice, firstStep) in [(201, 301), (202, 303)]) {
         expect(
           await durabilityRepository(
             database,
             choiceNumber: choice,
             firstStepNumber: firstStep,
-          ).execute(durabilityCreate()),
+          ).execute(
+            durabilityCreate(
+              schedule: schedule,
+              priority: DailyChoicePriority.p2,
+            ),
+          ),
           isA<GraphCommandSucceeded>(),
         );
       }
@@ -51,6 +59,8 @@ void main() {
         '  Выбор\nдня  ',
       ]);
       expect(choices.map((row) => row['is_completed']), [1, 1]);
+      expect(choices.map((row) => row['scheduled_minute']), [1080, 1080]);
+      expect(choices.map((row) => row['priority']), [2, 2]);
       final steps = await durabilityRows(database, 'daily_choice_path_steps');
       expect(steps.map((row) => row['id']), [
         durabilityUuid(301),
@@ -71,7 +81,12 @@ void main() {
         );
         expect(result, isA<DailyChoiceReadSuccess>());
         final details = (result as DailyChoiceReadSuccess).value.value!;
+        expect(details.choice.id, durabilityChoice(number));
         expect(details.choice.date, CalendarDate.fromParts(2026, 9, 23));
+        expect(details.choice.schedule, schedule);
+        expect(details.choice.priority, DailyChoicePriority.p2);
+        expect(details.choice.description!.value, '  Выбор\nдня  ');
+        expect(details.choice.isCompleted, isTrue);
         expect(details.path.map((step) => step.relation.id), [
           durabilityRelation(101),
           durabilityRelation(102),

@@ -74,8 +74,8 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           await _database.customInsert(
             '''INSERT INTO daily_choices
                (id, source_intention_id, selected_intention_id,
-                choice_date, description, is_completed)
-               VALUES (?, ?, ?, ?, ?, ?)''',
+                choice_date, description, is_completed, scheduled_minute, priority)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
             variables: [
               Variable<String>(choiceId.toCanonicalString()),
               Variable<String>(command.sourceIntentionId.toCanonicalString()),
@@ -83,6 +83,11 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
               Variable<String>(command.date.toCanonicalString()),
               Variable<String>(command.description?.value),
               Variable<int>(command.isCompleted ? 1 : 0),
+              Variable<int>(switch (command.schedule) {
+                DailyChoiceAllDay() => null,
+                DailyChoiceTime(:final minuteOfDay) => minuteOfDay,
+              }),
+              Variable<int>(command.priority.level),
             ],
             updates: {_database.dailyChoices},
           );
@@ -117,6 +122,8 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
               details.choice.date != command.date ||
               details.choice.description != command.description ||
               details.choice.isCompleted != command.isCompleted ||
+              details.choice.schedule != command.schedule ||
+              details.choice.priority != command.priority ||
               details.path.length != command.path.steps.length) {
             throw const _StoredIntentionCorruption();
           }

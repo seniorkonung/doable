@@ -55,7 +55,7 @@
   - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `test/graph/data/drift_daily_choice_read_test.dart`; необходимые импорты в `lib/src/graph/data/drift_personal_graph_repository.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.6 Сохранять время и приоритет при создании вместе с подтверждённым путём
+- [x] 1.6 Сохранять время и приоритет при создании вместе с подтверждённым путём
   - **Acceptance criteria:**
     - Команда создания атомарно записывает оба поля и путь, возвращает их в подтверждённом результате и публикует изменение через существующую ревизию графа по [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md).
     - После закрытия и повторного открытия постоянного хранилища доступны конкретное время, приоритет, полное описание, выполнение и все шаги. Приоритет выбора не наследуется от связей пути и не меняет их.

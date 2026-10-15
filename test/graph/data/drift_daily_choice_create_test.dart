@@ -6,6 +6,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -88,7 +90,7 @@ void main() {
       await database.customInsert(
         '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority, is_archived)
-           VALUES (?, ?, ?, ?, 2, 0)''',
+           VALUES (?, ?, ?, ?, 1, 0)''',
         variables: [
           Variable.withString(_uuid(n)),
           Variable.withString(_uuid(source)),
@@ -116,15 +118,21 @@ void main() {
       ),
   ]);
 
-  CreateDailyChoice command({ConfirmedChoicePath? path, int selected = 3}) =>
-      CreateDailyChoice(
-        sourceIntentionId: _intention(1),
-        selectedIntentionId: _intention(selected),
-        path: path ?? route(),
-        date: CalendarDate.fromParts(2026, 9, 23),
-        description: null,
-        isCompleted: true,
-      );
+  CreateDailyChoice command({
+    ConfirmedChoicePath? path,
+    int selected = 3,
+    DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+    DailyChoicePriority priority = DailyChoicePriority.p4,
+  }) => CreateDailyChoice(
+    sourceIntentionId: _intention(1),
+    selectedIntentionId: _intention(selected),
+    path: path ?? route(),
+    date: CalendarDate.fromParts(2026, 9, 23),
+    description: null,
+    isCompleted: true,
+    schedule: schedule,
+    priority: priority,
+  );
 
   Future<int> rows(String table) async =>
       (await database
@@ -134,12 +142,17 @@ void main() {
 
   test('сохраняет подтверждённый путь и публикует одну ревизию', () async {
     final before = await repository.getDailyChoice(_choice(201));
-    final result = await repository.execute(command());
+    final schedule = DailyChoiceTime(hour: 18, minute: 25);
+    final result = await repository.execute(
+      command(schedule: schedule, priority: DailyChoicePriority.p2),
+    );
     expect(result, isA<GraphCommandSucceeded>());
     final confirmed = (result as GraphCommandSucceeded).value;
     final created = confirmed.value as DailyChoiceCreated;
     expect(created.choice.id, _choice(201));
     expect(created.choice.isCompleted, isTrue);
+    expect(created.choice.schedule, schedule);
+    expect(created.choice.priority, DailyChoicePriority.p2);
     expect(created.path.steps.map((s) => s.relationId), [
       _relation(101),
       _relation(102),
@@ -147,6 +160,8 @@ void main() {
     expect(created.path.steps.map((s) => s.previousStepId), [null, _step(301)]);
     expect(created.changes, hasLength(1));
     final change = created.changes.single as DailyChoiceChange;
+    expect(change.after!.schedule, schedule);
+    expect(change.after!.priority, DailyChoicePriority.p2);
     expect(
       change.revision.compareTo(confirmed.revision),
       GraphRevisionOrder.same,
@@ -162,12 +177,16 @@ void main() {
     );
     expect(await rows('daily_choices'), 1);
     expect(await rows('daily_choice_path_steps'), 2);
-    expect(
-      (await repository.getDailyChoice(
-        _choice(201),
-      ) as GraphResultSuccess).value.value!.path,
-      hasLength(2),
-    );
+    final details = (await repository.getDailyChoice(
+      _choice(201),
+    ) as DailyChoiceReadSuccess).value.value!;
+    expect(details.path, hasLength(2));
+    expect(details.choice.schedule, schedule);
+    expect(details.choice.priority, DailyChoicePriority.p2);
+    expect(details.path.map((step) => step.relation.priority), [
+      RelationPriority.p1,
+      RelationPriority.p1,
+    ]);
     expect(
       diagnostics.events
           .whereType<DailyChoiceCommandDiagnosticsEvent>()
@@ -188,7 +207,33 @@ void main() {
     );
     expect(await rows('daily_choices'), 2);
     expect(await rows('daily_choice_path_steps'), 4);
+    for (final id in [_choice(201), _choice(202)]) {
+      final details = (await repository.getDailyChoice(
+        id,
+      ) as DailyChoiceReadSuccess).value.value!;
+      expect(details.choice.schedule, const DailyChoiceAllDay());
+      expect(details.choice.priority, DailyChoicePriority.p4);
+      expect(details.path.map((step) => step.relation.priority), [
+        RelationPriority.p1,
+        RelationPriority.p1,
+      ]);
+    }
   });
+
+  test(
+    'сохраняет полночь как конкретное время, отличное от всего дня',
+    () async {
+      final midnight = DailyChoiceTime(hour: 0, minute: 0);
+      expect(
+        await repository.execute(command(schedule: midnight)),
+        isA<GraphCommandSucceeded>(),
+      );
+      final details = (await repository.getDailyChoice(
+        _choice(201),
+      ) as DailyChoiceReadSuccess).value.value!;
+      expect(details.choice.schedule, midnight);
+    },
+  );
 
   test('изменённый смысл маршрута возвращает конфликт без записи', () async {
     await database.customUpdate(
@@ -308,7 +353,12 @@ void main() {
     stepIds.values
       ..clear()
       ..addAll([_step(303), _step(301)]);
-    final result = await repository.execute(command());
+    final result = await repository.execute(
+      command(
+        schedule: DailyChoiceTime(hour: 18, minute: 0),
+        priority: DailyChoicePriority.p2,
+      ),
+    );
     expect(result, isA<GraphCommandFailed>());
     expect(await rows('daily_choices'), 1);
     expect(await rows('daily_choice_path_steps'), 2);

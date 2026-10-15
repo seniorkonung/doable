@@ -7,6 +7,8 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
@@ -134,6 +136,8 @@ CreateDailyChoice durabilityCreate({
   CalendarDate? date,
   String? description = '  Выбор\nдня  ',
   bool completed = true,
+  DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+  DailyChoicePriority priority = DailyChoicePriority.p4,
 }) => CreateDailyChoice(
   sourceIntentionId: durabilityIntention(1),
   selectedIntentionId: durabilityIntention(path.last == 103 ? 4 : 3),
@@ -143,6 +147,8 @@ CreateDailyChoice durabilityCreate({
       ? null
       : DailyChoiceDescription.fromInput(description),
   isCompleted: completed,
+  schedule: schedule,
+  priority: priority,
 );
 
 DeleteBlockingRelations durabilityMixedDelete(int choiceNumber) =>
