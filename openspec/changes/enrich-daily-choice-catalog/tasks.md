@@ -23,7 +23,7 @@
   - **Files likely touched:** `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/data/local/app_database.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/daily_choice_schema_test.dart`; результаты генерации `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v2.json` (новый).
   - **Estimated scope:** M.
 
-- [ ] 1.3 Доказать сохранность существующей установки при переходе на схему 2
+- [x] 1.3 Доказать сохранность существующей установки при переходе на схему 2
   - **Acceptance criteria:**
     - Постоянный файл, созданный из сохранённой схемы 1, после обновления сохраняет идентификаторы, даты, полные описания, выполнение, участников и шаги разных выборов; новые поля получают весь день/P4. Схема проходит существующий verifier и эквивалентна новой установке.
     - Сохраняются `creation_sequence` и состояние `sqlite_sequence`, включая ранее удалённый максимальный номер; следующий выбор после повторного открытия получает новый номер.
