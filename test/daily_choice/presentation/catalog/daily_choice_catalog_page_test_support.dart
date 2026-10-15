@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
@@ -41,6 +42,7 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 /// приложения, поэтому [locale] — системная локаль устройства, а
 /// неподдерживаемый язык даёт английский. [size] — логический размер экрана;
 /// [today] — локальное сегодня.
+/// [catalogDate] открывает отдельный каталог на дату вместо корневого.
 /// Чтения каталога завершает сценарий через [repository].
 Future<void> pumpCatalogPage(
   WidgetTester tester,
@@ -48,6 +50,7 @@ Future<void> pumpCatalogPage(
   required CalendarDate today,
   required Locale locale,
   required Size size,
+  CalendarDate? catalogDate,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -74,7 +77,11 @@ Future<void> pumpCatalogPage(
       ),
     ),
   );
-  openDailyChoicesOn(router);
+  if (catalogDate == null) {
+    openDailyChoicesOn(router);
+  } else {
+    unawaited(router.push(DailyChoiceDateCatalogRoute(date: catalogDate)));
+  }
   await tester.pump();
   // Переход к каталогу заканчивается без анимации, а первое чтение каталога
   // остаётся незавершённым до решения сценария.

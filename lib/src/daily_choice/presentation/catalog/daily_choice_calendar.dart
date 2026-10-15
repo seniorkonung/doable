@@ -12,12 +12,12 @@ import '../../../design_system/components/notice.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
+import 'daily_choice_calendar_period_picker.dart';
 import 'daily_choice_calendar_viewport.dart';
 
 /// Встроенный недельный и месячный календарь каталога дневных выборов.
 ///
-/// Календарь управляется потребителем и не хранит собственных выбора или
-/// просмотра:
+/// Выбранной датой и просмотром управляет потребитель:
 ///
 /// - [selectedDate] — выбранная дата фильтра, которую календарь только
 ///   отмечает;
@@ -34,6 +34,11 @@ import 'daily_choice_calendar_viewport.dart';
 /// перелистать нельзя.
 /// При перелистывании месяца датой просмотра становится [selectedDate], если она
 /// входит в этот месяц, иначе его первое число.
+/// Заголовок месяца открывает встроенный выбор года и месяца. Его страницы
+/// календарь хранит сам, не сообщая промежуточные переходы потребителю.
+/// Выбор месяца сообщает только [onMonthSelectionCompleted] с итоговым
+/// просмотром, даже равным прежнему. Закрытие заголовком не создаёт событий;
+/// сворачивание ручкой возвращает неделю прежней даты просмотра.
 /// Ручка раскрытия или сворачивания также сообщает только
 /// [onViewportChanged]: меняется представление, а дата просмотра сохраняется
 /// точно, поэтому раскрывается месяц и сворачивается неделя этой даты.
@@ -81,6 +86,7 @@ final class DailyChoiceCalendar extends StatefulWidget {
     required this.today,
     required this.onDateSelected,
     required this.onViewportChanged,
+    required this.onMonthSelectionCompleted,
     this.dayStatusForDate,
     this.hasDayMarksReadFailure = false,
   });
@@ -101,6 +107,9 @@ final class DailyChoiceCalendar extends StatefulWidget {
   final ValueChanged<CalendarDate> onDateSelected;
   final ValueChanged<DailyChoiceCalendarViewport> onViewportChanged;
 
+  /// Один завершённый выбор месяца; [onViewportChanged] его не дублирует.
+  final ValueChanged<DailyChoiceCalendarViewport> onMonthSelectionCompleted;
+
   @override
   State<DailyChoiceCalendar> createState() => _DailyChoiceCalendarState();
 }
@@ -115,12 +124,23 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   /// ключом календарь делил бы с ней одну запись: после пересоздания показал
   /// бы период по её смещению и испортил бы сохранённое смещение. Запись в
   /// собственном хранилище не переживает календарь.
-  final _pageStorage = PageStorageBucket();
+  var _pageStorage = PageStorageBucket();
+
+  bool _isPeriodPickerOpen = false;
 
   /// Контроллер страниц принадлежит библиотеке: она создаёт его вместе с
   /// сеткой и сама освобождает. Кнопки шапки перелистывают им страницы, чтобы
   /// переход шёл тем же путём, что и свайп.
   late PageController _pages;
+
+  @override
+  void didUpdateWidget(DailyChoiceCalendar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.viewport.mode == DailyChoiceCalendarMode.week &&
+        _isPeriodPickerOpen) {
+      _closePeriodPicker();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,61 +151,76 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (isExpanded)
-          CalendarHeader(
-            title: _monthTitle(context, viewport.focusedDate),
-            previousLabel: localizations.dailyChoiceCalendarPreviousMonth,
-            nextLabel: localizations.dailyChoiceCalendarNextMonth,
-            onPrevious: _hasPreviousMonth(viewport.focusedDate)
-                ? _showPreviousPeriod
-                : null,
-            onNext: _hasNextMonth(viewport.focusedDate)
-                ? _showNextPeriod
-                : null,
-          ),
-        // Библиотека задаёт строкам фиксированную высоту, поэтому её
-        // рассчитывает календарь: по ширине колонки и масштабу текста.
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final columnWidth = _columnWidth(constraints.maxWidth);
-            // Основа библиотеки без готовых ячеек: ячейка `TableCalendar`
-            // задаёт собственную подпись даты, скрывает содержимое от
-            // вспомогательных технологий и объявляет пустое долгое нажатие.
-            // Дни и подписи дней недели строит календарь, а страницы, жесты и
-            // сетка остаются за библиотекой.
-            return TableCalendarBase(
-              firstDay: _firstDay,
-              lastDay: _lastDay,
-              focusedDay: _technicalDate(viewport.focusedDate),
-              calendarFormat: switch (viewport.mode) {
-                DailyChoiceCalendarMode.week => CalendarFormat.week,
-                DailyChoiceCalendarMode.month => CalendarFormat.month,
-              },
-              startingDayOfWeek: StartingDayOfWeek.monday,
-              // Постоянные шесть строк включают дни соседних месяцев:
-              // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase/sixWeekMonthsEnforced.html
-              sixWeekMonthsEnforced: true,
-              // Представление переключает только потребитель, поэтому
-              // вертикальные жесты не управляют календарём.
-              availableGestures: AvailableGestures.horizontalSwipe,
-              rowHeight: DailyChoiceCalendarDay.rowHeight(
-                context,
-                columnWidth: columnWidth,
-                mode: viewport.mode,
+        if (_isPeriodPickerOpen)
+          DailyChoiceCalendarPeriodPicker(
+            focusedDate: viewport.focusedDate,
+            today: widget.today,
+            onMonthSelected: _completeMonthSelection,
+            onClose: () => setState(_closePeriodPicker),
+          )
+        else ...[
+          if (isExpanded)
+            CalendarHeader(
+              title: _monthTitle(context, viewport.focusedDate),
+              previousLabel: localizations.dailyChoiceCalendarPreviousMonth,
+              nextLabel: localizations.dailyChoiceCalendarNextMonth,
+              onPrevious: _hasPreviousMonth(viewport.focusedDate)
+                  ? _showPreviousPeriod
+                  : null,
+              onNext: _hasNextMonth(viewport.focusedDate)
+                  ? _showNextPeriod
+                  : null,
+              titleAction: (
+                semanticLabel:
+                    localizations.dailyChoiceCalendarChooseYearAndMonth,
+                isExpanded: false,
+                onTap: _openPeriodPicker,
               ),
-              // В неделе подпись дня входит в ячейку:
-              // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase-class.html
-              dowVisible: viewport.mode == DailyChoiceCalendarMode.month,
-              dowHeight: _weekdayHeight(context, columnWidth: columnWidth),
-              dowBuilder: _buildWeekday,
-              dayBuilder: _buildDay,
-              pageAnimationDuration: _pageAnimationDuration,
-              pageAnimationCurve: _pageAnimationCurve,
-              onCalendarCreated: (pages) => _pages = pages,
-              onPageChanged: _reportFocusedDay,
-            );
-          },
-        ),
+            ),
+          // Библиотека задаёт строкам фиксированную высоту, поэтому её
+          // рассчитывает календарь: по ширине колонки и масштабу текста.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columnWidth = _columnWidth(constraints.maxWidth);
+              // Основа библиотеки без готовых ячеек: ячейка `TableCalendar`
+              // задаёт собственную подпись даты, скрывает содержимое от
+              // вспомогательных технологий и объявляет пустое долгое нажатие.
+              // Дни и подписи дней недели строит календарь, а страницы, жесты и
+              // сетка остаются за библиотекой.
+              return TableCalendarBase(
+                firstDay: _firstDay,
+                lastDay: _lastDay,
+                focusedDay: _technicalDate(viewport.focusedDate),
+                calendarFormat: switch (viewport.mode) {
+                  DailyChoiceCalendarMode.week => CalendarFormat.week,
+                  DailyChoiceCalendarMode.month => CalendarFormat.month,
+                },
+                startingDayOfWeek: StartingDayOfWeek.monday,
+                // Постоянные шесть строк включают дни соседних месяцев:
+                // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase/sixWeekMonthsEnforced.html
+                sixWeekMonthsEnforced: true,
+                // Представление переключает только потребитель, поэтому
+                // вертикальные жесты не управляют календарём.
+                availableGestures: AvailableGestures.horizontalSwipe,
+                rowHeight: DailyChoiceCalendarDay.rowHeight(
+                  context,
+                  columnWidth: columnWidth,
+                  mode: viewport.mode,
+                ),
+                // В неделе подпись дня входит в ячейку:
+                // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase-class.html
+                dowVisible: viewport.mode == DailyChoiceCalendarMode.month,
+                dowHeight: _weekdayHeight(context, columnWidth: columnWidth),
+                dowBuilder: _buildWeekday,
+                dayBuilder: _buildDay,
+                pageAnimationDuration: _pageAnimationDuration,
+                pageAnimationCurve: _pageAnimationCurve,
+                onCalendarCreated: (pages) => _pages = pages,
+                onPageChanged: _reportFocusedDay,
+              );
+            },
+          ),
+        ],
         CalendarHandle(
           isExpanded: isExpanded,
           semanticLabel: isExpanded
@@ -223,7 +258,11 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   // Дата просмотра сохраняется, а к периоду нового представления библиотека
   // переходит без сообщения о смене страницы.
   void _toggleMode() {
-    _stopPaging();
+    if (_isPeriodPickerOpen) {
+      setState(_closePeriodPicker);
+    } else {
+      _stopPaging();
+    }
     final viewport = widget.viewport;
     widget.onViewportChanged(
       viewport.withMode(switch (viewport.mode) {
@@ -231,6 +270,36 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
         DailyChoiceCalendarMode.month => DailyChoiceCalendarMode.week,
       }),
     );
+  }
+
+  void _openPeriodPicker() {
+    _stopPaging();
+    setState(() => _isPeriodPickerOpen = true);
+  }
+
+  void _closePeriodPicker() {
+    _isPeriodPickerOpen = false;
+    // При возвращении сетка создаётся с итоговым просмотром, без сохранённого
+    // номера прежней страницы или представления:
+    // https://api.flutter.dev/flutter/widgets/PageController/keepPage.html
+    _pageStorage = PageStorageBucket();
+  }
+
+  void _completeMonthSelection(CalendarDate firstDate) {
+    setState(_closePeriodPicker);
+    widget.onMonthSelectionCompleted(
+      DailyChoiceCalendarViewport(
+        focusedDate: _focusedDateForMonth(firstDate),
+        mode: DailyChoiceCalendarMode.month,
+      ),
+    );
+  }
+
+  CalendarDate _focusedDateForMonth(CalendarDate date) {
+    final selected = widget.selectedDate;
+    return selected.year == date.year && selected.month == date.month
+        ? selected
+        : CalendarDate.fromParts(date.year, date.month, 1);
   }
 
   /// Останавливает незаконченное перелистывание на странице, о которой
@@ -287,12 +356,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
     if (viewport.mode == DailyChoiceCalendarMode.month &&
         (focusedDate.year != viewport.focusedDate.year ||
             focusedDate.month != viewport.focusedDate.month)) {
-      final selected = widget.selectedDate;
-      focusedDate =
-          selected.year == focusedDate.year &&
-              selected.month == focusedDate.month
-          ? selected
-          : CalendarDate.fromParts(focusedDate.year, focusedDate.month, 1);
+      focusedDate = _focusedDateForMonth(focusedDate);
     }
     // Библиотека сообщает о смене страницы и после синхронизации с входами
     // потребителя; повтор текущего просмотра не является его изменением.

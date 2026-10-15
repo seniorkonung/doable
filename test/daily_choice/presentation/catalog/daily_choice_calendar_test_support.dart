@@ -151,6 +151,22 @@ final class ViewportChanged extends CalendarEvent {
   String toString() => 'ViewportChanged($viewport)';
 }
 
+final class MonthSelectionCompleted extends CalendarEvent {
+  const MonthSelectionCompleted(this.viewport);
+
+  final DailyChoiceCalendarViewport viewport;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MonthSelectionCompleted && other.viewport == viewport;
+
+  @override
+  int get hashCode => viewport.hashCode;
+
+  @override
+  String toString() => 'MonthSelectionCompleted($viewport)';
+}
+
 /// Потребитель календаря в тестах.
 ///
 /// Как страница каталога, он владеет выбранной датой и просмотром: выбор дня
@@ -347,6 +363,10 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
     },
     onViewportChanged: (value) {
       widget.consumer.events.add(ViewportChanged(value));
+      setState(() => _viewport = value);
+    },
+    onMonthSelectionCompleted: (value) {
+      widget.consumer.events.add(MonthSelectionCompleted(value));
       setState(() => _viewport = value);
     },
   );

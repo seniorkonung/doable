@@ -67,18 +67,24 @@ void main() {
             locale: texts.locale,
           );
 
+          final command = lookupAppLocalizations(texts.locale)
+              .dailyChoiceCalendarChooseYearAndMonth;
           final days = weeksFrom(date(2026, 9, 28), 6).expand((row) => row);
           expect(_announced(tester), [
             texts.previousMonth,
-            texts.october,
+            command,
             texts.nextMonth,
             for (final day in days)
               _dayLabel(tester, day, isToday: day == date(2026, 10, 4)),
             texts.collapse,
           ]);
-          final title = find.semantics.byLabel(texts.october).evaluate().single;
-          expect(title.flagsCollection.isButton, isFalse);
-          expect(title.getSemanticsData().actions, 0);
+          final title = find.semantics.byLabel(command).evaluate().single;
+          expect(title.value, texts.october);
+          expect(title.flagsCollection.isButton, isTrue);
+          expect(
+            title.getSemanticsData().hasAction(SemanticsAction.tap),
+            isTrue,
+          );
           // День соседнего месяца назван своей полной датой.
           expect(_announced(tester), contains(texts.september28));
           expect(_announced(tester), contains(texts.todayOctober4));

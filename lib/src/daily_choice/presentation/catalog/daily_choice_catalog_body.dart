@@ -124,6 +124,11 @@ final class _DailyChoiceCatalogBodyState
                 hasDayMarksReadFailure: dayMarks.hasReadFailure,
                 onDateSelected: (date) => _selectDate(model, date),
                 onViewportChanged: _setViewport,
+                onMonthSelectionCompleted: (viewport) => _setViewport(
+                  viewport,
+                  reason: DailyChoiceCalendarViewportUpdateReason
+                      .monthSelectionCompleted,
+                ),
               ),
             ),
             Expanded(
@@ -209,14 +214,18 @@ final class _DailyChoiceCatalogBodyState
     model.selectDate(date);
   }
 
-  void _setViewport(DailyChoiceCalendarViewport viewport) {
+  void _setViewport(
+    DailyChoiceCalendarViewport viewport, {
+    DailyChoiceCalendarViewportUpdateReason reason =
+        DailyChoiceCalendarViewportUpdateReason.ordinary,
+  }) {
     setState(() => _viewport = viewport);
     ref
         .read(
           dailyChoiceCalendarDayMarksViewModelProvider(widget.instance)
               .notifier,
         )
-        .setViewport(viewport);
+        .setViewport(viewport, reason: reason);
   }
 
   /// Слайверы выдачи под фильтрами.

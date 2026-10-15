@@ -93,6 +93,7 @@ final class CalendarHeader extends StatelessWidget {
                       button: true,
                       expanded: action.isExpanded,
                       label: action.semanticLabel,
+                      value: title,
                       onTap: action.onTap,
                       child: InkWell(
                         borderRadius: radius,
