@@ -22,6 +22,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/daily_choice_local_date.dart';
@@ -677,17 +678,17 @@ const _filterKeys = [
   'daily-choice-clear-filters',
 ];
 
-/// Шапка календаря называет выбранной дату [value].
+/// Заголовок дня называет выбранную дату [value].
 void _expectSelected(WidgetTester tester, CalendarDate value) =>
     expect(find.text(_selectedDateLabel(tester, value)), findsOneWidget);
 
-/// Подпись полной выбранной даты в шапке календаря по текущей локали.
+/// Полная выбранная дата в заголовке дня по текущей локали.
 String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
   final context = tester.element(find.byType(DailyChoiceCalendar));
-  return AppLocalizations.of(context).dailyChoiceCalendarSelectedDate(
-    MaterialLocalizations.of(context)
-        .formatFullDate(DateTime.utc(value.year, value.month, value.day)),
-  );
+  return DateFormat(
+    'd MMMM y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(value.year, value.month, value.day));
 }
 
 /// Доводит до конца перелистывание календаря. Индикатор загрузки выдачи не

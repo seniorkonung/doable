@@ -4,10 +4,12 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
@@ -61,7 +63,7 @@ void main() {
         _expectCommands(tester);
         expect(
           find.descendant(
-            of: find.byType(DailyChoiceCalendar),
+            of: find.byType(DayHeading),
             matching: find.text(_selectedDateLabel(tester, _today)),
           ),
           findsOneWidget,
@@ -176,13 +178,16 @@ void main() {
         expect(_pageScroll, findsOneWidget);
         final scroll = tester.state<ScrollableState>(_pageScroll).position;
 
-        final day = calendarDay(date(2026, 10, 1));
+        final day = calendarDay(date(2026, 10, 1), skipOffstage: false);
         await _reveal(tester, day);
         final before = scroll.pixels;
         await tester.drag(day, const Offset(0, -150));
         await tester.pumpAndSettle();
         expect(scroll.pixels, greaterThan(before + 100));
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
+        expect(
+          visibleWeeks(tester, skipOffstage: false),
+          weeksFrom(date(2026, 9, 28), 1),
+        );
 
         await _reveal(tester, day);
         final scrolled = scroll.pixels;
@@ -361,13 +366,13 @@ AppLocalizations _l10n(WidgetTester tester) => AppLocalizations.of(
   tester.element(find.byType(DailyChoiceCalendar, skipOffstage: false)),
 );
 
-/// Подпись полной выбранной даты в шапке календаря по текущей локали.
+/// Полная выбранная дата в заголовке дня по текущей локали.
 String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
   final context = tester.element(find.byType(DailyChoiceCalendar));
-  return AppLocalizations.of(context).dailyChoiceCalendarSelectedDate(
-    MaterialLocalizations.of(context)
-        .formatFullDate(DateTime.utc(value.year, value.month, value.day)),
-  );
+  return DateFormat(
+    'd MMMM y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(value.year, value.month, value.day));
 }
 
 /// Видимая часть страницы: под шапкой и над панелью основной навигации.

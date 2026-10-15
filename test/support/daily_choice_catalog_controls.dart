@@ -16,6 +16,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -118,21 +119,20 @@ Future<void> selectDailyChoiceCatalogDate(
 
 /// День, который открытый каталог дневных выборов показывает выбранным.
 ///
-/// Календарь называет выбранный день полной датой и тогда, когда просматривает
-/// другой период. Календарь прокручивается вместе с выдачей, поэтому шаг
-/// читает его и за краем видимой части страницы. Каталог, который не называет
-/// выбранный день, проваливает проверку.
+/// Заголовок называет выбранный день полной датой и тогда, когда календарь
+/// просматривает другой период. Заголовок прокручивается вместе с выдачей,
+/// поэтому шаг читает его и за краем видимой части страницы. Каталог, который
+/// не называет выбранный день, проваливает проверку.
 CalendarDate shownDailyChoiceCatalogDate(WidgetTester tester) {
   final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
   final selected = tester.widget<DailyChoiceCalendar>(calendar).selectedDate;
   final context = tester.element(calendar);
-  final label = AppLocalizations.of(context).dailyChoiceCalendarSelectedDate(
-    MaterialLocalizations.of(
-      context,
-    ).formatFullDate(DateTime.utc(selected.year, selected.month, selected.day)),
-  );
+  final label = DateFormat(
+    'd MMMM y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(selected.year, selected.month, selected.day));
   final shown = find.descendant(
-    of: calendar,
+    of: find.byType(DayHeading, skipOffstage: false),
     matching: find.text(label, skipOffstage: false),
   );
   if (shown.evaluate().isEmpty) {
@@ -287,6 +287,7 @@ Future<void> _turnUntilShown(
   required String? previous,
   required String? next,
 }) async {
+  await _revealCalendar(tester);
   for (var turn = 0; turn < _maxTurns; turn++) {
     final shown = [
       for (final element in find.byType(DailyChoiceCalendarDay).evaluate())

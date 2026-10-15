@@ -173,7 +173,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/support/daily_choice_catalog_controls.dart`; затронутые проверки переходов и доступности в `test/daily_choice/presentation/catalog/`
   - **Estimated scope:** M
 
-- [ ] 2.7 Оба каталога называют выбранную дату заголовком DayHeading в начале выдачи
+- [x] 2.7 Оба каталога называют выбранную дату заголовком DayHeading в начале выдачи
   - **Acceptance criteria:**
     - DailyChoiceCatalogBody строит DayHeading перед фильтром: полное название дня недели с заглавной буквы, дата формата d MMMM y без «г.» и локализованная отметка «Сегодня» только для текущей локальной даты. Дата остаётся выбранной и при просмотре другого периода.
     - Смена локального дня через DailyChoiceLocalDayObserver обновляет отметку «Сегодня», включая возврат приложения из фона, без изменения выбранной даты, просмотра, фильтра и выдачи. Дата объявляется заголовком.

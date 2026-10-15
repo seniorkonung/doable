@@ -9,7 +9,6 @@ import 'daily_choice_calendar_test_support.dart';
 /// зависит от языка, а подписи по языкам проверяет тест доступности.
 final _texts = (
   locale: const Locale('ru'),
-  selectedDate: 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.',
   october: 'Октябрь 2026',
   november: 'Ноябрь 2026',
   december: 'Декабрь 2026',
@@ -62,7 +61,6 @@ void main() {
         expect(find.bySemanticsLabel(texts.nextWeek), findsNothing);
         expect(find.byType(IconButton), findsNothing);
         expect(consumer.selectedDate, date(2026, 10, 4));
-        expect(find.text(texts.selectedDate), findsOneWidget);
       },
     );
   });
@@ -150,7 +148,6 @@ void main() {
           ViewportChanged(week(date(2026, 11, 15))),
         ]);
         expect(consumer.selectedDate, date(2026, 10, 4));
-        expect(find.text(texts.selectedDate), findsOneWidget);
       },
     );
 
@@ -178,7 +175,6 @@ void main() {
           ViewportChanged(month(date(2026, 11, 5))),
         ]);
         expect(consumer.selectedDate, date(2026, 10, 4));
-        expect(find.text(texts.selectedDate), findsOneWidget);
       },
     );
 

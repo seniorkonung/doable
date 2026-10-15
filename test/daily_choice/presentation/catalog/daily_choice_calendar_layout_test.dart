@@ -160,7 +160,7 @@ void main() {
     group('экран 360×780, $language', () {
       testWidgets(
         'свёрнутая неделя показывает семь колонок, числа, подписи дней '
-        'недели, выбранную дату и команды целиком, и всё нажимается',
+        'недели и команды целиком, и всё нажимается',
         (tester) async {
           final consumer = await _pumpOnPhone(
             tester,
@@ -169,12 +169,7 @@ void main() {
           );
           final weeks = weeksFrom(date(2026, 9, 28), 1);
 
-          _expectLaidOut(
-            tester,
-            weeks: weeks,
-            weekdays: _weekdays[language]!,
-            selectedDate: date(2026, 10, 4),
-          );
+          _expectLaidOut(tester, weeks: weeks, weekdays: _weekdays[language]!);
           await _tapEveryDay(tester, consumer, weeks);
           final localizations = _localizations(tester);
           await _tapEveryCommand(tester, consumer, {
@@ -206,7 +201,6 @@ void main() {
               tester,
               weeks: shown.weeks,
               weekdays: _weekdays[language]!,
-              selectedDate: focused,
             );
             await _tapEveryDay(tester, consumer, shown.weeks);
             final localizations = _localizations(tester);
@@ -376,7 +370,6 @@ void _expectLaidOut(
   WidgetTester tester, {
   required List<List<CalendarDate>> weeks,
   required List<String> weekdays,
-  required CalendarDate selectedDate,
 }) {
   expect(visibleWeeks(tester), weeks);
   final isWeek =
@@ -457,7 +450,7 @@ void _expectLaidOut(
       : [for (final label in labels) _rect(tester, label).top]
             .reduce((a, b) => a < b ? a : b);
 
-  // Шапка над подписями: выбранная дата, месяц просмотра и команды.
+  // Шапка над подписями месяца: месяц просмотра и команды.
   final header = Rect.fromLTRB(
     calendar.left,
     calendar.top,
@@ -465,20 +458,6 @@ void _expectLaidOut(
     gridTop,
   );
   final context = tester.element(find.byType(DailyChoiceCalendar));
-  final dates = MaterialLocalizations.of(context);
-  final selected = DateTime.utc(
-    selectedDate.year,
-    selectedDate.month,
-    selectedDate.day,
-  );
-  _expectFullyShown(
-    tester,
-    find.text(
-      AppLocalizations.of(context)
-          .dailyChoiceCalendarSelectedDate(dates.formatFullDate(selected)),
-    ),
-    within: header,
-  );
   final focused = tester
       .widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar))
       .viewport
@@ -517,17 +496,6 @@ void _expectLaidOut(
     expect(rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
   }
 
-  // Других текстов у календаря нет, и ни один не обрезан.
-  final texts = find.descendant(
-    of: find.byType(DailyChoiceCalendar),
-    matching: find.byType(Text),
-  );
-  expect(
-    texts,
-    findsNWidgets(
-      weeks.expand((week) => week).length + weekdays.length + (isWeek ? 1 : 2),
-    ),
-  );
   expect(tester.takeException(), isNull);
 }
 

@@ -23,49 +23,84 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
-  testWidgets('каталог на дату получает только заданный день и не создаёт '
-      'корневой каталог до выбора пункта', (tester) async {
-    final repository = CatalogPageRepository();
-    final clock = ControlledDailyChoiceLocalDate(date(2026, 10, 12));
-    final router = await _start(tester, repository, clock);
-    final selected = date(2026, 10, 7);
+  for (final (locale, weekday, heading, todayLabel, allStates, back) in const [
+    (
+      Locale('ru'),
+      'Среда',
+      '7 октября 2026',
+      'Сегодня',
+      'Все состояния',
+      'Назад',
+    ),
+    (
+      Locale('en'),
+      'Wednesday',
+      '7 October 2026',
+      'Today',
+      'All states',
+      'Back',
+    ),
+  ]) {
+    testWidgets('каталог на дату получает только заданный день и не создаёт '
+        'корневой каталог до выбора пункта (${locale.languageCode})', (
+      tester,
+    ) async {
+      final repository = CatalogPageRepository();
+      final clock = ControlledDailyChoiceLocalDate(date(2026, 10, 6));
+      final router = await _start(tester, repository, clock, locale: locale);
+      final selected = date(2026, 10, 7);
 
-    unawaited(router.push(DailyChoiceDateCatalogRoute(date: selected)));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(repository.queries, hasLength(1));
-    expect(repository.queries.single.date, selected);
-    expect(repository.queries.single.isCompleted, isNull);
-    repository.completeFirst(0, [], total: 0);
-    repository.completeDayStatuses(0, {});
-    await tester.pumpAndSettle();
+      unawaited(router.push(DailyChoiceDateCatalogRoute(date: selected)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(repository.queries, hasLength(1));
+      expect(repository.queries.single.date, selected);
+      expect(repository.queries.single.isCompleted, isNull);
+      repository.completeFirst(0, [], total: 0);
+      repository.completeDayStatuses(0, {});
+      await tester.pumpAndSettle();
 
-    expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
-    expect(
-      find.byType(DailyChoiceCatalogPage, skipOffstage: false),
-      findsNothing,
-    );
-    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-    expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Все состояния'), findsOneWidget);
-    expect(
-      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-      AppDestination.home,
-    );
+      expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
+      expect(
+        find.byType(DailyChoiceCatalogPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      expect(find.text(weekday, findRichText: true), findsOneWidget);
+      expect(find.text(heading), findsOneWidget);
+      expect(find.text(todayLabel), findsNothing);
+      expect(find.text(allStates), findsOneWidget);
+      expect(
+        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+        AppDestination.home,
+      );
 
-    await tester.tap(find.byTooltip('Назад'));
-    await tester.pumpAndSettle();
-    expectHomeRootPage(router);
-    clock.today = date(2026, 10, 13);
-    await openDailyChoices(tester);
-    expect(repository.queries, hasLength(2));
-    expect(repository.queries.last.date, clock.today);
-    repository.completeFirst(1, [], total: 0);
-    repository.completeDayStatuses(1, {});
-    await tester.pumpAndSettle();
-    expect(dayCell(tester, clock.today).isSelected, isTrue);
-    expect(tester.takeException(), isNull);
-  });
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clock.today = selected;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(todayLabel), findsOneWidget);
+      expect(find.text(heading), findsOneWidget);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+      expect(find.text(allStates), findsOneWidget);
+      expect(repository.queries, hasLength(1));
+      expect(repository.dayStatusQueries, hasLength(1));
+
+      await tester.tap(find.byTooltip(back));
+      await tester.pumpAndSettle();
+      expectHomeRootPage(router);
+      clock.today = date(2026, 10, 13);
+      await openDailyChoices(tester);
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries.last.date, clock.today);
+      repository.completeFirst(1, [], total: 0);
+      repository.completeDayStatuses(1, {});
+      await tester.pumpAndSettle();
+      expect(dayCell(tester, clock.today).isSelected, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('два открытия одной даты разделяют фильтр, просмотр, отметки '
       'и порции; возврат из подробностей сохраняет прокрутку', (tester) async {
@@ -258,8 +293,9 @@ Future<void> _back(WidgetTester tester) async {
 Future<AppRouter> _start(
   WidgetTester tester,
   CatalogPageRepository repository,
-  ControlledDailyChoiceLocalDate clock,
-) async {
+  ControlledDailyChoiceLocalDate clock, {
+  Locale locale = const Locale('ru'),
+}) async {
   final router = AppRouter();
   addTearDown(router.dispose);
   await tester.pumpWidget(
@@ -272,7 +308,7 @@ Future<AppRouter> _start(
       retry: (count, error) => null,
       child: MaterialApp.router(
         theme: doableTheme(Brightness.light),
-        locale: const Locale('ru'),
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(),

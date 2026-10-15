@@ -40,8 +40,8 @@ import 'daily_choice_calendar_viewport.dart';
 /// потребителем отражаются без обратных событий.
 ///
 /// Шапка только месячного представления называет месяц и год даты просмотра;
-/// у недели шапки и команд соседней недели нет. Отдельная подпись называет полную
-/// выбранную дату, даже если её нет в видимом периоде.
+/// у недели шапки и команд соседней недели нет. Полную выбранную дату называет
+/// потребитель за пределами календаря, даже если её нет в видимом периоде.
 /// [dayStatusForDate] задаёт галочку для всех выполненных дневных выборов,
 /// кружок для невыполненного или отсутствие отметки. В неделе отметка стоит
 /// под подписью дня недели внутри ячейки. Место под отметку резервируется всегда.
@@ -130,16 +130,6 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            localizations.dailyChoiceCalendarSelectedDate(
-              MaterialLocalizations.of(context)
-                  .formatFullDate(_technicalDate(widget.selectedDate)),
-            ),
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-        ),
         if (isExpanded)
           CalendarHeader(
             title: _monthTitle(context, viewport.focusedDate),

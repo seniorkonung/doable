@@ -1,9 +1,11 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/day_heading.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar.dart';
@@ -43,12 +45,12 @@ final class _DailyChoiceCatalogBodyState
   /// Изолирует смещение прокрутки от других экземпляров каталога.
   final _pageStorage = PageStorageBucket();
 
-  /// Текущий местный день, отмеченный в календаре.
+  /// Текущий местный день, отмеченный в календаре и заголовке дня.
   ///
   /// Тело перечитывает его при создании, возвращении приложения в
   /// активное состояние и наступлении следующей местной даты. Новый день
-  /// только перестраивает календарь: выбранная дата, просмотр, фильтры и
-  /// выдача остаются прежними.
+  /// только перестраивает календарь и заголовок: выбранная дата, просмотр,
+  /// фильтры и выдача остаются прежними.
   late final DailyChoiceLocalDayObserver _localDay;
 
   @override
@@ -76,6 +78,14 @@ final class _DailyChoiceCatalogBodyState
     final provider = dailyChoiceCatalogViewModelProvider(widget.instance);
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
+    final selectedDate = state.selection.date;
+    final date = DateTime.utc(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+    );
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final weekday = DateFormat.EEEE(locale).format(date);
     final dayMarks = ref.watch(
       dailyChoiceCalendarDayMarksViewModelProvider(widget.instance),
     );
@@ -104,6 +114,20 @@ final class _DailyChoiceCatalogBodyState
                   hasDayMarksReadFailure: dayMarks.hasReadFailure,
                   onDateSelected: (date) => _selectDate(model, date),
                   onViewportChanged: _setViewport,
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: DayHeading(
+                  weekday: weekday[0].toUpperCase() + weekday.substring(1),
+                  // Явный формат сохраняет порядок и не добавляет «г.»:
+                  // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+                  date: DateFormat('d MMMM y', locale).format(date),
+                  todayLabel: selectedDate == _localDay.today
+                      ? l10n.dailyChoiceCalendarToday
+                      : null,
                 ),
               ),
             ),

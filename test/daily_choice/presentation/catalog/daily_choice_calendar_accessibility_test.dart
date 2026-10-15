@@ -15,7 +15,6 @@ import 'daily_choice_calendar_test_support.dart';
 final _localizedTexts = [
   (
     locale: const Locale('ru'),
-    selectedDate: 'Выбранная дата: воскресенье, 4 октября 2026 г.',
     october: 'Октябрь 2026',
     todayOctober4: 'воскресенье, 4 октября 2026 г., Сегодня',
     october5: 'понедельник, 5 октября 2026 г.',
@@ -33,7 +32,6 @@ final _localizedTexts = [
   ),
   (
     locale: const Locale('en'),
-    selectedDate: 'Selected date: Sunday, October 4, 2026',
     october: 'October 2026',
     todayOctober4: 'Sunday, October 4, 2026, Today',
     october5: 'Monday, October 5, 2026',
@@ -71,7 +69,6 @@ void main() {
 
           final days = weeksFrom(date(2026, 9, 28), 6).expand((row) => row);
           expect(_announced(tester), [
-            texts.selectedDate,
             texts.previousMonth,
             texts.october,
             texts.nextMonth,
@@ -334,7 +331,6 @@ void main() {
     );
 
     expect(_announced(tester), [
-      'Selected date: Monday, October 5, 2026',
       for (final day in weeksFrom(date(2026, 9, 28), 1).single)
         _dayLabel(tester, day, isToday: day == date(2026, 10, 4)),
       english.expand,

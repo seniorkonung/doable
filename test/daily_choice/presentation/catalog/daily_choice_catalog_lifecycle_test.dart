@@ -24,6 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
@@ -69,6 +70,7 @@ void main() {
     _catalogScroll(tester).jumpTo(300);
     await tester.pump();
 
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsOneWidget);
     final catalog = _catalogState(tester);
     expect(catalog, isA<DailyChoiceCatalogLoaded>());
     expect(catalog.selection.isCompleted, false);
@@ -85,6 +87,7 @@ void main() {
     expect(_todayMarker(tester, date(2026, 10, 6)), findsNothing);
     // Новый сегодняшний день не выбирается сам: выбор, охват, просмотр,
     // загруженная выдача и прокрутка остаются прежними, чтений нет.
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsNothing);
     _expectSelected(tester, date(2026, 10, 6));
     expect(visibleWeeks(tester), shownWeeks);
     _expectCatalogUnchanged(tester, catalog);
@@ -174,6 +177,8 @@ void main() {
     final catalog = _catalogState(tester);
     final weeks = visibleWeeks(tester);
 
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsOneWidget);
+
     // Приостановленный процесс не выполняет таймеры, а часы устройства идут:
     // процесс возвращается 9 октября в 11:00.
     _sendToBackground(tester);
@@ -181,6 +186,7 @@ void main() {
     _returnToForeground(tester);
     await tester.pump();
     expect(_todayMarker(tester, date(2026, 10, 9)), findsOneWidget);
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsNothing);
     _expectSelected(tester, date(2026, 10, 6));
     expect(visibleWeeks(tester), weeks);
     _expectCatalogUnchanged(tester, catalog);
@@ -376,9 +382,14 @@ Finder _todayMarker(WidgetTester tester, CalendarDate value) =>
       '${_fullDate(tester, value)}, ${_l10n.dailyChoiceCalendarToday}',
     );
 
-/// Шапка календаря называет выбранной дату [value].
+/// Заголовок дня называет выбранную дату [value].
 void _expectSelected(WidgetTester tester, CalendarDate value) => expect(
-  find.text(_l10n.dailyChoiceCalendarSelectedDate(_fullDate(tester, value))),
+  find.text(
+    DateFormat(
+      'd MMMM y',
+      'ru',
+    ).format(DateTime.utc(value.year, value.month, value.day)),
+  ),
   findsOneWidget,
 );
 

@@ -4,9 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 
-/// Подпись выбранной 2026-10-04. Русские даты Flutter форматирует с узким
-/// неразрывным пробелом перед «г.».
-const _selectedOctober4 = 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.';
 const _november = 'Ноябрь 2026';
 
 double _calendarHeight(WidgetTester tester) =>
@@ -75,7 +72,6 @@ void main() {
         ViewportChanged(month(date(2026, 11, 1))),
       ]);
       expect(consumer.selectedDate, date(2026, 10, 4));
-      expect(find.text(_selectedOctober4), findsOneWidget);
     });
   });
 

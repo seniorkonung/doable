@@ -40,7 +40,7 @@ void main() {
       ),
       findsNothing,
     );
-    expect(find.textContaining('вторник, 6 октября 2026'), findsOneWidget);
+    expect(find.text('6 октября 2026'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
     expect(find.text('Повторить'), findsNothing);
@@ -66,7 +66,7 @@ void main() {
     ], total: 1);
     repository.failDayStatuses(1);
     await tester.pumpAndSettle();
-    expect(find.textContaining('среда, 7 октября 2026'), findsOneWidget);
+    expect(find.text('7 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
@@ -93,7 +93,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Отметки дней не загружены.'), findsNothing);
-    expect(find.textContaining('среда, 7 октября 2026'), findsOneWidget);
+    expect(find.text('7 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
@@ -143,7 +143,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
-    expect(find.textContaining('вторник, 6 октября 2026'), findsOneWidget);
+    expect(find.text('6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
@@ -161,7 +161,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
-    expect(find.textContaining('вторник, 6 октября 2026'), findsOneWidget);
+    expect(find.text('6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
@@ -241,7 +241,7 @@ void main() {
 
     final gesture = await _beginNextPeriod(tester);
     _expectVisibleMark(tester, nextTuesday, DailyChoiceDayStatus.hasIncomplete);
-    expect(find.textContaining('Выбранная дата:'), findsOneWidget);
+    expect(find.text('6 октября 2026'), findsOneWidget);
     await gesture.up();
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
@@ -260,7 +260,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Collapse calendar'));
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
-    expect(find.textContaining('Tuesday, October 6, 2026'), findsOneWidget);
+    expect(find.text('6 October 2026'), findsOneWidget);
     expect(repository.queries, hasLength(1));
     expect(repository.dayStatusQueries, hasLength(1));
   });
@@ -396,7 +396,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     _expectVisibleMark(tester, decemberDay, DailyChoiceDayStatus.hasIncomplete);
-    expect(find.textContaining('вторник, 6 октября 2026'), findsOneWidget);
+    expect(find.text('6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);

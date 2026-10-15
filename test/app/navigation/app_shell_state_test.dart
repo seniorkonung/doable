@@ -1073,7 +1073,8 @@ Map<String, Object?> _languageIndependent(Map<String, Object?> view) =>
 /// выполнения и количество.
 final _catalogLabels = {
   Locale('ru'): [
-    'Выбранная дата: пятница, 25 сентября 2026\u202Fг.',
+    'Пятница',
+    '25 сентября 2026',
     'Август 2026',
     'Пн',
     'Вс',
@@ -1081,7 +1082,8 @@ final _catalogLabels = {
     'Всего дневных выборов: 120',
   ],
   Locale('en'): [
-    'Selected date: Friday, September 25, 2026',
+    'Friday',
+    '25 September 2026',
     'August 2026',
     'Mon',
     'Sun',

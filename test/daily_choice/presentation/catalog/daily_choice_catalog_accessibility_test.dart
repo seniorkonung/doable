@@ -17,17 +17,20 @@ const _phone = Size(360, 780);
 /// Локальное сегодня проверок — воскресенье, последний день своей недели.
 final _today = date(2026, 10, 4);
 
-/// Полные даты, которые экранный диктор читает на каждом языке. Русские даты
-/// Flutter форматирует с узким неразрывным пробелом перед «г.».
+/// Доступные названия заголовка дня и дней календаря на обоих языках.
 final _texts = [
   (
     locale: const Locale('ru'),
-    selectedToday: 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.',
+    selectedToday: '4 октября 2026',
+    weekday: 'Воскресенье',
+    badge: 'Сегодня',
     today: 'воскресенье, 4 октября 2026\u202Fг., Сегодня',
   ),
   (
     locale: const Locale('en'),
-    selectedToday: 'Selected date: Sunday, October 4, 2026',
+    selectedToday: '4 October 2026',
+    weekday: 'Sunday',
+    badge: 'Today',
     today: 'Sunday, October 4, 2026, Today',
   ),
 ];
@@ -37,7 +40,7 @@ void main() {
     final language = texts.locale.languageCode;
 
     group('экранный диктор на странице каталога ($language)', () {
-      testWidgets('читает шапку календаря, дни недели, фильтры, количество, '
+      testWidgets('читает дни календаря, заголовок дня, фильтры, количество, '
           'строки и подгрузку по порядку, затем общую панель, '
           'без отдельных чисел дней', (tester) async {
         final semantics = tester.ensureSemantics();
@@ -60,10 +63,11 @@ void main() {
 
         final page = [
           l10n.appDestinationDailyChoices,
-          texts.selectedToday,
           for (final day in weeksFrom(date(2026, 9, 28), 1).single)
             day == _today ? texts.today : _fullDate(tester, day),
           l10n.dailyChoiceCalendarExpand,
+          '${texts.weekday}\n${texts.badge}',
+          texts.selectedToday,
           _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
           l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(3),
@@ -79,6 +83,15 @@ void main() {
           startsWith(l10n.appDestinationIntentionGraph),
           '${l10n.quickCreationLabel}, ${l10n.quickCreationModeIntention}',
         ]);
+        expect(
+          find.semantics
+              .byLabel(texts.selectedToday)
+              .evaluate()
+              .single
+              .flagsCollection
+              .isHeader,
+          isTrue,
+        );
         _expectEveryActionNamed(tester);
         semantics.dispose();
       });
@@ -107,7 +120,7 @@ void main() {
 
         repository.failUnavailable(0);
         await tester.pumpAndSettle();
-        expect(_afterCalendar(tester), [
+        expect(_afterDayHeading(tester), [
           ...filters,
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
@@ -127,7 +140,7 @@ void main() {
           cursor: const CatalogPageCursor(),
         );
         await tester.pumpAndSettle();
-        expect(_afterCalendar(tester), [
+        expect(_afterDayHeading(tester), [
           ...filters,
           l10n.dailyChoiceCatalogTotalCount(2),
           _rowLabel(l10n, 1),
@@ -144,7 +157,7 @@ void main() {
         repository.failUnavailable(2);
         await tester.pumpAndSettle();
         // Отказ подгрузки читается после загруженной строки.
-        expect(_afterCalendar(tester), [
+        expect(_afterDayHeading(tester), [
           ...filters,
           l10n.dailyChoiceCatalogTotalCount(2),
           _rowLabel(l10n, 1),
@@ -160,7 +173,7 @@ void main() {
         expect(repository.queries[3].cursor, isA<CatalogPageCursor>());
         repository.completeMore(3, [catalogPageItem(2, date: _today)]);
         await tester.pumpAndSettle();
-        expect(_afterCalendar(tester), [
+        expect(_afterDayHeading(tester), [
           ...filters,
           l10n.dailyChoiceCatalogTotalCount(2),
           _rowLabel(l10n, 1),
@@ -179,7 +192,7 @@ void main() {
         expect(repository.queries[4].cursor, isNull);
         repository.completeFirst(4, [], total: 0);
         await tester.pumpAndSettle();
-        expect(_afterCalendar(tester), [
+        expect(_afterDayHeading(tester), [
           _completionFilter(l10n, l10n.dailyChoiceCatalogIncomplete),
           l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(0),
@@ -221,10 +234,11 @@ void main() {
         // Системный размер текста доходит до календаря без ограничения.
 
         final page = [
-          texts.selectedToday,
           for (final day in weeksFrom(date(2026, 9, 28), 1).single)
             day == _today ? texts.today : _fullDate(tester, day),
           l10n.dailyChoiceCalendarExpand,
+          '${texts.weekday}\n${texts.badge}',
+          texts.selectedToday,
           _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
           l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(3),
@@ -247,7 +261,7 @@ void main() {
           await tester.pumpAndSettle();
         }
 
-        final start = visited.indexOf(texts.selectedToday);
+        final start = visited.indexOf(page.first);
         final end = visited.indexOf(l10n.dailyChoiceCatalogLoadMore);
         expect(start, isNonNegative);
         expect(end, greaterThan(start));
@@ -298,21 +312,16 @@ List<String> _announcedInScroll(WidgetTester tester) {
   ];
 }
 
-/// Названия после ручки календаря: фильтры, выдача и сообщения,
+/// Названия после заголовка дня: фильтры, выдача и сообщения,
 /// без панели основной навигации.
-List<String> _afterCalendar(WidgetTester tester) {
+List<String> _afterDayHeading(WidgetTester tester) {
   final nodes = tester.semantics.simulatedAccessibilityTraversal().toList();
-  final texts = _l10n(tester);
-  final handle = nodes.lastIndexWhere(
-    (node) =>
-        node.label == texts.dailyChoiceCalendarExpand ||
-        node.label == texts.dailyChoiceCalendarCollapse,
-  );
+  final heading = nodes.lastIndexWhere((node) => node.flagsCollection.isHeader);
   final navigation = nodes.indexWhere(
     (node) => node.getSemanticsData().role == SemanticsRole.tab,
   );
   return [
-    for (final node in nodes.sublist(handle + 1, navigation)) ?_name(node),
+    for (final node in nodes.sublist(heading + 1, navigation)) ?_name(node),
   ];
 }
 

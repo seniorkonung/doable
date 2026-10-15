@@ -320,7 +320,10 @@ void main() {
         await _select(tester, AppDestination.dailyChoices);
         await _until(
           tester,
-          find.text(l10n.dailyChoiceCatalogTotalCount(count)),
+          find.text(
+            l10n.dailyChoiceCatalogTotalCount(count),
+            skipOffstage: false,
+          ),
         );
         final page = find.byType(DailyChoiceCatalogPage);
 
@@ -385,7 +388,10 @@ void main() {
         await _select(tester, AppDestination.dailyChoices);
         await _until(
           tester,
-          find.text(l10n.dailyChoiceCatalogTotalCount(count)),
+          find.text(
+            l10n.dailyChoiceCatalogTotalCount(count),
+            skipOffstage: false,
+          ),
         );
         final page = find.byType(DailyChoiceCatalogPage);
         if (insets.keyboard > 0) {
