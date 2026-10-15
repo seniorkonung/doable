@@ -2,11 +2,12 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 
 /// Состояния панели основной навигации — [AppNavigationBar] приложения:
-/// по одному на каждый выбранный пункт в раскладке обычной страницы.
+/// Каждый выбранный пункт в раскладке обычной страницы с выбором режима.
 List<WidgetbookUseCase> appNavigationBarUseCases() => [
   for (final destination in AppDestination.values)
     WidgetbookUseCase(
@@ -22,7 +23,12 @@ List<WidgetbookUseCase> appNavigationBarUseCases() => [
         ),
         bottomNavigationBar: AppNavigationBar(
           selected: destination,
-          quickCreationMode: QuickCreationMode.intention,
+          // https://docs.widgetbook.io/knobs/object/dropdown
+          quickCreationMode: context.knobs.object.dropdown(
+            label: 'Режим быстрого создания',
+            options: QuickCreationMode.values,
+            labelBuilder: (mode) => mode.title(AppLocalizations.of(context)),
+          ),
           onQuickCreate: () {},
           onChangeQuickCreationMode: () {},
           onSelected: (_) {},

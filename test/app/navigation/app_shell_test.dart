@@ -1,6 +1,7 @@
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
@@ -36,9 +37,9 @@ void main() {
     expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
     expect(find.byType(HomePage), findsNothing);
     expect(_selected(tester), AppDestination.dailyChoices);
-    await openQuickCreation(
+    await openDailyChoiceQuickCreation(
       tester,
-      QuickCreationMode.dailyChoiceFromAction,
+      ChoicePathDraftDirection.bottomUp,
       openedPage: find.byType(DailyChoiceActionPickerPage),
     );
     await tester.binding.handlePopRoute();

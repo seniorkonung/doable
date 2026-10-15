@@ -12,13 +12,13 @@ import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
-import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -47,9 +47,12 @@ void main() {
   });
   tearDown(() => directory.delete(recursive: true));
 
-  // Соответствие ключа режиму одинаково для всех режимов, а запуск каждого
-  // режима проверяет тест запускателя.
-  for (final mode in <QuickCreationMode?>[null, QuickCreationMode.relation]) {
+  // Новый ключ дневного выбора восстанавливает режим с листом выбора начала.
+  for (final mode in <QuickCreationMode?>[
+    null,
+    QuickCreationMode.relation,
+    QuickCreationMode.dailyChoice,
+  ]) {
     final title =
         mode?.title(lookupAppLocalizations(const Locale('ru'))) ??
         'Первый запуск';
@@ -115,9 +118,9 @@ void main() {
         'показывают последний выбор; свежий runtime получает последний успех', (
       tester,
     ) async {
-      const initial = QuickCreationMode.dailyChoiceFromIntention;
+      const initial = QuickCreationMode.intention;
       const a = QuickCreationMode.relation;
-      const b = QuickCreationMode.dailyChoiceFromAction;
+      const b = QuickCreationMode.dailyChoice;
       await tester.runAsync(() => store().save(initial));
       final modes = [a, b, if (outcomes.length == 3) a];
       final attempts = [
@@ -165,11 +168,14 @@ void main() {
         tester.element(find.byType(BottomSheet)),
       );
       final selected = find.widgetWithText(
-        ListTile,
+        OptionRow,
         modes.last.title(localizations),
       );
       expect(
-        find.descendant(of: selected, matching: find.byIcon(Icons.check)),
+        find.descendant(
+          of: selected,
+          matching: find.byIcon(Icons.check_outlined),
+        ),
         findsOneWidget,
       );
 
@@ -193,7 +199,10 @@ void main() {
         );
         _expectVisiblePanel(tester, modes.last);
         expect(
-          find.descendant(of: selected, matching: find.byIcon(Icons.check)),
+          find.descendant(
+            of: selected,
+            matching: find.byIcon(Icons.check_outlined),
+          ),
           findsOneWidget,
         );
         expect(find.byType(SnackBar), findsNothing);
@@ -313,7 +322,7 @@ Future<void> _choose(WidgetTester tester, QuickCreationMode mode) async {
     tester.element(find.byType(QuickCreationButton)),
   );
   await _openMenu(tester);
-  await tester.tap(find.widgetWithText(ListTile, mode.title(localizations)));
+  await tester.tap(find.widgetWithText(OptionRow, mode.title(localizations)));
   await tester.pumpAndSettle();
   expect(find.byType(BottomSheet), findsNothing);
   expect(
@@ -353,8 +362,7 @@ Future<void> _expectLaunch(
     find.byType(switch (mode) {
       QuickCreationMode.intention => IntentionEditorPage,
       QuickCreationMode.relation => RelationEditorPage,
-      QuickCreationMode.dailyChoiceFromIntention => DailyChoiceSourcePickerPage,
-      QuickCreationMode.dailyChoiceFromAction => DailyChoiceActionPickerPage,
+      QuickCreationMode.dailyChoice => QuickCreationDailyChoiceStartSheet,
     }),
     findsOneWidget,
   );

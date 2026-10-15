@@ -316,9 +316,9 @@ void _registerPageMatrixTests() {
               wait: _until,
             );
           case _MatrixEntry.action:
-            await openQuickCreation(
+            await openDailyChoiceQuickCreation(
               tester,
-              QuickCreationMode.dailyChoiceFromAction,
+              ChoicePathDraftDirection.bottomUp,
               openedPage: find.byType(DailyChoiceActionPickerPage),
               wait: _until,
             );

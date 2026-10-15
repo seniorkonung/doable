@@ -1,8 +1,11 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -36,7 +39,7 @@ Future<void> openQuickCreation(
 
   await tester.longPress(button);
   await tester.pumpAndSettle();
-  final option = find.widgetWithText(ListTile, mode.title(localizations));
+  final option = find.widgetWithText(OptionRow, mode.title(localizations));
   // При строке выше области прокрутки центр остаётся целью обычного нажатия.
   await Scrollable.ensureVisible(tester.element(option), alignment: 0.5);
   await tester.pumpAndSettle();
@@ -63,5 +66,52 @@ Future<void> openQuickCreation(
   await tester.pump();
   if (wait != null) await wait(tester, openedPage);
   await tester.pumpAndSettle();
+  expect(openedPage, findsOneWidget);
+}
+
+/// Запускает общий режим, затем явно выбирает направление дневного выбора.
+Future<void> openDailyChoiceQuickCreation(
+  WidgetTester tester,
+  ChoicePathDraftDirection direction, {
+  required Finder openedPage,
+  Future<void> Function(WidgetTester tester, Finder button)? activate,
+  QuickCreationWait? wait,
+}) async {
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.dailyChoice,
+    openedPage: find.byType(QuickCreationDailyChoiceStartSheet),
+    activate: activate,
+  );
+  await chooseQuickCreationDailyChoiceStart(
+    tester,
+    direction,
+    openedPage: openedPage,
+    wait: wait,
+  );
+}
+
+/// Продолжает уже открытый лист и проверяет его исчезновение перед поиском.
+Future<void> chooseQuickCreationDailyChoiceStart(
+  WidgetTester tester,
+  ChoicePathDraftDirection direction, {
+  required Finder openedPage,
+  QuickCreationWait? wait,
+}) async {
+  final sheet = find.byType(QuickCreationDailyChoiceStartSheet);
+  expect(sheet, findsOneWidget);
+  final localizations = AppLocalizations.of(tester.element(sheet));
+  await tester.tap(
+    find.text(switch (direction) {
+      ChoicePathDraftDirection.topDown =>
+        localizations.quickCreationDailyChoiceFromIntention,
+      ChoicePathDraftDirection.bottomUp =>
+        localizations.quickCreationDailyChoiceFromAction,
+    }),
+  );
+  await tester.pump();
+  if (wait != null) await wait(tester, openedPage);
+  await tester.pumpAndSettle();
+  expect(sheet, findsNothing);
   expect(openedPage, findsOneWidget);
 }

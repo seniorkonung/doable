@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
@@ -32,13 +31,14 @@ void main() {
     (tester) async {
       final router = await _openApp(tester);
       final history = router.stackData.map((route) => route.matchId).toList();
-      await openQuickCreation(
+      await openDailyChoiceQuickCreation(
         tester,
-        QuickCreationMode.dailyChoiceFromAction,
+        ChoicePathDraftDirection.bottomUp,
         openedPage: find.byType(DailyChoiceActionPickerPage),
         activate: (tester, button) async {
-          await tester.tap(button);
-          await tester.tap(button);
+          final position = tester.getCenter(button);
+          await tester.tapAt(position);
+          await tester.tapAt(position);
         },
       );
       expect(router.stackData, hasLength(history.length + 1));

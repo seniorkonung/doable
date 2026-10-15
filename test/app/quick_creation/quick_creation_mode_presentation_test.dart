@@ -10,20 +10,18 @@ void main() {
     'Быстрое создание',
     'Новое намерение',
     'Новая связь',
-    'Дневной выбор от намерения',
-    'Дневной выбор от действия',
+    'Новый дневной выбор',
     'Сменить режим',
-    'Режим быстрого создания',
+    'Что создаёт кнопка',
     'Нажмите и удерживайте, чтобы сменить режим',
   ];
   const englishMessages = [
     'Quick create',
     'New intention',
     'New relation',
-    'Daily choice from an intention',
-    'Daily choice from an action',
+    'New daily choice',
     'Change mode',
-    'Quick creation mode',
+    'What the button creates',
     'Touch and hold to change mode',
   ];
 
