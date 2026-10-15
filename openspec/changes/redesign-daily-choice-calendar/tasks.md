@@ -284,7 +284,7 @@
   - **Files likely touched:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayHostActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`
   - **Estimated scope:** M
 
-- [ ] 2.16 Регрессионная проверка на Android подтверждает полноэкранный перенос в телефонную категорию с сохранением сессии
+- [x] 2.16 Регрессионная проверка на Android подтверждает полноэкранный перенос в телефонную категорию с сохранением сессии
   - **Acceptance criteria:**
     - Автоматизированный сценарий на API 36 устанавливает обычный Split screen приложения и Settings на полном дисплее 600×900 dp, затем меняет полный дисплей на 390×844 dp без перезапуска процесса. Исходный multi-window подтверждается наблюдением; отсутствие этого предусловия завершает проверку неуспехом. Обходные настройки принудительной многооконности не включаются.
     - Проверка наблюдает PhoneActivity в task режима fullscreen, отсутствие multi-window, портретную ориентацию и полное окно с учётом системных отступов; открытый экран и состояние каталога сохраняются, повторный launcher возвращает ту же сессию с одной карточкой приложения. Сценарий обнаруживает дефект механизма общей affinity и проходит с исправлением 2.15; фиксация Intent-флагов или task ID не подменяет результат. Изменённые параметры эмулятора восстанавливаются после проверки.
