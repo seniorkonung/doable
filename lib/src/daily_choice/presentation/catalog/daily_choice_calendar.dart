@@ -12,6 +12,7 @@ import '../../../design_system/components/notice.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
+import 'daily_choice_calendar_paging.dart';
 import 'daily_choice_calendar_period_picker.dart';
 import 'daily_choice_calendar_viewport.dart';
 
@@ -213,8 +214,8 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
                 dowHeight: _weekdayHeight(context, columnWidth: columnWidth),
                 dowBuilder: _buildWeekday,
                 dayBuilder: _buildDay,
-                pageAnimationDuration: _pageAnimationDuration,
-                pageAnimationCurve: _pageAnimationCurve,
+                pageAnimationDuration: calendarPageAnimationDuration,
+                pageAnimationCurve: calendarPageAnimationCurve,
                 onCalendarCreated: (pages) => _pages = pages,
                 onPageChanged: _reportFocusedDay,
               );
@@ -243,15 +244,15 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   // О смене страницы, как и после свайпа, сообщает _reportFocusedDay.
   void _showPreviousPeriod() => unawaited(
     _pages.previousPage(
-      duration: _pageAnimationDuration,
-      curve: _pageAnimationCurve,
+      duration: calendarPageAnimationDuration,
+      curve: calendarPageAnimationCurve,
     ),
   );
 
   void _showNextPeriod() => unawaited(
     _pages.nextPage(
-      duration: _pageAnimationDuration,
-      curve: _pageAnimationCurve,
+      duration: calendarPageAnimationDuration,
+      curve: calendarPageAnimationCurve,
     ),
   );
 
@@ -402,10 +403,6 @@ double _weekdayHeight(BuildContext context, {required double columnWidth}) {
     columnWidth: columnWidth,
   );
 }
-
-/// Переход к соседнему периоду: общий для свайпа и кнопок шапки.
-const _pageAnimationDuration = Duration(milliseconds: 300);
-const _pageAnimationCurve = Curves.easeOut;
 
 /// Библиотека вычисляет периоды над `DateTime` в UTC. Это нейтральное
 /// представление календарных частей, а не часовой пояс даты дневного выбора.
