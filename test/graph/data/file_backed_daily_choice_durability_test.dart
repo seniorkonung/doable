@@ -17,7 +17,7 @@ import '../../support/local_database_harness.dart';
 
 void main() {
   test(
-    'полное повторное открытие сохраняет выборы, шаги и зависимости',
+    'повторное открытие сохраняет создание, замену пути и независимые правки',
     () async {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
@@ -74,7 +74,7 @@ void main() {
         null,
         durabilityUuid(303),
       ]);
-      final repository = durabilityRepository(database);
+      final repository = durabilityRepository(database, firstStepNumber: 401);
       for (final number in [201, 202]) {
         final result = await repository.getDailyChoice(
           durabilityChoice(number),
@@ -106,12 +106,76 @@ void main() {
       expect(await _sourceChoiceCount(repository), 2);
       await _expectIntegrity(database);
 
+      for (final (command, expectedSchedule, expectedPriority) in [
+        (
+          ReplaceDailyChoicePath(
+            choiceId: durabilityChoice(201),
+            sourceIntentionId: durabilityIntention(1),
+            selectedIntentionId: durabilityIntention(4),
+            path: durabilityPath([103]),
+          ),
+          schedule,
+          DailyChoicePriority.p2,
+        ),
+        (
+          UpdateDailyChoiceFields(
+            choiceId: durabilityChoice(201),
+            patch: const DailyChoiceFieldsPatch(
+              priority: DailyChoiceFieldSet(DailyChoicePriority.p1),
+            ),
+          ),
+          schedule,
+          DailyChoicePriority.p1,
+        ),
+        (
+          UpdateDailyChoiceFields(
+            choiceId: durabilityChoice(201),
+            patch: const DailyChoiceFieldsPatch(
+              schedule: DailyChoiceFieldSet(DailyChoiceAllDay()),
+            ),
+          ),
+          const DailyChoiceAllDay(),
+          DailyChoicePriority.p1,
+        ),
+      ]) {
+        expect(await repository.execute(command), isA<GraphCommandSucceeded>());
+        final result = await repository.getDailyChoice(durabilityChoice(201));
+        final details = (result as DailyChoiceReadSuccess).value.value!;
+        expect(details.choice.schedule, expectedSchedule);
+        expect(details.choice.priority, expectedPriority);
+        expect(details.choice.id, durabilityChoice(201));
+        expect(details.choice.date, durabilityChoiceDate);
+        expect(details.choice.description!.value, '  Выбор\nдня  ');
+        expect(details.choice.isCompleted, isTrue);
+        expect(details.choice.sourceIntentionId, durabilityIntention(1));
+        expect(details.choice.selectedIntentionId, durabilityIntention(4));
+        expect(details.path.map((step) => step.relation.id), [
+          durabilityRelation(103),
+        ]);
+      }
+
       expect(
         await repository.execute(DeleteDailyChoice(durabilityChoice(202))),
         isA<GraphCommandSucceeded>(),
       );
+      final edited = await durabilityState(database);
       await harness.closePersistenceObjectGraph();
       database = await harness.openReadyDatabase();
+      expect(await durabilityState(database), edited);
+      final reopened = await durabilityRepository(database)
+          .getDailyChoice(durabilityChoice(201));
+      final details = (reopened as DailyChoiceReadSuccess).value.value!;
+      expect(details.choice.id, durabilityChoice(201));
+      expect(details.choice.date, durabilityChoiceDate);
+      expect(details.choice.description!.value, '  Выбор\nдня  ');
+      expect(details.choice.isCompleted, isTrue);
+      expect(details.choice.schedule, const DailyChoiceAllDay());
+      expect(details.choice.priority, DailyChoicePriority.p1);
+      expect(details.choice.sourceIntentionId, durabilityIntention(1));
+      expect(details.choice.selectedIntentionId, durabilityIntention(4));
+      expect(details.path.map((step) => step.relation.id), [
+        durabilityRelation(103),
+      ]);
       expect(
         await durabilityRepository(
           database,

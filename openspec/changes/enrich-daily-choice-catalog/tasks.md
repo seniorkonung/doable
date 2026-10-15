@@ -76,7 +76,7 @@
   - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `test/graph/data/drift_daily_choice_update_test.dart`, `test/graph/data/drift_daily_choice_replace_test.dart`, `test/graph/data/drift_daily_choice_watch_test.dart`, `test/graph/data/drift_daily_choice_concurrency_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.8 Подтвердить сквозной контракт хранения до подключения форм
+- [x] 1.8 Подтвердить сквозной контракт хранения до подключения форм
   - **Acceptance criteria:**
     - Через прикладную границу можно создать выбор на 18:00/P2, прочитать его, заменить путь, изменить только приоритет, установить весь день и снова открыть хранилище без потери независимых данных.
     - Чтения существующих потребителей и подтверждённые результаты согласованы с расширенной моделью; границы транзакций, порций и классификации отказов сохранены.
