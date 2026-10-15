@@ -20,6 +20,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
@@ -34,6 +35,31 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
 
 void main() {
+  testWidgets('корневой каталог оставляет над календарём только безопасный '
+      'отступ и меняет строку состояния вместе с темой', (tester) async {
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 48);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    final repository = _Repository();
+    await _open(tester, repository, size: const Size(390, 844));
+    repository.completeFirst([], total: 0);
+    await tester.pumpAndSettle();
+
+    final calendar = find.byType(DailyChoiceCalendar);
+    expect(tester.getTopLeft(calendar).dy, greaterThanOrEqualTo(24));
+    expect(tester.getTopLeft(calendar).dy, lessThan(24 + kToolbarHeight));
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.dark);
+    expect(SystemChrome.latestStyle?.statusBarBrightness, Brightness.light);
+
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    await tester.pumpAndSettle();
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.light);
+    expect(SystemChrome.latestStyle?.statusBarBrightness, Brightness.dark);
+    expect(tester.getTopLeft(calendar).dy, greaterThanOrEqualTo(24));
+    expect(repository.queries, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
   // Режим и язык независимы: диагональ покрывает оба режима и оба языка.
   for (final (locale, mode, route, cancelKey, name) in const [
     (
@@ -734,6 +760,7 @@ Future<AppRouter> _open(
       retry: (count, error) => null,
       child: MaterialApp.router(
         theme: doableTheme(Brightness.light),
+        darkTheme: doableTheme(Brightness.dark),
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

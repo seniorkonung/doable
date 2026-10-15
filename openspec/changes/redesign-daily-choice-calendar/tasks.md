@@ -195,7 +195,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/support/daily_choice_catalog_controls.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.9 Корневой каталог открывается без AppBar и сохраняет стиль строки состояния по теме
+- [x] 2.9 Корневой каталог открывается без AppBar и сохраняет стиль строки состояния по теме
   - **Acceptance criteria:**
     - DailyChoiceCatalogPage сохраняет собственный Scaffold без AppBar, верхний безопасный отступ и AnnotatedRegion<SystemUiOverlayStyle> по яркости темы. Каталог на заданную дату сохраняет прежние AppBar, заголовок и кнопку «назад» (ADR-0020).
     - Проверки навигации распознают открытый каталог по его содержимому; название «Дневные выборы» / Daily choices остаётся у пункта навигации для экранного диктора и в подсказке по долгому нажатию. Главная и каталог намерений сохраняют заголовки.

@@ -62,6 +62,13 @@ void main() {
 
       expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
       expect(
+        find.widgetWithText(
+          AppBar,
+          lookupAppLocalizations(locale).appDestinationDailyChoices,
+        ),
+        findsOneWidget,
+      );
+      expect(
         find.byType(DailyChoiceCatalogPage, skipOffstage: false),
         findsNothing,
       );

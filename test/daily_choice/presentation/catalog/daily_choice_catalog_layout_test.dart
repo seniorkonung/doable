@@ -440,12 +440,14 @@ String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
   ).format(DateTime.utc(value.year, value.month, value.day));
 }
 
-/// Видимая часть страницы: под шапкой и над панелью основной навигации.
+/// Видимая часть страницы: под строкой состояния и над основной навигацией.
 Rect _visibleArea(WidgetTester tester) {
-  final appBar = tester.getRect(find.byType(AppBar));
+  final safeTop = MediaQuery.paddingOf(
+    tester.element(find.byType(DailyChoiceCatalogPage)),
+  ).top;
   final bar = tester.getRect(find.byType(AppNavigationBar));
   expect(find.byType(FloatingActionButton), findsNothing);
-  return Rect.fromLTRB(0, appBar.bottom, _screen.width, bar.top);
+  return Rect.fromLTRB(0, safeTop, _screen.width, bar.top);
 }
 
 /// Область жестов по выдаче исключает закреплённый календарь.
@@ -486,8 +488,12 @@ void _expectAtEnd(WidgetTester tester, Finder finder) {
 /// листается крупнее.
 Future<void> _dragUntilReachable(WidgetTester tester, Finder finder) async {
   for (var step = 0; step < 200; step++) {
-    final area = _visibleArea(tester);
     final isBuilt = finder.evaluate().isNotEmpty;
+    final inList = find
+        .ancestor(of: finder, matching: _pageScroll)
+        .evaluate()
+        .isNotEmpty;
+    final area = !isBuilt || inList ? _listArea(tester) : _visibleArea(tester);
     if (isBuilt && _contains(area, tester.getRect(finder))) {
       _expectReachable(tester, finder);
       return;

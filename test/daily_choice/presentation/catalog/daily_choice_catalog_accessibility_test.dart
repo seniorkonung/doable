@@ -62,7 +62,6 @@ void main() {
         final l10n = _l10n(tester);
 
         final page = [
-          l10n.appDestinationDailyChoices,
           for (final day in weeksFrom(date(2026, 9, 28), 1).single)
             day == _today ? texts.today : _fullDate(tester, day),
           l10n.dailyChoiceCalendarExpand,
