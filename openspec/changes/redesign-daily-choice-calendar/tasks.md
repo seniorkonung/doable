@@ -81,7 +81,7 @@
   - **Files likely touched:** `lib/src/design_system/components/day_heading.dart` (новый), `widgetbook/lib/calendar/day_heading_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
   - **Estimated scope:** S
 
-- [ ] 1.8 `Notice` показывает сообщение об отказе без действия по дизайн-системе в Widgetbook
+- [x] 1.8 `Notice` показывает сообщение об отказе без действия по дизайн-системе в Widgetbook
   - **Acceptance criteria:**
     - Компонент получает только текст сообщения; кнопки и других вариантов у него нет.
     - В обеих темах вид совпадает с README `Notice` для отказа, а при появлении сообщение объявляется вспомогательным технологиям.

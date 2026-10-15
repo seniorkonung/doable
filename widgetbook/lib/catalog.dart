@@ -8,6 +8,7 @@ import 'calendar/week_strip_day_use_cases.dart';
 import 'foundations/colors_use_cases.dart';
 import 'foundations/typography_use_cases.dart';
 import 'intention/intention_summary_view_use_cases.dart';
+import 'messages/notice_use_cases.dart';
 import 'navigation/app_navigation_bar_use_cases.dart';
 
 /// Строит дерево каталога.
@@ -49,6 +50,15 @@ List<WidgetbookNode> buildCatalog() => [
       WidgetbookComponent(
         name: 'Заголовок дня',
         useCases: dayHeadingUseCases(),
+      ),
+    ],
+  ),
+  WidgetbookFolder(
+    name: 'Сообщения',
+    children: [
+      WidgetbookComponent(
+        name: 'Сообщение об отказе',
+        useCases: noticeUseCases(),
       ),
     ],
   ),
