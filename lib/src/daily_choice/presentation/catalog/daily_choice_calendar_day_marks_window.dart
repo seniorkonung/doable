@@ -2,22 +2,22 @@ import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 
 /// Окно отметок вокруг месяца [focusedDate], общее для недели и месяца.
-/// Покрывает сетки предыдущего, текущего и следующего месяцев с полными
-/// неделями по краям, обрезанными по допустимому диапазону [CalendarDate].
+/// Покрывает шестинедельные сетки предыдущего, текущего и следующего
+/// месяцев, обрезанные по допустимому диапазону [CalendarDate].
 DailyChoiceDayStatusQuery dailyChoiceCalendarDayMarksWindow(
   CalendarDate focusedDate,
 ) {
   final previousMonth = DateTime.utc(focusedDate.year, focusedDate.month - 1);
-  final nextMonthEnd = DateTime.utc(focusedDate.year, focusedDate.month + 2, 0);
+  final nextMonth = DateTime.utc(focusedDate.year, focusedDate.month + 1);
   final firstDay = DateTime.utc(
     previousMonth.year,
     previousMonth.month,
     previousMonth.day - (previousMonth.weekday - DateTime.monday),
   );
   final lastDay = DateTime.utc(
-    nextMonthEnd.year,
-    nextMonthEnd.month,
-    nextMonthEnd.day + (DateTime.sunday - nextMonthEnd.weekday),
+    nextMonth.year,
+    nextMonth.month,
+    nextMonth.day - (nextMonth.weekday - DateTime.monday) + 41,
   );
 
   return DailyChoiceDayStatusQuery(

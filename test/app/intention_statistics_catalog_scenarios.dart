@@ -41,7 +41,7 @@ void _catalogNavigationScenarios() {
         expect(_catalogData(app, catalog).items, hasLength(50));
         expect(find.text('Все состояния'), findsOneWidget);
         expect(
-          find.byTooltip(app.texts.dailyChoiceCalendarExpand),
+          find.bySemanticsLabel(app.texts.dailyChoiceCalendarExpand),
           findsOneWidget,
         );
         final held = app.probe.holdNextCatalogRead();
@@ -102,7 +102,7 @@ void _catalogNavigationScenarios() {
           findsOneWidget,
         );
         expect(
-          find.byTooltip(app.texts.dailyChoiceCalendarCollapse),
+          find.bySemanticsLabel(app.texts.dailyChoiceCalendarCollapse),
           findsOneWidget,
         );
         _catalogScroll(tester).position.jumpTo(offset);
@@ -409,10 +409,11 @@ Future<void> _prepareCatalog(
     await tester.tap(find.text(completed).last);
   }
   await _catalogReady(tester, app, provider, total: total);
-  await tester.tap(find.byTooltip(app.texts.dailyChoiceCalendarExpand));
+  await tester.tap(find.bySemanticsLabel(app.texts.dailyChoiceCalendarExpand));
   await tester.pumpAndSettle();
   final footer = find.byKey(const ValueKey('daily-choice-load-more'));
   await tester.scrollUntilVisible(footer, 500, scrollable: _catalogScrollable);
+  await tester.pumpAndSettle();
   await tester.tap(footer);
   await _wait(tester, () => _catalogData(app, provider).items.length == 100);
   await tester.scrollUntilVisible(

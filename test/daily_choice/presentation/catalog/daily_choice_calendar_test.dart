@@ -71,7 +71,7 @@ void main() {
         viewport: month(date(2026, 10, 4)),
         today: date(2026, 10, 4),
       );
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
 
       await tester.tap(calendarDay(date(2026, 11, 1)));
       await tester.pumpAndSettle();
@@ -93,7 +93,7 @@ void main() {
         today: date(2026, 10, 4),
       );
 
-      await tester.tap(find.byTooltip('Развернуть календарь'));
+      await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
       await tester.pumpAndSettle();
       await tester.tap(calendarDay(date(2026, 10, 15)));
       await tester.pumpAndSettle();
@@ -103,11 +103,11 @@ void main() {
         DateSelected(date(2026, 10, 15)),
       ]);
       expect(consumer.viewport, month(date(2026, 10, 15)));
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
       expect(dayCell(tester, date(2026, 10, 15)).isSelected, isTrue);
-      expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+      expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Свернуть календарь'));
+      await tester.tap(find.bySemanticsLabel('Свернуть календарь'));
       await tester.pumpAndSettle();
 
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
@@ -156,7 +156,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(visibleWeeks(tester), weeksFrom(date(2027, 2, 1), 4));
+    expect(visibleWeeks(tester), weeksFrom(date(2027, 2, 1), 6));
     expect(dayCell(tester, date(2027, 2, 14)).isSelected, isTrue);
     expect(dayCell(tester, date(2027, 2, 1)).isToday, isTrue);
     expect(dayCell(tester, date(2027, 2, 1)).isSelected, isFalse);

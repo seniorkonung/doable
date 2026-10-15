@@ -1,8 +1,15 @@
 import 'package:widgetbook/widgetbook.dart';
 
+import 'calendar/calendar_handle_use_cases.dart';
+import 'calendar/calendar_header_use_cases.dart';
+import 'calendar/day_heading_use_cases.dart';
+import 'calendar/month_grid_day_use_cases.dart';
+import 'calendar/period_picker_use_cases.dart';
+import 'calendar/week_strip_day_use_cases.dart';
 import 'foundations/colors_use_cases.dart';
 import 'foundations/typography_use_cases.dart';
 import 'intention/intention_summary_view_use_cases.dart';
+import 'messages/notice_use_cases.dart';
 import 'navigation/app_navigation_bar_use_cases.dart';
 import 'navigation/quick_creation_sheets_use_cases.dart';
 
@@ -21,6 +28,44 @@ List<WidgetbookNode> buildCatalog() => [
     children: [
       WidgetbookComponent(name: 'Цвета', useCases: colorsUseCases()),
       WidgetbookComponent(name: 'Типографика', useCases: typographyUseCases()),
+    ],
+  ),
+  WidgetbookFolder(
+    name: 'Календарь',
+    children: [
+      WidgetbookComponent(
+        name: 'День недельной полосы',
+        useCases: weekStripDayUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'День месячной сетки',
+        useCases: monthGridDayUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Шапка месяца',
+        useCases: calendarHeaderUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Выбор года и месяца',
+        useCases: periodPickerUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Ручка календаря',
+        useCases: calendarHandleUseCases(),
+      ),
+      WidgetbookComponent(
+        name: 'Заголовок дня',
+        useCases: dayHeadingUseCases(),
+      ),
+    ],
+  ),
+  WidgetbookFolder(
+    name: 'Сообщения',
+    children: [
+      WidgetbookComponent(
+        name: 'Сообщение об отказе',
+        useCases: noticeUseCases(),
+      ),
     ],
   ),
   WidgetbookFolder(

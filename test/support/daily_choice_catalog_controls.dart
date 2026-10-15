@@ -7,8 +7,8 @@
 /// наблюдают через интерфейс каталога и не обращаются к его модели.
 ///
 /// Каталог выбирает день встроенным календарём: шаги, как человек,
-/// перелистывают его командами шапки и нажимают день. Смена способа выбора
-/// дня меняет только этот файл, а не сценарии.
+/// перелистывают недели свайпом, месяцы командами шапки и нажимают день.
+/// Смена способа выбора дня меняет только этот файл, а не сценарии.
 library;
 
 import 'package:doable/l10n/app_localizations.dart';
@@ -16,8 +16,11 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/day_heading.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import 'app_root_pages.dart';
 
@@ -34,11 +37,20 @@ Finder dailyChoiceCatalogDay(CalendarDate date) => find.byKey(
   ValueKey('daily-choice-calendar-day-${date.toCanonicalString()}'),
 );
 
-/// Значок отметки показанного дня. У дня без выборов значка нет.
-Finder dailyChoiceCatalogDayMark(CalendarDate date) => find.descendant(
-  of: dailyChoiceCatalogDay(date),
-  matching: find.byType(Icon),
-);
+/// Отметка показанного дня. У дня без выборов отметки нет.
+Finder dailyChoiceCatalogDayMark(CalendarDate date, {DayMark? mark}) =>
+    find.descendant(
+      of: dailyChoiceCatalogDay(date),
+      matching: find.byWidgetPredicate((widget) {
+        final shown = switch (widget) {
+          DayMarkIndicator(:final mark) => mark,
+          Icon(icon: Icons.check) => DayMark.done,
+          Icon(icon: Icons.circle_outlined) => DayMark.todo,
+          _ => DayMark.none,
+        };
+        return shown != DayMark.none && (mark == null || shown == mark);
+      }),
+    );
 
 /// Выбирает [date] днём открытого каталога дневных выборов.
 ///
@@ -61,7 +73,7 @@ Future<void> selectDailyChoiceCatalogDate(
     final texts = AppLocalizations.of(
       tester.element(dailyChoiceCatalogDateControl),
     );
-    final expand = find.byTooltip(texts.dailyChoiceCalendarExpand);
+    final expand = find.bySemanticsLabel(texts.dailyChoiceCalendarExpand);
     final collapsed = expand.evaluate().isNotEmpty;
     if (collapsed) {
       await _runCommand(tester, tap, expand);
@@ -77,57 +89,31 @@ Future<void> selectDailyChoiceCatalogDate(
       await _runCommand(
         tester,
         tap,
-        find.byTooltip(texts.dailyChoiceCalendarCollapse),
+        find.bySemanticsLabel(texts.dailyChoiceCalendarCollapse),
       );
-      await _turnUntilShown(
-        tester,
-        date,
-        tap,
-        previous: texts.dailyChoiceCalendarPreviousWeek,
-        next: texts.dailyChoiceCalendarNextWeek,
-      );
+      await _turnUntilShown(tester, date, tap, previous: null, next: null);
     }
   }
-  // Нажатие сценария доводит до видимости сам элемент через все объемлющие
-  // прокрутки, и прокрутка к дню перелистнула бы заодно страницы календаря.
-  // Поэтому к дню прокручивается только страница каталога. Ближайший к дню
-  // viewport — страницы календаря, поэтому смещение страницы каталога
-  // считается от календаря с областью дня, и только когда день не виден.
-  final page = Scrollable.of(tester.element(dailyChoiceCatalogDateControl))
-      .position;
-  final calendar = dailyChoiceCatalogDateControl.evaluate().single;
-  for (final policy in [
-    ScrollPositionAlignmentPolicy.keepVisibleAtStart,
-    ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-  ]) {
-    await page.ensureVisible(
-      calendar.renderObject!,
-      targetRenderObject: day.evaluate().single.renderObject,
-      alignmentPolicy: policy,
-    );
-  }
-  await tester.pump();
   await tester.tap(day);
   await tester.pump();
 }
 
 /// День, который открытый каталог дневных выборов показывает выбранным.
 ///
-/// Календарь называет выбранный день полной датой и тогда, когда просматривает
-/// другой период. Календарь прокручивается вместе с выдачей, поэтому шаг
-/// читает его и за краем видимой части страницы. Каталог, который не называет
-/// выбранный день, проваливает проверку.
+/// Заголовок называет выбранный день полной датой и тогда, когда календарь
+/// просматривает другой период. Заголовок прокручивается вместе с выдачей,
+/// поэтому шаг читает его и за краем видимой части страницы. Каталог, который
+/// не называет выбранный день, проваливает проверку.
 CalendarDate shownDailyChoiceCatalogDate(WidgetTester tester) {
   final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
   final selected = tester.widget<DailyChoiceCalendar>(calendar).selectedDate;
   final context = tester.element(calendar);
-  final label = AppLocalizations.of(context).dailyChoiceCalendarSelectedDate(
-    MaterialLocalizations.of(
-      context,
-    ).formatFullDate(DateTime.utc(selected.year, selected.month, selected.day)),
-  );
+  final label = DateFormat(
+    'd MMMM y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(selected.year, selected.month, selected.day));
   final shown = find.descendant(
-    of: calendar,
+    of: find.byType(DayHeading, skipOffstage: false),
     matching: find.text(label, skipOffstage: false),
   );
   if (shown.evaluate().isEmpty) {
@@ -136,65 +122,59 @@ CalendarDate shownDailyChoiceCatalogDate(WidgetTester tester) {
   return selected;
 }
 
-/// Перелистывает календарь открытого каталога дневных выборов командами шапки
-/// в текущем представлении, пока он не покажет [date], и день не выбирает.
+/// Перелистывает календарь открытого каталога: недели свайпом, месяцы
+/// командами шапки, пока он не покажет [date], и день не выбирает.
 ///
-/// Календарь прокручивается вместе с выдачей, поэтому шаг сначала возвращает
-/// его на экран. [tap] — нажатие сценария для команд календаря; по умолчанию
-/// [tapWhenFound].
+/// Календарь закреплён над выдачей. [tap] — нажатие сценария для команд;
+/// по умолчанию [tapWhenFound].
 Future<void> showDailyChoiceCatalogPeriod(
   WidgetTester tester,
   CalendarDate date, {
   RootPageTap tap = tapWhenFound,
 }) async {
-  await _revealCalendar(tester);
+  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
   final texts = AppLocalizations.of(
     tester.element(dailyChoiceCatalogDateControl),
   );
   final collapsed = find
-      .byTooltip(texts.dailyChoiceCalendarExpand)
+      .bySemanticsLabel(texts.dailyChoiceCalendarExpand)
       .evaluate()
       .isNotEmpty;
   await _turnUntilShown(
     tester,
     date,
     tap,
-    previous: collapsed
-        ? texts.dailyChoiceCalendarPreviousWeek
-        : texts.dailyChoiceCalendarPreviousMonth,
-    next: collapsed
-        ? texts.dailyChoiceCalendarNextWeek
-        : texts.dailyChoiceCalendarNextMonth,
+    previous: collapsed ? null : texts.dailyChoiceCalendarPreviousMonth,
+    next: collapsed ? null : texts.dailyChoiceCalendarNextMonth,
   );
 }
 
 /// Раскрывает свёрнутый календарь открытого каталога дневных выборов в месяц
 /// просматриваемой даты.
 ///
-/// Календарь прокручивается вместе с выдачей, поэтому шаг сначала возвращает
-/// его на экран. [tap] — нажатие сценария для команды календаря; по умолчанию
-/// [tapWhenFound].
+/// Календарь закреплён над выдачей. [tap] — нажатие сценария для команды;
+/// по умолчанию [tapWhenFound].
 Future<void> expandDailyChoiceCatalogCalendar(
   WidgetTester tester, {
   RootPageTap tap = tapWhenFound,
 }) async {
-  await _revealCalendar(tester);
+  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
   final texts = AppLocalizations.of(
     tester.element(dailyChoiceCatalogDateControl),
   );
   await _runCommand(
     tester,
     tap,
-    find.byTooltip(texts.dailyChoiceCalendarExpand),
+    find.bySemanticsLabel(texts.dailyChoiceCalendarExpand),
   );
 }
 
 /// Период, который показывает календарь открытого каталога дневных выборов:
 /// дата просмотра и представление.
 ///
-/// Шапка календаря называет месяц и год даты просмотра, видны неделя или весь
-/// месяц с этой датой, а команда представления предлагает обратное:
-/// раскрыть неделю или свернуть месяц. Календарь, который показывает другой
+/// В месяце шапка называет месяц и год даты просмотра; в неделе шапки нет.
+/// Видны неделя или весь месяц с этой датой, а команда представления
+/// предлагает обратное: раскрыть неделю или свернуть месяц. Календарь, который показывает другой
 /// период, проваливает проверку. Как и выбранный день, период читается и за
 /// краем видимой части страницы.
 DailyChoiceCalendarViewport shownDailyChoiceCatalogViewport(
@@ -205,8 +185,11 @@ DailyChoiceCalendarViewport shownDailyChoiceCatalogViewport(
   final context = tester.element(calendar);
   final texts = AppLocalizations.of(context);
   final focused = viewport.focusedDate;
-  final title = MaterialLocalizations.of(context)
-      .formatMonthYear(DateTime.utc(focused.year, focused.month, focused.day));
+  final monthLabel = DateFormat(
+    'LLLL y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(focused.year, focused.month, focused.day));
+  final title = monthLabel[0].toUpperCase() + monthLabel.substring(1);
   final toggle = switch (viewport.mode) {
     DailyChoiceCalendarMode.week => texts.dailyChoiceCalendarExpand,
     DailyChoiceCalendarMode.month => texts.dailyChoiceCalendarCollapse,
@@ -243,11 +226,12 @@ DailyChoiceCalendarViewport shownDailyChoiceCatalogViewport(
   final toggleShown = find
       .descendant(
         of: calendar,
-        matching: find.byTooltip(toggle, skipOffstage: false),
+        matching: find.bySemanticsLabel(toggle, skipOffstage: false),
       )
       .evaluate()
       .isNotEmpty;
-  if (!periodShown || !titleShown || !toggleShown) {
+  final expectedTitle = viewport.mode == DailyChoiceCalendarMode.month;
+  if (!periodShown || titleShown != expectedTitle || !toggleShown) {
     fail(
       'Календарь каталога дневных выборов не показывает период $viewport: '
       'дни $days, шапка «$title» ${titleShown ? 'видна' : 'не видна'}, '
@@ -257,31 +241,20 @@ DailyChoiceCalendarViewport shownDailyChoiceCatalogViewport(
   return viewport;
 }
 
-/// Возвращает на экран календарь, ушедший с выдачей за верхний край страницы.
-Future<void> _revealCalendar(WidgetTester tester) async {
-  final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
-  await pumpUntilFound(tester, calendar);
-  await Scrollable.of(tester.element(calendar)).position.ensureVisible(
-    calendar.evaluate().single.renderObject!,
-    alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
-  );
-  await tester.pump();
-  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
-}
-
 /// Наибольшее число перелистываний к одному дню: далёкий день календарь
 /// находит по месяцам.
 const _maxTurns = 240;
 
-/// Перелистывает календарь командами [previous] и [next] текущего
-/// представления, пока он не покажет [date].
+/// Перелистывает календарь к [date]: месяц — командами [previous] и [next],
+/// неделю — свайпом, когда обе команды отсутствуют.
 Future<void> _turnUntilShown(
   WidgetTester tester,
   CalendarDate date,
   RootPageTap tap, {
-  required String previous,
-  required String next,
+  required String? previous,
+  required String? next,
 }) async {
+  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
   for (var turn = 0; turn < _maxTurns; turn++) {
     final shown = [
       for (final element in find.byType(DailyChoiceCalendarDay).evaluate())
@@ -289,7 +262,22 @@ Future<void> _turnUntilShown(
     ];
     if (shown.contains(date)) return;
     final isEarlier = shown.every((day) => _isBefore(date, day));
-    await _runCommand(tester, tap, find.byTooltip(isEarlier ? previous : next));
+    final command = isEarlier ? previous : next;
+    if (command != null) {
+      await _runCommand(tester, tap, find.bySemanticsLabel(command));
+    } else {
+      await tester.drag(
+        find.byType(DailyChoiceCalendarDay).first,
+        Offset(
+          tester.getSize(dailyChoiceCatalogDateControl).width *
+              (isEarlier ? 0.8 : -0.8),
+          0,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+    }
   }
   fail('Календарь каталога не показал день $date.');
 }

@@ -13,11 +13,11 @@ void main() {
   });
 
   test(
-    '98 дней включительно допустимы через границу года и високосный день',
+    '105 дней включительно допустимы через границу года и високосный день',
     () {
       for (final (first, last) in [
-        ('2026-12-01', '2027-03-08'),
-        ('2024-02-01', '2024-05-08'),
+        ('2026-12-01', '2027-03-15'),
+        ('2024-02-01', '2024-05-15'),
       ]) {
         final firstDate = CalendarDate.parseCanonical(first);
         final lastDate = CalendarDate.parseCanonical(last);
@@ -48,11 +48,11 @@ void main() {
     );
   });
 
-  test('99 дней включительно превышают предел чтения', () {
+  test('106 дней включительно превышают предел чтения', () {
     expect(
       () => DailyChoiceDayStatusQuery(
         firstDate: CalendarDate.fromParts(2024, 2, 1),
-        lastDate: CalendarDate.fromParts(2024, 5, 9),
+        lastDate: CalendarDate.fromParts(2024, 5, 16),
       ),
       throwsA(
         isA<DailyChoiceDayStatusQueryValidationException>().having(

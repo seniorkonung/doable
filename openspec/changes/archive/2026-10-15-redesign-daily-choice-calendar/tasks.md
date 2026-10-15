@@ -1,0 +1,453 @@
+**Уточнение к ссылке на проверку устройств в завершённой задаче 2.14.** Упомянутая в её критериях задача 2.15 «Подтвердить готовность фазы 2 после разграничения телефонных и больших дисплеев Android» отменена владельцем продукта в коммите `8cafb70fd4eefcd521eed89c7dd2ab16a8a4d8ea`. По явному решению владельца физическая проверка остаётся за ним вне списка задач; порядок подтверждения задан решением 6 в [дизайне](design.md). Текущие задачи 2.15–2.17 владеют исправлениями переноса и их регрессионными проверками, а не отменённой проверкой устройств. Завершённые блоки сохранены как запись выполненной работы; их отметки и состояние `all_done` сами по себе не подтверждают готовность фазы 2.
+
+## Phase 1: Компоненты календаря и каталога из дизайн-системы сверены с макетами
+
+- [x] 1.1 Модуль основ предоставляет область нажатия `tapMin` и тень `shadow-sm` для светлой и тёмной тем
+  - **Acceptance criteria:**
+    - `DoableMetrics.tapMin` равен 44 и объявлен один раз, даже если его уже добавило изменение `redesign-navigation-bar`.
+    - `shadow-sm` в обеих темах совпадает с `tokens.json` из `context/doable-design-system/`.
+    - Тени — расширение темы `DoableShadows` в темах обеих яркостей; как и у `DoableColors`, копирование и смешивание тем по построению охватывают все тени (решение 7 дизайна).
+  - **Verification:**
+    - `mise exec -- flutter analyze`
+    - `mise exec -- flutter test test/app/bootstrap` — темы по-прежнему строятся для экрана подготовки и корневого приложения.
+  - **Dependencies:** None
+  - **Files likely touched:** `lib/src/design_system/doable_metrics.dart`, `lib/src/design_system/doable_shadows.dart` (новый), `lib/src/design_system/doable_theme.dart`
+  - **Estimated scope:** S
+
+- [x] 1.2 Измерение высоты текста, по которому считаются высоты строк календаря, перенесено в модуль основ без изменения поведения
+  - **Acceptance criteria:**
+    - Функция измерения и её проверка находятся в модуле основ, который по-прежнему не зависит от модулей экранов (ADR-0030).
+    - Календарь каталога пользуется функцией из модуля основ, и его строки имеют прежнюю высоту при любом масштабе текста.
+  - **Verification:**
+    - `mise exec -- flutter test test/design_system test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart`
+    - `mise exec -- flutter analyze`
+  - **Dependencies:** None
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_text_metrics.dart` (переносится в `lib/src/design_system/text_metrics.dart`), `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_text_metrics_test.dart` (переносится в `test/design_system/text_metrics_test.dart`)
+  - **Estimated scope:** S
+
+- [x] 1.3 Ячейка дня `WeekStrip` с отметкой дня показывает все состояния дня недели по дизайн-системе в Widgetbook
+  - **Acceptance criteria:**
+    - Ячейка получает тексты числа и дня недели, признаки «выбран» и «сегодня», отметку дня (нет; есть невыполненный; всё выполнено), доступное название и нажатие. Предметных типов и строк локализации приложения в ней нет (ADR-0030).
+    - В обеих темах вид совпадает с README `WeekStrip` и разделами «Day in the week strip» и «Mark for a day with choices» спек-доски `Parts`. При крупном тексте ячейка растёт от размеров дизайна и сообщает высоту строки для текущего масштаба текста.
+    - Для вспомогательных технологий ячейка — одна кнопка с переданным названием и состоянием выбранности.
+  - **Verification:**
+    - `mise exec -- flutter analyze`
+    - Ручной просмотр примеров в `mise run widgetbook` в обеих темах и с увеличенным текстом.
+  - **Dependencies:** 1.1, 1.2
+  - **Files likely touched:** `lib/src/design_system/components/day_mark.dart` (новый), `lib/src/design_system/components/week_strip_day.dart` (новый), `widgetbook/lib/calendar/week_strip_day_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** M
+
+- [x] 1.4 Части сетки `MonthGrid` — ячейка дня и подпись дня недели — показывают все состояния месяца по дизайн-системе в Widgetbook
+  - **Acceptance criteria:**
+    - Ячейка получает текст числа, признаки «выбран», «сегодня» и «соседний месяц», отметку дня, доступное название и нажатие; подпись получает текст. Предметных типов и строк локализации приложения в них нет.
+    - В обеих темах вид совпадает с README `MonthGrid` и разделами «Day in the month grid» и «Mark for a day with choices» спек-доски `Parts`, включая отметку на выбранном дне.
+    - Ячейка и подпись растут от размеров дизайна при крупном тексте и сообщают высоты своих строк для текущего масштаба текста.
+  - **Verification:**
+    - `mise exec -- flutter analyze`
+    - Ручной просмотр примеров в `mise run widgetbook` в обеих темах и с увеличенным текстом.
+  - **Dependencies:** 1.1, 1.2, 1.3
+  - **Files likely touched:** `lib/src/design_system/components/month_grid_day.dart` (новый), `widgetbook/lib/calendar/month_grid_day_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** S
+
+- [x] 1.5 Шапка месяца показывает стрелки соседних месяцев и заголовок по дизайн-системе в Widgetbook
+  - **Acceptance criteria:**
+    - Шапка получает заголовок и команды предыдущего и следующего месяца с доступными названиями либо их недоступность. Заголовок пока не является командой: выбор года и месяца добавляет фаза 3.
+    - В обеих темах вид совпадает с README `MonthGrid` и разделом «Month header» спек-доски `Parts`; область нажатия каждой стрелки не меньше `tapMin`.
+  - **Verification:**
+    - `mise exec -- flutter analyze`
+    - Ручной просмотр примеров в `mise run widgetbook` в обеих темах, в том числе с недоступной стрелкой.
+  - **Dependencies:** 1.1
+  - **Files likely touched:** `lib/src/design_system/components/calendar_header.dart` (новый), `widgetbook/lib/calendar/calendar_header_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** S
+
+- [x] 1.6 Ручка календаря показывает раскрытие и сворачивание по дизайн-системе в Widgetbook
+  - **Acceptance criteria:**
+    - Ручка получает признак «раскрыт», доступное название и нажатие; для вспомогательных технологий это кнопка с этим названием и состоянием раскрытия.
+    - В обеих темах вид совпадает с README `WeekStrip` и `MonthGrid` и разделом «Expanding and period picker» спек-доски `Parts` (Collapsed, Expanded); область нажатия занимает всю ширину и не ниже `tapMin`.
+  - **Verification:**
+    - `mise exec -- flutter analyze`
+    - Ручной просмотр примеров в `mise run widgetbook` в обеих темах.
+  - **Dependencies:** 1.1
+  - **Files likely touched:** `lib/src/design_system/components/calendar_handle.dart` (новый), `widgetbook/lib/calendar/calendar_handle_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** S
+
+- [x] 1.7 `DayHeading` показывает день недели, отметку «Сегодня» и дату по дизайн-системе в Widgetbook
+  - **Acceptance criteria:**
+    - Заголовок получает тексты дня недели и даты и текст отметки либо её отсутствие; отдельного компонента `Badge` нет.
+    - В обеих темах вид совпадает с README `DayHeading` и разделом «Day heading» спек-доски `Parts`; при крупном тексте строки переносятся, а не обрезаются.
+    - Дата объявляется вспомогательным технологиям как заголовок.
+  - **Verification:**
+    - `mise exec -- flutter analyze`
+    - Ручной просмотр примеров с отметкой и без неё в `mise run widgetbook` в обеих темах и с увеличенным текстом.
+  - **Dependencies:** None
+  - **Files likely touched:** `lib/src/design_system/components/day_heading.dart` (новый), `widgetbook/lib/calendar/day_heading_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** S
+
+- [x] 1.8 `Notice` показывает сообщение об отказе без действия по дизайн-системе в Widgetbook
+  - **Acceptance criteria:**
+    - Компонент получает только текст сообщения; кнопки и других вариантов у него нет.
+    - В обеих темах вид совпадает с README `Notice` для отказа, а при появлении сообщение объявляется вспомогательным технологиям.
+  - **Verification:**
+    - `mise exec -- flutter analyze`
+    - Ручной просмотр примера с коротким и длинным текстом в `mise run widgetbook` в обеих темах.
+  - **Dependencies:** None
+  - **Files likely touched:** `lib/src/design_system/components/notice.dart` (новый), `widgetbook/lib/messages/notice_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** S
+
+- [x] 1.9 Проверить готовность фазы 1: компоненты сверены с макетами, приложение не изменилось
+  - **Acceptance criteria:**
+    - Компоненты в обеих темах соответствуют состояниям макетов, либо принятые расхождения названы.
+    - Проверки репозитория проходят, а приложение не изменилось.
+  - **Verification:**
+    - `mise run check`
+    - Ручная сверка примеров Widgetbook в обеих темах с README, превью компонентов и спек-доской `Parts` из `context/`.
+    - В изменениях фазы есть только модуль основ, Widgetbook и перенос измерения текста.
+  - **Dependencies:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8
+  - **Files likely touched:** None (verification only)
+  - **Estimated scope:** XS
+
+## Phase 2: Каталог дневных выборов работает с закреплённым календарём дизайна
+
+- [x] 2.1 Окно отметок покрывает три шестинедельные сетки одним запросом не длиннее 105 дней
+  - **Acceptance criteria:**
+    - Расчёт окна по решению 2 дизайна включает по 42 дня предыдущего, текущего и следующего месяцев, ведётся по календарным частям в UTC и обрезается по CalendarDate до создания запроса; для апреля 2026 года границы — 23 февраля и 7 июня.
+    - DailyChoiceDayStatusQuery принимает включительный диапазон до 105 дней и отклоняет обратный диапазон и 106 дней до чтения. Модель получает окно одним getDailyChoiceDayStatuses с общей ревизией, сохраняя прежние правила отказа и устаревших ответов (ADR-0024, ADR-0025).
+    - Проверки окна охватывают переход года, високосный февраль и обе границы CalendarDate; существующая проверка стоимости чтения проходит на новом максимуме без чтения путей или разбиения снимка.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/application/daily_choice_day_statuses_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_window_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart test/graph/data/drift_daily_choice_day_statuses_test.dart test/graph/data/drift_daily_choice_day_statuses_read_cost_test.dart`
+  - **Dependencies:** 1.9
+  - **Files likely touched:** `lib/src/daily_choice/application/daily_choice_day_statuses.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_window.dart`, `test/daily_choice/application/daily_choice_day_statuses_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_window_test.dart`
+  - **Estimated scope:** M
+
+- [x] 2.2 Свайп и стрелки месяца сохраняют выбранный день при возврате к его месяцу
+  - **Acceptance criteria:**
+    - DailyChoiceCalendar применяет правило требования «Встроенный недельный и месячный календарь каталога»: при смене месяца дата просмотра равна выбранной дате, если она входит в этот месяц, иначе первому числу; правило одинаково для свайпа и стрелок.
+    - Возврат из ноября к октябрю при выбранном 15 октября и последующее сворачивание показывают неделю 12–18 октября. Просмотр не выбирает день, не меняет фильтр и не запрашивает выдачу; переходы на границах CalendarDate и прерывание анимации сохраняют корректный просмотр.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_boundaries_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`
+  - **Dependencies:** 1.9
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_navigation_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`
+  - **Estimated scope:** M
+
+- [x] 2.3 Недельная строка календаря показывает дни компонентом WeekStripDay
+  - **Acceptance criteria:**
+    - DailyChoiceCalendarDay переводит CalendarDate и DailyChoiceDayStatus в готовые тексты, признаки и DayMark для WeekStripDay; локализация и семантика остаются у потребителя по ADR-0030. День недели с заглавной буквы находится внутри ячейки, отдельной строки подписей в неделе нет.
+    - TableCalendarBase сохраняет семь дней с понедельника, горизонтальный свайп и выбор дня. Высоту строки задаёт контракт компонента, минимум 54 dp; выбранность, «сегодня» и состояние дня доступны как прежде, включая совпадение выбранного и сегодняшнего дня.
+    - Проверки недельной раскладки и доступности обновлены под новый контракт без тестов внешнего вида; месячное представление продолжает работать.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_test.dart`
+    - Сверить неделю на устройстве с WeekStrip и Main.dc.html в обеих темах.
+  - **Dependencies:** 1.3, 2.2
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_test.dart`
+  - **Estimated scope:** M
+
+- [x] 2.4 Месячный календарь показывает шесть недель компонентами MonthGrid
+  - **Acceptance criteria:**
+    - Месяц использует MonthGridDay и подписи дней недели из модуля основ; TableCalendarBase включает sixWeekMonthsEnforced. Минимальные высоты строки дней и подписей — 44 и 28 dp, фактические высоты получаются из контрактов компонентов.
+    - Все месяцы занимают шесть недель с понедельника, включая февраль из четырёх календарных недель; дни соседних месяцев выбираются, а позиции вне CalendarDate не объявляются и не выбираются. Преобразование даты сохраняет календарные части.
+    - Проверки числа строк и раскладки календаря и каталога используют шестинедельную сетку; выбранность, текущий день и отметки сохраняют доступные названия.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_boundaries_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_utc_dates_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`
+    - Сверить месячную сетку на устройстве с MonthGrid и Parts.dc.html в обеих темах.
+  - **Dependencies:** 1.4, 2.1, 2.3
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_boundaries_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`
+  - **Estimated scope:** M
+
+- [x] 2.5 Подтвердить отметки дополнительной строки соседнего месяца до завершения первого свайпа
+  - **Acceptance criteria:**
+    - Интеграционная проверка календаря с моделью отметок сначала успешно получает окно апреля 2026 года, затем начинает свайп к маю: отметка на 7 июня видна в шестой строке мая до завершения нового чтения. Проверка использует настоящую сетку TableCalendarBase.
+    - Проверки единого снимка и общей ревизии, отбрасывания устаревшего ответа, сохранения отметок при отказе и независимости выдачи проходят с новым окном; стоимость чтения проверена на 105 днях.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_window_test.dart test/graph/data/drift_daily_choice_day_statuses_test.dart test/graph/data/drift_daily_choice_day_statuses_read_cost_test.dart`
+  - **Dependencies:** 2.1, 2.4
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart`, при необходимости — его существующая поддержка в `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test_support.dart`
+  - **Estimated scope:** S
+
+- [x] 2.6 Шапка месяца и ручка управляют календарём, а соседние недели открываются только свайпом
+  - **Acceptance criteria:**
+    - Шапка CalendarHeader показывается только в месяце: заголовок формата LLLL y с заглавной буквы, локализованные доступные стрелки и их недоступность на границах диапазона. Заголовок остаётся текстом без команды выбора года и месяца.
+    - CalendarHandle под сеткой раскрывает и сворачивает календарь, сохраняя дату просмотра, выбранный день, фильтр и выдачу. У недели отсутствуют шапка, месяц и год, кнопки и доступные команды перехода к соседней неделе.
+    - Общие шаги управления календарём и затронутые сценарии переходов, сохранения состояния и доступности используют свайпы недели и доступные команды месяца; проверки прежних кнопок заменены проверками их отсутствия и сохранности поведения.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog test/app/navigation/app_shell_state_test.dart test/intention/presentation/details/intention_details_statistics_test.dart`
+    - Сверить шапку месяца и ручку с Parts.dc.html в обеих темах; выполнить раскрытие, смену месяца и выбор дня через семантические действия без свайпа.
+  - **Dependencies:** 1.5, 1.6, 2.5
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/support/daily_choice_catalog_controls.dart`; затронутые проверки переходов и доступности в `test/daily_choice/presentation/catalog/`
+  - **Estimated scope:** M
+
+- [x] 2.7 Оба каталога называют выбранную дату заголовком DayHeading в начале выдачи
+  - **Acceptance criteria:**
+    - DailyChoiceCatalogBody строит DayHeading перед фильтром: полное название дня недели с заглавной буквы, дата формата d MMMM y без «г.» и локализованная отметка «Сегодня» только для текущей локальной даты. Дата остаётся выбранной и при просмотре другого периода.
+    - Смена локального дня через DailyChoiceLocalDayObserver обновляет отметку «Сегодня», включая возврат приложения из фона, без изменения выбранной даты, просмотра, фильтра и выдачи. Дата объявляется заголовком.
+    - Прежняя строка выбранной даты удалена из календаря; общие шаги и непосредственно затронутые проверки читают заголовок дня в обоих каталогах на русском и английском, сохраняя проверку состояния после смены раздела и локали.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog test/app/navigation/app_shell_state_test.dart test/app/daily_choice_app_lifecycle_test.dart test/intention/presentation/details/intention_details_statistics_test.dart`
+  - **Dependencies:** 1.7, 2.6
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/support/daily_choice_catalog_controls.dart`; проверки заголовка и локальной даты в `test/daily_choice/presentation/catalog/` и `test/app/navigation/app_shell_state_test.dart`
+  - **Estimated scope:** M
+
+- [x] 2.8 Календарь с Notice закреплён над выдачей, а выбор другого дня возвращает список к началу
+  - **Acceptance criteria:**
+    - Общее тело обоих каталогов размещает календарь над единственной прокруткой списка: DayHeading, фильтр, количество и выдача. Вертикальный жест по календарю не прокручивает список; раскрытие сохраняет закрепление. Контроллер списка принадлежит телу и освобождается вместе с ним.
+    - Выбор другого дня возвращает список к заголовку и началу выдачи; просмотр периода, обновление отметок и возврат между разделами сохраняют смещение списка. Состояние и прокрутка экземпляров каталогов остаются независимыми.
+    - DailyChoiceCalendar сам показывает Notice с существующим текстом отказа под ручкой; сообщение закреплено вместе с календарём и объявляется при появлении. Оно не содержит действия или всплывающего дубля; прежние отметки сохраняются, успешное получение убирает Notice.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_page_storage_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/app/navigation/app_shell_state_test.dart`
+  - **Dependencies:** 1.8, 2.7
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `test/support/daily_choice_catalog_controls.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart`
+  - **Estimated scope:** M
+
+- [x] 2.9 Корневой каталог открывается без AppBar и сохраняет стиль строки состояния по теме
+  - **Acceptance criteria:**
+    - DailyChoiceCatalogPage сохраняет собственный Scaffold без AppBar, верхний безопасный отступ и AnnotatedRegion<SystemUiOverlayStyle> по яркости темы. Каталог на заданную дату сохраняет прежние AppBar, заголовок и кнопку «назад» (ADR-0020).
+    - Проверки навигации распознают открытый каталог по его содержимому; название «Дневные выборы» / Daily choices остаётся у пункта навигации для экранного диктора и в подсказке по долгому нажатию. Главная и каталог намерений сохраняют заголовки.
+  - **Verification:**
+    - `mise exec -- flutter test test/app/navigation test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`
+    - На устройстве проверить верхний безопасный отступ и строку состояния в светлой и тёмной темах, затем открыть каталог на дату и вернуться назад.
+  - **Dependencies:** 2.8
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/support/app_root_pages.dart`; проверки заголовков в `test/app/navigation/` и `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`
+  - **Estimated scope:** M
+
+- [x] 2.10 Локализация больше не содержит строк выбранной даты и команд соседней недели
+  - **Acceptance criteria:**
+    - Из app_ru.arb и app_en.arb удалены dailyChoiceCalendarSelectedDate, dailyChoiceCalendarPreviousWeek и dailyChoiceCalendarNextWeek вместе с метаданными; потребителей старых ключей нет.
+    - Сгенерированная локализация соответствует ARB. Русские и английские форматы календаря и DayHeading, английский fallback и сохранение состояния при смене локали подтверждены существующими проверками; строки выбора года и месяца не добавляются.
+  - **Verification:**
+    - `mise exec -- flutter gen-l10n`
+    - `rg -n 'dailyChoiceCalendar(SelectedDate|PreviousWeek|NextWeek)' lib test` — совпадений нет.
+    - `mise exec -- flutter analyze`
+    - `mise exec -- flutter test test/app/localization test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart test/app/navigation/app_shell_state_test.dart`
+  - **Dependencies:** 2.6, 2.7, 2.9
+  - **Files likely touched:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, сгенерированные `lib/l10n/app_localizations.dart`, `lib/l10n/app_localizations_ru.dart`, `lib/l10n/app_localizations_en.dart`
+  - **Estimated scope:** S
+
+- [x] 2.11 Манифест ограничивает приложение на телефоне портретной ориентацией во весь экран
+  - **Acceptance criteria:**
+    - У MainActivity заданы android:screenOrientation="portrait" и android:resizeableActivity="false" по ADR-0031: ограничения действуют с запуска процесса, включая подготовку хранилища и её отказ.
+    - Проверка манифеста по образцу backup_policy_test.dart защищает оба атрибута именно MainActivity. Ограничения не дублируются вызовом из Dart или отказом от системного поведения больших экранов.
+  - **Verification:**
+    - `mise exec -- flutter test test/android`
+    - На телефоне проверить поворот и попытку разделить экран; результат остаётся портретным и полноэкранным. Повторить поворот при запуске и в доступном тестовом состоянии отказа подготовки хранилища.
+  - **Dependencies:** 1.9
+  - **Files likely touched:** `android/app/src/main/AndroidManifest.xml`, `test/android/orientation_policy_test.dart` (новый, по образцу существующего `test/android/backup_policy_test.dart`)
+  - **Estimated scope:** S
+
+- [x] 2.12 Раскрытый календарь с отказом отметок оставляет доступной выдачу на нижней границе поддержки
+  - **Acceptance criteria:**
+    - Проверка каталога на заданную дату использует окно 360×720 dp, системные отступы 24/48 dp и стандартный масштаб в обеих локалях. После панелей телу остаётся не менее 528 dp; закреплённый блок вместе с Notice и отступами занимает не более 480 dp, а прокрутке списка остаётся не менее 48 dp.
+    - В раскрытом месяце с отказом отметок дни, ручка и сообщение не обрезаны, переполнения нет; день можно выбрать, календарь свернуть, выдачу прокрутить. Проверка общего тела подтверждает эти действия и в корневом каталоге.
+    - Раскладка соблюдает бюджет за счёт согласованных размеров и отступов, без обрезки содержимого, автоматического сворачивания или дополнительной прокрутки календаря. Окна ниже области поддержки не получают адаптации или механизма блокировки.
+  - **Verification:**
+    - `mise exec -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/app/navigation/ordinary_page_scaffold_test.dart`
+    - На устройстве сверить оба каталога при раскрытом месяце и отказе отметок на нижней границе поддержки и с макетом 390×844.
+  - **Dependencies:** 2.8, 2.9, 2.10, 2.11
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`; при необходимости поправки бюджета в `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart` и `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`
+  - **Estimated scope:** M
+
+- [x] 2.13 Проверить готовность фазы 2: оба каталога сохраняют поведение с закреплённым календарём дизайна
+  - **Acceptance criteria:**
+    - Сценарии спецификаций объёма фазы 2 подтверждены: выбор дня, фильтр, выдача, отметки, сохранение состояния и независимость каталога на заданную дату работают; результаты проверок окна, первого свайпа и нижней границы поддержки из 2.1, 2.5 и 2.12 подтверждены.
+    - Ручная сверка обоих каталогов с Main.dc.html и Parts.dc.html в обеих темах на устройстве не выявила непринятых расхождений; подтверждены строка состояния, поворот и попытка разделить экран. Заголовок месяца пока не открывает выбор года и месяца.
+    - Полные проверки репозитория и строгая проверка изменения проходят. Результаты и принятые расхождения сообщены в сессии без создания отчётных документов; завершение этой фазы не считается завершением всего изменения.
+  - **Verification:**
+    - `mise run check`
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - Ручная сверка корневого каталога и каталога на заданную дату в светлой и тёмной темах, на нижней поддерживаемой границе и по макету 390×844; поворот телефона и попытка разделить экран.
+  - **Dependencies:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12
+  - **Files likely touched:** None (verification only)
+  - **Estimated scope:** XS
+
+- [x] 2.14 Нативный запуск Android ограничивает ориентацию и окно только на телефонных дисплеях
+  - **Acceptance criteria:**
+    - Нативный механизм по решению 6 и ADR-0031 сохраняет портретный полноэкранный режим телефонного дисплея с запуска, включая подготовку хранилища и её отказ. На большом дисплее приложение не добавляет ограничений поворота или изменения размера на всех поддерживаемых API, начиная с 24. Применимость механизма подтверждена первичными источниками Android; конкретные API и конфигурация отражены в решении 6, а при уточнении ADR-0031 согласован и её индекс.
+    - Безусловная пара portrait/resizeableActivity=false общей Activity заменена механизмом, различающим дисплеи по границе 600 dp. Узкое окно планшета не получает телефонную политику, смена дисплея складного устройства учитывается. Ограничения не переносятся в Dart, а системное поведение больших дисплеев Android 16 не отключается; отдельные раскладки не добавляются.
+    - Регрессионные проверки защищают обе категории и границу менее 600 / от 600 dp, применение политики при нативном запуске и сохранение системных режимов больших экранов до Android 16. `orientation_policy_test.dart` больше не требует безусловных литералов общей MainActivity; проверки относятся к реальному механизму. Нативная сборка проходит, а проверка поведения Activity на устройствах остаётся обязательной в 2.15.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Выполнить нативные проверки, если механизм требует кода Android; подтвердить их команды и результаты в сессии. Сопоставить механизм с документацией Activity и многооконного режима, указанной в решении 6; статическое чтение XML не заменяет проверку области действия политики.
+  - **Dependencies:** 2.13
+  - **Files likely touched:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `test/android/orientation_policy_test.dart`; при необходимости — ресурсы и новые нативные проверки в `android/app/src/`, конфигурация их запуска в `android/app/build.gradle.kts`, уточнение решения 6 в `design.md` и согласованные ADR-0031 / `docs/adr/README.md`
+  - **Estimated scope:** M
+
+- [x] 2.15 Переход из разделённого экрана большого дисплея в телефонную категорию сохраняет сессию в полном портретном окне
+  - **Acceptance criteria:**
+    - Нативная политика по решению 6 запускает целевой хост в отдельной task с отличающейся affinity и удаляет исходную task после передачи того же FlutterEngine. Переход полного дисплея из 600×900 dp с действующим Split screen в 390×844 dp завершается полноэкранной портретной PhoneActivity без наследования многооконного размещения; одно лишь NEW_TASK | CLEAR_TASK при общей affinity не считается исправлением.
+    - Открытый экран и состояние каталога сохраняются без повторной подготовки хранилища. Launcher находит действующую task независимо от временной MainActivity и возвращает ту же сессию; после переноса и повторного входа в недавних остаётся одна карточка приложения. Холодный запуск и восстановление после гибели процесса сохраняют прежний контракт.
+    - Нативные проверки защищают разделение task, передачу двигателя, удаление исходной task и повторный launcher. Существующие проверки обеих категорий, границы 600 dp и отсутствия ограничений больших дисплеев проходят; изменение остаётся внутри нативной оконной политики по ADR-0031.
+  - **Verification:**
+    - `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - На API 36 выполнить переход 600×900 → 390×844 dp из подтверждённого Split screen и проверить фактические режим и границы окна через `adb shell dumpsys activity activities` и `adb shell dumpsys window windows`; сравнить экран и состояние каталога до/после, затем повторить вход через launcher. Повторяемую автоматизированную защиту закрепляет 2.16.
+  - **Dependencies:** 2.14
+  - **Files likely touched:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayHostActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`
+  - **Estimated scope:** M
+
+- [x] 2.16 Регрессионная проверка на Android подтверждает полноэкранный перенос в телефонную категорию с сохранением сессии
+  - **Acceptance criteria:**
+    - Автоматизированный сценарий на API 36 устанавливает обычный Split screen приложения и Settings на полном дисплее 600×900 dp, затем меняет полный дисплей на 390×844 dp без перезапуска процесса. Исходный multi-window подтверждается наблюдением; отсутствие этого предусловия завершает проверку неуспехом. Обходные настройки принудительной многооконности не включаются.
+    - Проверка наблюдает PhoneActivity в task режима fullscreen, отсутствие multi-window, портретную ориентацию и полное окно с учётом системных отступов; открытый экран и состояние каталога сохраняются, повторный launcher возвращает ту же сессию с одной карточкой приложения. Сценарий обнаруживает дефект механизма общей affinity и проходит с исправлением 2.15; фиксация Intent-флагов или task ID не подменяет результат. Изменённые параметры эмулятора восстанавливаются после проверки.
+    - Команда запуска и результаты сообщены в сессии; проверки затронутых нативных модулей и строгая OpenSpec validation проходят. При завершении фазы 2 повторяются её условия Ready to advance и `mise run check`; успешный сценарий переноса сам по себе не подтверждает физическое складывание, не закрывает другие замечания ревью и не означает готовности всей фазы.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Выполнить добавленный сценарий на эмуляторе API 36 и сообщить точную команду запуска. Подтвердить, что он обнаруживает исходную регрессию и проходит после исправления; наблюдения режима и границ окна сопоставить с `adb shell dumpsys activity activities` и `adb shell dumpsys window windows`.
+    - `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - При завершении фазы: `mise run check` и условия Ready to advance из Phase 2 в `plan.md`.
+  - **Dependencies:** 2.15
+  - **Files likely touched:** `tool/` (новый сценарий проверки переноса на эмуляторе); при необходимости — нативный сценарий в `android/app/src/androidTest/` и конфигурация его запуска в `android/app/build.gradle.kts`
+  - **Estimated scope:** M
+
+- [x] 2.17 После переноса двигателя системный жест «Назад» соблюдает сохранённую навигацию и ограничения закрытия
+  - **Acceptance criteria:**
+    - Нативный перенос по решению 6 сохраняет последнее значение готовности Flutter обработать «Назад» и применяет его к новому хосту после подключения того же FlutterEngine; дальнейшие уведомления Flutter продолжают менять регистрацию обработчика. Источником остаются навигация Flutter и её PopScope. Для восстановления жеста не требуются пересоздание Navigator, повторное открытие маршрута или действие пользователя; обработчик не включается безусловно и не заменяет существующие правила возврата проверкой глубины стека.
+    - Автоматизированный сценарий на Android API 36 с подтверждённой жестовой навигацией сохраняет «Подробности намерения» поверх Главной при переносе полного дисплея 600×900 → 390×844 dp без перезапуска процесса. Первый жест от края возвращает на Главную с активной PhoneActivity, как контроль без переноса, вместо закрытия Activity. Проверка наблюдает экран и действующую Activity, обнаруживает исходный дефект и проходит после исправления; KEYCODE_BACK или проверка регистрации callback не заменяют системный жест.
+    - После переноса жест в изменённом черновике создания намерения при скрытой клавиатуре запрашивает существующее подтверждение закрытия, а продолжение ввода сохраняет черновик. На Главной без верхнего маршрута жест сохраняет обычный выход по правилам платформы. Проверки затронутых нативных модулей и сценарий 2.16 проходят; перед объявлением фазы завершённой повторяется её итоговая проверка по Ready to advance из plan.md после этого исправления. Новые проверки не объявляют другие API и направления переноса неисправными и не заменяют физическую проверку владельца.
+  - **Verification:**
+    - `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Дополнить сценарий переноса из 2.16 проверками жеста и выполнить его на эмуляторе API 36 с `navigation_mode=2`. Сообщить точную команду и наблюдения возврата с подробностей, подтверждения закрытия изменённого черновика и выхода с Главной; подтвердить обнаружение исходной регрессии и успешный результат после исправления. Проверить исходную Activity и конечную PhoneActivity через `adb shell dumpsys activity activities`, сопоставить показанные страницы и восстановить изменённые параметры эмулятора после проверки.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - Итоговая проверка фазы после задачи: `mise run check` и условия Ready to advance из Phase 2 в `plan.md`; результаты сообщить в сессии без нового отчётного документа.
+  - **Dependencies:** 2.15, 2.16
+  - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DisplayHostActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`, `tool/` (сценарий переноса из 2.16)
+  - **Estimated scope:** M
+
+- [x] 2.18 Холодный запуск на большом дисплее сохраняет выбранное системой размещение окна
+  - **Acceptance criteria:**
+    - По решению 6 дизайна холодный вход без существующего хоста сохраняет размещение, с которым система запустила MainActivity: при выборе приложения второй стороной Split screen на большом дисплее LargeDisplayActivity остаётся в выбранной половине. Передача управления сохраняет связь с исходной Activity/task; используемый механизм подтверждён первичными источниками Android и действует в границах ADR-0031 на поддерживаемых API начиная с 24.
+    - Холодный запуск разграничен с отделением от прежней многооконной task при переходе в телефонную категорию. Существующие гарантии переноса, сохранения двигателя, повторного launcher и системного возврата из 2.15–2.17 сохраняются; измерение полного дисплея и граница 600 dp не меняются.
+    - Нативная регрессионная проверка запуска без существующего хоста обнаруживает потерю связи с исходной Activity/task и проходит после исправления. Проверки переноса и повторного входа остаются действующими; нативные проверки сами по себе не объявляются доказательством фактической половины Split screen, которую проверяет 2.19.
+  - **Verification:**
+    - С установленным JDK 21 или новее: `mise exec --no-deps -- android/gradlew -p android :app:testDebugUnitTest --console=plain`.
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Сообщить, какая нативная проверка обнаруживает исходную регрессию и проходит после исправления; сопоставить выбранный механизм с первичными источниками запуска Activity и многооконного режима, не подменяя наблюдение окна проверкой Intent-флагов.
+  - **Dependencies:** 2.15, 2.17
+  - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/MainActivity.kt`, `android/app/src/main/kotlin/software/doable/doable/DisplayWindowPolicy.kt`, `android/app/src/test/kotlin/software/doable/doable/DisplayWindowPolicyTest.kt`; при необходимости — `android/app/src/main/AndroidManifest.xml`
+  - **Estimated scope:** M
+
+- [x] 2.19 Сценарий Android подтверждает выбранную половину Split screen при холодном запуске
+  - **Acceptance criteria:**
+    - Автоматизированная проверка на Android API 36 и полном дисплее 600×900 dp подтверждает отсутствие процесса и task приложения до выбора его второй стороной обычного Split screen рядом с Settings. Предварительный полноэкранный запуск и последующее перемещение существующей task не заменяют холодный вход; неустановленное предусловие завершает проверку неуспехом. Настройки принудительной многооконности не включаются.
+    - После холодного входа наблюдаются LargeDisplayActivity в выбранной половине, фактические режим и границы окна и видимое соседнее приложение. Проверка обнаруживает потерю размещения до исправления 2.18 и проходит после него. Существующий сценарий переноса 600×900 → 390×844 dp и жестов из 2.16–2.17 также проходит; изменённые параметры эмулятора восстанавливаются после проверки.
+    - Итоговые проверки затронутых модулей и строгая OpenSpec validation проходят. Условия Ready to advance фазы 2 повторно оценены после исправления и сообщены в сессии вместе с непроведёнными проверками; перед объявлением фазы завершённой выполнен `mise run check`. Физическая проверка остаётся за владельцем по решению 6 дизайна, а успешный сценарий не заменяет её подтверждения и не означает готовности фазы 3 или всего изменения.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter build apk --debug --no-pub`
+    - Дополнить `tool/check_android_display_transfer.py` отдельным холодным входом и выполнить `python3 tool/check_android_display_transfer.py --serial <серийный номер эмулятора API 36>`. Сообщить точную команду, сборки до/после исправления, наблюдения предусловия, выбранной половины и соседнего приложения; сопоставить режим и границы с `adb shell dumpsys activity activities` и `adb shell dumpsys window windows`. Отдельно подтвердить сохранность сценариев 2.16–2.17 и восстановление параметров эмулятора.
+    - С установленным JDK 21 или новее: `mise exec --no-deps -- android/gradlew -p android :app:testDebugUnitTest --console=plain`.
+    - `mise exec --no-deps -- flutter test test/android`
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - При завершении фазы: `mise run check` и условия Ready to advance из Phase 2 в `plan.md`; результаты сообщить в сессии без нового отчётного документа.
+  - **Dependencies:** 2.16, 2.17, 2.18
+  - **Files likely touched:** `tool/check_android_display_transfer.py`
+  - **Estimated scope:** M
+
+## Phase 3: Календарь переходит к любому году и месяцу
+
+- [x] 3.1 Компоненты выбора года и месяца из модуля основ представлены в Widgetbook
+  - **Acceptance criteria:**
+    - По решениям 1 и 2 дизайна CalendarHeader получает доступную команду заголовка и открытое состояние, а PeriodPicker показывает 12 позиций по три в ряд; недопустимая позиция пуста. Потребитель передаёт тексты, доступные названия, признаки «показан» и «текущий» и обработчики; предметных типов, локализации и управления периодом в компонентах нет (ADR-0030).
+    - Примеры показывают годы, месяцы, совпадение обоих признаков, пустые крайние позиции и недоступные стрелки; шапка в открытом состоянии имеет обводку и шеврон вверх. Размеры и оформление следуют PeriodPicker и Parts из context/ в обеих темах.
+    - Нынешний потребитель шапки сохраняет работоспособность до подключения выбора в 3.5; выбор периода на Главной не меняется.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter analyze`
+    - В `mise run widgetbook` вручную сверить состояния с `context/doable-design-system/components/PeriodPicker/` и `context/doable-design/design/Parts.dc.html` в обеих темах; тесты внешнего вида и Widgetbook не добавлять.
+  - **Dependencies:** 1.9
+  - **Files likely touched:** `lib/src/design_system/components/calendar_header.dart`, `lib/src/design_system/components/period_picker.dart` (новый), `widgetbook/lib/calendar/calendar_header_use_cases.dart`, `widgetbook/lib/calendar/period_picker_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** M
+
+- [x] 3.2 Локализация предоставляет русские и английские названия команд выбора года и месяца
+  - **Acceptance criteria:**
+    - ARB содержат шесть пар названий команд из решения 8 дизайна: открыть выбор, вернуться к дням, предыдущие и следующие годы, предыдущий и следующий год.
+    - Сгенерированная локализация соответствует ARB; названия месяцев берутся из существующего механизма форматирования дат, а английский fallback сохраняется.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter gen-l10n`
+    - `mise exec --no-deps -- flutter analyze`
+    - `mise exec --no-deps -- flutter test test/app/localization`
+  - **Dependencies:** Нет
+  - **Files likely touched:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `lib/l10n/app_localizations.dart`, `lib/l10n/app_localizations_ru.dart`, `lib/l10n/app_localizations_en.dart`
+  - **Estimated scope:** M
+
+- [x] 3.3 Модель отметок повторяет чтение после отказа по завершённому выбору месяца даже при равном просмотре
+  - **Acceptance criteria:**
+    - Единый вход просмотра модели различает обычную установку и завершённый выбор месяца типизированной причиной по решению 2 дизайна; решение о чтении и окно остаются у модели отметок.
+    - После отказа завершённый выбор того же месяца запускает одно чтение; выбор другого месяца после отказа обновляет окно и также запускает одно чтение. Равный обычный просмотр и выбор того же месяца после успеха чтения не создают.
+    - Существующие гарантии сохранения подтверждённых отметок, отбрасывания устаревших ответов и независимости выдачи сохраняются (ADR-0024, ADR-0025); проверки модели различают перечисленные причины обращения.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart`
+  - **Dependencies:** 2.1
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart`
+  - **Estimated scope:** S
+
+- [x] 3.4 Подтвердить готовность компонентов, локализации и контракта отметок к подключению выбора в календарь
+  - **Acceptance criteria:**
+    - Результаты 3.1–3.3 подтверждены: состояния компонентов сверены в обеих темах, названия доступны в обеих локалях, модель различает завершённый выбор и обычный просмотр.
+    - Действующий календарь и его потребители проходят проверки до подключения нового управления; результаты сообщены в сессии без отчётного документа.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter analyze`
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/localization`
+    - Проверить результаты ручной сверки 3.1 и назвать принятые расхождения, если они есть.
+  - **Dependencies:** 3.1, 3.2, 3.3
+  - **Files likely touched:** Нет (только проверка)
+  - **Estimated scope:** XS
+
+- [x] 3.5 Оба каталога переходят к выбранному году и месяцу через встроенный выбор без изменения выбранной даты и выдачи
+  - **Acceptance criteria:**
+    - DailyChoiceCalendar реализует требование «Выбор года и месяца в календаре каталога»: внутренние состояния «закрыт», «страница лет», «месяцы года», страницы по 12 лет от 2020, стрелки лет и годов, закрытие заголовком и сворачивание ручкой. Выбор заменяет сетку дней без отдельного маршрута и свайпа; годы вне CalendarDate не предлагаются, переходы за диапазон недоступны.
+    - Выбор месяца возвращает настоящую сетку TableCalendarBase с выбранной датой как датой просмотра, если она входит в месяц, иначе с первым числом. Календарь сообщает ровно одно событие завершения с итоговым просмотром, даже равным прежнему, без дублирующего onViewportChanged; общий обработчик DailyChoiceCatalogBody сохраняет просмотр и передаёт причину модели из 3.3, не обращаясь к модели выдачи.
+    - Виджет-проверки покрывают переход из октября 2026 в март 2028 и сворачивание к 28 февраля — 5 марта, возврат к месяцу выбранной даты, отмену обоими способами, страницы у обеих границ CalendarDate и отсутствие событий просмотра на промежуточных шагах. Выбранная дата и фильтр сохраняются.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_boundaries_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`
+  - **Dependencies:** 2.19, 3.4
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart` (новый), `test/daily_choice/presentation/catalog/daily_choice_calendar_test_support.dart`
+  - **Estimated scope:** M
+
+- [x] 3.6 Проверка календаря с моделью подтверждает восстановление отметок после выбора месяца без лишних чтений
+  - **Acceptance criteria:**
+    - Сценарий «Повторный выбор показанного месяца восстанавливает отметки» выполнен через настоящий выбор календаря: при выбранной 2026-10-08 и просмотре 2026-11-01 после отказа повторный выбор ноября создаёт ровно одно чтение отметок; успех обновляет отметки и убирает Notice без чтения выдачи и изменения фильтра.
+    - Перестройка виджета, открытие, промежуточные шаги и закрытие выбора заголовком не запускают повтор; закрытие заголовком сохраняет просмотр и не сообщает ни смену просмотра, ни завершённый выбор месяца. Тот же месяц после успеха не читается, а другой месяц после отказа читается один раз своим окном.
+    - Сворачивание открытого выбора ручкой сообщает обычный просмотр «неделя» с прежней датой просмотра, без события завершённого выбора месяца. После отказа это создаёт ровно одно повторное чтение отметок; при успешных отметках без смены месяца чтения нет. Оба способа закрытия сохраняют выбранную дату, фильтр и выдачу без нового чтения выдачи.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart`
+    - В проверке настоящего календаря с моделью отдельно выполнить закрытие заголовком и сворачивание ручкой после отказа и после успеха; сравнить счётчики чтений отметок и выдачи до и после действия по решению 9 дизайна. Существующую регрессионную проверку повторного чтения при смене представления после отказа сохранить.
+  - **Dependencies:** 3.5
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test_support.dart`
+  - **Estimated scope:** S
+
+- [x] 3.7 Открытый выбор года и месяца сохраняется независимо в каждом экземпляре каталога
+  - **Acceptance criteria:**
+    - Проверки корневого каталога подтверждают сохранение страницы лет и месяцев выбранного года при смене пункта, повторном выборе текущего пункта и возврате со страницы поверх каталога вместе с фильтром, выбранной датой, выдачей и прокруткой.
+    - Два экземпляра каталога на заданную дату имеют независимые состояния выбора; возврат по истории сохраняет открытый выбор прежнего экземпляра, не меняя корневой каталог (ADR-0028).
+    - Подтверждённое изменение, смена локали и обновление текущей локальной даты не закрывают выбор; текущие признаки обновляются без изменения просмотра. Новый экземпляр после завершения прежнего жизненного цикла начинает с прежнего начального состояния недели, без восстановления выбора.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_state_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_lifecycle_test.dart`
+  - **Dependencies:** 3.5
+  - **Files likely touched:** `test/app/navigation/app_shell_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`; при необходимости — `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`
+  - **Estimated scope:** M
+
+- [x] 3.8 Доступные команды выбора года и месяца работают на русском и английском без свайпа
+  - **Acceptance criteria:**
+    - Семантическая активация открывает выбор, листает страницы лет и годы, выбирает год и месяц, возвращает к дням и сворачивает календарь; названия команд соответствуют решению 8 дизайна в обеих локалях.
+    - Ячейка года называет год, ячейка месяца — месяц и год; показанные и текущие год и месяц различимы, включая совпадение признаков. Пустые крайние позиции не объявляются и не выбираются, стрелки сообщают недоступность на границе.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`
+  - **Dependencies:** 3.5
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`; при необходимости — `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/design_system/components/period_picker.dart`, `lib/src/design_system/components/calendar_header.dart`
+  - **Estimated scope:** M
+
+- [x] 3.9 Подтвердить готовность фазы 3: выбор года и месяца соответствует спецификации и сохраняет поведение фазы 2
+  - **Acceptance criteria:**
+    - Сценарии выбора, сохранение состояния и доступность подтверждены; проверки 3.6 доказывают восстановление отметок и отсутствие лишних чтений. Поведение фазы 2, включая закрепление, выбор дня, выдачу, отметки и нижнюю границу поддержки, сохраняется.
+    - Компоненты выбора в Widgetbook и оба каталога на устройстве сверены с макетами лет и месяцев в обеих темах; непринятых расхождений нет.
+    - Полные проверки репозитория и строгая проверка изменения проходят; результаты и принятые расхождения сообщены в сессии без нового отчётного документа.
+  - **Verification:**
+    - `mise run check`
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - Вручную сверить выбор в `mise run widgetbook` и на устройстве с `context/doable-design-system/components/PeriodPicker/` и `context/doable-design/design/Parts.dc.html`; в обоих каталогах пройти открытие, переход к далёкому месяцу, закрытие и сворачивание в обеих темах.
+  - **Dependencies:** 3.4, 3.5, 3.6, 3.7, 3.8
+  - **Files likely touched:** Нет (только проверка)
+  - **Estimated scope:** XS

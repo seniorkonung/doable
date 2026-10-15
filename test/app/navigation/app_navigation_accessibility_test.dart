@@ -11,6 +11,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
@@ -123,7 +124,7 @@ void main() {
   });
 
   testWidgets('значки пунктов не обрезаются, каждый '
-      'пункт выбирается касанием, а заголовок его корневой страницы виден: '
+      'пункт выбирается касанием, Главная и граф сохраняют заголовки: '
       '$code', (tester) async {
     final semantics = tester.ensureSemantics();
     tester.view.physicalSize = _screen;
@@ -133,7 +134,7 @@ void main() {
     await _start(tester, locale);
 
     _expectWholeIcons(tester, selected: AppDestination.home);
-    _expectVisibleTitle(tester, names, AppDestination.home);
+    _expectRootContent(tester, names, AppDestination.home);
 
     for (final selected in [
       AppDestination.dailyChoices,
@@ -145,7 +146,7 @@ void main() {
 
       expect(_selected(tester), selected);
       _expectWholeIcons(tester, selected: selected);
-      _expectVisibleTitle(tester, names, selected);
+      _expectRootContent(tester, names, selected);
       expect(tester.takeException(), isNull);
     }
     semantics.dispose();
@@ -271,8 +272,9 @@ String _destinationLabel(
 }
 
 /// Экранный диктор проходит три пункта по порядку с названием, ролью,
-/// положением и признаком выбранного, а из корневых страниц слышит заголовок
-/// только открытой. Текстовые подписи в панели не рисуются.
+/// положением и признаком выбранного. Главная и граф объявляют свой заголовок
+/// только при открытии; у дневных выборов заголовка нет.
+/// Текстовые подписи в панели не рисуются.
 void _expectAnnounced(
   WidgetTester tester,
   Map<AppDestination, String> names, {
@@ -309,11 +311,16 @@ void _expectAnnounced(
         _destinationLabel(tester, names, destination),
     ],
   );
-  expect([
-    for (final node in traversal)
-      if (node.flagsCollection.isHeader && names.containsValue(node.label))
-        node.label,
-  ], rootHeaderVisible ? [names[selected]] : <String>[]);
+  expect(
+    [
+      for (final node in traversal)
+        if (node.flagsCollection.isHeader && names.containsValue(node.label))
+          node.label,
+    ],
+    rootHeaderVisible && selected != AppDestination.dailyChoices
+        ? [names[selected]]
+        : <String>[],
+  );
 
   expect(appNavigationDestinations(), findsExactly(3));
   final panel = tester.renderObject(_bar);
@@ -366,21 +373,27 @@ void _expectWholeIcons(
   }
 }
 
-/// Заголовок открытой корневой страницы — название её пункта: шапка
-/// показывает его на экране без обрезки по высоте, а экранный диктор получает
-/// его целиком.
+/// Дневные выборы открываются с календарём без шапки. Главная и граф
+/// показывают название пункта в шапке без обрезки по высоте, а экранный
+/// диктор получает его целиком.
 ///
 /// Material ограничивает масштаб заголовка шапки и сокращает многоточием
 /// заголовок, не помещающийся по ширине; квадратные глифы тестового шрифта
 /// шире настоящих, поэтому полнота названия проверяется по его доступному
 /// названию, а не по ширине строки.
-void _expectVisibleTitle(
+void _expectRootContent(
   WidgetTester tester,
   Map<AppDestination, String> names,
   AppDestination destination,
 ) {
   final name = names[destination]!;
   final appBar = _appBar(destination);
+  if (destination == AppDestination.dailyChoices) {
+    expect(appBar, findsNothing);
+    expect(find.text(name), findsNothing);
+    expect(find.byType(DailyChoiceCalendar), findsOneWidget);
+    return;
+  }
   final title = find.descendant(of: appBar, matching: find.text(name));
   expect(title, findsOneWidget);
   final rect = tester.getRect(title);

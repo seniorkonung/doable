@@ -321,7 +321,10 @@ void main() {
         await _select(tester, AppDestination.dailyChoices);
         await _until(
           tester,
-          find.text(l10n.dailyChoiceCatalogTotalCount(count)),
+          find.text(
+            l10n.dailyChoiceCatalogTotalCount(count),
+            skipOffstage: false,
+          ),
         );
         final page = find.byType(DailyChoiceCatalogPage);
 
@@ -386,7 +389,10 @@ void main() {
         await _select(tester, AppDestination.dailyChoices);
         await _until(
           tester,
-          find.text(l10n.dailyChoiceCatalogTotalCount(count)),
+          find.text(
+            l10n.dailyChoiceCatalogTotalCount(count),
+            skipOffstage: false,
+          ),
         );
         final page = find.byType(DailyChoiceCatalogPage);
         if (insets.keyboard > 0) {
@@ -792,8 +798,8 @@ Future<void> _buildEveryTab(WidgetTester tester) async {
 
 /// Элемент [finder] виден целиком.
 ///
-/// Элемент лежит в видимой части корневой страницы — под её шапкой и над
-/// панелью либо клавиатурой. Элемент внутри прокрутки, кроме того, лежит в
+/// Элемент лежит в видимой части корневой страницы — под шапкой, если она
+/// есть, и над панелью либо клавиатурой. Элемент внутри прокрутки лежит в
 /// видимой части каждой объемлющей его прокрутки, не обрезанной её краями, а
 /// нажатия у его верхнего и нижнего края попадают в него.
 void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
@@ -802,7 +808,10 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
   final rect = tester.getRect(finder);
   // Видимая часть корневой страницы, суженная видимой частью каждой
   // объемлющей прокрутки.
-  var visibleTop = tester.getRect(find.byType(AppBar)).bottom;
+  final appBar = find.byType(AppBar);
+  var visibleTop = appBar.evaluate().isEmpty
+      ? insets.safeTop
+      : tester.getRect(appBar).bottom;
   var visibleBottom =
       tester.view.physicalSize.height / tester.view.devicePixelRatio -
       math.max(insets.keyboard, insets.barExtent);
@@ -910,10 +919,9 @@ Future<void> _scrollToEnd(WidgetTester tester, Finder page) async {
   final appBar = find.descendant(of: page, matching: find.byType(AppBar));
   for (var attempt = 0; attempt < 120; attempt++) {
     final before = _scrollOffsets(tester, page);
-    final top = math.max(
-      tester.getRect(list).top,
-      tester.getRect(appBar).bottom,
-    );
+    final top = appBar.evaluate().isEmpty
+        ? tester.getRect(list).top
+        : math.max(tester.getRect(list).top, tester.getRect(appBar).bottom);
     await tester.dragFrom(
       Offset(tester.getRect(list).left + 24, top + 24),
       const Offset(0, -200),

@@ -2,10 +2,14 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/design_system/components/day_heading.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
@@ -23,16 +27,16 @@ final _configurations = [
 /// Локальное сегодня проверок свёрнутой недели и прокрутки.
 final _today = date(2026, 10, 4);
 
-/// Раскрытые месяцы с четырьмя и шестью неделями, крайними по числу строк:
+/// Месяцы разной длины с одинаковой шестинедельной сеткой:
 /// сегодня и выбранный день — середина месяца.
 final _months = [
   (
-    name: 'февраль 2027 года из четырёх недель',
+    name: 'февраль 2027 года',
     today: date(2027, 2, 15),
-    weeks: weeksFrom(date(2027, 2, 1), 4),
+    weeks: weeksFrom(date(2027, 2, 1), 6),
   ),
   (
-    name: 'март 2026 года из шести недель',
+    name: 'март 2026 года',
     today: date(2026, 3, 15),
     weeks: weeksFrom(date(2026, 2, 23), 6),
   ),
@@ -53,26 +57,24 @@ void main() {
           catalogPageItem(1, date: _today),
         ], total: 1);
         await tester.pumpAndSettle();
-        final l10n = _l10n(tester);
-
         _expectColumns(tester, weeksFrom(date(2026, 9, 28), 1));
         _expectCommands(tester);
         expect(
           find.descendant(
-            of: find.byType(DailyChoiceCalendar),
+            of: find.byType(DayHeading),
             matching: find.text(_selectedDateLabel(tester, _today)),
           ),
           findsOneWidget,
         );
         await _expectWholeTexts(tester);
 
-        await _tapCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+        await swipeToNextPeriod(tester);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-        await _tapCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
+        await swipeToPreviousPeriod(tester);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
 
         final day = date(2026, 10, 1);
-        await _reveal(tester, calendarDay(day));
+        _expectReachable(tester, calendarDay(day));
         _expectTappable(tester, calendarDay(day));
         await tester.tap(calendarDay(day));
         await tester.pump();
@@ -99,14 +101,12 @@ void main() {
           final month = _measure(tester);
           expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
           expect(month.rows, shown.weeks.length);
-          expect(month.rowHeight, moreOrLessEquals(week.rowHeight));
-          // Шапка прежняя, поэтому календарь вырастает ровно на строки
-          // месяца, и выдача сдвигается вниз на столько же.
-          final grown = (shown.weeks.length - 1) * week.rowHeight;
-          expect(
-            month.calendar.height - week.calendar.height,
-            moreOrLessEquals(grown),
-          );
+          expect(week.rowHeight, greaterThanOrEqualTo(54));
+          expect(month.rowHeight, moreOrLessEquals(44));
+          // Неделя и месяц используют разные высоты строк и подписи.
+          // Выдача сдвигается ровно на прирост высоты календаря.
+          final grown = month.calendar.height - week.calendar.height;
+          expect(grown, greaterThan(0));
           expect(month.countOffset - week.countOffset, moreOrLessEquals(grown));
           // Месяц раскрывается внутри страницы: прокрутка остаётся одной.
           expect(_pageScroll, findsOneWidget);
@@ -115,7 +115,10 @@ void main() {
           await _expectWholeTexts(tester);
 
           for (final row in shown.weeks) {
-            await _reveal(tester, calendarDay(row.first, skipOffstage: false));
+            _expectReachable(
+              tester,
+              calendarDay(row.first, skipOffstage: false),
+            );
             for (final day in row) {
               _expectTappable(tester, calendarDay(day));
             }
@@ -125,7 +128,7 @@ void main() {
           final lastDay = shown.weeks
               .expand((week) => week)
               .lastWhere((day) => day.month == shown.today.month);
-          await _reveal(tester, calendarDay(lastDay, skipOffstage: false));
+          _expectReachable(tester, calendarDay(lastDay, skipOffstage: false));
           await tester.tap(calendarDay(lastDay));
           await tester.pump();
           repository.completeFirst(1, [
@@ -134,7 +137,7 @@ void main() {
           await _settle(tester);
           expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
           expect(
-            find.byTooltip(l10n.dailyChoiceCalendarCollapse),
+            find.bySemanticsLabel(l10n.dailyChoiceCalendarCollapse),
             findsOneWidget,
           );
 
@@ -156,8 +159,8 @@ void main() {
         });
       }
 
-      testWidgets('у страницы одна вертикальная прокрутка: жест из '
-          'календаря прокручивает страницу, горизонтальный листает неделю, '
+      testWidgets('календарь закреплён над единственной прокруткой: '
+          'вертикальный жест по нему не двигает выдачу, горизонтальный листает неделю, '
           'а фильтры, подгрузка и последняя строка достижимы жестами над '
           'панелью без зарезервированного места', (tester) async {
         final repository = CatalogPageRepository();
@@ -176,21 +179,31 @@ void main() {
         expect(_pageScroll, findsOneWidget);
         final scroll = tester.state<ScrollableState>(_pageScroll).position;
 
-        final day = calendarDay(date(2026, 10, 1));
-        await _reveal(tester, day);
+        final day = calendarDay(date(2026, 10, 1), skipOffstage: false);
+        _expectReachable(tester, day);
         final before = scroll.pixels;
+        final calendarRect = tester.getRect(find.byType(DailyChoiceCalendar));
         await tester.drag(day, const Offset(0, -150));
         await tester.pumpAndSettle();
-        expect(scroll.pixels, greaterThan(before + 100));
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
+        expect(scroll.pixels, before);
+        expect(
+          visibleWeeks(tester, skipOffstage: false),
+          weeksFrom(date(2026, 9, 28), 1),
+        );
 
-        await _reveal(tester, day);
+        _expectReachable(tester, day);
         final scrolled = scroll.pixels;
         // Больше половины, но меньше ширины недели.
         await tester.drag(day, const Offset(-200, 0));
         await tester.pumpAndSettle();
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
         expect(scroll.pixels, scrolled);
+
+        await tester.drag(_pageScroll, const Offset(0, -300));
+        await tester.pumpAndSettle();
+        expect(scroll.pixels, greaterThan(scrolled));
+        expect(tester.getRect(find.byType(DailyChoiceCalendar)), calendarRect);
+        expect(find.byType(DayHeading).hitTestable(), findsNothing);
 
         for (final key in _filterKeys) {
           await _dragUntilReachable(
@@ -217,8 +230,67 @@ void main() {
         await _expectWholeTexts(tester);
         await _dragUntilReachable(
           tester,
-          find.byTooltip(l10n.dailyChoiceCalendarExpand, skipOffstage: false),
+          find.bySemanticsLabel(
+            l10n.dailyChoiceCalendarExpand,
+            skipOffstage: false,
+          ),
         );
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('смена выбранного дня возвращает выдачу к заголовку, '
+          'а повторный выбор, просмотр и раскрытие сохраняют смещение', (
+        tester,
+      ) async {
+        final repository = CatalogPageRepository();
+        await _open(tester, repository, locale, today: _today);
+        final items = [
+          for (var number = 1; number <= 20; number++)
+            catalogPageItem(number, date: _today),
+        ];
+        repository.completeFirst(0, items, total: 20);
+        await tester.pumpAndSettle();
+        final headingTop = tester.getTopLeft(find.byType(DayHeading)).dy;
+        final scroll = tester.state<ScrollableState>(_pageScroll).position;
+        await tester.drag(_pageScroll, const Offset(0, -350));
+        await tester.pumpAndSettle();
+        final offset = scroll.pixels;
+        expect(offset, greaterThan(0));
+
+        await tester.tap(calendarDay(_today));
+        await tester.pumpAndSettle();
+        expect(scroll.pixels, offset);
+        expect(repository.queries, hasLength(1));
+        await swipeToNextPeriod(tester);
+        expect(scroll.pixels, offset);
+        await _tapCommand(tester, _l10n(tester).dailyChoiceCalendarExpand);
+        expect(scroll.pixels, offset);
+        final expandedTop = tester.getTopLeft(find.byType(DailyChoiceCalendar));
+        await tester.drag(_pageScroll, const Offset(0, -100));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getTopLeft(find.byType(DailyChoiceCalendar)),
+          expandedTop,
+        );
+        await _tapCommand(tester, _l10n(tester).dailyChoiceCalendarCollapse);
+
+        final nextDay = date(2026, 10, 9);
+        await tester.tap(calendarDay(nextDay));
+        // Быстрый ответ не оставляет кадра с короткой загрузкой, который
+        // сам ограничил бы смещение прокрутки до нуля.
+        repository.completeFirst(1, [
+          for (var number = 1; number <= 20; number++)
+            catalogPageItem(number, date: nextDay),
+        ], total: 20);
+        await tester.pumpAndSettle();
+        expect(find.byType(DayHeading).hitTestable(), findsOneWidget);
+        expect(tester.getTopLeft(find.byType(DayHeading)).dy, headingTop);
+        expect(find.text('9 октября 2026'), findsOneWidget);
+        _expectReachable(
+          tester,
+          find.byKey(const ValueKey('daily-choice-row-1')),
+        );
+        expect(scroll.pixels, 0);
         expect(tester.takeException(), isNull);
       });
 
@@ -329,8 +401,7 @@ const _filterKeys = [
   'daily-choice-clear-filters',
 ];
 
-/// Общая вертикальная прокрутка страницы каталога. Перелистывание периодов
-/// календаря — горизонтальная прокрутка внутри неё.
+/// Единственная вертикальная прокрутка выдачи под календарём.
 final _pageScroll = find.descendant(
   of: find.byType(DailyChoiceCatalogPage),
   matching: find.byWidgetPredicate(
@@ -358,21 +429,30 @@ AppLocalizations _l10n(WidgetTester tester) => AppLocalizations.of(
   tester.element(find.byType(DailyChoiceCalendar, skipOffstage: false)),
 );
 
-/// Подпись полной выбранной даты в шапке календаря по текущей локали.
+/// Полная выбранная дата в заголовке дня по текущей локали.
 String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
   final context = tester.element(find.byType(DailyChoiceCalendar));
-  return AppLocalizations.of(context).dailyChoiceCalendarSelectedDate(
-    MaterialLocalizations.of(context)
-        .formatFullDate(DateTime.utc(value.year, value.month, value.day)),
-  );
+  return DateFormat(
+    'd MMMM y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(value.year, value.month, value.day));
 }
 
-/// Видимая часть страницы: под шапкой и над панелью основной навигации.
+/// Видимая часть страницы: под строкой состояния и над основной навигацией.
 Rect _visibleArea(WidgetTester tester) {
-  final appBar = tester.getRect(find.byType(AppBar));
+  final safeTop = MediaQuery.paddingOf(
+    tester.element(find.byType(DailyChoiceCatalogPage)),
+  ).top;
   final bar = tester.getRect(find.byType(AppNavigationBar));
   expect(find.byType(FloatingActionButton), findsNothing);
-  return Rect.fromLTRB(0, appBar.bottom, _screen.width, bar.top);
+  return Rect.fromLTRB(0, safeTop, _screen.width, bar.top);
+}
+
+/// Область жестов по выдаче исключает закреплённый календарь.
+Rect _listArea(WidgetTester tester) {
+  final area = _visibleArea(tester);
+  final calendar = tester.getRect(find.byType(DailyChoiceCalendar));
+  return Rect.fromLTRB(area.left, calendar.bottom, area.right, area.bottom);
 }
 
 /// Элемент [finder] целиком лежит над панелью, и касание его середины достигает его.
@@ -406,8 +486,12 @@ void _expectAtEnd(WidgetTester tester, Finder finder) {
 /// листается крупнее.
 Future<void> _dragUntilReachable(WidgetTester tester, Finder finder) async {
   for (var step = 0; step < 200; step++) {
-    final area = _visibleArea(tester);
     final isBuilt = finder.evaluate().isNotEmpty;
+    final inList = find
+        .ancestor(of: finder, matching: _pageScroll)
+        .evaluate()
+        .isNotEmpty;
+    final area = !isBuilt || inList ? _listArea(tester) : _visibleArea(tester);
     if (isBuilt && _contains(area, tester.getRect(finder))) {
       _expectReachable(tester, finder);
       return;
@@ -417,8 +501,9 @@ Future<void> _dragUntilReachable(WidgetTester tester, Finder finder) async {
         : tester.getRect(finder).bottom > area.bottom
         ? -120
         : 120;
+    final listArea = _listArea(tester);
     await tester.dragFrom(
-      Offset(area.left + 24, area.center.dy),
+      Offset(listArea.left + 24, listArea.center.dy),
       Offset(0, shift),
     );
     await _settle(tester);
@@ -431,7 +516,7 @@ Future<void> _dragToEnd(WidgetTester tester) async {
   final scroll = tester.state<ScrollableState>(_pageScroll).position;
   for (var step = 0; step < 200; step++) {
     if (scroll.pixels >= scroll.maxScrollExtent - _epsilon) return;
-    final area = _visibleArea(tester);
+    final area = _listArea(tester);
     await tester.dragFrom(
       Offset(area.left + 24, area.center.dy),
       const Offset(0, -300),
@@ -450,28 +535,10 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump();
 }
 
-/// Прокручивает страницу так, чтобы элемент календаря [finder] оказался
-/// посередине экрана. Перелистывание календаря при этом не меняется.
-Future<void> _reveal(WidgetTester tester, Finder finder) async {
-  // Ближайшая прокрутка дня — горизонтальная страница периода, поэтому
-  // положение в общей прокрутке определяется через календарь целиком.
-  await tester
-      .state<ScrollableState>(_pageScroll)
-      .position
-      .ensureVisible(
-        tester.renderObject(
-          find.byType(DailyChoiceCalendar, skipOffstage: false),
-        ),
-        alignment: 0.5,
-        targetRenderObject: tester.renderObject(finder),
-      );
-  await tester.pump();
-}
-
-/// Выполняет команду шапки календаря касанием после прокрутки к ней.
+/// Выполняет команду закреплённого календаря касанием.
 Future<void> _tapCommand(WidgetTester tester, String name) async {
-  await _reveal(tester, find.byTooltip(name, skipOffstage: false));
-  final command = find.byTooltip(name);
+  _expectReachable(tester, find.bySemanticsLabel(name, skipOffstage: false));
+  final command = find.bySemanticsLabel(name);
   _expectTappable(tester, command);
   await tester.tap(command);
   await _settle(tester);
@@ -565,7 +632,7 @@ void _expectColumns(WidgetTester tester, List<List<CalendarDate>> weeks) {
     expect(row.last.right, moreOrLessEquals(calendar.right));
     for (final (column, cell) in row.indexed) {
       expect(cell.width, greaterThanOrEqualTo(kMinInteractiveDimension));
-      expect(cell.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+      expect(cell.height, greaterThanOrEqualTo(44));
       expect(cell.top, moreOrLessEquals(row.first.top));
       if (column > 0) {
         expect(cell.left, moreOrLessEquals(row[column - 1].right));
@@ -578,19 +645,30 @@ void _expectColumns(WidgetTester tester, List<List<CalendarDate>> weeks) {
   expect(rows.last.last.bottom, lessThanOrEqualTo(calendar.bottom + _epsilon));
 }
 
-/// Команды шапки календаря лежат в ширине экрана и не меньше области нажатия.
+/// Команды месяца и ручка лежат в ширине экрана и не меньше области нажатия.
 void _expectCommands(WidgetTester tester) {
-  final commands = find.descendant(
-    of: find.byType(DailyChoiceCalendar, skipOffstage: false),
-    matching: find.byType(IconButton, skipOffstage: false),
-  );
-  expect(commands, findsNWidgets(3));
-  for (final command in commands.evaluate()) {
-    final rect = _globalRect(command.renderObject! as RenderBox);
+  final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
+  final isExpanded =
+      tester.widget<DailyChoiceCalendar>(calendar).viewport.mode ==
+      DailyChoiceCalendarMode.month;
+  final texts = AppLocalizations.of(tester.element(calendar));
+  final names = [
+    if (isExpanded) ...[
+      texts.dailyChoiceCalendarPreviousMonth,
+      texts.dailyChoiceCalendarNextMonth,
+    ],
+    isExpanded
+        ? texts.dailyChoiceCalendarCollapse
+        : texts.dailyChoiceCalendarExpand,
+  ];
+  for (final name in names) {
+    final command = find.bySemanticsLabel(name, skipOffstage: false);
+    expect(command, findsOneWidget);
+    final rect = _globalRect(tester.renderObject<RenderBox>(command));
     expect(rect.left, greaterThanOrEqualTo(-_epsilon));
     expect(rect.right, lessThanOrEqualTo(_screen.width + _epsilon));
-    expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
-    expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+    expect(rect.width, greaterThanOrEqualTo(DoableMetrics.tapMin));
+    expect(rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
   }
 }
 
@@ -600,6 +678,7 @@ void _expectCommands(WidgetTester tester) {
 Future<void> _expectWholeTexts(WidgetTester tester) async {
   final scroll = tester.state<ScrollableState>(_pageScroll).position;
   final initial = scroll.pixels;
+  _expectWholeTextsIn(tester, find.byType(DailyChoiceCalendar));
   var offset = scroll.minScrollExtent;
   while (true) {
     scroll.jumpTo(offset);

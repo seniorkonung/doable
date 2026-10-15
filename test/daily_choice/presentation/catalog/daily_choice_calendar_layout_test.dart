@@ -3,9 +3,14 @@ import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.da
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/design_system/components/month_grid_weekday.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 
@@ -19,26 +24,26 @@ final _configurations = [
   (locale: const Locale('en'), full: false),
 ];
 
-/// Короткие подписи колонок с понедельника по воскресенье.
+/// Короткие подписи дней с понедельника по воскресенье.
 const _weekdays = {
   'ru': ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'],
   'en': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
 };
 
-/// Раскрытые месяцы с четырьмя, пятью и шестью неделями.
+/// Месяцы разной длины всегда занимают шесть недель.
 final _months = [
   (
-    name: 'февраль 2027 года из четырёх недель',
+    name: 'февраль 2027 года',
     focusedDate: date(2027, 2, 15),
-    weeks: weeksFrom(date(2027, 2, 1), 4),
+    weeks: weeksFrom(date(2027, 2, 1), 6),
   ),
   (
-    name: 'апрель 2026 года из пяти недель',
+    name: 'апрель 2026 года',
     focusedDate: date(2026, 4, 15),
-    weeks: weeksFrom(date(2026, 3, 30), 5),
+    weeks: weeksFrom(date(2026, 3, 30), 6),
   ),
   (
-    name: 'март 2026 года из шести недель',
+    name: 'март 2026 года',
     focusedDate: date(2026, 3, 15),
     weeks: weeksFrom(date(2026, 2, 23), 6),
   ),
@@ -119,15 +124,20 @@ void main() {
       );
       for (final day in statuses.keys) {
         final cell = calendarDay(day);
-        final mark = find.descendant(of: cell, matching: find.byType(Icon));
+        final mark = find.descendant(
+          of: cell,
+          matching: find.byType(DayMarkIndicator),
+        );
         final number = find.descendant(
           of: cell,
           matching: find.text('${day.day}'),
         );
         final markRect = _rect(tester, mark);
         expect(_contains(_rect(tester, cell), markRect), isTrue);
-        expect(markRect.top, greaterThan(_rect(tester, number).bottom));
-        expect(markRect.height, greaterThanOrEqualTo(12));
+        expect(
+          markRect.top,
+          greaterThanOrEqualTo(_rect(tester, number).bottom),
+        );
       }
 
       consumer.replaceInputs(hasDayMarksReadFailure: true);
@@ -137,8 +147,8 @@ void main() {
       final failure = find.text('Отметки дней не загружены.');
       _expectFullyShown(tester, failure, within: failed.calendar);
       expect(
-        _rect(tester, failure).bottom,
-        lessThan(_rect(tester, calendarDay(date(2026, 9, 28))).top),
+        _rect(tester, failure).top,
+        greaterThanOrEqualTo(_rect(tester, find.byType(CalendarHandle)).bottom),
       );
       expect(tester.takeException(), isNull);
     }
@@ -151,7 +161,7 @@ void main() {
     group('экран 360×780, $language', () {
       testWidgets(
         'свёрнутая неделя показывает семь колонок, числа, подписи дней '
-        'недели, выбранную дату и команды целиком, и всё нажимается',
+        'недели и команды целиком, и всё нажимается',
         (tester) async {
           final consumer = await _pumpOnPhone(
             tester,
@@ -160,19 +170,10 @@ void main() {
           );
           final weeks = weeksFrom(date(2026, 9, 28), 1);
 
-          _expectLaidOut(
-            tester,
-            weeks: weeks,
-            weekdays: _weekdays[language]!,
-            selectedDate: date(2026, 10, 4),
-          );
+          _expectLaidOut(tester, weeks: weeks, weekdays: _weekdays[language]!);
           await _tapEveryDay(tester, consumer, weeks);
           final localizations = _localizations(tester);
           await _tapEveryCommand(tester, consumer, {
-            localizations.dailyChoiceCalendarPreviousWeek: week(
-              date(2026, 9, 27),
-            ),
-            localizations.dailyChoiceCalendarNextWeek: week(date(2026, 10, 11)),
             localizations.dailyChoiceCalendarExpand: month(date(2026, 10, 4)),
           });
         },
@@ -180,9 +181,12 @@ void main() {
 
       if (!full) return;
 
-      // Крайние месяцы: строки сетки не ветвят раскладку, пять недель
-      // лежат между ними и проверяются вместе с высотами ниже.
-      for (final shown in [_months.first, _months.last]) {
+      // Февраль и март проверяют выбор всех дней, включая дополнительные
+      // строки соседнего месяца; апрель ниже проверяет постоянную высоту.
+      for (final (shown, nextFocusedDate) in [
+        (_months.first, date(2027, 3, 14)),
+        (_months.last, date(2026, 4, 5)),
+      ]) {
         testWidgets(
           'раскрытый ${shown.name} размещается целиком, а все его дни и '
           'команды нажимаются',
@@ -198,7 +202,6 @@ void main() {
               tester,
               weeks: shown.weeks,
               weekdays: _weekdays[language]!,
-              selectedDate: focused,
             );
             await _tapEveryDay(tester, consumer, shown.weeks);
             final localizations = _localizations(tester);
@@ -207,7 +210,7 @@ void main() {
                 date(focused.year, focused.month - 1, 1),
               ),
               localizations.dailyChoiceCalendarNextMonth: month(
-                date(focused.year, focused.month + 1, 1),
+                nextFocusedDate,
               ),
               localizations.dailyChoiceCalendarCollapse: week(focused),
             });
@@ -227,7 +230,7 @@ void main() {
         final weekLayout = await _calendarLayout(tester);
         expect(weekLayout.rows, 1);
 
-        final expand = find.byTooltip(
+        final expand = find.bySemanticsLabel(
           _localizations(tester).dailyChoiceCalendarExpand,
         );
         await _reveal(tester, expand);
@@ -247,17 +250,25 @@ void main() {
           layouts.add(await _calendarLayout(tester));
         }
 
-        expect(layouts.map((layout) => layout.rows), [1, 4, 5, 6]);
+        expect(layouts.map((layout) => layout.rows), [1, 6, 6, 6]);
         final rowHeight = weekLayout.rowHeight;
-        expect(rowHeight, greaterThanOrEqualTo(kMinInteractiveDimension));
+        expect(rowHeight, greaterThanOrEqualTo(54));
+        final monthRowHeight = layouts[1].rowHeight;
+        expect(monthRowHeight, moreOrLessEquals(44));
+        expect(
+          layouts.skip(1).map((layout) => layout.calendar.height),
+          everyElement(moreOrLessEquals(layouts[1].calendar.height)),
+        );
         for (final layout in layouts) {
           // Сетка занимает ровно свои строки одинаковой высоты, а каталог
           // начинается сразу под календарём: ничего не обрезано и не
           // перекрыто.
-          expect(layout.rowHeight, moreOrLessEquals(rowHeight));
+          if (layout.rows > 1) {
+            expect(layout.rowHeight, moreOrLessEquals(monthRowHeight));
+          }
           expect(
             layout.gridHeight,
-            moreOrLessEquals(layout.rows * rowHeight),
+            moreOrLessEquals(layout.rows * layout.rowHeight),
             reason: '${layout.rows} строк',
           );
           expect(
@@ -266,11 +277,9 @@ void main() {
             reason: '${layout.rows} строк',
           );
         }
-        // Высота шапки зависит от длины названия месяца, поэтому
-        // раскрытие сравнивается на одном и том же феврале 2027 года.
         expect(
-          layouts[1].calendar.height - weekLayout.calendar.height,
-          moreOrLessEquals(3 * rowHeight),
+          layouts[1].calendar.height,
+          greaterThan(weekLayout.calendar.height),
         );
 
         await tester.scrollUntilVisible(
@@ -309,7 +318,7 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(scroll.pixels, greaterThan(before + 100));
-          expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+          expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
           expect(consumer.events, isEmpty);
 
           final scrolled = scroll.pixels;
@@ -356,15 +365,20 @@ AppLocalizations _localizations(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(DailyChoiceCalendar)));
 
 /// Проверяет, что календарь с видимыми неделями [weeks] целиком размещён в
-/// ширине экрана: семь колонок дней, подписи колонок над ними, шапка над
-/// подписями и все тексты показаны полностью.
+/// ширине экрана: семь колонок дней, подписи внутри недели или над месяцем,
+/// все тексты показаны полностью.
 void _expectLaidOut(
   WidgetTester tester, {
   required List<List<CalendarDate>> weeks,
   required List<String> weekdays,
-  required CalendarDate selectedDate,
 }) {
   expect(visibleWeeks(tester), weeks);
+  final isWeek =
+      tester
+          .widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar))
+          .viewport
+          .mode ==
+      DailyChoiceCalendarMode.week;
   final screen = Offset.zero & _screen;
   final calendar = _rect(tester, find.byType(DailyChoiceCalendar));
   expect(calendar.left, moreOrLessEquals(screen.left));
@@ -381,7 +395,7 @@ void _expectLaidOut(
     expect(row.last.right, moreOrLessEquals(calendar.right));
     for (final (column, cell) in row.indexed) {
       expect(cell.width, greaterThanOrEqualTo(kMinInteractiveDimension));
-      expect(cell.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+      expect(cell.height, greaterThanOrEqualTo(isWeek ? 54 : 44));
       expect(cell.top, moreOrLessEquals(row.first.top));
       expect(cell.height, moreOrLessEquals(row.first.height));
       if (column > 0) {
@@ -397,34 +411,47 @@ void _expectLaidOut(
     for (final (column, day) in week.indexed) {
       final number = find.descendant(
         of: calendarDay(day),
-        matching: find.byType(Text),
+        matching: find.text('${day.day}'),
       );
       expect(_textOf(tester, number), '${day.day}');
       _expectFullyShown(tester, number, within: rows[index][column]);
     }
   }
 
-  // Подписи дней недели — над своими колонками.
+  // В неделе подписи находятся в ячейках дней, в месяце — над колонками.
   final labels = [
     for (final weekday in weekdays)
       find.descendant(
         of: find.byType(DailyChoiceCalendar),
-        matching: find.text(weekday),
+        matching: find.text(weekday[0].toUpperCase() + weekday.substring(1)),
       ),
   ];
   for (final (column, label) in labels.indexed) {
-    final columnRect = Rect.fromLTRB(
-      rows.first[column].left,
-      calendar.top,
-      rows.first[column].right,
-      rows.first[column].top,
-    );
+    final columnRect = isWeek
+        ? rows.first[column]
+        : Rect.fromLTRB(
+            rows.first[column].left,
+            calendar.top,
+            rows.first[column].right,
+            rows.first[column].top,
+          );
     _expectFullyShown(tester, label, within: columnRect);
+    if (!isWeek) {
+      expect(
+        _rect(
+          tester,
+          find.ancestor(of: label, matching: find.byType(MonthGridWeekday)),
+        ).height,
+        moreOrLessEquals(28),
+      );
+    }
   }
-  final gridTop = [for (final label in labels) _rect(tester, label).top]
-      .reduce((a, b) => a < b ? a : b);
+  final gridTop = isWeek
+      ? rows.first.first.top
+      : [for (final label in labels) _rect(tester, label).top]
+            .reduce((a, b) => a < b ? a : b);
 
-  // Шапка над подписями: выбранная дата, месяц просмотра и команды.
+  // Шапка над подписями месяца: месяц просмотра и команды.
   final header = Rect.fromLTRB(
     calendar.left,
     calendar.top,
@@ -432,50 +459,44 @@ void _expectLaidOut(
     gridTop,
   );
   final context = tester.element(find.byType(DailyChoiceCalendar));
-  final dates = MaterialLocalizations.of(context);
-  final selected = DateTime.utc(
-    selectedDate.year,
-    selectedDate.month,
-    selectedDate.day,
-  );
-  _expectFullyShown(
-    tester,
-    find.text(
-      AppLocalizations.of(context)
-          .dailyChoiceCalendarSelectedDate(dates.formatFullDate(selected)),
-    ),
-    within: header,
-  );
   final focused = tester
       .widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar))
       .viewport
       .focusedDate;
-  _expectFullyShown(
-    tester,
-    find.text(dates.formatMonthYear(DateTime.utc(focused.year, focused.month))),
-    within: header,
+  final monthLabel = DateFormat(
+    'LLLL y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(focused.year, focused.month));
+  final title = find.text(
+    monthLabel[0].toUpperCase() + monthLabel.substring(1),
   );
+  if (isWeek) {
+    expect(title, findsNothing);
+  } else {
+    _expectFullyShown(tester, title, within: header);
+  }
+  final toggle = find.bySemanticsLabel(
+    isWeek
+        ? AppLocalizations.of(context).dailyChoiceCalendarExpand
+        : AppLocalizations.of(context).dailyChoiceCalendarCollapse,
+  );
+  final handle = _rect(tester, toggle);
+  expect(handle.top, greaterThanOrEqualTo(rows.last.first.bottom));
+  expect(handle.bottom, lessThanOrEqualTo(calendar.bottom));
+  expect(handle.width, calendar.width);
+  expect(handle.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
   final commands = find.descendant(
     of: find.byType(DailyChoiceCalendar),
     matching: find.byType(IconButton),
   );
-  expect(commands, findsNWidgets(3));
+  expect(commands, findsNWidgets(isWeek ? 0 : 2));
   for (final command in commands.evaluate()) {
     final rect = _rect(tester, find.byWidget(command.widget));
     expect(_contains(header, rect), isTrue, reason: '$rect вне $header');
-    expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
-    expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+    expect(rect.width, greaterThanOrEqualTo(DoableMetrics.tapMin));
+    expect(rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
   }
 
-  // Других текстов у календаря нет, и ни один не обрезан.
-  final texts = find.descendant(
-    of: find.byType(DailyChoiceCalendar),
-    matching: find.byType(Text),
-  );
-  expect(
-    texts,
-    findsNWidgets(weeks.expand((week) => week).length + weekdays.length + 2),
-  );
   expect(tester.takeException(), isNull);
 }
 
@@ -562,7 +583,12 @@ Future<_CalendarLayout> _calendarLayout(WidgetTester tester) async {
     calendar: calendar,
     rows: weeks.length,
     rowHeight: firstDay.height,
-    gridHeight: calendar.bottom - firstDay.top,
+    gridHeight:
+        _rect(
+          tester,
+          calendarDay(weeks.last.lastWhere((day) => day != null)!),
+        ).bottom -
+        firstDay.top,
     messageTop: _rect(tester, find.byKey(_message)).top,
   );
 }
@@ -638,7 +664,7 @@ Future<void> _tapEveryCommand(
 ) async {
   final viewport = consumer.viewport;
   for (final MapEntry(key: name, value: changed) in expected.entries) {
-    final command = find.byTooltip(name);
+    final command = find.bySemanticsLabel(name);
     await _reveal(tester, command);
     _expectTappable(tester, command);
     await tester.tap(command);

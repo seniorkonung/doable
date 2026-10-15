@@ -10,6 +10,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,49 +23,171 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
-  testWidgets('каталог на дату получает только заданный день и не создаёт '
-      'корневой каталог до выбора пункта', (tester) async {
+  testWidgets('выбор года и месяца независим у двух каталогов одной даты '
+      'и корневого; новый экземпляр начинает с недели', (tester) async {
     final repository = CatalogPageRepository();
-    final clock = ControlledDailyChoiceLocalDate(date(2026, 10, 12));
-    final router = await _start(tester, repository, clock);
+    final today = date(2026, 10, 12);
     final selected = date(2026, 10, 7);
-
-    unawaited(router.push(DailyChoiceDateCatalogRoute(date: selected)));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(repository.queries, hasLength(1));
-    expect(repository.queries.single.date, selected);
-    expect(repository.queries.single.isCompleted, isNull);
-    repository.completeFirst(0, [], total: 0);
+    final router = await _start(
+      tester,
+      repository,
+      ControlledDailyChoiceLocalDate(today),
+    );
+    await openDailyChoices(tester);
+    repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 1);
     repository.completeDayStatuses(0, {});
     await tester.pumpAndSettle();
-
-    expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
-    expect(
-      find.byType(DailyChoiceCatalogPage, skipOffstage: false),
-      findsNothing,
-    );
-    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-    expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Все состояния'), findsOneWidget);
-    expect(
-      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-      AppDestination.home,
-    );
-
-    await tester.tap(find.byTooltip('Назад'));
+    await _calendarCommand(tester, 'Развернуть календарь');
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    await tester.tap(find.text('2028'));
     await tester.pumpAndSettle();
-    expectHomeRootPage(router);
-    clock.today = date(2026, 10, 13);
-    await openDailyChoices(tester);
-    expect(repository.queries, hasLength(2));
-    expect(repository.queries.last.date, clock.today);
-    repository.completeFirst(1, [], total: 0);
+
+    await _pushDate(tester, router, selected);
+    repository.completeFirst(1, [catalogPageItem(2, date: selected)], total: 1);
     repository.completeDayStatuses(1, {});
     await tester.pumpAndSettle();
-    expect(dayCell(tester, clock.today).isSelected, isTrue);
+    await _calendarCommand(tester, 'Развернуть календарь');
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    await _calendarCommand(tester, 'Следующие годы');
+    expect(find.text('2032–2043'), findsOneWidget);
+
+    await _pushDate(tester, router, selected);
+    repository.completeFirst(2, [catalogPageItem(3, date: selected)], total: 1);
+    repository.completeDayStatuses(2, {});
+    await tester.pumpAndSettle();
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+    await _calendarCommand(tester, 'Развернуть календарь');
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    expect(find.text('2020–2031'), findsOneWidget);
+    await tester.tap(find.text('2029'));
+    await tester.pumpAndSettle();
+    expect(find.text('2029'), findsOneWidget);
+    expect(find.text('7 октября 2026'), findsOneWidget);
+
+    await _back(tester);
+    expect(find.text('2032–2043'), findsOneWidget);
+    expect(find.text('Январь'), findsNothing);
+    expect(find.text('7 октября 2026'), findsOneWidget);
+    await _calendarCommand(tester, 'Вернуться к дням месяца');
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
+    expect(dayCell(tester, selected).isSelected, isTrue);
+    await _calendarCommand(tester, 'Выбрать год и месяц');
+    await tester.tap(find.text('2030'));
+    await tester.pumpAndSettle();
+
+    await _back(tester);
+    expectDailyChoicesRootPage(router);
+    expect(find.text('2028'), findsOneWidget);
+    expect(find.text('Январь'), findsOneWidget);
+    expect(find.text('12 октября 2026'), findsOneWidget);
+    expect(repository.queries, hasLength(3));
+    expect(repository.dayStatusQueries, hasLength(3));
+
+    await _pushDate(tester, router, selected);
+    expect(repository.queries, hasLength(4));
+    expect(repository.queries.last.date, selected);
+    expect(repository.queries.last.isCompleted, isNull);
+    expect(repository.queries.last.cursor, isNull);
+    repository.completeFirst(3, [], total: 0);
+    repository.completeDayStatuses(3, {});
+    await tester.pumpAndSettle();
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+    expect(dayCell(tester, selected).isSelected, isTrue);
+    expect(find.bySemanticsLabel('Развернуть календарь'), findsOneWidget);
+    expect(find.text('Все состояния'), findsOneWidget);
+    await _back(tester);
+    expect(find.text('2028'), findsOneWidget);
+    await _calendarCommand(tester, 'Вернуться к дням месяца');
+    expect(dayCell(tester, today).isSelected, isTrue);
+    expect(repository.queries, hasLength(4));
     expect(tester.takeException(), isNull);
   });
+
+  for (final (locale, weekday, heading, todayLabel, allStates, back) in const [
+    (
+      Locale('ru'),
+      'Среда',
+      '7 октября 2026',
+      'Сегодня',
+      'Все состояния',
+      'Назад',
+    ),
+    (
+      Locale('en'),
+      'Wednesday',
+      '7 October 2026',
+      'Today',
+      'All states',
+      'Back',
+    ),
+  ]) {
+    testWidgets('каталог на дату получает только заданный день и не создаёт '
+        'корневой каталог до выбора пункта (${locale.languageCode})', (
+      tester,
+    ) async {
+      final repository = CatalogPageRepository();
+      final clock = ControlledDailyChoiceLocalDate(date(2026, 10, 6));
+      final router = await _start(tester, repository, clock, locale: locale);
+      final selected = date(2026, 10, 7);
+
+      unawaited(router.push(DailyChoiceDateCatalogRoute(date: selected)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(repository.queries, hasLength(1));
+      expect(repository.queries.single.date, selected);
+      expect(repository.queries.single.isCompleted, isNull);
+      repository.completeFirst(0, [], total: 0);
+      repository.completeDayStatuses(0, {});
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
+      expect(
+        find.widgetWithText(
+          AppBar,
+          lookupAppLocalizations(locale).appDestinationDailyChoices,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byType(DailyChoiceCatalogPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      expect(find.text(weekday, findRichText: true), findsOneWidget);
+      expect(find.text(heading), findsOneWidget);
+      expect(find.text(todayLabel), findsNothing);
+      expect(find.text(allStates), findsOneWidget);
+      expect(
+        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+        AppDestination.home,
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clock.today = selected;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(todayLabel), findsOneWidget);
+      expect(find.text(heading), findsOneWidget);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+      expect(find.text(allStates), findsOneWidget);
+      expect(repository.queries, hasLength(1));
+      expect(repository.dayStatusQueries, hasLength(1));
+
+      await tester.tap(find.byTooltip(back));
+      await tester.pumpAndSettle();
+      expectHomeRootPage(router);
+      clock.today = date(2026, 10, 13);
+      await openDailyChoices(tester);
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries.last.date, clock.today);
+      repository.completeFirst(1, [], total: 0);
+      repository.completeDayStatuses(1, {});
+      await tester.pumpAndSettle();
+      expect(dayCell(tester, clock.today).isSelected, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('два открытия одной даты разделяют фильтр, просмотр, отметки '
       'и порции; возврат из подробностей сохраняет прокрутку', (tester) async {
@@ -91,9 +214,9 @@ void main() {
       cursor: const CatalogPageCursor(),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Следующий месяц'));
+    await tester.tap(find.bySemanticsLabel('Следующий месяц'));
     await tester.pumpAndSettle();
     final marked = date(2026, 11, 7);
     repository.completeDayStatuses(1, {
@@ -149,7 +272,7 @@ void main() {
     await tester.drag(_verticalScroll, const Offset(0, 5000));
     await tester.pumpAndSettle();
     expect(find.text('Выполненные'), findsOneWidget);
-    expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+    expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
     expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
     await tester.scrollUntilVisible(
@@ -181,7 +304,7 @@ void main() {
     await _selectCompletion(tester, 'Не выполненные');
     repository.completeFirst(1, [catalogPageItem(1, date: today)], total: 1);
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Развернуть календарь'));
+    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
 
     await _pushDate(tester, router, selected);
@@ -197,7 +320,12 @@ void main() {
     expectDailyChoicesRootPage(router);
     expect(dayCell(tester, today).isSelected, isTrue);
     expect(find.text('Не выполненные'), findsOneWidget);
-    expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+    expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Всего дневных выборов: 1'),
+      100,
+      scrollable: _verticalScroll,
+    );
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
 
@@ -224,6 +352,11 @@ final _verticalScroll = find.byWidgetPredicate(
   (widget) =>
       widget is Scrollable && widget.axisDirection == AxisDirection.down,
 );
+
+Future<void> _calendarCommand(WidgetTester tester, String label) async {
+  await tester.tap(find.bySemanticsLabel(label));
+  await tester.pumpAndSettle();
+}
 
 Future<void> _pushDate(
   WidgetTester tester,
@@ -252,8 +385,9 @@ Future<void> _back(WidgetTester tester) async {
 Future<AppRouter> _start(
   WidgetTester tester,
   CatalogPageRepository repository,
-  ControlledDailyChoiceLocalDate clock,
-) async {
+  ControlledDailyChoiceLocalDate clock, {
+  Locale locale = const Locale('ru'),
+}) async {
   final router = AppRouter();
   addTearDown(router.dispose);
   await tester.pumpWidget(
@@ -265,7 +399,8 @@ Future<AppRouter> _start(
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(
-        locale: const Locale('ru'),
+        theme: doableTheme(Brightness.light),
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(),

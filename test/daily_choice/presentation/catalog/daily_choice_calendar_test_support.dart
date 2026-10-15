@@ -5,6 +5,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -84,13 +85,19 @@ Finder get calendarPeriodArea => find.byType(DailyChoiceCalendarDay).first;
 
 /// Перелистывает календарь горизонтальным свайпом к следующему периоду.
 Future<void> swipeToNextPeriod(WidgetTester tester) async {
-  await tester.drag(calendarPeriodArea, const Offset(-600, 0));
+  await tester.drag(
+    calendarPeriodArea,
+    Offset(-tester.getSize(find.byType(DailyChoiceCalendar)).width * 0.8, 0),
+  );
   await tester.pumpAndSettle();
 }
 
 /// Перелистывает календарь горизонтальным свайпом к предыдущему периоду.
 Future<void> swipeToPreviousPeriod(WidgetTester tester) async {
-  await tester.drag(calendarPeriodArea, const Offset(600, 0));
+  await tester.drag(
+    calendarPeriodArea,
+    Offset(tester.getSize(find.byType(DailyChoiceCalendar)).width * 0.8, 0),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -142,6 +149,22 @@ final class ViewportChanged extends CalendarEvent {
 
   @override
   String toString() => 'ViewportChanged($viewport)';
+}
+
+final class MonthSelectionCompleted extends CalendarEvent {
+  const MonthSelectionCompleted(this.viewport);
+
+  final DailyChoiceCalendarViewport viewport;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MonthSelectionCompleted && other.viewport == viewport;
+
+  @override
+  int get hashCode => viewport.hashCode;
+
+  @override
+  String toString() => 'MonthSelectionCompleted($viewport)';
 }
 
 /// Потребитель календаря в тестах.
@@ -221,6 +244,7 @@ Future<CalendarConsumer> pumpCalendarConsumer(
   final consumer = CalendarConsumer._();
   await tester.pumpWidget(
     MaterialApp(
+      theme: doableTheme(Brightness.light),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       localeListResolutionCallback: resolveAppLocale,
@@ -339,6 +363,10 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
     },
     onViewportChanged: (value) {
       widget.consumer.events.add(ViewportChanged(value));
+      setState(() => _viewport = value);
+    },
+    onMonthSelectionCompleted: (value) {
+      widget.consumer.events.add(MonthSelectionCompleted(value));
       setState(() => _viewport = value);
     },
   );

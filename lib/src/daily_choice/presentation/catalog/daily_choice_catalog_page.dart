@@ -1,8 +1,8 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../l10n/app_localizations.dart';
 import 'daily_choice_catalog_body.dart';
 import 'daily_choice_catalog_instance.dart';
 import 'daily_choice_local_date_provider.dart';
@@ -30,13 +30,17 @@ final class _DailyChoiceCatalogPageState
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(AppLocalizations.of(context).appDestinationDailyChoices),
-    ),
-    body: DailyChoiceCatalogBody(
-      key: ObjectKey(_instance),
-      instance: _instance,
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+    // Без AppBar стиль системной строки задаёт страница:
+    // https://api.flutter.dev/flutter/services/SystemChrome/setSystemUIOverlayStyle.html
+    value: Theme.of(context).brightness == Brightness.dark
+        ? SystemUiOverlayStyle.light
+        : SystemUiOverlayStyle.dark,
+    child: Scaffold(
+      body: DailyChoiceCatalogBody(
+        key: ObjectKey(_instance),
+        instance: _instance,
+      ),
     ),
   );
 }

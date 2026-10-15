@@ -59,12 +59,12 @@ void main() {
       expect(harness.repository.queries[2].firstDate, _date(9, 28));
       expect(
         harness.repository.queries[2].lastDate,
-        CalendarDate.fromParts(2027, 1, 3),
+        CalendarDate.fromParts(2027, 1, 10),
       );
       expect(harness.repository.queries[3].firstDate, _date(10, 26));
       expect(
         harness.repository.queries[3].lastDate,
-        CalendarDate.fromParts(2027, 1, 31),
+        CalendarDate.fromParts(2027, 2, 7),
       );
       harness.repository.succeed(3, {
         _date(12, 15): DailyChoiceDayStatus.allCompleted,
@@ -166,6 +166,85 @@ void main() {
     expect(harness.repository.queries, hasLength(1));
   });
 
+  test('завершённый выбор показанного месяца после отказа повторяет чтение, '
+      'равная установка просмотра и повтор после успеха не читают', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.succeed(0, {
+      _initialDate: DailyChoiceDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+    final viewport = _viewport(11, 1, DailyChoiceCalendarMode.month);
+    harness.model.setViewport(viewport);
+    harness.repository.fail(1);
+    await pumpEventQueue();
+
+    harness.model.setViewport(viewport);
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(2));
+    expect(harness.state.hasReadFailure, isTrue);
+
+    harness.model.setViewport(
+      viewport,
+      reason: DailyChoiceCalendarViewportUpdateReason.monthSelectionCompleted,
+    );
+    expect(harness.repository.queries, hasLength(3));
+    expect(harness.repository.queries.last.firstDate, _date(9, 28));
+    expect(
+      harness.repository.queries.last.lastDate,
+      CalendarDate.fromParts(2027, 1, 10),
+    );
+    expect(harness.marks, {_initialDate: DailyChoiceDayStatus.hasIncomplete});
+    expect(harness.state.hasReadFailure, isTrue);
+
+    harness.repository.succeed(2, {
+      _date(11, 8): DailyChoiceDayStatus.allCompleted,
+    });
+    await pumpEventQueue();
+    expect(harness.marks, {_date(11, 8): DailyChoiceDayStatus.allCompleted});
+    expect(harness.state.hasReadFailure, isFalse);
+    harness.model.setViewport(
+      viewport,
+      reason: DailyChoiceCalendarViewportUpdateReason.monthSelectionCompleted,
+    );
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(3));
+  });
+
+  test('завершённый выбор другого месяца после отказа читает новое окно '
+      'один раз и сохраняет подтверждённые отметки до ответа', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.succeed(0, {
+      _initialDate: DailyChoiceDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+    harness.model.setViewport(_viewport(11, 1, DailyChoiceCalendarMode.month));
+    harness.repository.fail(1);
+    await pumpEventQueue();
+
+    harness.model.setViewport(
+      _viewport(12, 1, DailyChoiceCalendarMode.month),
+      reason: DailyChoiceCalendarViewportUpdateReason.monthSelectionCompleted,
+    );
+    expect(harness.repository.queries, hasLength(3));
+    expect(harness.repository.queries.last.firstDate, _date(10, 26));
+    expect(
+      harness.repository.queries.last.lastDate,
+      CalendarDate.fromParts(2027, 2, 7),
+    );
+    expect(harness.marks, {_initialDate: DailyChoiceDayStatus.hasIncomplete});
+    expect(harness.state.hasReadFailure, isTrue);
+
+    harness.repository.succeed(2, {
+      _date(12, 15): DailyChoiceDayStatus.allCompleted,
+    });
+    await pumpEventQueue();
+    expect(harness.marks, {_date(12, 15): DailyChoiceDayStatus.allCompleted});
+    expect(harness.state.hasReadFailure, isFalse);
+    expect(harness.repository.queries, hasLength(3));
+  });
+
   test(
     'смена окна в полёте сохраняет прежние отметки, отбрасывает поздний '
     'ответ и читает только последнее окно без параллельных запросов',
@@ -179,8 +258,13 @@ void main() {
       });
       await pumpEventQueue();
 
-      harness.model.setViewport(_viewport(11, 1));
-      harness.model.setViewport(_viewport(12, 1));
+      harness.model.setViewport(
+        _viewport(11, 1, DailyChoiceCalendarMode.month),
+      );
+      harness.model.setViewport(
+        _viewport(12, 1, DailyChoiceCalendarMode.month),
+        reason: DailyChoiceCalendarViewportUpdateReason.monthSelectionCompleted,
+      );
       expect(harness.repository.queries, hasLength(2));
       expect(harness.marks, {novemberMark: DailyChoiceDayStatus.hasIncomplete});
       harness.repository.succeed(1, {
@@ -191,7 +275,7 @@ void main() {
       expect(harness.repository.queries.last.firstDate, _date(10, 26));
       expect(
         harness.repository.queries.last.lastDate,
-        CalendarDate.fromParts(2027, 1, 31),
+        CalendarDate.fromParts(2027, 2, 7),
       );
       expect(harness.marks, {novemberMark: DailyChoiceDayStatus.hasIncomplete});
 

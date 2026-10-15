@@ -20,6 +20,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -113,6 +114,63 @@ const _dailyChoicePageSize = 50;
 const _message = ValueKey('graph-operation-message');
 
 void main() {
+  for (final fromMonths in [false, true]) {
+    final level = fromMonths ? 'месяцев' : 'лет';
+    testWidgets('открытая страница $level сохраняется вместе с каталогом '
+        'при смене пункта, повторном выборе и возврате из подробностей', (
+      tester,
+    ) async {
+      final app = await _start(tester);
+      await _prepareDailyChoiceCatalog(tester, app);
+      final before = _dailyChoiceCatalogView(tester, app);
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarChooseYearAndMonth),
+      );
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarNextYears),
+      );
+      if (fromMonths) {
+        await _tap(tester, find.text('2035'));
+        await _tap(
+          tester,
+          find.bySemanticsLabel(app.l10n.dailyChoiceCalendarNextYear),
+        );
+      }
+      final title = fromMonths ? '2036' : '2032–2043';
+      final position = _dailyChoicePosition(tester).pixels;
+
+      void expectPreserved() {
+        expect(find.text(title), findsOneWidget);
+        expect(_dailyChoicePosition(tester).pixels, position);
+        expect(app.dailyChoiceCatalog.selection.date, _choiceDate);
+        expect(app.dailyChoiceCatalog.selection.isCompleted, isFalse);
+        expect(_dailyChoiceIds(app), before['загруженные записи']);
+        expect(app.repository.dailyChoiceCatalogReads, before['чтения выдачи']);
+      }
+
+      await _select(tester, AppDestination.home);
+      await _select(tester, AppDestination.dailyChoices);
+      expectPreserved();
+      await _select(tester, AppDestination.dailyChoices);
+      expectPreserved();
+      await tester.tap(_dailyChoiceRows.hitTestable().first);
+      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await tester.pumpAndSettle();
+      await _closeTop(tester, DailyChoiceDetailsPage);
+      expectPreserved();
+
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarBackToMonthDays),
+      );
+      await tester.pumpAndSettle();
+      expect(_dailyChoiceCatalogView(tester, app), before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   group('повторный выбор уже выбранного пункта', () {
     for (final destination in _rootPageStates.keys) {
       testWidgets('«${_names[destination]}»: состояние страницы не меняется', (
@@ -311,6 +369,11 @@ void main() {
       await _prepareDailyChoiceCatalog(tester, app);
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarChooseYearAndMonth),
+      );
+      await _tap(tester, find.text('2028'));
       final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
@@ -381,6 +444,12 @@ void main() {
         for (var choice = changed - 1; choice >= _firstChoice; choice--)
           if (!_isCompleted(choice)) tagFixtureId(choice),
       ];
+      expect(find.text('2028'), findsOneWidget);
+      await _tap(
+        tester,
+        find.bySemanticsLabel(app.l10n.dailyChoiceCalendarBackToMonthDays),
+      );
+      await tester.pumpAndSettle();
       expect(_dailyChoiceParameters(tester, app), before);
       expect(
         find.text(
@@ -421,8 +490,8 @@ void main() {
       );
       await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
       expect(
-        tester.widget<Icon>(dailyChoiceCatalogDayMark(_viewedDate)).icon,
-        Icons.check,
+        dailyChoiceCatalogDayMark(_viewedDate, mark: DayMark.done),
+        findsOneWidget,
       );
       expect(tester.takeException(), isNull);
     });
@@ -465,8 +534,8 @@ void main() {
       await _selectDay(tester, app, _choiceDate, total: _choiceCount);
       await _until(tester, dailyChoiceCatalogDayMark(_choiceDate));
       expect(
-        tester.widget<Icon>(dailyChoiceCatalogDayMark(_choiceDate)).icon,
-        Icons.circle_outlined,
+        dailyChoiceCatalogDayMark(_choiceDate, mark: DayMark.todo),
+        findsOneWidget,
       );
       // Раскрытый календарь показывает следующий месяц.
       await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
@@ -528,9 +597,10 @@ void main() {
       await showDailyChoiceCatalogPeriod(tester, _choiceDate, tap: _tap);
       await _waitFor(
         tester,
-        () =>
-            tester.widget<Icon>(dailyChoiceCatalogDayMark(_choiceDate)).icon ==
-            Icons.check,
+        () => dailyChoiceCatalogDayMark(
+          _choiceDate,
+          mark: DayMark.done,
+        ).evaluate().isNotEmpty,
       );
       expect(tester.takeException(), isNull);
     });
@@ -577,7 +647,7 @@ void main() {
             expect(
               find.descendant(
                 of: page,
-                matching: find.byTooltip(command, skipOffstage: false),
+                matching: find.bySemanticsLabel(command, skipOffstage: false),
                 skipOffstage: false,
               ),
               locale == resolved ? findsOneWidget : findsNothing,
@@ -1071,15 +1141,17 @@ Map<String, Object?> _languageIndependent(Map<String, Object?> view) =>
 /// выполнения и количество.
 final _catalogLabels = {
   Locale('ru'): [
-    'Выбранная дата: пятница, 25 сентября 2026\u202Fг.',
-    'август 2026\u202Fг.',
-    'пн',
-    'вс',
+    'Пятница',
+    '25 сентября 2026',
+    'Август 2026',
+    'Пн',
+    'Вс',
     'Выполнение',
     'Всего дневных выборов: 120',
   ],
   Locale('en'): [
-    'Selected date: Friday, September 25, 2026',
+    'Friday',
+    '25 September 2026',
     'August 2026',
     'Mon',
     'Sun',

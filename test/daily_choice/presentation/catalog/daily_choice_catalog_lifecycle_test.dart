@@ -12,6 +12,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -23,6 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
@@ -41,6 +43,66 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  for (final fromMonths in [false, true]) {
+    final level = fromMonths ? 'месяцев' : 'лет';
+    testWidgets('местная полночь обновляет текущий период, сохраняя открытую '
+        'страницу $level, выбранный день и выдачу', (tester) async {
+      final selected = fromMonths ? date(2026, 9, 30) : date(2026, 12, 31);
+      final clock = _LocalClock(
+        tester,
+        start: _local(selected.year, selected.month, selected.day, 23, 30),
+      );
+      final repository = _Repository();
+      await _openCatalog(tester, repository, clock);
+      repository.completeFirst(_items(selected), total: 40);
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
+      await _settle(tester);
+      await tester.tap(
+        find.bySemanticsLabel(_l10n.dailyChoiceCalendarChooseYearAndMonth),
+      );
+      await tester.pumpAndSettle();
+      if (fromMonths) {
+        await tester.tap(find.text('2026'));
+        await tester.pumpAndSettle();
+      }
+      final previous = fromMonths ? 'Сентябрь 2026' : '2026';
+      final current = fromMonths ? 'Октябрь 2026' : '2027';
+      expect(
+        find.bySemanticsLabel('$previous, ${_l10n.statisticsCurrentPeriod}'),
+        findsOneWidget,
+      );
+      _catalogScroll(tester).jumpTo(200);
+      await tester.pump();
+      final catalog = _catalogState(tester);
+
+      await tester.pump(clock.untilNextDate);
+
+      expect(find.text(fromMonths ? '2026' : '2020–2031'), findsOneWidget);
+      expect(visibleWeeks(tester), isEmpty);
+      expect(find.bySemanticsLabel(previous), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('$current, ${_l10n.statisticsCurrentPeriod}'),
+        findsOneWidget,
+      );
+      _expectCatalogUnchanged(tester, catalog);
+      expect(_catalogScroll(tester).pixels, 200);
+      expect(repository.queries, hasLength(1));
+
+      await tester.tap(
+        find.bySemanticsLabel(_l10n.dailyChoiceCalendarBackToMonthDays),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        visibleWeeks(tester),
+        weeksFrom(fromMonths ? date(2026, 8, 31) : date(2026, 11, 30), 6),
+      );
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      expect(repository.queries, hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('в местную полночь отмечает новый сегодняшний день, не меняя '
       'выбор, просмотр, выдачу и прокрутку', (tester) async {
@@ -63,8 +125,9 @@ void main() {
     expect(repository.queries, hasLength(2));
     repository.completeFirst(_items(date(2026, 10, 6)), index: 1, total: 40);
     await tester.pump();
-    await tester.tap(find.byTooltip(_l10n.dailyChoiceCalendarExpand));
+    await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
     await _settle(tester);
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsOneWidget);
     _catalogScroll(tester).jumpTo(300);
     await tester.pump();
 
@@ -72,7 +135,7 @@ void main() {
     expect(catalog, isA<DailyChoiceCatalogLoaded>());
     expect(catalog.selection.isCompleted, false);
     final shownWeeks = visibleWeeks(tester);
-    expect(shownWeeks, weeksFrom(date(2026, 9, 28), 5));
+    expect(shownWeeks, weeksFrom(date(2026, 9, 28), 6));
     expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);
 
     // Подготовка заняла часть оставшегося до полуночи поддельного времени.
@@ -84,11 +147,15 @@ void main() {
     expect(_todayMarker(tester, date(2026, 10, 6)), findsNothing);
     // Новый сегодняшний день не выбирается сам: выбор, охват, просмотр,
     // загруженная выдача и прокрутка остаются прежними, чтений нет.
-    _expectSelected(tester, date(2026, 10, 6));
     expect(visibleWeeks(tester), shownWeeks);
     _expectCatalogUnchanged(tester, catalog);
     expect(repository.queries, hasLength(2));
     expect(_catalogScroll(tester).pixels, 300);
+    // Заголовок дня строится лениво и возвращается вместе с началом выдачи.
+    _catalogScroll(tester).jumpTo(0);
+    await tester.pump();
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsNothing);
+    _expectSelected(tester, date(2026, 10, 6));
     semantics.dispose();
   });
 
@@ -106,7 +173,7 @@ void main() {
     repository.completeFirst([], total: 0);
     await tester.pump();
     // Месяц показывает и сутки перехода, и следующую за ними дату.
-    await tester.tap(find.byTooltip(_l10n.dailyChoiceCalendarExpand));
+    await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
     await _settle(tester);
     _expectSelected(tester, date(2026, 3, 7));
 
@@ -173,6 +240,8 @@ void main() {
     final catalog = _catalogState(tester);
     final weeks = visibleWeeks(tester);
 
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsOneWidget);
+
     // Приостановленный процесс не выполняет таймеры, а часы устройства идут:
     // процесс возвращается 9 октября в 11:00.
     _sendToBackground(tester);
@@ -180,6 +249,7 @@ void main() {
     _returnToForeground(tester);
     await tester.pump();
     expect(_todayMarker(tester, date(2026, 10, 9)), findsOneWidget);
+    expect(find.text(_l10n.dailyChoiceCalendarToday), findsNothing);
     _expectSelected(tester, date(2026, 10, 6));
     expect(visibleWeeks(tester), weeks);
     _expectCatalogUnchanged(tester, catalog);
@@ -375,9 +445,14 @@ Finder _todayMarker(WidgetTester tester, CalendarDate value) =>
       '${_fullDate(tester, value)}, ${_l10n.dailyChoiceCalendarToday}',
     );
 
-/// Шапка календаря называет выбранной дату [value].
+/// Заголовок дня называет выбранную дату [value].
 void _expectSelected(WidgetTester tester, CalendarDate value) => expect(
-  find.text(_l10n.dailyChoiceCalendarSelectedDate(_fullDate(tester, value))),
+  find.text(
+    DateFormat(
+      'd MMMM y',
+      'ru',
+    ).format(DateTime.utc(value.year, value.month, value.day)),
+  ),
   findsOneWidget,
 );
 
@@ -402,12 +477,14 @@ DailyChoiceCatalogState _catalogState(WidgetTester tester) {
   return container.read(openedDailyChoiceCatalogProvider(container));
 }
 
-/// Общая вертикальная прокрутка каталога.
+/// Вертикальная прокрутка выдачи под закреплённым календарём.
 ScrollPosition _catalogScroll(WidgetTester tester) => tester
     .state<ScrollableState>(
       find
           .descendant(
-            of: find.byType(DailyChoiceCatalogPage),
+            of: find.byKey(
+              const PageStorageKey<String>('daily-choice-catalog'),
+            ),
             matching: find.byType(Scrollable),
           )
           .first,
@@ -441,6 +518,7 @@ Future<AppRouter> _pumpApp(
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

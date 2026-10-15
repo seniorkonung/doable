@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -40,6 +42,7 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 /// приложения, поэтому [locale] — системная локаль устройства, а
 /// неподдерживаемый язык даёт английский. [size] — логический размер экрана;
 /// [today] — локальное сегодня.
+/// [catalogDate] открывает отдельный каталог на дату вместо корневого.
 /// Чтения каталога завершает сценарий через [repository].
 Future<void> pumpCatalogPage(
   WidgetTester tester,
@@ -47,6 +50,7 @@ Future<void> pumpCatalogPage(
   required CalendarDate today,
   required Locale locale,
   required Size size,
+  CalendarDate? catalogDate,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -65,6 +69,7 @@ Future<void> pumpCatalogPage(
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         localeListResolutionCallback: resolveAppLocale,
@@ -72,7 +77,11 @@ Future<void> pumpCatalogPage(
       ),
     ),
   );
-  openDailyChoicesOn(router);
+  if (catalogDate == null) {
+    openDailyChoicesOn(router);
+  } else {
+    unawaited(router.push(DailyChoiceDateCatalogRoute(date: catalogDate)));
+  }
   await tester.pump();
   // Переход к каталогу заканчивается без анимации, а первое чтение каталога
   // остаётся незавершённым до решения сценария.
@@ -102,22 +111,33 @@ final class CatalogPageRepository
     return request.future;
   }
 
-  /// Завершает отдельное чтение отметок без изменения выдачи каталога.
+  /// Завершает отдельное чтение отметками только запрошенного диапазона,
+  /// без изменения выдачи каталога.
   void completeDayStatuses(
     int index,
     Map<CalendarDate, DailyChoiceDayStatus> statuses, {
     int revision = 0,
-  }) => _dayStatusRequests[index].complete(
-    GraphResultSuccess(
-      GraphSnapshot(
-        value: DailyChoiceDayStatuses(
-          query: dayStatusQueries[index],
-          statuses: statuses,
+  }) {
+    final query = dayStatusQueries[index];
+    final first = query.firstDate.toCanonicalString();
+    final last = query.lastDate.toCanonicalString();
+    _dayStatusRequests[index].complete(
+      GraphResultSuccess(
+        GraphSnapshot(
+          value: DailyChoiceDayStatuses(
+            query: query,
+            statuses: {
+              for (final entry in statuses.entries)
+                if (entry.key.toCanonicalString().compareTo(first) >= 0 &&
+                    entry.key.toCanonicalString().compareTo(last) <= 0)
+                  entry.key: entry.value,
+            },
+          ),
+          revision: _Revision(revision),
         ),
-        revision: _Revision(revision),
       ),
-    ),
-  );
+    );
+  }
 
   /// Завершает отдельное чтение отметок отказом, не затрагивая выдачу.
   void failDayStatuses(int index) => _dayStatusRequests[index].complete(

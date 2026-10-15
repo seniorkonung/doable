@@ -78,10 +78,10 @@ void main() {
         in [
           (
             start: week,
-            next: 'Следующая неделя',
+            next: null,
             afterSwipe: week(date(2026, 10, 11)),
             afterSwipeWeeks: weeksFrom(date(2026, 10, 5), 1),
-            afterSwipeMonth: 'октябрь 2026 г.',
+            afterSwipeMonth: 'Октябрь 2026',
             afterButton: week(date(2026, 10, 18)),
             afterButtonWeeks: weeksFrom(date(2026, 10, 12), 1),
             tappedDay: date(2026, 10, 14),
@@ -91,9 +91,9 @@ void main() {
             next: 'Следующий месяц',
             afterSwipe: month(date(2026, 11, 1)),
             afterSwipeWeeks: weeksFrom(date(2026, 10, 26), 6),
-            afterSwipeMonth: 'ноябрь 2026 г.',
+            afterSwipeMonth: 'Ноябрь 2026',
             afterButton: month(date(2026, 12, 1)),
-            afterButtonWeeks: weeksFrom(date(2026, 11, 30), 5),
+            afterButtonWeeks: weeksFrom(date(2026, 11, 30), 6),
             tappedDay: date(2026, 12, 16),
           ),
         ]) {
@@ -114,10 +114,17 @@ void main() {
           await _recreateCalendar(tester, consumer);
 
           expect(visibleWeeks(tester), afterSwipeWeeks);
-          expect(find.text(afterSwipeMonth), findsOneWidget);
+          expect(
+            find.text(afterSwipeMonth),
+            next == null ? findsNothing : findsOneWidget,
+          );
 
           // Первое перелистывание пересозданного календаря.
-          await tester.tap(find.byTooltip(next));
+          if (next == null) {
+            await swipeToNextPeriod(tester);
+          } else {
+            await tester.tap(find.bySemanticsLabel(next));
+          }
           await tester.pumpAndSettle();
 
           expect(consumer.events, [
@@ -150,25 +157,25 @@ void main() {
       'просмотра и сообщает его даты',
       (tester) async {
         final consumer = await _pumpUnderStoredScroll(tester, viewport: week);
-        await tester.tap(find.byTooltip('Развернуть календарь'));
+        await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
         await tester.pumpAndSettle();
 
         await _scrollPageDownAndBack(tester);
         await _recreateCalendar(tester, consumer);
 
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
-        expect(find.text('октябрь 2026 г.'), findsOneWidget);
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
+        expect(find.text('Октябрь 2026'), findsOneWidget);
 
         await tester.tap(calendarDay(date(2026, 10, 14)));
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Свернуть календарь'));
+        await tester.tap(find.bySemanticsLabel('Свернуть календарь'));
         await tester.pumpAndSettle();
 
         await _scrollPageDownAndBack(tester);
         await _recreateCalendar(tester, consumer);
 
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
-        expect(find.text('октябрь 2026 г.'), findsOneWidget);
+        expect(find.text('Октябрь 2026'), findsNothing);
 
         // Первое перелистывание пересозданного календаря.
         await swipeToNextPeriod(tester);
@@ -201,11 +208,11 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
-        expect(find.text('октябрь 2026 г.'), findsOneWidget);
+        expect(find.text('Октябрь 2026'), findsNothing);
 
         await tester.tap(calendarDay(date(2026, 10, 2)));
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Следующая неделя'));
+        await swipeToNextPeriod(tester);
         await tester.pumpAndSettle();
 
         expect(consumer.events, [
@@ -227,10 +234,10 @@ void main() {
         await tester.pumpAndSettle();
 
         await swipeToNextPeriod(tester);
-        await tester.tap(find.byTooltip('Развернуть календарь'));
+        await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
         await tester.pumpAndSettle();
         await _recreateCalendar(tester, consumer);
-        await tester.tap(find.byTooltip('Следующий месяц'));
+        await tester.tap(find.bySemanticsLabel('Следующий месяц'));
         await tester.pumpAndSettle();
 
         expect(consumer.events, [
@@ -247,7 +254,7 @@ void main() {
 
         expect(_pageScrollPosition(tester).pixels, 12);
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-        expect(find.text('ноябрь 2026 г.'), findsOneWidget);
+        expect(find.text('Ноябрь 2026'), findsOneWidget);
       },
     );
   });

@@ -1,13 +1,9 @@
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 
-/// Подпись выбранной 2026-10-04. Русские даты Flutter форматирует с узким
-/// неразрывным пробелом перед «г.».
-const _selectedOctober4 = 'Выбранная дата: воскресенье, 4 октября 2026\u202Fг.';
-const _november = 'ноябрь 2026\u202Fг.';
+const _november = 'Ноябрь 2026';
 
 double _calendarHeight(WidgetTester tester) =>
     tester.getSize(find.byType(DailyChoiceCalendar)).height;
@@ -18,6 +14,32 @@ void main() {
   // по событиям календаря. Отсутствие лишних чтений каталога проверяется при
   // подключении к странице.
   group('сценарии спецификации', () {
+    testWidgets('сворачивание прерывает возврат к месяцу выбранного дня '
+        'и показывает его неделю', (tester) async {
+      final selected = date(2026, 10, 15);
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: selected,
+        viewport: month(date(2026, 11, 1)),
+        today: selected,
+      );
+
+      await tester.tap(find.bySemanticsLabel('Предыдущий месяц'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.hasRunningAnimations, isTrue);
+      await tester.tap(find.bySemanticsLabel('Свернуть календарь'));
+      await tester.pumpAndSettle();
+
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      expect(consumer.events, [
+        ViewportChanged(month(selected)),
+        ViewportChanged(week(selected)),
+      ]);
+      expect(consumer.selectedDate, selected);
+    });
+
     testWidgets('раскрытие сохраняет просмотр соседнего периода', (
       tester,
     ) async {
@@ -35,7 +57,7 @@ void main() {
       expect(consumer.viewport, week(date(2026, 11, 1)));
       final weekHeight = _calendarHeight(tester);
 
-      await tester.tap(find.byTooltip('Развернуть календарь'));
+      await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
       await tester.pumpAndSettle();
 
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
@@ -49,7 +71,6 @@ void main() {
         ViewportChanged(month(date(2026, 11, 1))),
       ]);
       expect(consumer.selectedDate, date(2026, 10, 4));
-      expect(find.text(_selectedOctober4), findsOneWidget);
     });
   });
 
@@ -68,14 +89,14 @@ void main() {
         in [
           (
             start: week(date(2026, 10, 4)),
-            next: 'Следующая неделя',
+            next: null,
             toggle: 'Развернуть календарь',
             afterNext: week(date(2026, 10, 11)),
             afterSwipe: week(date(2026, 10, 18)),
             afterToggle: month(date(2026, 10, 18)),
             nextWeeks: weeksFrom(date(2026, 10, 5), 1),
             swipedWeeks: weeksFrom(date(2026, 10, 12), 1),
-            toggledWeeks: weeksFrom(date(2026, 9, 28), 5),
+            toggledWeeks: weeksFrom(date(2026, 9, 28), 6),
           ),
           (
             start: month(date(2026, 10, 4)),
@@ -85,7 +106,7 @@ void main() {
             afterSwipe: month(date(2026, 12, 1)),
             afterToggle: week(date(2026, 12, 1)),
             nextWeeks: weeksFrom(date(2026, 10, 26), 6),
-            swipedWeeks: weeksFrom(date(2026, 11, 30), 5),
+            swipedWeeks: weeksFrom(date(2026, 11, 30), 6),
             toggledWeeks: weeksFrom(date(2026, 11, 30), 1),
           ),
         ]) {
@@ -113,7 +134,11 @@ void main() {
       ) async {
         final consumer = await pumpStart(tester);
 
-        await tester.tap(find.byTooltip(next));
+        if (next == null) {
+          await swipeToNextPeriod(tester);
+        } else {
+          await tester.tap(find.bySemanticsLabel(next));
+        }
         await tester.pumpAndSettle();
         await rebuildAndSettle(tester, consumer);
         expect(visibleWeeks(tester), nextWeeks);
@@ -122,7 +147,7 @@ void main() {
         await rebuildAndSettle(tester, consumer);
         expect(visibleWeeks(tester), swipedWeeks);
 
-        await tester.tap(find.byTooltip(toggle));
+        await tester.tap(find.bySemanticsLabel(toggle));
         await tester.pumpAndSettle();
         await rebuildAndSettle(tester, consumer);
         expect(visibleWeeks(tester), toggledWeeks);
@@ -137,50 +162,52 @@ void main() {
       });
 
       // Перестроение посреди перехода не зависит от представления: страницы и
-      // их анимацией ведёт одна и та же сетка, поэтому достаточно недели.
-      if (start.mode != DailyChoiceCalendarMode.week) continue;
+      // их анимацией ведёт одна и та же сетка, поэтому достаточно месяца.
+      if (next case final nextCommand?) {
+        testWidgets(
+          'во время перелистывания кнопкой до середины перехода ($mode)',
+          (tester) async {
+            final consumer = await pumpStart(tester);
 
-      testWidgets(
-        'во время перелистывания кнопкой до середины перехода ($mode)',
-        (tester) async {
-          final consumer = await pumpStart(tester);
+            await tester.tap(find.bySemanticsLabel(nextCommand));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 50));
+            expect(consumer.events, isEmpty);
+            consumer.rebuild();
+            await tester.pump();
+            expect(tester.hasRunningAnimations, isTrue);
+            expect(consumer.events, isEmpty);
+            await tester.pumpAndSettle();
 
-          await tester.tap(find.byTooltip(next));
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 50));
-          expect(consumer.events, isEmpty);
-          consumer.rebuild();
-          await tester.pump();
-          expect(tester.hasRunningAnimations, isTrue);
-          expect(consumer.events, isEmpty);
-          await tester.pumpAndSettle();
+            expect(visibleWeeks(tester), nextWeeks);
+            expect(consumer.events, nextPeriod);
+            expect(consumer.selectedDate, date(2026, 10, 4));
+          },
+        );
 
-          expect(visibleWeeks(tester), nextWeeks);
-          expect(consumer.events, nextPeriod);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-        },
-      );
+        testWidgets(
+          'во время перелистывания кнопкой после середины перехода ($mode)',
+          (tester) async {
+            final consumer = await pumpStart(tester);
 
-      testWidgets(
-        'во время перелистывания кнопкой после середины перехода ($mode)',
-        (tester) async {
-          final consumer = await pumpStart(tester);
+            await tester.tap(find.bySemanticsLabel(nextCommand));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 200));
+            expect(tester.hasRunningAnimations, isTrue);
+            expect(consumer.events, nextPeriod);
+            consumer.rebuild();
+            await tester.pump();
+            expect(tester.hasRunningAnimations, isTrue);
+            await tester.pumpAndSettle();
 
-          await tester.tap(find.byTooltip(next));
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 200));
-          expect(tester.hasRunningAnimations, isTrue);
-          expect(consumer.events, nextPeriod);
-          consumer.rebuild();
-          await tester.pump();
-          expect(tester.hasRunningAnimations, isTrue);
-          await tester.pumpAndSettle();
+            expect(visibleWeeks(tester), nextWeeks);
+            expect(consumer.events, nextPeriod);
+            expect(consumer.selectedDate, date(2026, 10, 4));
+          },
+        );
 
-          expect(visibleWeeks(tester), nextWeeks);
-          expect(consumer.events, nextPeriod);
-          expect(consumer.selectedDate, date(2026, 10, 4));
-        },
-      );
+        continue;
+      }
 
       testWidgets('во время свайпа, пока палец на календаре ($mode)', (
         tester,

@@ -12,6 +12,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.da
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -20,8 +21,10 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/daily_choice_local_date.dart';
@@ -33,6 +36,31 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
 
 void main() {
+  testWidgets('корневой каталог оставляет над календарём только безопасный '
+      'отступ и меняет строку состояния вместе с темой', (tester) async {
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 48);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    final repository = _Repository();
+    await _open(tester, repository, size: const Size(390, 844));
+    repository.completeFirst([], total: 0);
+    await tester.pumpAndSettle();
+
+    final calendar = find.byType(DailyChoiceCalendar);
+    expect(tester.getTopLeft(calendar).dy, greaterThanOrEqualTo(24));
+    expect(tester.getTopLeft(calendar).dy, lessThan(24 + kToolbarHeight));
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.dark);
+    expect(SystemChrome.latestStyle?.statusBarBrightness, Brightness.light);
+
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    await tester.pumpAndSettle();
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.light);
+    expect(SystemChrome.latestStyle?.statusBarBrightness, Brightness.dark);
+    expect(tester.getTopLeft(calendar).dy, greaterThanOrEqualTo(24));
+    expect(repository.queries, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
   // Направление и язык независимы: диагональ покрывает оба направления и языка.
   for (final (locale, direction, route, cancelKey, name) in const [
     (
@@ -121,7 +149,6 @@ void main() {
       'календаря', (tester) async {
     final repository = _Repository();
     await _open(tester, repository);
-    final l10n = lookupAppLocalizations(const Locale('ru'));
     expect(repository.queries.single.date, _today);
     expect(repository.queries.single.isCompleted, isNull);
     repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
@@ -144,7 +171,7 @@ void main() {
 
     // Просмотр другой недели не меняет условий выдачи, а смена охвата и сброс
     // не меняют просматриваемую неделю.
-    await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+    await _swipeCalendar(tester, toNext: true);
     final viewed = weeksFrom(date(2026, 9, 28), 1);
     expect(visibleWeeks(tester), viewed);
     expect(repository.queries, hasLength(3));
@@ -286,9 +313,12 @@ void main() {
       await tester.pumpAndSettle();
 
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
-      expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(l10n.dailyChoiceCalendarCollapse),
+        findsOneWidget,
+      );
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
       // Выбранный день вне просматриваемого месяца остаётся названным.
       expect(find.text(_selectedDateLabel(tester, _today)), findsOneWidget);
       expect(repository.queries, hasLength(1));
@@ -300,8 +330,11 @@ void main() {
 
       await _settleCalendar(tester);
       _expectSelected(tester, selectedDay);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
-      expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
+      expect(
+        find.bySemanticsLabel(l10n.dailyChoiceCalendarCollapse),
+        findsOneWidget,
+      );
       expect(
         find.text(_selectedDateLabel(tester, selectedDay)),
         findsOneWidget,
@@ -318,11 +351,11 @@ void main() {
 
       // Первое чтение ещё не завершено: просмотр его не отменяет и не
       // повторяет.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
+      await _swipeCalendar(tester, toNext: false);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
       expect(repository.queries, hasLength(1));
@@ -337,9 +370,9 @@ void main() {
 
       // Неделя с датой просмотра в ноябре раскрывается в ноябрь, сдвигая
       // выдачу вниз.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
       await _swipeCalendar(tester, toNext: true);
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
+      await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
       final weekCountTop = tester.getRect(count).top;
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
@@ -347,7 +380,7 @@ void main() {
       expect(tester.getRect(count).top, greaterThan(weekCountTop));
 
       await _swipeCalendar(tester, toNext: true);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 6));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
@@ -355,8 +388,8 @@ void main() {
       expect(tester.getRect(count).top, moreOrLessEquals(weekCountTop));
 
       // Свёрнутая неделя показывает точную дату просмотра из середины месяца.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
+      await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
@@ -366,6 +399,40 @@ void main() {
       _expectSelected(tester, today);
       expect(count, findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
+    });
+
+    testWidgets('стрелки месяца возвращают неделю выбранного дня, сохраняя '
+        'фильтр и выдачу без чтения', (tester) async {
+      final selected = date(2026, 10, 15);
+      final repository = _Repository();
+      await _open(tester, repository, today: selected);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      repository.completeFirst([_item(1, date: selected)], total: 1);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-completion-filter')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Не выполненные').last);
+      await tester.pump();
+      repository.completeFirst([_item(1, date: selected)], index: 1, total: 1);
+      await tester.pumpAndSettle();
+
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
+
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
+      expect(dayCell(tester, selected).isSelected, isTrue);
+      _expectSelected(tester, selected);
+      expect(find.text('Не выполненные'), findsOneWidget);
+      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries.last.date, selected);
+      expect(repository.queries.last.isCompleted, isFalse);
     });
 
     testWidgets('повторное нажатие выбранного дня возвращает к нему просмотр '
@@ -379,12 +446,12 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 6));
 
       await tester.tap(calendarDay(_today));
       await _settleCalendar(tester);
       _expectSelected(tester, _today);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 6));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
 
@@ -487,7 +554,7 @@ void main() {
       expect(repository.queries, hasLength(2));
 
       // Первая порция выбранного дня ещё читается.
-      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _swipeCalendar(tester, toNext: true);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
@@ -637,17 +704,17 @@ const _filterKeys = [
   'daily-choice-clear-filters',
 ];
 
-/// Шапка календаря называет выбранной дату [value].
+/// Заголовок дня называет выбранную дату [value].
 void _expectSelected(WidgetTester tester, CalendarDate value) =>
     expect(find.text(_selectedDateLabel(tester, value)), findsOneWidget);
 
-/// Подпись полной выбранной даты в шапке календаря по текущей локали.
+/// Полная выбранная дата в заголовке дня по текущей локали.
 String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
   final context = tester.element(find.byType(DailyChoiceCalendar));
-  return AppLocalizations.of(context).dailyChoiceCalendarSelectedDate(
-    MaterialLocalizations.of(context)
-        .formatFullDate(DateTime.utc(value.year, value.month, value.day)),
-  );
+  return DateFormat(
+    'd MMMM y',
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(DateTime.utc(value.year, value.month, value.day));
 }
 
 /// Доводит до конца перелистывание календаря. Индикатор загрузки выдачи не
@@ -660,7 +727,7 @@ Future<void> _settleCalendar(WidgetTester tester) async {
 
 /// Выполняет команду шапки календаря по её доступному названию.
 Future<void> _tapCalendarCommand(WidgetTester tester, String label) async {
-  await tester.tap(find.byTooltip(label));
+  await tester.tap(find.bySemanticsLabel(label));
   await _settleCalendar(tester);
 }
 
@@ -692,6 +759,8 @@ Future<AppRouter> _open(
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
+        darkTheme: doableTheme(Brightness.dark),
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

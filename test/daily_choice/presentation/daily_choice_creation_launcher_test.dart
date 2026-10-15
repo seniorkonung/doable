@@ -12,6 +12,7 @@ import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -598,6 +599,7 @@ Future<RootStackRouter> _openApp(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

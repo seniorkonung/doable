@@ -19,6 +19,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -313,8 +314,8 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(
-        tester.widget<Icon>(dailyChoiceCatalogDayMark(createdDate)).icon,
-        Icons.circle_outlined,
+        dailyChoiceCatalogDayMark(createdDate, mark: DayMark.todo),
+        findsOneWidget,
       );
       // Новый выбор относится к другому дню: человек выбирает этот день.
       await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);

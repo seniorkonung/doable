@@ -14,6 +14,10 @@ ThemeData doableTheme(Brightness brightness) {
     Brightness.light => DoableColors.light,
     Brightness.dark => DoableColors.dark,
   };
+  final shadows = switch (brightness) {
+    Brightness.light => DoableShadows.light,
+    Brightness.dark => DoableShadows.dark,
+  };
   final textTheme = TextTheme(
     displayLarge: DoableType.display,
     displayMedium: DoableType.display,
@@ -88,13 +92,7 @@ ThemeData doableTheme(Brightness brightness) {
     ),
     fontFamily: 'Inter',
     textTheme: textTheme,
-    extensions: [
-      colors,
-      switch (brightness) {
-        Brightness.light => DoableShadows.light,
-        Brightness.dark => DoableShadows.dark,
-      },
-    ],
+    extensions: [colors, shadows],
     iconTheme: IconThemeData(color: colors.ink, size: 24),
     iconButtonTheme: IconButtonThemeData(
       style: ButtonStyle(

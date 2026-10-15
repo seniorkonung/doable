@@ -3929,12 +3929,6 @@ abstract class AppLocalizations {
   /// **'Loading daily choices…'**
   String get dailyChoiceCatalogLoading;
 
-  /// Подпись выбранной даты фильтра календаря, видимая и при просмотре другого периода
-  ///
-  /// In en, this message translates to:
-  /// **'Selected date: {date}'**
-  String dailyChoiceCalendarSelectedDate(String date);
-
   /// Доступное состояние дня календаря, совпадающего с текущим локальным днём устройства, а не с выбранной датой
   ///
   /// In en, this message translates to:
@@ -3971,18 +3965,6 @@ abstract class AppLocalizations {
   /// **'Collapse calendar'**
   String get dailyChoiceCalendarCollapse;
 
-  /// Команда просмотра предыдущей недели в свёрнутом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Previous week'**
-  String get dailyChoiceCalendarPreviousWeek;
-
-  /// Команда просмотра следующей недели в свёрнутом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Next week'**
-  String get dailyChoiceCalendarNextWeek;
-
   /// Команда просмотра предыдущего месяца в раскрытом календаре без выбора дня
   ///
   /// In en, this message translates to:
@@ -3994,6 +3976,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next month'**
   String get dailyChoiceCalendarNextMonth;
+
+  /// Доступное название команды заголовка месяца, открывающей выбор года и месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Choose year and month'**
+  String get dailyChoiceCalendarChooseYearAndMonth;
+
+  /// Доступное название команды заголовка, закрывающей выбор года и месяца и возвращающей сетку дней месяца просмотра
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the days of the month'**
+  String get dailyChoiceCalendarBackToMonthDays;
+
+  /// Доступное название команды перехода к предыдущей странице из двенадцати лет в выборе года
+  ///
+  /// In en, this message translates to:
+  /// **'Previous years'**
+  String get dailyChoiceCalendarPreviousYears;
+
+  /// Доступное название команды перехода к следующей странице из двенадцати лет в выборе года
+  ///
+  /// In en, this message translates to:
+  /// **'Next years'**
+  String get dailyChoiceCalendarNextYears;
+
+  /// Доступное название команды перехода к месяцам предыдущего года в выборе месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Previous year'**
+  String get dailyChoiceCalendarPreviousYear;
+
+  /// Доступное название команды перехода к месяцам следующего года в выборе месяца
+  ///
+  /// In en, this message translates to:
+  /// **'Next year'**
+  String get dailyChoiceCalendarNextYear;
 
   /// Фильтр по выполнению
   ///

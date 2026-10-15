@@ -17,6 +17,7 @@ abstract final class DoableMetrics {
   static const double radiusFull = 9999;
 
   static const double controlHeight = 40;
+  static const double tapMin = 44;
   static const double navHeight = 55;
   static const double iconSize = 24;
 }

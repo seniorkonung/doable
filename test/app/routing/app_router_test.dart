@@ -7,6 +7,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
@@ -179,6 +180,7 @@ void main() {
           ],
           retry: (retryCount, error) => null,
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('en'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -475,6 +477,7 @@ Future<void> _pumpRouter(
       ],
       retry: (retryCount, error) => null,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
