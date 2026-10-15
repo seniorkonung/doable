@@ -13,6 +13,7 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -228,8 +229,13 @@ void _expectButtonIcons(
   expect(rect.width, greaterThanOrEqualTo(48));
   expect(rect.height, greaterThanOrEqualTo(48));
   _expectWithin(tester, button, tester.getRect(find.byType(AppNavigationBar)));
-  for (final icon in [Icons.add_outlined, mode.icon]) {
-    final finder = find.descendant(of: button, matching: find.byIcon(icon));
+  for (final icon in [DoableIconData.plus, mode.miniIcon]) {
+    final finder = find.descendant(
+      of: button,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is DoableIcon && widget.icon == icon,
+      ),
+    );
     _expectWithin(tester, finder, rect.intersect(Offset.zero & screen));
   }
   expect(

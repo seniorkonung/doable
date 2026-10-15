@@ -56,7 +56,7 @@
   - **Вероятные файлы:** `lib/src/design_system/components/nav_bar.dart`, `lib/src/app/navigation/app_destination.dart`, два перечисленных файла тестов и `widgetbook/lib/navigation/app_navigation_bar_use_cases.dart`.
   - **Размер:** M.
 
-- [ ] 1.7 Показывать исходный плюс и мини-значок каждого режима быстрого создания
+- [x] 1.7 Показывать исходный плюс и мини-значок каждого режима быстрого создания
   - **Критерии приёмки:**
     - `NavBarCreateButton` принимает `DoableIconData`; плюс и мини-значки рисуются общим компонентом в размерах 24 и 14 с исходной толщиной линий.
     - `QuickCreationModePresentation.miniIcon` задаёт три мини-варианта, а `QuickCreationButton` передаёт текущий. Смена и восстановление режима сохраняют прежнее поведение.

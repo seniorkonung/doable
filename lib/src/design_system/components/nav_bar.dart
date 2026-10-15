@@ -124,7 +124,7 @@ final class NavBarCreateButton extends StatelessWidget {
     super.key,
   });
 
-  final IconData icon;
+  final DoableIconData icon;
   final String label;
   final String hint;
   final String longPressLabel;
@@ -168,24 +168,22 @@ final class NavBarCreateButton extends StatelessWidget {
           excludeFromSemantics: true,
           customBorder: const StadiumBorder(),
           child: Center(
-            child: IconTheme(
-              data: IconThemeData(color: colors.muted),
-              child: SizedBox.square(
-                dimension: 48,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const Icon(
-                      Icons.add_outlined,
-                      size: DoableMetrics.iconSize,
-                    ),
-                    Positioned(
-                      right: 4,
-                      bottom: 8,
-                      child: Icon(icon, size: 14),
-                    ),
-                  ],
-                ),
+            child: SizedBox.square(
+              dimension: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  DoableIcon(
+                    DoableIconData.plus,
+                    size: DoableMetrics.iconSize,
+                    color: colors.muted,
+                  ),
+                  Positioned(
+                    right: 4,
+                    bottom: 8,
+                    child: DoableIcon(icon, size: 14, color: colors.muted),
+                  ),
+                ],
               ),
             ),
           ),

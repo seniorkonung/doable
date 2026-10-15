@@ -6,6 +6,8 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_controller.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_menu.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -84,7 +86,6 @@ void main() {
       await tester.tap(nextTitle);
       await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
-      expect(find.byIcon(next.icon), findsOneWidget);
       expect(
         tester.getSemantics(button).label,
         '${localizations.quickCreationLabel}, ${next.title(localizations)}',
@@ -98,50 +99,68 @@ void main() {
   }
 
   const locale = Locale('ru');
-  const mode = QuickCreationMode.relation;
-  testWidgets('плюс и значок режима доступны без подписи, '
-      'вся зона доступна: '
-      '${locale.languageCode}, ${mode.name}', (tester) async {
-    final launches = await _pumpButton(tester, locale: locale, mode: mode);
-    final button = find.byType(QuickCreationButton);
-    final bounds = tester.getRect(button);
-    expect(bounds.width, greaterThanOrEqualTo(48));
-    expect(bounds.height, greaterThanOrEqualTo(48));
-    expect(button.hitTestable(), findsOneWidget);
-    expect(
-      find.descendant(of: button, matching: find.byType(Text)),
-      findsNothing,
-    );
-    for (final icon in [Icons.add_outlined, mode.icon]) {
-      final finder = find.byIcon(icon);
-      expect(finder.hitTestable(), findsOneWidget);
-      final rect = tester.getRect(finder);
-      expect(rect.isEmpty, isFalse);
-      for (final container in [
-        bounds,
-        tester.getRect(find.byType(InkWell)),
-        Offset.zero & tester.view.physicalSize,
+  for (final (mode, miniIcon) in [
+    (QuickCreationMode.intention, DoableIconData.intentionMini),
+    (QuickCreationMode.relation, DoableIconData.relationMini),
+    (QuickCreationMode.dailyChoice, DoableIconData.calendarMini),
+  ]) {
+    testWidgets('исходный плюс и мини-значок режима доступны без подписи, '
+        'вся зона доступна: '
+        '${locale.languageCode}, ${mode.name}', (tester) async {
+      final launches = await _pumpButton(tester, locale: locale, mode: mode);
+      final button = find.byType(QuickCreationButton);
+      final bounds = tester.getRect(button);
+      expect(bounds.width, greaterThanOrEqualTo(48));
+      expect(bounds.height, greaterThanOrEqualTo(48));
+      expect(button.hitTestable(), findsOneWidget);
+      expect(
+        find.descendant(of: button, matching: find.byType(Text)),
+        findsNothing,
+      );
+      for (final (icon, size) in [
+        (DoableIconData.plus, 24.0),
+        (miniIcon, 14.0),
       ]) {
-        expect(container.contains(rect.topLeft), isTrue);
-        expect(
-          container.contains(rect.bottomRight - const Offset(0.1, 0.1)),
-          isTrue,
+        final finder = find.descendant(
+          of: button,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is DoableIcon && widget.icon == icon,
+          ),
         );
+        expect(finder.hitTestable(), findsOneWidget);
+        expect(tester.getSize(finder), Size.square(size));
+        expect(
+          tester.widget<DoableIcon>(finder).color,
+          DoableColors.light.muted,
+        );
+        final rect = tester.getRect(finder);
+        expect(rect.isEmpty, isFalse);
+        for (final container in [
+          bounds,
+          tester.getRect(find.byType(InkWell)),
+          Offset.zero & tester.view.physicalSize,
+        ]) {
+          expect(container.contains(rect.topLeft), isTrue);
+          expect(
+            container.contains(rect.bottomRight - const Offset(0.1, 0.1)),
+            isTrue,
+          );
+        }
       }
-    }
-    for (final corner in [
-      bounds.topLeft + const Offset(10, 10),
-      bounds.topRight + const Offset(-10, 10),
-      bounds.bottomLeft + const Offset(10, -10),
-      bounds.bottomRight - const Offset(10, 10),
-    ]) {
-      await tester.tapAt(corner);
-    }
-    await tester.pumpAndSettle();
-    expect(launches, List.filled(4, mode));
-    expect(find.byType(BottomSheet), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      for (final corner in [
+        bounds.topLeft + const Offset(10, 10),
+        bounds.topRight + const Offset(-10, 10),
+        bounds.bottomLeft + const Offset(10, -10),
+        bounds.bottomRight - const Offset(10, 10),
+      ]) {
+        await tester.tapAt(corner);
+      }
+      await tester.pumpAndSettle();
+      expect(launches, List.filled(4, mode));
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('кнопка запускается действием экранного диктора и клавиатурой', (
     tester,
