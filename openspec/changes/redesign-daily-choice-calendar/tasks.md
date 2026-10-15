@@ -345,3 +345,107 @@
   - **Dependencies:** 2.16, 2.17, 2.18
   - **Files likely touched:** `tool/check_android_display_transfer.py`
   - **Estimated scope:** M
+
+## Phase 3: Календарь переходит к любому году и месяцу
+
+- [ ] 3.1 Компоненты выбора года и месяца из модуля основ представлены в Widgetbook
+  - **Acceptance criteria:**
+    - По решениям 1 и 2 дизайна CalendarHeader получает доступную команду заголовка и открытое состояние, а PeriodPicker показывает 12 позиций по три в ряд; недопустимая позиция пуста. Потребитель передаёт тексты, доступные названия, признаки «показан» и «текущий» и обработчики; предметных типов, локализации и управления периодом в компонентах нет (ADR-0030).
+    - Примеры показывают годы, месяцы, совпадение обоих признаков, пустые крайние позиции и недоступные стрелки; шапка в открытом состоянии имеет обводку и шеврон вверх. Размеры и оформление следуют PeriodPicker и Parts из context/ в обеих темах.
+    - Нынешний потребитель шапки сохраняет работоспособность до подключения выбора в 3.5; выбор периода на Главной не меняется.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter analyze`
+    - В `mise run widgetbook` вручную сверить состояния с `context/doable-design-system/components/PeriodPicker/` и `context/doable-design/design/Parts.dc.html` в обеих темах; тесты внешнего вида и Widgetbook не добавлять.
+  - **Dependencies:** 1.9
+  - **Files likely touched:** `lib/src/design_system/components/calendar_header.dart`, `lib/src/design_system/components/period_picker.dart` (новый), `widgetbook/lib/calendar/calendar_header_use_cases.dart`, `widgetbook/lib/calendar/period_picker_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
+  - **Estimated scope:** M
+
+- [ ] 3.2 Локализация предоставляет русские и английские названия команд выбора года и месяца
+  - **Acceptance criteria:**
+    - ARB содержат шесть пар названий команд из решения 8 дизайна: открыть выбор, вернуться к дням, предыдущие и следующие годы, предыдущий и следующий год.
+    - Сгенерированная локализация соответствует ARB; названия месяцев берутся из существующего механизма форматирования дат, а английский fallback сохраняется.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter gen-l10n`
+    - `mise exec --no-deps -- flutter analyze`
+    - `mise exec --no-deps -- flutter test test/app/localization`
+  - **Dependencies:** Нет
+  - **Files likely touched:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `lib/l10n/app_localizations.dart`, `lib/l10n/app_localizations_ru.dart`, `lib/l10n/app_localizations_en.dart`
+  - **Estimated scope:** M
+
+- [ ] 3.3 Модель отметок повторяет чтение после отказа по завершённому выбору месяца даже при равном просмотре
+  - **Acceptance criteria:**
+    - Единый вход просмотра модели различает обычную установку и завершённый выбор месяца типизированной причиной по решению 2 дизайна; решение о чтении и окно остаются у модели отметок.
+    - После отказа завершённый выбор того же месяца запускает одно чтение; выбор другого месяца после отказа обновляет окно и также запускает одно чтение. Равный обычный просмотр и выбор того же месяца после успеха чтения не создают.
+    - Существующие гарантии сохранения подтверждённых отметок, отбрасывания устаревших ответов и независимости выдачи сохраняются (ADR-0024, ADR-0025); проверки модели различают перечисленные причины обращения.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart`
+  - **Dependencies:** 2.1
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart`
+  - **Estimated scope:** S
+
+- [ ] 3.4 Подтвердить готовность компонентов, локализации и контракта отметок к подключению выбора в календарь
+  - **Acceptance criteria:**
+    - Результаты 3.1–3.3 подтверждены: состояния компонентов сверены в обеих темах, названия доступны в обеих локалях, модель различает завершённый выбор и обычный просмотр.
+    - Действующий календарь и его потребители проходят проверки до подключения нового управления; результаты сообщены в сессии без отчётного документа.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter analyze`
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/localization`
+    - Проверить результаты ручной сверки 3.1 и назвать принятые расхождения, если они есть.
+  - **Dependencies:** 3.1, 3.2, 3.3
+  - **Files likely touched:** Нет (только проверка)
+  - **Estimated scope:** XS
+
+- [ ] 3.5 Оба каталога переходят к выбранному году и месяцу через встроенный выбор без изменения выбранной даты и выдачи
+  - **Acceptance criteria:**
+    - DailyChoiceCalendar реализует требование «Выбор года и месяца в календаре каталога»: внутренние состояния «закрыт», «страница лет», «месяцы года», страницы по 12 лет от 2020, стрелки лет и годов, закрытие заголовком и сворачивание ручкой. Выбор заменяет сетку дней без отдельного маршрута и свайпа; годы вне CalendarDate не предлагаются, переходы за диапазон недоступны.
+    - Выбор месяца возвращает настоящую сетку TableCalendarBase с выбранной датой как датой просмотра, если она входит в месяц, иначе с первым числом. Календарь сообщает ровно одно событие завершения с итоговым просмотром, даже равным прежнему, без дублирующего onViewportChanged; общий обработчик DailyChoiceCatalogBody сохраняет просмотр и передаёт причину модели из 3.3, не обращаясь к модели выдачи.
+    - Виджет-проверки покрывают переход из октября 2026 в март 2028 и сворачивание к 28 февраля — 5 марта, возврат к месяцу выбранной даты, отмену обоими способами, страницы у обеих границ CalendarDate и отсутствие событий просмотра на промежуточных шагах. Выбранная дата и фильтр сохраняются.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_boundaries_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`
+  - **Dependencies:** 2.19, 3.4
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart` (новый), `test/daily_choice/presentation/catalog/daily_choice_calendar_test_support.dart`
+  - **Estimated scope:** M
+
+- [ ] 3.6 Проверка календаря с моделью подтверждает восстановление отметок после выбора месяца без лишних чтений
+  - **Acceptance criteria:**
+    - Сценарий «Повторный выбор показанного месяца восстанавливает отметки» выполнен через настоящий выбор календаря: при выбранной 2026-10-08 и просмотре 2026-11-01 после отказа повторный выбор ноября создаёт ровно одно чтение отметок; успех обновляет отметки и убирает Notice без чтения выдачи и изменения фильтра.
+    - Перестройка виджета, открытие, промежуточные шаги и отмена выбора не запускают повтор; тот же месяц после успеха не читается, а другой месяц после отказа читается один раз своим окном. Проверки используют счётчики чтений отметок и выдачи по решению 9 дизайна.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model_test.dart`
+  - **Dependencies:** 3.5
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test_support.dart`
+  - **Estimated scope:** S
+
+- [ ] 3.7 Открытый выбор года и месяца сохраняется независимо в каждом экземпляре каталога
+  - **Acceptance criteria:**
+    - Проверки корневого каталога подтверждают сохранение страницы лет и месяцев выбранного года при смене пункта, повторном выборе текущего пункта и возврате со страницы поверх каталога вместе с фильтром, выбранной датой, выдачей и прокруткой.
+    - Два экземпляра каталога на заданную дату имеют независимые состояния выбора; возврат по истории сохраняет открытый выбор прежнего экземпляра, не меняя корневой каталог (ADR-0028).
+    - Подтверждённое изменение, смена локали и обновление текущей локальной даты не закрывают выбор; текущие признаки обновляются без изменения просмотра. Новый экземпляр после завершения прежнего жизненного цикла начинает с прежнего начального состояния недели, без восстановления выбора.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_state_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_lifecycle_test.dart`
+  - **Dependencies:** 3.5
+  - **Files likely touched:** `test/app/navigation/app_shell_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`; при необходимости — `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`
+  - **Estimated scope:** M
+
+- [ ] 3.8 Доступные команды выбора года и месяца работают на русском и английском без свайпа
+  - **Acceptance criteria:**
+    - Семантическая активация открывает выбор, листает страницы лет и годы, выбирает год и месяц, возвращает к дням и сворачивает календарь; названия команд соответствуют решению 8 дизайна в обеих локалях.
+    - Ячейка года называет год, ячейка месяца — месяц и год; показанные и текущие год и месяц различимы, включая совпадение признаков. Пустые крайние позиции не объявляются и не выбираются, стрелки сообщают недоступность на границе.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`
+  - **Dependencies:** 3.5
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`; при необходимости — `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/design_system/components/period_picker.dart`, `lib/src/design_system/components/calendar_header.dart`
+  - **Estimated scope:** M
+
+- [ ] 3.9 Подтвердить готовность фазы 3: выбор года и месяца соответствует спецификации и сохраняет поведение фазы 2
+  - **Acceptance criteria:**
+    - Сценарии выбора, сохранение состояния и доступность подтверждены; проверки 3.6 доказывают восстановление отметок и отсутствие лишних чтений. Поведение фазы 2, включая закрепление, выбор дня, выдачу, отметки и нижнюю границу поддержки, сохраняется.
+    - Компоненты выбора в Widgetbook и оба каталога на устройстве сверены с макетами лет и месяцев в обеих темах; непринятых расхождений нет.
+    - Полные проверки репозитория и строгая проверка изменения проходят; результаты и принятые расхождения сообщены в сессии без нового отчётного документа.
+  - **Verification:**
+    - `mise run check`
+    - `mise exec --no-deps -- openspec validate redesign-daily-choice-calendar --strict`
+    - Вручную сверить выбор в `mise run widgetbook` и на устройстве с `context/doable-design-system/components/PeriodPicker/` и `context/doable-design/design/Parts.dc.html`; в обоих каталогах пройти открытие, переход к далёкому месяцу, закрытие и сворачивание в обеих темах.
+  - **Dependencies:** 3.4, 3.5, 3.6, 3.7, 3.8
+  - **Files likely touched:** Нет (только проверка)
+  - **Estimated scope:** XS
