@@ -16,6 +16,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_riverpod: ^3.4.2
+  flutter_svg: ^2.3.0
   intl: ^0.20.3
   path_provider: 2.1.6
   riverpod_annotation: ^4.0.6
@@ -36,6 +37,24 @@ dev_dependencies:
 flutter:
   generate: true
   uses-material-design: true
+  assets:
+    - packages/doable/src/design_system/icons/assets/home.svg
+    - packages/doable/src/design_system/icons/assets/home_filled.svg
+    - packages/doable/src/design_system/icons/assets/calendar_days.svg
+    - packages/doable/src/design_system/icons/assets/calendar_days_filled.svg
+    - packages/doable/src/design_system/icons/assets/graph.svg
+    - packages/doable/src/design_system/icons/assets/graph_filled.svg
+    - packages/doable/src/design_system/icons/assets/plus.svg
+    - packages/doable/src/design_system/icons/assets/intention.svg
+    - packages/doable/src/design_system/icons/assets/relation.svg
+    - packages/doable/src/design_system/icons/assets/calendar.svg
+    - packages/doable/src/design_system/icons/assets/intention_mini.svg
+    - packages/doable/src/design_system/icons/assets/relation_mini.svg
+    - packages/doable/src/design_system/icons/assets/calendar_mini.svg
+    - packages/doable/src/design_system/icons/assets/from_intention.svg
+    - packages/doable/src/design_system/icons/assets/from_action.svg
+    - packages/doable/src/design_system/icons/assets/check.svg
+    - packages/doable/src/design_system/icons/assets/chevron_right.svg
   fonts:
     - family: Inter
       fonts:
