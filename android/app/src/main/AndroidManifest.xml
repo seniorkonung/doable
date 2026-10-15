@@ -8,6 +8,8 @@
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="portrait"
+            android:resizeableActivity="false"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""

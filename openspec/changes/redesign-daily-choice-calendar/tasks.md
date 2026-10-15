@@ -219,7 +219,7 @@
   - **Files likely touched:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, сгенерированные `lib/l10n/app_localizations.dart`, `lib/l10n/app_localizations_ru.dart`, `lib/l10n/app_localizations_en.dart`
   - **Estimated scope:** S
 
-- [ ] 2.11 Манифест ограничивает приложение на телефоне портретной ориентацией во весь экран
+- [x] 2.11 Манифест ограничивает приложение на телефоне портретной ориентацией во весь экран
   - **Acceptance criteria:**
     - У MainActivity заданы android:screenOrientation="portrait" и android:resizeableActivity="false" по ADR-0031: ограничения действуют с запуска процесса, включая подготовку хранилища и её отказ.
     - Проверка манифеста по образцу backup_policy_test.dart защищает оба атрибута именно MainActivity. Ограничения не дублируются вызовом из Dart или отказом от системного поведения больших экранов.
