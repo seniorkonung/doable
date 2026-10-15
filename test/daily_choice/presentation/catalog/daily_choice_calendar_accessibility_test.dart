@@ -29,6 +29,27 @@ final _localizedTexts = [
     allCompleted: 'Все дневные выборы выполнены',
     hasIncomplete: 'Есть невыполненный дневной выбор',
     marksUnavailable: 'Отметки дней не загружены.',
+    choosePeriod: 'Выбрать год и месяц',
+    backToDays: 'Вернуться к дням месяца',
+    previousYears: 'Предыдущие годы',
+    nextYears: 'Следующие годы',
+    previousYear: 'Предыдущий год',
+    nextYear: 'Следующий год',
+    currentPeriod: 'Текущий период',
+    months: [
+      'Январь',
+      'Февраль',
+      'Март',
+      'Апрель',
+      'Май',
+      'Июнь',
+      'Июль',
+      'Август',
+      'Сентябрь',
+      'Октябрь',
+      'Ноябрь',
+      'Декабрь',
+    ],
   ),
   (
     locale: const Locale('en'),
@@ -46,6 +67,27 @@ final _localizedTexts = [
     allCompleted: 'All daily choices are completed',
     hasIncomplete: 'There is an incomplete daily choice',
     marksUnavailable: 'Day marks could not be loaded.',
+    choosePeriod: 'Choose year and month',
+    backToDays: 'Back to the days of the month',
+    previousYears: 'Previous years',
+    nextYears: 'Next years',
+    previousYear: 'Previous year',
+    nextYear: 'Next year',
+    currentPeriod: 'Current period',
+    months: [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ],
   ),
 ];
 
@@ -111,9 +153,9 @@ void main() {
         );
         final completed = '${texts.todayOctober4}, ${texts.allCompleted}';
         final incomplete = '${texts.october5}, ${texts.hasIncomplete}';
-        _expectDay(tester, completed, isSelected: false);
-        _expectDay(tester, incomplete, isSelected: true);
-        _expectDay(
+        _expectSelection(tester, completed, isSelected: false);
+        _expectSelection(tester, incomplete, isSelected: true);
+        _expectSelection(
           tester,
           _dayLabel(tester, date(2026, 10, 7)),
           isSelected: false,
@@ -136,20 +178,235 @@ void main() {
 
         tester.semantics.tap(find.semantics.byLabel(completed));
         await tester.pumpAndSettle();
-        _expectDay(tester, completed, isSelected: true);
+        _expectSelection(tester, completed, isSelected: true);
         expect(consumer.events, [DateSelected(date(2026, 10, 4))]);
 
         consumer.replaceInputs(dayStatuses: {});
         await tester.pumpAndSettle();
-        _expectDay(tester, texts.todayOctober4, isSelected: true);
+        _expectSelection(tester, texts.todayOctober4, isSelected: true);
         expect(find.semantics.byLabel(completed), findsNothing);
         expect(failure, findsOne);
+        semantics.dispose();
+      });
+
+      testWidgets('доступная активация открывает выбор, листает годы, '
+          'выбирает месяц, возвращает дни и сворачивает без свайпа', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2026, 10, 4),
+          viewport: week(date(2026, 10, 4)),
+          today: date(2026, 10, 4),
+          locale: texts.locale,
+        );
+
+        await _activate(tester, texts.expand);
+        _expectPickerTitle(
+          tester,
+          texts.choosePeriod,
+          texts.october,
+          isExpanded: false,
+        );
+        await _activate(tester, texts.choosePeriod);
+        _expectPickerTitle(tester, texts.backToDays, '2020–2031');
+        expect(_announced(tester), [
+          texts.previousYears,
+          texts.backToDays,
+          texts.nextYears,
+          for (var year = 2020; year <= 2031; year++)
+            year == 2026 ? '$year, ${texts.currentPeriod}' : '$year',
+          texts.collapse,
+        ]);
+        _expectSelection(
+          tester,
+          '2026, ${texts.currentPeriod}',
+          isSelected: true,
+        );
+
+        await _activate(tester, texts.previousYears);
+        _expectPickerTitle(tester, texts.backToDays, '2008–2019');
+        await _activate(tester, texts.nextYears);
+        await _activate(tester, texts.nextYears);
+        _expectPickerTitle(tester, texts.backToDays, '2032–2043');
+        await _activate(tester, texts.previousYears);
+        await _activate(tester, '2026, ${texts.currentPeriod}');
+        _expectPickerTitle(tester, texts.backToDays, '2026');
+        expect(_announced(tester), [
+          texts.previousYear,
+          texts.backToDays,
+          texts.nextYear,
+          for (var index = 0; index < 12; index++)
+            '${texts.months[index]} 2026'
+                '${index == 9 ? ', ${texts.currentPeriod}' : ''}',
+          texts.collapse,
+        ]);
+        _expectSelection(
+          tester,
+          '${texts.october}, ${texts.currentPeriod}',
+          isSelected: true,
+        );
+
+        await _activate(tester, texts.previousYear);
+        _expectPickerTitle(tester, texts.backToDays, '2025');
+        await _activate(tester, texts.nextYear);
+        await _activate(tester, texts.nextYear);
+        _expectPickerTitle(tester, texts.backToDays, '2027');
+        await _activate(tester, texts.backToDays);
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
+        expect(consumer.events, [ViewportChanged(month(date(2026, 10, 4)))]);
+
+        await _activate(tester, texts.choosePeriod);
+        await _activate(tester, '2028');
+        await _activate(tester, '${texts.months[2]} 2028');
+        _expectPickerTitle(
+          tester,
+          texts.choosePeriod,
+          '${texts.months[2]} 2028',
+          isExpanded: false,
+        );
+        expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 6));
+        await _activate(tester, texts.collapse);
+        expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 1));
+        expect(consumer.selectedDate, date(2026, 10, 4));
+        expect(consumer.events, [
+          ViewportChanged(month(date(2026, 10, 4))),
+          MonthSelectionCompleted(month(date(2028, 3, 1))),
+          ViewportChanged(week(date(2028, 3, 1))),
+        ]);
+        semantics.dispose();
+      });
+
+      testWidgets('показанный и текущий периоды читаются независимо '
+          'от выбранной даты', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: date(2035, 1, 15),
+          viewport: month(date(2028, 3, 1)),
+          today: date(2026, 10, 4),
+          locale: texts.locale,
+        );
+
+        await _activate(tester, texts.choosePeriod);
+        _expectSelection(tester, '2028', isSelected: true);
+        _expectSelection(
+          tester,
+          '2026, ${texts.currentPeriod}',
+          isSelected: false,
+        );
+        _expectSelection(tester, '2027', isSelected: false);
+        await _activate(tester, '2026, ${texts.currentPeriod}');
+        for (var index = 0; index < 12; index++) {
+          _expectSelection(
+            tester,
+            '${texts.months[index]} 2026'
+            '${index == 9 ? ', ${texts.currentPeriod}' : ''}',
+            isSelected: false,
+          );
+        }
+
+        await _activate(tester, texts.backToDays);
+        await _activate(tester, texts.choosePeriod);
+        await _activate(tester, '2028');
+        for (var index = 0; index < 12; index++) {
+          _expectSelection(
+            tester,
+            '${texts.months[index]} 2028',
+            isSelected: index == 2,
+          );
+        }
+        await _activate(tester, texts.collapse);
+        expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 1));
+        expect(consumer.selectedDate, date(2035, 1, 15));
+        expect(consumer.events, [ViewportChanged(week(date(2028, 3, 1)))]);
         semantics.dispose();
       });
 
       // Остальные проверки не зависят от языка: подписи по языкам читает тест
       // выше.
       if (texts != _localizedTexts.first) return;
+
+      for (final (boundary, years, disabledYears, disabledYear) in [
+        (1, [1, 2, 3], texts.previousYears, texts.previousYear),
+        (
+          9999,
+          [for (var year = 9988; year <= 9999; year++) year],
+          texts.nextYears,
+          texts.nextYear,
+        ),
+      ]) {
+        testWidgets(
+          'выбор у границы $boundary объявляет только допустимые годы '
+          'и сообщает недоступность стрелок',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            final consumer = await pumpCalendarConsumer(
+              tester,
+              selectedDate: date(2026, 10, 4),
+              viewport: month(date(boundary, 6, 15)),
+              today: date(2026, 10, 4),
+            );
+            await _activate(tester, texts.choosePeriod);
+            _expectPickerTitle(
+              tester,
+              texts.backToDays,
+              '${years.first}–${years.last}',
+            );
+            _expectCommand(
+              tester,
+              texts.previousYears,
+              isEnabled: boundary != 1,
+            );
+            _expectCommand(
+              tester,
+              texts.nextYears,
+              isEnabled: boundary != 9999,
+            );
+            final yearLabels = [
+              texts.previousYears,
+              texts.backToDays,
+              texts.nextYears,
+              for (final year in years) '$year',
+              texts.collapse,
+            ];
+            expect(_announced(tester), yearLabels);
+            expect(
+              _actionable(tester),
+              yearLabels.where((label) => label != disabledYears),
+            );
+            for (final year in years) {
+              _expectSelection(tester, '$year', isSelected: year == boundary);
+            }
+
+            await _activate(tester, '$boundary');
+            _expectCommand(
+              tester,
+              texts.previousYear,
+              isEnabled: boundary != 1,
+            );
+            _expectCommand(tester, texts.nextYear, isEnabled: boundary != 9999);
+            final monthLabels = [
+              texts.previousYear,
+              texts.backToDays,
+              texts.nextYear,
+              for (final month in texts.months) '$month $boundary',
+              texts.collapse,
+            ];
+            expect(_announced(tester), monthLabels);
+            expect(
+              _actionable(tester),
+              monthLabels.where((label) => label != disabledYear),
+            );
+            await _activate(tester, '${texts.months[5]} $boundary');
+            expect(consumer.events, [
+              MonthSelectionCompleted(month(date(boundary, 6, 1))),
+            ]);
+            semantics.dispose();
+          },
+        );
+      }
 
       testWidgets('различает сегодняшний 2026-10-04 и выбранный 2026-10-05 при '
           'последовательном чтении', (tester) async {
@@ -167,9 +424,9 @@ void main() {
         expect(today, isNonNegative);
         expect(announced[today + 1], texts.october5);
 
-        _expectDay(tester, texts.todayOctober4, isSelected: false);
-        _expectDay(tester, texts.october5, isSelected: true);
-        _expectDay(tester, texts.september28, isSelected: false);
+        _expectSelection(tester, texts.todayOctober4, isSelected: false);
+        _expectSelection(tester, texts.october5, isSelected: true);
+        _expectSelection(tester, texts.september28, isSelected: false);
         // Каждый показанный день — одна кнопка выбора с состоянием
         // выбранности; выбран ровно один.
         final dayNodes = _dayNodes(tester);
@@ -198,7 +455,7 @@ void main() {
           locale: texts.locale,
         );
 
-        _expectDay(tester, texts.todayOctober4, isSelected: true);
+        _expectSelection(tester, texts.todayOctober4, isSelected: true);
         expect(_dayNodes(tester), hasLength(7));
         for (final node in _dayNodes(tester)) {
           _expectSingleSelectAction(node);
@@ -242,7 +499,7 @@ void main() {
             for (final day in lastDays) _dayLabel(tester, day),
             texts.expand,
           ]);
-          _expectDay(
+          _expectSelection(
             tester,
             _dayLabel(tester, date(9999, 12, 31)),
             isSelected: true,
@@ -274,7 +531,7 @@ void main() {
           expect(_dayNodes(tester).map((node) => node.label), [
             for (final day in firstDays) _dayLabel(tester, day),
           ]);
-          _expectDay(
+          _expectSelection(
             tester,
             _dayLabel(tester, date(1, 1, 1)),
             isSelected: true,
@@ -376,7 +633,7 @@ void main() {
       ]);
       expect(dayCell(tester, date(2026, 10, 6)).isToday, isFalse);
       expect(dayCell(tester, date(2026, 10, 7)).isToday, isTrue);
-      _expectDay(
+      _expectSelection(
         tester,
         _dayLabel(tester, date(2026, 10, 5)),
         isSelected: true,
@@ -430,8 +687,12 @@ String _dayLabel(
       : fullDate;
 }
 
-/// День объявляется одной кнопкой выбора с явным состоянием выбранности.
-void _expectDay(WidgetTester tester, String label, {required bool isSelected}) {
+/// Ячейка объявляется одной кнопкой выбора с явным состоянием выбранности.
+void _expectSelection(
+  WidgetTester tester,
+  String label, {
+  required bool isSelected,
+}) {
   final node = find.semantics.byLabel(label).evaluate().single;
   _expectSingleSelectAction(node);
   expect(
@@ -451,6 +712,26 @@ void _expectSingleSelectAction(SemanticsNode node) {
 }
 
 SemanticsFinder _command(String name) => find.semantics.byLabel(name);
+
+Future<void> _activate(WidgetTester tester, String label) async {
+  tester.semantics.tap(find.semantics.byLabel(label));
+  await tester.pumpAndSettle();
+}
+
+void _expectPickerTitle(
+  WidgetTester tester,
+  String label,
+  String value, {
+  bool isExpanded = true,
+}) {
+  final node = find.semantics.byLabel(label).evaluate().single;
+  _expectSingleSelectAction(node);
+  expect(node.value, value);
+  expect(
+    node.flagsCollection.isExpanded,
+    isExpanded ? Tristate.isTrue : Tristate.isFalse,
+  );
+}
 
 /// Команда шапки — кнопка с названием, сообщающая доступность; недоступная
 /// команда не предлагает касания.

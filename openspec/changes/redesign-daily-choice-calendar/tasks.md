@@ -429,7 +429,7 @@
   - **Files likely touched:** `test/app/navigation/app_shell_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`; при необходимости — `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`
   - **Estimated scope:** M
 
-- [ ] 3.8 Доступные команды выбора года и месяца работают на русском и английском без свайпа
+- [x] 3.8 Доступные команды выбора года и месяца работают на русском и английском без свайпа
   - **Acceptance criteria:**
     - Семантическая активация открывает выбор, листает страницы лет и годы, выбирает год и месяц, возвращает к дням и сворачивает календарь; названия команд соответствуют решению 8 дизайна в обеих локалях.
     - Ячейка года называет год, ячейка месяца — месяц и год; показанные и текущие год и месяц различимы, включая совпадение признаков. Пустые крайние позиции не объявляются и не выбираются, стрелки сообщают недоступность на границе.
