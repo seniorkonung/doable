@@ -15,6 +15,15 @@ import 'daily_choice_catalog_instance.dart';
 
 part 'daily_choice_calendar_day_marks_view_model.g.dart';
 
+/// Причина передачи просмотра модели отметок.
+enum DailyChoiceCalendarViewportUpdateReason {
+  /// Обычная установка просмотра, включая смену недели или представления.
+  ordinary,
+
+  /// Пользователь завершил выбор месяца, даже если просмотр не изменился.
+  monthSelectionCompleted,
+}
+
 /// Отметки периода, независимые от выбранного дня и выдачи каталога.
 /// Страница удерживает провайдер с ключом своего экземпляра всё время
 /// своей жизни и передаёт изменения просмотра через [setViewport].
@@ -56,10 +65,17 @@ final class DailyChoiceCalendarDayMarksViewModel
     return const DailyChoiceCalendarDayMarksState();
   }
 
-  /// После отказа даже смена представления или недели внутри месяца
-  /// повторяет чтение; неизменившийся просмотр не создаёт запроса.
-  void setViewport(DailyChoiceCalendarViewport viewport) {
-    if (_viewport == viewport) return;
+  /// После отказа изменение просмотра или завершённый выбор месяца
+  /// повторяет чтение. Обычная установка равного просмотра бездействует.
+  void setViewport(
+    DailyChoiceCalendarViewport viewport, {
+    DailyChoiceCalendarViewportUpdateReason reason =
+        DailyChoiceCalendarViewportUpdateReason.ordinary,
+  }) {
+    if (_viewport == viewport &&
+        reason == DailyChoiceCalendarViewportUpdateReason.ordinary) {
+      return;
+    }
     final previousDate = _viewport.focusedDate;
     _viewport = viewport;
     final date = viewport.focusedDate;

@@ -78,7 +78,7 @@ final class DailyChoiceCalendarDayMarksViewModelProvider
 }
 
 String _$dailyChoiceCalendarDayMarksViewModelHash() =>
-    r'4476c097e2239d0b72f7ddedff401a701a69c769';
+    r'89cb3a04c02824136265cfc2b58d045545d28f10';
 
 /// Отметки периода, независимые от выбранного дня и выдачи каталога.
 /// Страница удерживает провайдер с ключом своего экземпляра всё время
