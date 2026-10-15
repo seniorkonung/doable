@@ -76,7 +76,7 @@
   - **Вероятные файлы:** `lib/src/design_system/components/option_row.dart`, `lib/src/app/quick_creation/quick_creation_mode_presentation.dart`, `quick_creation_daily_choice_start_sheet.dart`, `widgetbook/lib/navigation/quick_creation_sheets_use_cases.dart`; проверки графики в `quick_creation_mode_menu_test.dart`, `quick_creation_daily_choice_start_sheet_test.dart` и `quick_creation_accessibility_test.dart`.
   - **Размер:** M — миграция единственного общего потребителя строк и его двух панелей; адаптации ожиданий механические.
 
-- [ ] 1.9 Подтвердить соответствие графики и готовность всего участка к итоговой проверке
+- [x] 1.9 Подтвердить соответствие графики и готовность всего участка к итоговой проверке
   - **Критерии приёмки:**
     - Все поверхности из границ фазы показывают исходную графику в обеих темах; внутри них не осталось `Icons.*` и `IconData`. Проверены варианты из решения 5 дизайна, включая составные значки и мини-значки.
     - Обязательная полная проверка проекта проходит; приложение и Widgetbook используют ресурсы из репозитория.
