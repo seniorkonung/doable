@@ -2,14 +2,19 @@ package software.doable.doable
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.app.Instrumentation
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
 import android.os.Build
+import android.os.Bundle
+import android.os.IBinder
 import android.view.Display
 import io.flutter.embedding.android.FlutterActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,8 +24,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowAppTask
 import org.robolectric.shadows.ShadowDisplayManager
+import org.robolectric.shadows.ShadowInstrumentation
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
 
@@ -47,7 +56,7 @@ class DisplayWindowPolicyTest {
     }
 
     @Test
-    @Config(qualifiers = "w599dp-h900dp-mdpi")
+    @Config(qualifiers = "w599dp-h900dp-mdpi", shadows = [LaunchSourceInstrumentation::class])
     fun `Холодный запуск выбирает телефонную Activity до запуска Flutter`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java)
         controller.create()
@@ -57,17 +66,30 @@ class DisplayWindowPolicyTest {
         assertEquals(PhoneActivity::class.java.name, launch.component!!.className)
         assertEquals(0, launch.flags and Intent.FLAG_ACTIVITY_CLEAR_TASK)
         assertTrue(launch.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertNull(Shadow.extract<LaunchSourceInstrumentation>(
+            ShadowInstrumentation.getInstrumentation(),
+        ).sourceToken)
         assertTrue(activity.isFinishing)
         controller.destroy()
     }
 
     @Test
-    @Config(qualifiers = "w600dp-h900dp-mdpi")
-    fun `Холодный запуск на границе выбирает большую Activity`() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).create()
-        val launch = shadowOf(controller.get()).nextStartedActivity
+    @Config(qualifiers = "w600dp-h900dp-mdpi", shadows = [LaunchSourceInstrumentation::class])
+    fun `Холодный запуск большой Activity сохраняет связь с исходной Activity и задачей`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java)
+        val activity = controller.get()
+        assertTrue(activity.getSystemService(ActivityManager::class.java).appTasks.isEmpty())
+
+        controller.create()
+        val launch = shadowOf(activity).nextStartedActivity
+        val instrumentation = Shadow.extract<LaunchSourceInstrumentation>(
+            ShadowInstrumentation.getInstrumentation(),
+        )
 
         assertEquals(LargeDisplayActivity::class.java.name, launch.component!!.className)
+        assertTrue(launch.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertNotNull("Android должен получить токен исходной Activity", instrumentation.sourceToken)
+        assertEquals(activity.taskId, instrumentation.sourceTaskId)
         controller.destroy()
     }
 
@@ -94,7 +116,7 @@ class DisplayWindowPolicyTest {
     }
 
     @Test
-    @Config(qualifiers = "w800dp-h1200dp-mdpi")
+    @Config(qualifiers = "w800dp-h1200dp-mdpi", shadows = [LaunchSourceInstrumentation::class])
     fun `Смена категории передаёт двигатель в отдельную задачу до удаления исходной`() {
         val controller = Robolectric.buildActivity(Activity::class.java).create()
         val activity = controller.get()
@@ -111,6 +133,11 @@ class DisplayWindowPolicyTest {
         assertTrue(launch.getBooleanExtra("destroy_engine_with_activity", false))
         assertEquals(0, launch.flags and Intent.FLAG_ACTIVITY_CLEAR_TASK)
         assertTrue(launch.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        val instrumentation = Shadow.extract<LaunchSourceInstrumentation>(
+            ShadowInstrumentation.getInstrumentation(),
+        )
+        assertNull(instrumentation.sourceToken)
+        assertNull(instrumentation.sourceTaskId)
         assertFalse(activity.isFinishing)
         assertEquals(1, transfers)
 
@@ -241,5 +268,28 @@ class DisplayWindowPolicyTest {
             shadowOf(activity).nextStartedActivity.component!!.className,
         )
         controller.destroy()
+    }
+
+    @Implements(Instrumentation::class)
+    class LaunchSourceInstrumentation : ShadowInstrumentation() {
+        var sourceToken: IBinder? = null
+        var sourceTaskId: Int? = null
+
+        @Implementation
+        override fun execStartActivity(
+            who: Context,
+            contextThread: IBinder?,
+            token: IBinder?,
+            target: Activity?,
+            intent: Intent,
+            requestCode: Int,
+            options: Bundle?,
+        ): Instrumentation.ActivityResult? {
+            sourceToken = token
+            sourceTaskId = target?.taskId
+            return super.execStartActivity(
+                who, contextThread, token, target, intent, requestCode, options,
+            )
+        }
     }
 }

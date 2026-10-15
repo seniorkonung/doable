@@ -102,20 +102,24 @@ internal class DisplayWindowPolicy(private val activity: Activity) {
                 .putExtra(PREVIOUS_TASK_ID, activity.taskId)
                 .putExtra(FRAMEWORK_HANDLES_BACK, engine.frameworkHandlesBack)
         }
-        // Разные affinity хостов не дают NEW_TASK унаследовать разделённое окно.
+        // Новый хост получает отдельную task с собственной affinity; повторный вход возвращает корень.
         // https://developer.android.com/guide/components/activities/tasks-and-back-stack#HandleAffinities
         intent.addFlags(
             if (task == null) Intent.FLAG_ACTIVITY_NEW_TASK
             else Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
         )
-        if (task == null) {
-            // Независимый контекст сохраняет дисплей, исключая размеры исходной Activity.
-            // https://developer.android.com/reference/android/content/Context#startActivity(android.content.Intent)
-            activity.createDisplayContext(activity.windowManager.defaultDisplay).startActivity(intent)
-        } else {
+        if (task != null) {
             // AppTask направляет Intent в найденную задачу, независимо от задачи launcher.
             // https://developer.android.com/reference/android/app/ActivityManager.AppTask#startActivity(android.content.Context,android.content.Intent,android.os.Bundle)
             task.startActivity(activity, intent, null)
+        } else if (engine == null && target == DisplayCategory.LARGE) {
+            // Токен исходной Activity сохраняет выбранное системой размещение холодного запуска.
+            // https://android.googlesource.com/platform/frameworks/base/+/android-7.0.0_r1/core/java/android/app/Activity.java#4224
+            activity.startActivity(intent)
+        } else {
+            // Телефонный запуск и перенос не наследуют прежнее многооконное размещение.
+            // https://developer.android.com/reference/android/content/Context#startActivity(android.content.Intent)
+            activity.createDisplayContext(activity.windowManager.defaultDisplay).startActivity(intent)
         }
     }
 
