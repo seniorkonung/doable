@@ -69,7 +69,7 @@
   - **Files likely touched:** `lib/src/design_system/components/calendar_handle.dart` (новый), `widgetbook/lib/calendar/calendar_handle_use_cases.dart` (новый), `widgetbook/lib/catalog.dart`
   - **Estimated scope:** S
 
-- [ ] 1.7 `DayHeading` показывает день недели, отметку «Сегодня» и дату по дизайн-системе в Widgetbook
+- [x] 1.7 `DayHeading` показывает день недели, отметку «Сегодня» и дату по дизайн-системе в Widgetbook
   - **Acceptance criteria:**
     - Заголовок получает тексты дня недели и даты и текст отметки либо её отсутствие; отдельного компонента `Badge` нет.
     - В обеих темах вид совпадает с README `DayHeading` и разделом «Day heading» спек-доски `Parts`; при крупном тексте строки переносятся, а не обрезаются.
