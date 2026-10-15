@@ -50,9 +50,11 @@
 
 ### 3. Один адрес ресурса для приложения и Widgetbook
 
-Ресурсы из `lib/src/design_system/icons/assets/` включаются по адресам пакета `packages/doable/src/design_system/icons/assets/` в манифесты приложения и Widgetbook. Компонент использует `SvgPicture.asset('src/design_system/icons/assets/<имя>.svg', package: 'doable', ...)`. Префикс `lib/` в адрес пакета не входит. Такое включение ресурсов из `lib/` предусмотрено [правилами Flutter для ресурсов пакетов](https://docs.flutter.dev/ui/assets/assets-and-images#asset-images-in-package-dependencies) и уже применяется в Widgetbook к шрифту Inter.
+Физические SVG находятся в `lib/src/design_system/icons/assets/`. В секции `flutter.assets` обоих манифестов — `pubspec.yaml` и `widgetbook/pubspec.yaml` — явно перечисляются все 17 файлов из решения 1 отдельными записями вида `packages/doable/src/design_system/icons/assets/<имя>.svg`, где `<имя>` заменяется фактическим именем файла. `packages/doable/src/design_system/icons/assets/` — только логический префикс этих адресов: запись каталога с завершающим `/` не используется, поскольку Flutter ищет такой каталог относительно манифеста, а не разрешает его через пакет.
 
-Обе сборки используют одни физические файлы, без копий SVG в Widgetbook и без обращений к `context`. Подключение проверяется сначала на реальном ресурсе составного значка, затем на всём перенесённом наборе.
+Компонент использует `SvgPicture.asset('src/design_system/icons/assets/<имя>.svg', package: 'doable', ...)`. Префикс `lib/` в адрес пакета не входит. Пофайловое включение ресурсов из `lib/` предусмотрено [правилами Flutter для ресурсов пакетов](https://docs.flutter.dev/ui/assets/assets-and-images#asset-images-in-package-dependencies) и уже применяется в Widgetbook к шрифту Inter.
+
+Обе сборки используют одни физические файлы, без копий SVG в Widgetbook и без обращений к `context`. При добавлении иконки её запись добавляется в оба манифеста; эти записи общие для платформ приложения, включая Android и iOS. Загрузка всех 17 вариантов проверяется тестом общего компонента в приложении и ручным показом полного набора в Widgetbook, включая составной значок `fromIntention` с ромбом и стрелкой.
 
 ### 4. Сопоставление остаётся у текущих потребителей
 
