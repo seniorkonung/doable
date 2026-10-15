@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../design_system/text_metrics.dart';
+import '../../../design_system/components/month_grid_weekday.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
@@ -47,7 +46,7 @@ import 'daily_choice_calendar_viewport.dart';
 ///
 /// Календарь рассчитан на размещение элементом общей вертикальной прокрутки
 /// страницы: он занимает доступную ширину, а высоту определяет сам по шапке,
-/// числу недель видимого периода и системному масштабу текста. Раскрытие
+/// шести неделям месяца и системному масштабу текста. Раскрытие
 /// увеличивает эту высоту и сдвигает последующее содержимое; собственной
 /// вертикальной прокрутки у календаря нет, и вертикальные жесты по нему
 /// прокручивают страницу. Семь колонок дней всегда занимают всю ширину: при
@@ -160,6 +159,9 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
                 DailyChoiceCalendarMode.month => CalendarFormat.month,
               },
               startingDayOfWeek: StartingDayOfWeek.monday,
+              // Постоянные шесть строк включают дни соседних месяцев:
+              // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase/sixWeekMonthsEnforced.html
+              sixWeekMonthsEnforced: true,
               // Представление переключает только потребитель, поэтому
               // вертикальные жесты остаются общей прокрутке страницы.
               availableGestures: AvailableGestures.horizontalSwipe,
@@ -232,16 +234,8 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   /// Короткое название дня недели над колонкой. Каждый день и так называет
   /// свой день недели, поэтому подпись колонки не читается отдельно.
   Widget _buildWeekday(BuildContext context, DateTime day) {
-    final theme = Theme.of(context);
-    return Center(
-      child: ExcludeSemantics(
-        child: Text(
-          _weekdayLabel(context, day),
-          textAlign: TextAlign.center,
-          style: _weekdayStyle(theme)
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        ),
-      ),
+    return ExcludeSemantics(
+      child: MonthGridWeekday(text: _weekdayLabel(context, day)),
     );
   }
 
@@ -299,38 +293,32 @@ const _unavailableDay = SizedBox.expand(
   key: ValueKey('daily-choice-calendar-unavailable-day'),
 );
 
-/// Наименьшая высота строки названий дней недели.
-const _minWeekdayHeight = 16.0;
-
 /// Ширина колонки дня, не больше фактической: высоты строк, рассчитанные по
 /// ней, вмещают текст колонки.
 double _columnWidth(double width) =>
     (width / DateTime.daysPerWeek).floorToDouble();
 
-String _weekdayLabel(BuildContext context, DateTime day) =>
-    DateFormat.E(Localizations.localeOf(context).toLanguageTag()).format(day);
-
-TextStyle? _weekdayStyle(ThemeData theme) => theme.textTheme.bodySmall;
+String _weekdayLabel(BuildContext context, DateTime day) {
+  final label = DateFormat.E(Localizations.localeOf(context).toLanguageTag())
+      .format(day);
+  return label[0].toUpperCase() + label.substring(1);
+}
 
 /// Высота строки названий дней недели, в которую каждое название при ширине
 /// колонки [columnWidth] помещается целиком, при необходимости с переносом.
 double _weekdayHeight(BuildContext context, {required double columnWidth}) {
   // Названия не зависят от недели: подойдёт любая неделя с понедельника.
   final monday = DateTime.utc(2024);
-  return math.max(
-    _minWeekdayHeight,
-    tallestTextHeight(
-      context,
-      texts: [
-        for (var offset = 0; offset < DateTime.daysPerWeek; offset++)
-          _weekdayLabel(
-            context,
-            DateTime.utc(monday.year, monday.month, monday.day + offset),
-          ),
-      ],
-      style: _weekdayStyle(Theme.of(context)),
-      maxWidth: columnWidth,
-    ),
+  return MonthGridWeekday.rowHeight(
+    context,
+    texts: [
+      for (var offset = 0; offset < DateTime.daysPerWeek; offset++)
+        _weekdayLabel(
+          context,
+          DateTime.utc(monday.year, monday.month, monday.day + offset),
+        ),
+    ],
+    columnWidth: columnWidth,
   );
 }
 

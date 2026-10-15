@@ -14,7 +14,7 @@ import 'daily_choice_calendar_test_support.dart';
 void main() {
   group('календарные периоды', () {
     testWidgets(
-      'февраль невисокосного 2027 года занимает четыре недели без 29-го числа',
+      'февраль невисокосного 2027 года занимает шесть недель без 29-го числа',
       (tester) async {
         await pumpCalendarConsumer(
           tester,
@@ -23,8 +23,8 @@ void main() {
           today: date(2026, 10, 4),
         );
 
-        expect(visibleWeeks(tester), weeksFrom(date(2027, 2, 1), 4));
-        expect(visibleWeeks(tester).last, [
+        expect(visibleWeeks(tester), weeksFrom(date(2027, 2, 1), 6));
+        expect(visibleWeeks(tester)[3], [
           date(2027, 2, 22),
           date(2027, 2, 23),
           date(2027, 2, 24),
@@ -46,8 +46,8 @@ void main() {
         today: date(2026, 10, 4),
       );
 
-      expect(visibleWeeks(tester), weeksFrom(date(1900, 1, 29), 5));
-      expect(visibleWeeks(tester).last, [
+      expect(visibleWeeks(tester), weeksFrom(date(1900, 1, 29), 6));
+      expect(visibleWeeks(tester)[4], [
         date(1900, 2, 26),
         date(1900, 2, 27),
         date(1900, 2, 28),
@@ -60,8 +60,8 @@ void main() {
       consumer.replaceInputs(viewport: month(date(2000, 2, 1)));
       await tester.pumpAndSettle();
 
-      expect(visibleWeeks(tester), weeksFrom(date(2000, 1, 31), 5));
-      expect(visibleWeeks(tester).last, [
+      expect(visibleWeeks(tester), weeksFrom(date(2000, 1, 31), 6));
+      expect(visibleWeeks(tester)[4], [
         date(2000, 2, 28),
         date(2000, 2, 29),
         date(2000, 3, 1),
@@ -225,7 +225,10 @@ void main() {
             ),
             today: date(2026, 10, 4),
           );
-          expect(unavailableCalendarDays, findsNWidgets(2));
+          expect(
+            unavailableCalendarDays,
+            findsNWidgets(mode == DailyChoiceCalendarMode.week ? 2 : 9),
+          );
 
           for (final position in unavailableCalendarDays.evaluate().toList()) {
             await tester.tapAt(
@@ -309,10 +312,10 @@ void main() {
 
       await swipeToPreviousPeriod(tester);
       expect(consumer.events, isEmpty);
-      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 6));
 
       await swipeToNextPeriod(tester);
-      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 29), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 29), 6));
       await swipeToPreviousPeriod(tester);
 
       expect(consumer.events, [
@@ -320,7 +323,7 @@ void main() {
         ViewportChanged(month(date(1, 1, 15))),
       ]);
       expect(consumer.selectedDate, date(1, 1, 15));
-      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 6));
 
       await tester.tap(find.byTooltip('Свернуть календарь'));
       await tester.pumpAndSettle();
@@ -340,6 +343,7 @@ void main() {
         final lastMonth = [
           ...weeksFrom(date(9999, 11, 29), 4),
           _lastWeekPositions,
+          List<CalendarDate?>.filled(7, null),
         ];
 
         await swipeToNextPeriod(tester);
@@ -347,7 +351,7 @@ void main() {
         expect(visibleWeeks(tester), lastMonth);
 
         await swipeToPreviousPeriod(tester);
-        expect(visibleWeeks(tester), weeksFrom(date(9999, 11, 1), 5));
+        expect(visibleWeeks(tester), weeksFrom(date(9999, 11, 1), 6));
         await swipeToNextPeriod(tester);
 
         expect(consumer.events, [

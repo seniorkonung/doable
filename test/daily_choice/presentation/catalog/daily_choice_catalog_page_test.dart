@@ -288,7 +288,7 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
       // Выбранный день вне просматриваемого месяца остаётся названным.
       expect(find.text(_selectedDateLabel(tester, _today)), findsOneWidget);
       expect(repository.queries, hasLength(1));
@@ -300,7 +300,7 @@ void main() {
 
       await _settleCalendar(tester);
       _expectSelected(tester, selectedDay);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
       expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
       expect(
         find.text(_selectedDateLabel(tester, selectedDay)),
@@ -347,7 +347,7 @@ void main() {
       expect(tester.getRect(count).top, greaterThan(weekCountTop));
 
       await _swipeCalendar(tester, toNext: true);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 6));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
@@ -413,12 +413,12 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 6));
 
       await tester.tap(calendarDay(_today));
       await _settleCalendar(tester);
       _expectSelected(tester, _today);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 6));
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
 

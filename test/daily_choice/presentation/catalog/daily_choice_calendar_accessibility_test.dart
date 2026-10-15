@@ -69,7 +69,7 @@ void main() {
             locale: texts.locale,
           );
 
-          final days = weeksFrom(date(2026, 9, 28), 5).expand((row) => row);
+          final days = weeksFrom(date(2026, 9, 28), 6).expand((row) => row);
           expect(_announced(tester), [
             texts.selectedDate,
             texts.previousMonth,
@@ -166,7 +166,7 @@ void main() {
         // Каждый показанный день — одна кнопка выбора с состоянием
         // выбранности; выбран ровно один.
         final dayNodes = _dayNodes(tester);
-        expect(dayNodes, hasLength(35));
+        expect(dayNodes, hasLength(42));
         for (final node in dayNodes) {
           _expectSingleSelectAction(node);
         }
@@ -244,7 +244,7 @@ void main() {
           _expectCommand(tester, texts.previousMonth, isEnabled: true);
           _expectCommand(tester, texts.nextMonth, isEnabled: false);
           _expectCommand(tester, texts.collapse, isEnabled: true);
-          expect(unavailableCalendarDays, findsNWidgets(2));
+          expect(unavailableCalendarDays, findsNWidgets(9));
           expect(_dayNodes(tester), hasLength(33));
 
           consumer.replaceInputs(
@@ -268,7 +268,7 @@ void main() {
           await tester.pumpAndSettle();
           _expectCommand(tester, texts.previousMonth, isEnabled: false);
           _expectCommand(tester, texts.nextMonth, isEnabled: true);
-          expect(_dayNodes(tester), hasLength(35));
+          expect(_dayNodes(tester), hasLength(42));
           expect(consumer.events, isEmpty);
           semantics.dispose();
         },
@@ -490,7 +490,7 @@ Future<List<CalendarEvent>> _controlWithoutSwipes(
 
   await activateCommand(texts.expand);
   await tester.pumpAndSettle();
-  expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+  expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
 
   await activateCommand(texts.nextMonth);
   await tester.pumpAndSettle();

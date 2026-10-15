@@ -73,7 +73,7 @@ void main() {
     expect(catalog, isA<DailyChoiceCatalogLoaded>());
     expect(catalog.selection.isCompleted, false);
     final shownWeeks = visibleWeeks(tester);
-    expect(shownWeeks, weeksFrom(date(2026, 9, 28), 5));
+    expect(shownWeeks, weeksFrom(date(2026, 9, 28), 6));
     expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);
 
     // Подготовка заняла часть оставшегося до полуночи поддельного времени.

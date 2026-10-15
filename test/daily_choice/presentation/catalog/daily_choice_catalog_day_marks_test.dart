@@ -248,7 +248,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Развернуть календарь'));
     await tester.pumpAndSettle();
-    expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+    expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
     tester.platformDispatcher.localesTestValue = const [Locale('en')];
     await tester.pumpAndSettle();
     expect(find.text('October 2026'), findsOneWidget);

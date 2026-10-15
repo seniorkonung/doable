@@ -101,7 +101,7 @@ void main() {
             afterToggle: month(date(2026, 10, 18)),
             nextWeeks: weeksFrom(date(2026, 10, 5), 1),
             swipedWeeks: weeksFrom(date(2026, 10, 12), 1),
-            toggledWeeks: weeksFrom(date(2026, 9, 28), 5),
+            toggledWeeks: weeksFrom(date(2026, 9, 28), 6),
           ),
           (
             start: month(date(2026, 10, 4)),
@@ -111,7 +111,7 @@ void main() {
             afterSwipe: month(date(2026, 12, 1)),
             afterToggle: week(date(2026, 12, 1)),
             nextWeeks: weeksFrom(date(2026, 10, 26), 6),
-            swipedWeeks: weeksFrom(date(2026, 11, 30), 5),
+            swipedWeeks: weeksFrom(date(2026, 11, 30), 6),
             toggledWeeks: weeksFrom(date(2026, 11, 30), 1),
           ),
         ]) {

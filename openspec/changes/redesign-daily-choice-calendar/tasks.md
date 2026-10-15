@@ -139,7 +139,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_layout_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_accessibility_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_test.dart`
   - **Estimated scope:** M
 
-- [ ] 2.4 Месячный календарь показывает шесть недель компонентами MonthGrid
+- [x] 2.4 Месячный календарь показывает шесть недель компонентами MonthGrid
   - **Acceptance criteria:**
     - Месяц использует MonthGridDay и подписи дней недели из модуля основ; TableCalendarBase включает sixWeekMonthsEnforced. Минимальные высоты строки дней и подписей — 44 и 28 dp, фактические высоты получаются из контрактов компонентов.
     - Все месяцы занимают шесть недель с понедельника, включая февраль из четырёх календарных недель; дни соседних месяцев выбираются, а позиции вне CalendarDate не объявляются и не выбираются. Преобразование даты сохраняет календарные части.

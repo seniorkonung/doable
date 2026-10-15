@@ -23,16 +23,16 @@ final _configurations = [
 /// Локальное сегодня проверок свёрнутой недели и прокрутки.
 final _today = date(2026, 10, 4);
 
-/// Раскрытые месяцы с четырьмя и шестью неделями, крайними по числу строк:
+/// Месяцы разной длины с одинаковой шестинедельной сеткой:
 /// сегодня и выбранный день — середина месяца.
 final _months = [
   (
-    name: 'февраль 2027 года из четырёх недель',
+    name: 'февраль 2027 года',
     today: date(2027, 2, 15),
-    weeks: weeksFrom(date(2027, 2, 1), 4),
+    weeks: weeksFrom(date(2027, 2, 1), 6),
   ),
   (
-    name: 'март 2026 года из шести недель',
+    name: 'март 2026 года',
     today: date(2026, 3, 15),
     weeks: weeksFrom(date(2026, 2, 23), 6),
   ),
@@ -100,6 +100,7 @@ void main() {
           expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
           expect(month.rows, shown.weeks.length);
           expect(week.rowHeight, greaterThanOrEqualTo(54));
+          expect(month.rowHeight, moreOrLessEquals(44));
           // Неделя и месяц используют разные высоты строк и подписи.
           // Выдача сдвигается ровно на прирост высоты календаря.
           final grown = month.calendar.height - week.calendar.height;
@@ -562,7 +563,7 @@ void _expectColumns(WidgetTester tester, List<List<CalendarDate>> weeks) {
     expect(row.last.right, moreOrLessEquals(calendar.right));
     for (final (column, cell) in row.indexed) {
       expect(cell.width, greaterThanOrEqualTo(kMinInteractiveDimension));
-      expect(cell.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+      expect(cell.height, greaterThanOrEqualTo(44));
       expect(cell.top, moreOrLessEquals(row.first.top));
       if (column > 0) {
         expect(cell.left, moreOrLessEquals(row[column - 1].right));

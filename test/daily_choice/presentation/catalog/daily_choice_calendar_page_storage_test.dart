@@ -93,7 +93,7 @@ void main() {
             afterSwipeWeeks: weeksFrom(date(2026, 10, 26), 6),
             afterSwipeMonth: 'ноябрь 2026 г.',
             afterButton: month(date(2026, 12, 1)),
-            afterButtonWeeks: weeksFrom(date(2026, 11, 30), 5),
+            afterButtonWeeks: weeksFrom(date(2026, 11, 30), 6),
             tappedDay: date(2026, 12, 16),
           ),
         ]) {
@@ -156,7 +156,7 @@ void main() {
         await _scrollPageDownAndBack(tester);
         await _recreateCalendar(tester, consumer);
 
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
         expect(find.text('октябрь 2026 г.'), findsOneWidget);
 
         await tester.tap(calendarDay(date(2026, 10, 14)));

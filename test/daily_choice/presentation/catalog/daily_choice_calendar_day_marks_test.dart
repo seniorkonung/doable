@@ -1,7 +1,6 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
-import 'package:doable/src/design_system/components/week_strip_day.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,26 +27,21 @@ void main() {
           incomplete: DailyChoiceDayStatus.hasIncomplete,
         },
       );
-      if (mode == DailyChoiceCalendarMode.week) {
-        for (final (day, mark) in [
-          (completed, DayMark.done),
-          (incomplete, DayMark.todo),
-          (empty, DayMark.none),
-        ]) {
-          final cell = tester.widget<WeekStripDay>(
-            find.descendant(
-              of: calendarDay(day),
-              matching: find.byType(WeekStripDay),
-            ),
-          );
-          expect(cell.mark, mark);
-        }
-      } else {
-        expect(find.byIcon(Icons.check), findsOneWidget);
-        expect(find.byIcon(Icons.circle_outlined), findsOneWidget);
+      for (final (day, mark) in [
+        (completed, DayMark.done),
+        (incomplete, DayMark.todo),
+        (empty, DayMark.none),
+      ]) {
+        final indicator = tester.widget<DayMarkIndicator>(
+          find.descendant(
+            of: calendarDay(day),
+            matching: find.byType(DayMarkIndicator),
+          ),
+        );
+        expect(indicator.mark, mark);
         expect(
-          find.descendant(of: calendarDay(empty), matching: find.byType(Icon)),
-          findsNothing,
+          indicator.onAccent,
+          mode == DailyChoiceCalendarMode.month && day == incomplete,
         );
       }
 

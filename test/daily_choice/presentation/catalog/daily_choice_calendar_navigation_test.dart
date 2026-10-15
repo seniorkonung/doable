@@ -81,7 +81,7 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
 
       await swipeToNextPeriod(tester);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 30), 6));
       expect(find.text(texts.december), findsOneWidget);
 
       await tester.tap(find.byTooltip(texts.previousMonth));
@@ -89,7 +89,7 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
 
       await swipeToPreviousPeriod(tester);
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
       expect(find.text(texts.october), findsOneWidget);
 
       await tester.tap(find.byTooltip(texts.collapse));
@@ -245,7 +245,7 @@ void main() {
 
         await tester.tap(calendarDay(date(2026, 9, 29)));
         await tester.pumpAndSettle();
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 5));
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 8, 31), 6));
 
         await tester.tap(find.byTooltip('Свернуть календарь'));
         await tester.pumpAndSettle();
@@ -344,7 +344,7 @@ void main() {
         ]);
         expect(consumer.viewport, month(date(2026, 10, 1)));
         expect(consumer.selectedDate, date(2026, 10, 1));
-        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 6));
         expect(dayCell(tester, date(2026, 10, 1)).isSelected, isTrue);
       },
     );
@@ -423,8 +423,8 @@ void main() {
       beforeMidpoint: month(date(2026, 10, 4)),
       reported: week(date(2026, 10, 11)),
       afterMidpoint: month(date(2026, 10, 11)),
-      beforeMidpointWeeks: weeksFrom(date(2026, 9, 28), 5),
-      afterMidpointWeeks: weeksFrom(date(2026, 9, 28), 5),
+      beforeMidpointWeeks: weeksFrom(date(2026, 9, 28), 6),
+      afterMidpointWeeks: weeksFrom(date(2026, 9, 28), 6),
     );
     final mode = start.mode.name;
 
@@ -516,7 +516,7 @@ void main() {
             towardEdge: 'Предыдущий месяц',
             awayFromEdge: 'Следующий месяц',
             edge: month(date(1, 1, 1)),
-            edgePeriod: weeksFrom(date(1, 1, 1), 5),
+            edgePeriod: weeksFrom(date(1, 1, 1), 6),
             backFromEdge: month(date(1, 2, 1)),
           ),
           (
@@ -528,6 +528,7 @@ void main() {
             edgePeriod: [
               ...weeksFrom(date(9999, 11, 29), 4),
               _lastWeekPositions,
+              List<CalendarDate?>.filled(7, null),
             ],
             backFromEdge: month(date(9999, 11, 1)),
           ),
@@ -586,7 +587,7 @@ void main() {
             description: 'первая неделя',
             focusedDate: date(1, 1, 3),
             weekPeriod: weeksFrom(date(1, 1, 1), 1),
-            monthPeriod: weeksFrom(date(1, 1, 1), 5),
+            monthPeriod: weeksFrom(date(1, 1, 1), 6),
             towardEdgeWeek: 'Предыдущая неделя',
             towardEdgeMonth: 'Предыдущий месяц',
             awayFromEdgeWeek: 'Следующая неделя',
@@ -600,6 +601,7 @@ void main() {
             monthPeriod: [
               ...weeksFrom(date(9999, 11, 29), 4),
               _lastWeekPositions,
+              List<CalendarDate?>.filled(7, null),
             ],
             towardEdgeWeek: 'Следующая неделя',
             towardEdgeMonth: 'Следующий месяц',
