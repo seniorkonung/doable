@@ -334,7 +334,9 @@ void main() {
 
         await _scrollToEnd(tester, page);
 
-        final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
+        final loadMore = find.byKey(
+          const ValueKey('daily-choice-load-more-false'),
+        );
         _expectFullyVisible(tester, loadMore, insets);
         _expectDailyChoiceEnd(tester, loadMore, insets);
         expect(loadMore.hitTestable(), findsOneWidget);
@@ -357,15 +359,15 @@ void main() {
         await tester.tap(lastRow);
         await _until(tester, find.byType(DailyChoiceDetailsPage));
         await tester.pumpAndSettle();
-        // Записи одного дня идут от поздних к ранним по созданию: первый
-        // дневной выбор стоит последним.
+        // При равных времени и приоритете записи идут по созданию: последний
+        // созданный дневной выбор стоит последним.
         expect(
           tester
               .widget<DailyChoiceDetailsPage>(
                 find.byType(DailyChoiceDetailsPage),
               )
               .choiceId,
-          _dailyChoiceId(_firstChoice),
+          _dailyChoiceId(_firstChoice + count - 1),
         );
         expect(tester.takeException(), isNull);
       });
@@ -401,7 +403,9 @@ void main() {
         await _scrollToEnd(tester, page);
 
         faults.isFailing = true;
-        await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-load-more-false')),
+        );
         final failure = find.descendant(
           of: page,
           matching: find.text(l10n.dailyChoiceCatalogUnavailable),
@@ -581,7 +585,7 @@ Finder _continuation(Finder page, AppLocalizations l10n) {
     of: page,
     matching: find.byWidgetPredicate(
       (widget) =>
-          widget.key == const ValueKey('daily-choice-load-more') ||
+          widget.key == const ValueKey('daily-choice-load-more-false') ||
           widget is Text && messages.contains(widget.data),
     ),
   );
@@ -897,7 +901,15 @@ void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
 
 /// Выдача дневных выборов заканчивается у панели либо клавиатуры без зазора.
 void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
-  expect(tester.getRect(last).bottom, moreOrLessEquals(insets.contentBottom));
+  final completed = find.byKey(const ValueKey('daily-choice-section-true'));
+  expect(
+    tester.getRect(last).bottom,
+    moreOrLessEquals(tester.getRect(completed).top),
+  );
+  expect(
+    tester.getRect(completed).bottom,
+    moreOrLessEquals(insets.contentBottom),
+  );
   expect(find.byType(FloatingActionButton), findsNothing);
 }
 
