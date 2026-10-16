@@ -42,8 +42,7 @@ final class DoableIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SvgPicture.asset(
-    'src/design_system/icons/assets/${icon._assetName}.svg',
-    package: 'doable',
+    'lib/src/design_system/icons/assets/${icon._assetName}.svg',
     width: size,
     height: size,
     fit: BoxFit.contain,

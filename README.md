@@ -59,9 +59,8 @@ mise run codegen-check-test
 
 ## Pull request checks
 
-`mise run --skip-tools check` runs formatting, analysis, functional tests and
-Widgetbook checks. Benchmarks are separate from this command and
-from automatic test discovery:
+`mise run --skip-tools check` runs formatting, analysis and functional tests.
+Benchmarks are separate from this command and from automatic test discovery:
 
 ```sh
 mise run --skip-tools benchmark
