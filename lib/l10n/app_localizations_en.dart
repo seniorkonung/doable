@@ -2502,6 +2502,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load daily choices because of an unexpected error.';
 
   @override
+  String dailyChoiceCatalogPathIntentionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions in path',
+      one: '$count intention in path',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String dailyChoiceCatalogRowLabel(
     int number,
     String phrase,

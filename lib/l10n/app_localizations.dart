@@ -4115,6 +4115,12 @@ abstract class AppLocalizations {
   /// **'Could not load daily choices because of an unexpected error.'**
   String get dailyChoiceCatalogUnexpected;
 
+  /// Число намерений сохранённого пути в карточке
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} intention in path} other{{count} intentions in path}}'**
+  String dailyChoiceCatalogPathIntentionCount(int count);
+
   /// Доступная подпись строки с порядковым номером текущей выдачи
   ///
   /// In en, this message translates to:

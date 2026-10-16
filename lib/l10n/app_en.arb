@@ -2136,6 +2136,8 @@
   "@dailyChoiceCatalogExpired": {"description": "Устаревший снимок каталога"},
   "dailyChoiceCatalogUnexpected": "Could not load daily choices because of an unexpected error.",
   "@dailyChoiceCatalogUnexpected": {"description": "Непредвиденная ошибка чтения дневного каталога"},
+  "dailyChoiceCatalogPathIntentionCount": "{count, plural, one{{count} intention in path} other{{count} intentions in path}}",
+  "@dailyChoiceCatalogPathIntentionCount": {"description": "Число намерений сохранённого пути в карточке", "placeholders": {"count": {"type": "int"}}},
   "dailyChoiceCatalogRowLabel": "Choice #{number}. {phrase}. {date}. {completion}",
   "@dailyChoiceCatalogRowLabel": {"description": "Доступная подпись строки с порядковым номером текущей выдачи", "placeholders": {"number": {"type": "int"}, "phrase": {"type": "String"}, "date": {"type": "String"}, "completion": {"type": "String"}}},
   "dailyChoiceDetailsTitle": "Daily choice",

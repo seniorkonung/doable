@@ -743,6 +743,7 @@
   "dailyChoiceCatalogCorruption": "Сохранённые данные дневных выборов повреждены и не могут быть показаны.",
   "dailyChoiceCatalogExpired": "Каталог изменился. Обновите его, чтобы продолжить.",
   "dailyChoiceCatalogUnexpected": "Не удалось загрузить дневные выборы из-за непредвиденной ошибки.",
+  "dailyChoiceCatalogPathIntentionCount": "{count, plural, one{{count} намерение в пути} few{{count} намерения в пути} many{{count} намерений в пути} other{{count} намерения в пути}}",
   "dailyChoiceCatalogRowLabel": "Выбор № {number}. {phrase}. {date}. {completion}",
   "dailyChoiceDetailsTitle": "Дневной выбор",
   "dailyChoiceEditTitle": "Редактировать дневной выбор",

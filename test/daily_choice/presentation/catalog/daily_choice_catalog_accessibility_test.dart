@@ -349,10 +349,14 @@ String _fullDate(WidgetTester tester, CalendarDate value) =>
 
 /// Доступное название строки выдачи [number] за [day], по умолчанию — за
 /// сегодняшний день.
-String _rowLabel(AppLocalizations l10n, int number, [CalendarDate? day]) =>
-    l10n.dailyChoiceCatalogRowLabel(
-      number,
-      l10n.dailyChoiceDetailsPhrase('Основание', 'Действие'),
-      (day ?? _today).toCanonicalString(),
-      l10n.dailyChoiceDetailsNotCompleted,
-    );
+String _rowLabel(AppLocalizations l10n, int number, [CalendarDate? day]) => [
+  l10n.dailyChoiceCatalogRowLabel(
+    number,
+    l10n.dailyChoiceDetailsPhrase('Основание', 'Действие'),
+    (day ?? _today).toCanonicalString(),
+    l10n.dailyChoiceDetailsNotCompleted,
+  ),
+  l10n.dailyChoiceAllDay,
+  l10n.dailyChoicePriorityOption('P4'),
+  l10n.dailyChoiceCatalogPathIntentionCount(2),
+].join('\n');

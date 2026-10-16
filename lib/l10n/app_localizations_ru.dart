@@ -2506,6 +2506,19 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
 
   @override
+  String dailyChoiceCatalogPathIntentionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения в пути',
+      many: '$count намерений в пути',
+      few: '$count намерения в пути',
+      one: '$count намерение в пути',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String dailyChoiceCatalogRowLabel(
     int number,
     String phrase,

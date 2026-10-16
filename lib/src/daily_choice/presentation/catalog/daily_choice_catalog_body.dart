@@ -8,6 +8,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/day_heading.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
+import '../../domain/daily_choice_schedule.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_day_marks_view_model.dart';
 import 'daily_choice_calendar_viewport.dart';
@@ -267,9 +268,16 @@ final class _DailyChoiceCatalogBodyState
     AppLocalizations l10n,
   ) {
     final section = state.section(isCompleted);
+    final indices = {
+      for (var index = 0; index < section.items.length; index++)
+        ValueKey(section.items[index].id): index,
+    };
     return [
       SliverList.builder(
         itemCount: section.items.length,
+        // При смене порядка Flutter находит карточку по идентификатору:
+        // https://api.flutter.dev/flutter/widgets/SliverChildBuilderDelegate/findChildIndexCallback.html
+        findChildIndexCallback: (key) => indices[key],
         itemBuilder: (context, index) {
           final item = section.items[index];
           final number =
@@ -284,25 +292,85 @@ final class _DailyChoiceCatalogBodyState
               : l10n.dailyChoiceDetailsNotCompleted;
           void open() =>
               context.router.push(DailyChoiceDetailsRoute(choiceId: item.id));
-          return Semantics(
-            key: ValueKey('daily-choice-row-$number'),
-            button: true,
-            label: l10n.dailyChoiceCatalogRowLabel(
-              number,
-              phrase,
-              date,
-              completion,
-            ),
-            onTap: open,
-            child: ExcludeSemantics(
-              child: ListTile(
-                title: Text(phrase),
-                subtitle: Text(
-                  '${l10n.dailyChoiceDetailsDate(date)} · $completion',
+          final schedule = switch (item.schedule) {
+            DailyChoiceAllDay() => l10n.dailyChoiceAllDay,
+            DailyChoiceTime(:final hour, :final minute) => TimeOfDay(
+              hour: hour,
+              minute: minute,
+            ).format(context),
+          };
+          final priority = l10n.dailyChoicePriorityOption(
+            item.priority.name.toUpperCase(),
+          );
+          final pathCount = l10n.dailyChoiceCatalogPathIntentionCount(
+            item.pathIntentionCount,
+          );
+          final startsGroup =
+              index == 0 || section.items[index - 1].schedule != item.schedule;
+          final showGroup =
+              startsGroup &&
+              (item.schedule is DailyChoiceTime || section.hasTimedChoices);
+          return Column(
+            key: ValueKey(item.id),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showGroup)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Semantics(
+                    container: true,
+                    header: true,
+                    child: Text(
+                      schedule,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
                 ),
+              Semantics(
+                key: ValueKey('daily-choice-row-$number'),
+                container: true,
+                button: true,
+                label: [
+                  l10n.dailyChoiceCatalogRowLabel(
+                    number,
+                    phrase,
+                    date,
+                    completion,
+                  ),
+                  schedule,
+                  priority,
+                  pathCount,
+                  if (item.description case final description?)
+                    description.value,
+                ].join('\n'),
                 onTap: open,
+                child: ExcludeSemantics(
+                  child: ListTile(
+                    title: Text(phrase),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '${l10n.dailyChoiceDetailsDate(date)} · $completion',
+                        ),
+                        Text(schedule),
+                        Text(priority),
+                        Text(pathCount),
+                        if (item.description case final description?)
+                          // Ограничение относится только к карточке:
+                          // https://api.flutter.dev/flutter/widgets/Text/maxLines.html
+                          Text(
+                            description.value,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                    onTap: open,
+                  ),
+                ),
               ),
-            ),
+            ],
           );
         },
       ),

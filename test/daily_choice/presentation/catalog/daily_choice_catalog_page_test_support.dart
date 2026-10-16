@@ -9,6 +9,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -197,7 +198,8 @@ final class CatalogPageRepository
           DailyChoiceCatalogFirstPage(
             items: _completedPages[query.date]?.items ?? const [],
             totalCount: _completedPages[query.date]?.totalCount ?? 0,
-            hasTimedChoices: false,
+            hasTimedChoices:
+                _completedPages[query.date]?.hasTimedChoices ?? false,
             nextCursor: _completedPages[query.date]?.nextCursor,
             revision: const _Revision(),
           ),
@@ -217,6 +219,7 @@ final class CatalogPageRepository
     List<DailyChoiceCatalogItem> items, {
     required int total,
     DailyChoiceCatalogCursor? cursor,
+    bool? hasTimedChoices,
   }) {
     final completed = items.where((item) => item.isCompleted).toList();
     final incomplete = items.where((item) => !item.isCompleted).toList();
@@ -224,7 +227,9 @@ final class CatalogPageRepository
     _completedPages[queries[index].date] = DailyChoiceCatalogFirstPage(
       items: completed,
       totalCount: completedOnly ? total : completed.length,
-      hasTimedChoices: false,
+      hasTimedChoices: completed.any(
+        (item) => item.schedule is DailyChoiceTime,
+      ),
       nextCursor: completedOnly ? cursor : null,
       revision: const _Revision(),
     );
@@ -233,7 +238,9 @@ final class CatalogPageRepository
         DailyChoiceCatalogFirstPage(
           items: incomplete,
           totalCount: completedOnly ? 0 : total - completed.length,
-          hasTimedChoices: false,
+          hasTimedChoices:
+              hasTimedChoices ??
+              incomplete.any((item) => item.schedule is DailyChoiceTime),
           nextCursor: completedOnly ? null : cursor,
           revision: const _Revision(),
         ),
@@ -241,17 +248,20 @@ final class CatalogPageRepository
     );
   }
 
-  /// Завершает запрос продолжения номер [index] последними строками [items].
-  void completeMore(int index, List<DailyChoiceCatalogItem> items) =>
-      _requests[index].complete(
-        DailyChoiceCatalogPageSuccess(
-          DailyChoiceCatalogContinuationPage(
-            items: items,
-            nextCursor: null,
-            revision: const _Revision(),
-          ),
-        ),
-      );
+  /// Завершает продолжение номер [index]; [cursor] оставляет следующую порцию.
+  void completeMore(
+    int index,
+    List<DailyChoiceCatalogItem> items, {
+    DailyChoiceCatalogCursor? cursor,
+  }) => _requests[index].complete(
+    DailyChoiceCatalogPageSuccess(
+      DailyChoiceCatalogContinuationPage(
+        items: items,
+        nextCursor: cursor,
+        revision: const _Revision(),
+      ),
+    ),
+  );
 
   /// Завершает запрос номер [index] доказанно временной недоступностью
   /// хранилища: каталог предлагает повтор.
@@ -290,6 +300,10 @@ DailyChoiceCatalogItem catalogPageItem(
   int number, {
   required CalendarDate date,
   bool isCompleted = false,
+  DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+  DailyChoicePriority priority = DailyChoicePriority.p4,
+  DailyChoiceDescription? description,
+  int pathIntentionCount = 2,
 }) => DailyChoiceCatalogItem(
   id: (DailyChoiceId.decode(_uuid(number)) as DailyChoiceIdDecodingSuccess).id,
   source: DailyChoiceCatalogParticipant(
@@ -306,10 +320,10 @@ DailyChoiceCatalogItem catalogPageItem(
   ),
   date: date,
   isCompleted: isCompleted,
-  schedule: const DailyChoiceAllDay(),
-  priority: DailyChoicePriority.p4,
-  description: null,
-  pathIntentionCount: 2,
+  schedule: schedule,
+  priority: priority,
+  description: description,
+  pathIntentionCount: pathIntentionCount,
 );
 
 String _uuid(int number) =>

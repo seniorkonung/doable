@@ -489,6 +489,7 @@ void main() {
         if (day != catalogToday) {
           await selectDailyChoiceCatalogDate(tester, day, tap: _tap);
         }
+        await showDailyChoiceCatalogSection(tester, day == catalogToday);
         await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
         await _waitFor(
           tester,
@@ -525,6 +526,10 @@ void main() {
       tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
 
+      final duplicateDescription = List.filled(
+        70,
+        'Полное описание самостоятельного выбора',
+      ).join(' ');
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       await tester.runAsync(() => _seed(harness));
       // Каталог открывается на дне выборов, которые сценарий создаёт
@@ -702,7 +707,7 @@ void main() {
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
-        'Одно звено',
+        duplicateDescription,
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
@@ -713,7 +718,7 @@ void main() {
       expect(oneStep.choice.sourceIntentionId, _intention(2));
       expect(oneStep.choice.selectedIntentionId, _intention(3));
       expect(oneStep.choice.date, CalendarDate.fromParts(2030, 9, 24));
-      expect(oneStep.choice.description?.value, 'Одно звено');
+      expect(oneStep.choice.description?.value, duplicateDescription);
       expect(oneStep.choice.isCompleted, isTrue);
       expect(oneStep.path.map((step) => step.relation.id), [_relation(102)]);
 
@@ -735,7 +740,7 @@ void main() {
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
-        'Одно звено',
+        duplicateDescription,
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
@@ -761,14 +766,28 @@ void main() {
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      await showDailyChoiceCatalogSection(tester, true);
+      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-3')));
+      expect(find.text(duplicateDescription), findsNWidgets(2));
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-3')));
       await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       expect(
         tester
             .widget<DailyChoiceDetailsPage>(find.byType(DailyChoiceDetailsPage))
             .choiceId,
         allIds.last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(DailyChoiceDetailsPage),
+          matching: find.text(duplicateDescription),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('daily-choice-relation-1')),
+        findsOneWidget,
       );
       expect(_savedIds(harness), hasLength(4));
     },
