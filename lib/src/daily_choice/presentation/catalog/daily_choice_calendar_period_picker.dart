@@ -30,13 +30,26 @@ final class DailyChoiceCalendarPeriodPicker extends StatefulWidget {
   final VoidCallback onClose;
 
   @override
-  State<DailyChoiceCalendarPeriodPicker> createState() =>
-      _DailyChoiceCalendarPeriodPickerState();
+  DailyChoiceCalendarPeriodPickerState createState() =>
+      DailyChoiceCalendarPeriodPickerState();
 }
 
-final class _DailyChoiceCalendarPeriodPickerState
+final class DailyChoiceCalendarPeriodPickerState
     extends State<DailyChoiceCalendarPeriodPicker> {
   late _PickerPage _page = _YearsPage.containing(widget.focusedDate.year);
+
+  /// Останавливает перелистывание перед вертикальным переходом календаря,
+  /// сохраняя режим и страницу, уже показанную в шапке.
+  void stopPaging() {
+    // Остановка синхронна: следующий кадр анимации не должен успеть сменить
+    // страницу до перестроения календаря. Контроллер остаётся у выбора.
+    // https://api.flutter.dev/flutter/widgets/PageController/jumpToPage.html
+    final controller = _page.controller;
+    // Сразу после выбора года новая сетка ещё может ждать первой раскладки;
+    // её начальная страница уже задана, перелистывание ещё не началось.
+    if (!controller.hasClients) return;
+    controller.jumpToPage(controller.page!.round());
+  }
 
   @override
   void dispose() {

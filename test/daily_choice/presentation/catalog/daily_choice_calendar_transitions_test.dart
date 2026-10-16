@@ -479,41 +479,82 @@ void main() {
     expect(consumer.events, isEmpty);
   });
 
-  testWidgets('выбор периода участвует в плавном сворачивании '
-      'и закрывается только при достижении недели', (tester) async {
-    final focused = date(2026, 10, 15);
-    final consumer = await pumpCalendarConsumer(
+  for (final fromMonths in [false, true]) {
+    testWidgets('страница ${fromMonths ? 'месяцев' : 'лет'} сохраняется '
+        'при отмене жеста и смене цели и закрывается после сворачивания', (
       tester,
-      selectedDate: focused,
-      viewport: month(focused),
-      today: focused,
-    );
-    await tester.tap(find.bySemanticsLabel('Выбрать год и месяц'));
-    await tester.pumpAndSettle();
-    final expandedHeight = _calendarHeight(tester);
-    await tester.tap(find.byType(CalendarHandle));
-    await tester.pump();
-    expect(_calendarHeight(tester), expandedHeight);
-    await tester.pump(const Duration(milliseconds: 60));
-    expect(_calendarHeight(tester), lessThan(expandedHeight));
-    expect(find.text('2020–2031'), findsOneWidget);
-    expect(consumer.events, isEmpty);
-    await tester.tap(find.byType(CalendarHandle));
-    await tester.pumpAndSettle();
-    expect(_calendarHeight(tester), expandedHeight);
-    expect(find.text('2020–2031'), findsOneWidget);
-    expect(consumer.events, isEmpty);
+    ) async {
+      final focused = date(2026, 10, 15);
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: focused,
+        viewport: month(focused),
+        today: focused,
+      );
+      await tester.tap(find.bySemanticsLabel('Выбрать год и месяц'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Следующие годы'));
+      await tester.pumpAndSettle();
+      if (fromMonths) {
+        await tester.tap(find.text('2035'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsLabel('Следующий год'));
+        await tester.pumpAndSettle();
+      }
+      final title = fromMonths ? '2036' : '2032–2043';
+      final expandedHeight = _calendarHeight(tester);
+      final cancelledGesture = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await cancelledGesture.moveBy(const Offset(0, -20));
+      await cancelledGesture.moveBy(const Offset(0, -100));
+      await tester.pump();
+      expect(_calendarHeight(tester), lessThan(expandedHeight));
+      await cancelledGesture.cancel();
+      await tester.pumpAndSettle();
+      expect(_calendarHeight(tester), expandedHeight);
+      expect(find.text(title), findsOneWidget);
+      expect(consumer.events, isEmpty);
 
-    await tester.tap(find.byType(CalendarHandle));
-    await tester.pumpAndSettle();
-    expect(find.text('2020–2031'), findsNothing);
-    expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
-    expect(consumer.events, [ViewportChanged(week(focused))]);
-    await tester.tap(find.byType(CalendarHandle));
-    await tester.pumpAndSettle();
-    expect(find.text('Октябрь 2026'), findsOneWidget);
-    expect(find.text('2020–2031'), findsNothing);
-  });
+      await tester.tap(find.byType(CalendarHandle));
+      await tester.pump();
+      expect(_calendarHeight(tester), expandedHeight);
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(_calendarHeight(tester), lessThan(expandedHeight));
+      expect(find.text(title), findsOneWidget);
+      expect(consumer.events, isEmpty);
+      await tester.tap(find.byType(CalendarHandle));
+      await tester.pumpAndSettle();
+      expect(_calendarHeight(tester), expandedHeight);
+      expect(find.text(title), findsOneWidget);
+      expect(consumer.events, isEmpty);
+
+      final completedGesture = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await completedGesture.moveBy(const Offset(0, -20));
+      await completedGesture.moveBy(Offset(0, -expandedHeight));
+      await completedGesture.up(timeStamp: const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsNothing);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
+      expect(consumer.events, [ViewportChanged(week(focused))]);
+      await tester.tap(find.byType(CalendarHandle));
+      await tester.pumpAndSettle();
+      expect(find.text('Октябрь 2026'), findsOneWidget);
+      expect(find.text(title), findsNothing);
+      expect(consumer.events, [
+        ViewportChanged(week(focused)),
+        ViewportChanged(month(focused)),
+      ]);
+      await tester.tap(find.bySemanticsLabel('Выбрать год и месяц'));
+      await tester.pumpAndSettle();
+      expect(find.text('2020–2031'), findsOneWidget);
+      expect(find.text('Январь'), findsNothing);
+      expect(consumer.selectedDate, focused);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('сворачивание до смены страницы останавливает перелистывание '
       'и сохраняет уже сообщённый период', (tester) async {

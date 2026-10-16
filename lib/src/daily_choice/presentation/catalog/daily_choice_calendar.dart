@@ -133,6 +133,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
   /// собственном хранилище не переживает календарь.
   final _weekStorage = PageStorageBucket();
   var _monthStorage = PageStorageBucket();
+  final _periodPicker = GlobalKey<DailyChoiceCalendarPeriodPickerState>();
 
   bool _isPeriodPickerOpen = false;
   bool _isTransitioning = false;
@@ -180,6 +181,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
       expanded = PageStorage(
         bucket: _monthStorage,
         child: DailyChoiceCalendarPeriodPicker(
+          key: _periodPicker,
           focusedDate: viewport.focusedDate,
           today: widget.today,
           onMonthSelected: _completeMonthSelection,
@@ -340,8 +342,12 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
   }
 
   void _beginTransition() {
-    if (!_isTransitioning && !_isPeriodPickerOpen) {
-      _stopPaging();
+    if (!_isTransitioning) {
+      if (_isPeriodPickerOpen) {
+        _periodPicker.currentState?.stopPaging();
+      } else {
+        _stopPaging();
+      }
     }
     _expansion.stop();
     setState(() => _isTransitioning = true);

@@ -1,5 +1,6 @@
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -226,7 +227,7 @@ void main() {
 
     testWidgets(
       'пересозданная прокрутка страницы восстанавливает своё смещение после '
-      'перелистывания дней, лет и месяцев и пересоздания календаря',
+      'перелистывания, вертикального перехода и пересоздания календаря',
       (tester) async {
         final consumer = await _pumpUnderStoredScroll(tester, viewport: week);
         // Небольшое смещение оставляет команды и дни календаря на экране.
@@ -261,6 +262,29 @@ void main() {
         expect(find.text('2036'), findsOneWidget);
         expect(_pageScrollPosition(tester).pixels, 12);
 
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(CalendarHandle)),
+        );
+        await gesture.moveBy(const Offset(0, -20));
+        await gesture.moveBy(const Offset(0, -30));
+        await tester.pump();
+        await gesture.up(timeStamp: const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(find.text('2036'), findsOneWidget);
+        expect(_pageScrollPosition(tester).pixels, 12);
+        expect(consumer.events, hasLength(3));
+
+        await tester.tap(find.byType(CalendarHandle));
+        await tester.pumpAndSettle();
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
+        await tester.tap(find.byType(CalendarHandle));
+        await tester.pumpAndSettle();
+        expect(_pageScrollPosition(tester).pixels, 12);
+        expect(consumer.events.skip(3), [
+          ViewportChanged(week(date(2026, 11, 1))),
+          ViewportChanged(month(date(2026, 11, 1))),
+        ]);
+
         consumer.removeScrollView();
         await tester.pump();
         consumer.restoreScrollView();
@@ -274,7 +298,7 @@ void main() {
         expect(find.text('2020–2031'), findsOneWidget);
         expect(find.text('Январь'), findsNothing);
         expect(_pageScrollPosition(tester).pixels, 12);
-        expect(consumer.events, hasLength(3));
+        expect(consumer.events, hasLength(5));
         expect(tester.takeException(), isNull);
       },
     );

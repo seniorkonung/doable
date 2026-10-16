@@ -1,4 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,97 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  testWidgets('вертикальный жест сразу после выбора года сохраняет '
+      'месяцы нового года без ошибки контроллера', (tester) async {
+    final selected = date(2026, 10, 8);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: selected,
+      viewport: month(selected),
+      today: selected,
+    );
+    await _command(tester, 'Выбрать год и месяц');
+    // Выбор года и начало жеста могут попасть между двумя кадрами:
+    // новая сетка месяцев ещё не подключила свой контроллер.
+    await tester.tap(find.text('2028'));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CalendarHandle)),
+    );
+    await gesture.moveBy(const Offset(0, -20));
+    await gesture.moveBy(const Offset(0, -30));
+    await tester.pump();
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(find.text('2028'), findsOneWidget);
+    expect(find.text('Март'), findsOneWidget);
+    expect(consumer.events, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Март'));
+    await tester.pumpAndSettle();
+    expect(consumer.events, [MonthSelectionCompleted(month(date(2028, 3, 1)))]);
+  });
+
+  for (final fromMonths in [false, true]) {
+    for (final afterPageChanged in [false, true]) {
+      testWidgets('вертикальный жест останавливает анимацию '
+          '${fromMonths ? 'месяцев' : 'лет'} '
+          '${afterPageChanged ? 'после' : 'до'} смены страницы', (
+        tester,
+      ) async {
+        final selected = date(2026, 10, 8);
+        final viewport = month(date(2026, 11, 15));
+        final consumer = await pumpCalendarConsumer(
+          tester,
+          selectedDate: selected,
+          viewport: viewport,
+          today: selected,
+        );
+        await _command(tester, 'Выбрать год и месяц');
+        await _command(tester, 'Следующие годы');
+        if (fromMonths) {
+          await tester.tap(find.text('2035'));
+          await tester.pumpAndSettle();
+          await _command(tester, 'Следующий год');
+        }
+        final title = fromMonths
+            ? (afterPageChanged ? '2037' : '2036')
+            : (afterPageChanged ? '2044–2055' : '2032–2043');
+        final cell = fromMonths
+            ? find.text('Март').hitTestable()
+            : find.text(afterPageChanged ? '2044' : '2032');
+        final initialX = tester
+            .getCenter(fromMonths ? find.text('Март') : find.text('2032'))
+            .dx;
+        await tester.tap(
+          find.bySemanticsLabel(
+            fromMonths ? 'Следующий год' : 'Следующие годы',
+          ),
+        );
+        await tester.pump();
+        await tester.pump(Duration(milliseconds: afterPageChanged ? 120 : 40));
+        expect(find.text(title), findsOneWidget);
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(CalendarHandle)),
+        );
+        await gesture.moveBy(const Offset(0, -20));
+        await gesture.moveBy(const Offset(0, -30));
+        // До перестроения следующая горизонтальная анимация могла бы
+        // пройти середину и заменить подтверждённую страницу.
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text(title), findsOneWidget);
+        expect(consumer.events, isEmpty);
+        await gesture.up(timeStamp: const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(find.text(title), findsOneWidget);
+        expect(tester.getCenter(cell).dx, closeTo(initialX, 0.01));
+        expect(consumer.viewport, viewport);
+        expect(consumer.selectedDate, selected);
+        expect(consumer.events, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('страницы лет следуют за удерживаемым жестом в обе стороны '
       'с постоянной высотой и без событий календаря', (tester) async {
     final selected = date(2026, 10, 8);
@@ -266,7 +358,9 @@ void main() {
   for (final fromMonths in [false, true]) {
     final level = fromMonths ? 'месяцев' : 'лет';
     testWidgets('перестроение, отметки, сегодня, тема и локаль сохраняют '
-        'пролистанную страницу $level без событий календаря', (tester) async {
+        'страницу $level при возврате из короткого сворачивания', (
+      tester,
+    ) async {
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       final selected = date(2026, 10, 8);
       final viewport = month(date(2026, 11, 1));
@@ -288,6 +382,12 @@ void main() {
       consumer.rebuild();
       await tester.pumpAndSettle();
       expect(find.text(title), findsOneWidget);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await gesture.moveBy(const Offset(0, -20));
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
       consumer.replaceInputs(
         today: date(2026, 10, 9),
         dayStatuses: {selected: DailyChoiceDayStatus.allCompleted},
@@ -303,6 +403,11 @@ void main() {
         Brightness.dark,
       );
       expect(find.text(title), findsOneWidget);
+      tester.platformDispatcher.localesTestValue = [const Locale('en')];
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsOneWidget);
+      await gesture.up(timeStamp: const Duration(seconds: 1));
+      await tester.pumpAndSettle();
 
       for (final (locale, january, back) in const [
         (Locale('en'), 'January', 'Back to the days of the month'),
@@ -323,9 +428,17 @@ void main() {
         expect(consumer.events, isEmpty);
       }
 
-      await _command(tester, 'Вернуться к дням месяца');
-      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-      expect(consumer.events, isEmpty);
+      if (!fromMonths) {
+        await tester.tap(find.text('2036'));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text('Март'));
+      await tester.pumpAndSettle();
+      expect(find.text('Март 2036'), findsOneWidget);
+      expect(consumer.events, [
+        MonthSelectionCompleted(month(date(2036, 3, 1))),
+      ]);
+      expect(consumer.selectedDate, selected);
       expect(tester.takeException(), isNull);
     });
   }
