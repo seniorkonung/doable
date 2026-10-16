@@ -207,6 +207,7 @@ final class CatalogPageRepository
       DailyChoiceCatalogFirstPage(
         items: items,
         totalCount: total,
+        hasTimedChoices: false,
         nextCursor: cursor,
         revision: const _Revision(),
       ),

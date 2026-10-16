@@ -111,6 +111,7 @@ void main() {
     final page = DailyChoiceCatalogFirstPage(
       items: items,
       totalCount: 3,
+      hasTimedChoices: false,
       nextCursor: const _Cursor(),
       revision: revision,
     );
@@ -129,6 +130,7 @@ void main() {
       () => DailyChoiceCatalogFirstPage(
         items: [_item(1)],
         totalCount: 0,
+        hasTimedChoices: false,
         nextCursor: null,
         revision: revision,
       ),

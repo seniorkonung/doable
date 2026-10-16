@@ -57,7 +57,10 @@ void main() {
         final category = switch (point) {
           _FailurePoint.catalogRead =>
             (await repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(),
+              DailyChoiceCatalogQuery(
+                date: durabilityChoiceDate,
+                isCompleted: true,
+              ),
             ) as DailyChoiceCatalogPageError).failure.category,
           _FailurePoint.groupRead => (await repository.getRelationGroupPage(
             DailyChoiceGroupQuery(
@@ -215,7 +218,7 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
     final targeted = switch (_point) {
       _FailurePoint.catalogRead =>
         sql.contains('FROM daily_choices') &&
-            sql.contains('ORDER BY choice_date'),
+            sql.contains('ORDER BY COALESCE(scheduled_minute, -1)'),
       _FailurePoint.groupRead => sql.contains('FROM daily_choices INDEXED BY'),
       _FailurePoint.continuationRead =>
         sql.contains('WITH RECURSIVE') || sql.contains('WITH visited(id)'),

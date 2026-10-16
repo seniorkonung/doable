@@ -141,7 +141,10 @@ final class DailyChoiceCatalogItem {
   final int pathIntentionCount;
 }
 
-/// Репозиторий выдаёт записи по date DESC, creation_sequence DESC.
+/// Секция одной даты и выполнения упорядочена по времени (весь день первым),
+/// приоритету и последовательности создания, по возрастанию.
+/// Прежний запрос без даты или выполнения сохраняет порядок по убыванию
+/// даты и создания до перехода потребителей на секции.
 /// Список и ревизия относятся к одному подтверждённому снимку.
 sealed class DailyChoiceCatalogPage {
   DailyChoiceCatalogPage({
@@ -155,16 +158,20 @@ sealed class DailyChoiceCatalogPage {
   final GraphRevision revision;
 }
 
-/// Точное количество и строки первой порции получены на одной ревизии.
+/// Сводка всей секции и строки первой порции получены на одном снимке.
 final class DailyChoiceCatalogFirstPage extends DailyChoiceCatalogPage {
   DailyChoiceCatalogFirstPage({
     required super.items,
     required int totalCount,
+    required this.hasTimedChoices,
     required super.nextCursor,
     required super.revision,
   }) : totalCount = _checkedCount(totalCount, items.length);
 
   final int totalCount;
+
+  /// Учитывает также выборы за границей загруженной порции.
+  final bool hasTimedChoices;
 
   static int _checkedCount(int count, int itemCount) {
     if (count < itemCount) {

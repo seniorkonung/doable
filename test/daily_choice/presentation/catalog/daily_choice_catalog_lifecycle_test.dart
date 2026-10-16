@@ -576,6 +576,7 @@ final class _Repository
         DailyChoiceCatalogFirstPage(
           items: items,
           totalCount: total,
+          hasTimedChoices: false,
           nextCursor: items.length < total ? const _Cursor() : null,
           revision: const _Revision(),
         ),

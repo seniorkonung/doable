@@ -365,9 +365,9 @@ void main() {
       await reconciled(completed);
       expect(catalog().totalCount, 52);
       expect(ids(), [
-        for (var number = 252; number >= 201; number--) _choice(number),
+        for (var number = 201; number <= 252; number++) _choice(number),
       ]);
-      final twin = catalog().items.first;
+      final twin = catalog().items.last;
       expect(twin.id, _choice(252));
       expect(twin.date, day);
       expect(twin.isCompleted, isFalse);
@@ -384,10 +384,10 @@ void main() {
       await reconciled(moved);
       expect(catalog().totalCount, 51);
       expect(ids(), [
-        for (var number = 251; number >= 201; number--) _choice(number),
+        for (var number = 201; number <= 251; number++) _choice(number),
       ]);
 
-      // Новая запись выбранного дня становится первой.
+      // При равных времени и приоритете новая запись идёт после прежних.
       final createdToday = await confirm(
         coordinator.acceptDailyChoiceCreation(
           DailyChoiceCreationFormKey(),
@@ -396,7 +396,7 @@ void main() {
       );
       await reconciled(createdToday);
       expect(catalog().totalCount, 52);
-      expect(ids().first, _choice(401));
+      expect(ids().last, _choice(401));
       expect(ids(), hasLength(52));
 
       // Запись другого дня не входит в выдачу.
