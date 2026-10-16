@@ -4121,6 +4121,34 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{{count} intention in path} other{{count} intentions in path}}'**
   String dailyChoiceCatalogPathIntentionCount(int count);
 
+  /// Доступное название отдельного флажка с принадлежностью выбору; состояние сообщает сам флажок
+  ///
+  /// In en, this message translates to:
+  /// **'Completion of choice #{number}. {phrase}. {date}'**
+  String dailyChoiceCatalogCompletionLabel(
+    int number,
+    String phrase,
+    String date,
+  );
+
+  /// Ожидание подтверждения записи выполнения рядом с карточкой
+  ///
+  /// In en, this message translates to:
+  /// **'Saving completion…'**
+  String get dailyChoiceCompletionSaving;
+
+  /// Запись подтверждена, флажок ожидает согласованного снимка секций
+  ///
+  /// In en, this message translates to:
+  /// **'Completion saved. Refreshing the catalog…'**
+  String get dailyChoiceCompletionSynchronizing;
+
+  /// Актуализация карточки после конфликта перед новым подтверждением выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh choice'**
+  String get dailyChoiceCompletionRefresh;
+
   /// Доступная подпись строки с порядковым номером текущей выдачи
   ///
   /// In en, this message translates to:

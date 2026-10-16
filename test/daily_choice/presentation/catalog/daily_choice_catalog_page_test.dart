@@ -7,6 +7,8 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.d
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -16,6 +18,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -36,11 +39,180 @@ import '../../../support/daily_choice_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 import 'daily_choice_calendar_test_support.dart';
+import 'daily_choice_catalog_page_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
 
 void main() {
+  for (final onDate in [false, true]) {
+    testWidgets(
+      'флажок ${onDate ? "каталога на дату" : "корневого каталога"} меняет только '
+      'выбранный дубликат и ждёт сохранения и согласования',
+      (tester) async {
+        final repository = CatalogPageRepository();
+        final day = date(2026, 10, 4);
+        final first = catalogPageItem(1, date: day);
+        final second = catalogPageItem(2, date: day);
+        final router = await pumpCatalogPage(
+          tester,
+          repository,
+          today: day,
+          locale: const Locale('ru'),
+          size: const Size(390, 1000),
+          catalogDate: onDate ? day : null,
+        );
+        repository.completeFirst(0, [first, second], total: 2);
+        await tester.pumpAndSettle();
+        final route = router.current.name;
+        final checkbox = find.byKey(
+          ValueKey('daily-choice-completion-${second.id.toCanonicalString()}'),
+        );
+        expect(checkbox, findsOneWidget);
+        await tester.tap(checkbox);
+        await tester.pump();
+        expect(router.current.name, route);
+        expect(repository.completionCommands.single.choiceId, second.id);
+        expect(
+          repository.completionCommands.single.patch.isCompleted,
+          isA<DailyChoiceFieldSet<bool>>().having(
+            (patch) => patch.value,
+            'выполнение',
+            true,
+          ),
+        );
+        expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+        expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+        expect(find.text('Сохраняем выполнение…'), findsOneWidget);
+        expect(
+          tester
+              .widget<Checkbox>(
+                find.byKey(
+                  ValueKey(
+                    'daily-choice-completion-${first.id.toCanonicalString()}',
+                  ),
+                ),
+              )
+              .onChanged,
+          isNotNull,
+        );
+        await tester.tap(checkbox);
+        await tester.pump();
+        expect(repository.completionCommands, hasLength(1));
+        await tester.drag(calendarPeriodArea, const Offset(-300, 0));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+        expect(repository.queries, hasLength(1));
+
+        repository.confirmCompletion(0, second, isCompleted: true, revision: 1);
+        await tester.pump();
+        await tester.pump();
+        expect(
+          find.text('Выполнение сохранено. Обновляем каталог…'),
+          findsOneWidget,
+        );
+        expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+        expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+        repository.completeFirst(
+          1,
+          [first, catalogPageItem(2, date: day, isCompleted: true)],
+          total: 2,
+          revision: 1,
+        );
+        await tester.pumpAndSettle();
+        expect(checkbox, findsNothing);
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-section-true')),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+        await tester.tap(checkbox);
+        await tester.pump();
+        expect(repository.completionCommands.last.choiceId, second.id);
+        expect(repository.completionCommands, hasLength(2));
+        expect(
+          repository.completionCommands.last.patch.isCompleted,
+          isA<DailyChoiceFieldSet<bool>>().having(
+            (patch) => patch.value,
+            'снятие выполнения',
+            false,
+          ),
+        );
+        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+        await tester.tap(find.byKey(const ValueKey('daily-choice-row-2')));
+        await tester.pump();
+        expect(router.current.name, DailyChoiceDetailsRoute.name);
+        expect(
+          router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
+          second.id,
+        );
+      },
+    );
+  }
+
+  for (final locale in const [Locale('ru'), Locale('en')]) {
+    testWidgets('отказ флажка локализован, временный допускает повтор, '
+        'а конфликт требует актуализации (${locale.languageCode})', (
+      tester,
+    ) async {
+      final repository = CatalogPageRepository();
+      final day = date(2026, 10, 4);
+      final item = catalogPageItem(1, date: day);
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: locale,
+        size: const Size(390, 1000),
+      );
+      repository.completeFirst(0, [item], total: 1);
+      await tester.pumpAndSettle();
+      final l10n = lookupAppLocalizations(locale);
+      final checkbox = find.byType(Checkbox);
+      await tester.tap(checkbox);
+      await tester.pump();
+      repository.failCompletion(0, const DailyChoiceUnavailableFailure());
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceOperationUnavailable), findsOneWidget);
+      expect(
+        tester
+            .widget<OperationFailurePresentation>(
+              find.byType(OperationFailurePresentation),
+            )
+            .claim,
+        isNotNull,
+      );
+      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+      await tester.tap(find.widgetWithText(TextButton, l10n.commonRetry));
+      await tester.pump();
+      expect(repository.completionCommands, hasLength(2));
+      repository.failCompletion(
+        1,
+        const DailyChoiceConflictFailure(
+          DailyChoiceConflictReason.dependencyChanged,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceOperationConflict), findsOneWidget);
+      expect(find.text(l10n.commonRetry), findsNothing);
+      expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+      await tester.tap(
+        find.widgetWithText(
+          TextButton,
+          locale.languageCode == 'ru' ? 'Обновить выбор' : 'Refresh choice',
+        ),
+      );
+      await tester.pump();
+      repository.completeFirst(1, [item], total: 1);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceOperationConflict), findsNothing);
+      expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
+      expect(repository.completionCommands, hasLength(2));
+    });
+  }
+
   testWidgets('корневой каталог оставляет над календарём только безопасный '
       'отступ и меняет строку состояния вместе с темой', (tester) async {
     tester.view.padding = const FakeViewPadding(top: 24, bottom: 48);

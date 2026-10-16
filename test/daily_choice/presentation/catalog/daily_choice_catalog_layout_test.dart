@@ -1,6 +1,9 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
@@ -47,6 +50,55 @@ void main() {
     final language = locale.languageCode;
 
     group('экран 360×780, $language', () {
+      testWidgets('при масштабе текста 200% флажок, открытие и краткие данные '
+          'карточки доступны без переполнения', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final repository = CatalogPageRepository();
+        final item = catalogPageItem(
+          1,
+          date: _today,
+          schedule: DailyChoiceTime(hour: 18, minute: 0),
+          priority: DailyChoicePriority.p2,
+          description: DailyChoiceDescription.fromInput('Пояснение'),
+          pathIntentionCount: 4,
+        );
+        await _open(tester, repository, locale, today: _today);
+        repository.completeFirst(0, [item], total: 1);
+        await tester.pumpAndSettle();
+        expect(
+          MediaQuery.textScalerOf(
+            tester.element(find.byType(DailyChoiceCalendar)),
+          ).scale(14),
+          28,
+        );
+        await _expectWholeTexts(tester);
+        final checkbox = find.byType(Checkbox, skipOffstage: false);
+        await _dragUntilReachable(tester, checkbox);
+        final rect = tester.getRect(checkbox);
+        expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
+        expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+        expect(
+          find.text(_l10n(tester).dailyChoicePriorityOption('P2')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(_l10n(tester).dailyChoiceCatalogPathIntentionCount(4)),
+          findsOneWidget,
+        );
+        expect(find.text('Пояснение'), findsOneWidget);
+        await tester.tap(checkbox);
+        await tester.pump();
+        expect(repository.completionCommands.single.choiceId, item.id);
+        await _expectWholeTexts(tester);
+        final phrase = find.text(
+          _l10n(tester).dailyChoiceDetailsPhrase('Основание', 'Действие'),
+        );
+        await _dragUntilReachable(tester, phrase);
+        _expectTappable(tester, phrase);
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('свёрнутая неделя занимает семь колонок во всю ширину, '
           'тексты страницы показаны целиком, а дни и команды нажимаются', (
         tester,

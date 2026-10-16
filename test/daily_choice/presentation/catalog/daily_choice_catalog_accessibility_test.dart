@@ -1,6 +1,8 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show Tristate, CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +42,74 @@ void main() {
     final language = texts.locale.languageCode;
 
     group('экранный диктор на странице каталога ($language)', () {
+      testWidgets('независимо переключает выполнение и открывает выбор, '
+          'читает сохранённое состояние и недоступность при записи', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        final repository = CatalogPageRepository();
+        final completed = language == 'en';
+        final item = catalogPageItem(1, date: _today, isCompleted: completed);
+        final router = await pumpCatalogPage(
+          tester,
+          repository,
+          today: _today,
+          locale: texts.locale,
+          size: _phone,
+        );
+        repository.completeFirst(0, [item], total: 1);
+        await tester.pumpAndSettle();
+        final l10n = _l10n(tester);
+        if (completed) {
+          tester.semantics.tap(
+            find.semantics.byLabel(l10n.dailyChoiceCatalogCompleted),
+          );
+          await tester.pumpAndSettle();
+        }
+        final checkbox = find.semantics.byLabel(_completionLabel(l10n, 1));
+        final initial = checkbox.evaluate().single;
+        expect(
+          initial.flagsCollection.isChecked,
+          completed ? CheckedState.isTrue : CheckedState.isFalse,
+        );
+        expect(initial.flagsCollection.isEnabled, Tristate.isTrue);
+        expect(
+          initial.getSemanticsData().hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        final route = router.current.name;
+        tester.semantics.tap(checkbox);
+        await tester.pump();
+        expect(router.current.name, route);
+        expect(repository.completionCommands.single.choiceId, item.id);
+        final pending = checkbox.evaluate().single;
+        expect(
+          pending.flagsCollection.isChecked,
+          completed ? CheckedState.isTrue : CheckedState.isFalse,
+        );
+        expect(pending.flagsCollection.isEnabled, Tristate.isFalse);
+        expect(
+          pending.getSemanticsData().hasAction(SemanticsAction.tap),
+          isFalse,
+        );
+        repository.failCompletion(0, const DailyChoiceUnavailableFailure());
+        await tester.pumpAndSettle();
+        _expectLiveRegion(tester, l10n.dailyChoiceOperationUnavailable);
+        final opening = find.semantics.byLabel(
+          _rowLabel(l10n, 1, null, completed),
+        );
+        expect(opening.evaluate().single.flagsCollection.isButton, isTrue);
+        tester.semantics.tap(opening);
+        await tester.pump();
+        expect(router.current.name, DailyChoiceDetailsRoute.name);
+        expect(
+          router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
+          item.id,
+        );
+        expect(repository.completionCommands, hasLength(1));
+        semantics.dispose();
+      });
+
       testWidgets('обе секции доступны при переходе по заголовкам; '
           'читает дни календаря, заголовок дня, секции, количество, '
           'строки и подгрузку по порядку, затем общую панель, '
@@ -71,7 +141,9 @@ void main() {
           l10n.dailyChoiceCatalogTotalCount(3),
           l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
+          _completionLabel(l10n, 1),
           _rowLabel(l10n, 2),
+          _completionLabel(l10n, 2),
           l10n.dailyChoiceCatalogLoadMore,
           l10n.dailyChoiceCatalogCompleted,
         ];
@@ -172,6 +244,7 @@ void main() {
           l10n.dailyChoiceCatalogTotalCount(2),
           l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
+          _completionLabel(l10n, 1),
           l10n.dailyChoiceCatalogLoadMore,
           l10n.dailyChoiceCatalogCompleted,
         ]);
@@ -190,6 +263,7 @@ void main() {
           l10n.dailyChoiceCatalogTotalCount(2),
           l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
+          _completionLabel(l10n, 1),
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
           l10n.dailyChoiceCatalogCompleted,
@@ -207,7 +281,9 @@ void main() {
           l10n.dailyChoiceCatalogTotalCount(2),
           l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
+          _completionLabel(l10n, 1),
           _rowLabel(l10n, 2),
+          _completionLabel(l10n, 2),
           l10n.dailyChoiceCatalogCompleted,
         ]);
 
@@ -259,7 +335,10 @@ void main() {
           texts.selectedToday,
           l10n.dailyChoiceCatalogTotalCount(21),
           l10n.dailyChoiceCatalogIncomplete,
-          for (var number = 1; number <= 20; number++) _rowLabel(l10n, number),
+          for (var number = 1; number <= 20; number++) ...[
+            _rowLabel(l10n, number),
+            _completionLabel(l10n, number),
+          ],
           l10n.dailyChoiceCatalogLoadMore,
         ];
 
@@ -380,14 +459,29 @@ String _fullDate(WidgetTester tester, CalendarDate value) =>
 
 /// Доступное название строки выдачи [number] за [day], по умолчанию — за
 /// сегодняшний день.
-String _rowLabel(AppLocalizations l10n, int number, [CalendarDate? day]) => [
+String _rowLabel(
+  AppLocalizations l10n,
+  int number, [
+  CalendarDate? day,
+  bool completed = false,
+]) => [
   l10n.dailyChoiceCatalogRowLabel(
     number,
     l10n.dailyChoiceDetailsPhrase('Основание', 'Действие'),
     (day ?? _today).toCanonicalString(),
-    l10n.dailyChoiceDetailsNotCompleted,
+    completed
+        ? l10n.dailyChoiceDetailsCompleted
+        : l10n.dailyChoiceDetailsNotCompleted,
   ),
   l10n.dailyChoiceAllDay,
   l10n.dailyChoicePriorityOption('P4'),
   l10n.dailyChoiceCatalogPathIntentionCount(2),
 ].join('\n');
+
+String _completionLabel(AppLocalizations l10n, int number) {
+  final phrase = l10n.dailyChoiceDetailsPhrase('Основание', 'Действие');
+  final day = _today.toCanonicalString();
+  return l10n.localeName == 'ru'
+      ? 'Выполнение выбора № $number. $phrase. $day'
+      : 'Completion of choice #$number. $phrase. $day';
+}

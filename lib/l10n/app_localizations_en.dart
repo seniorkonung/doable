@@ -2513,6 +2513,25 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String dailyChoiceCatalogCompletionLabel(
+    int number,
+    String phrase,
+    String date,
+  ) {
+    return 'Completion of choice #$number. $phrase. $date';
+  }
+
+  @override
+  String get dailyChoiceCompletionSaving => 'Saving completion…';
+
+  @override
+  String get dailyChoiceCompletionSynchronizing =>
+      'Completion saved. Refreshing the catalog…';
+
+  @override
+  String get dailyChoiceCompletionRefresh => 'Refresh choice';
+
+  @override
   String dailyChoiceCatalogRowLabel(
     int number,
     String phrase,

@@ -2519,6 +2519,25 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String dailyChoiceCatalogCompletionLabel(
+    int number,
+    String phrase,
+    String date,
+  ) {
+    return 'Выполнение выбора № $number. $phrase. $date';
+  }
+
+  @override
+  String get dailyChoiceCompletionSaving => 'Сохраняем выполнение…';
+
+  @override
+  String get dailyChoiceCompletionSynchronizing =>
+      'Выполнение сохранено. Обновляем каталог…';
+
+  @override
+  String get dailyChoiceCompletionRefresh => 'Обновить выбор';
+
+  @override
   String dailyChoiceCatalogRowLabel(
     int number,
     String phrase,
