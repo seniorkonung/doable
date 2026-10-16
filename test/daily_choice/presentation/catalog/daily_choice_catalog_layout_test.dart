@@ -3,12 +3,13 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
@@ -46,6 +47,75 @@ final _months = [
 void main() {
   for (final onDate in [false, true]) {
     final catalog = onDate ? 'каталог на дату' : 'корневой каталог';
+    for (final cancel in [false, true]) {
+      final ending = cancel ? 'системная отмена' : 'медленное отпускание';
+      testWidgets('$catalog: $ending короткого сворачивания '
+          'восстанавливает конец выдачи', (tester) async {
+        final repository = await _openExpandedCatalogAtEnd(tester, onDate);
+        final list = find.byType(CustomScrollView);
+        final position = tester.state<ScrollableState>(_pageScroll).position;
+        final offset = position.pixels;
+        final row = find.byKey(const ValueKey('daily-choice-row-20'));
+        final rowOffset =
+            tester.getTopLeft(row).dy - tester.getTopLeft(list).dy;
+        final calendar = find.byType(DailyChoiceCalendar);
+        final height = tester.getSize(calendar).height;
+        final viewport = tester.widget<DailyChoiceCalendar>(calendar).viewport;
+
+        final gesture = await _startShortCollapse(tester);
+        expect(tester.getSize(calendar).height, lessThan(height));
+        expect(position.pixels, lessThan(offset));
+        if (cancel) {
+          await gesture.cancel();
+        } else {
+          await gesture.up(timeStamp: const Duration(seconds: 2));
+        }
+        await tester.pumpAndSettle();
+
+        expect(tester.getSize(calendar).height, height);
+        expect(position.pixels, closeTo(offset, _epsilon));
+        expect(
+          tester.getTopLeft(row).dy - tester.getTopLeft(list).dy,
+          closeTo(rowOffset, _epsilon),
+        );
+        expect(tester.widget<DailyChoiceCalendar>(calendar).viewport, viewport);
+        expect(repository.queries, hasLength(1));
+        expect(repository.queries.single.date, _today);
+        expect(repository.queries.single.isCompleted, isNull);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('$catalog: возврат календаря сохраняет прокрутку выдачи '
+        'вторым указателем во время удержания ручки', (tester) async {
+      final repository = await _openExpandedCatalogAtEnd(tester, onDate);
+      final position = tester.state<ScrollableState>(_pageScroll).position;
+      final originalOffset = position.pixels;
+      final gesture = await _startShortCollapse(tester);
+      final clampedOffset = position.pixels;
+      final list = find.byType(CustomScrollView);
+      final scrolling = await tester.startGesture(
+        tester.getCenter(list),
+        pointer: 2,
+      );
+      await scrolling.moveBy(const Offset(0, 20));
+      await scrolling.moveBy(
+        const Offset(0, 80),
+        timeStamp: const Duration(seconds: 1),
+      );
+      await scrolling.up(timeStamp: const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      final userOffset = position.pixels;
+      expect(userOffset, lessThan(clampedOffset));
+
+      await gesture.up(timeStamp: const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(position.pixels, closeTo(userOffset, _epsilon));
+      expect(position.pixels, lessThan(originalOffset));
+      expect(repository.queries, hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('$catalog: перетягивание, возврат и смена представления '
         'сдвигают выдачу без сброса прокрутки', (tester) async {
       final repository = CatalogPageRepository();
@@ -141,6 +211,25 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('постороннее изменение графа во время удержания ручки '
+      'сохраняет восстановление неизменившейся выдачи', (tester) async {
+    final repository = await _openExpandedCatalogAtEnd(tester, false);
+    final position = tester.state<ScrollableState>(_pageScroll).position;
+    final offset = position.pixels;
+    final gesture = await _startShortCollapse(tester);
+    final coordinator = ProviderScope.containerOf(
+      tester.element(find.byType(DailyChoiceCalendar)),
+    ).read(graphCommandCoordinatorProvider.notifier);
+    await repository.confirmTagRename(coordinator, revision: 1);
+    await tester.pump();
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+
+    expect(position.pixels, closeTo(offset, _epsilon));
+    expect(repository.queries, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
 
   for (final (:locale, :full) in _configurations) {
     final language = locale.languageCode;
@@ -482,6 +571,47 @@ void main() {
   }
 }
 
+Future<CatalogPageRepository> _openExpandedCatalogAtEnd(
+  WidgetTester tester,
+  bool onDate,
+) async {
+  final repository = CatalogPageRepository();
+  await pumpCatalogPage(
+    tester,
+    repository,
+    today: _today,
+    catalogDate: onDate ? _today : null,
+    locale: const Locale('ru'),
+    size: _screen,
+  );
+  repository.completeFirst(0, [
+    for (var number = 1; number <= 20; number++)
+      catalogPageItem(number, date: _today),
+  ], total: 20);
+  repository.completeDayStatuses(0, {});
+  await tester.pumpAndSettle();
+  await tester.tap(find.byType(CalendarHandle));
+  await tester.pumpAndSettle();
+  await _dragToEnd(tester);
+  final position = tester.state<ScrollableState>(_pageScroll).position;
+  expect(position.pixels, closeTo(position.maxScrollExtent, _epsilon));
+  return repository;
+}
+
+Future<TestGesture> _startShortCollapse(WidgetTester tester) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(find.byType(CalendarHandle)),
+    pointer: 1,
+  );
+  await gesture.moveBy(const Offset(0, -20));
+  await gesture.moveBy(
+    const Offset(0, -40),
+    timeStamp: const Duration(seconds: 1),
+  );
+  await tester.pumpAndSettle();
+  return gesture;
+}
+
 /// Допуск сравнения координат.
 const _epsilon = 0.01;
 
@@ -493,7 +623,7 @@ const _filterKeys = [
 
 /// Единственная вертикальная прокрутка выдачи под календарём.
 final _pageScroll = find.descendant(
-  of: find.byType(DailyChoiceCatalogPage),
+  of: find.byType(CustomScrollView),
   matching: find.byWidgetPredicate(
     (widget) =>
         widget is Scrollable &&
@@ -531,7 +661,7 @@ String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
 /// Видимая часть страницы: под строкой состояния и над основной навигацией.
 Rect _visibleArea(WidgetTester tester) {
   final safeTop = MediaQuery.paddingOf(
-    tester.element(find.byType(DailyChoiceCatalogPage)),
+    tester.element(find.byType(DailyChoiceCalendar)),
   ).top;
   final bar = tester.getRect(find.byType(AppNavigationBar));
   expect(find.byType(FloatingActionButton), findsNothing);

@@ -1,5 +1,7 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -51,6 +53,8 @@ final class _DailyChoiceCatalogBodyState
   /// https://api.flutter.dev/flutter/widgets/ScrollController-class.html
   final _scrollController = ScrollController();
 
+  _CalendarTransitionScrollSnapshot? _scrollSnapshot;
+
   /// Текущий местный день, отмеченный в календаре и заголовке дня.
   ///
   /// Тело перечитывает его при создании, возвращении приложения в
@@ -85,11 +89,12 @@ final class _DailyChoiceCatalogBodyState
     final provider = dailyChoiceCatalogViewModelProvider(widget.instance);
     // Только новый выбранный день возвращает выдачу к началу:
     // https://riverpod.dev/docs/concepts2/refs#reflisten
-    ref.listen(provider.select((state) => state.selection.date), (
-      previous,
-      next,
-    ) {
-      if (previous != next && _scrollController.hasClients) {
+    ref.listen(provider, (previous, next) {
+      if (_scrollSnapshot != null && !_hasSameScrollContent(previous, next)) {
+        _scrollSnapshot = null;
+      }
+      if (previous?.selection.date != next.selection.date &&
+          _scrollController.hasClients) {
         _scrollController.jumpTo(0);
       }
     });
@@ -125,6 +130,8 @@ final class _DailyChoiceCatalogBodyState
                 hasDayMarksReadFailure: dayMarks.hasReadFailure,
                 onDateSelected: (date) => _selectDate(model, date),
                 onViewportChanged: _setViewport,
+                onExpansionTransitionStarted: _rememberScrollPosition,
+                onExpansionTransitionEnded: _restoreScrollPosition,
                 onMonthSelectionCompleted: (viewport) => _setViewport(
                   viewport,
                   reason: DailyChoiceCalendarViewportUpdateReason
@@ -133,72 +140,79 @@ final class _DailyChoiceCatalogBodyState
               ),
             ),
             Expanded(
-              child: CustomScrollView(
-                controller: _scrollController,
-                key: const PageStorageKey<String>('daily-choice-catalog'),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: DayHeading(
-                        weekday:
-                            weekday[0].toUpperCase() + weekday.substring(1),
-                        // Явный формат сохраняет порядок и не добавляет «г.»:
-                        // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
-                        date: DateFormat('d MMMM y', locale).format(date),
-                        todayLabel: selectedDate == _localDay.today
-                            ? l10n.dailyChoiceCalendarToday
-                            : null,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onScrollNotification,
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  key: const PageStorageKey<String>('daily-choice-catalog'),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: DayHeading(
+                          weekday:
+                              weekday[0].toUpperCase() + weekday.substring(1),
+                          // Явный формат сохраняет порядок и не добавляет «г.»:
+                          // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+                          date: DateFormat('d MMMM y', locale).format(date),
+                          todayLabel: selectedDate == _localDay.today
+                              ? l10n.dailyChoiceCalendarToday
+                              : null,
+                        ),
                       ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _CompletionFilter(
-                            label: l10n.dailyChoiceCatalogCompletionFilter,
-                            field: DropdownButtonFormField<bool?>(
-                              key: ValueKey(state.selection.isCompleted),
-                              initialValue: state.selection.isCompleted,
-                              isExpanded: true,
-                              // Выбранное состояние переносится и растягивает поле
-                              // по высоте вместо обрезки по одной строке.
-                              isDense: false,
-                              items: [
-                                DropdownMenuItem<bool?>(
-                                  value: null,
-                                  child: Text(l10n.dailyChoiceCatalogAllStates),
-                                ),
-                                DropdownMenuItem<bool?>(
-                                  value: false,
-                                  child: Text(
-                                    l10n.dailyChoiceCatalogIncomplete,
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _CompletionFilter(
+                              label: l10n.dailyChoiceCatalogCompletionFilter,
+                              field: DropdownButtonFormField<bool?>(
+                                key: ValueKey(state.selection.isCompleted),
+                                initialValue: state.selection.isCompleted,
+                                isExpanded: true,
+                                // Выбранное состояние переносится и растягивает поле
+                                // по высоте вместо обрезки по одной строке.
+                                isDense: false,
+                                items: [
+                                  DropdownMenuItem<bool?>(
+                                    value: null,
+                                    child: Text(
+                                      l10n.dailyChoiceCatalogAllStates,
+                                    ),
                                   ),
-                                ),
-                                DropdownMenuItem<bool?>(
-                                  value: true,
-                                  child: Text(l10n.dailyChoiceCatalogCompleted),
-                                ),
-                              ],
-                              onChanged: model.selectCompletion,
+                                  DropdownMenuItem<bool?>(
+                                    value: false,
+                                    child: Text(
+                                      l10n.dailyChoiceCatalogIncomplete,
+                                    ),
+                                  ),
+                                  DropdownMenuItem<bool?>(
+                                    value: true,
+                                    child: Text(
+                                      l10n.dailyChoiceCatalogCompleted,
+                                    ),
+                                  ),
+                                ],
+                                onChanged: model.selectCompletion,
+                              ),
                             ),
-                          ),
-                          TextButton(
-                            key: const ValueKey('daily-choice-clear-filters'),
-                            onPressed: model.clearFilters,
-                            child: Text(l10n.dailyChoiceCatalogClearFilters),
-                          ),
-                        ],
+                            TextButton(
+                              key: const ValueKey('daily-choice-clear-filters'),
+                              onPressed: model.clearFilters,
+                              child: Text(l10n.dailyChoiceCatalogClearFilters),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  ..._content(state, model, l10n),
-                ],
+                    ..._content(state, model, l10n),
+                  ],
+                ),
               ),
             ),
           ],
@@ -220,6 +234,7 @@ final class _DailyChoiceCatalogBodyState
     DailyChoiceCalendarViewportUpdateReason reason =
         DailyChoiceCalendarViewportUpdateReason.ordinary,
   }) {
+    _scrollSnapshot = null;
     setState(() => _viewport = viewport);
     ref
         .read(
@@ -227,6 +242,50 @@ final class _DailyChoiceCatalogBodyState
               .notifier,
         )
         .setViewport(viewport, reason: reason);
+  }
+
+  void _rememberScrollPosition() {
+    _scrollSnapshot = _scrollController.hasClients
+        ? _CalendarTransitionScrollSnapshot(
+            mode: _viewport.mode,
+            offset: _scrollController.offset,
+          )
+        : null;
+  }
+
+  bool _onScrollNotification(ScrollNotification notification) {
+    // Коррекция геометрии не является пользовательской прокруткой:
+    // https://api.flutter.dev/flutter/widgets/UserScrollNotification-class.html
+    final isUserScroll = switch (notification) {
+      UserScrollNotification(:final direction) =>
+        direction != ScrollDirection.idle,
+      ScrollUpdateNotification(:final dragDetails) => dragDetails != null,
+      _ => false,
+    };
+    if (notification.depth == 0 && isUserScroll) _scrollSnapshot = null;
+    return false;
+  }
+
+  void _restoreScrollPosition(DailyChoiceCalendarMode mode) {
+    final snapshot = _scrollSnapshot;
+    if (snapshot == null) return;
+    if (snapshot.mode != mode) {
+      _scrollSnapshot = null;
+      return;
+    }
+    // Окончательные границы известны после раскладки с исходной высотой:
+    // https://api.flutter.dev/flutter/scheduler/SchedulerBinding/addPostFrameCallback.html
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_scrollSnapshot, snapshot)) return;
+      _scrollSnapshot = null;
+      if (!_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      final offset = snapshot.offset.clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if (position.pixels != offset) _scrollController.jumpTo(offset);
+    });
   }
 
   /// Слайверы выдачи под фильтрами.
@@ -365,6 +424,37 @@ final class _DailyChoiceCatalogBodyState
     DailyChoiceCatalogCorruptionFailure() => l10n.dailyChoiceCatalogCorruption,
     DailyChoiceCatalogSnapshotExpired() => l10n.dailyChoiceCatalogExpired,
     DailyChoiceCatalogUnexpectedFailure() => l10n.dailyChoiceCatalogUnexpected,
+  };
+}
+
+/// Идентичность снимка не даёт отложенному возврату отменить новый переход,
+/// прокрутку пользователя или изменение выдачи.
+final class _CalendarTransitionScrollSnapshot {
+  _CalendarTransitionScrollSnapshot({required this.mode, required this.offset});
+
+  final DailyChoiceCalendarMode mode;
+  final double offset;
+}
+
+/// Посторонняя ревизия меняет needsRebase, сохраняя строки и их раскладку.
+/// Отменять восстановление должны только изменения содержимого прокрутки.
+bool _hasSameScrollContent(
+  DailyChoiceCatalogState? previous,
+  DailyChoiceCatalogState next,
+) {
+  if (previous?.selection.date != next.selection.date ||
+      previous?.selection.isCompleted != next.selection.isCompleted) {
+    return false;
+  }
+  return switch ((previous, next)) {
+    (DailyChoiceCatalogLoaded before, DailyChoiceCatalogLoaded after) =>
+      listEquals(before.items, after.items) &&
+          before.totalCount == after.totalCount &&
+          (before.nextCursor != null) == (after.nextCursor != null) &&
+          before.freshness == after.freshness &&
+          before.refreshFailure == after.refreshFailure &&
+          before.pageStatus == after.pageStatus,
+    _ => identical(previous, next),
   };
 }
 

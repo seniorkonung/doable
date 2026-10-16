@@ -95,6 +95,8 @@ final class DailyChoiceCalendar extends StatefulWidget {
     required this.onMonthSelectionCompleted,
     this.dayStatusForDate,
     this.hasDayMarksReadFailure = false,
+    this.onExpansionTransitionStarted,
+    this.onExpansionTransitionEnded,
   });
 
   final CalendarDate selectedDate;
@@ -115,6 +117,13 @@ final class DailyChoiceCalendar extends StatefulWidget {
 
   /// Один завершённый выбор месяца; [onViewportChanged] его не дублирует.
   final ValueChanged<DailyChoiceCalendarViewport> onMonthSelectionCompleted;
+
+  /// Согласование прокрутки потребителя с изменением высоты. Начало сообщается
+  /// один раз до движения; итог — после достижения конечного представления,
+  /// включая возврат без [onViewportChanged] и внешнюю смену просмотра.
+  /// Промежуточная степень раскрытия остаётся внутри календаря.
+  final VoidCallback? onExpansionTransitionStarted;
+  final ValueChanged<DailyChoiceCalendarMode>? onExpansionTransitionEnded;
 
   @override
   State<DailyChoiceCalendar> createState() => _DailyChoiceCalendarState();
@@ -161,12 +170,16 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
   void didUpdateWidget(DailyChoiceCalendar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.viewport != oldWidget.viewport) {
+      final wasTransitioning = _isTransitioning;
       _expansion.stop();
       _dragGlobalY = null;
       _isTransitioning = false;
       _targetMode = widget.viewport.mode;
       _expansion.value = _progressFor(_targetMode);
       _closePeriodPickerIfCollapsed();
+      if (wasTransitioning) {
+        widget.onExpansionTransitionEnded?.call(_targetMode);
+      }
     }
   }
 
@@ -348,6 +361,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
       } else {
         _stopPaging();
       }
+      widget.onExpansionTransitionStarted?.call();
     }
     _expansion.stop();
     setState(() => _isTransitioning = true);
@@ -415,6 +429,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
             if (_targetMode != widget.viewport.mode) {
               widget.onViewportChanged(widget.viewport.withMode(_targetMode));
             }
+            widget.onExpansionTransitionEnded?.call(_targetMode);
           }),
     );
   }
