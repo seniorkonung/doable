@@ -92,7 +92,6 @@ Future<void> _edit(
   WidgetTester tester, {
   String? date,
   String? description,
-  bool toggleCompletion = false,
 }) async {
   await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
   final submit = find.byKey(const ValueKey('daily-choice-edit-submit'));
@@ -107,12 +106,6 @@ Future<void> _edit(
     await tester.enterText(
       find.byKey(const ValueKey('daily-choice-edit-description')),
       description,
-    );
-  }
-  if (toggleCompletion) {
-    await _tap(
-      tester,
-      find.byKey(const ValueKey('daily-choice-edit-completed')),
     );
   }
   await _tap(tester, submit);
@@ -292,8 +285,26 @@ void main() {
             .label,
         contains('Не готово к действию'),
       );
-      await _edit(tester, toggleCompletion: true);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await selectDailyChoiceCatalogDate(
+        tester,
+        CalendarDate.fromParts(2027, 1, 2),
+        tap: _tap,
+      );
+      final completion = find.byKey(
+        ValueKey('daily-choice-completion-${editedId.toCanonicalString()}'),
+      );
+      await _until(tester, completion);
+      expect(tester.widget<Checkbox>(completion).value, isTrue);
+      await _tap(tester, completion);
+      await showDailyChoiceCatalogSection(tester, false);
+      await _until(tester, completion);
+      expect(tester.widget<Checkbox>(completion).value, isFalse);
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      await _until(tester, find.byType(DailyChoiceDetailsPage));
       final changed = await _read(repository, editedId);
+      expect(changed.choice.id, editedId);
       expect(changed.choice.date, CalendarDate.fromParts(2027, 1, 2));
       expect(changed.choice.description?.value, 'После архивирования');
       expect(changed.choice.isCompleted, isFalse);
@@ -312,6 +323,9 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-delete-confirm')),
       );
+      await _until(tester, dailyChoiceCatalogDateControl);
+      await selectDailyChoiceCatalogDate(tester, _formChoiceDate, tap: _tap);
+      await showDailyChoiceCatalogSection(tester, true);
       await _until(tester, find.byKey(const ValueKey('daily-choice-row-1')));
       expect(_savedIds(harness), [firstId]);
 

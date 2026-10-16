@@ -18,6 +18,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
@@ -373,6 +374,7 @@ void main() {
         find.bySemanticsLabel(app.l10n.dailyChoiceCalendarChooseYearAndMonth),
       );
       await _tap(tester, find.text('2028'));
+      final rootProvider = openedDailyChoiceCatalogProvider(app.container);
       final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
@@ -401,9 +403,9 @@ void main() {
         DailyChoiceDetailsPage,
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
-      await _tap(
+      await _until(
         tester,
-        find.byKey(const ValueKey('daily-choice-edit-completed')),
+        find.byKey(const ValueKey('daily-choice-edit-date')),
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-edit-date')),
@@ -417,6 +419,33 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-open')),
       );
+      await _closeTop(tester, DailyChoiceDetailsPage);
+      // Флажок доступен в другом каталоге; корневой остаётся скрытым.
+      final dayLabel = app.l10n.statisticsCalendarDaySemantics(
+        DateTime.utc(_choiceDate.year, _choiceDate.month, _choiceDate.day),
+        '',
+      );
+      final statisticsDay = find.bySemanticsLabel(
+        RegExp('^${RegExp.escape(dayLabel)}'),
+      );
+      await tester.scrollUntilVisible(
+        statisticsDay,
+        -500,
+        scrollable: find
+            .descendant(
+              of: find.byType(IntentionDetailsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await _open(tester, statisticsDay, DailyChoiceDateCatalogPage);
+      await selectDailyChoiceCatalogDate(tester, _viewedDate, tap: _tap);
+      final completion = find.byKey(
+        ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
+      );
+      await _until(tester, completion);
+      expect(tester.widget<Checkbox>(completion).value, isFalse);
+      await _tap(tester, completion);
       // Существующая модель скрытого каталога согласуется до возврата.
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
@@ -426,7 +455,13 @@ void main() {
                 ?.statuses[_viewedDate] ==
             DailyChoiceDayStatus.allCompleted;
       });
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      expect(find.byType(daily_page.DailyChoiceCatalogPage), findsNothing);
+      final hiddenRoot =
+          app.container.read(rootProvider) as DailyChoiceCatalogLoaded;
+      expect(hiddenRoot.selection.date, _choiceDate);
+      expect(hiddenRoot.totalCount, _choiceCount - 1);
+      expect(hiddenRoot.incomplete.items, hasLength(100));
+      await _closeTop(tester, DailyChoiceDateCatalogPage);
       await _closeTop(tester, IntentionDetailsPage);
       await _select(tester, AppDestination.dailyChoices);
       await _waitFor(
@@ -581,18 +616,12 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('daily-choice-row-1')));
       await _until(tester, find.byType(DailyChoiceDetailsPage));
       await tester.pumpAndSettle();
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+      await _closeTop(tester, DailyChoiceDetailsPage);
       await _tap(
         tester,
-        find.byKey(const ValueKey('daily-choice-edit-completed')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
-      await _until(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-open')),
+        find.byKey(
+          ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
+        ),
       );
       final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
@@ -603,7 +632,6 @@ void main() {
                 ?.statuses[_choiceDate] ==
             DailyChoiceDayStatus.allCompleted;
       });
-      await _closeTop(tester, DailyChoiceDetailsPage);
       await _waitFor(
         tester,
         () =>
