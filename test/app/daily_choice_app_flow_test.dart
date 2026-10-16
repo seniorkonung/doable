@@ -18,6 +18,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
+import '../support/daily_choice_catalog_controls.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -214,7 +215,8 @@ void main() {
       expect((await _read(repository, firstId)).choice.id, firstId);
 
       await openDailyChoices(tester, tap: _tap);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      await showDailyChoiceCatalogSection(tester, true);
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
       await _until(
         tester,
         find.byKey(const ValueKey('daily-choice-edit-open')),
