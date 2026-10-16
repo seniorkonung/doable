@@ -1,6 +1,9 @@
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../application/daily_choice_catalog.dart';
+import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
+import '../../domain/daily_choice_id.dart';
 import 'daily_choice_catalog_snapshot_assembly.dart';
 
 /// Выбранный день и независимое раскрытие секций принадлежат экземпляру.
@@ -36,21 +39,90 @@ final class DailyChoiceCatalogSelection {
 }
 
 sealed class DailyChoiceCatalogState {
-  const DailyChoiceCatalogState(this.selection);
+  const DailyChoiceCatalogState(
+    this.selection, {
+    this.completionOperations = const {},
+  });
   final DailyChoiceCatalogSelection selection;
+  final Map<DailyChoiceId, DailyChoiceCompletionOperation> completionOperations;
+
+  bool canChangeCompletion(DailyChoiceId id) => switch (this) {
+    DailyChoiceCatalogLoaded(:final items)
+        when items.any((item) => item.id == id) =>
+      switch (completionOperations[id]) {
+        null || DailyChoiceCompletionFailed(canRetry: true) => true,
+        _ => false,
+      },
+    _ => false,
+  };
+
+  DailyChoiceCatalogState withCompletionOperations(
+    Map<DailyChoiceId, DailyChoiceCompletionOperation> operations,
+  ) {
+    final immutable =
+        Map<DailyChoiceId, DailyChoiceCompletionOperation>.unmodifiable(
+          operations,
+        );
+    return switch (this) {
+      DailyChoiceCatalogInitialLoad() => DailyChoiceCatalogInitialLoad(
+        selection,
+        completionOperations: immutable,
+      ),
+      DailyChoiceCatalogInitialFailure(:final failure) =>
+        DailyChoiceCatalogInitialFailure(
+          selection,
+          failure,
+          completionOperations: immutable,
+        ),
+      DailyChoiceCatalogLoaded loaded => loaded.withStatus(
+        completionOperations: immutable,
+        refreshFailure: loaded.refreshFailure,
+      ),
+    };
+  }
 }
 
 final class DailyChoiceCatalogInitialLoad extends DailyChoiceCatalogState {
-  const DailyChoiceCatalogInitialLoad(super.selection);
+  const DailyChoiceCatalogInitialLoad(
+    super.selection, {
+    super.completionOperations,
+  });
 }
 
 final class DailyChoiceCatalogInitialFailure extends DailyChoiceCatalogState {
-  const DailyChoiceCatalogInitialFailure(super.selection, this.failure);
+  const DailyChoiceCatalogInitialFailure(
+    super.selection,
+    this.failure, {
+    super.completionOperations,
+  });
   final DailyChoiceCatalogReadFailure failure;
   bool get canRetry => failure is DailyChoiceCatalogUnavailableFailure;
 }
 
 enum DailyChoiceCatalogFreshness { current, refreshing, stale }
+
+sealed class DailyChoiceCompletionOperation {
+  const DailyChoiceCompletionOperation();
+}
+
+final class DailyChoiceCompletionSubmitting
+    extends DailyChoiceCompletionOperation {
+  const DailyChoiceCompletionSubmitting();
+}
+
+final class DailyChoiceCompletionAwaitingSnapshot
+    extends DailyChoiceCompletionOperation {
+  const DailyChoiceCompletionAwaitingSnapshot(this.revision);
+  final GraphRevision revision;
+}
+
+final class DailyChoiceCompletionFailed extends DailyChoiceCompletionOperation {
+  const DailyChoiceCompletionFailed(this.failure, {this.failurePresentation});
+  final DailyChoiceCommandFailure failure;
+  final GraphInitiatorPresentationClaim? failurePresentation;
+  bool get canRetry => failure is DailyChoiceUnavailableFailure;
+  bool get requiresRefresh => failure is DailyChoiceConflictFailure;
+}
 
 sealed class DailyChoiceCatalogPageStatus {
   const DailyChoiceCatalogPageStatus();
@@ -120,8 +192,11 @@ final class DailyChoiceCatalogLoaded extends DailyChoiceCatalogState {
   DailyChoiceCatalogLoaded.fromSnapshot({
     required DailyChoiceCatalogSelection selection,
     required DailyChoiceCatalogSnapshot snapshot,
+    Map<DailyChoiceId, DailyChoiceCompletionOperation> completionOperations =
+        const {},
   }) : this._(
          selection: selection,
+         completionOperations: completionOperations,
          incomplete: DailyChoiceCatalogSectionState.fromSnapshot(
            snapshot.incomplete,
          ),
@@ -139,7 +214,9 @@ final class DailyChoiceCatalogLoaded extends DailyChoiceCatalogState {
     this.freshness = DailyChoiceCatalogFreshness.current,
     this.refreshFailure,
     this.needsRebase = false,
-  }) : super(selection);
+    Map<DailyChoiceId, DailyChoiceCompletionOperation> completionOperations =
+        const {},
+  }) : super(selection, completionOperations: completionOperations);
 
   final DailyChoiceCatalogSectionState incomplete;
   final DailyChoiceCatalogSectionState completed;
@@ -163,8 +240,10 @@ final class DailyChoiceCatalogLoaded extends DailyChoiceCatalogState {
     DailyChoiceCatalogFreshness? freshness,
     DailyChoiceCatalogReadFailure? refreshFailure,
     bool? needsRebase,
+    Map<DailyChoiceId, DailyChoiceCompletionOperation>? completionOperations,
   }) => DailyChoiceCatalogLoaded._(
     selection: selection ?? this.selection,
+    completionOperations: completionOperations ?? this.completionOperations,
     incomplete: incomplete ?? this.incomplete,
     completed: completed ?? this.completed,
     revision: revision,

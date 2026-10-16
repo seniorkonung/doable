@@ -10,8 +10,11 @@ import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/application/intention_catalog.dart';
 import '../../application/daily_choice_catalog.dart';
+import '../../application/daily_choice_command.dart';
+import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice.dart';
+import '../../domain/daily_choice_id.dart';
 import 'daily_choice_catalog_instance.dart';
 import 'daily_choice_catalog_snapshot_assembly.dart';
 import 'daily_choice_catalog_state.dart';
@@ -22,6 +25,8 @@ part 'daily_choice_catalog_view_model.g.dart';
 @riverpod
 final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   late PersonalGraphRepository _repository;
+  late GraphCommandCoordinator _coordinator;
+  final _completionTokens = <DailyChoiceId, DailyChoiceOperationToken>{};
   StreamSubscription<GraphCommandCompletion>? _completions;
   late var _selection = DailyChoiceCatalogSelection(date: instance.initialDate);
   var _generation = 0;
@@ -33,13 +38,17 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   DailyChoiceCatalogState build(DailyChoiceCatalogInstance instance) {
     unawaited(_completions?.cancel());
     _repository = ref.watch(personalGraphRepositoryProvider);
-    _completions = ref
-        .watch(graphCommandCoordinatorProvider.notifier)
-        .completions
-        .listen((completion) {
-          scheduleMicrotask(() => _onCompletion(completion));
-        });
+    _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    _completions = _coordinator.completions.listen((completion) {
+      scheduleMicrotask(() => _onCompletion(completion));
+    });
     ref.onDispose(() => unawaited(_completions?.cancel()));
+    ref.onDispose(() {
+      for (final token in _completionTokens.values) {
+        _coordinator.releaseInitiatorPresentation(token);
+      }
+      _completionTokens.clear();
+    });
     _pages.clear();
     _requiredRevision = null;
     ++_generation;
@@ -52,7 +61,10 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     _selection = _selection.withDate(date);
     ++_generation;
     _pages.clear();
-    state = DailyChoiceCatalogInitialLoad(_selection);
+    state = DailyChoiceCatalogInitialLoad(
+      _selection,
+      completionOperations: state.completionOperations,
+    );
     unawaited(_assemble());
   }
 
@@ -61,9 +73,14 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     state = switch (state) {
       DailyChoiceCatalogInitialLoad() => DailyChoiceCatalogInitialLoad(
         _selection,
+        completionOperations: state.completionOperations,
       ),
       DailyChoiceCatalogInitialFailure(:final failure) =>
-        DailyChoiceCatalogInitialFailure(_selection, failure),
+        DailyChoiceCatalogInitialFailure(
+          _selection,
+          failure,
+          completionOperations: state.completionOperations,
+        ),
       DailyChoiceCatalogLoaded loaded => loaded.withStatus(
         selection: _selection,
         refreshFailure: loaded.refreshFailure,
@@ -73,7 +90,10 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
 
   Future<void> retryFirstPage() {
     if (state case DailyChoiceCatalogInitialFailure(canRetry: true)) {
-      state = DailyChoiceCatalogInitialLoad(_selection);
+      state = DailyChoiceCatalogInitialLoad(
+        _selection,
+        completionOperations: state.completionOperations,
+      );
       return _assemble();
     }
     return Future.value();
@@ -88,6 +108,141 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     }
     return Future.value();
   }
+
+  /// Отправляет только выполнение; сохранённая карточка меняется вместе с парой.
+  void changeCompletion(DailyChoiceId id, bool isCompleted) {
+    final current = state;
+    if (current is! DailyChoiceCatalogLoaded ||
+        !current.canChangeCompletion(id))
+      return;
+    if (current.items.firstWhere((item) => item.id == id).isCompleted ==
+        isCompleted)
+      return;
+    _releaseCompletionToken(id);
+    final start = _coordinator.acceptDailyChoiceUpdate(
+      UpdateDailyChoiceFields(
+        choiceId: id,
+        patch: DailyChoiceFieldsPatch(
+          isCompleted: DailyChoiceFieldSet(isCompleted),
+        ),
+      ),
+    );
+    switch (start) {
+      case DailyChoiceCommandAccepted(:final token, :final future):
+        _completionTokens[id] = token;
+        _setCompletionOperation(id, const DailyChoiceCompletionSubmitting());
+        unawaited(_finishCompletion(id, future));
+      case DailyChoiceCommandAlreadyRunning():
+        _setCompletionOperation(
+          id,
+          const DailyChoiceCompletionFailed(
+            DailyChoiceConflictFailure(
+              DailyChoiceConflictReason.dependencyChanged,
+            ),
+          ),
+        );
+      case GraphCommandCoordinatorDraining():
+        _setCompletionOperation(
+          id,
+          const DailyChoiceCompletionFailed(DailyChoiceUnexpectedFailure()),
+        );
+    }
+  }
+
+  /// После конфликта новая пара разрешает только новое явное подтверждение.
+  Future<void> refreshCompletion(DailyChoiceId id) async {
+    final current = state;
+    final operation = current.completionOperations[id];
+    if (current is! DailyChoiceCatalogLoaded ||
+        operation is! DailyChoiceCompletionFailed ||
+        !operation.requiresRefresh ||
+        _assembly != null)
+      return;
+    await _assemble(base: current);
+    if (!ref.mounted) return;
+    if (state case DailyChoiceCatalogLoaded(
+      freshness: DailyChoiceCatalogFreshness.current,
+    )) {
+      if (!identical(state.completionOperations[id], operation)) return;
+      _releaseCompletionToken(id);
+      state = state.withCompletionOperations(
+        {...state.completionOperations}..remove(id),
+      );
+    }
+  }
+
+  Future<void> _finishCompletion(
+    DailyChoiceId id,
+    Future<DailyChoiceCommandCompletion> future,
+  ) async {
+    final completion = await future;
+    if (!ref.mounted || !identical(_completionTokens[id], completion.token))
+      return;
+    switch (completion.confirmedResult) {
+      case GraphResultSuccess(value: final confirmed):
+        _releaseCompletionToken(id);
+        _setCompletionOperation(
+          id,
+          DailyChoiceCompletionAwaitingSnapshot(confirmed.revision),
+        );
+        final current = state;
+        if (current is DailyChoiceCatalogLoaded &&
+            _includesRevision(current.revision, confirmed.revision)) {
+          state = current.withCompletionOperations(
+            _reconciledOperations(current.revision),
+          );
+        } else if (_assembly == null) {
+          unawaited(
+            _assemble(
+              base: current is DailyChoiceCatalogLoaded ? current : null,
+            ),
+          );
+        }
+      case GraphResultFailure(:final failure):
+        _setCompletionOperation(
+          id,
+          DailyChoiceCompletionFailed(
+            failure,
+            failurePresentation: _coordinator.claimInitiatorFailure(
+              completion.token,
+            ),
+          ),
+        );
+    }
+  }
+
+  void _setCompletionOperation(
+    DailyChoiceId id,
+    DailyChoiceCompletionOperation operation,
+  ) {
+    state = state.withCompletionOperations({
+      ...state.completionOperations,
+      id: operation,
+    });
+  }
+
+  void _releaseCompletionToken(DailyChoiceId id) {
+    final token = _completionTokens.remove(id);
+    if (token != null) _coordinator.releaseInitiatorPresentation(token);
+  }
+
+  Map<DailyChoiceId, DailyChoiceCompletionOperation> _reconciledOperations(
+    GraphRevision revision,
+  ) => Map.unmodifiable({
+    for (final entry in state.completionOperations.entries)
+      if (switch (entry.value) {
+        DailyChoiceCompletionAwaitingSnapshot(revision: final required) =>
+          !_includesRevision(revision, required),
+        _ => true,
+      })
+        entry.key: entry.value,
+  });
+
+  bool _includesRevision(GraphRevision snapshot, GraphRevision required) =>
+      switch (snapshot.compareTo(required)) {
+        GraphRevisionOrder.same || GraphRevisionOrder.newer => true,
+        GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => false,
+      };
 
   Future<void> loadMore({required bool isCompleted}) {
     final current = state;
@@ -168,11 +323,17 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
         state = DailyChoiceCatalogLoaded.fromSnapshot(
           selection: _selection,
           snapshot: snapshot,
+          completionOperations: _reconciledOperations(snapshot.revision),
         );
       case DailyChoiceCatalogAssemblyFailed(:final failure):
         state = base == null
-            ? DailyChoiceCatalogInitialFailure(_selection, failure)
+            ? DailyChoiceCatalogInitialFailure(
+                _selection,
+                failure,
+                completionOperations: state.completionOperations,
+              )
             : base.withStatus(
+                completionOperations: state.completionOperations,
                 selection: _selection,
                 freshness: DailyChoiceCatalogFreshness.stale,
                 refreshFailure: failure,

@@ -37,9 +37,12 @@ import '../../../support/daily_choice_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
+part 'daily_choice_catalog_completion_scenarios.dart';
+
 final _today = CalendarDate.fromParts(2026, 9, 24);
 
 void main() {
+  _completionScenarios();
   test('первые порции публикуются только согласованной парой; раскрытие не читает граф', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -437,6 +440,7 @@ final class _Repository
   final queries = <DailyChoiceCatalogQuery>[];
   final _pages = <Completer<DailyChoiceCatalogPageResult>>[];
   final _commands = <Completer<DailyChoiceCommandResult>>[];
+  final commands = <DailyChoiceCommand>[];
   final _intentionCommands =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _tagCommands = <Completer<TagCommandResult>>[];
@@ -485,6 +489,9 @@ final class _Repository
   void fail(int index, DailyChoiceCatalogReadFailure failure) =>
       _pages[index].complete(DailyChoiceCatalogPageError(failure));
 
+  void failCommand(int index, DailyChoiceCommandFailure failure) =>
+      _commands[index].complete(GraphCommandFailed(failure));
+
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -502,6 +509,7 @@ final class _Repository
       return await request.future as GraphCommandResult<TSuccess, TFailure>;
     }
     final request = Completer<DailyChoiceCommandResult>();
+    commands.add(command as DailyChoiceCommand);
     _commands.add(request);
     return await request.future as GraphCommandResult<TSuccess, TFailure>;
   }
@@ -587,15 +595,20 @@ final class _Repository
     );
   }
 
-  void succeedCompletionUpdate(int index, int id, {required int revision}) =>
-      succeedDateUpdate(
-        index,
-        id,
-        _today,
-        _today,
-        revision: revision,
-        completed: true,
-      );
+  void succeedCompletionUpdate(
+    int index,
+    int id, {
+    required int revision,
+    bool completed = true,
+  }) => succeedDateUpdate(
+    index,
+    id,
+    _today,
+    _today,
+    revision: revision,
+    completed: completed,
+    beforeCompleted: !completed,
+  );
 
   void succeedDateUpdate(
     int index,
@@ -604,6 +617,7 @@ final class _Repository
     CalendarDate afterDate, {
     required int revision,
     bool completed = false,
+    bool beforeCompleted = false,
   }) {
     DailyChoice choice(CalendarDate date, bool isCompleted) => DailyChoice(
       id: _choiceId(id),
@@ -613,7 +627,7 @@ final class _Repository
       description: null,
       isCompleted: isCompleted,
     );
-    final before = choice(beforeDate, false);
+    final before = choice(beforeDate, beforeCompleted);
     final after = choice(afterDate, completed);
     final change = DailyChoiceChange(
       revision: _Revision(revision),
