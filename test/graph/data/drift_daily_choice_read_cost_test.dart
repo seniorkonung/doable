@@ -124,6 +124,9 @@ final class _Fixture {
         900,
         for (var node = 2; node <= _pathLength; node++) 1000 + node,
       ], stepBase: 30000);
+      raw.execute('UPDATE daily_choices SET priority = 1 WHERE id = ?', [
+        _uuid(10400),
+      ]);
       raw.execute('COMMIT');
     } on Object {
       raw.execute('ROLLBACK');
@@ -511,7 +514,11 @@ void main() {
     const firstPageSteps = _pathLength + _pageSize - 1;
     final first =
         (await fixture.repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(pageSize: _pageSize),
+              DailyChoiceCatalogQuery(
+                date: CalendarDate.fromParts(2026, 9, 24),
+                isCompleted: false,
+                pageSize: _pageSize,
+              ),
             ) as DailyChoiceCatalogPageSuccess).value
             as DailyChoiceCatalogFirstPage;
     expect(first.totalCount, _catalogChoices + _otherGroupChoices);
@@ -524,7 +531,12 @@ void main() {
 
     fixture.trace.clear();
     final second = (await fixture.repository.getDailyChoiceCatalogPage(
-      DailyChoiceCatalogQuery(pageSize: _pageSize, cursor: first.nextCursor),
+      DailyChoiceCatalogQuery(
+        date: CalendarDate.fromParts(2026, 9, 24),
+        isCompleted: false,
+        pageSize: _pageSize,
+        cursor: first.nextCursor,
+      ),
     ) as DailyChoiceCatalogPageSuccess).value;
     expect(second.items, hasLength(_pageSize));
     _expectBoundedPage(
@@ -598,10 +610,14 @@ void main() {
     fixture.trace.clear();
     final rebuilt =
         (await fixture.repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(pageSize: _pageSize),
+              DailyChoiceCatalogQuery(
+                date: CalendarDate.fromParts(2026, 9, 24),
+                isCompleted: false,
+                pageSize: _pageSize,
+              ),
             ) as DailyChoiceCatalogPageSuccess).value
             as DailyChoiceCatalogFirstPage;
-    expect(rebuilt.items.first.id, durabilityChoice(10399));
+    expect(rebuilt.items.first.id, durabilityChoice(10400));
     _expectBoundedPage(
       fixture.trace,
       pageSteps: firstPageSteps,
@@ -609,7 +625,12 @@ void main() {
     );
     fixture.trace.clear();
     final rebuiltNext = (await fixture.repository.getDailyChoiceCatalogPage(
-      DailyChoiceCatalogQuery(pageSize: _pageSize, cursor: rebuilt.nextCursor),
+      DailyChoiceCatalogQuery(
+        date: CalendarDate.fromParts(2026, 9, 24),
+        isCompleted: false,
+        pageSize: _pageSize,
+        cursor: rebuilt.nextCursor,
+      ),
     ) as DailyChoiceCatalogPageSuccess).value;
     expect(rebuiltNext.items, hasLength(_pageSize));
     _expectBoundedPage(
@@ -683,7 +704,7 @@ void main() {
     fixture.trace.clear();
     final first =
         (await fixture.repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(date: day),
+              DailyChoiceCatalogQuery(isCompleted: false, date: day),
             ) as DailyChoiceCatalogPageSuccess).value
             as DailyChoiceCatalogFirstPage;
     expect(first.totalCount, dayChoices);
@@ -702,7 +723,7 @@ void main() {
     while (cursor != null) {
       fixture.trace.clear();
       final next = (await fixture.repository.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(date: day, cursor: cursor),
+        DailyChoiceCatalogQuery(isCompleted: false, date: day, cursor: cursor),
       ) as DailyChoiceCatalogPageSuccess).value;
       expect(next, isA<DailyChoiceCatalogContinuationPage>());
       expect(next.items.map((item) => item.date), everyElement(day));
@@ -749,12 +770,12 @@ void main() {
     fixture.trace.clear();
     final rebuilt =
         (await fixture.repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(date: day),
+              DailyChoiceCatalogQuery(isCompleted: false, date: day),
             ) as DailyChoiceCatalogPageSuccess).value
             as DailyChoiceCatalogFirstPage;
-    expect(rebuilt.totalCount, dayChoices - 1);
+    expect(rebuilt.totalCount, _catalogChoices - 1);
     expect(rebuilt.items.first.id, durabilityChoice(10400));
-    expect(rebuilt.items[1].id, durabilityChoice(10398));
+    expect(rebuilt.items[1].id, durabilityChoice(10000));
     _expectBoundedPage(
       fixture.trace,
       pageSteps: _pathLength + pageSize - 1,
@@ -764,6 +785,7 @@ void main() {
     final nextDay =
         (await fixture.repository.getDailyChoiceCatalogPage(
               DailyChoiceCatalogQuery(
+                isCompleted: false,
                 date: CalendarDate.fromParts(2026, 9, 25),
               ),
             ) as DailyChoiceCatalogPageSuccess).value
@@ -777,7 +799,11 @@ void main() {
     () async {
       fixture.trace.clear();
       final single = (await fixture.repository.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(pageSize: 1),
+        DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 24),
+          isCompleted: false,
+          pageSize: 1,
+        ),
       ) as DailyChoiceCatalogPageSuccess).value;
       expect(single.items.single.id, durabilityChoice(10400));
       _expectBoundedPage(fixture.trace, pageSteps: _pathLength, pageSize: 1);

@@ -203,7 +203,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`; адаптация существующих построителей состояний и обращений к модели у непосредственных тестовых потребителей.
   - **Estimated scope:** M.
 
-- [ ] 2.6 Завершить переход на запрос ровно одной даты и одного состояния выполнения
+- [x] 2.6 Завершить переход на запрос ровно одной даты и одного состояния выполнения
   - **Acceptance criteria:**
     - По решению 3 дизайна `DailyChoiceCatalogQuery` требует ненулевые `CalendarDate` и `isCompleted`; размер порции остаётся проверяемым, курсор — непрозрачным. Типы больше не допускают чтение всех дат или обоих состояний одним запросом.
     - Удалены прежние ветви необязательного отбора в адаптере и оставшиеся интерфейсы фильтра выполнения. Все первые чтения, продолжения, пересборки и повторы модели явно адресуют одну секцию выбранного дня; отдельного совместимого API для старого охвата не остаётся.

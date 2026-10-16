@@ -15,11 +15,22 @@ import '../../support/catalog_reconciliation_test_fallback.dart';
 void main() {
   test('размер порции допускает границы 1 и 100 и отвергает остальные', () {
     for (final size in [1, 100]) {
-      expect(DailyChoiceCatalogQuery(pageSize: size).pageSize, size);
+      expect(
+        DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 24),
+          isCompleted: false,
+          pageSize: size,
+        ).pageSize,
+        size,
+      );
     }
     for (final size in [-1, 0, 101]) {
       expect(
-        () => DailyChoiceCatalogQuery(pageSize: size),
+        () => DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 24),
+          isCompleted: false,
+          pageSize: size,
+        ),
         throwsA(
           isA<DailyChoiceCatalogQueryValidationException>().having(
             (error) => error.failure,
@@ -119,7 +130,10 @@ void main() {
       DailyChoiceCatalogPageSuccess(page),
     );
     final result = await repository.getDailyChoiceCatalogPage(
-      DailyChoiceCatalogQuery(),
+      DailyChoiceCatalogQuery(
+        date: CalendarDate.fromParts(2026, 9, 24),
+        isCompleted: false,
+      ),
     );
 
     items.clear();

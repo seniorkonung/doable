@@ -2467,19 +2467,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCalendarNextYear => 'Следующий год';
 
   @override
-  String get dailyChoiceCatalogCompletionFilter => 'Выполнение';
-
-  @override
-  String get dailyChoiceCatalogAllStates => 'Все состояния';
-
-  @override
   String get dailyChoiceCatalogIncomplete => 'Не выполненные';
 
   @override
   String get dailyChoiceCatalogCompleted => 'Выполненные';
-
-  @override
-  String get dailyChoiceCatalogClearFilters => 'Сбросить фильтры';
 
   @override
   String dailyChoiceCatalogTotalCount(int count) {

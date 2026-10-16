@@ -221,7 +221,7 @@ final class CatalogPageRepository
     final completed = items.where((item) => item.isCompleted).toList();
     final incomplete = items.where((item) => !item.isCompleted).toList();
     final completedOnly = items.isNotEmpty && incomplete.isEmpty;
-    _completedPages[queries[index].date!] = DailyChoiceCatalogFirstPage(
+    _completedPages[queries[index].date] = DailyChoiceCatalogFirstPage(
       items: completed,
       totalCount: completedOnly ? total : completed.length,
       hasTimedChoices: false,

@@ -2463,19 +2463,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCalendarNextYear => 'Next year';
 
   @override
-  String get dailyChoiceCatalogCompletionFilter => 'Completion';
-
-  @override
-  String get dailyChoiceCatalogAllStates => 'All states';
-
-  @override
   String get dailyChoiceCatalogIncomplete => 'Not completed';
 
   @override
   String get dailyChoiceCatalogCompleted => 'Completed';
-
-  @override
-  String get dailyChoiceCatalogClearFilters => 'Clear filters';
 
   @override
   String dailyChoiceCatalogTotalCount(int count) {

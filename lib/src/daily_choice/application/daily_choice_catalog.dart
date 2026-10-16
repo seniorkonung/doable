@@ -23,8 +23,8 @@ abstract interface class DailyChoiceCatalogCursor {}
 
 final class DailyChoiceCatalogQuery {
   factory DailyChoiceCatalogQuery({
-    CalendarDate? date,
-    bool? isCompleted,
+    required CalendarDate date,
+    required bool isCompleted,
     int pageSize = defaultPageSize,
     DailyChoiceCatalogCursor? cursor,
   }) {
@@ -47,11 +47,8 @@ final class DailyChoiceCatalogQuery {
   static const maxPageSize = 100;
   static const defaultPageSize = 50;
 
-  /// null означает все календарные даты.
-  final CalendarDate? date;
-
-  /// null означает оба состояния выполнения.
-  final bool? isCompleted;
+  final CalendarDate date;
+  final bool isCompleted;
   final int pageSize;
   final DailyChoiceCatalogCursor? cursor;
 }
@@ -143,8 +140,6 @@ final class DailyChoiceCatalogItem {
 
 /// Секция одной даты и выполнения упорядочена по времени (весь день первым),
 /// приоритету и последовательности создания, по возрастанию.
-/// Прежний запрос без даты или выполнения сохраняет порядок по убыванию
-/// даты и создания до перехода потребителей на секции.
 /// Список и ревизия относятся к одному подтверждённому снимку.
 sealed class DailyChoiceCatalogPage {
   DailyChoiceCatalogPage({

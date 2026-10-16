@@ -4049,18 +4049,6 @@ abstract class AppLocalizations {
   /// **'Next year'**
   String get dailyChoiceCalendarNextYear;
 
-  /// Фильтр по выполнению
-  ///
-  /// In en, this message translates to:
-  /// **'Completion'**
-  String get dailyChoiceCatalogCompletionFilter;
-
-  /// Оба состояния выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'All states'**
-  String get dailyChoiceCatalogAllStates;
-
   /// Фильтр невыполненных выборов
   ///
   /// In en, this message translates to:
@@ -4072,12 +4060,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Completed'**
   String get dailyChoiceCatalogCompleted;
-
-  /// Вернуть все даты и оба состояния выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'Clear filters'**
-  String get dailyChoiceCatalogClearFilters;
 
   /// Полное количество подходящих дневных выборов
   ///

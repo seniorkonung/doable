@@ -151,7 +151,12 @@ void main() {
       addChoice(203);
 
       final items = page(
-        await repository.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
+        await repository.getDailyChoiceCatalogPage(
+          DailyChoiceCatalogQuery(
+            date: CalendarDate.fromParts(2026, 9, 23),
+            isCompleted: false,
+          ),
+        ),
       ).items;
       final timed = items.singleWhere(
         (item) => item.id.toCanonicalString() == _uuid(201),
@@ -176,64 +181,54 @@ void main() {
     },
   );
 
-  test('читает все даты и дубликаты по убыванию даты и создания', () async {
-    addChoice(201, date: '2026-09-22');
-    addChoice(202, completed: 1);
-    addChoice(203);
-    addChoice(204, date: '2026-09-24', longPath: true);
-    addChoice(205);
-
-    final ids = <String>[];
-    DailyChoiceCatalogCursor? cursor;
-    var reads = 0;
-    do {
-      final result = page(
-        await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(pageSize: 2, cursor: cursor),
-        ),
-      );
-      if (reads == 0) {
-        expect((result as DailyChoiceCatalogFirstPage).totalCount, 5);
-        expect(
-          result.items.first.selected.readiness,
-          IntentionReadiness.notReady,
-        );
-      } else {
-        expect(result, isA<DailyChoiceCatalogContinuationPage>());
-      }
-      ids.addAll(result.items.map((item) => item.id.toCanonicalString()));
-      cursor = result.nextCursor;
-      reads++;
-    } while (cursor != null);
-
-    expect(ids, [_uuid(204), _uuid(205), _uuid(203), _uuid(202), _uuid(201)]);
-    expect(reads, 3);
-    expect(
-      page(
-        await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(
-            date: CalendarDate.fromParts(2026, 9, 23),
-            isCompleted: true,
+  test(
+    'читает дубликаты выбранного дня отдельно от выполненных и соседних дат',
+    () async {
+      addChoice(201, date: '2026-09-22');
+      addChoice(202, completed: 1);
+      addChoice(203, longPath: true);
+      addChoice(204, date: '2026-09-24');
+      addChoice(205);
+      addChoice(206);
+      final day = CalendarDate.fromParts(2026, 9, 23);
+      final ids = <String>[];
+      DailyChoiceCatalogCursor? cursor;
+      var reads = 0;
+      do {
+        final result = page(
+          await repository.getDailyChoiceCatalogPage(
+            DailyChoiceCatalogQuery(
+              date: day,
+              isCompleted: false,
+              pageSize: 2,
+              cursor: cursor,
+            ),
           ),
-        ),
-      ).items.single.id.toCanonicalString(),
-      _uuid(202),
-    );
-    expect(
-      (page(
+        );
+        if (reads == 0) {
+          expect((result as DailyChoiceCatalogFirstPage).totalCount, 3);
+          expect(
+            result.items.first.selected.readiness,
+            IntentionReadiness.notReady,
+          );
+        } else {
+          expect(result, isA<DailyChoiceCatalogContinuationPage>());
+        }
+        ids.addAll(result.items.map((item) => item.id.toCanonicalString()));
+        cursor = result.nextCursor;
+        reads++;
+      } while (cursor != null);
+      expect(ids, [_uuid(203), _uuid(205), _uuid(206)]);
+      expect(reads, 2);
+      final completed = page(
         await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(isCompleted: false),
+          DailyChoiceCatalogQuery(date: day, isCompleted: true),
         ),
-      ) as DailyChoiceCatalogFirstPage).totalCount,
-      4,
-    );
-    expect(
-      (page(
-        await repository.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
-      ) as DailyChoiceCatalogFirstPage).totalCount,
-      5,
-    );
-  });
+      ) as DailyChoiceCatalogFirstPage;
+      expect(completed.totalCount, 1);
+      expect(completed.items.single.id.toCanonicalString(), _uuid(202));
+    },
+  );
 
   test('проверяет путь только выбранной порции, а повреждение следующей находит при продолжении', () async {
     final day = CalendarDate.fromParts(2026, 9, 23);
@@ -431,12 +426,6 @@ void main() {
           pageSize: 2,
           cursor: cursor,
         ),
-        DailyChoiceCatalogQuery(date: day, pageSize: 1, cursor: cursor),
-        DailyChoiceCatalogQuery(
-          isCompleted: false,
-          pageSize: 1,
-          cursor: cursor,
-        ),
       ]) {
         expect(
           await repository.getDailyChoiceCatalogPage(query),
@@ -490,7 +479,11 @@ void main() {
     () async {
       final empty = page(
         await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(pageSize: 100),
+          DailyChoiceCatalogQuery(
+            date: CalendarDate.fromParts(2026, 9, 23),
+            isCompleted: false,
+            pageSize: 100,
+          ),
         ),
       ) as DailyChoiceCatalogFirstPage;
       expect(empty.items, isEmpty);
@@ -502,17 +495,26 @@ void main() {
       }
       final first = page(
         await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(pageSize: 100),
+          DailyChoiceCatalogQuery(
+            date: CalendarDate.fromParts(2026, 9, 23),
+            isCompleted: false,
+            pageSize: 100,
+          ),
         ),
       ) as DailyChoiceCatalogFirstPage;
       expect(first.items, hasLength(100));
       expect(first.totalCount, 101);
       final last = page(
         await repository.getDailyChoiceCatalogPage(
-          DailyChoiceCatalogQuery(pageSize: 100, cursor: first.nextCursor),
+          DailyChoiceCatalogQuery(
+            date: CalendarDate.fromParts(2026, 9, 23),
+            isCompleted: false,
+            pageSize: 100,
+            cursor: first.nextCursor,
+          ),
         ),
       );
-      expect(last.items.single.id.toCanonicalString(), _uuid(201));
+      expect(last.items.single.id.toCanonicalString(), _uuid(301));
       expect(last.nextCursor, isNull);
     },
   );
@@ -525,7 +527,11 @@ void main() {
       [_uuid(201)],
     );
     final result = await repository.getDailyChoiceCatalogPage(
-      DailyChoiceCatalogQuery(pageSize: 2),
+      DailyChoiceCatalogQuery(
+        date: CalendarDate.fromParts(2026, 9, 23),
+        isCompleted: false,
+        pageSize: 2,
+      ),
     );
     expect(
       result,
@@ -586,7 +592,11 @@ void main() {
 
     final catalog = page(
       await repository.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(pageSize: 1),
+        DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 23),
+          isCompleted: false,
+          pageSize: 1,
+        ),
       ),
     );
     expect(
@@ -667,12 +677,13 @@ void main() {
         hasLength(1),
       );
 
-      // Внутренний запрос без даты по-прежнему охватывает все дни.
-      final undated = page(
-        await repository.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
-      ) as DailyChoiceCatalogFirstPage;
-      expect(undated.totalCount, 120 + neighbours.length);
-      expect(undated.items.first.id.toCanonicalString(), _uuid(910));
+      expect(
+        items
+            .map((item) => item.id.toCanonicalString())
+            .toSet()
+            .intersection(neighbours),
+        isEmpty,
+      );
     },
   );
 
@@ -688,10 +699,10 @@ void main() {
     final future = CalendarDate.fromParts(2027, 1, 1);
 
     for (final (date, completion, expected) in [
-      (past, null, [202, 201]),
+      (past, false, [202]),
       (past, true, [201]),
       (future, false, [203]),
-      (CalendarDate.fromParts(2026, 9, 23), null, <int>[]),
+      (CalendarDate.fromParts(2026, 9, 23), false, <int>[]),
     ]) {
       final result = page(
         await repository.getDailyChoiceCatalogPage(
@@ -706,12 +717,10 @@ void main() {
       expect(result.totalCount, expected.length);
       expect(result.nextCursor, isNull);
       expect(result.items.map((item) => item.date), everyElement(date));
-      if (completion != null) {
-        expect(
-          result.items.map((item) => item.isCompleted),
-          everyElement(completion),
-        );
-      }
+      expect(
+        result.items.map((item) => item.isCompleted),
+        everyElement(completion),
+      );
     }
 
     final archivedAction = page(
