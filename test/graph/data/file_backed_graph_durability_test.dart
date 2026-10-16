@@ -1,9 +1,12 @@
+@Tags(['flutter_process'])
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart'
-    hide Intention, LongTermRelation;
+    hide Intention, LongTermRelation, Tags;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';

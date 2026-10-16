@@ -1,9 +1,12 @@
+@Tags(['flutter_process'])
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:drift/drift.dart';
