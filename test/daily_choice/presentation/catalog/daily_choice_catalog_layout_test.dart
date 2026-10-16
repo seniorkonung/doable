@@ -4,6 +4,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +44,104 @@ final _months = [
 ];
 
 void main() {
+  for (final onDate in [false, true]) {
+    final catalog = onDate ? 'каталог на дату' : 'корневой каталог';
+    testWidgets('$catalog: перетягивание, возврат и смена представления '
+        'сдвигают выдачу без сброса прокрутки', (tester) async {
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: _today,
+        catalogDate: onDate ? _today : null,
+        locale: const Locale('ru'),
+        size: _screen,
+      );
+      repository.completeFirst(0, [
+        for (var number = 1; number <= 20; number++)
+          catalogPageItem(number, date: _today),
+      ], total: 20);
+      repository.completeDayStatuses(0, {});
+      await tester.pumpAndSettle();
+      await swipeToNextPeriod(tester);
+      final list = find.byType(CustomScrollView);
+      final scrollable = find.descendant(
+        of: list,
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(scrollable).position;
+      await tester.drag(list, const Offset(0, -350));
+      await tester.pumpAndSettle();
+      final offset = position.pixels;
+      expect(offset, greaterThan(0));
+      final firstVisibleRow = find
+          .byWidgetPredicate(
+            (widget) => switch (widget.key) {
+              ValueKey<String>(:final value) => value.startsWith(
+                'daily-choice-row-',
+              ),
+              _ => false,
+            },
+          )
+          .hitTestable()
+          .first;
+      final row = find.byKey(tester.widget(firstVisibleRow).key!);
+      expect(row.hitTestable(), findsOneWidget);
+      final rowOffset = tester.getTopLeft(row).dy - tester.getTopLeft(list).dy;
+      final calendar = find.byType(DailyChoiceCalendar);
+
+      for (final (distance, expanded) in [
+        (40.0, false),
+        (200.0, true),
+        (-200.0, false),
+      ]) {
+        final height = tester.getSize(calendar).height;
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(CalendarHandle)),
+        );
+        await gesture.moveBy(Offset(0, distance.sign * 20));
+        await gesture.moveBy(
+          Offset(0, distance),
+          timeStamp: const Duration(seconds: 1),
+        );
+        await tester.pump();
+        expect(
+          tester.getSize(calendar).height,
+          distance > 0 ? greaterThan(height) : lessThan(height),
+        );
+        expect(position.pixels, offset);
+        expect(
+          tester.getTopLeft(row).dy - tester.getTopLeft(list).dy,
+          closeTo(rowOffset, 0.01),
+        );
+        expect(repository.queries, hasLength(1));
+        await gesture.up(timeStamp: const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(position.pixels, offset);
+        expect(
+          tester.getTopLeft(row).dy - tester.getTopLeft(list).dy,
+          closeTo(rowOffset, 0.01),
+        );
+        expect(
+          visibleWeeks(tester),
+          weeksFrom(
+            expanded ? date(2026, 9, 28) : date(2026, 10, 5),
+            expanded ? 6 : 1,
+          ),
+        );
+        expect(repository.queries, hasLength(1));
+      }
+
+      final calendarRect = tester.getRect(calendar);
+      await tester.drag(list, const Offset(0, -100));
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(offset));
+      expect(tester.getRect(calendar), calendarRect);
+      expect(repository.queries, hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final (:locale, :full) in _configurations) {
     final language = locale.languageCode;
 

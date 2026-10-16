@@ -20,6 +20,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -116,13 +117,17 @@ const _message = ValueKey('graph-operation-message');
 void main() {
   for (final fromMonths in [false, true]) {
     final level = fromMonths ? 'месяцев' : 'лет';
-    testWidgets('открытая страница $level сохраняется вместе с каталогом '
-        'при смене пункта, повторном выборе и возврате из подробностей', (
-      tester,
-    ) async {
+    testWidgets('после возврата ручки открытая страница $level сохраняется '
+        'вместе с каталогом при смене пункта, повторном выборе и возврате '
+        'из подробностей', (tester) async {
       final app = await _start(tester);
       await _prepareDailyChoiceCatalog(tester, app);
       final before = _dailyChoiceCatalogView(tester, app);
+      for (final distance in [-400.0, 400.0]) {
+        await tester.drag(find.byType(CalendarHandle), Offset(0, distance));
+        await tester.pumpAndSettle();
+      }
+      expect(_dailyChoiceCatalogView(tester, app), before);
       await _tap(
         tester,
         find.bySemanticsLabel(app.l10n.dailyChoiceCalendarChooseYearAndMonth),
@@ -138,6 +143,7 @@ void main() {
           find.bySemanticsLabel(app.l10n.dailyChoiceCalendarNextYear),
         );
       }
+      await tester.pumpAndSettle();
       final title = fromMonths ? '2036' : '2032–2043';
       final position = _dailyChoicePosition(tester).pixels;
 
@@ -149,6 +155,25 @@ void main() {
         expect(_dailyChoiceIds(app), before['загруженные записи']);
         expect(app.repository.dailyChoiceCatalogReads, before['чтения выдачи']);
       }
+
+      final height = tester.getSize(dailyChoiceCatalogDateControl).height;
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await gesture.moveBy(const Offset(0, -20));
+      await gesture.moveBy(
+        const Offset(0, -40),
+        timeStamp: const Duration(seconds: 1),
+      );
+      await tester.pump();
+      expect(
+        tester.getSize(dailyChoiceCatalogDateControl).height,
+        lessThan(height),
+      );
+      expect(_dailyChoicePosition(tester).pixels, position);
+      await gesture.up(timeStamp: const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expectPreserved();
 
       await _select(tester, AppDestination.home);
       await _select(tester, AppDestination.dailyChoices);
@@ -628,16 +653,21 @@ void main() {
         for (final (locale, labels) in _catalogLabels.entries.map(
           (entry) => (entry.key, entry.value),
         )) {
-          for (final label in labels) {
-            expect(
-              find.descendant(
-                of: page,
-                matching: find.text(label, skipOffstage: false),
-                skipOffstage: false,
-              ),
-              locale == resolved ? findsOneWidget : findsNothing,
-              reason: '$reason: «$label»',
-            );
+          for (final (scope, texts, skipOffstage) in [
+            (dailyChoiceCatalogDateControl, labels.calendar, true),
+            (find.byType(CustomScrollView), labels.content, false),
+          ]) {
+            for (final label in texts) {
+              expect(
+                find.descendant(
+                  of: scope,
+                  matching: find.text(label, skipOffstage: skipOffstage),
+                  skipOffstage: skipOffstage,
+                ),
+                locale == resolved ? findsOneWidget : findsNothing,
+                reason: '$reason: «$label»',
+              );
+            }
           }
         }
         for (final (locale, commands) in _calendarCommands.entries.map(
@@ -1140,24 +1170,24 @@ Map<String, Object?> _languageIndependent(Map<String, Object?> view) =>
 /// языке: выбранный день, месяц и дни недели календаря, название фильтра
 /// выполнения и количество.
 final _catalogLabels = {
-  Locale('ru'): [
-    'Пятница',
-    '25 сентября 2026',
-    'Август 2026',
-    'Пн',
-    'Вс',
-    'Выполнение',
-    'Всего дневных выборов: 120',
-  ],
-  Locale('en'): [
-    'Friday',
-    '25 September 2026',
-    'August 2026',
-    'Mon',
-    'Sun',
-    'Completion',
-    'Total daily choices: 120',
-  ],
+  Locale('ru'): (
+    calendar: ['Август 2026', 'Пн', 'Вс'],
+    content: [
+      'Пятница',
+      '25 сентября 2026',
+      'Выполнение',
+      'Всего дневных выборов: 120',
+    ],
+  ),
+  Locale('en'): (
+    calendar: ['August 2026', 'Mon', 'Sun'],
+    content: [
+      'Friday',
+      '25 September 2026',
+      'Completion',
+      'Total daily choices: 120',
+    ],
+  ),
 };
 
 /// Названия команд раскрытого календаря на каждом языке.

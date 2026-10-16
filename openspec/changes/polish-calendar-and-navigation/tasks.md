@@ -170,7 +170,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_period_picker.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_transitions_test.dart`; `test/daily_choice/presentation/catalog/daily_choice_calendar_page_storage_test.dart` — только для недостающей проверки изоляции.
   - **Оценка объёма:** M.
 
-- [ ] 3.5 Подтвердить сохранение выдачи и состояния обоих каталогов при управляемом раскрытии
+- [x] 3.5 Подтвердить сохранение выдачи и состояния обоих каталогов при управляемом раскрытии
   - **Критерии приёмки:**
     - В корневом каталоге и каталоге на заданную дату перетягивание, возврат и завершённая смена представления сохраняют выбранную дату, дату просмотра, фильтр выполнения и строки выдачи без нового получения каталога. Сдвиг содержимого вслед за календарём не сбрасывает прокрутку выдачи; жест на выдаче продолжает её прокручивать.
     - По [ADR-0017](../../../docs/adr/0017-isolate-inline-calendar-behind-app-component.md) и [ADR-0025](../../../docs/adr/0025-load-calendar-day-marks-in-separate-viewport-model.md) промежуточная степень раскрытия не выходит в страницу и модель отметок. Подготовленные представления используют переданные отметки; только подтверждённый просмотр проходит существующей точкой обновления модели отметок. Полученный отказ отметок не прерывает управление календарём.

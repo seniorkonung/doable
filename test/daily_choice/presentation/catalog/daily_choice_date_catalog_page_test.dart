@@ -10,6 +10,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:flutter/material.dart';
@@ -24,8 +25,8 @@ import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
   testWidgets(
-    'пролистанные годы и месяцы независимы у двух каталогов одной даты '
-    'и корневого; новый экземпляр начинает с недели',
+    'после возврата ручки пролистанные годы и месяцы независимы '
+    'у двух каталогов одной даты и корневого; новый экземпляр начинает с недели',
     (tester) async {
       final repository = CatalogPageRepository();
       final today = date(2026, 10, 12);
@@ -39,7 +40,8 @@ void main() {
       repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 1);
       repository.completeDayStatuses(0, {});
       await tester.pumpAndSettle();
-      await _calendarCommand(tester, 'Развернуть календарь');
+      await tester.drag(find.byType(CalendarHandle), const Offset(0, 500));
+      await tester.pumpAndSettle();
       await _calendarCommand(tester, 'Выбрать год и месяц');
       await tester.tap(find.text('2028'));
       await tester.pumpAndSettle();
@@ -51,10 +53,13 @@ void main() {
       ], total: 1);
       repository.completeDayStatuses(1, {});
       await tester.pumpAndSettle();
-      await _calendarCommand(tester, 'Развернуть календарь');
+      await tester.drag(find.byType(CalendarHandle), const Offset(0, 500));
+      await tester.pumpAndSettle();
       await _calendarCommand(tester, 'Выбрать год и месяц');
       await tester.drag(find.text('2025'), const Offset(-600, 0));
       await tester.pumpAndSettle();
+      expect(find.text('2032–2043'), findsOneWidget);
+      await _returnHandle(tester);
       expect(find.text('2032–2043'), findsOneWidget);
 
       await _pushDate(tester, router, selected);
@@ -64,12 +69,15 @@ void main() {
       repository.completeDayStatuses(2, {});
       await tester.pumpAndSettle();
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-      await _calendarCommand(tester, 'Развернуть календарь');
+      await tester.drag(find.byType(CalendarHandle), const Offset(0, 500));
+      await tester.pumpAndSettle();
       await _calendarCommand(tester, 'Выбрать год и месяц');
       expect(find.text('2020–2031'), findsOneWidget);
       await tester.tap(find.text('2029'));
       await tester.pumpAndSettle();
       await _calendarCommand(tester, 'Следующий год');
+      expect(find.text('2030'), findsOneWidget);
+      await _returnHandle(tester);
       expect(find.text('2030'), findsOneWidget);
       expect(find.text('7 октября 2026'), findsOneWidget);
       final row = find.byKey(const ValueKey('daily-choice-row-1'));
@@ -215,8 +223,9 @@ void main() {
     });
   }
 
-  testWidgets('два открытия одной даты разделяют фильтр, просмотр, отметки '
-      'и порции; возврат из подробностей сохраняет прокрутку', (tester) async {
+  testWidgets('после раскрытия жестом два открытия одной даты разделяют '
+      'фильтр, просмотр, отметки и порции; возврат из подробностей сохраняет '
+      'прокрутку', (tester) async {
     final repository = CatalogPageRepository();
     final selected = date(2026, 10, 7);
     final router = await _start(
@@ -240,7 +249,7 @@ void main() {
       cursor: const CatalogPageCursor(),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
+    await tester.drag(find.byType(CalendarHandle), const Offset(0, 500));
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('Следующий месяц'));
     await tester.pumpAndSettle();
@@ -381,6 +390,20 @@ final _verticalScroll = find.byWidgetPredicate(
 
 Future<void> _calendarCommand(WidgetTester tester, String label) async {
   await tester.tap(find.bySemanticsLabel(label));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _returnHandle(WidgetTester tester) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(find.byType(CalendarHandle)),
+  );
+  await gesture.moveBy(const Offset(0, -20));
+  await gesture.moveBy(
+    const Offset(0, -40),
+    timeStamp: const Duration(seconds: 1),
+  );
+  await tester.pump();
+  await gesture.up(timeStamp: const Duration(seconds: 2));
   await tester.pumpAndSettle();
 }
 
