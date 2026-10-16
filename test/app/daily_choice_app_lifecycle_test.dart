@@ -413,10 +413,6 @@ void main() {
       );
       await _tap(
         tester,
-        find.byKey(const ValueKey('daily-choice-edit-completed')),
-      );
-      await _tap(
-        tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
       );
       await _until(tester, () => gate.hasEntered);

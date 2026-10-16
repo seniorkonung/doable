@@ -167,14 +167,6 @@ final class _DailyChoiceEditPageState
               ),
               onChanged: model.changeDescription,
             ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              key: const ValueKey('daily-choice-edit-completed'),
-              title: Text(l10n.dailyChoiceCreationCompleted),
-              subtitle: Text(l10n.dailyChoiceCreationCompletedHint),
-              value: state.isCompleted,
-              onChanged: isSubmitting ? null : model.changeCompletion,
-            ),
             if (failureMessage != null) ...[
               const SizedBox(height: 12),
               OperationFailurePresentation(

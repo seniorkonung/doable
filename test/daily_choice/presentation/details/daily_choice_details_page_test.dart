@@ -179,13 +179,6 @@ void main() {
       );
       await _revealEditor(
         tester,
-        find.byKey(const ValueKey('daily-choice-edit-completed')),
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-edit-completed')),
-      );
-      await _revealEditor(
-        tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
       );
       expect(
@@ -206,10 +199,7 @@ void main() {
         CalendarDate.fromParts(1, 1, 1),
       );
       expect(command.patch.description, isA<DailyChoiceDescriptionCleared>());
-      expect(
-        (command.patch.isCompleted as DailyChoiceFieldSet<bool>).value,
-        isFalse,
-      );
+      expect(command.patch.isCompleted, isA<DailyChoiceFieldUnchanged<bool>>());
       repository.succeedUpdate();
       await tester.pumpAndSettle();
       expect(router.current.name, DailyChoiceDetailsRoute.name);

@@ -43,9 +43,10 @@ void main() {
 
   tearDown(() => database.close());
 
-  testWidgets('сохранённые 18:00/P2 редактируются в обеих локалях', (
-    tester,
-  ) async {
+  testWidgets('редактор без выполнения сохраняет поля в ru/en', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final updates = _PendingUpdates();
     final semantics = tester.ensureSemantics();
     final locale = ValueNotifier(const Locale('ru'));
@@ -69,11 +70,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Время: 18:00'), findsOneWidget);
     expect(find.text('Приоритет P2'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('daily-choice-edit-completed')),
+      findsNothing,
+    );
+    expect(find.text('Уже выполнено'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Уже выполнено')), findsNothing);
     await _tap(tester, find.text('Весь день'));
     locale.value = const Locale('en');
     await tester.pumpAndSettle();
     expect(find.text('All day'), findsOneWidget);
     expect(find.text('Priority P2'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('daily-choice-edit-completed')),
+      findsNothing,
+    );
+    expect(find.text('Already completed'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Already completed')), findsNothing);
     await _tap(tester, find.text('Priority P1'));
     await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-submit')));
     await _tap(tester, find.text('Priority P3'), delta: -150);
