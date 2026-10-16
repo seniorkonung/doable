@@ -87,7 +87,8 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
     await database.customInsert(
       '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
-          description, is_completed) VALUES (?, ?, ?, ?, ?, 1)''',
+          description, is_completed, scheduled_minute, priority)
+         VALUES (?, ?, ?, ?, ?, 1, 1080, 2)''',
       variables: [
         Variable.withString(_uuid(id)),
         Variable.withString(_uuid(source)),
@@ -472,6 +473,8 @@ void main() {
         expect(after.choice.date, _replacedChoiceDate);
         expect(after.choice.description?.value, 'Прежнее описание');
         expect(after.choice.isCompleted, isTrue);
+        expect(find.text('Время: 18:00'), findsOneWidget);
+        expect(find.text('Приоритет P2'), findsOneWidget);
         expect(after.choice.sourceIntentionId.toCanonicalString(), _uuid(4));
         expect(after.choice.selectedIntentionId.toCanonicalString(), _uuid(5));
         expect(after.path.map((step) => step.relation.id.toCanonicalString()), [

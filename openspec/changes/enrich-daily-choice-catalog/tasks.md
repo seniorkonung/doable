@@ -119,7 +119,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart` (новый).
   - **Estimated scope:** M.
 
-- [ ] 1.12 Показывать сохранённые время и приоритет в подробностях дневного выбора
+- [x] 1.12 Показывать сохранённые время и приоритет в подробностях дневного выбора
   - **Acceptance criteria:**
     - Подробности показывают конкретное время либо весь день и приоритет из подтверждённой модели, включая значения существующего выбора после миграции.
     - После создания, правки и замены пути значения соответствуют сохранённым данным; полное описание и путь остаются доступны. Новые подписи локализованы и читаются вспомогательными технологиями.

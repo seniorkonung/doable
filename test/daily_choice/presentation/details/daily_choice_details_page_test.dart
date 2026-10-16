@@ -13,6 +13,8 @@ import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -46,6 +48,53 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  for (final (locale, allDay, time, priority) in [
+    (const Locale('ru'), 'Весь день', 'Время: 18:00', 'Приоритет'),
+    (const Locale('en'), 'All day', 'Time: 6:00 PM', 'Priority'),
+  ]) {
+    testWidgets(
+      'сохранённые время и приоритет доступны и обновляются в локали $locale',
+      (tester) async {
+        final repository = _Repository();
+        addTearDown(repository.dispose);
+        final semantics = tester.ensureSemantics();
+        await _pumpApp(tester, repository, locale);
+        repository.emit(_details());
+        await tester.pumpAndSettle();
+
+        expect(find.text(allDay), findsOneWidget);
+        expect(find.text('$priority P4'), findsOneWidget);
+        expect(tester.getSemantics(find.text(allDay)).label, contains(allDay));
+        expect(
+          tester.getSemantics(find.text('$priority P4')).label,
+          contains('$priority P4'),
+        );
+
+        repository.emit(
+          _details(
+            schedule: DailyChoiceTime(hour: 18, minute: 0),
+            priority: DailyChoicePriority.p2,
+            relationPriority: RelationPriority.p1,
+          ),
+          revision: 2,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(time), findsOneWidget);
+        expect(find.text('$priority P2'), findsOneWidget);
+        expect(tester.getSemantics(find.text(time)).label, contains(time));
+        expect(
+          tester.getSemantics(find.text('$priority P2')).label,
+          contains('$priority P2'),
+        );
+        expect(find.text(allDay), findsNothing);
+        expect(find.text('$priority P4'), findsNothing);
+        expect(find.text('Пояснение'), findsOneWidget);
+        semantics.dispose();
+      },
+    );
+  }
 
   testWidgets(
     'панель дневного выбора доступна при загрузке, чтении, отсутствии '
@@ -700,6 +749,8 @@ DailyChoiceDetails _details({
   RelationPriority relationPriority = RelationPriority.p2,
   bool isCompleted = true,
   String choiceDescription = 'Пояснение',
+  DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+  DailyChoicePriority priority = DailyChoicePriority.p4,
 }) {
   final source = _intention(1, 'Основа', archived: true);
   final middle = _intention(2, middleTitle);
@@ -709,6 +760,8 @@ DailyChoiceDetails _details({
     sourceIntentionId: source.id,
     selectedIntentionId: selected.id,
     date: CalendarDate.fromParts(2026, 9, 24),
+    schedule: schedule,
+    priority: priority,
     description: DailyChoiceDescription.fromInput(choiceDescription),
     isCompleted: isCompleted,
   );
