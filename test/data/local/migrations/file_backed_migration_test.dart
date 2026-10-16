@@ -5,16 +5,29 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderContainer;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/doable_schema_verifier.dart';
+import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/local_database_harness.dart';
 import '../../../support/tag_storage_fixture.dart';
 
@@ -39,6 +52,157 @@ const _workerStartedMarker = 'DOABLE_MIGRATION_WORKER_STARTED';
 const _workerReadyMarker = 'DOABLE_MIGRATION_WORKER_READY';
 
 void main() {
+  test('каталог после перехода 1 → 2 меняет выполнение в обе стороны '
+      'и сохраняет данные после повторного открытия файла', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    _createStoredSchema1(harness.databaseFile);
+    final stored = sqlite.sqlite3.open(harness.databaseFile.path);
+    try {
+      configureDoableSqliteConnection(stored);
+      stored.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_finalRelationId],
+      );
+      stored.execute(
+        'UPDATE intentions SET is_archived = 1, is_action_ready = 0 WHERE id = ?',
+        [_selectedIntentionId],
+      );
+    } finally {
+      stored.close();
+    }
+    final beforeGraph = _graphRows(harness.databaseFile);
+    final expectedChoices = [
+      for (final row in beforeGraph['daily_choices']!)
+        {...row, 'scheduled_minute': null, 'priority': 4},
+    ];
+
+    void expectSections(DailyChoiceCatalogLoaded catalog) {
+      for (final completed in [false, true]) {
+        final expectedSection = expectedChoices.where(
+          (row) =>
+              row['choice_date'] ==
+                  catalog.selection.date.toCanonicalString() &&
+              (row['is_completed'] == 1) == completed,
+        );
+        expect(
+          catalog
+              .section(completed)
+              .items
+              .map((item) => item.id.toCanonicalString()),
+          expectedSection.map((row) => row['id']),
+        );
+        expect(catalog.section(completed).totalCount, expectedSection.length);
+      }
+    }
+
+    for (final reopened in [false, true]) {
+      final database = await harness.openReadyDatabase();
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 10, 16),
+        InMemoryDiagnosticsSink(),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWith((ref) => repository),
+        ],
+      );
+      final provider = dailyChoiceCatalogViewModelProvider(
+        DailyChoiceCatalogInstance(
+          initialDate: CalendarDate.fromParts(2026, 9, 25),
+        ),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      final model = container.read(provider.notifier);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+
+      Future<DailyChoiceCatalogLoaded> settledCatalog() async {
+        final settled = Completer<DailyChoiceCatalogLoaded>();
+        final listener = container.listen(provider, (_, state) {
+          if (!settled.isCompleted &&
+              state is DailyChoiceCatalogLoaded &&
+              state.freshness == DailyChoiceCatalogFreshness.current &&
+              state.completionOperations.isEmpty) {
+            settled.complete(state);
+          }
+        }, fireImmediately: true);
+        try {
+          return await settled.future.timeout(const Duration(seconds: 5));
+        } finally {
+          listener.close();
+        }
+      }
+
+      try {
+        for (final row in expectedChoices) {
+          final id = (DailyChoiceId.decode(
+            row['id']! as String,
+          ) as DailyChoiceIdDecodingSuccess).id;
+          final date = CalendarDate.parseCanonical(
+            row['choice_date']! as String,
+          );
+          final wasCompleted = row['is_completed'] == 1;
+          model.selectDate(date);
+          final catalog = await settledCatalog();
+          expectSections(catalog);
+          final item = catalog
+              .section(wasCompleted)
+              .items
+              .singleWhere((item) => item.id == id);
+          expect(item.date, date);
+          expect(item.description?.value, row['description']);
+          expect(
+            item.source.id.toCanonicalString(),
+            row['source_intention_id'],
+          );
+          expect(
+            item.selected.id.toCanonicalString(),
+            row['selected_intention_id'],
+          );
+          expect(item.schedule, const DailyChoiceAllDay());
+          expect(item.priority, DailyChoicePriority.p4);
+          expect(item.isCompleted, wasCompleted);
+          expect(
+            item.pathIntentionCount,
+            beforeGraph['daily_choice_path_steps']!
+                    .where((step) => step['daily_choice_id'] == row['id'])
+                    .length +
+                1,
+          );
+
+          if (!reopened &&
+              (row['id'] == _dailyChoiceId || row['id'] == _pendingChoiceId)) {
+            model.changeCompletion(id, !wasCompleted);
+            final changed = await settledCatalog();
+            row['is_completed'] = wasCompleted ? 0 : 1;
+            expectSections(changed);
+            expect(
+              changed
+                  .section(!wasCompleted)
+                  .items
+                  .singleWhere((item) => item.id == id)
+                  .isCompleted,
+              !wasCompleted,
+            );
+          }
+        }
+      } finally {
+        await coordinator.shutdown();
+        subscription.close();
+        container.dispose();
+        await harness.closePersistenceObjectGraph();
+      }
+      expect(_graphRows(harness.databaseFile), {
+        ...beforeGraph,
+        'daily_choices': expectedChoices,
+      });
+    }
+  });
+
   test('переход 1 → 2 на файловой базе сохраняет граф и последовательности, '
       'назначает весь день/P4 и совпадает с новой установкой', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
