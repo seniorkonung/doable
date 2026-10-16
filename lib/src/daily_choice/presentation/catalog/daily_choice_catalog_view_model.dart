@@ -170,7 +170,8 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     }
   }
 
-  /// После конфликта новая пара разрешает только новое явное подтверждение.
+  /// После отказа без явного повтора актуальная пара разрешает только новое
+  /// явное подтверждение; отклонённое изменение не отправляется повторно.
   Future<void> refreshCompletion(DailyChoiceId id) async {
     final current = state;
     final operation = current.completionOperations[id];

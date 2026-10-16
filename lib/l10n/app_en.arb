@@ -2145,7 +2145,7 @@
   "dailyChoiceCompletionSynchronizing": "Completion saved. Refreshing the catalog…",
   "@dailyChoiceCompletionSynchronizing": {"description": "Запись подтверждена, флажок ожидает согласованного снимка секций"},
   "dailyChoiceCompletionRefresh": "Refresh choice",
-  "@dailyChoiceCompletionRefresh": {"description": "Актуализация карточки после конфликта перед новым подтверждением выполнения"},
+  "@dailyChoiceCompletionRefresh": {"description": "Актуализация карточки после отказа без явного повтора перед новым подтверждением выполнения"},
   "dailyChoiceCatalogRowLabel": "Choice #{number}. {phrase}. {date}. {completion}",
   "@dailyChoiceCatalogRowLabel": {"description": "Доступная подпись строки с порядковым номером текущей выдачи", "placeholders": {"number": {"type": "int"}, "phrase": {"type": "String"}, "date": {"type": "String"}, "completion": {"type": "String"}}},
   "dailyChoiceDetailsTitle": "Daily choice",

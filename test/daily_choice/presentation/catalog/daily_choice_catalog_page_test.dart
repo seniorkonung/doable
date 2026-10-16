@@ -211,6 +211,58 @@ void main() {
       expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
       expect(repository.completionCommands, hasLength(2));
     });
+
+    testWidgets('актуализация после неизвестного отказа возвращает флажок '
+        'корневого каталога без повтора отклонённого изменения '
+        '(${locale.languageCode})', (tester) async {
+      final repository = CatalogPageRepository();
+      final day = date(2026, 10, 4);
+      final item = catalogPageItem(1, date: day);
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: locale,
+        size: const Size(390, 1000),
+      );
+      repository.completeFirst(0, [item], total: 1);
+      await tester.pumpAndSettle();
+      final l10n = lookupAppLocalizations(locale);
+      final checkbox = find.byType(Checkbox);
+      await tester.tap(checkbox);
+      await tester.pump();
+      repository.failCompletion(0, const DailyChoiceUnexpectedFailure());
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceOperationUnexpected), findsOneWidget);
+      expect(find.text(l10n.commonRetry), findsNothing);
+      expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+
+      await tester.tap(
+        find.widgetWithText(
+          TextButton,
+          locale.languageCode == 'ru' ? 'Обновить выбор' : 'Refresh choice',
+        ),
+      );
+      await tester.pump();
+      expect(repository.completionCommands, hasLength(1));
+      repository.completeFirst(1, [item], total: 1);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceOperationUnexpected), findsNothing);
+      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+      expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
+
+      await tester.tap(checkbox);
+      await tester.pump();
+      expect(repository.completionCommands, hasLength(2));
+      expect(
+        repository.completionCommands.last.patch.isCompleted,
+        isA<DailyChoiceFieldSet<bool>>().having(
+          (patch) => patch.value,
+          'выполнение',
+          true,
+        ),
+      );
+    });
   }
 
   testWidgets('корневой каталог оставляет над календарём только безопасный '

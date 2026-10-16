@@ -138,7 +138,10 @@ void _completionScenarios() {
         expect(failed.inline?.session, same(session));
         expect(failed.inline?.claim, isNotNull);
         expect(failed.canRetry, failure is DailyChoiceUnavailableFailure);
-        expect(failed.requiresRefresh, failure is DailyChoiceConflictFailure);
+        expect(
+          failed.requiresRefresh,
+          failure is! DailyChoiceUnavailableFailure,
+        );
         expect(_loaded(h).incomplete.items.single.isCompleted, isFalse);
         expect(_loaded(h).completed.items, isEmpty);
         expect(h.repository.queries, hasLength(2));
@@ -160,8 +163,6 @@ void _completionScenarios() {
           expect(h.state.completionOperations, isEmpty);
         } else {
           expect(h.repository.commands, hasLength(1));
-        }
-        if (failure is DailyChoiceConflictFailure) {
           final failedRefresh = h.model.refreshCompletion(_choiceId(1));
           h.repository.fail(2, const DailyChoiceCatalogUnavailableFailure());
           await failedRefresh;

@@ -4143,7 +4143,7 @@ abstract class AppLocalizations {
   /// **'Completion saved. Refreshing the catalog…'**
   String get dailyChoiceCompletionSynchronizing;
 
-  /// Актуализация карточки после конфликта перед новым подтверждением выполнения
+  /// Актуализация карточки после отказа без явного повтора перед новым подтверждением выполнения
   ///
   /// In en, this message translates to:
   /// **'Refresh choice'**

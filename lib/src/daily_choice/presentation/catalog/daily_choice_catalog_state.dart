@@ -123,7 +123,9 @@ final class DailyChoiceCompletionFailed extends DailyChoiceCompletionOperation {
   /// Сообщение у карточки; без него отказ предъявляет общая поверхность.
   final DailyChoiceCompletionInlineFailure? inline;
   bool get canRetry => failure is DailyChoiceUnavailableFailure;
-  bool get requiresRefresh => failure is DailyChoiceConflictFailure;
+
+  /// Без явного повтора флажок возвращает только актуальная пара.
+  bool get requiresRefresh => !canRetry;
 }
 
 /// Отказ, который карточка предъявляет только в получившей его сессии.
