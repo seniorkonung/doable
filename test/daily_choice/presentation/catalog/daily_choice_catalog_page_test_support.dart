@@ -46,10 +46,10 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 /// неподдерживаемый язык даёт английский. [size] — логический размер экрана;
 /// [today] — локальное сегодня.
 /// [catalogDate] открывает отдельный каталог на дату вместо корневого.
-/// Чтения каталога завершает сценарий через [repository].
+/// Чтения каталога предоставляет [repository].
 Future<void> pumpCatalogPage(
   WidgetTester tester,
-  CatalogPageRepository repository, {
+  PersonalGraphRepository repository, {
   required CalendarDate today,
   required Locale locale,
   required Size size,
