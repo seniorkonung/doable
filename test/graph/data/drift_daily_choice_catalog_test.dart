@@ -236,23 +236,29 @@ void main() {
   });
 
   test('проверяет путь только выбранной порции, а повреждение следующей находит при продолжении', () async {
-    addChoice(201);
-    addChoice(202, longPath: true);
+    final day = CalendarDate.fromParts(2026, 9, 23);
+    addChoice(201, longPath: true);
+    addChoice(202);
     raw.execute(
       'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [_uuid(201)],
+      [_uuid(202)],
     );
     final first = page(
       await repository.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(pageSize: 1),
+        DailyChoiceCatalogQuery(date: day, isCompleted: false, pageSize: 1),
       ),
     );
-    expect(first.items.single.id.toCanonicalString(), _uuid(202));
+    expect(first.items.single.id.toCanonicalString(), _uuid(201));
     expect((first as DailyChoiceCatalogFirstPage).totalCount, 2);
 
     expect(
       await repository.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(pageSize: 1, cursor: first.nextCursor),
+        DailyChoiceCatalogQuery(
+          date: day,
+          isCompleted: false,
+          pageSize: 1,
+          cursor: first.nextCursor,
+        ),
       ),
       isA<DailyChoiceCatalogPageError>().having(
         (result) => result.failure.category,

@@ -167,7 +167,7 @@
   - **Files likely touched:** `lib/src/daily_choice/application/daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `test/daily_choice/application/daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_diagnostics_test.dart`; механическое дополнение построителей первой порции достоверным `hasTimedChoices`.
   - **Estimated scope:** M.
 
-- [ ] 2.3 Подтвердить ограниченность чтения расширенных секций до подключения новой модели каталога
+- [x] 2.3 Подтвердить ограниченность чтения расширенных секций до подключения новой модели каталога
   - **Acceptance criteria:**
     - Трассировка существующих проверок стоимости доказывает, что две начальные порции материализуют только выбранные записи и структуру их путей; полные промежуточные намерения и незагруженный остаток дня ради сводки не читаются.
     - Продолжение читает только запрошенную секцию, а количество и наличие конкретного времени определяются агрегатом SQLite. Повреждение пути в незагруженном остатке обнаруживается при чтении соответствующей порции, не превращаясь в ложный пустой результат.
