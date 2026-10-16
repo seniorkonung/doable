@@ -1,17 +1,33 @@
+@Tags(['flutter_process'])
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderContainer;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/doable_schema_verifier.dart';
+import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/local_database_harness.dart';
 import '../../../support/tag_storage_fixture.dart';
 
@@ -24,96 +40,291 @@ const _pathStepId = '018f0b5d-6b2e-7c80-8000-000000000317';
 const _middleIntentionId = '018f0b5d-6b2e-7c80-8000-000000000318';
 const _finalRelationId = '018f0b5d-6b2e-7c80-8000-000000000319';
 const _finalPathStepId = '018f0b5d-6b2e-7c80-8000-000000000320';
+const _pendingChoiceId = '018f0b5d-6b2e-7c80-8000-000000000321';
+const _pendingPathStepId = '018f0b5d-6b2e-7c80-8000-000000000322';
+const _deletedChoiceId = '018f0b5d-6b2e-7c80-8000-000000000323';
+const _deletedPathStepId = '018f0b5d-6b2e-7c80-8000-000000000324';
+const _newChoiceId = '018f0b5d-6b2e-7c80-8000-000000000325';
+const _newPathStepId = '018f0b5d-6b2e-7c80-8000-000000000326';
 const _workerStopPointEnvironment = 'DOABLE_MIGRATION_STOP_POINT';
 const _workerDatabasePathEnvironment = 'DOABLE_MIGRATION_DATABASE_PATH';
 const _workerStartedMarker = 'DOABLE_MIGRATION_WORKER_STARTED';
 const _workerReadyMarker = 'DOABLE_MIGRATION_WORKER_READY';
 
 void main() {
-  test(
-    'текущая схема на файловой базе совпадает с новой установкой и сохраняет '
-    'граф, назначения и счётчик после повторного открытия',
-    () async {
-      final fresh = await LocalDatabaseHarness.fileBacked();
-      addTearDown(fresh.dispose);
-      final freshDatabase = await fresh.openReadyDatabase();
-      await verifyDoableDatabaseSchema(freshDatabase);
-      await fresh.closePersistenceObjectGraph();
-      _expectCurrentSchemaContract(fresh.databaseFile);
-      final freshSchema = _schemaContract(fresh.databaseFile);
-
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      late sqlite.Database raw;
-      await harness.openReadyDatabase(setup: (database) => raw = database);
-      _seedStoredGraph(raw);
-      seedTagStorageFixture(raw);
-      // Последнее назначение удалено: следующий номер должен продолжить счётчик
-      // последовательности, а не максимум сохранённых строк.
-      raw.execute('DELETE FROM tag_assignments WHERE creation_sequence = 3');
-      await harness.closePersistenceObjectGraph();
-      final beforeGraph = _graphRows(harness.databaseFile);
-      final beforeAssignments = _assignmentRows(harness.databaseFile);
-      expect(beforeAssignments.rows, hasLength(2));
-      expect(beforeAssignments.sequence, 3);
-
-      final reopened = await harness.openReadyDatabase();
-      await verifyDoableDatabaseSchema(reopened);
-      await verifyIntentionTitlesFtsIntegrity(reopened);
-      expect(
-        await reopened.customSelect('PRAGMA foreign_key_check').get(),
-        isEmpty,
+  test('каталог после перехода 1 → 2 меняет выполнение в обе стороны '
+      'и сохраняет данные после повторного открытия файла', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    _createStoredSchema1(harness.databaseFile);
+    final stored = sqlite.sqlite3.open(harness.databaseFile.path);
+    try {
+      configureDoableSqliteConnection(stored);
+      stored.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_finalRelationId],
       );
-      expect(
-        (await reopened.customSelect('PRAGMA foreign_keys').getSingle())
-            .read<int>('foreign_keys'),
-        1,
+      stored.execute(
+        'UPDATE intentions SET is_archived = 1, is_action_ready = 0 WHERE id = ?',
+        [_selectedIntentionId],
       );
-      await harness.closePersistenceObjectGraph();
+    } finally {
+      stored.close();
+    }
+    final beforeGraph = _graphRows(harness.databaseFile);
+    final expectedChoices = [
+      for (final row in beforeGraph['daily_choices']!)
+        {...row, 'scheduled_minute': null, 'priority': 4},
+    ];
 
-      expect(_schemaContract(harness.databaseFile), freshSchema);
-      expect(_graphRows(harness.databaseFile), beforeGraph);
-      final afterAssignments = _assignmentRows(harness.databaseFile);
-      expect(afterAssignments.rows, beforeAssignments.rows);
-      expect(afterAssignments.sequence, beforeAssignments.sequence);
-      _expectStoredIntentionsSearchable(harness.databaseFile);
-
-      final database = sqlite.sqlite3.open(harness.databaseFile.path);
-      try {
-        composeDoableSqliteConnectionSetup(null)(database);
-        expect(
-          database.select('PRAGMA user_version').single['user_version'],
-          AppDatabase.currentSchemaVersion,
+    void expectSections(DailyChoiceCatalogLoaded catalog) {
+      for (final completed in [false, true]) {
+        final expectedSection = expectedChoices.where(
+          (row) =>
+              row['choice_date'] ==
+                  catalog.selection.date.toCanonicalString() &&
+              (row['is_completed'] == 1) == completed,
         );
         expect(
-          database.select('''
+          catalog
+              .section(completed)
+              .items
+              .map((item) => item.id.toCanonicalString()),
+          expectedSection.map((row) => row['id']),
+        );
+        expect(catalog.section(completed).totalCount, expectedSection.length);
+      }
+    }
+
+    for (final reopened in [false, true]) {
+      final database = await harness.openReadyDatabase();
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 10, 16),
+        InMemoryDiagnosticsSink(),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWith((ref) => repository),
+        ],
+      );
+      final provider = dailyChoiceCatalogViewModelProvider(
+        DailyChoiceCatalogInstance(
+          initialDate: CalendarDate.fromParts(2026, 9, 25),
+        ),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      final model = container.read(provider.notifier);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+
+      Future<DailyChoiceCatalogLoaded> settledCatalog() async {
+        final settled = Completer<DailyChoiceCatalogLoaded>();
+        final listener = container.listen(provider, (_, state) {
+          if (!settled.isCompleted &&
+              state is DailyChoiceCatalogLoaded &&
+              state.freshness == DailyChoiceCatalogFreshness.current &&
+              state.completionOperations.isEmpty) {
+            settled.complete(state);
+          }
+        }, fireImmediately: true);
+        try {
+          return await settled.future.timeout(const Duration(seconds: 5));
+        } finally {
+          listener.close();
+        }
+      }
+
+      try {
+        for (final row in expectedChoices) {
+          final id = (DailyChoiceId.decode(
+            row['id']! as String,
+          ) as DailyChoiceIdDecodingSuccess).id;
+          final date = CalendarDate.parseCanonical(
+            row['choice_date']! as String,
+          );
+          final wasCompleted = row['is_completed'] == 1;
+          model.selectDate(date);
+          final catalog = await settledCatalog();
+          expectSections(catalog);
+          final item = catalog
+              .section(wasCompleted)
+              .items
+              .singleWhere((item) => item.id == id);
+          expect(item.date, date);
+          expect(item.description?.value, row['description']);
+          expect(
+            item.source.id.toCanonicalString(),
+            row['source_intention_id'],
+          );
+          expect(
+            item.selected.id.toCanonicalString(),
+            row['selected_intention_id'],
+          );
+          expect(item.schedule, const DailyChoiceAllDay());
+          expect(item.priority, DailyChoicePriority.p4);
+          expect(item.isCompleted, wasCompleted);
+          expect(
+            item.pathIntentionCount,
+            beforeGraph['daily_choice_path_steps']!
+                    .where((step) => step['daily_choice_id'] == row['id'])
+                    .length +
+                1,
+          );
+
+          if (!reopened &&
+              (row['id'] == _dailyChoiceId || row['id'] == _pendingChoiceId)) {
+            model.changeCompletion(id, !wasCompleted);
+            final changed = await settledCatalog();
+            row['is_completed'] = wasCompleted ? 0 : 1;
+            expectSections(changed);
+            expect(
+              changed
+                  .section(!wasCompleted)
+                  .items
+                  .singleWhere((item) => item.id == id)
+                  .isCompleted,
+              !wasCompleted,
+            );
+          }
+        }
+      } finally {
+        await coordinator.shutdown();
+        subscription.close();
+        container.dispose();
+        await harness.closePersistenceObjectGraph();
+      }
+      expect(_graphRows(harness.databaseFile), {
+        ...beforeGraph,
+        'daily_choices': expectedChoices,
+      });
+    }
+  });
+
+  test('переход 1 → 2 на файловой базе сохраняет граф и последовательности, '
+      'назначает весь день/P4 и совпадает с новой установкой', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    _createStoredSchema1(harness.databaseFile);
+    final beforeGraph = _graphRows(harness.databaseFile);
+    final beforeAssignments = _assignmentRows(harness.databaseFile);
+    expect(beforeAssignments.rows, hasLength(2));
+    expect(beforeAssignments.sequence, 3);
+
+    await _expectCurrentSchemaSurvivesReopen(harness);
+
+    _expectMigratedGraph(harness.databaseFile, beforeGraph);
+    final afterAssignments = _assignmentRows(harness.databaseFile);
+    expect(afterAssignments.rows, beforeAssignments.rows);
+    expect(afterAssignments.sequence, beforeAssignments.sequence);
+    _expectStoredIntentionsSearchable(harness.databaseFile);
+
+    final database = sqlite.sqlite3.open(harness.databaseFile.path);
+    try {
+      composeDoableSqliteConnectionSetup(null)(database);
+      database.execute('PRAGMA foreign_keys = ON');
+      expect(
+        database.select('PRAGMA user_version').single['user_version'],
+        AppDatabase.currentSchemaVersion,
+      );
+      expect(
+        database.select('''
           SELECT 1 FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
           WHERE a.tag_creation_sequence <> t.creation_sequence
         '''),
-          isEmpty,
-        );
-        database.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [tagFixtureId(lastTagNumber), _activeIntentionId],
-        );
-        expect(
-          database
-              .select(
-                '''
+        isEmpty,
+      );
+      database.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(lastTagNumber), _activeIntentionId],
+      );
+      expect(
+        database
+            .select(
+              '''
           SELECT creation_sequence FROM tag_assignments
           WHERE tag_id = ? AND intention_id = ?
         ''',
-                [tagFixtureId(lastTagNumber), _activeIntentionId],
-              )
-              .single['creation_sequence'],
-          4,
-        );
-        expect(database.select('PRAGMA foreign_key_check'), isEmpty);
-      } finally {
-        database.close();
-      }
-    },
-  );
+              [tagFixtureId(lastTagNumber), _activeIntentionId],
+            )
+            .single['creation_sequence'],
+        4,
+      );
+      database.execute(
+        '''
+          INSERT INTO daily_choices (
+            id, source_intention_id, selected_intention_id,
+            choice_date, is_completed
+          ) VALUES (?, ?, ?, '2026-10-16', 0)
+        ''',
+        [_newChoiceId, _middleIntentionId, _selectedIntentionId],
+      );
+      database.execute(
+        '''
+          INSERT INTO daily_choice_path_steps (
+            id, daily_choice_id, long_term_relation_id
+          ) VALUES (?, ?, ?)
+        ''',
+        [_newPathStepId, _newChoiceId, _finalRelationId],
+      );
+      expect(
+        database
+            .select('''
+            SELECT creation_sequence FROM daily_choices
+            ORDER BY creation_sequence
+          ''')
+            .map((row) => row['creation_sequence']),
+        [1, 63, 64, 66],
+      );
+      expect(database.select('PRAGMA foreign_key_check'), isEmpty);
+    } finally {
+      database.close();
+    }
+  });
+
+  test('остановка процесса до подтверждения перехода 1 → 2 сохраняет '
+      'схему 1 и данные и допускает повторное обновление', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    _createStoredSchema1(harness.databaseFile);
+    final beforeSchema = _schemaContract(harness.databaseFile);
+    final beforeGraph = _graphRows(harness.databaseFile);
+    final beforeAssignments = _assignmentRows(harness.databaseFile);
+
+    await _runMigrationWorkerUntilStopPoint(
+      harness,
+      _MigrationProcessStopPoint.beforeCommit,
+    );
+
+    _expectStorageFileKept(harness.databaseFile);
+    expect(_schemaContract(harness.databaseFile), beforeSchema);
+    expect(_graphRows(harness.databaseFile), beforeGraph);
+    final rolledBackAssignments = _assignmentRows(harness.databaseFile);
+    expect(rolledBackAssignments.rows, beforeAssignments.rows);
+    expect(rolledBackAssignments.sequence, beforeAssignments.sequence);
+    _expectStoredIntentionsSearchable(harness.databaseFile);
+    final database = sqlite.sqlite3.open(harness.databaseFile.path);
+    try {
+      configureDoableSqliteConnection(database);
+      expect(database.select('PRAGMA user_version').single['user_version'], 1);
+      expect(
+        database.select('PRAGMA integrity_check').single['integrity_check'],
+        'ok',
+      );
+      expect(database.select('PRAGMA foreign_key_check'), isEmpty);
+    } finally {
+      database.close();
+    }
+
+    await _expectCurrentSchemaSurvivesReopen(harness);
+
+    _expectMigratedGraph(harness.databaseFile, beforeGraph);
+    final retriedAssignments = _assignmentRows(harness.databaseFile);
+    expect(retriedAssignments.rows, beforeAssignments.rows);
+    expect(retriedAssignments.sequence, beforeAssignments.sequence);
+  });
 
   // Отказ в самом конце создания, когда все объекты схемы уже созданы:
   // откат обязан убрать их все, поэтому более ранняя точка ничего не добавляет.
@@ -136,7 +347,7 @@ void main() {
       await _expectStorageWithoutUserSchema(harness.databaseFile);
       _expectStorageFileKept(harness.databaseFile);
 
-      await _expectRecreatedSchemaSurvivesReopen(harness);
+      await _expectCurrentSchemaSurvivesReopen(harness);
     },
   );
 
@@ -156,7 +367,7 @@ void main() {
       }
       _expectStorageFileKept(harness.databaseFile);
 
-      await _expectRecreatedSchemaSurvivesReopen(harness);
+      await _expectCurrentSchemaSurvivesReopen(harness);
     });
   }
 }
@@ -192,6 +403,57 @@ void _seedStoredIntentions(sqlite.Database database) {
         1704326400000000
       )
   ''');
+}
+
+void _createStoredSchema1(File databaseFile) {
+  _markEmptyStorageFile(databaseFile);
+  final snapshot = jsonDecode(
+    File('drift_schemas/drift_schema_v1.json').readAsStringSync(),
+  ) as Map<String, dynamic>;
+  final entities = (snapshot['fixed_sql'] as List).cast<Map<String, dynamic>>();
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    configureDoableSqliteConnection(database);
+    database.execute('PRAGMA foreign_keys = ON');
+    for (final entity in entities) {
+      final statements = (entity['sql'] as List).cast<Map<String, dynamic>>();
+      for (final statement in statements) {
+        if (statement['dialect'] == 'sqlite') {
+          database.execute(statement['sql'] as String);
+        }
+      }
+    }
+    database.execute('PRAGMA user_version = 1');
+    seedTagStorageFixture(database);
+    _seedStoredGraph(database);
+    // Удалённые максимумы должны сохраняться в sqlite_sequence при обновлении.
+    database.execute('DELETE FROM tag_assignments WHERE creation_sequence = 3');
+    database.execute('DELETE FROM daily_choices WHERE creation_sequence = 65');
+    expect(database.select('PRAGMA foreign_key_check'), isEmpty);
+    expect(
+      database
+          .select(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'daily_choices'",
+          )
+          .single['seq'],
+      65,
+    );
+  } finally {
+    database.close();
+  }
+}
+
+void _expectMigratedGraph(
+  File databaseFile,
+  Map<String, List<Map<String, Object?>>> beforeGraph,
+) {
+  expect(_graphRows(databaseFile), {
+    ...beforeGraph,
+    'daily_choices': [
+      for (final choice in beforeGraph['daily_choices']!)
+        {...choice, 'scheduled_minute': null, 'priority': 4},
+    ],
+  });
 }
 
 void _seedStoredGraph(sqlite.Database database) {
@@ -251,7 +513,13 @@ void _seedStoredGraph(sqlite.Database database) {
       choice_date, description, is_completed
     ) VALUES (
       63, '$_dailyChoiceId', '$_activeIntentionId',
-      '$_selectedIntentionId', '2026-09-25', '  Сделано  ', 1
+      '$_selectedIntentionId', '2026-09-25', '  Сделано\nПолное описание\nс пробелами  ', 1
+    ), (
+      64, '$_pendingChoiceId', '$_middleIntentionId',
+      '$_selectedIntentionId', '2026-10-17', '  Запланировано\nна другой день  ', 0
+    ), (
+      65, '$_deletedChoiceId', '$_middleIntentionId',
+      '$_selectedIntentionId', '2026-10-18', NULL, 0
     )
   ''');
   database.execute('''
@@ -259,7 +527,9 @@ void _seedStoredGraph(sqlite.Database database) {
       id, daily_choice_id, long_term_relation_id, previous_step_id
     ) VALUES
       ('$_pathStepId', '$_dailyChoiceId', '$_activeRelationId', NULL),
-      ('$_finalPathStepId', '$_dailyChoiceId', '$_finalRelationId', '$_pathStepId')
+      ('$_finalPathStepId', '$_dailyChoiceId', '$_finalRelationId', '$_pathStepId'),
+      ('$_pendingPathStepId', '$_pendingChoiceId', '$_finalRelationId', NULL),
+      ('$_deletedPathStepId', '$_deletedChoiceId', '$_finalRelationId', NULL)
   ''');
 }
 
@@ -555,7 +825,7 @@ void _expectCurrentSchemaContract(File databaseFile) {
 
 /// Следующий запуск создаёт или открывает схему на том же файле, а повторное
 /// открытие после закрытия видит тот же подтверждённый контракт схемы.
-Future<void> _expectRecreatedSchemaSurvivesReopen(
+Future<void> _expectCurrentSchemaSurvivesReopen(
   LocalDatabaseHarness harness,
 ) async {
   final createdDatabase = await harness.openReadyDatabase();
@@ -563,6 +833,10 @@ Future<void> _expectRecreatedSchemaSurvivesReopen(
   await expectLater(
     verifyIntentionTitlesFtsIntegrity(createdDatabase),
     completes,
+  );
+  expect(
+    await createdDatabase.customSelect('PRAGMA foreign_key_check').get(),
+    isEmpty,
   );
   expect(
     (await createdDatabase.customSelect('PRAGMA foreign_keys').getSingle())

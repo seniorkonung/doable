@@ -24,8 +24,21 @@ CREATE TABLE daily_choices (
     typeof(is_completed) = 'integer' AND
     is_completed IN (0, 1)
   ),
+  scheduled_minute INTEGER CHECK (
+    scheduled_minute IS NULL OR
+    (typeof(scheduled_minute) = 'integer' AND scheduled_minute BETWEEN 0 AND 1439)
+  ),
+  priority INTEGER NOT NULL DEFAULT 4 CHECK (
+    typeof(priority) = 'integer' AND priority BETWEEN 1 AND 4
+  ),
   CHECK (source_intention_id <> selected_intention_id)
 );
+
+CREATE INDEX daily_choices_date_completion_schedule_order
+  ON daily_choices (
+    choice_date, is_completed, COALESCE(scheduled_minute, -1),
+    priority, creation_sequence
+  );
 
 CREATE INDEX daily_choices_date_creation_order
   ON daily_choices (choice_date, creation_sequence);

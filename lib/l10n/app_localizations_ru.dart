@@ -2391,6 +2391,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
 
   @override
+  String get dailyChoiceScheduleLabel => 'Запланированное время';
+
+  @override
+  String get dailyChoiceAllDay => 'Весь день';
+
+  @override
+  String get dailyChoiceSetTime => 'Указать время';
+
+  @override
+  String dailyChoiceTimeLabel(String time) {
+    return 'Время: $time';
+  }
+
+  @override
+  String get dailyChoicePriorityLabel => 'Приоритет';
+
+  @override
+  String dailyChoicePriorityOption(String priority) {
+    return 'Приоритет $priority';
+  }
+
+  @override
   String get dailyChoiceCatalogTitle => 'Дневные выборы';
 
   @override
@@ -2445,19 +2467,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCalendarNextYear => 'Следующий год';
 
   @override
-  String get dailyChoiceCatalogCompletionFilter => 'Выполнение';
-
-  @override
-  String get dailyChoiceCatalogAllStates => 'Все состояния';
-
-  @override
   String get dailyChoiceCatalogIncomplete => 'Не выполненные';
 
   @override
   String get dailyChoiceCatalogCompleted => 'Выполненные';
-
-  @override
-  String get dailyChoiceCatalogClearFilters => 'Сбросить фильтры';
 
   @override
   String dailyChoiceCatalogTotalCount(int count) {
@@ -2465,7 +2478,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceCatalogEmpty => 'Дневных выборов по фильтрам нет.';
+  String get dailyChoiceCatalogEmpty => 'На этот день нет дневных выборов.';
 
   @override
   String get dailyChoiceCatalogRefreshing => 'Обновляем дневные выборы…';
@@ -2491,6 +2504,38 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoiceCatalogUnexpected =>
       'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
+
+  @override
+  String dailyChoiceCatalogPathIntentionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения в пути',
+      many: '$count намерений в пути',
+      few: '$count намерения в пути',
+      one: '$count намерение в пути',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dailyChoiceCatalogCompletionLabel(
+    int number,
+    String phrase,
+    String date,
+  ) {
+    return 'Выполнение выбора № $number. $phrase. $date';
+  }
+
+  @override
+  String get dailyChoiceCompletionSaving => 'Сохраняем выполнение…';
+
+  @override
+  String get dailyChoiceCompletionSynchronizing =>
+      'Выполнение сохранено. Обновляем каталог…';
+
+  @override
+  String get dailyChoiceCompletionRefresh => 'Обновить выбор';
 
   @override
   String dailyChoiceCatalogRowLabel(

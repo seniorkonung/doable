@@ -1,3 +1,5 @@
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -110,6 +112,12 @@ void main() {
     addChoice(204, source: 3, selected: 1, path: [102]);
     addChoice(205, source: 3, selected: 2, path: [102, 101]);
     raw.execute('UPDATE long_term_relations SET is_archived = 1');
+    const description = 'Описание дневной группы\nПолный текст';
+    raw.execute(
+      '''UPDATE daily_choices
+      SET scheduled_minute = 1080, priority = 2, description = ? WHERE id = ?''',
+      [description, _uuid(206)],
+    );
 
     final source = page(
       await repository.getRelationGroupPage(
@@ -131,6 +139,10 @@ void main() {
     expect(source.items[2].isCompleted, isTrue);
     expect(source.items.first.source.title, 'Намерение 1');
     expect(source.items.first.selected.title, 'Намерение 2');
+    expect(source.items.first.schedule, DailyChoiceTime(hour: 18, minute: 0));
+    expect(source.items.first.priority, DailyChoicePriority.p2);
+    expect(source.items.first.description?.value, description);
+    expect(source.items.first.pathIntentionCount, 2);
     expect(source.counts.dailySource, 4);
     expect(source.counts.dailySelected, 1);
     expect(source.counts.archivedNeedIncoming, 1);

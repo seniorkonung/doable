@@ -3911,6 +3911,42 @@ abstract class AppLocalizations {
   /// **'Confirm daily choice'**
   String get dailyChoiceCreationTitle;
 
+  /// Подпись запланированного времени дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled time'**
+  String get dailyChoiceScheduleLabel;
+
+  /// Планирование на весь день без конкретного времени
+  ///
+  /// In en, this message translates to:
+  /// **'All day'**
+  String get dailyChoiceAllDay;
+
+  /// Открыть выбор конкретного времени
+  ///
+  /// In en, this message translates to:
+  /// **'Set time'**
+  String get dailyChoiceSetTime;
+
+  /// Подтверждённое время дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Time: {time}'**
+  String dailyChoiceTimeLabel(String time);
+
+  /// Собственный приоритет дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get dailyChoicePriorityLabel;
+
+  /// Вариант приоритета дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String dailyChoicePriorityOption(String priority);
+
   /// Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено
   ///
   /// In en, this message translates to:
@@ -4013,18 +4049,6 @@ abstract class AppLocalizations {
   /// **'Next year'**
   String get dailyChoiceCalendarNextYear;
 
-  /// Фильтр по выполнению
-  ///
-  /// In en, this message translates to:
-  /// **'Completion'**
-  String get dailyChoiceCatalogCompletionFilter;
-
-  /// Оба состояния выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'All states'**
-  String get dailyChoiceCatalogAllStates;
-
   /// Фильтр невыполненных выборов
   ///
   /// In en, this message translates to:
@@ -4037,12 +4061,6 @@ abstract class AppLocalizations {
   /// **'Completed'**
   String get dailyChoiceCatalogCompleted;
 
-  /// Вернуть все даты и оба состояния выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'Clear filters'**
-  String get dailyChoiceCatalogClearFilters;
-
   /// Полное количество подходящих дневных выборов
   ///
   /// In en, this message translates to:
@@ -4052,7 +4070,7 @@ abstract class AppLocalizations {
   /// Пустой дневной каталог
   ///
   /// In en, this message translates to:
-  /// **'No daily choices match the filters.'**
+  /// **'No daily choices for this day.'**
   String get dailyChoiceCatalogEmpty;
 
   /// Обновление подтверждённого снимка каталога
@@ -4096,6 +4114,40 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not load daily choices because of an unexpected error.'**
   String get dailyChoiceCatalogUnexpected;
+
+  /// Число намерений сохранённого пути в карточке
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} intention in path} other{{count} intentions in path}}'**
+  String dailyChoiceCatalogPathIntentionCount(int count);
+
+  /// Доступное название отдельного флажка с принадлежностью выбору; состояние сообщает сам флажок
+  ///
+  /// In en, this message translates to:
+  /// **'Completion of choice #{number}. {phrase}. {date}'**
+  String dailyChoiceCatalogCompletionLabel(
+    int number,
+    String phrase,
+    String date,
+  );
+
+  /// Ожидание подтверждения записи выполнения рядом с карточкой
+  ///
+  /// In en, this message translates to:
+  /// **'Saving completion…'**
+  String get dailyChoiceCompletionSaving;
+
+  /// Запись подтверждена, флажок ожидает согласованного снимка секций
+  ///
+  /// In en, this message translates to:
+  /// **'Completion saved. Refreshing the catalog…'**
+  String get dailyChoiceCompletionSynchronizing;
+
+  /// Актуализация карточки после отказа без явного повтора перед новым подтверждением выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh choice'**
+  String get dailyChoiceCompletionRefresh;
 
   /// Доступная подпись строки с порядковым номером текущей выдачи
   ///

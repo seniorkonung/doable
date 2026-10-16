@@ -1,5 +1,7 @@
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -195,6 +197,74 @@ void main() {
           .code,
       DiagnosticsFailureCode.corruption,
     );
+  });
+
+  test(
+    'читает сохранённые время и приоритет без подстановки значений',
+    () async {
+      addIntention(1);
+      addIntention(2);
+      addRelation(101, 1, 2);
+      addChoice(201, 1, 2);
+      addStep(301, 201, 101);
+
+      for (final (minute, priority, schedule) in [
+        (null, DailyChoicePriority.p4, const DailyChoiceAllDay()),
+        (0, DailyChoicePriority.p1, DailyChoiceTime(hour: 0, minute: 0)),
+        (1097, DailyChoicePriority.p2, DailyChoiceTime(hour: 18, minute: 17)),
+        (1439, DailyChoicePriority.p3, DailyChoiceTime(hour: 23, minute: 59)),
+      ]) {
+        raw.execute(
+          'UPDATE daily_choices SET scheduled_minute = ?, priority = ? WHERE id = ?',
+          [minute, priority.level, _uuid(201)],
+        );
+
+        final result = await repository.getDailyChoice(_choiceId(201));
+        final choice = (result as DailyChoiceReadSuccess).value.value!.choice;
+        expect(choice.schedule, schedule);
+        expect(choice.priority, priority);
+      }
+    },
+  );
+
+  test('повреждённые время и приоритет дают отказ повреждения', () async {
+    addIntention(1);
+    addIntention(2);
+    addRelation(101, 1, 2);
+    addChoice(201, 1, 2);
+    addStep(301, 201, 101);
+
+    for (final (minute, priority) in <(Object?, Object)>[
+      (-1, 4),
+      (1440, 4),
+      (0.5, 4),
+      ('18:00', 4),
+      (null, 0),
+      (null, 5),
+      (null, 1.5),
+      (null, 'P1'),
+    ]) {
+      // Имитируем повреждение хранения, недоступное через обычную запись.
+      raw.execute('PRAGMA ignore_check_constraints = ON');
+      try {
+        raw.execute(
+          'UPDATE daily_choices SET scheduled_minute = ?, priority = ? WHERE id = ?',
+          [minute, priority, _uuid(201)],
+        );
+      } finally {
+        raw.execute('PRAGMA ignore_check_constraints = OFF');
+      }
+
+      expect(
+        await repository.getDailyChoice(_choiceId(201)),
+        isA<DailyChoiceReadError>().having(
+          (value) => value.failure.category,
+          'категория',
+          GraphFailureCategory.corruption,
+        ),
+        reason: 'Повреждённые значения: время $minute, приоритет $priority.',
+      );
+    }
   });
 
   test('различает временную недоступность и неизвестный отказ', () async {

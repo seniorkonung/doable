@@ -6,6 +6,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -113,6 +115,10 @@ void main() {
             ),
             date: CalendarDate.fromParts(2026, 9, 24),
             isCompleted: false,
+            schedule: const DailyChoiceAllDay(),
+            priority: DailyChoicePriority.p4,
+            description: null,
+            pathIntentionCount: 2,
           ),
         ],
         counts: counts,

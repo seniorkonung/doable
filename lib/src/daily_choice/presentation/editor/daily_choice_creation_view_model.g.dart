@@ -72,7 +72,7 @@ final class DailyChoiceCreationViewModelProvider
 }
 
 String _$dailyChoiceCreationViewModelHash() =>
-    r'd12f27631b40a2d43d4c8882eefd3a34ea4f4dda';
+    r'255809bf770334497fb5fce85e331523c2bcf78a';
 
 /// Собирает явную команду создания и сохраняет её принятие и результат в общей
 /// сессии потока. Координатор выполняет запись независимо от жизни формы.

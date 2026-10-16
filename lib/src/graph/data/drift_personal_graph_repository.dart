@@ -20,6 +20,8 @@ import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_description.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
+import '../../daily_choice/domain/daily_choice_priority.dart';
+import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';

@@ -1192,6 +1192,29 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL CHECK (typeof(is_completed) = \'integer\' AND is_completed IN (0, 1))',
   );
+  static const VerificationMeta _scheduledMinuteMeta = const VerificationMeta(
+    'scheduledMinute',
+  );
+  late final GeneratedColumn<int> scheduledMinute = GeneratedColumn<int>(
+    'scheduled_minute',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (scheduled_minute IS NULL OR(typeof(scheduled_minute) = \'integer\' AND scheduled_minute BETWEEN 0 AND 1439))',
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 4 CHECK (typeof(priority) = \'integer\' AND priority BETWEEN 1 AND 4)',
+    defaultValue: const CustomExpression('4'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     creationSequence,
@@ -1201,6 +1224,8 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     choiceDate,
     description,
     isCompleted,
+    scheduledMinute,
+    priority,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1278,6 +1303,21 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     } else if (isInserting) {
       context.missing(_isCompletedMeta);
     }
+    if (data.containsKey('scheduled_minute')) {
+      context.handle(
+        _scheduledMinuteMeta,
+        scheduledMinute.isAcceptableOrUnknown(
+          data['scheduled_minute']!,
+          _scheduledMinuteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
     return context;
   }
 
@@ -1315,6 +1355,14 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_completed'],
       )!,
+      scheduledMinute: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}scheduled_minute'],
+      ),
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}priority'],
+      )!,
     );
   }
 
@@ -1339,6 +1387,8 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
   final String choiceDate;
   final String? description;
   final bool isCompleted;
+  final int? scheduledMinute;
+  final int priority;
   const DailyChoice({
     required this.creationSequence,
     required this.id,
@@ -1347,6 +1397,8 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
     required this.choiceDate,
     this.description,
     required this.isCompleted,
+    this.scheduledMinute,
+    required this.priority,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1360,6 +1412,10 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
       map['description'] = Variable<String>(description);
     }
     map['is_completed'] = Variable<bool>(isCompleted);
+    if (!nullToAbsent || scheduledMinute != null) {
+      map['scheduled_minute'] = Variable<int>(scheduledMinute);
+    }
+    map['priority'] = Variable<int>(priority);
     return map;
   }
 
@@ -1374,6 +1430,10 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
           ? const Value.absent()
           : Value(description),
       isCompleted: Value(isCompleted),
+      scheduledMinute: scheduledMinute == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scheduledMinute),
+      priority: Value(priority),
     );
   }
 
@@ -1394,6 +1454,8 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
       choiceDate: serializer.fromJson<String>(json['choice_date']),
       description: serializer.fromJson<String?>(json['description']),
       isCompleted: serializer.fromJson<bool>(json['is_completed']),
+      scheduledMinute: serializer.fromJson<int?>(json['scheduled_minute']),
+      priority: serializer.fromJson<int>(json['priority']),
     );
   }
   @override
@@ -1407,6 +1469,8 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
       'choice_date': serializer.toJson<String>(choiceDate),
       'description': serializer.toJson<String?>(description),
       'is_completed': serializer.toJson<bool>(isCompleted),
+      'scheduled_minute': serializer.toJson<int?>(scheduledMinute),
+      'priority': serializer.toJson<int>(priority),
     };
   }
 
@@ -1418,6 +1482,8 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
     String? choiceDate,
     Value<String?> description = const Value.absent(),
     bool? isCompleted,
+    Value<int?> scheduledMinute = const Value.absent(),
+    int? priority,
   }) => DailyChoice(
     creationSequence: creationSequence ?? this.creationSequence,
     id: id ?? this.id,
@@ -1426,6 +1492,10 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
     choiceDate: choiceDate ?? this.choiceDate,
     description: description.present ? description.value : this.description,
     isCompleted: isCompleted ?? this.isCompleted,
+    scheduledMinute: scheduledMinute.present
+        ? scheduledMinute.value
+        : this.scheduledMinute,
+    priority: priority ?? this.priority,
   );
   DailyChoice copyWithCompanion(DailyChoicesCompanion data) {
     return DailyChoice(
@@ -1448,6 +1518,10 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
       isCompleted: data.isCompleted.present
           ? data.isCompleted.value
           : this.isCompleted,
+      scheduledMinute: data.scheduledMinute.present
+          ? data.scheduledMinute.value
+          : this.scheduledMinute,
+      priority: data.priority.present ? data.priority.value : this.priority,
     );
   }
 
@@ -1460,7 +1534,9 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
           ..write('selectedIntentionId: $selectedIntentionId, ')
           ..write('choiceDate: $choiceDate, ')
           ..write('description: $description, ')
-          ..write('isCompleted: $isCompleted')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('scheduledMinute: $scheduledMinute, ')
+          ..write('priority: $priority')
           ..write(')'))
         .toString();
   }
@@ -1474,6 +1550,8 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
     choiceDate,
     description,
     isCompleted,
+    scheduledMinute,
+    priority,
   );
   @override
   bool operator ==(Object other) =>
@@ -1485,7 +1563,9 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
           other.selectedIntentionId == this.selectedIntentionId &&
           other.choiceDate == this.choiceDate &&
           other.description == this.description &&
-          other.isCompleted == this.isCompleted);
+          other.isCompleted == this.isCompleted &&
+          other.scheduledMinute == this.scheduledMinute &&
+          other.priority == this.priority);
 }
 
 class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
@@ -1496,6 +1576,8 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
   final Value<String> choiceDate;
   final Value<String?> description;
   final Value<bool> isCompleted;
+  final Value<int?> scheduledMinute;
+  final Value<int> priority;
   const DailyChoicesCompanion({
     this.creationSequence = const Value.absent(),
     this.id = const Value.absent(),
@@ -1504,6 +1586,8 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
     this.choiceDate = const Value.absent(),
     this.description = const Value.absent(),
     this.isCompleted = const Value.absent(),
+    this.scheduledMinute = const Value.absent(),
+    this.priority = const Value.absent(),
   });
   DailyChoicesCompanion.insert({
     this.creationSequence = const Value.absent(),
@@ -1513,6 +1597,8 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
     required String choiceDate,
     this.description = const Value.absent(),
     required bool isCompleted,
+    this.scheduledMinute = const Value.absent(),
+    this.priority = const Value.absent(),
   }) : id = Value(id),
        sourceIntentionId = Value(sourceIntentionId),
        selectedIntentionId = Value(selectedIntentionId),
@@ -1526,6 +1612,8 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
     Expression<String>? choiceDate,
     Expression<String>? description,
     Expression<bool>? isCompleted,
+    Expression<int>? scheduledMinute,
+    Expression<int>? priority,
   }) {
     return RawValuesInsertable({
       if (creationSequence != null) 'creation_sequence': creationSequence,
@@ -1536,6 +1624,8 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
       if (choiceDate != null) 'choice_date': choiceDate,
       if (description != null) 'description': description,
       if (isCompleted != null) 'is_completed': isCompleted,
+      if (scheduledMinute != null) 'scheduled_minute': scheduledMinute,
+      if (priority != null) 'priority': priority,
     });
   }
 
@@ -1547,6 +1637,8 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
     Value<String>? choiceDate,
     Value<String?>? description,
     Value<bool>? isCompleted,
+    Value<int?>? scheduledMinute,
+    Value<int>? priority,
   }) {
     return DailyChoicesCompanion(
       creationSequence: creationSequence ?? this.creationSequence,
@@ -1556,6 +1648,8 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
       choiceDate: choiceDate ?? this.choiceDate,
       description: description ?? this.description,
       isCompleted: isCompleted ?? this.isCompleted,
+      scheduledMinute: scheduledMinute ?? this.scheduledMinute,
+      priority: priority ?? this.priority,
     );
   }
 
@@ -1585,6 +1679,12 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
     if (isCompleted.present) {
       map['is_completed'] = Variable<bool>(isCompleted.value);
     }
+    if (scheduledMinute.present) {
+      map['scheduled_minute'] = Variable<int>(scheduledMinute.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<int>(priority.value);
+    }
     return map;
   }
 
@@ -1597,7 +1697,9 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
           ..write('selectedIntentionId: $selectedIntentionId, ')
           ..write('choiceDate: $choiceDate, ')
           ..write('description: $description, ')
-          ..write('isCompleted: $isCompleted')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('scheduledMinute: $scheduledMinute, ')
+          ..write('priority: $priority')
           ..write(')'))
         .toString();
   }
@@ -2716,6 +2818,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'tag_assignments_immutable_identity',
   );
   late final DailyChoices dailyChoices = DailyChoices(this);
+  late final Index dailyChoicesDateCompletionScheduleOrder = Index(
+    'daily_choices_date_completion_schedule_order',
+    'CREATE INDEX daily_choices_date_completion_schedule_order ON daily_choices (choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)',
+  );
   late final Index dailyChoicesDateCreationOrder = Index(
     'daily_choices_date_creation_order',
     'CREATE INDEX daily_choices_date_creation_order ON daily_choices (choice_date, creation_sequence)',
@@ -2854,6 +2960,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     tagAssignmentsValidTagOrderUpdate,
     tagAssignmentsImmutableIdentity,
     dailyChoices,
+    dailyChoicesDateCompletionScheduleOrder,
     dailyChoicesDateCreationOrder,
     dailyChoicesSourceDateCreationOrder,
     dailyChoicesSelectedDateCreationOrder,
@@ -4011,6 +4118,8 @@ typedef $DailyChoicesCreateCompanionBuilder = DailyChoicesCompanion Function({
   required String choiceDate,
   Value<String?> description,
   required bool isCompleted,
+  Value<int?> scheduledMinute,
+  Value<int> priority,
 });
 typedef $DailyChoicesUpdateCompanionBuilder = DailyChoicesCompanion Function({
   Value<int> creationSequence,
@@ -4020,6 +4129,8 @@ typedef $DailyChoicesUpdateCompanionBuilder = DailyChoicesCompanion Function({
   Value<String> choiceDate,
   Value<String?> description,
   Value<bool> isCompleted,
+  Value<int?> scheduledMinute,
+  Value<int> priority,
 });
 
 final class $DailyChoicesReferences
@@ -4114,6 +4225,16 @@ class $DailyChoicesFilterComposer
 
   ColumnFilters<bool> get isCompleted => $composableBuilder(
     column: $table.isCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scheduledMinute => $composableBuilder(
+    column: $table.scheduledMinute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4223,6 +4344,16 @@ class $DailyChoicesOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get scheduledMinute => $composableBuilder(
+    column: $table.scheduledMinute,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $IntentionsOrderingComposer get sourceIntentionId {
     final $IntentionsOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -4301,6 +4432,14 @@ class $DailyChoicesAnnotationComposer
     column: $table.isCompleted,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get scheduledMinute => $composableBuilder(
+    column: $table.scheduledMinute,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
 
   $IntentionsAnnotationComposer get sourceIntentionId {
     final $IntentionsAnnotationComposer composer = $composerBuilder(
@@ -4413,6 +4552,8 @@ class $DailyChoicesTableManager
                 Value<String> choiceDate = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
+                Value<int?> scheduledMinute = const Value.absent(),
+                Value<int> priority = const Value.absent(),
               }) => DailyChoicesCompanion(
                 creationSequence: creationSequence,
                 id: id,
@@ -4421,6 +4562,8 @@ class $DailyChoicesTableManager
                 choiceDate: choiceDate,
                 description: description,
                 isCompleted: isCompleted,
+                scheduledMinute: scheduledMinute,
+                priority: priority,
               ),
           createCompanionCallback:
               ({
@@ -4431,6 +4574,8 @@ class $DailyChoicesTableManager
                 required String choiceDate,
                 Value<String?> description = const Value.absent(),
                 required bool isCompleted,
+                Value<int?> scheduledMinute = const Value.absent(),
+                Value<int> priority = const Value.absent(),
               }) => DailyChoicesCompanion.insert(
                 creationSequence: creationSequence,
                 id: id,
@@ -4439,6 +4584,8 @@ class $DailyChoicesTableManager
                 choiceDate: choiceDate,
                 description: description,
                 isCompleted: isCompleted,
+                scheduledMinute: scheduledMinute,
+                priority: priority,
               ),
           withReferenceMapper: (p0) => p0
               .map(

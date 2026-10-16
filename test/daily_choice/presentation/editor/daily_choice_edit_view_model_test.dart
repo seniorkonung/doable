@@ -7,6 +7,8 @@ import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_state.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -24,33 +26,101 @@ import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   test(
-    'отправляет независимые поля и удерживает повтор до результата',
+    'время и приоритет блокируются при отправке и правятся после отказа',
     () async {
       final harness = _Harness();
       addTearDown(harness.dispose);
       harness.model
+        ..changeSchedule(const DailyChoiceAllDay())
+        ..changePriority(DailyChoicePriority.p1)
+        ..submit()
+        ..changeSchedule(DailyChoiceTime(hour: 9, minute: 30))
+        ..changePriority(DailyChoicePriority.p3);
+      expect(harness.state.schedule, const DailyChoiceAllDay());
+      expect(harness.state.priority, DailyChoicePriority.p1);
+      harness.repository.fail(0, const DailyChoiceUnavailableFailure());
+      await pumpEventQueue();
+      harness.model
+        ..changeSchedule(DailyChoiceTime(hour: 19, minute: 30))
+        ..changePriority(DailyChoicePriority.p3)
+        ..submit();
+      final patch = harness.repository.commands.last.patch;
+      expect(
+        (patch.schedule as DailyChoiceFieldSet<DailyChoiceSchedule>).value,
+        DailyChoiceTime(hour: 19, minute: 30),
+      );
+      expect(
+        (patch.priority as DailyChoiceFieldSet<DailyChoicePriority>).value,
+        DailyChoicePriority.p3,
+      );
+      expect(patch.date, isA<DailyChoiceFieldUnchanged<CalendarDate>>());
+      expect(patch.description, isA<DailyChoiceDescriptionUnchanged>());
+      expect(patch.isCompleted, isA<DailyChoiceFieldUnchanged<bool>>());
+      harness.repository.succeed(1);
+      await pumpEventQueue();
+      expect(harness.state.operation, isA<DailyChoiceEditSucceeded>());
+      expect(harness.state.schedule, DailyChoiceTime(hour: 19, minute: 30));
+      expect(harness.state.priority, DailyChoicePriority.p3);
+    },
+  );
+
+  for (final isCompleted in [false, true]) {
+    final label = isCompleted ? 'выполненного' : 'невыполненного';
+    test('правка полей $label выбора не отправляет выполнение '
+        'и удерживает повтор до результата', () async {
+      final harness = _Harness(isCompleted: isCompleted);
+      addTearDown(harness.dispose);
+      harness.model
         ..changeDate(CalendarDate.fromParts(1, 1, 1))
-        ..changeCompletion(true)
+        ..changeDescription('Новое описание')
+        ..changeSchedule(const DailyChoiceAllDay())
+        ..changePriority(DailyChoicePriority.p1)
         ..submit()
         ..submit();
       expect(harness.repository.commands, hasLength(1));
       final patch = harness.repository.commands.single.patch;
-      expect(patch.date, isA<DailyChoiceFieldSet<CalendarDate>>());
-      expect(patch.description, isA<DailyChoiceDescriptionUnchanged>());
-      expect((patch.isCompleted as DailyChoiceFieldSet<bool>).value, isTrue);
+      expect(
+        (patch.date as DailyChoiceFieldSet<CalendarDate>).value,
+        CalendarDate.fromParts(1, 1, 1),
+      );
+      expect(
+        (patch.description as DailyChoiceDescriptionSet).value.value,
+        'Новое описание',
+      );
+      expect(patch.isCompleted, isA<DailyChoiceFieldUnchanged<bool>>());
+      expect(
+        (patch.schedule as DailyChoiceFieldSet<DailyChoiceSchedule>).value,
+        const DailyChoiceAllDay(),
+      );
+      expect(
+        (patch.priority as DailyChoiceFieldSet<DailyChoicePriority>).value,
+        DailyChoicePriority.p1,
+      );
       expect(harness.state.operation, isA<DailyChoiceEditSubmitting>());
       harness.repository.succeed(0);
       await pumpEventQueue();
       expect(harness.state.operation, isA<DailyChoiceEditSucceeded>());
-    },
-  );
+    });
+
+    test('без правок не отправляет команду для $label выбора', () {
+      final harness = _Harness(isCompleted: isCompleted);
+      addTearDown(harness.dispose);
+      harness.model.submit();
+      expect(harness.repository.commands, isEmpty);
+      harness.model
+        ..changeDescription('Новое описание')
+        ..changeDescription('Исходное описание')
+        ..submit();
+      expect(harness.repository.commands, isEmpty);
+    });
+  }
 
   test(
     'временный отказ допускает повтор, отсутствие и конфликт его блокируют',
     () async {
       final harness = _Harness();
       addTearDown(harness.dispose);
-      harness.model.changeCompletion(true);
+      harness.model.changeDescription('Новое описание');
       harness.model.submit();
       harness.repository.fail(0, const DailyChoiceUnavailableFailure());
       await pumpEventQueue();
@@ -59,13 +129,13 @@ void main() {
       harness.repository.fail(1, const DailyChoiceNotFoundFailure());
       await pumpEventQueue();
       expect(harness.state.canSubmit, isFalse);
-      expect(harness.state.isCompleted, isTrue);
+      expect(harness.state.description, 'Новое описание');
       harness.model.submit();
       expect(harness.repository.commands, hasLength(2));
 
       final another = _Harness();
       addTearDown(another.dispose);
-      another.model.changeCompletion(true);
+      another.model.changeDescription('Новое описание');
       another.model.submit();
       another.repository.fail(
         0,
@@ -75,7 +145,7 @@ void main() {
       );
       await pumpEventQueue();
       expect(another.state.canSubmit, isFalse);
-      expect(another.state.isCompleted, isTrue);
+      expect(another.state.description, 'Новое описание');
     },
   );
 
@@ -86,7 +156,7 @@ void main() {
       addTearDown(harness.dispose);
       harness.model
         ..changeDate(CalendarDate.fromParts(9999, 12, 31))
-        ..changeCompletion(true)
+        ..changeDescription('Новое описание')
         ..submit();
       harness.repository.fail(
         0,
@@ -103,10 +173,11 @@ void main() {
         isA<DailyChoiceFieldUnchanged<CalendarDate>>(),
       );
       expect(
-        (harness.repository.commands.last.patch.isCompleted
-                as DailyChoiceFieldSet<bool>)
+        (harness.repository.commands.last.patch.description
+                as DailyChoiceDescriptionSet)
+            .value
             .value,
-        isTrue,
+        'Новое описание',
       );
     },
   );
@@ -114,7 +185,7 @@ void main() {
   test('уход формы не отменяет принятую запись и поздний результат', () async {
     final harness = _Harness();
     final completion = harness.coordinator.completions.first;
-    harness.model.changeCompletion(true);
+    harness.model.changeDescription('Новое описание');
     harness.model.submit();
     harness.closeForm();
     harness.repository.succeed(0);
@@ -124,7 +195,8 @@ void main() {
 }
 
 final class _Harness {
-  _Harness() : repository = _Repository() {
+  _Harness({bool isCompleted = false})
+    : repository = _Repository(isCompleted: isCompleted) {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
@@ -150,14 +222,18 @@ final class _Harness {
 final class _Repository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
-  final choice = DailyChoice(
-    id: _choiceId(),
-    sourceIntentionId: _intentionId(1),
-    selectedIntentionId: _intentionId(2),
-    date: CalendarDate.fromParts(2026, 9, 24),
-    description: DailyChoiceDescription.fromInput('Исходное описание'),
-    isCompleted: false,
-  );
+  _Repository({required bool isCompleted})
+    : choice = DailyChoice(
+        id: _choiceId(),
+        sourceIntentionId: _intentionId(1),
+        selectedIntentionId: _intentionId(2),
+        date: CalendarDate.fromParts(2026, 9, 24),
+        description: DailyChoiceDescription.fromInput('Исходное описание'),
+        isCompleted: isCompleted,
+        schedule: DailyChoiceTime(hour: 18, minute: 0),
+        priority: DailyChoicePriority.p2,
+      );
+  final DailyChoice choice;
   final commands = <UpdateDailyChoiceFields>[];
   final _requests = <Completer<DailyChoiceCommandResult>>[];
 
@@ -192,10 +268,22 @@ final class _Repository
                 DailyChoiceFieldSet<CalendarDate>(:final value) => value,
                 _ => choice.date,
               },
-              description: choice.description,
+              description: switch (command.patch.description) {
+                DailyChoiceDescriptionUnchanged() => choice.description,
+                DailyChoiceDescriptionCleared() => null,
+                DailyChoiceDescriptionSet(:final value) => value,
+              },
               isCompleted: switch (command.patch.isCompleted) {
                 DailyChoiceFieldSet<bool>(:final value) => value,
                 _ => choice.isCompleted,
+              },
+              schedule: switch (command.patch.schedule) {
+                DailyChoiceFieldSet<DailyChoiceSchedule>(:final value) => value,
+                _ => choice.schedule,
+              },
+              priority: switch (command.patch.priority) {
+                DailyChoiceFieldSet<DailyChoicePriority>(:final value) => value,
+                _ => choice.priority,
               },
             ),
             path: StoredChoicePath([

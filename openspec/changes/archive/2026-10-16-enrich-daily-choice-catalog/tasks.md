@@ -1,0 +1,476 @@
+## Phase 1: Дневной выбор сохраняет запланированное время и собственный приоритет
+
+- [x] 1.1 Выразить время и приоритет в предметной модели и контрактах команд дневного выбора
+  - **Acceptance criteria:**
+    - По [спецификации](specs/daily-choice-management/spec.md) и решению 1 [дизайна](design.md) `DailyChoiceSchedule` допускает только весь день либо проверенные часы и минуты; `00:00` отличается от всего дня. `DailyChoicePriority` задаёт P1–P4 независимо от `RelationPriority`.
+    - `DailyChoice` и создание несут оба значения, включая согласованные значения по умолчанию «Весь день»/P4; снимки результатов используют эту же модель. Прикладной контракт не зависит от `TimeOfDay`, строк времени или представления SQLite.
+    - `DailyChoiceFieldsPatch` различает отсутствие правки и явную установку всего дня; существующие вызовы и проверки остаются работоспособны.
+  - **Verification:**
+    - Расширить контрактные проверки различия всего дня и полуночи, допустимых границ времени и независимой правки; выполнить `mise exec -- flutter test test/daily_choice/application/daily_choice_contract_test.dart test/daily_choice/application/daily_choice_change_test.dart`.
+  - **Dependencies:** Нет.
+  - **Files likely touched:** `lib/src/daily_choice/domain/daily_choice_schedule.dart` (новый), `lib/src/daily_choice/domain/daily_choice_priority.dart` (новый), `lib/src/daily_choice/domain/daily_choice.dart`, `lib/src/daily_choice/application/daily_choice_command.dart`, `test/daily_choice/application/daily_choice_contract_test.dart`.
+  - **Estimated scope:** M.
+
+- [x] 1.2 Добавить схему версии 2 и атомарный переход с версии 1
+  - **Acceptance criteria:**
+    - Новая схема содержит nullable `scheduled_minute` с допустимыми целыми 0–1439 и `priority` с целыми 1–4, `NOT NULL DEFAULT 4`; ограничения проверяют тип и диапазон. Индекс имеет ключ `(choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)` по решению 2 дизайна.
+    - Переход 1 → 2 добавляет столбцы и индекс через существующий `runAtomicMigration`, сохраняя проверки внешних ключей и FTS. Порядок и определения столбцов совпадают с новой установкой; destructive recovery и downgrade не добавляются согласно [ADR-0002](../../../docs/adr/0002-use-drift-sqlite-for-local-graph.md).
+    - Добавлен снимок версии 2 и обновлён сгенерированный код; `drift_schema_v1.json` сохранён без изменений.
+  - **Verification:**
+    - Выполнить `mise run codegen`, проверить изменения генерации и неизменность снимка версии 1.
+    - Дополнить проверки ограничений обоих полей; выполнить `mise exec -- flutter test test/data/local/daily_choice_schema_test.dart test/data/local/app_database_schema_test.dart test/data/local/schema_verifier_test.dart test/data/local/migrations/migration_test.dart`.
+  - **Dependencies:** Нет.
+  - **Files likely touched:** `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/data/local/app_database.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/daily_choice_schema_test.dart`; результаты генерации `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v2.json` (новый).
+  - **Estimated scope:** M.
+
+- [x] 1.3 Доказать сохранность существующей установки при переходе на схему 2
+  - **Acceptance criteria:**
+    - Постоянный файл, созданный из сохранённой схемы 1, после обновления сохраняет идентификаторы, даты, полные описания, выполнение, участников и шаги разных выборов; новые поля получают весь день/P4. Схема проходит существующий verifier и эквивалентна новой установке.
+    - Сохраняются `creation_sequence` и состояние `sqlite_sequence`, включая ранее удалённый максимальный номер; следующий выбор после повторного открытия получает новый номер.
+    - Прерывание именно перехода 1 → 2 оставляет целостную прежнюю версию, после чего обновление успешно повторяется. Существующая проверка несовместимой более новой версии продолжает подтверждать отказ без изменения файла.
+  - **Verification:**
+    - Дополнить файловые проверки настоящим переходом 1 → 2, используя существующие средства прерывания миграции и настроенное соединение; выполнить `mise exec -- flutter test test/data/local/migrations/file_backed_migration_test.dart test/data/local/migrations/fault_injection_test.dart`.
+  - **Dependencies:** 1.2.
+  - **Files likely touched:** `test/data/local/migrations/file_backed_migration_test.dart`, `test/data/local/migrations/fault_injection_test.dart`, `test/support/migration_process_worker.dart`; при необходимости отдельная фикстура схемы 1 рядом с существующими помощниками в `test/support/` (новый файл).
+  - **Estimated scope:** M.
+
+- [x] 1.4 Подтвердить готовность схемы и контрактов к подключению чтения и записи
+  - **Acceptance criteria:**
+    - Контракты выражают оба варианта времени и собственный приоритет; новая установка и файловое обновление дают одинаковую схему, а проверки сохранности и прерывания проходят.
+    - Обновление использует существующую границу соединений и диагностику миграций; пользовательские значения не попадают в события, ошибки не приводят к пересозданию базы.
+  - **Verification:**
+    - Проверить актуальные результаты команд задач 1.1–1.3 и выполнить `mise exec -- flutter analyze`. Если после проверок менялись соответствующие файлы, повторить затронутые проверки из этих задач.
+  - **Dependencies:** 1.1, 1.2, 1.3.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
+
+- [x] 1.5 Читать сохранённые время и приоритет через все существующие вызовы общего декодера
+  - **Acceptance criteria:**
+    - Подробности и все SQL-проекции, использующие `_decodeStoredDailyChoice`, передают оба столбца; декодер возвращает типизированные значения, различая `NULL` и минуту 0. Неверные хранимые значения дают существующий отказ повреждения, без подстановки значений по умолчанию.
+    - Каталог, группы и выбранные связи продолжают читать допустимые записи через общий декодер с прежними границами порций и проверкой пути. Новая организация каталога в эту задачу не входит.
+  - **Verification:**
+    - Дополнить проверку чтения записью с конкретным временем и нестандартным приоритетом и проверкой повреждённых новых полей через существующий тестовый обход ограничений.
+    - Выполнить `mise exec -- flutter test test/graph/data/drift_daily_choice_read_test.dart test/graph/data/drift_daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_groups_test.dart test/graph/data/drift_daily_choice_read_cost_test.dart`.
+  - **Dependencies:** 1.4.
+  - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `test/graph/data/drift_daily_choice_read_test.dart`; необходимые импорты в `lib/src/graph/data/drift_personal_graph_repository.dart`.
+  - **Estimated scope:** M.
+
+- [x] 1.6 Сохранять время и приоритет при создании вместе с подтверждённым путём
+  - **Acceptance criteria:**
+    - Команда создания атомарно записывает оба поля и путь, возвращает их в подтверждённом результате и публикует изменение через существующую ревизию графа по [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md).
+    - После закрытия и повторного открытия постоянного хранилища доступны конкретное время, приоритет, полное описание, выполнение и все шаги. Приоритет выбора не наследуется от связей пути и не меняет их.
+  - **Verification:**
+    - Расширить существующие проверки создания и файловой долговечности; выполнить `mise exec -- flutter test test/graph/data/drift_daily_choice_create_test.dart test/graph/data/file_backed_daily_choice_durability_test.dart`.
+  - **Dependencies:** 1.5.
+  - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `test/graph/data/drift_daily_choice_create_test.dart`, `test/graph/data/file_backed_daily_choice_durability_test.dart`, `test/support/daily_choice_durability_fixture.dart`.
+  - **Estimated scope:** M.
+
+- [x] 1.7 Сохранять независимость новых полей при правках и замене пути
+  - **Acceptance criteria:**
+    - Изменение времени или приоритета применяет только заданные поля, включая переход на весь день; дата, описание, выполнение, идентичность, порядок создания и путь сохраняются. Архивирование шагов или утрата готовности после создания не препятствуют такой правке.
+    - Изменение прежних полей и атомарная замена пути сохраняют актуальные время и приоритет. Отказ оставляет прежние данные целиком; правка без фактических изменений не продвигает ревизию.
+    - Снимки до/после и наблюдение подробностей отражают подтверждённые значения через существующие механизмы команд, без нового канала обновлений или диагностики пользовательских данных.
+  - **Verification:**
+    - Расширить проверки независимых правок и замены пути, в том числе последовательного изменения разных полей; выполнить `mise exec -- flutter test test/graph/data/drift_daily_choice_update_test.dart test/graph/data/drift_daily_choice_replace_test.dart test/graph/data/drift_daily_choice_watch_test.dart test/graph/data/drift_daily_choice_concurrency_test.dart test/graph/data/drift_daily_choice_diagnostics_test.dart`.
+  - **Dependencies:** 1.6.
+  - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `test/graph/data/drift_daily_choice_update_test.dart`, `test/graph/data/drift_daily_choice_replace_test.dart`, `test/graph/data/drift_daily_choice_watch_test.dart`, `test/graph/data/drift_daily_choice_concurrency_test.dart`.
+  - **Estimated scope:** M.
+
+- [x] 1.8 Подтвердить сквозной контракт хранения до подключения форм
+  - **Acceptance criteria:**
+    - Через прикладную границу можно создать выбор на 18:00/P2, прочитать его, заменить путь, изменить только приоритет, установить весь день и снова открыть хранилище без потери независимых данных.
+    - Чтения существующих потребителей и подтверждённые результаты согласованы с расширенной моделью; границы транзакций, порций и классификации отказов сохранены.
+  - **Verification:**
+    - Сопоставить результаты проверок задач 1.5–1.7 с указанным контрактом; выполнить `mise exec -- flutter analyze`. Недостающую проверку добавить в соответствующий существующий набор из этих задач и запустить только его.
+  - **Dependencies:** 1.5, 1.6, 1.7.
+  - **Files likely touched:** Нет при достаточном покрытии; при выявленном пробеле — соответствующий тест из задач 1.5–1.7.
+  - **Estimated scope:** XS.
+
+- [x] 1.9 Сохранить новые поля черновика при актуализации пути и повторном подтверждении создания
+  - **Acceptance criteria:**
+    - Черновик начинается со всего дня/P4, принимает типизированные изменения и отправляет видимые значения в команду через существующий координатор.
+    - Конфликт и новое подтверждение пути сохраняют время и приоритет вместе с остальными независимыми полями. Отказ позволяет исправить значения для явного повтора; принятая операция сохраняет прежние правила блокировки формы и жизненного цикла.
+  - **Verification:**
+    - Расширить сценарий конфликта пути значениями 18:00/P2 и проверить команду после повторного подтверждения; выполнить `mise exec -- flutter test test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Dependencies:** 1.8.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; соответствующий сгенерированный файл модели при необходимости.
+  - **Estimated scope:** M.
+
+- [x] 1.10 Дать форме создания доступный ввод времени и приоритета
+  - **Acceptance criteria:**
+    - Форма позволяет выбрать весь день либо подтвердить конкретное время и выбрать P1–P4. Отмена ввода времени сохраняет прежнее значение; состояние без заданных часов и минут не становится конкретным временем черновика.
+    - Общие для создания и редактирования элементы ввода получают текущие типизированные значения, признак доступности и обработчики изменения; команды и состояние формы остаются у существующих моделей. Выбор выполнения при создании сохраняется.
+    - Подписи и значения доступны на русском и английском, понятны экранному диктору и помещаются при поддерживаемом крупном тексте; смена локали сохраняет черновик.
+  - **Verification:**
+    - В проверках формы проверить подтверждение и отмену выбора времени, весь день/полночь, выбор приоритета, блокировку при отправке, семантику и обе локали. Выполнить `mise run codegen` и `mise exec -- flutter test test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`.
+  - **Dependencies:** 1.9.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_planning_fields.dart` (новый компонент приложения для двух форм), `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`; сгенерированная локализация.
+  - **Estimated scope:** M.
+
+- [x] 1.11 Редактировать сохранённые время и приоритет правкой только изменённых полей
+  - **Acceptance criteria:**
+    - Редактор инициализируется сохранёнными значениями и использует элементы ввода задачи 1.10. Можно изменить конкретное время, вернуть весь день и выбрать любой приоритет.
+    - `hasEdits` и `toPatch` учитывают новые поля; возврат к исходным значениям снимает правку. Сохранение только описания или приоритета не отправляет остальные поля и не затирает их независимые подтверждённые изменения.
+    - Новые элементы следуют существующим состояниям отправки и отказа и доступны в обеих локалях. Поле выполнения остаётся в редакторе до этапа 3 согласно [плану](plan.md).
+  - **Verification:**
+    - Дополнить проверки состава правки и добавить проверку подключения элементов к редактору с сохранённым 18:00/P2 и переходом на весь день. Повторно проверять внутренний механизм выбора времени из задачи 1.10 не требуется.
+    - Выполнить `mise exec -- flutter test test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`.
+  - **Dependencies:** 1.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart` (новый).
+  - **Estimated scope:** M.
+
+- [x] 1.12 Показывать сохранённые время и приоритет в подробностях дневного выбора
+  - **Acceptance criteria:**
+    - Подробности показывают конкретное время либо весь день и приоритет из подтверждённой модели, включая значения существующего выбора после миграции.
+    - После создания, правки и замены пути значения соответствуют сохранённым данным; полное описание и путь остаются доступны. Новые подписи локализованы и читаются вспомогательными технологиями.
+  - **Verification:**
+    - Дополнить проверки подробностей отображением обоих вариантов времени, приоритета и подтверждённой правки; выполнить `mise exec -- flutter test test/daily_choice/presentation/details/daily_choice_details_page_test.dart test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`.
+  - **Dependencies:** 1.8, 1.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`; общие подписи в `lib/l10n/app_ru.arb` и `lib/l10n/app_en.arb`, если их не добавила задача 1.10.
+  - **Estimated scope:** M.
+
+- [x] 1.13 Подтвердить готовность этапа: новые поля доступны человеку и переживают обновление и перезапуск
+  - **Acceptance criteria:**
+    - Условие Ready to advance этапа 1 из [плана](plan.md) подтверждено: создание, редактирование и подробности работают сквозным образом; обновлённая установка сохраняет прежние данные, а новые значения долговечны и независимы от пути и выполнения.
+    - Проверки изменённых модулей и прямых потребителей, генерация и полные проверки проекта проходят; реализация соблюдает применимые архитектурные ограничения и не содержит незавершённых частей этого этапа.
+  - **Verification:**
+    - Проверить на уровне существующего сценария создания переход от формы с 18:00/P2 к подробностям, последующую правку на весь день и сохранение при замене пути; при необходимости дополнить соответствующие проверки из задач 1.9–1.12. Сохранность после перезапуска и обновления подтвердить файловыми проверками задач 1.3 и 1.6.
+    - Выполнить `mise run codegen`, проверить согласованность сгенерированных файлов и сохранность снимка версии 1; выполнить `mise run check` и `openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart и проверить новые поля и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 1.4, 1.8, 1.9, 1.10, 1.11, 1.12.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в соответствующих файлах задач этапа.
+  - **Estimated scope:** XS.
+
+## Phase 2: Каталог показывает выбранный день в согласованных секциях
+
+- [x] 2.1 Передавать в краткой проекции сохранённые время, приоритет, полное описание и число намерений пути
+  - **Acceptance criteria:**
+    - По требованию «Краткая карточка дневного выбора» [спецификации](specs/daily-choice-management/spec.md) и решению 3 [дизайна](design.md) `DailyChoiceCatalogItem` содержит типизированные время и приоритет, полное необязательное описание и `pathIntentionCount`. Репозиторий передаёт сохранённые значения без подстановки значений по умолчанию вместо отсутствующих данных.
+    - Число намерений равно числу шагов проверенного сохранённого пути плюс один: прямой путь даёт 2, путь через два промежуточных намерения — 4. Общая проверка пути сохраняется, в том числе отказ при пустом или повреждённом пути и допустимость архивированных участников и связей.
+    - Общий построитель проекции обслуживает каталог, дневные группы связей и выбранные связи; их прежнее поведение сохраняется. Существующие тестовые построители и прямые вызовы конструктора приведены к расширенному контракту без фиктивных производственных значений.
+  - **Verification:**
+    - Дополнить существующие контрактные проверки и чтение каталога примером 18:00/P2, полным многострочным описанием и многошаговым путём; проверить действительных потребителей общего построителя.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/application/daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_groups_test.dart test/graph/application/selected_relations_test.dart`; выполнить затронутые проверки непосредственных потребителей в `test/long_term_relation/presentation/neighborhood/` и `test/intention/presentation/details/intention_details_page_test.dart`.
+  - **Dependencies:** 1.13.
+  - **Files likely touched:** `lib/src/daily_choice/application/daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `test/daily_choice/application/daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_catalog_test.dart`; механическое дополнение существующих построителей `DailyChoiceCatalogItem` в проверках каталога, выбранных связей, соседства и подробностей намерения.
+  - **Estimated scope:** M; основное изменение — общий контракт и его единственный построитель, остальные правки — передача обязательных полей тестовых данных.
+
+- [x] 2.2 Читать секцию выбранного дня в полном порядке времени и приоритета со сводкой и привязанным к запросу продолжением
+  - **Acceptance criteria:**
+    - Для явно заданных даты и выполнения `getDailyChoiceCatalogPage` возвращает ограниченную порцию по ключу `(COALESCE(scheduled_minute, -1), priority, creation_sequence)` по возрастанию. Весь день предшествует `00:00`; равные время и приоритет разрешаются неизменяемой последовательностью создания, полные дубликаты остаются отдельными записями.
+    - Первая порция, точное количество и `hasTimedChoices` относятся к одному транзакционному снимку и ревизии по [ADR-0033](../../../docs/adr/0033-coordinate-daily-choice-sections-on-one-revision.md). Агрегат учитывает всю секцию, включая конкретное время за первой порцией; продолжение использует полный ключ порядка, без смещения или сортировки загруженных строк в Dart.
+    - Непрозрачный курсор проверяет дату, выполнение, размер порции, эпоху и ревизию; смешать продолжения разных запросов нельзя. Устаревшая основа возвращает `DailyChoiceCatalogSnapshotExpired`, прочие отказы сохраняют существующую классификацию и диагностику без пользовательского текста. До перевода модели в задаче 2.5 действующий вызов прежнего каталога остаётся работоспособным; окончательное сужение запроса выполняется в задаче 2.6.
+  - **Verification:**
+    - Проверить на реальном SQLite переходы весь день → полночь → другое время, равные приоритеты на границе порций, обход более 50 дубликатов ровно один раз и различный `hasTimedChoices` у двух секций. Проверки курсора включают смену даты, выполнения, размера порции и ревизии.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/application/daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_diagnostics_test.dart`.
+  - **Dependencies:** 2.1.
+  - **Files likely touched:** `lib/src/daily_choice/application/daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `test/daily_choice/application/daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_diagnostics_test.dart`; механическое дополнение построителей первой порции достоверным `hasTimedChoices`.
+  - **Estimated scope:** M.
+
+- [x] 2.3 Подтвердить ограниченность чтения расширенных секций до подключения новой модели каталога
+  - **Acceptance criteria:**
+    - Трассировка существующих проверок стоимости доказывает, что две начальные порции материализуют только выбранные записи и структуру их путей; полные промежуточные намерения и незагруженный остаток дня ради сводки не читаются.
+    - Продолжение читает только запрошенную секцию, а количество и наличие конкретного времени определяются агрегатом SQLite. Повреждение пути в незагруженном остатке обнаруживается при чтении соответствующей порции, не превращаясь в ложный пустой результат.
+    - Контракт и реальный адаптер из задач 2.1–2.2 согласованы; существующий индекс схемы 2 используется для требуемого порядка без новой миграции.
+  - **Verification:**
+    - Расширить `drift_daily_choice_read_cost_test.dart` двумя секциями, конкретным временем за первой порцией и длинным путём выбранной записи; использовать имеющуюся трассировку SQL, без отдельного бенчмарк-механизма.
+    - Выполнить `mise exec --no-deps -- flutter test test/graph/data/drift_daily_choice_read_cost_test.dart test/graph/data/drift_daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_groups_test.dart` и `mise exec --no-deps -- flutter analyze`.
+  - **Dependencies:** 2.1, 2.2.
+  - **Files likely touched:** `test/graph/data/drift_daily_choice_read_cost_test.dart`; при выявленном нарушении — адаптер чтения из задачи 2.2.
+  - **Estimated scope:** S.
+
+- [x] 2.4 Собирать обе секции до заданного загруженного объёма в один снимок одной ревизии
+  - **Acceptance criteria:**
+    - Внутренний механизм сборки для модели каталога получает выбранную дату, требуемый объём каждой секции и возможность ограниченного чтения репозитория. Он возвращает только целую согласованную пару со сводками и отдельными продолжениями либо типизированный отказ или отмену; публикацией состояния и раскрытием секций владеет модель.
+    - Сборка получает минимум первую порцию обеих секций независимо от раскрытия и затем только порции до заданного объёма. Ревизии всех частей совпадают; изменение ревизии или устаревшее продолжение отбрасывает незавершённую сборку и запускает новую в пределах существующего лимита попыток.
+    - Смена поколения запроса или завершение жизни экземпляра прекращает сборку без публикации позднего результата. Чтения остаются отдельными транзакциями; механизм не удерживает транзакцию между чтениями, не владеет командами и не создаёт отдельного канала обновлений.
+  - **Verification:**
+    - Проверить управляемыми ответами репозитория несовпадение ревизий первых порций, изменение между продолжениями, отказ одной части, исчерпание лимита попыток и отмену поколения. Проверка успешной сборки подтверждает разные целевые объёмы секций и отсутствие чтения всего остатка.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_snapshot_assembly_test.dart` и `mise exec --no-deps -- flutter analyze`.
+  - **Dependencies:** 2.3.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_snapshot_assembly.dart` и `test/daily_choice/presentation/catalog/daily_choice_catalog_snapshot_assembly_test.dart` (новые внутренний механизм и его проверки рядом с существующей моделью); тип результата рядом с механизмом.
+  - **Estimated scope:** M.
+
+- [x] 2.5 Подключить согласованную пару к двум независимо раскрываемым секциям общего каталога
+  - **Acceptance criteria:**
+    - `DailyChoiceCatalogState` и `DailyChoiceCatalogViewModel` хранят одну ревизию и актуальность пары, а строки, сводку, продолжение и состояние подгрузки — для каждой секции. Общее тело каталога показывает невыполненные сверху раскрытыми и выполненные снизу свёрнутыми; фильтр и его сброс заменены заголовками с независимым раскрытием и собственным действием «Загрузить ещё».
+    - Первое чтение, пересборка и подгрузка используют контракт задач 2.2–2.4. Подтверждённое изменение выбранного дня или загруженных карточек пересобирает обе секции до прежнего объёма и публикует их вместе, включая перенос выполнения, смену даты, времени, приоритета, описания, пути и данных участников. Постороннее изменение графа требует новой основы перед продолжением; ручной вставки карточки в предполагаемое место нет.
+    - При обновлении или отказе доступна прежняя согласованная пара с соответствующим состоянием; загрузка одной секции сохраняет доступ к другой. Пустой день определяется полными количествами, а не сворачиванием. Смена даты очищает выдачу прежнего дня, сохраняет раскрытие обеих секций и исключает поздние ответы; повтор предлагается только при доказанно временном отказе и относится к текущей дате. Новые заголовки используют имеющиеся локализованные названия и доступное состояние раскрытия.
+  - **Verification:**
+    - Адаптировать проверки модели и страницы к паре секций; проверить независимую подгрузку, смену дня с невыполненными свёрнутыми и выполненными раскрытыми, ошибку первоначального чтения, подгрузки и пересборки. Задержанный ответ и перенос выполнения между чтениями не должны предъявлять смешанную пару.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart` и затронутые проверки, использующие `daily_choice_catalog_page_test_support.dart`; при изменении входов генератора выполнить `mise run codegen`.
+  - **Dependencies:** 2.4.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`; адаптация существующих построителей состояний и обращений к модели у непосредственных тестовых потребителей.
+  - **Estimated scope:** M.
+
+- [x] 2.6 Завершить переход на запрос ровно одной даты и одного состояния выполнения
+  - **Acceptance criteria:**
+    - По решению 3 дизайна `DailyChoiceCatalogQuery` требует ненулевые `CalendarDate` и `isCompleted`; размер порции остаётся проверяемым, курсор — непрозрачным. Типы больше не допускают чтение всех дат или обоих состояний одним запросом.
+    - Удалены прежние ветви необязательного отбора в адаптере и оставшиеся интерфейсы фильтра выполнения. Все первые чтения, продолжения, пересборки и повторы модели явно адресуют одну секцию выбранного дня; отдельного совместимого API для старого охвата не остаётся.
+    - Прямые тестовые вызовы переведены на секции с сохранением проверок дубликатов, прошлых и будущих дат, архивированных участников, отказов и ограниченности чтения. Проверки удалённого пользовательского фильтра заменены проверками соответствующего поведения секций.
+  - **Verification:**
+    - Проверить использования `DailyChoiceCatalogQuery`, `selectCompletion` и `clearFilters`; выполнить `mise exec --no-deps -- flutter analyze`.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/application/daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_catalog_test.dart test/graph/data/drift_daily_choice_read_cost_test.dart test/graph/data/drift_daily_choice_diagnostics_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`.
+  - **Dependencies:** 2.5.
+  - **Files likely touched:** `lib/src/daily_choice/application/daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `test/daily_choice/application/daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_read_cost_test.dart`, `test/graph/data/drift_daily_choice_diagnostics_test.dart`; оставшиеся вызовы прежнего фильтра в проверках каталога.
+  - **Estimated scope:** M; изменение одного контракта и механический перенос его прямых вызовов.
+
+- [x] 2.7 Подтвердить согласование секций с реальными командами, подробностями и календарными отметками
+  - **Acceptance criteria:**
+    - Реальный `DriftPersonalGraphRepository`, общий координатор и модель каталога согласуют создание, изменение, замену пути и удаление без ручного обновления. Выбор после правки занимает место по сохранённым данным; если оно за загруженной границей, он доступен через продолжение соответствующей секции.
+    - При подтверждённом переносе даты или выполнения обе секции меняются одной публикацией; подробности и отдельная модель отметок отражают те же сохранённые данные. Отказ пересборки сохраняет прежнюю пару и не откатывает уже сохранённую команду.
+    - Проверки задач 2.3–2.6 подтверждают контракт [ADR-0033](../../../docs/adr/0033-coordinate-daily-choice-sections-on-one-revision.md); согласование не зависит от будущего флажка карточки и использует существующие команды.
+  - **Verification:**
+    - Расширить существующий интеграционный сценарий двумя загруженными секциями с разными временем и приоритетом, сменой длины пути и перемещением за границу порции. Использовать реальную базу и координатор; проверки перестановки ответов остаются у сборки и модели.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_snapshot_assembly_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart` и `mise exec --no-deps -- flutter analyze`.
+  - **Dependencies:** 2.4, 2.5, 2.6.
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`; при выявленном нарушении — соответствующий владелец из задач 2.4–2.6.
+  - **Estimated scope:** S.
+
+- [x] 2.8 Показывать группы времени и расширенные доступные карточки с переходом к полным данным
+  - **Acceptance criteria:**
+    - По требованиям «Группировка и порядок дневных выборов» и «Краткая карточка дневного выбора» строки используют порядок репозитория: сначала весь день, затем конкретное время. Заголовок «Весь день» зависит от `hasTimedChoices` всей своей секции; группа одного времени имеет один заголовок и при переходе через границу порций.
+    - Карточка показывает каноническую формулировку, дату, время либо весь день, приоритет, число намерений пути и описание максимум в две строки с многоточием. Открытие по устойчивому идентификатору ведёт к полному описанию и пути; совпадающие записи остаются различимыми, ключ не зависит от номера строки.
+    - Новые подписи и семантика доступны в ru/en, крупный текст не обрезает действия и сведения, которые не ограничены спецификацией. Сохранённое выполнение остаётся различимым; действие флажка и удаление поля выполнения из редактора относятся к фазе 3 [плана](plan.md) и здесь не реализуются.
+  - **Verification:**
+    - Дополнить проверки страницы примерами с конкретным временем только за первой порцией, разными сводками секций, группой через границу порций и описанием длиннее двух строк; открыть один из полных дубликатов и сверить полные данные.
+    - Дополнить существующие проверки доступности и раскладки новыми данными карточки и заголовками секций в обеих локалях, включая поддерживаемую нижнюю границу размера и крупный текст. Выполнить `mise run codegen` и `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`.
+  - **Dependencies:** 2.7.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, проверки доступности и раскладки из Verification; сгенерированная локализация.
+  - **Estimated scope:** M.
+
+- [x] 2.9 Сохранить независимость экземпляров каталога и состояние секций при календарной навигации и возврате
+  - **Acceptance criteria:**
+    - В корневом каталоге и каталоге на заданную дату смена дня сохраняет оба состояния раскрытия, начинает каждую выдачу с первой порции и возвращает прокрутку к заголовку нового дня. Новая страница получает только свою начальную дату и стандартное раскрытие; два экземпляра даже одной даты не изменяют состояние друг друга.
+    - Возврат из подробностей, другой корневой страницы или страницы поверх каталога сохраняет дату, раскрытие секций, просмотр и представление календаря, загруженные порции и прокрутку в пределах жизни экземпляра. Закрытие освобождает только свой экземпляр; новый запуск корневого каталога выбирает текущий локальный день и начальное раскрытие.
+    - Просмотр недели, месяца и выбор года и месяца не перечитывают секции. Сворачивание секций не меняет отметки, а получение и отказ отметок не изменяют выдачу; календарь и просмотр карточек остаются доступными при загрузке и отказе.
+  - **Verification:**
+    - Заменить прежние сценарии сохранения фильтра выполнением сценариев сохранения двух секций, используя существующие средства управления каталогом. Для обоих входов проверить смену даты после нескольких порций с невыполненными свёрнутыми и выполненными раскрытыми.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_lifecycle_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart test/app/navigation/app_shell_state_test.dart test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Dependencies:** 2.8.
+  - **Files likely touched:** пять существующих файлов проверок из Verification; при выявленном нарушении — `daily_choice_catalog_body.dart` или `daily_choice_catalog_view_model.dart`, владеющие соответствующим состоянием.
+  - **Estimated scope:** M.
+
+- [x] 2.10 Подтвердить готовность фазы 2: оба каталога показывают согласованные секции без потери состояния страницы
+  - **Acceptance criteria:**
+    - Условие Ready to advance фазы 2 из [плана](plan.md) подтверждено: порции полны и упорядочены, краткие данные и заголовки достоверны, подтверждённые изменения согласуют обе секции, экземпляры независимы, раскрытие сохраняется при смене даты в обоих входах.
+    - Загрузка, отсутствие выборов и отказ различимы; доступ к подробностям и календарной навигации сохраняется при обновлении. Все части результата этой фазы подключены к реальному репозиторию, применимые проверки проходят.
+  - **Verification:**
+    - Сопоставить свежие результаты задач 2.1–2.9 с требованиями фазы; подтвердить сквозной сценарий от сохранённого 18:00/P2 с многошаговым путём и длинным описанием до карточки, подробностей, правки времени или приоритета и согласования обеих секций.
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, выполнить hot reload или restart и проверить оба входа, сворачивание, смену даты, подгрузку, возврат и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии, без отдельного отчёта.
+  - **Dependencies:** 2.3, 2.7, 2.8, 2.9.
+  - **Files likely touched:** Нет, только проверка; выявленные пробелы исправляются в соответствующих файлах задач фазы.
+  - **Estimated scope:** XS.
+
+- [x] 2.11 Сделать обе секции каталога доступными заголовками для экранного диктора
+  - **Acceptance criteria:**
+    - По требованию «Локализация и доступность дневного выбора» [спецификации](specs/daily-choice-management/spec.md) и решению 6 [дизайна](design.md) заголовки обеих секций передают роль заголовка вместе с локализованным названием, текущим раскрытым или свёрнутым состоянием и доступным действием переключения.
+    - Семантика принадлежит общему `DailyChoiceCatalogBody`, используемому корневым каталогом и каталогом на заданную дату; роль сохраняется при сворачивании и раскрытии. Визуальное представление, порядок карточек и поведение переключения сохраняются.
+    - Существующая проверка доступности в ru/en показывает сценарий «Обе секции доступны при переходе по заголовкам» и обнаруживает потерю роли у любой секции; доступная активация продолжает менять её состояние.
+  - **Verification:**
+    - Расширить существующую проверку семантики обеими секциями до и после доступной активации. Убедиться, что проверка роли падает на прежней реализации и проходит после исправления; сохранить проверки названий, состояний, действий и порядка чтения.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+  - **Dependencies:** 2.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`.
+  - **Estimated scope:** S.
+
+- [x] 2.12 Подтвердить готовность согласованных секций к повторному review после исправления доступности
+  - **Acceptance criteria:**
+    - Результат задачи 2.11 и актуальные проверки подтверждают условие Ready to advance фазы 2 из [плана](plan.md), включая доступную навигацию по заголовкам обеих секций и сохранение управления раскрытием. Прежние результаты задачи 2.10 не подменяют проверку изменённой реализации.
+    - Полные проверки проекта и строгая валидация изменения проходят; результат готов к implementation review. Завершение фазы определяет последующий review после последней задачи, а не отметка этого checkpoint.
+  - **Verification:**
+    - Сопоставить результаты задачи 2.11 с обновлённым требованием доступности; выполнить `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart, проверить оба входа, переход по заголовкам секций, раскрытие и сворачивание и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 2.10, 2.11.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
+
+## Phase 3: Выполнение управляется из карточки дневного выбора
+
+- [x] 3.1 Управлять изменением выполнения через модель каталога с блокировкой до согласования секций
+  - **Acceptance criteria:**
+    - По требованию «Календарная дата и независимое выполнение» [спецификации](specs/daily-choice-management/spec.md) и решению 5 [дизайна](design.md) модель отправляет через `acceptDailyChoiceUpdate` команду `UpdateDailyChoiceFields` для устойчивого идентификатора с явным целевым `isCompleted`; остальные поля остаются `DailyChoiceFieldUnchanged`. Принятие использует существующий `ExistingDailyChoiceKey`, включая занятость выбора другим экземпляром каталога, редактором, заменой пути или удалением.
+    - Состояние операции принадлежит модели экземпляра и различает принятую запись, ожидание согласованного снимка и отказ. До подтверждения флажок использует прежнее сохранённое значение; после успеха повтор по прежней карточке заблокирован до публикации пары, отражающей результат. Отказ перечитывания не превращается в отказ записи и не разрешает повторную отправку уже сохранённой правки; успешное согласование снимает ожидание и при уходе записи за загруженную границу.
+    - Типизированный отказ и право его предъявления используют существующие контракты координатора и [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md). Временный отказ допускает явный повтор, конфликт требует актуализации, повреждение и неизвестный отказ не предлагают обычный повтор. Перенос между секциями выполняет готовое согласование по [ADR-0033](../../../docs/adr/0033-coordinate-daily-choice-sections-on-one-revision.md); модель не подменяет сохранённые поля состоянием отправки.
+  - **Verification:**
+    - Дополнить проверки модели установкой и снятием выполнения, точным составом правки, задержанной записью, занятым ключом и повторным нажатием между успехом и обновлением секций. Задержать и отклонить пересборку, затем получить актуальную пару; проверить отсутствие второй команды и снятие блокировки без требования наличия строки в загруженной части.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart test/graph/application/graph_command_coordinator_daily_choice_test.dart`. Использовать существующие проверки исключительности ключа координатора, дополняя только проверки подключения каталога; при изменении входов генератора выполнить `mise run codegen`.
+  - **Dependencies:** 2.12.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`; соответствующий сгенерированный файл модели при необходимости.
+  - **Estimated scope:** M.
+
+- [x] 3.2 Подключить доступный флажок выполнения и локализованный отказ к карточке обоих каталогов
+  - **Acceptance criteria:**
+    - Общее `DailyChoiceCatalogBody` связывает флажок каждой карточки с моделью из задачи 3.1 по идентификатору выбора. Нажатие меняет выполнение без открытия подробностей и отдельного подтверждения; открытие карточки остаётся самостоятельным действием. Полные дубликаты и перемещение между секциями не меняют адресата действия.
+    - Флажок показывает сохранённое значение и доступность из состояния модели; ожидание записи или согласования различимо и не блокирует просмотр карточки и календарную навигацию. Безопасное объяснение отказа строится через `dailyChoiceCommandFailureMessage` и предъявляется рядом с карточкой через `OperationFailurePresentation` с действующим правом; локальная очередь сообщений не появляется.
+    - По требованию «Локализация и доступность дневного выбора» оба действия имеют отдельную доступную семантику; флажок сообщает принадлежность выбору, выполнение и недоступность. Новые подписи доступны в ru/en, общий `ExcludeSemantics` не скрывает флажок; крупный текст сохраняет доступ к действиям и кратким данным.
+  - **Verification:**
+    - Дополнить проверки страницы и доступности независимой активацией открытия и флажка, адресацией одного из дубликатов, сохранённым значением во время отправки и подключением локализованного отказа. В существующих проверках раскладки проверить флажок при крупном тексте на поддерживаемом размере телефона.
+    - При добавлении подписей выполнить `mise run codegen`; выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart`.
+  - **Dependencies:** 3.1.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`; сгенерированная локализация и необходимая адаптация существующих проверок раскладки.
+  - **Estimated scope:** M; одно общее представление карточки и его прямые проверки.
+
+- [x] 3.3 Сохранить принятую операцию и однократное предъявление результата при исчезновении карточки или страницы
+  - **Acceptance criteria:**
+    - По требованию «Подтверждённые результаты и безопасные ошибки дневного выбора» сворачивание секции, смена даты, переход в другой раздел и закрытие каталога на заданную дату во время записи сохраняют принятую команду в координаторе. Поздний результат не возвращает прежнюю дату, карточку или маршрут и не отправляет команду заново.
+    - Ошибка использует инлайн-поверхность, пока та доступна для предъявления; отсутствие карточки к моменту отказа или исчезновение её сообщения до предъявления передаёт результат общей поверхности. Завершение жизни модели освобождает её права без отмены команды; результат не теряется и не предъявляется повторно при возвращении.
+    - Корневой каталог и каталог на заданную дату используют одно подключение при независимом состоянии страниц. Просмотр и раскрытие секций сохраняются по прежним правилам; успешная команда продолжает согласовывать живые представления через общий поток завершений.
+  - **Verification:**
+    - Дополнить проверки жизненного цикла задержанной командой флажка: свернуть секцию или сменить дату до отказа, закрыть страницу до результата и вернуться после завершения. Для остающегося сообщения проверить инлайн-предъявление, для исчезнувшего — передачу общей поверхности и отсутствие второго предъявления.
+    - Выполнить `mise exec --no-deps -- flutter test test/app/daily_choice_app_lifecycle_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/graph/presentation/operation_failure_presentation_test.dart`. Внутренние проверки видимости кадра и перевыдачи прав оставить у общего модуля; здесь проверить только подключение карточки и страницы.
+  - **Dependencies:** 3.2.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`.
+  - **Estimated scope:** M.
+
+- [x] 3.4 Подтвердить готовность управления выполнением из карточки перед удалением прежнего поля редактора
+  - **Acceptance criteria:**
+    - Актуальные результаты задач 3.1–3.3 подтверждают переключение в обе стороны, отдельное доступное действие, блокировку до согласования и сохранность результата при исчезновении карточки или страницы в обоих входах.
+    - Отказ записи и отказ последующего чтения различаются; повтор не дублирует сохранённую команду, а подключение общей поверхности не создаёт второго владельца сообщений.
+  - **Verification:**
+    - Сопоставить результаты задач 3.1–3.3 с решениями 5–6 дизайна; если соответствующие файлы менялись после проверки, повторить только затронутые наборы из этих задач.
+    - Выполнить `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`; результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 3.1, 3.2, 3.3.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
+
+- [x] 3.5 Перенести сквозные проверки выполнения на флажок карточки до удаления поля редактора
+  - **Acceptance criteria:**
+    - По требованию «Календарная дата и независимое выполнение» и решениям 5–6 дизайна существующий сценарий `daily_choice_app_flow_test.dart` переключает выполнение флажком нужной карточки каталога, сохраняя проверки независимой правки после архивирования пути и утраты готовности, идентичности и шагов, перезапуска и удаления только выбранного дубликата. Помощник редактора меняет только оставшиеся поля.
+    - Сценарии `app_shell_state_test.dart` и `intention_statistics_catalog_scenarios.dart` используют флажок вместо `daily-choice-edit-completed`, сохраняя согласование скрытого корневого каталога до возвращения, отметок дней и нескольких живых экземпляров каталога, их выбранных дат, секций, загруженного объёма и прокрутки. Для проверки скрытого корневого каталога выполнение меняется из другого видимого каталога на заданную дату; возврат в корневой каталог не подменяет условие скрытости.
+    - Сценарий задержанного подсчёта статистики сохраняет доказательство, что выполнение и отдельная правка даты подтверждаются до окончания подсчёта, скрытая статистика не начинает чтение или пересчёт до возврата, а затем показывает актуальные числа и дату. Проверки переходят на доступные пользовательские действия без прямой подмены выполнения в хранилище и без удаления прежних наблюдаемых гарантий.
+  - **Verification:**
+    - Перенести существующие вызовы и помощники, не создавая дублирующих наборов; действие флажка адресовать по устойчивому идентификатору. Проверить сохранение исходных условий скрытости и независимости страниц, а также утверждений о сохранённых данных и согласованных представлениях.
+    - Выполнить `mise exec --no-deps -- flutter test test/app/daily_choice_app_flow_test.dart test/app/navigation/app_shell_state_test.dart test/app/intention_statistics_app_flow_test.dart`. Последний файл включает `intention_statistics_catalog_scenarios.dart` через `part` и служит точкой запуска его сценариев.
+  - **Dependencies:** 3.4.
+  - **Files likely touched:** `test/app/daily_choice_app_flow_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/app/intention_statistics_catalog_scenarios.dart`; существующие помощники навигации используются повторно.
+  - **Estimated scope:** M.
+
+- [x] 3.6 Убрать поле выполнения из формы редактирования с переносом оставшихся проверок редактора
+  - **Acceptance criteria:**
+    - По требованию «Календарная дата и независимое выполнение» форма редактирования сохранённого выбора больше не показывает элемент изменения выполнения и не предоставляет соответствующего доступного действия в ru/en; дата, время, приоритет и описание остаются редактируемыми.
+    - Возможность явно указать выполнение при создании и показ сохранённого выполнения в подробностях сохраняются; используемые ими общие строки локализации не удаляются вместе с элементом редактора.
+    - Оставшиеся прямые потребители поля перенесены вместе с его удалением: `daily_choice_details_page_test.dart` проверяет правку даты и описания и `DailyChoiceFieldUnchanged` для `isCompleted`; сценарий отказа записи после ухода из редактора в `daily_choice_app_lifecycle_test.dart` использует дату и описание, сохраняя проверки отката данных и однократного предъявления результата после возвращения фокуса. Сквозные сценарии задачи 3.5 продолжают проверять прежние гарантии через флажок карточки.
+  - **Verification:**
+    - Дополнить существующую проверку страницы отсутствием поля выполнения в обеих локалях при сохранении остальных правок. Сохранность создания проверить существующим сценарием явной отметки, без повторения проверок механизма создания.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart test/daily_choice/presentation/details/daily_choice_details_page_test.dart test/app/daily_choice_app_lifecycle_test.dart test/app/daily_choice_app_flow_test.dart test/app/navigation/app_shell_state_test.dart test/app/intention_statistics_app_flow_test.dart` после удаления поля, до перехода к следующей задаче.
+    - Проверить оставшиеся упоминания через `rg -n 'daily-choice-edit-completed' lib test widgetbook`: допустимы только проверки отсутствия удалённого элемента; действующих обращений к нему нет. Перенос потребителей не откладывается до итоговой проверки фазы.
+  - **Dependencies:** 3.5.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Estimated scope:** M.
+
+- [x] 3.7 Исключить выполнение из изменяемого состояния и правки редактора
+  - **Acceptance criteria:**
+    - Решение 6 дизайна завершено внутри редактора: удалены изменяемое поле выполнения, `withCompletion`, `changeCompletion` и их участие в `hasEdits` и `toPatch`. Исходный сохранённый `DailyChoice` остаётся полноценной предметной моделью, а команда каталога и создание сохраняют право изменять или задавать выполнение.
+    - Любая правка редактора передаёт только действительно изменённые дату, время, приоритет или описание; `isCompleted` всегда остаётся `DailyChoiceFieldUnchanged`. Сохранение ранее открытого редактора не откатывает выполнение, подтверждённое флажком, а отсутствие правок не создаёт команду.
+    - Существующие проверки отказа, явного повтора и ухода редактора переведены с удалённого поля выполнения на оставшееся редактируемое поле, сохраняя проверяемое поведение.
+  - **Verification:**
+    - Дополнить проверки состояния и модели составом правки для оставшихся полей при обоих исходных значениях выполнения; проверить отсутствие производственных вызовов прежних методов редактора.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`; при изменении входов генератора выполнить `mise run codegen`.
+  - **Dependencies:** 3.6.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart`; соответствующий сгенерированный файл модели при необходимости.
+  - **Estimated scope:** M.
+
+- [x] 3.8 Подтвердить сквозное согласование флажка с секциями, календарём, подробностями и независимой правкой
+  - **Acceptance criteria:**
+    - С реальными `DriftPersonalGraphRepository` и координатором нажатие флажка в корневом каталоге и каталоге на заданную дату устанавливает и снимает выполнение. Выбор с 18:00/P2, многошаговым путём и полным описанием занимает положенное место в другой секции; за загруженной границей он доступен через продолжение, а полный дубликат остаётся самостоятельным.
+    - Выполнение последнего невыполненного выбора меняет отметку дня на галочку, снятие — обратно; подробности и другой живой экземпляр каталога получают подтверждённое состояние без ручного обновления и сброса своих параметров просмотра. Перенос в свёрнутую секцию не раскрывает её автоматически.
+    - Правка описания, начатая до изменения выполнения через модель другого каталога, сохраняет новое выполнение и остальные независимые данные. Проверки создания с временем, приоритетом и явным выполнением вместе с новым сценарием подтверждают путь от планирования до просмотра и обратимого выполнения.
+  - **Verification:**
+    - Расширить существующий сценарий карточки реальными нажатиями и возвратом из подробностей; интеграционную проверку нескольких представлений запускать через действие модели каталога, а не прямую подмену результата команды. В проверке редактора подтвердить сохранение после выполнения, изменённого другим экземпляром каталога.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart`. Повторно проверять алгоритм порядка и внутренний протокол отметок отдельными новыми наборами не требуется.
+  - **Dependencies:** 3.4, 3.7.
+  - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`.
+  - **Estimated scope:** M.
+
+- [x] 3.9 Подтвердить изменение выполнения через каталог после обновления установки и повторного открытия файла
+  - **Acceptance criteria:**
+    - На существующей файловой фикстуре схемы 1 после штатного перехода 1 → 2 выполненный и невыполненный выборы доступны в секциях с прежними идентификаторами и данными, временем «Весь день» и приоритетом P4. Действие модели каталога через реальный координатор меняет их выполнение в обе стороны.
+    - После завершения команд, закрытия объектов хранилища и повторного открытия того же файла сохраняются подтверждённое выполнение, дата, описание, участники, шаги пути и порядок создания. Новый экземпляр каталога читает сохранённые данные без памяти прежней модели; архивированные участники или шаги не мешают независимой правке.
+  - **Verification:**
+    - Дополнить `file_backed_migration_test.dart` сценарием использования обновлённой базы через модель каталога и координатор, переиспользуя имеющуюся фикстуру схемы 1 и `LocalDatabaseHarness`. Не дублировать проверки прерывания миграции и не менять снимок версии 1; проверяется соединение обновления с новым пользовательским действием.
+    - Выполнить `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/data/local/migrations/file_backed_migration_test.dart` и `mise exec --no-deps -- flutter test test/graph/data/file_backed_daily_choice_durability_test.dart`.
+  - **Dependencies:** 3.8.
+  - **Files likely touched:** `test/data/local/migrations/file_backed_migration_test.dart`; существующие помощники в `test/support/local_database_harness.dart` только при необходимости подключения сценария.
+  - **Estimated scope:** M.
+
+- [x] 3.10 Подтвердить готовность результата фазы 3 к проверке реализации
+  - **Acceptance criteria:**
+    - Условие Ready to advance фазы 3 из [плана](plan.md) подтверждено результатами задач 3.1–3.9: путь от планирования до обратимого выполнения работает в обоих каталогах и на обновлённой установке; отказы, ожидание согласования и уход со страницы не оставляют ложного выполнения, повторной операции или рассогласованных представлений.
+    - Редактор сохраняет независимые правки без управления выполнением, создание сохраняет явную отметку; доступность и локализация нового действия проверены. Полные проверки проекта, согласованность генерации и строгая валидация изменения проходят.
+    - Результат готов к последующей проверке реализации после последней задачи; отметка этого checkpoint сама по себе не завершает фазу `plan.md`.
+  - **Verification:**
+    - Сопоставить актуальные результаты задач с требованиями фазы, переносом существующих проверок в 3.5–3.6 и сквозными сценариями 3.8–3.9; выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, выполнить hot reload или restart и проверить флажок в обоих входах, его недоступность во время операции, перемещение между секциями, отметку дня, возврат и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии без отдельного отчёта.
+  - **Dependencies:** 3.4, 3.5, 3.6, 3.7, 3.8, 3.9.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
+
+- [x] 3.11 Устранить замечания анализатора в модели каталога без изменения поведения флажка выполнения
+  - **Acceptance criteria:**
+    - `changeCompletion` в `DailyChoiceCatalogViewModel` явно возвращает отсутствие освобождения права карточки во всех ветках, где команда не принята, включая занятость выбора и завершение работы координатора. Принятая команда по-прежнему возвращает освобождение права, которое не отменяет команду; состояния операции и категории отказов не меняются.
+    - Условия с переносом строки в `changeCompletion`, `refreshCompletion` и `_finishCompletion` оформлены блоками в фигурных скобках. `flutter analyze` не сообщает замечаний по модели каталога; правила анализатора не ослаблены, подавлений не добавлено.
+  - **Verification:**
+    - Выполнить `mise exec --no-deps -- flutter analyze lib/src/daily_choice/presentation/catalog/` и убедиться в отсутствии замечаний.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`.
+  - **Dependencies:** 3.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`.
+  - **Estimated scope:** XS.
+
+- [x] 3.12 Подтвердить готовность результата фазы 3 к повторной проверке реализации после устранения замечаний анализатора
+  - **Acceptance criteria:**
+    - Результат задачи 3.11 и актуальные проверки подтверждают условие Ready to advance фазы 3 из [плана](plan.md). Прежние результаты задачи 3.10 не подменяют проверку исправленной реализации.
+    - Полные проверки проекта, согласованность генерации и строгая валидация изменения проходят; результат готов к implementation review. Завершение фазы определяет последующий review после последней задачи, а не отметка этого checkpoint.
+  - **Verification:**
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart, проверить флажок в обоих входах и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 3.10, 3.11.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
+
+- [x] 3.13 Предъявлять отказ флажка только в экранной сессии карточки, которая им владеет, без повторного показа после её возвращения
+  - **Acceptance criteria:**
+    - По требованию «Подтверждённые результаты и безопасные ошибки дневного выбора» и [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md) отказ изменения выполнения предъявляется ровно один раз: у карточки или общей поверхностью. Карточка, вернувшаяся после ухода из раздела, сворачивания секции или смены даты, не показывает и не объявляет отказ, уже предъявленный у неё или переданный общей поверхности, в том числе если она оставалась в дереве скрытого раздела. Пока карточка остаётся в экранной сессии, где получен отказ, инлайн-сообщение и его передача при исчезновении работают по-прежнему.
+    - Вернувшейся карточке остаётся доступно восстановление, допустимое для категории отказа: после временного отказа флажок допускает явный повтор, после конфликта новое подтверждение требует действия «Обновить выбор». Отказы без обычного повтора по-прежнему не предлагают повтор; продолжительность недоступности флажка после них не меняется.
+    - Исправление ограничено подключением каталога: общий модуль предъявления, протокол прав координатора и предъявление на других экранах не меняются, новая очередь сообщений или собственный `SnackBar` не вводятся. Корневой каталог и каталог на заданную дату ведут себя одинаково.
+  - **Verification:**
+    - В `daily_choice_date_catalog_page_test.dart` дополнить сценарии ухода из корневого каталога, исчезновения ещё не построенной, ещё не предъявленной и предъявленной инлайн-ошибки, сворачивания секции и смены даты до отказа: после возвращения карточки нет `OperationFailurePresentation`, а флажок после временного отказа доступен. Одним сценарием проверить конфликт, переданный общей поверхности: у вернувшейся карточки нет сообщения, флажок недоступен до «Обновить выбор», после актуализации доступен.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart test/app/daily_choice_app_lifecycle_test.dart` и `mise exec --no-deps -- flutter analyze lib/src/daily_choice/presentation/catalog/`.
+  - **Dependencies:** 3.11.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`.
+  - **Estimated scope:** M.
+
+- [x] 3.14 Подтвердить готовность результата фазы 3 к повторной проверке реализации после устранения повторного предъявления отказа
+  - **Acceptance criteria:**
+    - Результаты задач 3.11–3.13 и актуальные проверки подтверждают условие Ready to advance фазы 3 из [плана](plan.md): отказы и уход со страницы не оставляют ложного выполнения, повторной операции, повторного предъявления результата или рассогласованных представлений. Прежние результаты задач 3.10 и 3.12 не подменяют проверку исправленной реализации.
+    - Полные проверки проекта, согласованность генерации и строгая валидация изменения проходят; результат готов к implementation review. Завершение фазы определяет последующий review после последней задачи, а не отметка этого checkpoint.
+  - **Verification:**
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart, проверить отказ флажка при уходе из раздела и возвращении в обоих входах и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 3.12, 3.13.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
+
+- [x] 3.15 Возвращать доступность флажка после отказа без явного повтора через актуализацию выбора одинаково в обоих каталогах
+  - **Acceptance criteria:**
+    - По требованию «Подтверждённые результаты и безопасные ошибки дневного выбора» [спецификации](specs/daily-choice-management/spec.md) и решению 5 [дизайна](design.md) любой отказ изменения выполнения, кроме временной недоступности, включая повреждение, неизвестный отказ (в том числе при завершении работы координатора) и отсутствие выбора, оставляет флажок недоступным, а у карточки — действие «Обновить выбор» без «Повторить». Временный отказ по-прежнему допускает явный повтор, конфликт ведёт себя как прежде.
+    - Успешная актуальная пара после «Обновить выбор» снимает состояние отказа и освобождает его право предъявления; флажок снова доступен, и следующее нажатие принимается как новая команда. Актуализация не отправляет команду; её отказ оставляет флажок недоступным. Корневой каталог и каталог на заданную дату ведут себя одинаково, перезапуск приложения или повторное открытие каталога не требуются.
+    - Карточка, вернувшаяся по результату задачи 3.13 без уже предъявленного отказа, сохраняет недоступный флажок и действие «Обновить выбор». Общий модуль предъявления, протокол прав координатора и тексты отказов не меняются.
+  - **Verification:**
+    - В `daily_choice_catalog_completion_scenarios.dart` перевести проверку категорий отказа на новое правило: после повреждения и неизвестного отказа нет второй команды до нового нажатия, отказ перечитывания сохраняет флажок недоступным, а актуальная пара делает его доступным. В `daily_choice_catalog_page_test.dart` проверить сценарий «Актуализация после неизвестного отказа возвращает флажок» в ru/en: после неизвестного отказа нет «Повторить», есть «Обновить выбор», после актуализации флажок доступен и нажатие отправляет новую команду.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart` и `mise exec --no-deps -- flutter analyze lib/src/daily_choice/presentation/catalog/`.
+  - **Dependencies:** 3.13.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_completion_scenarios.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Estimated scope:** S.
+
+- [x] 3.16 Подтвердить готовность результата фазы 3 к повторной проверке реализации после возврата доступности флажка актуализацией
+  - **Acceptance criteria:**
+    - Результаты задач 3.11–3.15 и актуальные проверки подтверждают условие Ready to advance фазы 3 из [плана](plan.md): отказы и уход со страницы не оставляют ложного выполнения, повторной операции, повторного предъявления результата, бессрочно недоступного флажка или рассогласованных представлений. Прежние результаты задач 3.10, 3.12 и 3.14 не подменяют проверку исправленной реализации.
+    - Полные проверки проекта, согласованность генерации и строгая валидация изменения проходят; результат готов к implementation review. Завершение фазы определяет последующий review после последней задачи, а не отметка этого checkpoint.
+  - **Verification:**
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart, проверить актуализацию после отказа флажка в обоих входах и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 3.14, 3.15.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.

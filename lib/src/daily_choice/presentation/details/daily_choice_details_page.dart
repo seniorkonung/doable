@@ -17,6 +17,7 @@ import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/daily_choice_id.dart';
+import '../../domain/daily_choice_schedule.dart';
 import '../daily_choice_command_failure_message.dart';
 import '../editor/daily_choice_path_replacement_flow.dart';
 import 'daily_choice_delete_confirmation.dart';
@@ -362,6 +363,12 @@ final class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final choice = details.choice;
+    final schedule = switch (choice.schedule) {
+      DailyChoiceAllDay() => l10n.dailyChoiceAllDay,
+      DailyChoiceTime(:final hour, :final minute) => l10n.dailyChoiceTimeLabel(
+        TimeOfDay(hour: hour, minute: minute).format(context),
+      ),
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -377,6 +384,10 @@ final class _Summary extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(l10n.dailyChoiceDetailsDate(choice.date.toCanonicalString())),
+        Text(schedule),
+        Text(
+          l10n.dailyChoicePriorityOption(choice.priority.name.toUpperCase()),
+        ),
         Text(
           choice.isCompleted
               ? l10n.dailyChoiceDetailsCompleted

@@ -312,7 +312,8 @@ final class PackageConsumerProbes {
           }
           probe.revision = state.revision;
           if (state.refreshFailure != null ||
-              state.pageStatus is DailyChoiceCatalogPageFailure) {
+              state.incomplete.pageStatus is DailyChoiceCatalogPageFailure ||
+              state.completed.pageStatus is DailyChoiceCatalogPageFailure) {
             probe.forbiddenStates.add(state);
           }
         case DailyChoiceCatalogInitialLoad():
@@ -371,7 +372,7 @@ final class PackageConsumerProbes {
 
   (Object?, bool?) get dailyCatalogSelection {
     final selection = _container.read(dailyCatalogProvider).selection;
-    return (selection.date, selection.isCompleted);
+    return (selection.date, selection.completedExpanded);
   }
 
   Object? neighborhoodSelection(IntentionId id) {
@@ -498,7 +499,7 @@ Object _dailyItem(DailyChoiceCatalogItem item) => (
 Object _dailyCatalogContent(DailyChoiceCatalogLoaded state) => [
   [for (final item in state.items) _dailyItem(item)],
   state.totalCount,
-  state.nextCursor == null,
+  state.incomplete.nextCursor == null && state.completed.nextCursor == null,
 ];
 
 Object _selectedContent(SelectedRelationsSnapshot snapshot) => [

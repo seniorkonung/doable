@@ -4,7 +4,10 @@ import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
 import '../domain/calendar_date.dart';
+import '../domain/daily_choice_description.dart';
 import '../domain/daily_choice_id.dart';
+import '../domain/daily_choice_priority.dart';
+import '../domain/daily_choice_schedule.dart';
 
 enum DailyChoiceCatalogQueryValidationFailure { pageSizeOutOfRange }
 
@@ -20,8 +23,8 @@ abstract interface class DailyChoiceCatalogCursor {}
 
 final class DailyChoiceCatalogQuery {
   factory DailyChoiceCatalogQuery({
-    CalendarDate? date,
-    bool? isCompleted,
+    required CalendarDate date,
+    required bool isCompleted,
     int pageSize = defaultPageSize,
     DailyChoiceCatalogCursor? cursor,
   }) {
@@ -44,11 +47,8 @@ final class DailyChoiceCatalogQuery {
   static const maxPageSize = 100;
   static const defaultPageSize = 50;
 
-  /// null означает все календарные даты.
-  final CalendarDate? date;
-
-  /// null означает оба состояния выполнения.
-  final bool? isCompleted;
+  final CalendarDate date;
+  final bool isCompleted;
   final int pageSize;
   final DailyChoiceCatalogCursor? cursor;
 }
@@ -89,9 +89,16 @@ final class DailyChoiceCatalogItem {
     required DailyChoiceCatalogParticipant selected,
     required CalendarDate date,
     required bool isCompleted,
+    required DailyChoiceSchedule schedule,
+    required DailyChoicePriority priority,
+    required DailyChoiceDescription? description,
+    required int pathIntentionCount,
   }) {
     if (source.id == selected.id) {
       throw ArgumentError.value(selected.id, 'selected');
+    }
+    if (pathIntentionCount < 2) {
+      throw ArgumentError.value(pathIntentionCount, 'pathIntentionCount');
     }
     return DailyChoiceCatalogItem._(
       id: id,
@@ -99,6 +106,10 @@ final class DailyChoiceCatalogItem {
       selected: selected,
       date: date,
       isCompleted: isCompleted,
+      schedule: schedule,
+      priority: priority,
+      description: description,
+      pathIntentionCount: pathIntentionCount,
     );
   }
 
@@ -108,6 +119,10 @@ final class DailyChoiceCatalogItem {
     required this.selected,
     required this.date,
     required this.isCompleted,
+    required this.schedule,
+    required this.priority,
+    required this.description,
+    required this.pathIntentionCount,
   });
 
   final DailyChoiceId id;
@@ -115,9 +130,16 @@ final class DailyChoiceCatalogItem {
   final DailyChoiceCatalogParticipant selected;
   final CalendarDate date;
   final bool isCompleted;
+  final DailyChoiceSchedule schedule;
+  final DailyChoicePriority priority;
+  final DailyChoiceDescription? description;
+
+  /// Число намерений проверенного сохранённого пути, включая обоих участников.
+  final int pathIntentionCount;
 }
 
-/// Репозиторий выдаёт записи по date DESC, creation_sequence DESC.
+/// Секция одной даты и выполнения упорядочена по времени (весь день первым),
+/// приоритету и последовательности создания, по возрастанию.
 /// Список и ревизия относятся к одному подтверждённому снимку.
 sealed class DailyChoiceCatalogPage {
   DailyChoiceCatalogPage({
@@ -131,16 +153,20 @@ sealed class DailyChoiceCatalogPage {
   final GraphRevision revision;
 }
 
-/// Точное количество и строки первой порции получены на одной ревизии.
+/// Сводка всей секции и строки первой порции получены на одном снимке.
 final class DailyChoiceCatalogFirstPage extends DailyChoiceCatalogPage {
   DailyChoiceCatalogFirstPage({
     required super.items,
     required int totalCount,
+    required this.hasTimedChoices,
     required super.nextCursor,
     required super.revision,
   }) : totalCount = _checkedCount(totalCount, items.length);
 
   final int totalCount;
+
+  /// Учитывает также выборы за границей загруженной порции.
+  final bool hasTimedChoices;
 
   static int _checkedCount(int count, int itemCount) {
     if (count < itemCount) {

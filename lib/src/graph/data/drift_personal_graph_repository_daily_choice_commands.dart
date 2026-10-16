@@ -74,8 +74,8 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           await _database.customInsert(
             '''INSERT INTO daily_choices
                (id, source_intention_id, selected_intention_id,
-                choice_date, description, is_completed)
-               VALUES (?, ?, ?, ?, ?, ?)''',
+                choice_date, description, is_completed, scheduled_minute, priority)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
             variables: [
               Variable<String>(choiceId.toCanonicalString()),
               Variable<String>(command.sourceIntentionId.toCanonicalString()),
@@ -83,6 +83,11 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
               Variable<String>(command.date.toCanonicalString()),
               Variable<String>(command.description?.value),
               Variable<int>(command.isCompleted ? 1 : 0),
+              Variable<int>(switch (command.schedule) {
+                DailyChoiceAllDay() => null,
+                DailyChoiceTime(:final minuteOfDay) => minuteOfDay,
+              }),
+              Variable<int>(command.priority.level),
             ],
             updates: {_database.dailyChoices},
           );
@@ -117,6 +122,8 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
               details.choice.date != command.date ||
               details.choice.description != command.description ||
               details.choice.isCompleted != command.isCompleted ||
+              details.choice.schedule != command.schedule ||
+              details.choice.priority != command.priority ||
               details.path.length != command.path.steps.length) {
             throw const _StoredIntentionCorruption();
           }
@@ -227,10 +234,20 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
             DailyChoiceFieldUnchanged<bool>() => before.isCompleted,
             DailyChoiceFieldSet<bool>(:final value) => value,
           };
+          final schedule = switch (command.patch.schedule) {
+            DailyChoiceFieldUnchanged<DailyChoiceSchedule>() => before.schedule,
+            DailyChoiceFieldSet<DailyChoiceSchedule>(:final value) => value,
+          };
+          final priority = switch (command.patch.priority) {
+            DailyChoiceFieldUnchanged<DailyChoicePriority>() => before.priority,
+            DailyChoiceFieldSet<DailyChoicePriority>(:final value) => value,
+          };
           final didMutate =
               date != before.date ||
               description != before.description ||
-              isCompleted != before.isCompleted;
+              isCompleted != before.isCompleted ||
+              schedule != before.schedule ||
+              priority != before.priority;
           record(DiagnosticsSucceeded(stopwatch.elapsed));
 
           var verified = existing;
@@ -265,6 +282,26 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                             value,
                           ),
                         },
+                        scheduledMinute: switch (command.patch.schedule) {
+                          DailyChoiceFieldUnchanged<DailyChoiceSchedule>() =>
+                            const Value.absent(),
+                          DailyChoiceFieldSet<DailyChoiceSchedule>(
+                            :final value,
+                          ) =>
+                            Value(switch (value) {
+                              DailyChoiceAllDay() => null,
+                              DailyChoiceTime(:final minuteOfDay) =>
+                                minuteOfDay,
+                            }),
+                        },
+                        priority: switch (command.patch.priority) {
+                          DailyChoiceFieldUnchanged<DailyChoicePriority>() =>
+                            const Value.absent(),
+                          DailyChoiceFieldSet<DailyChoicePriority>(
+                            :final value,
+                          ) =>
+                            Value(value.level),
+                        },
                       ),
                     );
             if (updatedRows != 1) throw const _StoredIntentionCorruption();
@@ -280,6 +317,8 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                 after.date != date ||
                 after.description != description ||
                 after.isCompleted != isCompleted ||
+                after.schedule != schedule ||
+                after.priority != priority ||
                 verified.path.length != existing.path.length) {
               throw const _StoredIntentionCorruption();
             }
@@ -474,6 +513,8 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                 after.date != before.date ||
                 after.description != before.description ||
                 after.isCompleted != before.isCompleted ||
+                after.schedule != before.schedule ||
+                after.priority != before.priority ||
                 verified.path.length != generatedStepIds.length) {
               throw const _StoredIntentionCorruption();
             }

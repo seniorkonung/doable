@@ -1,4 +1,6 @@
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
@@ -42,7 +44,7 @@ Future<void> _until(bool Function() condition) async {
 
 void main() {
   test(
-    'реальный каталог, отметки и подробности согласуют изменения графа',
+    'реальный флажок, каталоги, отметки и подробности согласуют выполнение',
     () async {
       final sourceDay = CalendarDate.fromParts(2026, 9, 24);
       final targetDay = CalendarDate.fromParts(2026, 9, 25);
@@ -50,12 +52,19 @@ void main() {
       await database.open();
       addTearDown(database.close);
       await _seedGraph(database);
-      for (var number = 201; number <= 251; number++) {
+      const description = 'Полное описание\nмногошагового выбора\nна вечер';
+      for (final number in [
+        for (var number = 202; number <= 251; number++) number,
+        201,
+      ]) {
         await _insertChoice(
           database,
           number,
           sourceDay,
           completed: number != 201,
+          scheduledMinute: 1080,
+          priority: 2,
+          description: description,
         );
       }
 
@@ -103,25 +112,38 @@ void main() {
       DailyChoiceCatalogLoaded catalog() =>
           container.read(catalogProvider) as DailyChoiceCatalogLoaded;
       final model = container.read(catalogProvider.notifier);
+      final otherProvider = dailyChoiceCatalogViewModelProvider(
+        DailyChoiceCatalogInstance(initialDate: targetDay),
+      );
+      final otherSubscription = container.listen(otherProvider, (_, _) {});
+      addTearDown(otherSubscription.close);
+      final otherModel = container.read(otherProvider.notifier);
+      otherModel.selectDate(sourceDay);
+      otherModel.toggleSection(false);
+      otherModel.toggleSection(true);
+      DailyChoiceCatalogLoaded otherCatalog() =>
+          container.read(otherProvider) as DailyChoiceCatalogLoaded;
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
 
       model.selectDate(sourceDay);
       await _until(
-        () => container.read(catalogProvider) is DailyChoiceCatalogLoaded,
+        () =>
+            container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
+            container.read(otherProvider) is DailyChoiceCatalogLoaded,
       );
       expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 51);
-      expect(catalog().items, hasLength(50));
-      expect(catalog().items.first.id, _choice(251));
-      expect(catalog().nextCursor, isNotNull);
-      await model.loadMore();
+      expect(catalog().items, hasLength(51));
+      expect(catalog().incomplete.items.single.id, _choice(201));
+      expect(catalog().completed.totalCount, 50);
+      await model.loadMore(isCompleted: false);
       expect(catalog().items.map((item) => item.id).toSet(), {
         _choice(201),
         for (var number = 202; number <= 251; number++) _choice(number),
       });
-      expect(catalog().items.last.id, _choice(201));
+      expect(catalog().items.last.id, _choice(251));
       await expectMarks({sourceDay: DailyChoiceDayStatus.hasIncomplete});
 
       final details = DailyChoiceDetailsViewModel(repository, _choice(201));
@@ -143,20 +165,65 @@ void main() {
 
       // Единственный невыполненный выбор определяет отметку всего дня.
       for (final completed in [true, false]) {
-        final command = coordinator.acceptDailyChoiceUpdate(
-          UpdateDailyChoiceFields(
-            choiceId: _choice(201),
-            patch: DailyChoiceFieldsPatch(
-              isCompleted: DailyChoiceFieldSet(completed),
-            ),
-          ),
-        ) as DailyChoiceCommandAccepted;
-        await command.future;
+        (completed ? model : otherModel).changeCompletion(
+          _choice(201),
+          completed,
+        );
+        await _until(
+          () =>
+              catalog().freshness == DailyChoiceCatalogFreshness.current &&
+              otherCatalog().freshness == DailyChoiceCatalogFreshness.current &&
+              catalog().incomplete.totalCount == (completed ? 0 : 1) &&
+              otherCatalog().incomplete.totalCount == (completed ? 0 : 1) &&
+              opened().details.choice.isCompleted == completed,
+        );
         await expectMarks({
           sourceDay: completed
               ? DailyChoiceDayStatus.allCompleted
               : DailyChoiceDayStatus.hasIncomplete,
         });
+        expect(catalog().selection.date, sourceDay);
+        expect(catalog().selection.incompleteExpanded, isTrue);
+        expect(catalog().selection.completedExpanded, isFalse);
+        expect(otherCatalog().selection.date, sourceDay);
+        expect(otherCatalog().selection.incompleteExpanded, isFalse);
+        expect(otherCatalog().selection.completedExpanded, isTrue);
+        expect(
+          opened().details.choice.schedule,
+          DailyChoiceTime(hour: 18, minute: 0),
+        );
+        expect(opened().details.choice.priority, DailyChoicePriority.p2);
+        expect(opened().details.choice.description?.value, description);
+        expect(opened().details.path.map((step) => step.relation.id), [
+          _relation(101),
+          _relation(102),
+        ]);
+        if (completed) {
+          for (final loaded in [catalog(), otherCatalog()]) {
+            expect(loaded.completed.totalCount, 51);
+            expect(loaded.completed.items.map((item) => item.id), [
+              for (var number = 202; number <= 251; number++) _choice(number),
+            ]);
+            expect(loaded.completed.nextCursor, isNotNull);
+          }
+          await model.loadMore(isCompleted: true);
+          await otherModel.loadMore(isCompleted: true);
+          for (final loaded in [catalog(), otherCatalog()]) {
+            expect(loaded.completed.items.map((item) => item.id), [
+              for (var number = 202; number <= 251; number++) _choice(number),
+              _choice(201),
+            ]);
+            expect(loaded.completed.nextCursor, isNull);
+            expect(loaded.completed.items.last.pathIntentionCount, 3);
+          }
+        } else {
+          for (final loaded in [catalog(), otherCatalog()]) {
+            expect(loaded.incomplete.items.single.id, _choice(201));
+            expect(loaded.completed.items.map((item) => item.id), [
+              for (var number = 202; number <= 251; number++) _choice(number),
+            ]);
+          }
+        }
       }
 
       final update = coordinator.acceptDailyChoiceUpdate(
@@ -181,7 +248,7 @@ void main() {
       expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 50);
       expect(catalog().items, hasLength(50));
-      expect(catalog().nextCursor, isNull);
+      expect(catalog().incomplete.nextCursor, isNull);
       expect(catalog().items.any((item) => item.id == _choice(201)), isFalse);
       expect(catalog().items.every((item) => item.date == sourceDay), isTrue);
       expect(opened().details.choice.date, targetDay);
@@ -218,7 +285,7 @@ void main() {
             catalog().selection.date == targetDay,
       );
       expect(catalog().totalCount, 1);
-      expect(catalog().nextCursor, isNull);
+      expect(catalog().incomplete.nextCursor, isNull);
       expect(catalog().items.single.id, _choice(201));
       expect(catalog().items.single.date, targetDay);
       expect(catalog().items.single.isCompleted, isTrue);
@@ -235,7 +302,14 @@ void main() {
             catalog().totalCount == 0 &&
             details.state is DailyChoiceDetailsNotFound,
       );
-      expect(catalog(), isA<DailyChoiceCatalogEmpty>());
+      expect(
+        catalog(),
+        isA<DailyChoiceCatalogLoaded>().having(
+          (state) => state.totalCount,
+          'количество',
+          0,
+        ),
+      );
       expect(catalog().selection.date, targetDay);
       await expectMarks({sourceDay: DailyChoiceDayStatus.allCompleted});
 
@@ -303,12 +377,14 @@ void main() {
           switch (container.read(catalogProvider)) {
             final DailyChoiceCatalogLoaded loaded =>
               loaded.selection.date == date &&
-                  loaded.selection.isCompleted == isCompleted &&
                   loaded.freshness == DailyChoiceCatalogFreshness.current,
             _ => false,
           };
+      var includeCompleted = false;
       List<DailyChoiceId> ids() => [
-        for (final item in catalog().items) item.id,
+        for (final item
+            in includeCompleted ? catalog().items : catalog().incomplete.items)
+          item.id,
       ];
       final model = container.read(catalogProvider.notifier);
       final coordinator = container.read(
@@ -336,38 +412,32 @@ void main() {
       await _until(() => shows(day, null));
       expect(catalog().totalCount, 53);
       expect(ids(), [
-        for (var number = 253; number > 203; number--) _choice(number),
+        for (var number = 201; number <= 250; number++) _choice(number),
       ]);
-      await model.loadMore();
+      await model.loadMore(isCompleted: false);
       expect(ids(), [
-        for (var number = 253; number >= 201; number--) _choice(number),
+        for (var number = 201; number <= 253; number++) _choice(number),
       ]);
-      expect(catalog().nextCursor, isNull);
+      expect(catalog().incomplete.nextCursor, isNull);
 
-      model.selectCompletion(false);
       await _until(() => shows(day, false));
-      await model.loadMore();
+      await model.loadMore(isCompleted: false);
       expect(catalog().totalCount, 53);
       expect(catalog().items, hasLength(53));
 
       // Выполнение одного дубликата убирает его из охвата невыполненных, а
       // его полный дубликат остаётся прежним.
-      final completed = await confirm(
-        coordinator.acceptDailyChoiceUpdate(
-          UpdateDailyChoiceFields(
-            choiceId: _choice(253),
-            patch: const DailyChoiceFieldsPatch(
-              isCompleted: DailyChoiceFieldSet(true),
-            ),
-          ),
-        ),
+      model.changeCompletion(_choice(253), true);
+      await _until(
+        () =>
+            catalog().freshness == DailyChoiceCatalogFreshness.current &&
+            catalog().incomplete.totalCount == 52,
       );
-      await reconciled(completed);
-      expect(catalog().totalCount, 52);
+      expect(catalog().incomplete.totalCount, 52);
       expect(ids(), [
-        for (var number = 252; number >= 201; number--) _choice(number),
+        for (var number = 201; number <= 252; number++) _choice(number),
       ]);
-      final twin = catalog().items.first;
+      final twin = catalog().incomplete.items.last;
       expect(twin.id, _choice(252));
       expect(twin.date, day);
       expect(twin.isCompleted, isFalse);
@@ -382,12 +452,12 @@ void main() {
         ),
       );
       await reconciled(moved);
-      expect(catalog().totalCount, 51);
+      expect(catalog().incomplete.totalCount, 51);
       expect(ids(), [
-        for (var number = 251; number >= 201; number--) _choice(number),
+        for (var number = 201; number <= 251; number++) _choice(number),
       ]);
 
-      // Новая запись выбранного дня становится первой.
+      // При равных времени и приоритете новая запись идёт после прежних.
       final createdToday = await confirm(
         coordinator.acceptDailyChoiceCreation(
           DailyChoiceCreationFormKey(),
@@ -395,8 +465,8 @@ void main() {
         ),
       );
       await reconciled(createdToday);
-      expect(catalog().totalCount, 52);
-      expect(ids().first, _choice(401));
+      expect(catalog().incomplete.totalCount, 52);
+      expect(ids().last, _choice(401));
       expect(ids(), hasLength(52));
 
       // Запись другого дня не входит в выдачу.
@@ -407,34 +477,183 @@ void main() {
         ),
       );
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(catalog().totalCount, 52);
+      expect(catalog().incomplete.totalCount, 52);
       expect(ids(), isNot(contains(_choice(402))));
 
       final deleted = await confirm(
         coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_choice(401))),
       );
       await reconciled(deleted);
-      expect(catalog().totalCount, 51);
+      expect(catalog().incomplete.totalCount, 51);
       expect(ids(), isNot(contains(_choice(401))));
 
-      // Сброс возвращает выполненную запись того же дня.
-      model.clearFilters();
+      // Раскрытие выполненных сохраняет обе прочитанные секции того же дня.
+      includeCompleted = true;
+      model.toggleSection(true);
       await _until(() => shows(day, null));
       expect(catalog().totalCount, 52);
-      expect(ids().first, _choice(253));
-      expect(catalog().items.first.isCompleted, isTrue);
+      expect(ids().last, _choice(253));
+      expect(catalog().completed.items.single.isCompleted, isTrue);
 
       // Перенесённая и созданная записи доступны выбором их дней.
       model.selectDate(futureDay);
       await _until(() => shows(futureDay, null));
-      expect(ids(), [_choice(302), _choice(252)]);
+      expect(ids(), [_choice(252), _choice(302)]);
       expect(catalog().totalCount, 2);
-      expect(catalog().items.last.isCompleted, isFalse);
+      expect(catalog().incomplete.items.single.isCompleted, isFalse);
       model.selectDate(pastDay);
       await _until(() => shows(pastDay, null));
-      expect(ids(), [_choice(402), _choice(301)]);
+      expect(ids(), [_choice(301), _choice(402)]);
     },
   );
+
+  test('реальные правки пересобирают обе секции до прежнего объёма и сохраняются при отказе чтения', () async {
+    final day = CalendarDate.fromParts(2026, 9, 24);
+    final probe = _CatalogReadFailure();
+    final database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        probe,
+      ),
+    );
+    await database.open();
+    addTearDown(database.close);
+    await _seedGraph(database);
+    await database.customStatement(
+      "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, 'can', 1, 0)",
+      [_uuid(103), _uuid(1), _uuid(3)],
+    );
+    for (var number = 201; number <= 251; number++) {
+      await _insertChoice(database, number, day);
+      await _insertChoice(database, number + 100, day, completed: true);
+    }
+    await database.customStatement(
+      'UPDATE daily_choices SET scheduled_minute = 1080 WHERE is_completed = 1',
+    );
+    final repository = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 9, 24),
+      InMemoryDiagnosticsSink(),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWith((ref) => repository),
+      ],
+    );
+    addTearDown(container.dispose);
+    final provider = dailyChoiceCatalogViewModelProvider(
+      DailyChoiceCatalogInstance(initialDate: day),
+    );
+    final subscription = container.listen(provider, (_, value) {
+      if (value is DailyChoiceCatalogLoaded) {
+        expect(
+          value.items.where((item) => item.id == _choice(201)).length,
+          lessThanOrEqualTo(1),
+        );
+        expect(
+          value.incomplete.items.every((item) => !item.isCompleted),
+          isTrue,
+        );
+        expect(value.completed.items.every((item) => item.isCompleted), isTrue);
+      }
+    });
+    addTearDown(subscription.close);
+    DailyChoiceCatalogLoaded catalog() =>
+        container.read(provider) as DailyChoiceCatalogLoaded;
+    await _until(() => container.read(provider) is DailyChoiceCatalogLoaded);
+    final model = container.read(provider.notifier);
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final details = DailyChoiceDetailsViewModel(repository, _choice(201));
+    addTearDown(details.dispose);
+    await _until(() => details.state is DailyChoiceDetailsLoaded);
+    DailyChoiceDetailsLoaded opened() =>
+        details.state as DailyChoiceDetailsLoaded;
+    await model.loadMore(isCompleted: true);
+    expect(
+      (catalog().incomplete.items.length, catalog().completed.items.length),
+      (50, 51),
+    );
+
+    probe.failNext = true;
+    final update = coordinator.acceptDailyChoiceUpdate(
+      UpdateDailyChoiceFields(
+        choiceId: _choice(201),
+        patch: DailyChoiceFieldsPatch(
+          schedule: DailyChoiceFieldSet(DailyChoiceTime(hour: 18, minute: 0)),
+          priority: const DailyChoiceFieldSet(DailyChoicePriority.p2),
+        ),
+      ),
+    ) as DailyChoiceCommandAccepted;
+    expect((await update.future).isFailure, isFalse);
+    await _until(
+      () =>
+          catalog().freshness == DailyChoiceCatalogFreshness.stale &&
+          opened().details.choice.priority == DailyChoicePriority.p2,
+    );
+    expect(
+      catalog().incomplete.items.first.schedule,
+      const DailyChoiceAllDay(),
+    );
+    expect(
+      opened().details.choice.schedule,
+      DailyChoiceTime(hour: 18, minute: 0),
+    );
+
+    final replace = coordinator.acceptDailyChoiceReplace(
+      ReplaceDailyChoicePath(
+        choiceId: _choice(201),
+        sourceIntentionId: _intention(1),
+        selectedIntentionId: _intention(3),
+        path: ConfirmedChoicePath([
+          ConfirmedChoicePathStep(
+            relationId: _relation(103),
+            sourceIntentionId: _intention(1),
+            type: LongTermRelationType.can,
+            relatedIntentionId: _intention(3),
+          ),
+        ]),
+      ),
+    ) as DailyChoiceCommandAccepted;
+    expect((await replace.future).isFailure, isFalse);
+    await _until(
+      () =>
+          catalog().freshness == DailyChoiceCatalogFreshness.current &&
+          opened().details.path.length == 1,
+    );
+    expect(
+      (catalog().incomplete.items.length, catalog().completed.items.length),
+      (50, 51),
+    );
+    expect(
+      catalog().incomplete.items.any((item) => item.id == _choice(201)),
+      isFalse,
+    );
+    await model.loadMore(isCompleted: false);
+    final moved = catalog().incomplete.items.last;
+    expect(moved.id, _choice(201));
+    expect(moved.schedule, DailyChoiceTime(hour: 18, minute: 0));
+    expect(moved.priority, DailyChoicePriority.p2);
+    expect(moved.pathIntentionCount, 2);
+
+    model.changeCompletion(moved.id, true);
+    await _until(
+      () =>
+          catalog().freshness == DailyChoiceCatalogFreshness.current &&
+          catalog().completed.totalCount == 52 &&
+          opened().details.choice.isCompleted,
+    );
+    expect(catalog().incomplete.totalCount, 50);
+    expect(
+      catalog().incomplete.items.any((item) => item.id == moved.id),
+      isFalse,
+    );
+    expect(catalog().completed.items.first.id, moved.id);
+    expect(catalog().completed.items.first.pathIntentionCount, 2);
+    expect(catalog().completed.items, hasLength(52));
+  });
 }
 
 /// Засевает основание 1, промежуточное намерение 2, готовое действие 3 и
@@ -465,17 +684,24 @@ Future<void> _insertChoice(
   int number,
   CalendarDate date, {
   bool completed = false,
+  int? scheduledMinute,
+  int priority = 4,
+  String? description,
 }) async {
   await database.customStatement(
     '''INSERT INTO daily_choices
      (id, source_intention_id, selected_intention_id, choice_date,
-      is_completed) VALUES (?, ?, ?, ?, ?)''',
+      is_completed, scheduled_minute, priority, description)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
     [
       _uuid(number),
       _uuid(1),
       _uuid(3),
       date.toCanonicalString(),
       if (completed) 1 else 0,
+      scheduledMinute,
+      priority,
+      description,
     ],
   );
   await database.customStatement(
@@ -529,4 +755,20 @@ final class _SequentialChoiceIds implements DailyChoiceIdGenerator {
 
   @override
   DailyChoiceId generate() => _choice(_next++);
+}
+
+/// Отказ реального чтения после подтверждённой команды не откатывает запись.
+final class _CatalogReadFailure extends LocalDatabaseConnectionObserver {
+  bool failNext = false;
+  @override
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (failNext &&
+        statement.operation == LocalDatabaseSqlOperation.select &&
+        statement.statements.single.contains(
+          'FROM daily_choices WHERE choice_date',
+        )) {
+      failNext = false;
+      throw StateError('Управляемый отказ чтения каталога');
+    }
+  }
 }

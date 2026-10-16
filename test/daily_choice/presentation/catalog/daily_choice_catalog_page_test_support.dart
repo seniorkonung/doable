@@ -5,12 +5,20 @@ import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -19,6 +27,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -43,10 +53,10 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 /// неподдерживаемый язык даёт английский. [size] — логический размер экрана;
 /// [today] — локальное сегодня.
 /// [catalogDate] открывает отдельный каталог на дату вместо корневого.
-/// Чтения каталога завершает сценарий через [repository].
-Future<void> pumpCatalogPage(
+/// Чтения каталога предоставляет [repository].
+Future<AppRouter> pumpCatalogPage(
   WidgetTester tester,
-  CatalogPageRepository repository, {
+  PersonalGraphRepository repository, {
   required CalendarDate today,
   required Locale locale,
   required Size size,
@@ -86,6 +96,7 @@ Future<void> pumpCatalogPage(
   // Переход к каталогу заканчивается без анимации, а первое чтение каталога
   // остаётся незавершённым до решения сценария.
   await tester.pump(const Duration(milliseconds: 400));
+  return router;
 }
 
 /// Хранилище личного графа для страничных проверок каталога дневных выборов.
@@ -95,11 +106,86 @@ Future<void> pumpCatalogPage(
 final class CatalogPageRepository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
+  // Управляемые чтения невыполненных; completeFirst задаёт обе секции дня.
   final queries = <DailyChoiceCatalogQuery>[];
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
+  final _completedPages = <CalendarDate, DailyChoiceCatalogFirstPage>{};
   final dayStatusQueries = <DailyChoiceDayStatusQuery>[];
   final _dayStatusRequests = <Completer<DailyChoiceDayStatusesReadResult>>[];
   late TagCommandResult _tagCommandResult;
+  final completionCommands = <UpdateDailyChoiceFields>[];
+  final _completionRequests = <Completer<DailyChoiceCommandResult>>[];
+
+  void failCompletion(int index, DailyChoiceCommandFailure failure) =>
+      _completionRequests[index].complete(GraphCommandFailed(failure));
+
+  void confirmCompletion(
+    int index,
+    DailyChoiceCatalogItem item, {
+    required bool isCompleted,
+    required int revision,
+  }) {
+    DailyChoice choice(bool completed) => DailyChoice(
+      id: item.id,
+      sourceIntentionId: item.source.id,
+      selectedIntentionId: item.selected.id,
+      date: item.date,
+      description: item.description,
+      schedule: item.schedule,
+      priority: item.priority,
+      isCompleted: completed,
+    );
+    final before = choice(item.isCompleted);
+    final after = choice(isCompleted);
+    final graphRevision = _Revision(revision);
+    final counts = RelationCounts(
+      activeNeedIncoming: 0,
+      activeNeedOutgoing: 0,
+      activeCanIncoming: 0,
+      activeCanOutgoing: 0,
+      archivedNeedIncoming: 0,
+      archivedNeedOutgoing: 0,
+      archivedCanIncoming: 0,
+      archivedCanOutgoing: 0,
+    );
+    _completionRequests[index].complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: graphRevision,
+          value: DailyChoiceFieldsUpdated(
+            before: before,
+            choice: after,
+            path: StoredChoicePath([
+              ChoicePathStep(
+                id: (ChoicePathStepId.decode(
+                  _uuid(1),
+                ) as ChoicePathStepIdDecodingSuccess).id,
+                dailyChoiceId: item.id,
+                relationId: (LongTermRelationId.decode(
+                  _uuid(1),
+                ) as LongTermRelationIdDecodingSuccess).id,
+                previousStepId: null,
+              ),
+            ]),
+            changes: [
+              DailyChoiceChange(
+                revision: graphRevision,
+                before: before,
+                after: after,
+                releasedRelationIds: const [],
+                occupiedRelationIds: const [],
+                intentionCounts: {
+                  item.source.id: counts,
+                  item.selected.id: counts,
+                },
+                relationPermissions: const {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
@@ -180,6 +266,12 @@ final class CatalogPageRepository
     if (command is RenameTag) {
       return _tagCommandResult as GraphCommandResult<T, F>;
     }
+    if (command is UpdateDailyChoiceFields) {
+      completionCommands.add(command as UpdateDailyChoiceFields);
+      final request = Completer<DailyChoiceCommandResult>();
+      _completionRequests.add(request);
+      return await request.future as GraphCommandResult<T, F>;
+    }
     throw UnsupportedError('Команда не предусмотрена сценарием.');
   }
 
@@ -187,6 +279,21 @@ final class CatalogPageRepository
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) {
+    if (query.isCompleted == true && query.cursor == null) {
+      return Future.value(
+        DailyChoiceCatalogPageSuccess(
+          DailyChoiceCatalogFirstPage(
+            items: _completedPages[query.date]?.items ?? const [],
+            totalCount: _completedPages[query.date]?.totalCount ?? 0,
+            hasTimedChoices:
+                _completedPages[query.date]?.hasTimedChoices ?? false,
+            nextCursor: _completedPages[query.date]?.nextCursor,
+            revision:
+                _completedPages[query.date]?.revision ?? const _Revision(),
+          ),
+        ),
+      );
+    }
     queries.add(query);
     final request = Completer<DailyChoiceCatalogPageResult>();
     _requests.add(request);
@@ -200,28 +307,50 @@ final class CatalogPageRepository
     List<DailyChoiceCatalogItem> items, {
     required int total,
     DailyChoiceCatalogCursor? cursor,
+    bool? hasTimedChoices,
+    int revision = 0,
+  }) {
+    final completed = items.where((item) => item.isCompleted).toList();
+    final incomplete = items.where((item) => !item.isCompleted).toList();
+    final completedOnly = items.isNotEmpty && incomplete.isEmpty;
+    _completedPages[queries[index].date] = DailyChoiceCatalogFirstPage(
+      items: completed,
+      totalCount: completedOnly ? total : completed.length,
+      hasTimedChoices: completed.any(
+        (item) => item.schedule is DailyChoiceTime,
+      ),
+      nextCursor: completedOnly ? cursor : null,
+      revision: _Revision(revision),
+    );
+    _requests[index].complete(
+      DailyChoiceCatalogPageSuccess(
+        DailyChoiceCatalogFirstPage(
+          items: incomplete,
+          totalCount: completedOnly ? 0 : total - completed.length,
+          hasTimedChoices:
+              hasTimedChoices ??
+              incomplete.any((item) => item.schedule is DailyChoiceTime),
+          nextCursor: completedOnly ? null : cursor,
+          revision: _Revision(revision),
+        ),
+      ),
+    );
+  }
+
+  /// Завершает продолжение номер [index]; [cursor] оставляет следующую порцию.
+  void completeMore(
+    int index,
+    List<DailyChoiceCatalogItem> items, {
+    DailyChoiceCatalogCursor? cursor,
   }) => _requests[index].complete(
     DailyChoiceCatalogPageSuccess(
-      DailyChoiceCatalogFirstPage(
+      DailyChoiceCatalogContinuationPage(
         items: items,
-        totalCount: total,
         nextCursor: cursor,
         revision: const _Revision(),
       ),
     ),
   );
-
-  /// Завершает запрос продолжения номер [index] последними строками [items].
-  void completeMore(int index, List<DailyChoiceCatalogItem> items) =>
-      _requests[index].complete(
-        DailyChoiceCatalogPageSuccess(
-          DailyChoiceCatalogContinuationPage(
-            items: items,
-            nextCursor: null,
-            revision: const _Revision(),
-          ),
-        ),
-      );
 
   /// Завершает запрос номер [index] доказанно временной недоступностью
   /// хранилища: каталог предлагает повтор.
@@ -260,6 +389,10 @@ DailyChoiceCatalogItem catalogPageItem(
   int number, {
   required CalendarDate date,
   bool isCompleted = false,
+  DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+  DailyChoicePriority priority = DailyChoicePriority.p4,
+  DailyChoiceDescription? description,
+  int pathIntentionCount = 2,
 }) => DailyChoiceCatalogItem(
   id: (DailyChoiceId.decode(_uuid(number)) as DailyChoiceIdDecodingSuccess).id,
   source: DailyChoiceCatalogParticipant(
@@ -276,6 +409,10 @@ DailyChoiceCatalogItem catalogPageItem(
   ),
   date: date,
   isCompleted: isCompleted,
+  schedule: schedule,
+  priority: priority,
+  description: description,
+  pathIntentionCount: pathIntentionCount,
 );
 
 String _uuid(int number) =>

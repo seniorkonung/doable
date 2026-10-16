@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -39,6 +41,78 @@ void main() {
   });
 
   tearDown(() => harness.dispose());
+
+  test('новый выбор по умолчанию запланирован на весь день с P4', () {
+    _addChoice(raw, _choice);
+
+    final row = raw
+        .select('SELECT scheduled_minute, priority FROM daily_choices')
+        .single;
+    expect(row['scheduled_minute'], isNull);
+    expect(row['priority'], 4);
+  });
+
+  test('сохраняет весь день, границы времени и все четыре приоритета', () {
+    _addChoice(raw, _choice);
+
+    for (final (minute, priority) in [
+      (0, 1),
+      (1080, 2),
+      (1439, 3),
+      (null, 4),
+    ]) {
+      raw.execute(
+        'UPDATE daily_choices SET scheduled_minute = ?, priority = ?',
+        [minute, priority],
+      );
+      final row = raw
+          .select('SELECT scheduled_minute, priority FROM daily_choices')
+          .single;
+      expect(row['scheduled_minute'], minute);
+      expect(row['priority'], priority);
+    }
+  });
+
+  test('отклоняет неверные типы и диапазоны времени и приоритета', () {
+    _addChoice(raw, _choice);
+
+    for (final (column, invalidValues) in [
+      (
+        'scheduled_minute',
+        [
+          -1,
+          1440,
+          0.5,
+          '18:00',
+          Uint8List.fromList([0]),
+        ],
+      ),
+      (
+        'priority',
+        [
+          null,
+          0,
+          5,
+          1.5,
+          'P1',
+          Uint8List.fromList([1]),
+        ],
+      ),
+    ]) {
+      for (final value in invalidValues) {
+        expect(
+          () => raw.execute('UPDATE daily_choices SET $column = ?', [value]),
+          throwsA(isA<sqlite.SqliteException>()),
+          reason: 'Недопустимое значение $column: $value.',
+        );
+      }
+    }
+    final row = raw
+        .select('SELECT scheduled_minute, priority FROM daily_choices')
+        .single;
+    expect(row['scheduled_minute'], isNull);
+    expect(row['priority'], 4);
+  });
 
   test(
     'сохраняет полные дубликаты с отдельной последовательностью создания',

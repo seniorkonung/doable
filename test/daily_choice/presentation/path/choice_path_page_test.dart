@@ -78,9 +78,12 @@ void main() {
             .onPressed!;
         oldOpen();
         await tester.pumpAndSettle();
-        await tester.ensureVisible(
+        await tester.scrollUntilVisible(
           find.byKey(const ValueKey('daily-choice-submit')),
+          200,
+          scrollable: find.byType(Scrollable).first,
         );
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
         await tester.pump();
         await tester.binding.handlePopRoute();
@@ -166,9 +169,12 @@ void main() {
       expect(find.byKey(const ValueKey('daily-choice-date')), findsOneWidget);
       expect(find.textContaining('Намерение 1'), findsWidgets);
       expect(find.textContaining('Намерение 2'), findsWidgets);
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.byKey(const ValueKey('daily-choice-cancel')),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('daily-choice-cancel')));
       await tester.pump();
       expect(repository.commands, 0);
@@ -218,9 +224,12 @@ void main() {
         find.byKey(const ValueKey('daily-choice-date')),
         '2026-12-31',
       );
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.byKey(const ValueKey('daily-choice-submit')),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
       await tester.pump();
       expect(repository.commands, 1);

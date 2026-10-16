@@ -8,6 +8,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart'
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
@@ -116,15 +118,6 @@ void main() {
 
     // Пользователь смотрит невыполненные выборы дня, раскрывает месяц и
     // прокручивает выдачу.
-    await tester.tap(
-      find.byKey(const ValueKey('daily-choice-completion-filter')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(_l10n.dailyChoiceCatalogIncomplete).last);
-    await tester.pump();
-    expect(repository.queries, hasLength(2));
-    repository.completeFirst(_items(date(2026, 10, 6)), index: 1, total: 40);
-    await tester.pump();
     await tester.tap(find.bySemanticsLabel(_l10n.dailyChoiceCalendarExpand));
     await _settle(tester);
     expect(find.text(_l10n.dailyChoiceCalendarToday), findsOneWidget);
@@ -133,7 +126,7 @@ void main() {
 
     final catalog = _catalogState(tester);
     expect(catalog, isA<DailyChoiceCatalogLoaded>());
-    expect(catalog.selection.isCompleted, false);
+    expect(catalog.selection.completedExpanded, false);
     final shownWeeks = visibleWeeks(tester);
     expect(shownWeeks, weeksFrom(date(2026, 9, 28), 6));
     expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);
@@ -149,7 +142,7 @@ void main() {
     // загруженная выдача и прокрутка остаются прежними, чтений нет.
     expect(visibleWeeks(tester), shownWeeks);
     _expectCatalogUnchanged(tester, catalog);
-    expect(repository.queries, hasLength(2));
+    expect(repository.queries, hasLength(1));
     expect(_catalogScroll(tester).pixels, 300);
     // Заголовок дня строится лениво и возвращается вместе с началом выдачи.
     _catalogScroll(tester).jumpTo(0);
@@ -317,7 +310,7 @@ void main() {
     await tester.pump();
 
     expect(repository.queries.single.date, date(2026, 10, 7));
-    expect(repository.queries.single.isCompleted, isNull);
+    expect(repository.queries.single.isCompleted, isFalse);
     _expectSelected(tester, date(2026, 10, 7));
     expect(_todayMarker(tester, date(2026, 10, 7)), findsOneWidget);
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
@@ -467,7 +460,8 @@ void _expectCatalogUnchanged(
   expect(now.items.map((item) => item.id), was.items.map((item) => item.id));
   expect(now.totalCount, was.totalCount);
   expect(now.selection.date, was.selection.date);
-  expect(now.selection.isCompleted, was.selection.isCompleted);
+  expect(now.selection.incompleteExpanded, was.selection.incompleteExpanded);
+  expect(now.selection.completedExpanded, was.selection.completedExpanded);
 }
 
 DailyChoiceCatalogState _catalogState(WidgetTester tester) {
@@ -558,6 +552,19 @@ final class _Repository
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) {
+    if (query.isCompleted == true) {
+      return Future.value(
+        DailyChoiceCatalogPageSuccess(
+          DailyChoiceCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            hasTimedChoices: false,
+            nextCursor: null,
+            revision: const _Revision(),
+          ),
+        ),
+      );
+    }
     queries.add(query);
     final request = Completer<DailyChoiceCatalogPageResult>();
     _requests.add(request);
@@ -574,6 +581,7 @@ final class _Repository
         DailyChoiceCatalogFirstPage(
           items: items,
           totalCount: total,
+          hasTimedChoices: false,
           nextCursor: items.length < total ? const _Cursor() : null,
           revision: const _Revision(),
         ),
@@ -627,6 +635,10 @@ List<DailyChoiceCatalogItem> _items(CalendarDate day) => [
       ),
       date: day,
       isCompleted: false,
+      schedule: const DailyChoiceAllDay(),
+      priority: DailyChoicePriority.p4,
+      description: null,
+      pathIntentionCount: 2,
     ),
 ];
 

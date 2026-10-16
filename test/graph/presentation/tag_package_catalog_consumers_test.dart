@@ -118,7 +118,8 @@ void main() {
       ..changeTitle('Черновик названия');
     container.read(probes.dailyCatalogProvider.notifier)
       ..selectDate(durabilityChoiceDate)
-      ..selectCompletion(true);
+      ..toggleSection(false)
+      ..toggleSection(true);
     await settlePackageConsumersUntil(
       () => probes.allLoaded && probes.dailyCatalogSelected,
       diagnostics: probes.describe,

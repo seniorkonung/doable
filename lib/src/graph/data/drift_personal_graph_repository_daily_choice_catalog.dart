@@ -52,56 +52,64 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
       _ => throw StateError('Недопустимый курсор каталога дневных выборов.'),
     };
     if (cursor != null &&
-        cursor.revision.compareTo(_currentRevision) !=
-            GraphRevisionOrder.same) {
+        (cursor.date != query.date ||
+            cursor.isCompleted != query.isCompleted ||
+            cursor.pageSize != query.pageSize ||
+            cursor.revision.compareTo(_currentRevision) !=
+                GraphRevisionOrder.same)) {
       throw const _DailyChoiceCatalogSnapshotHasExpired();
     }
 
-    final filters = <String>[];
-    final variables = <Variable>[];
-    if (query.date case final date?) {
-      filters.add('choice_date = ?');
-      variables.add(Variable<String>(date.toCanonicalString()));
+    final filters = ['choice_date = ?', 'is_completed = ?'];
+    final variables = <Variable>[
+      Variable<String>(query.date.toCanonicalString()),
+      Variable<int>(query.isCompleted ? 1 : 0),
+    ];
+    final where = 'WHERE ${filters.join(' AND ')}';
+    final ({int totalCount, bool hasTimedChoices}) summary;
+    if (cursor == null) {
+      final data =
+          (await _database
+                  .customSelect(
+                    '''SELECT COUNT(*) AS total_count,
+                  COUNT(scheduled_minute) > 0 AS has_timed_choices
+           FROM daily_choices $where''',
+                    variables: variables,
+                    readsFrom: {_database.dailyChoices},
+                  )
+                  .getSingle())
+              .data;
+      summary = (
+        totalCount: _requiredStoredInteger(data, 'total_count'),
+        hasTimedChoices: _requiredStoredInteger(data, 'has_timed_choices') == 1,
+      );
+    } else {
+      summary = cursor.summary;
     }
-    if (query.isCompleted case final completed?) {
-      filters.add('is_completed = ?');
-      variables.add(Variable<int>(completed ? 1 : 0));
-    }
-    final where = filters.isEmpty ? '' : 'WHERE ${filters.join(' AND ')}';
-    final totalCount = cursor == null
-        ? _requiredStoredInteger(
-            (await _database
-                    .customSelect(
-                      'SELECT COUNT(*) AS total_count FROM daily_choices $where',
-                      variables: variables,
-                      readsFrom: {_database.dailyChoices},
-                    )
-                    .getSingle())
-                .data,
-            'total_count',
-          )
-        : cursor.expectedCount;
 
     final pageFilters = [...filters];
     final pageVariables = [...variables];
     if (cursor != null) {
-      pageFilters.add('''(choice_date < ? OR
-        (choice_date = ? AND creation_sequence < ?))''');
+      // Сравнение полного ключа продолжает порядок без OFFSET:
+      // https://www.sqlite.org/rowvalue.html#scrolling_window_queries
+      pageFilters.add(
+        '(COALESCE(scheduled_minute, -1), priority, creation_sequence) > (?, ?, ?)',
+      );
       pageVariables.addAll([
-        Variable<String>(cursor.boundaryDate),
-        Variable<String>(cursor.boundaryDate),
-        Variable<int>(cursor.boundarySequence),
+        Variable<int>(cursor.boundary.scheduledMinute),
+        Variable<int>(cursor.boundary.priority),
+        Variable<int>(cursor.boundary.sequence),
       ]);
     }
-    final pageWhere = pageFilters.isEmpty
-        ? ''
-        : 'WHERE ${pageFilters.join(' AND ')}';
+    final pageWhere = 'WHERE ${pageFilters.join(' AND ')}';
     final rawRows = await _database
         .customSelect(
           '''SELECT creation_sequence, id, source_intention_id,
-                selected_intention_id, choice_date, description, is_completed
+                selected_intention_id, choice_date, description, is_completed,
+                scheduled_minute, priority
          FROM daily_choices $pageWhere
-         ORDER BY choice_date DESC, creation_sequence DESC LIMIT ?''',
+         ORDER BY COALESCE(scheduled_minute, -1), priority, creation_sequence
+         LIMIT ?''',
           variables: [...pageVariables, Variable<int>(query.pageSize + 1)],
           readsFrom: {_database.dailyChoices},
         )
@@ -120,29 +128,38 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
     ];
     final items = await _verifyDailyChoiceCatalogItems(choices);
     final returnedCount = (cursor?.returnedCount ?? 0) + items.length;
-    if (hasNext ? returnedCount >= totalCount : returnedCount != totalCount) {
+    if (hasNext
+        ? returnedCount >= summary.totalCount
+        : returnedCount != summary.totalCount) {
       throw const _StoredIntentionCorruption();
     }
     final revision = _currentRevision;
     final nextCursor = hasNext
         ? _DriftDailyChoiceCatalogCursor(
             revision: revision,
-            boundaryDate: _requiredStoredString(
-              selectedRows.last.data,
-              'choice_date',
+            date: query.date,
+            isCompleted: query.isCompleted,
+            pageSize: query.pageSize,
+            boundary: (
+              scheduledMinute: switch (choices.last.schedule) {
+                DailyChoiceAllDay() => -1,
+                DailyChoiceTime(:final minuteOfDay) => minuteOfDay,
+              },
+              priority: choices.last.priority.level,
+              sequence: _requiredStoredInteger(
+                selectedRows.last.data,
+                'creation_sequence',
+              ),
             ),
-            boundarySequence: _requiredStoredInteger(
-              selectedRows.last.data,
-              'creation_sequence',
-            ),
-            expectedCount: totalCount,
+            summary: summary,
             returnedCount: returnedCount,
           )
         : null;
     return cursor == null
         ? DailyChoiceCatalogFirstPage(
             items: items,
-            totalCount: totalCount,
+            totalCount: summary.totalCount,
+            hasTimedChoices: summary.hasTimedChoices,
             nextCursor: nextCursor,
             revision: revision,
           )
@@ -349,22 +366,30 @@ DailyChoiceCatalogItem _catalogItemFor(
         (throw const _StoredIntentionCorruption()),
     date: choice.date,
     isCompleted: choice.isCompleted,
+    schedule: choice.schedule,
+    priority: choice.priority,
+    description: choice.description,
+    pathIntentionCount: steps.length + 1,
   );
 }
 
 final class _DriftDailyChoiceCatalogCursor implements DailyChoiceCatalogCursor {
   const _DriftDailyChoiceCatalogCursor({
     required this.revision,
-    required this.boundaryDate,
-    required this.boundarySequence,
-    required this.expectedCount,
+    required this.date,
+    required this.isCompleted,
+    required this.pageSize,
+    required this.boundary,
+    required this.summary,
     required this.returnedCount,
   });
 
   final GraphRevision revision;
-  final String boundaryDate;
-  final int boundarySequence;
-  final int expectedCount;
+  final CalendarDate date;
+  final bool isCompleted;
+  final int pageSize;
+  final ({int scheduledMinute, int priority, int sequence}) boundary;
+  final ({int totalCount, bool hasTimedChoices}) summary;
   final int returnedCount;
 }
 

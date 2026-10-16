@@ -11,9 +11,12 @@
 /// Смена способа выбора дня меняет только этот файл, а не сценарии.
 library;
 
+import 'dart:ui' show Tristate;
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
@@ -300,3 +303,45 @@ Future<void> _runCommand(
 /// календарный.
 bool _isBefore(CalendarDate a, CalendarDate b) =>
     a.toCanonicalString().compareTo(b.toCanonicalString()) < 0;
+
+/// Показывает только выбранную секцию, сохраняя дату и загруженные порции.
+Future<void> showDailyChoiceCatalogSection(
+  WidgetTester tester,
+  bool isCompleted,
+) async {
+  final body = find.byType(DailyChoiceCatalogBody).last;
+  final scroll = find.descendant(
+    of: body,
+    matching: find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    ),
+  );
+  Finder header(bool completed) => find.descendant(
+    of: body,
+    matching: find.byKey(ValueKey('daily-choice-section-$completed')),
+  );
+  final semantics = tester.ensureSemantics();
+  for (final completed in [false, true]) {
+    await tester.scrollUntilVisible(
+      header(completed),
+      completed ? 500 : -500,
+      scrollable: scroll,
+    );
+    await tester.pump();
+    final expanded = tester
+        .getSemantics(header(completed))
+        .flagsCollection
+        .isExpanded;
+    if ((expanded == Tristate.isTrue) != (completed == isCompleted)) {
+      await tester.tap(header(completed));
+      await tester.pump();
+    }
+  }
+  await tester.scrollUntilVisible(
+    header(isCompleted),
+    isCompleted ? 500 : -500,
+    scrollable: scroll,
+  );
+  semantics.dispose();
+}

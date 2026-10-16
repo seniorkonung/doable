@@ -2386,6 +2386,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Confirm daily choice';
 
   @override
+  String get dailyChoiceScheduleLabel => 'Scheduled time';
+
+  @override
+  String get dailyChoiceAllDay => 'All day';
+
+  @override
+  String get dailyChoiceSetTime => 'Set time';
+
+  @override
+  String dailyChoiceTimeLabel(String time) {
+    return 'Time: $time';
+  }
+
+  @override
+  String get dailyChoicePriorityLabel => 'Priority';
+
+  @override
+  String dailyChoicePriorityOption(String priority) {
+    return 'Priority $priority';
+  }
+
+  @override
   String get dailyChoiceCatalogTitle => 'Daily choices';
 
   @override
@@ -2441,19 +2463,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCalendarNextYear => 'Next year';
 
   @override
-  String get dailyChoiceCatalogCompletionFilter => 'Completion';
-
-  @override
-  String get dailyChoiceCatalogAllStates => 'All states';
-
-  @override
   String get dailyChoiceCatalogIncomplete => 'Not completed';
 
   @override
   String get dailyChoiceCatalogCompleted => 'Completed';
-
-  @override
-  String get dailyChoiceCatalogClearFilters => 'Clear filters';
 
   @override
   String dailyChoiceCatalogTotalCount(int count) {
@@ -2461,7 +2474,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceCatalogEmpty => 'No daily choices match the filters.';
+  String get dailyChoiceCatalogEmpty => 'No daily choices for this day.';
 
   @override
   String get dailyChoiceCatalogRefreshing => 'Refreshing daily choices…';
@@ -2487,6 +2500,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoiceCatalogUnexpected =>
       'Could not load daily choices because of an unexpected error.';
+
+  @override
+  String dailyChoiceCatalogPathIntentionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions in path',
+      one: '$count intention in path',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dailyChoiceCatalogCompletionLabel(
+    int number,
+    String phrase,
+    String date,
+  ) {
+    return 'Completion of choice #$number. $phrase. $date';
+  }
+
+  @override
+  String get dailyChoiceCompletionSaving => 'Saving completion…';
+
+  @override
+  String get dailyChoiceCompletionSynchronizing =>
+      'Completion saved. Refreshing the catalog…';
+
+  @override
+  String get dailyChoiceCompletionRefresh => 'Refresh choice';
 
   @override
   String dailyChoiceCatalogRowLabel(

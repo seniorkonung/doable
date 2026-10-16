@@ -4,6 +4,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -1398,6 +1400,10 @@ DailyChoiceCatalogItem _dailyItem({
     selected: selected,
     date: CalendarDate.fromParts(2026, 9, 24),
     isCompleted: role == DailyChoiceRelationRole.source,
+    schedule: const DailyChoiceAllDay(),
+    priority: DailyChoicePriority.p4,
+    description: null,
+    pathIntentionCount: 2,
   );
 }
 

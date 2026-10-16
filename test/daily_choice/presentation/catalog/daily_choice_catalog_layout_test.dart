@@ -1,6 +1,9 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
@@ -81,7 +84,7 @@ void main() {
         expect(tester.widget<DailyChoiceCalendar>(calendar).viewport, viewport);
         expect(repository.queries, hasLength(1));
         expect(repository.queries.single.date, _today);
-        expect(repository.queries.single.isCompleted, isNull);
+        expect(repository.queries.single.isCompleted, isFalse);
         expect(tester.takeException(), isNull);
       });
 
@@ -143,7 +146,7 @@ void main() {
         expect(tester.widget<DailyChoiceCalendar>(calendar).viewport, viewport);
         expect(repository.queries, hasLength(1));
         expect(repository.queries.single.date, _today);
-        expect(repository.queries.single.isCompleted, isNull);
+        expect(repository.queries.single.isCompleted, isFalse);
         expect(tester.takeException(), isNull);
       });
       testWidgets('$catalog: $ending после движения ручки во время инерции '
@@ -360,6 +363,55 @@ void main() {
     final language = locale.languageCode;
 
     group('экран 360×780, $language', () {
+      testWidgets('при масштабе текста 200% флажок, открытие и краткие данные '
+          'карточки доступны без переполнения', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final repository = CatalogPageRepository();
+        final item = catalogPageItem(
+          1,
+          date: _today,
+          schedule: DailyChoiceTime(hour: 18, minute: 0),
+          priority: DailyChoicePriority.p2,
+          description: DailyChoiceDescription.fromInput('Пояснение'),
+          pathIntentionCount: 4,
+        );
+        await _open(tester, repository, locale, today: _today);
+        repository.completeFirst(0, [item], total: 1);
+        await tester.pumpAndSettle();
+        expect(
+          MediaQuery.textScalerOf(
+            tester.element(find.byType(DailyChoiceCalendar)),
+          ).scale(14),
+          28,
+        );
+        await _expectWholeTexts(tester);
+        final checkbox = find.byType(Checkbox, skipOffstage: false);
+        await _dragUntilReachable(tester, checkbox);
+        final rect = tester.getRect(checkbox);
+        expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
+        expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+        expect(
+          find.text(_l10n(tester).dailyChoicePriorityOption('P2')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(_l10n(tester).dailyChoiceCatalogPathIntentionCount(4)),
+          findsOneWidget,
+        );
+        expect(find.text('Пояснение'), findsOneWidget);
+        await tester.tap(checkbox);
+        await tester.pump();
+        expect(repository.completionCommands.single.choiceId, item.id);
+        await _expectWholeTexts(tester);
+        final phrase = find.text(
+          _l10n(tester).dailyChoiceDetailsPhrase('Основание', 'Действие'),
+        );
+        await _dragUntilReachable(tester, phrase);
+        _expectTappable(tester, phrase);
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('свёрнутая неделя занимает семь колонок во всю ширину, '
           'тексты страницы показаны целиком, а дни и команды нажимаются', (
         tester,
@@ -519,7 +571,7 @@ void main() {
           );
         }
         final loadMore = find.byKey(
-          const ValueKey('daily-choice-load-more'),
+          const ValueKey('daily-choice-load-more-false'),
           skipOffstage: false,
         );
         await _dragUntilReachable(tester, loadMore);
@@ -648,50 +700,29 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('фильтр выполнения показывает название и каждое '
-          'состояние целиком, а меню выбирает состояние для выбранного дня', (
-        tester,
-      ) async {
-        final repository = CatalogPageRepository();
-        await _open(tester, repository, locale, today: _today);
-        repository.completeFirst(0, [], total: 0);
-        await tester.pumpAndSettle();
-        final l10n = _l10n(tester);
-        final filter = find.byKey(
-          const ValueKey('daily-choice-completion-filter'),
-          skipOffstage: false,
-        );
-
-        for (final (index, (value, state)) in [
-          (false, l10n.dailyChoiceCatalogIncomplete),
-          (true, l10n.dailyChoiceCatalogCompleted),
-          (null, l10n.dailyChoiceCatalogAllStates),
-        ].indexed) {
-          await _dragUntilReachable(tester, filter);
-          await tester.tap(filter);
+      testWidgets(
+        'заголовки секций видны целиком и независимо раскрываются при крупном тексте',
+        (tester) async {
+          final repository = CatalogPageRepository();
+          await _open(tester, repository, locale, today: _today);
+          repository.completeFirst(0, [], total: 0);
           await tester.pumpAndSettle();
-          final item = find
-              .byWidgetPredicate(
-                (widget) =>
-                    widget is DropdownMenuItem<bool?> && widget.value == value,
-              )
-              .last;
-          _expectTappable(tester, item);
-          _expectWholeTextsIn(tester, item);
-          await tester.tap(item);
-          await tester.pump();
-          repository.completeFirst(index + 1, [], total: 0);
-          await tester.pumpAndSettle();
-
-          await _dragUntilReachable(tester, filter);
-          expect(
-            find.descendant(of: filter, matching: find.text(state)),
-            findsOneWidget,
-          );
-          await _expectWholeTexts(tester);
-        }
-        expect(tester.takeException(), isNull);
-      });
+          for (final completed in [false, true]) {
+            final header = find.byKey(
+              ValueKey('daily-choice-section-$completed'),
+              skipOffstage: false,
+            );
+            await _dragUntilReachable(tester, header);
+            _expectTappable(tester, header);
+            _expectWholeTextsIn(tester, header);
+            await tester.tap(header);
+            await tester.pumpAndSettle();
+            await _expectWholeTexts(tester);
+          }
+          expect(repository.queries, hasLength(1));
+          expect(tester.takeException(), isNull);
+        },
+      );
     });
   }
 }
@@ -740,11 +771,8 @@ Future<TestGesture> _startShortCollapse(WidgetTester tester) async {
 /// Допуск сравнения координат.
 const _epsilon = 0.01;
 
-/// Фильтры каталога под календарём: выполнение и сброс.
-const _filterKeys = [
-  'daily-choice-completion-filter',
-  'daily-choice-clear-filters',
-];
+/// Заголовки секций под календарём.
+const _filterKeys = ['daily-choice-section-false', 'daily-choice-section-true'];
 
 /// Единственная вертикальная прокрутка выдачи под календарём.
 final _pageScroll = find.descendant(
@@ -818,7 +846,11 @@ void _expectReachable(WidgetTester tester, Finder finder) {
 void _expectAtEnd(WidgetTester tester, Finder finder) {
   final area = _visibleArea(tester);
   final rect = tester.getRect(finder);
-  expect(rect.bottom, moreOrLessEquals(area.bottom, epsilon: _epsilon));
+  final lastHeader = tester.getRect(
+    find.byKey(const ValueKey('daily-choice-section-true')),
+  );
+  expect(rect.bottom, moreOrLessEquals(lastHeader.top, epsilon: _epsilon));
+  expect(lastHeader.bottom, moreOrLessEquals(area.bottom, epsilon: _epsilon));
   expect(rect.bottom, greaterThan(area.top));
   _expectHit(tester, finder, rect.intersect(area).center);
 }

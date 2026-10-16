@@ -1,6 +1,8 @@
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -13,11 +15,22 @@ import '../../support/catalog_reconciliation_test_fallback.dart';
 void main() {
   test('размер порции допускает границы 1 и 100 и отвергает остальные', () {
     for (final size in [1, 100]) {
-      expect(DailyChoiceCatalogQuery(pageSize: size).pageSize, size);
+      expect(
+        DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 24),
+          isCompleted: false,
+          pageSize: size,
+        ).pageSize,
+        size,
+      );
     }
     for (final size in [-1, 0, 101]) {
       expect(
-        () => DailyChoiceCatalogQuery(pageSize: size),
+        () => DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 24),
+          isCompleted: false,
+          pageSize: size,
+        ),
         throwsA(
           isA<DailyChoiceCatalogQueryValidationException>().having(
             (error) => error.failure,
@@ -29,46 +42,79 @@ void main() {
     }
   });
 
-  test('краткая проекция проверяет участников и сохраняет дубликаты', () {
-    final source = _participant(
-      1,
-      ' Основание ',
-      IntentionArchiveState.archived,
-    );
-    final selected = _participant(2, 'Действие', IntentionArchiveState.active);
-    final date = CalendarDate.fromParts(2026, 9, 24);
-    final first = DailyChoiceCatalogItem(
-      id: _choice(1),
-      source: source,
-      selected: selected,
-      date: date,
-      isCompleted: true,
-    );
-    final duplicate = DailyChoiceCatalogItem(
-      id: _choice(2),
-      source: source,
-      selected: selected,
-      date: date,
-      isCompleted: true,
-    );
-
-    expect(first.source.title, 'Основание');
-    expect(first.source.archiveState, IntentionArchiveState.archived);
-    expect(first.selected.title, 'Действие');
-    expect(first.date, date);
-    expect(first.isCompleted, true);
-    expect(first.id, isNot(duplicate.id));
-    expect(
-      () => DailyChoiceCatalogItem(
-        id: _choice(3),
+  test(
+    'краткая проекция проверяет участников и размер пути, сохраняет дубликаты',
+    () {
+      final source = _participant(
+        1,
+        ' Основание ',
+        IntentionArchiveState.archived,
+      );
+      final selected = _participant(
+        2,
+        'Действие',
+        IntentionArchiveState.active,
+      );
+      final date = CalendarDate.fromParts(2026, 9, 24);
+      final first = DailyChoiceCatalogItem(
+        id: _choice(1),
         source: source,
-        selected: source,
+        selected: selected,
         date: date,
-        isCompleted: false,
-      ),
-      throwsArgumentError,
-    );
-  });
+        isCompleted: true,
+        schedule: const DailyChoiceAllDay(),
+        priority: DailyChoicePriority.p4,
+        description: null,
+        pathIntentionCount: 2,
+      );
+      final duplicate = DailyChoiceCatalogItem(
+        id: _choice(2),
+        source: source,
+        selected: selected,
+        date: date,
+        isCompleted: true,
+        schedule: const DailyChoiceAllDay(),
+        priority: DailyChoicePriority.p4,
+        description: null,
+        pathIntentionCount: 2,
+      );
+
+      expect(first.source.title, 'Основание');
+      expect(first.source.archiveState, IntentionArchiveState.archived);
+      expect(first.selected.title, 'Действие');
+      expect(first.date, date);
+      expect(first.isCompleted, true);
+      expect(first.id, isNot(duplicate.id));
+      expect(
+        () => DailyChoiceCatalogItem(
+          id: _choice(3),
+          source: source,
+          selected: source,
+          date: date,
+          isCompleted: false,
+          schedule: const DailyChoiceAllDay(),
+          priority: DailyChoicePriority.p4,
+          description: null,
+          pathIntentionCount: 2,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => DailyChoiceCatalogItem(
+          id: _choice(3),
+          source: source,
+          selected: selected,
+          date: date,
+          isCompleted: false,
+          schedule: const DailyChoiceAllDay(),
+          priority: DailyChoicePriority.p4,
+          description: null,
+          pathIntentionCount: 1,
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
 
   test('первая порция копирует список и проверяет согласованность', () async {
     final items = [_item(1), _item(2)];
@@ -76,6 +122,7 @@ void main() {
     final page = DailyChoiceCatalogFirstPage(
       items: items,
       totalCount: 3,
+      hasTimedChoices: false,
       nextCursor: const _Cursor(),
       revision: revision,
     );
@@ -83,7 +130,10 @@ void main() {
       DailyChoiceCatalogPageSuccess(page),
     );
     final result = await repository.getDailyChoiceCatalogPage(
-      DailyChoiceCatalogQuery(),
+      DailyChoiceCatalogQuery(
+        date: CalendarDate.fromParts(2026, 9, 24),
+        isCompleted: false,
+      ),
     );
 
     items.clear();
@@ -94,6 +144,7 @@ void main() {
       () => DailyChoiceCatalogFirstPage(
         items: [_item(1)],
         totalCount: 0,
+        hasTimedChoices: false,
         nextCursor: null,
         revision: revision,
       ),
@@ -108,6 +159,10 @@ DailyChoiceCatalogItem _item(int value) => DailyChoiceCatalogItem(
   selected: _participant(2, 'Действие', IntentionArchiveState.active),
   date: CalendarDate.fromParts(2026, 9, 24),
   isCompleted: false,
+  schedule: const DailyChoiceAllDay(),
+  priority: DailyChoicePriority.p4,
+  description: null,
+  pathIntentionCount: 2,
 );
 
 DailyChoiceCatalogParticipant _participant(

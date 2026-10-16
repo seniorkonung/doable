@@ -60,7 +60,7 @@ final class DailyChoiceEditViewModelProvider
 }
 
 String _$dailyChoiceEditViewModelHash() =>
-    r'1aa33278e3f84f9d7dba42ec1c6eb1ade941cc63';
+    r'5018518173d2331b5381b67c147c0460a3ea25f1';
 
 final class DailyChoiceEditViewModelFamily extends $Family
     with

@@ -90,7 +90,8 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
       final rows = await _database
           .customSelect(
             '''SELECT creation_sequence, id, source_intention_id,
-                  selected_intention_id, choice_date, description, is_completed
+                  selected_intention_id, choice_date, description, is_completed,
+                  scheduled_minute, priority
                FROM daily_choices
                WHERE id IN (${List.filled(batch.length, '?').join(', ')})''',
             variables: [

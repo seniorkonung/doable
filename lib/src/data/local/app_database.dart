@@ -20,9 +20,7 @@ final class AppDatabase extends _$AppDatabase {
     this.diagnosticsSink,
   }) : super(connection._executor);
 
-  /// Единственная версия схемы: хранилище создаётся сразу в ней, прежних
-  /// версий и переходов между ними нет.
-  static const currentSchemaVersion = 1;
+  static const currentSchemaVersion = 2;
   final DiagnosticsSink? diagnosticsSink;
 
   @override

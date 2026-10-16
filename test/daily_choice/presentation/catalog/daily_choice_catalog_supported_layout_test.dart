@@ -397,7 +397,11 @@ Future<void> _scrollToLastRow(WidgetTester tester, Finder list) async {
   await tester.pumpAndSettle();
   final last = tester.getRect(lastRow);
   expect(last.intersect(viewport).height, greaterThan(0));
-  expect(last.bottom, closeTo(viewport.bottom, 0.01));
+  final completedHeader = tester.getRect(
+    find.byKey(const ValueKey('daily-choice-section-true')),
+  );
+  expect(last.bottom, closeTo(completedHeader.top, 0.01));
+  expect(completedHeader.bottom, closeTo(viewport.bottom, 0.01));
 }
 
 void _expectCalendarTextsWhole(

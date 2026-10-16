@@ -9,6 +9,8 @@ import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice.dart';
 import '../../domain/daily_choice_description.dart';
+import '../../domain/daily_choice_priority.dart';
+import '../../domain/daily_choice_schedule.dart';
 import 'daily_choice_edit_state.dart';
 
 part 'daily_choice_edit_view_model.g.dart';
@@ -49,11 +51,14 @@ final class DailyChoiceEditViewModel extends _$DailyChoiceEditViewModel {
     state = next;
   }
 
-  void changeCompletion(bool value) {
-    if (state.isCompleted == value) return;
-    final next = state.withCompletion(value);
-    _releaseDroppedClaim(next);
-    state = next;
+  void changeSchedule(DailyChoiceSchedule value) {
+    if (state.schedule == value) return;
+    state = state.withSchedule(value);
+  }
+
+  void changePriority(DailyChoicePriority value) {
+    if (state.priority == value) return;
+    state = state.withPriority(value);
   }
 
   void submit() {
