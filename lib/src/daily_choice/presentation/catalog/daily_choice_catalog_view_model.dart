@@ -118,11 +118,13 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   }) {
     final current = state;
     if (current is! DailyChoiceCatalogLoaded ||
-        !current.canChangeCompletion(id))
+        !current.canChangeCompletion(id)) {
       return null;
+    }
     if (current.items.firstWhere((item) => item.id == id).isCompleted ==
-        isCompleted)
+        isCompleted) {
       return null;
+    }
     _releaseCompletionToken(id);
     final start = _coordinator.acceptDailyChoiceUpdate(
       UpdateDailyChoiceFields(
@@ -148,11 +150,13 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
             ),
           ),
         );
+        return null;
       case GraphCommandCoordinatorDraining():
         _setCompletionOperation(
           id,
           const DailyChoiceCompletionFailed(DailyChoiceUnexpectedFailure()),
         );
+        return null;
     }
   }
 
@@ -163,8 +167,9 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     if (current is! DailyChoiceCatalogLoaded ||
         operation is! DailyChoiceCompletionFailed ||
         !operation.requiresRefresh ||
-        _assembly != null)
+        _assembly != null) {
       return;
+    }
     await _assemble(base: current);
     if (!ref.mounted) return;
     if (state case DailyChoiceCatalogLoaded(
@@ -184,8 +189,9 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     bool Function()? canPresentFailure,
   ) async {
     final completion = await future;
-    if (!ref.mounted || !identical(_completionTokens[id], completion.token))
+    if (!ref.mounted || !identical(_completionTokens[id], completion.token)) {
       return;
+    }
     switch (completion.confirmedResult) {
       case GraphResultSuccess(value: final confirmed):
         _releaseCompletionToken(id);
