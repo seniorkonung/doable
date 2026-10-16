@@ -441,7 +441,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 3.14 Подтвердить готовность результата фазы 3 к повторной проверке реализации после устранения повторного предъявления отказа
+- [x] 3.14 Подтвердить готовность результата фазы 3 к повторной проверке реализации после устранения повторного предъявления отказа
   - **Acceptance criteria:**
     - Результаты задач 3.11–3.13 и актуальные проверки подтверждают условие Ready to advance фазы 3 из [плана](plan.md): отказы и уход со страницы не оставляют ложного выполнения, повторной операции, повторного предъявления результата или рассогласованных представлений. Прежние результаты задач 3.10 и 3.12 не подменяют проверку исправленной реализации.
     - Полные проверки проекта, согласованность генерации и строгая валидация изменения проходят; результат готов к implementation review. Завершение фазы определяет последующий review после последней задачи, а не отметка этого checkpoint.
