@@ -7,8 +7,14 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
+import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_state.dart';
+import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -25,7 +31,7 @@ void main() {
   late DriftPersonalGraphRepository repository;
   late DailyChoiceDetails original;
 
-  setUp(() async {
+  Future<void> prepare() async {
     database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
     await seedDurabilityGraph(database);
@@ -39,11 +45,12 @@ void main() {
     original = (await repository.getDailyChoice(
       durabilityChoice(201),
     ) as DailyChoiceReadSuccess).value.value!;
-  });
+  }
 
   tearDown(() => database.close());
 
   testWidgets('редактор без выполнения сохраняет поля в ru/en', (tester) async {
+    await tester.runAsync(prepare);
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -137,14 +144,18 @@ void main() {
   });
 
   testWidgets(
-    'правка описания сохраняет независимые подтверждённые изменения',
+    'правка описания из открытого редактора сохраняет выполнение из другого каталога и независимые поля',
     (tester) async {
-      final updates = _PendingUpdates();
+      await prepare();
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWith((ref) => repository),
+        ],
+      );
+      addTearDown(container.dispose);
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            personalGraphRepositoryProvider.overrideWith((ref) => updates),
-          ],
+        UncontrolledProviderScope(
+          container: container,
           child: MaterialApp(
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -154,44 +165,97 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final time = DailyChoiceTime(hour: 9, minute: 30);
-      final date = CalendarDate.fromParts(2026, 10, 16);
-      await tester.runAsync(
-        () => repository.execute(
-          UpdateDailyChoiceFields(
-            choiceId: original.choice.id,
-            patch: DailyChoiceFieldsPatch(
-              date: DailyChoiceFieldSet(date),
-              isCompleted: const DailyChoiceFieldSet(false),
-              schedule: DailyChoiceFieldSet(time),
-              priority: const DailyChoiceFieldSet(DailyChoicePriority.p4),
-            ),
-          ),
-        ),
-      );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-edit-description')),
         'Правка из открытой формы',
+      );
+      final time = DailyChoiceTime(hour: 9, minute: 30);
+      final date = CalendarDate.fromParts(2026, 10, 16);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final update = coordinator.acceptDailyChoiceUpdate(
+        UpdateDailyChoiceFields(
+          choiceId: original.choice.id,
+          patch: DailyChoiceFieldsPatch(
+            date: DailyChoiceFieldSet(date),
+            schedule: DailyChoiceFieldSet(time),
+            priority: const DailyChoiceFieldSet(DailyChoicePriority.p4),
+          ),
+        ),
+      ) as DailyChoiceCommandAccepted;
+      var updated = false;
+      unawaited(
+        update.future.then((_) {
+          updated = true;
+        }),
+      );
+      await _until(tester, () => updated);
+      expect((await update.future).isFailure, isFalse);
+      final catalogProvider = dailyChoiceCatalogViewModelProvider(
+        DailyChoiceCatalogInstance(initialDate: date),
+      );
+      final subscription = container.listen(catalogProvider, (_, _) {});
+      addTearDown(subscription.close);
+      await _until(
+        tester,
+        () => container.read(catalogProvider) is DailyChoiceCatalogLoaded,
+      );
+      final catalog = container.read(catalogProvider.notifier);
+      catalog.changeCompletion(original.choice.id, false);
+      await _until(
+        tester,
+        () => switch (container.read(catalogProvider)) {
+          DailyChoiceCatalogLoaded(:final incomplete) => incomplete.items.any(
+            (item) => item.id == original.choice.id,
+          ),
+          _ => false,
+        },
       );
       await _tap(
         tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
       );
-      updates.complete(
-        (await tester.runAsync(() => repository.execute(updates.command)))!,
+      await _until(
+        tester,
+        () =>
+            container
+                    .read(dailyChoiceEditViewModelProvider(original.choice))
+                    .operation
+                is DailyChoiceEditSucceeded,
       );
       await tester.pumpAndSettle();
-      final saved = (await tester.runAsync(
-        () => repository.getDailyChoice(original.choice.id),
-      ) as DailyChoiceReadSuccess).value.value!.choice;
+      final savedDetails = (await repository.getDailyChoice(
+        original.choice.id,
+      ) as DailyChoiceReadSuccess).value.value!;
+      final saved = savedDetails.choice;
       expect(saved.description?.value, 'Правка из открытой формы');
       expect(saved.schedule, time);
       expect(saved.priority, DailyChoicePriority.p4);
       expect(saved.date, date);
       expect(saved.isCompleted, isFalse);
+      expect(saved.sourceIntentionId, original.choice.sourceIntentionId);
+      expect(saved.selectedIntentionId, original.choice.selectedIntentionId);
+      expect(
+        savedDetails.path.map(
+          (entry) =>
+              (entry.step.id, entry.step.relationId, entry.step.previousStepId),
+        ),
+        original.path.map(
+          (entry) =>
+              (entry.step.id, entry.step.relationId, entry.step.previousStepId),
+        ),
+      );
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+Future<void> _until(WidgetTester tester, bool Function() condition) async {
+  for (var attempt = 0; attempt < 200 && !condition(); attempt++) {
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  expect(condition(), isTrue);
 }
 
 final class _PendingUpdates implements PersonalGraphRepository {
