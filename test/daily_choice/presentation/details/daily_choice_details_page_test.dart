@@ -128,10 +128,15 @@ void main() {
         find.byKey(const ValueKey('daily-choice-edit-description')),
         ' \n ',
       );
+      await _revealEditor(
+        tester,
+        find.byKey(const ValueKey('daily-choice-edit-completed')),
+      );
       await tester.tap(
         find.byKey(const ValueKey('daily-choice-edit-completed')),
       );
-      await tester.ensureVisible(
+      await _revealEditor(
+        tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
       );
       expect(
@@ -194,7 +199,8 @@ void main() {
       '9999-02-30',
     );
     await tester.pump();
-    await tester.ensureVisible(
+    await _revealEditor(
+      tester,
       find.byKey(const ValueKey('daily-choice-edit-submit')),
     );
     expect(
@@ -206,8 +212,13 @@ void main() {
       isNotNull,
     );
     await tester.tap(find.byKey(const ValueKey('daily-choice-edit-submit')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(repository.updateCommands, isEmpty);
+    await _revealEditor(
+      tester,
+      find.byKey(const ValueKey('daily-choice-edit-date')),
+      delta: -150,
+    );
     expect(find.text('9999-02-30'), findsOneWidget);
     expect(
       tester
@@ -227,12 +238,18 @@ void main() {
       find.byKey(const ValueKey('daily-choice-edit-description')),
       'е\u0301' * 4097,
     );
-    await tester.ensureVisible(
+    await _revealEditor(
+      tester,
       find.byKey(const ValueKey('daily-choice-edit-submit')),
     );
     await tester.tap(find.byKey(const ValueKey('daily-choice-edit-submit')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(repository.updateCommands, isEmpty);
+    await _revealEditor(
+      tester,
+      find.byKey(const ValueKey('daily-choice-edit-description')),
+      delta: -150,
+    );
     expect(find.text('е\u0301' * 4097), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('daily-choice-edit-cancel')),
@@ -608,6 +625,24 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+Future<void> _revealEditor(
+  WidgetTester tester,
+  Finder finder, {
+  double delta = 150,
+}) async {
+  await tester.scrollUntilVisible(
+    finder,
+    delta,
+    scrollable: find
+        .descendant(
+          of: find.byType(DailyChoiceEditPage),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpApp(

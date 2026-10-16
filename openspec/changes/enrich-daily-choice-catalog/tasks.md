@@ -107,7 +107,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_planning_fields.dart` (новый компонент приложения для двух форм), `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`; сгенерированная локализация.
   - **Estimated scope:** M.
 
-- [ ] 1.11 Редактировать сохранённые время и приоритет правкой только изменённых полей
+- [x] 1.11 Редактировать сохранённые время и приоритет правкой только изменённых полей
   - **Acceptance criteria:**
     - Редактор инициализируется сохранёнными значениями и использует элементы ввода задачи 1.10. Можно изменить конкретное время, вернуть весь день и выбрать любой приоритет.
     - `hasEdits` и `toPatch` учитывают новые поля; возврат к исходным значениям снимает правку. Сохранение только описания или приоритета не отправляет остальные поля и не затирает их независимые подтверждённые изменения.

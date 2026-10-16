@@ -4,6 +4,8 @@ import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice.dart';
 import '../../domain/daily_choice_description.dart';
+import '../../domain/daily_choice_priority.dart';
+import '../../domain/daily_choice_schedule.dart';
 
 sealed class DailyChoiceEditOperation {
   const DailyChoiceEditOperation();
@@ -49,6 +51,8 @@ final class DailyChoiceEditState {
     required this.date,
     required this.description,
     required this.isCompleted,
+    required this.schedule,
+    required this.priority,
     required this.operation,
     required this.failurePresentation,
   });
@@ -57,6 +61,8 @@ final class DailyChoiceEditState {
     : date = original.date,
       description = original.description?.value ?? '',
       isCompleted = original.isCompleted,
+      schedule = original.schedule,
+      priority = original.priority,
       operation = const DailyChoiceEditIdle(),
       failurePresentation = null;
 
@@ -64,13 +70,17 @@ final class DailyChoiceEditState {
   final CalendarDate date;
   final String description;
   final bool isCompleted;
+  final DailyChoiceSchedule schedule;
+  final DailyChoicePriority priority;
   final DailyChoiceEditOperation operation;
   final GraphInitiatorPresentationClaim? failurePresentation;
 
   bool get hasEdits =>
       date != original.date ||
       description != (original.description?.value ?? '') ||
-      isCompleted != original.isCompleted;
+      isCompleted != original.isCompleted ||
+      schedule != original.schedule ||
+      priority != original.priority;
 
   bool get canRetry => switch (operation) {
     DailyChoiceEditFailed(
@@ -95,7 +105,9 @@ final class DailyChoiceEditState {
         : DailyChoiceDescriptionSet(parsedDescription);
     if (date == original.date &&
         descriptionPatch is DailyChoiceDescriptionUnchanged &&
-        isCompleted == original.isCompleted) {
+        isCompleted == original.isCompleted &&
+        schedule == original.schedule &&
+        priority == original.priority) {
       return null;
     }
     return DailyChoiceFieldsPatch(
@@ -106,6 +118,12 @@ final class DailyChoiceEditState {
       isCompleted: isCompleted == original.isCompleted
           ? const DailyChoiceFieldUnchanged<bool>()
           : DailyChoiceFieldSet(isCompleted),
+      schedule: schedule == original.schedule
+          ? const DailyChoiceFieldUnchanged<DailyChoiceSchedule>()
+          : DailyChoiceFieldSet(schedule),
+      priority: priority == original.priority
+          ? const DailyChoiceFieldUnchanged<DailyChoicePriority>()
+          : DailyChoiceFieldSet(priority),
     );
   }
 
@@ -120,6 +138,12 @@ final class DailyChoiceEditState {
   DailyChoiceEditState withCompletion(bool value) =>
       _withField(isCompleted: value);
 
+  DailyChoiceEditState withSchedule(DailyChoiceSchedule value) =>
+      _withField(schedule: value);
+
+  DailyChoiceEditState withPriority(DailyChoicePriority value) =>
+      _withField(priority: value);
+
   DailyChoiceEditState withOperation(
     DailyChoiceEditOperation value, {
     GraphInitiatorPresentationClaim? failurePresentation,
@@ -128,6 +152,8 @@ final class DailyChoiceEditState {
     date: date,
     description: description,
     isCompleted: isCompleted,
+    schedule: schedule,
+    priority: priority,
     operation: value,
     failurePresentation: failurePresentation,
   );
@@ -136,6 +162,8 @@ final class DailyChoiceEditState {
     CalendarDate? date,
     String? description,
     bool? isCompleted,
+    DailyChoiceSchedule? schedule,
+    DailyChoicePriority? priority,
     DailyChoiceValidationField? corrects,
   }) {
     if (operation is DailyChoiceEditSubmitting ||
@@ -160,6 +188,8 @@ final class DailyChoiceEditState {
       date: date ?? this.date,
       description: description ?? this.description,
       isCompleted: isCompleted ?? this.isCompleted,
+      schedule: schedule ?? this.schedule,
+      priority: priority ?? this.priority,
       operation: nextOperation,
       failurePresentation: nextOperation is DailyChoiceEditFailed
           ? failurePresentation

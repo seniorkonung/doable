@@ -13,6 +13,7 @@ import '../../domain/daily_choice_description.dart';
 import '../daily_choice_command_failure_message.dart';
 import 'daily_choice_edit_state.dart';
 import 'daily_choice_edit_view_model.dart';
+import 'daily_choice_planning_fields.dart';
 
 @RoutePage()
 final class DailyChoiceEditPage extends ConsumerStatefulWidget {
@@ -142,6 +143,14 @@ final class _DailyChoiceEditPageState
                     : null,
               ),
               onChanged: (text) => _changeDate(text, model),
+            ),
+            const SizedBox(height: 16),
+            DailyChoicePlanningFields(
+              schedule: state.schedule,
+              priority: state.priority,
+              enabled: !isSubmitting,
+              onScheduleChanged: model.changeSchedule,
+              onPriorityChanged: model.changePriority,
             ),
             const SizedBox(height: 16),
             TextField(
