@@ -8,9 +8,11 @@ import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
@@ -45,6 +47,83 @@ final _locales = {
 };
 
 void main() {
+  for (final withAppBar in [false, true]) {
+    testWidgets('системная навигация следует теме и сохраняет верхний стиль '
+        '${withAppBar ? 'AppBar' : 'страницы в оболочке'}', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 48);
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      const upperStyle = SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemStatusBarContrastEnforced: false,
+        systemNavigationBarColor: Colors.red,
+        systemNavigationBarDividerColor: Colors.red,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: true,
+      );
+      final bar = AppNavigationBar(
+        selected: AppDestination.home,
+        onSelected: (_) {},
+        quickCreationMode: QuickCreationMode.intention,
+        onQuickCreate: () {},
+        onChangeQuickCreationMode: () {},
+      );
+      const body = TextField();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: doableTheme(Brightness.light),
+          darkTheme: doableTheme(Brightness.dark),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: withAppBar
+              ? Scaffold(
+                  appBar: AppBar(systemOverlayStyle: upperStyle),
+                  body: body,
+                  bottomNavigationBar: bar,
+                )
+              : Column(
+                  children: [
+                    const Expanded(
+                      child: AnnotatedRegion<SystemUiOverlayStyle>(
+                        value: upperStyle,
+                        child: Scaffold(body: body),
+                      ),
+                    ),
+                    bar,
+                  ],
+                ),
+        ),
+      );
+      await tester.enterText(find.byType(TextField), 'Несохранённое название');
+
+      for (final (brightness, colors, icons) in [
+        (Brightness.light, DoableColors.light, Brightness.dark),
+        (Brightness.dark, DoableColors.dark, Brightness.light),
+      ]) {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        await tester.pumpAndSettle();
+        final style = SystemChrome.latestStyle;
+        expect(style?.systemNavigationBarColor, colors.raised);
+        expect(style?.systemNavigationBarDividerColor, colors.raised);
+        expect(style?.systemNavigationBarIconBrightness, icons);
+        expect(style?.systemNavigationBarContrastEnforced, isFalse);
+        expect(style?.statusBarColor, upperStyle.statusBarColor);
+        expect(
+          style?.statusBarIconBrightness,
+          upperStyle.statusBarIconBrightness,
+        );
+        expect(style?.statusBarBrightness, upperStyle.statusBarBrightness);
+        expect(style?.systemStatusBarContrastEnforced, isFalse);
+        expect(find.text('Несохранённое название'), findsOneWidget);
+      }
+    });
+  }
+
   // Режим меняет лишь название и значок кнопки, поэтому достаточно одного.
   testWidgets('создание и смена режима — отдельные действия', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -81,6 +160,30 @@ void main() {
   // Устройство панели не зависит от языка: достаточно одной локали.
   group('устройство панели', () {
     const locale = Locale('ru');
+
+    for (final bottomPadding in [0.0, 34.0]) {
+      testWidgets('сохраняет кнопки 48 dp и собственные отступы 6 dp '
+          'при системном отступе $bottomPadding dp', (tester) async {
+        tester.view.padding = FakeViewPadding(
+          bottom: bottomPadding * tester.view.devicePixelRatio,
+        );
+        addTearDown(tester.view.resetPadding);
+        await tester.pumpWidget(_testApp(locale: locale));
+
+        final barRect = tester.getRect(find.byType(AppNavigationBar));
+        expect(barRect.height, 61 + bottomPadding);
+        for (final button in [
+          for (final destination in AppDestination.values)
+            appNavigationDestination(destination),
+          find.byType(QuickCreationButton),
+        ]) {
+          final buttonRect = tester.getRect(button);
+          expect(buttonRect.height, 48);
+          expect(buttonRect.top - barRect.top, 1 + 6);
+          expect(barRect.bottom - buttonRect.bottom, 6 + bottomPadding);
+        }
+      });
+    }
 
     testWidgets('показывает три пункта слева направо со значками дома, '
         'календаря и графа, а за ними — быстрое создание', (tester) async {

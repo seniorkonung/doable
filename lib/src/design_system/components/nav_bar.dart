@@ -62,7 +62,7 @@ final class NavBar extends StatelessWidget {
                 DoableMetrics.space3,
                 1 + 6,
                 DoableMetrics.space3,
-                0,
+                6,
               ),
               child: Stack(
                 fit: StackFit.expand,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/calendar_header.dart';
 import '../../../design_system/components/period_picker.dart';
 import '../../domain/calendar_date.dart';
+import 'daily_choice_calendar_paging.dart';
 
 /// Открытый выбор периода: шапка и сетка заменяют дни календаря.
 ///
@@ -28,13 +30,32 @@ final class DailyChoiceCalendarPeriodPicker extends StatefulWidget {
   final VoidCallback onClose;
 
   @override
-  State<DailyChoiceCalendarPeriodPicker> createState() =>
-      _DailyChoiceCalendarPeriodPickerState();
+  DailyChoiceCalendarPeriodPickerState createState() =>
+      DailyChoiceCalendarPeriodPickerState();
 }
 
-final class _DailyChoiceCalendarPeriodPickerState
+final class DailyChoiceCalendarPeriodPickerState
     extends State<DailyChoiceCalendarPeriodPicker> {
   late _PickerPage _page = _YearsPage.containing(widget.focusedDate.year);
+
+  /// Останавливает перелистывание перед вертикальным переходом календаря,
+  /// сохраняя режим и страницу, уже показанную в шапке.
+  void stopPaging() {
+    // Остановка синхронна: следующий кадр анимации не должен успеть сменить
+    // страницу до перестроения календаря. Контроллер остаётся у выбора.
+    // https://api.flutter.dev/flutter/widgets/PageController/jumpToPage.html
+    final controller = _page.controller;
+    // Сразу после выбора года новая сетка ещё может ждать первой раскладки;
+    // её начальная страница уже задана, перелистывание ещё не началось.
+    if (!controller.hasClients) return;
+    controller.jumpToPage(controller.page!.round());
+  }
+
+  @override
+  void dispose() {
+    _page.controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,32 +99,88 @@ final class _DailyChoiceCalendarPeriodPickerState
             onTap: widget.onClose,
           ),
         ),
-        PeriodPicker(
-          cells: switch (_page) {
-            _YearsPage(:final firstYear) => [
-              for (var year = firstYear; year < firstYear + 12; year++)
-                if (year < CalendarDate.earliest.year ||
-                    year > CalendarDate.latest.year)
-                  null
-                else
-                  _yearCell(year, l10n),
-            ],
-            _MonthsPage(:final year) => [
-              for (var month = 1; month <= 12; month++)
-                _monthCell(context, year, month, l10n),
-            ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final layout = PeriodPicker.layoutFor(
+              context,
+              width: constraints.maxWidth,
+              texts: switch (_page) {
+                // Цифры PeriodPicker равноширинные: самый длинный год
+                // задаёт размер всех страниц, включая крайние блоки.
+                // https://api.flutter.dev/flutter/dart-ui/FontFeature/FontFeature.tabularFigures.html
+                _YearsPage() => ['${CalendarDate.latest.year}'],
+                _MonthsPage(:final year) => _monthCells(
+                  context,
+                  year,
+                  l10n,
+                ).map((cell) => cell.text),
+              },
+            );
+            return SizedBox(
+              height: layout.height,
+              child: switch (_page) {
+                final _YearsPage page => PageView.builder(
+                  key: ObjectKey(page),
+                  controller: page.controller,
+                  itemCount: _yearPageCount,
+                  onPageChanged: (index) =>
+                      setState(() => page.firstYear = _firstYear + index * 12),
+                  itemBuilder: (context, index) => PeriodPicker(
+                    cells: _yearCells(_firstYear + index * 12, l10n),
+                    layout: layout,
+                  ),
+                ),
+                final _MonthsPage page => PageView.builder(
+                  key: ObjectKey(page),
+                  controller: page.controller,
+                  itemCount: _monthPageCount,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (index) => setState(
+                    () => page.year = CalendarDate.earliest.year + index,
+                  ),
+                  itemBuilder: (context, index) => PeriodPicker(
+                    cells: _monthCells(
+                      context,
+                      CalendarDate.earliest.year + index,
+                      l10n,
+                    ),
+                    layout: layout,
+                  ),
+                ),
+              },
+            );
           },
         ),
       ],
     );
   }
 
-  void _shiftPage(int direction) => setState(() {
-    _page = switch (_page) {
-      _YearsPage(:final firstYear) => _YearsPage(firstYear + direction * 12),
-      _MonthsPage(:final year) => _MonthsPage(year + direction),
+  void _shiftPage(int direction) {
+    final controller = _page.controller;
+    final pageCount = switch (_page) {
+      _YearsPage() => _yearPageCount,
+      _MonthsPage() => _monthPageCount,
     };
-  });
+    final target = (controller.page!.round() + direction).clamp(
+      0,
+      pageCount - 1,
+    );
+    unawaited(
+      controller.animateToPage(
+        target,
+        duration: calendarPageAnimationDuration,
+        curve: calendarPageAnimationCurve,
+      ),
+    );
+  }
+
+  List<PeriodPickerCell?> _yearCells(int firstYear, AppLocalizations l10n) => [
+    for (var year = firstYear; year < firstYear + 12; year++)
+      if (year < CalendarDate.earliest.year || year > CalendarDate.latest.year)
+        null
+      else
+        _yearCell(year, l10n),
+  ];
 
   PeriodPickerCell _yearCell(int year, AppLocalizations l10n) {
     final isCurrent = year == widget.today.year;
@@ -112,9 +189,21 @@ final class _DailyChoiceCalendarPeriodPickerState
       semanticLabel: _periodLabel('$year', isCurrent, l10n),
       isShown: year == widget.focusedDate.year,
       isCurrent: isCurrent,
-      onTap: () => setState(() => _page = _MonthsPage(year)),
+      onTap: () {
+        _page.controller.dispose();
+        setState(() => _page = _MonthsPage(year));
+      },
     );
   }
+
+  List<PeriodPickerCell> _monthCells(
+    BuildContext context,
+    int year,
+    AppLocalizations l10n,
+  ) => [
+    for (var month = 1; month <= 12; month++)
+      _monthCell(context, year, month, l10n),
+  ];
 
   PeriodPickerCell _monthCell(
     BuildContext context,
@@ -147,19 +236,44 @@ String _periodLabel(String title, bool isCurrent, AppLocalizations l10n) =>
 
 sealed class _PickerPage {
   const _PickerPage();
+
+  PageController get controller;
 }
 
 final class _YearsPage extends _PickerPage {
-  const _YearsPage(this.firstYear);
+  _YearsPage(this.firstYear);
 
   factory _YearsPage.containing(int year) =>
       _YearsPage(2020 + ((year - 2020) / 12).floor() * 12);
 
-  final int firstYear;
+  int firstYear;
+
+  // Страница принадлежит открытому выбору, без чтения и записи PageStorage:
+  // https://api.flutter.dev/flutter/widgets/PageController/keepPage.html
+  @override
+  late final controller = PageController(
+    initialPage: (firstYear - _firstYear) ~/ 12,
+    keepPage: false,
+  );
 }
+
+final _firstYear = _YearsPage.containing(CalendarDate.earliest.year).firstYear;
+final _yearPageCount =
+    (_YearsPage.containing(CalendarDate.latest.year).firstYear - _firstYear) ~/
+        12 +
+    1;
 
 final class _MonthsPage extends _PickerPage {
-  const _MonthsPage(this.year);
+  _MonthsPage(this.year);
 
-  final int year;
+  int year;
+
+  @override
+  late final controller = PageController(
+    initialPage: year - CalendarDate.earliest.year,
+    keepPage: false,
+  );
 }
+
+final _monthPageCount =
+    CalendarDate.latest.year - CalendarDate.earliest.year + 1;
