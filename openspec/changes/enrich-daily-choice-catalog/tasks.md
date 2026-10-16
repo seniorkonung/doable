@@ -215,7 +215,7 @@
   - **Files likely touched:** `lib/src/daily_choice/application/daily_choice_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`, `test/daily_choice/application/daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_catalog_test.dart`, `test/graph/data/drift_daily_choice_read_cost_test.dart`, `test/graph/data/drift_daily_choice_diagnostics_test.dart`; оставшиеся вызовы прежнего фильтра в проверках каталога.
   - **Estimated scope:** M; изменение одного контракта и механический перенос его прямых вызовов.
 
-- [ ] 2.7 Подтвердить согласование секций с реальными командами, подробностями и календарными отметками
+- [x] 2.7 Подтвердить согласование секций с реальными командами, подробностями и календарными отметками
   - **Acceptance criteria:**
     - Реальный `DriftPersonalGraphRepository`, общий координатор и модель каталога согласуют создание, изменение, замену пути и удаление без ручного обновления. Выбор после правки занимает место по сохранённым данным; если оно за загруженной границей, он доступен через продолжение соответствующей секции.
     - При подтверждённом переносе даты или выполнения обе секции меняются одной публикацией; подробности и отдельная модель отметок отражают те же сохранённые данные. Отказ пересборки сохраняет прежнюю пару и не откатывает уже сохранённую команду.
