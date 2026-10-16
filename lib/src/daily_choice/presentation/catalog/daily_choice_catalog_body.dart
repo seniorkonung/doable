@@ -315,114 +315,117 @@ final class _DailyChoiceCatalogBodyState
           final showGroup =
               startsGroup &&
               (item.schedule is DailyChoiceTime || section.hasTimedChoices);
-          return Column(
+          return _CompletionSurface(
             key: ValueKey(item.id),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (showGroup)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                  child: Semantics(
-                    container: true,
-                    header: true,
-                    child: Text(
-                      schedule,
-                      style: Theme.of(context).textTheme.titleSmall,
+            id: item.id,
+            model: model,
+            builder: (changeCompletion) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (showGroup)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                    child: Semantics(
+                      container: true,
+                      header: true,
+                      child: Text(
+                        schedule,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                     ),
                   ),
-                ),
-              // Сначала читаются данные карточки, затем отдельный флажок:
-              // https://api.flutter.dev/flutter/semantics/SemanticsProperties/sortKey.html
-              Semantics(
-                container: true,
-                explicitChildNodes: true,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Semantics(
-                        key: ValueKey('daily-choice-row-$number'),
-                        sortKey: const OrdinalSortKey(0),
-                        container: true,
-                        button: true,
-                        label: [
-                          l10n.dailyChoiceCatalogRowLabel(
-                            number,
-                            phrase,
-                            date,
-                            completion,
-                          ),
-                          schedule,
-                          priority,
-                          pathCount,
-                          if (item.description case final description?)
-                            description.value,
-                        ].join('\n'),
-                        onTap: open,
-                        child: ExcludeSemantics(
-                          child: ListTile(
-                            title: Text(phrase),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  '${l10n.dailyChoiceDetailsDate(date)} · $completion',
-                                ),
-                                Text(schedule),
-                                Text(priority),
-                                Text(pathCount),
-                                if (item.description case final description?)
-                                  // Ограничение относится только к карточке:
-                                  // https://api.flutter.dev/flutter/widgets/Text/maxLines.html
-                                  Text(
-                                    description.value,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                              ],
+                // Сначала читаются данные карточки, затем отдельный флажок:
+                // https://api.flutter.dev/flutter/semantics/SemanticsProperties/sortKey.html
+                Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          key: ValueKey('daily-choice-row-$number'),
+                          sortKey: const OrdinalSortKey(0),
+                          container: true,
+                          button: true,
+                          label: [
+                            l10n.dailyChoiceCatalogRowLabel(
+                              number,
+                              phrase,
+                              date,
+                              completion,
                             ),
-                            onTap: open,
+                            schedule,
+                            priority,
+                            pathCount,
+                            if (item.description case final description?)
+                              description.value,
+                          ].join('\n'),
+                          onTap: open,
+                          child: ExcludeSemantics(
+                            child: ListTile(
+                              title: Text(phrase),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    '${l10n.dailyChoiceDetailsDate(date)} · $completion',
+                                  ),
+                                  Text(schedule),
+                                  Text(priority),
+                                  Text(pathCount),
+                                  if (item.description case final description?)
+                                    // Ограничение относится только к карточке:
+                                    // https://api.flutter.dev/flutter/widgets/Text/maxLines.html
+                                    Text(
+                                      description.value,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                              onTap: open,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8, right: 8),
-                      // Флажок остаётся вне исключённого содержимого открытия:
-                      // https://api.flutter.dev/flutter/material/Checkbox-class.html
-                      child: Semantics(
-                        sortKey: const OrdinalSortKey(1),
-                        child: Checkbox(
-                          key: ValueKey(
-                            'daily-choice-completion-${item.id.toCanonicalString()}',
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, right: 8),
+                        // Флажок остаётся вне исключённого содержимого открытия:
+                        // https://api.flutter.dev/flutter/material/Checkbox-class.html
+                        child: Semantics(
+                          sortKey: const OrdinalSortKey(1),
+                          child: Checkbox(
+                            key: ValueKey(
+                              'daily-choice-completion-${item.id.toCanonicalString()}',
+                            ),
+                            semanticLabel: l10n
+                                .dailyChoiceCatalogCompletionLabel(
+                                  number,
+                                  phrase,
+                                  date,
+                                ),
+                            value: item.isCompleted,
+                            onChanged: state.canChangeCompletion(item.id)
+                                ? (_) => changeCompletion(!item.isCompleted)
+                                : null,
                           ),
-                          semanticLabel: l10n.dailyChoiceCatalogCompletionLabel(
-                            number,
-                            phrase,
-                            date,
-                          ),
-                          value: item.isCompleted,
-                          onChanged: state.canChangeCompletion(item.id)
-                              ? (_) => model.changeCompletion(
-                                  item.id,
-                                  !item.isCompleted,
-                                )
-                              : null,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              if (state.completionOperations[item.id] case final operation?)
-                _completionFeedback(
-                  item.id,
-                  item.isCompleted,
-                  operation,
-                  model,
-                  l10n,
-                ),
-            ],
+                if (state.completionOperations[item.id] case final operation?)
+                  _completionFeedback(
+                    item.id,
+                    item.isCompleted,
+                    operation,
+                    model,
+                    l10n,
+                    changeCompletion,
+                  ),
+              ],
+            ),
           );
         },
       ),
@@ -437,6 +440,7 @@ final class _DailyChoiceCatalogBodyState
     DailyChoiceCompletionOperation operation,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
+    ValueChanged<bool> changeCompletion,
   ) => switch (operation) {
     DailyChoiceCompletionSubmitting() => _Banner(
       message: l10n.dailyChoiceCompletionSaving,
@@ -463,7 +467,7 @@ final class _DailyChoiceCatalogBodyState
             ),
             if (canRetry)
               TextButton(
-                onPressed: () => model.changeCompletion(id, !isCompleted),
+                onPressed: () => changeCompletion(!isCompleted),
                 child: Text(l10n.commonRetry),
               ),
             if (requiresRefresh)
@@ -587,4 +591,51 @@ final class _Banner extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Карточка удерживает только право будущей ошибки; команда живёт в координаторе.
+final class _CompletionSurface extends StatefulWidget {
+  const _CompletionSurface({
+    required this.id,
+    required this.model,
+    required this.builder,
+    super.key,
+  });
+
+  final DailyChoiceId id;
+  final DailyChoiceCatalogViewModel model;
+  final Widget Function(ValueChanged<bool> changeCompletion) builder;
+
+  @override
+  State<_CompletionSurface> createState() => _CompletionSurfaceState();
+}
+
+final class _CompletionSurfaceState extends State<_CompletionSurface> {
+  VoidCallback? _releasePresentation;
+
+  @override
+  void dispose() {
+    // Освобождаем право даже до построения первого сообщения ошибки:
+    // https://api.flutter.dev/flutter/widgets/State/dispose.html
+    _releasePresentation?.call();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Читаем актуальную доступность вкладки и маршрута при получении отказа,
+    // даже если скрытый потребитель Riverpod приостановил перестроения:
+    // https://api.flutter.dev/flutter/widgets/TickerMode/getValuesNotifier.html
+    final tickerMode = TickerMode.getValuesNotifier(context);
+    final route = ModalRoute.of(context);
+    return widget.builder((isCompleted) {
+      _releasePresentation?.call();
+      _releasePresentation = widget.model.changeCompletion(
+        widget.id,
+        isCompleted,
+        canPresentFailure: () =>
+            mounted && tickerMode.value.enabled && (route?.isCurrent ?? true),
+      );
+    });
+  }
 }

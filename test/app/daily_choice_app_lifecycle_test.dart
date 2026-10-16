@@ -6,6 +6,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
@@ -15,6 +16,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
@@ -59,6 +61,8 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
+
+part 'daily_choice_completion_lifecycle_scenarios.dart';
 
 /// Локальное сегодня запуска, в котором человек настраивает календарь.
 final _firstToday = CalendarDate.fromParts(2026, 10, 4);
@@ -168,6 +172,8 @@ final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
 }
 
 void main() {
+  _completionLifecycleScenarios();
+
   testWidgets(
     'создание снизу вверх завершается после ухода, смены фокуса и повторного открытия',
     (tester) async {

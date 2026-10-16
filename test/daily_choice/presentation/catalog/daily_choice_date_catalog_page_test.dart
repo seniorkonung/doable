@@ -6,6 +6,7 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
@@ -16,6 +17,8 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_c
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +31,198 @@ import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  for (final closePage in [false, true]) {
+    testWidgets(
+      'флажок: ${closePage ? 'закрытие каталога на дату' : 'уход из корневого каталога'} сохраняет поздний отказ без смены маршрута',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        final repository = CatalogPageRepository();
+        final selected = date(2026, 10, 7);
+        final router = await _start(
+          tester,
+          repository,
+          ControlledDailyChoiceLocalDate(selected),
+        );
+        if (closePage) {
+          await _pushDate(tester, router, selected);
+        } else {
+          await openDailyChoices(tester);
+        }
+        final item = catalogPageItem(1, date: selected);
+        repository.completeFirst(0, [item], total: 1);
+        repository.completeDayStatuses(0, {});
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(Checkbox));
+        await tester.pump();
+        if (closePage) {
+          await _back(tester);
+        } else {
+          await openHome(tester);
+        }
+        repository.failCompletion(0, const DailyChoiceUnavailableFailure());
+        await tester.pumpAndSettle();
+        expectHomeRootPage(router);
+        expect(find.byType(SnackBar), findsOneWidget);
+        await _dismissCompletionMessage(tester);
+        if (closePage) {
+          await _pushDate(tester, router, selected);
+          repository.completeFirst(1, [item], total: 1);
+          repository.completeDayStatuses(1, {});
+        } else {
+          await openDailyChoices(tester);
+        }
+        await tester.pumpAndSettle();
+        expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(repository.completionCommands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final (presented, buildMessage) in [
+    (false, true),
+    (true, true),
+    (false, false),
+  ]) {
+    testWidgets(
+      'флажок: исчезновение ${!buildMessage
+          ? 'ещё не построенной'
+          : presented
+          ? 'предъявленной'
+          : 'ещё не предъявленной'} инлайн-ошибки сохраняет единственного получателя результата',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        tester.view.physicalSize = const Size(800, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final repository = CatalogPageRepository();
+        final selected = date(2026, 10, 7);
+        await _start(
+          tester,
+          repository,
+          ControlledDailyChoiceLocalDate(selected),
+        );
+        await openDailyChoices(tester);
+        repository.completeFirst(0, [
+          catalogPageItem(1, date: selected),
+        ], total: 1);
+        repository.completeDayStatuses(0, {});
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(Checkbox));
+        await tester.pump();
+        if (!presented) {
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.inactive,
+          );
+        }
+        if (buildMessage) {
+          repository.failCompletion(0, const DailyChoiceUnavailableFailure());
+          await tester.pumpAndSettle();
+          expect(find.byType(OperationFailurePresentation), findsOneWidget);
+        } else {
+          // Команда завершена, но кадра с её сообщением ещё не было.
+          await tester.runAsync(() async {
+            repository.failCompletion(0, const DailyChoiceUnavailableFailure());
+            await Future<void>.delayed(Duration.zero);
+          });
+          expect(find.byType(OperationFailurePresentation), findsNothing);
+        }
+        expect(find.byType(SnackBar), findsNothing);
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-section-false')),
+        );
+        await tester.pumpAndSettle();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(OperationFailurePresentation), findsNothing);
+        if (!presented) {
+          expect(find.byType(SnackBar), findsOneWidget);
+          await _dismissCompletionMessage(tester);
+        }
+        expect(find.byType(SnackBar), findsNothing);
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-section-false')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsNothing);
+        expect(repository.completionCommands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final changeDate in [false, true]) {
+    testWidgets(
+      'флажок: ${changeDate ? 'смена даты отдельного каталога' : 'сворачивание корневой секции'} до отказа передаёт результат оболочке один раз',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        final repository = CatalogPageRepository();
+        final selected = date(2026, 10, 7);
+        final next = date(2026, 10, 8);
+        final router = await _start(
+          tester,
+          repository,
+          ControlledDailyChoiceLocalDate(selected),
+        );
+        if (changeDate) {
+          await _pushDate(tester, router, selected);
+        } else {
+          await openDailyChoices(tester);
+        }
+        final item = catalogPageItem(1, date: selected);
+        repository.completeFirst(0, [item], total: 1);
+        repository.completeDayStatuses(0, {});
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(Checkbox));
+        await tester.pump();
+        if (changeDate) {
+          await tester.tap(calendarDay(next));
+          await tester.pump();
+          repository.completeFirst(1, [], total: 0);
+        } else {
+          await tester.tap(
+            find.byKey(const ValueKey('daily-choice-section-false')),
+          );
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(Checkbox), findsNothing);
+        repository.failCompletion(0, const DailyChoiceUnavailableFailure());
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(find.byType(OperationFailurePresentation), findsNothing);
+        expect(
+          dayCell(tester, changeDate ? next : selected).isSelected,
+          isTrue,
+        );
+        await _dismissCompletionMessage(tester);
+
+        if (changeDate) {
+          await tester.tap(calendarDay(selected));
+          await tester.pump();
+          repository.completeFirst(2, [item], total: 1);
+        } else {
+          await tester.tap(
+            find.byKey(const ValueKey('daily-choice-section-false')),
+          );
+        }
+        await tester.pumpAndSettle();
+        expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(repository.completionCommands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final onDate in [false, true]) {
     testWidgets(
       '${onDate ? 'каталог на дату' : 'корневой каталог'}: смена дня после двух порций сохраняет свёрнутые невыполненные и раскрытые выполненные',
@@ -463,6 +658,13 @@ Future<void> _back(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _dismissCompletionMessage(WidgetTester tester) async {
+  final message = find.byKey(const ValueKey('graph-operation-message'));
+  ScaffoldMessenger.of(tester.element(message)).hideCurrentSnackBar();
+  await tester.pumpAndSettle();
+  expect(find.byType(SnackBar), findsNothing);
+}
+
 Future<AppRouter> _start(
   WidgetTester tester,
   CatalogPageRepository repository,
@@ -485,6 +687,7 @@ Future<AppRouter> _start(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(),
+        builder: (context, child) => GraphOperationPresenter(child: child!),
       ),
     ),
   );

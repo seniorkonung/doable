@@ -110,14 +110,19 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   }
 
   /// Отправляет только выполнение; сохранённая карточка меняется вместе с парой.
-  void changeCompletion(DailyChoiceId id, bool isCompleted) {
+  /// Возвращает освобождение права карточки, которое не отменяет команду.
+  void Function()? changeCompletion(
+    DailyChoiceId id,
+    bool isCompleted, {
+    bool Function()? canPresentFailure,
+  }) {
     final current = state;
     if (current is! DailyChoiceCatalogLoaded ||
         !current.canChangeCompletion(id))
-      return;
+      return null;
     if (current.items.firstWhere((item) => item.id == id).isCompleted ==
         isCompleted)
-      return;
+      return null;
     _releaseCompletionToken(id);
     final start = _coordinator.acceptDailyChoiceUpdate(
       UpdateDailyChoiceFields(
@@ -131,7 +136,9 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
       case DailyChoiceCommandAccepted(:final token, :final future):
         _completionTokens[id] = token;
         _setCompletionOperation(id, const DailyChoiceCompletionSubmitting());
-        unawaited(_finishCompletion(id, future));
+        unawaited(_finishCompletion(id, future, canPresentFailure));
+        final coordinator = _coordinator;
+        return () => coordinator.releaseInitiatorPresentation(token);
       case DailyChoiceCommandAlreadyRunning():
         _setCompletionOperation(
           id,
@@ -174,6 +181,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   Future<void> _finishCompletion(
     DailyChoiceId id,
     Future<DailyChoiceCommandCompletion> future,
+    bool Function()? canPresentFailure,
   ) async {
     final completion = await future;
     if (!ref.mounted || !identical(_completionTokens[id], completion.token))
@@ -199,6 +207,9 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
           );
         }
       case GraphResultFailure(:final failure):
+        if (canPresentFailure != null && !canPresentFailure()) {
+          _coordinator.releaseInitiatorPresentation(completion.token);
+        }
         _setCompletionOperation(
           id,
           DailyChoiceCompletionFailed(
