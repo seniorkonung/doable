@@ -141,6 +141,7 @@ Future<void> _openReplacedChoice(WidgetTester tester) async {
   // Каталог открывается на другом дне: человек выбирает день заменяемого
   // выбора, и тот оказывается единственной строкой выдачи.
   await selectDailyChoiceCatalogDate(tester, _replacedChoiceDate, tap: _tap);
+  await showDailyChoiceCatalogSection(tester, true);
   await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
 }
 
