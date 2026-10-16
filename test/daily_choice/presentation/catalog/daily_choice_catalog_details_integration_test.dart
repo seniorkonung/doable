@@ -113,15 +113,15 @@ void main() {
       );
       expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 51);
-      expect(catalog().items, hasLength(50));
-      expect(catalog().items.first.id, _choice(251));
-      expect(catalog().nextCursor, isNotNull);
-      await model.loadMore();
+      expect(catalog().items, hasLength(51));
+      expect(catalog().incomplete.items.single.id, _choice(201));
+      expect(catalog().completed.totalCount, 50);
+      await model.loadMore(isCompleted: false);
       expect(catalog().items.map((item) => item.id).toSet(), {
         _choice(201),
         for (var number = 202; number <= 251; number++) _choice(number),
       });
-      expect(catalog().items.last.id, _choice(201));
+      expect(catalog().items.last.id, _choice(251));
       await expectMarks({sourceDay: DailyChoiceDayStatus.hasIncomplete});
 
       final details = DailyChoiceDetailsViewModel(repository, _choice(201));
@@ -181,7 +181,7 @@ void main() {
       expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 50);
       expect(catalog().items, hasLength(50));
-      expect(catalog().nextCursor, isNull);
+      expect(catalog().incomplete.nextCursor, isNull);
       expect(catalog().items.any((item) => item.id == _choice(201)), isFalse);
       expect(catalog().items.every((item) => item.date == sourceDay), isTrue);
       expect(opened().details.choice.date, targetDay);
@@ -218,7 +218,7 @@ void main() {
             catalog().selection.date == targetDay,
       );
       expect(catalog().totalCount, 1);
-      expect(catalog().nextCursor, isNull);
+      expect(catalog().incomplete.nextCursor, isNull);
       expect(catalog().items.single.id, _choice(201));
       expect(catalog().items.single.date, targetDay);
       expect(catalog().items.single.isCompleted, isTrue);
@@ -235,7 +235,14 @@ void main() {
             catalog().totalCount == 0 &&
             details.state is DailyChoiceDetailsNotFound,
       );
-      expect(catalog(), isA<DailyChoiceCatalogEmpty>());
+      expect(
+        catalog(),
+        isA<DailyChoiceCatalogLoaded>().having(
+          (state) => state.totalCount,
+          'количество',
+          0,
+        ),
+      );
       expect(catalog().selection.date, targetDay);
       await expectMarks({sourceDay: DailyChoiceDayStatus.allCompleted});
 
@@ -303,12 +310,14 @@ void main() {
           switch (container.read(catalogProvider)) {
             final DailyChoiceCatalogLoaded loaded =>
               loaded.selection.date == date &&
-                  loaded.selection.isCompleted == isCompleted &&
                   loaded.freshness == DailyChoiceCatalogFreshness.current,
             _ => false,
           };
+      var includeCompleted = false;
       List<DailyChoiceId> ids() => [
-        for (final item in catalog().items) item.id,
+        for (final item
+            in includeCompleted ? catalog().items : catalog().incomplete.items)
+          item.id,
       ];
       final model = container.read(catalogProvider.notifier);
       final coordinator = container.read(
@@ -336,17 +345,16 @@ void main() {
       await _until(() => shows(day, null));
       expect(catalog().totalCount, 53);
       expect(ids(), [
-        for (var number = 253; number > 203; number--) _choice(number),
+        for (var number = 201; number <= 250; number++) _choice(number),
       ]);
-      await model.loadMore();
+      await model.loadMore(isCompleted: false);
       expect(ids(), [
-        for (var number = 253; number >= 201; number--) _choice(number),
+        for (var number = 201; number <= 253; number++) _choice(number),
       ]);
-      expect(catalog().nextCursor, isNull);
+      expect(catalog().incomplete.nextCursor, isNull);
 
-      model.selectCompletion(false);
       await _until(() => shows(day, false));
-      await model.loadMore();
+      await model.loadMore(isCompleted: false);
       expect(catalog().totalCount, 53);
       expect(catalog().items, hasLength(53));
 
@@ -363,11 +371,11 @@ void main() {
         ),
       );
       await reconciled(completed);
-      expect(catalog().totalCount, 52);
+      expect(catalog().incomplete.totalCount, 52);
       expect(ids(), [
         for (var number = 201; number <= 252; number++) _choice(number),
       ]);
-      final twin = catalog().items.last;
+      final twin = catalog().incomplete.items.last;
       expect(twin.id, _choice(252));
       expect(twin.date, day);
       expect(twin.isCompleted, isFalse);
@@ -382,7 +390,7 @@ void main() {
         ),
       );
       await reconciled(moved);
-      expect(catalog().totalCount, 51);
+      expect(catalog().incomplete.totalCount, 51);
       expect(ids(), [
         for (var number = 201; number <= 251; number++) _choice(number),
       ]);
@@ -395,7 +403,7 @@ void main() {
         ),
       );
       await reconciled(createdToday);
-      expect(catalog().totalCount, 52);
+      expect(catalog().incomplete.totalCount, 52);
       expect(ids().last, _choice(401));
       expect(ids(), hasLength(52));
 
@@ -407,32 +415,33 @@ void main() {
         ),
       );
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(catalog().totalCount, 52);
+      expect(catalog().incomplete.totalCount, 52);
       expect(ids(), isNot(contains(_choice(402))));
 
       final deleted = await confirm(
         coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_choice(401))),
       );
       await reconciled(deleted);
-      expect(catalog().totalCount, 51);
+      expect(catalog().incomplete.totalCount, 51);
       expect(ids(), isNot(contains(_choice(401))));
 
-      // Сброс возвращает выполненную запись того же дня.
-      model.clearFilters();
+      // Раскрытие выполненных сохраняет обе прочитанные секции того же дня.
+      includeCompleted = true;
+      model.toggleSection(true);
       await _until(() => shows(day, null));
       expect(catalog().totalCount, 52);
-      expect(ids().first, _choice(253));
-      expect(catalog().items.first.isCompleted, isTrue);
+      expect(ids().last, _choice(253));
+      expect(catalog().completed.items.single.isCompleted, isTrue);
 
       // Перенесённая и созданная записи доступны выбором их дней.
       model.selectDate(futureDay);
       await _until(() => shows(futureDay, null));
-      expect(ids(), [_choice(302), _choice(252)]);
+      expect(ids(), [_choice(252), _choice(302)]);
       expect(catalog().totalCount, 2);
-      expect(catalog().items.last.isCompleted, isFalse);
+      expect(catalog().incomplete.items.single.isCompleted, isFalse);
       model.selectDate(pastDay);
       await _until(() => shows(pastDay, null));
-      expect(ids(), [_choice(402), _choice(301)]);
+      expect(ids(), [_choice(301), _choice(402)]);
     },
   );
 }

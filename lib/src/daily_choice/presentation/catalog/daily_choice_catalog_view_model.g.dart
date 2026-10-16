@@ -8,20 +8,20 @@ part of 'daily_choice_catalog_view_model.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+/// Публикует согласованную пару и независимо подгружает её секции.
 
 @ProviderFor(DailyChoiceCatalogViewModel)
 final dailyChoiceCatalogViewModelProvider =
     DailyChoiceCatalogViewModelFamily._();
 
-/// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+/// Публикует согласованную пару и независимо подгружает её секции.
 final class DailyChoiceCatalogViewModelProvider
     extends
         $NotifierProvider<
           DailyChoiceCatalogViewModel,
           DailyChoiceCatalogState
         > {
-  /// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+  /// Публикует согласованную пару и независимо подгружает её секции.
   DailyChoiceCatalogViewModelProvider._({
     required DailyChoiceCatalogViewModelFamily super.from,
     required DailyChoiceCatalogInstance super.argument,
@@ -68,9 +68,9 @@ final class DailyChoiceCatalogViewModelProvider
 }
 
 String _$dailyChoiceCatalogViewModelHash() =>
-    r'3be14cb3f36f8534be1ee8dd8432b05fc85b4339';
+    r'df407d874c0d8346b8e07af8096bb361154cbf28';
 
-/// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+/// Публикует согласованную пару и независимо подгружает её секции.
 
 final class DailyChoiceCatalogViewModelFamily extends $Family
     with
@@ -90,7 +90,7 @@ final class DailyChoiceCatalogViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+  /// Публикует согласованную пару и независимо подгружает её секции.
 
   DailyChoiceCatalogViewModelProvider call(
     DailyChoiceCatalogInstance instance,
@@ -100,7 +100,7 @@ final class DailyChoiceCatalogViewModelFamily extends $Family
   String toString() => r'dailyChoiceCatalogViewModelProvider';
 }
 
-/// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+/// Публикует согласованную пару и независимо подгружает её секции.
 
 abstract class _$DailyChoiceCatalogViewModel
     extends $Notifier<DailyChoiceCatalogState> {

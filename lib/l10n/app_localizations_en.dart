@@ -2483,7 +2483,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceCatalogEmpty => 'No daily choices match the filters.';
+  String get dailyChoiceCatalogEmpty => 'No daily choices for this day.';
 
   @override
   String get dailyChoiceCatalogRefreshing => 'Refreshing daily choices…';

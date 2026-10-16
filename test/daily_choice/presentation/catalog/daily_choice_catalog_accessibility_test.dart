@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
-/// Экран телефона: при обычном тексте страница с календарём, фильтрами и
+/// Экран телефона: при обычном тексте страница с календарём, секциями и
 /// двумя строками выдачи помещается целиком.
 const _phone = Size(360, 780);
 
@@ -38,7 +38,7 @@ void main() {
     final language = texts.locale.languageCode;
 
     group('экранный диктор на странице каталога ($language)', () {
-      testWidgets('читает дни календаря, заголовок дня, фильтры, количество, '
+      testWidgets('читает дни календаря, заголовок дня, секции, количество, '
           'строки и подгрузку по порядку, затем общую панель, '
           'без отдельных чисел дней', (tester) async {
         final semantics = tester.ensureSemantics();
@@ -65,12 +65,12 @@ void main() {
           l10n.dailyChoiceCalendarExpand,
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
-          _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
-          l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(3),
+          l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
           _rowLabel(l10n, 2),
           l10n.dailyChoiceCatalogLoadMore,
+          l10n.dailyChoiceCatalogCompleted,
         ];
         final announced = _announced(tester);
         expect(announced.take(page.length), page);
@@ -98,7 +98,7 @@ void main() {
       if (texts != _texts.first) return;
 
       testWidgets('читает отказы с повтором на месте выдачи и выполняет '
-          'повтор, подгрузку, фильтр выполнения и сброс доступной '
+          'повтор, подгрузку, раскрытие секций доступной '
           'активацией для выбранного дня', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
@@ -111,8 +111,8 @@ void main() {
         );
         final l10n = _l10n(tester);
         final filters = [
-          _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
-          l10n.dailyChoiceCatalogClearFilters,
+          l10n.dailyChoiceCatalogIncomplete,
+          l10n.dailyChoiceCatalogCompleted,
         ];
 
         repository.failUnavailable(0);
@@ -128,7 +128,7 @@ void main() {
         await tester.pump();
         expect(repository.queries, hasLength(2));
         expect(repository.queries[1].date, _today);
-        expect(repository.queries[1].isCompleted, isNull);
+        expect(repository.queries[1].isCompleted, isFalse);
         expect(repository.queries[1].cursor, isNull);
         repository.completeFirst(
           1,
@@ -138,10 +138,11 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
-          ...filters,
           l10n.dailyChoiceCatalogTotalCount(2),
+          l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogLoadMore,
+          l10n.dailyChoiceCatalogCompleted,
         ]);
 
         tester.semantics.tap(
@@ -155,11 +156,12 @@ void main() {
         await tester.pumpAndSettle();
         // Отказ подгрузки читается после загруженной строки.
         expect(_afterDayHeading(tester), [
-          ...filters,
           l10n.dailyChoiceCatalogTotalCount(2),
+          l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
+          l10n.dailyChoiceCatalogCompleted,
         ]);
         _expectLiveRegion(tester, l10n.dailyChoiceCatalogUnavailable);
 
@@ -171,45 +173,33 @@ void main() {
         repository.completeMore(3, [catalogPageItem(2, date: _today)]);
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
-          ...filters,
           l10n.dailyChoiceCatalogTotalCount(2),
+          l10n.dailyChoiceCatalogIncomplete,
           _rowLabel(l10n, 1),
           _rowLabel(l10n, 2),
+          l10n.dailyChoiceCatalogCompleted,
         ]);
 
-        tester.semantics.tap(find.semantics.byLabel(filters.first));
-        await tester.pumpAndSettle();
         tester.semantics.tap(
           find.semantics.byLabel(l10n.dailyChoiceCatalogIncomplete),
         );
-        await tester.pump();
-        expect(repository.queries, hasLength(5));
-        expect(repository.queries[4].date, _today);
-        expect(repository.queries[4].isCompleted, isFalse);
-        expect(repository.queries[4].cursor, isNull);
-        repository.completeFirst(4, [], total: 0);
         await tester.pumpAndSettle();
-        expect(_afterDayHeading(tester), [
-          _completionFilter(l10n, l10n.dailyChoiceCatalogIncomplete),
-          l10n.dailyChoiceCatalogClearFilters,
-          l10n.dailyChoiceCatalogTotalCount(0),
-          l10n.dailyChoiceCatalogEmpty,
-        ]);
-
         tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogClearFilters),
+          find.semantics.byLabel(l10n.dailyChoiceCatalogCompleted),
         );
-        await tester.pump();
-        expect(repository.queries, hasLength(6));
-        expect(repository.queries[5].date, _today);
-        expect(repository.queries[5].isCompleted, isNull);
-        expect(repository.queries[5].cursor, isNull);
+        await tester.pumpAndSettle();
+        expect(repository.queries, hasLength(4));
+        expect(_afterDayHeading(tester), [
+          l10n.dailyChoiceCatalogTotalCount(2),
+          l10n.dailyChoiceCatalogIncomplete,
+          l10n.dailyChoiceCatalogCompleted,
+        ]);
         expect(_announced(tester), contains(texts.selectedToday));
         semantics.dispose();
       });
 
       testWidgets('прокрутка страницы диктором '
-          'проходит заголовок дня, фильтры, строки и подгрузку по порядку, '
+          'проходит заголовок дня, секции, строки и подгрузку по порядку, '
           'и подгрузка выполняется', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
@@ -236,9 +226,8 @@ void main() {
         final page = [
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
-          _completionFilter(l10n, l10n.dailyChoiceCatalogAllStates),
-          l10n.dailyChoiceCatalogClearFilters,
           l10n.dailyChoiceCatalogTotalCount(21),
+          l10n.dailyChoiceCatalogIncomplete,
           for (var number = 1; number <= 20; number++) _rowLabel(l10n, number),
           l10n.dailyChoiceCatalogLoadMore,
         ];
@@ -308,7 +297,7 @@ List<String> _announcedInScroll(WidgetTester tester) {
   ];
 }
 
-/// Названия после заголовка дня: фильтры, выдача и сообщения,
+/// Названия после заголовка дня: секции, выдача и сообщения,
 /// без панели основной навигации.
 List<String> _afterDayHeading(WidgetTester tester) {
   final nodes = tester.semantics.simulatedAccessibilityTraversal().toList();
@@ -357,10 +346,6 @@ void _expectLiveRegion(WidgetTester tester, String message) {
 String _fullDate(WidgetTester tester, CalendarDate value) =>
     MaterialLocalizations.of(tester.element(find.byType(DailyChoiceCalendar)))
         .formatFullDate(DateTime.utc(value.year, value.month, value.day));
-
-/// Фильтр выполнения читается своим названием и выбранным состоянием.
-String _completionFilter(AppLocalizations l10n, String state) =>
-    '${l10n.dailyChoiceCatalogCompletionFilter}\n$state';
 
 /// Доступное название строки выдачи [number] за [day], по умолчанию — за
 /// сегодняшний день.

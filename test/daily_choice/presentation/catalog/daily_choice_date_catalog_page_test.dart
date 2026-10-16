@@ -20,6 +20,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'daily_choice_calendar_test_support.dart';
+import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
@@ -86,7 +87,7 @@ void main() {
     await _pushDate(tester, router, selected);
     expect(repository.queries, hasLength(4));
     expect(repository.queries.last.date, selected);
-    expect(repository.queries.last.isCompleted, isNull);
+    expect(repository.queries.last.isCompleted, isFalse);
     expect(repository.queries.last.cursor, isNull);
     repository.completeFirst(3, [], total: 0);
     repository.completeDayStatuses(3, {});
@@ -94,7 +95,7 @@ void main() {
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
     expect(dayCell(tester, selected).isSelected, isTrue);
     expect(find.bySemanticsLabel('Развернуть календарь'), findsOneWidget);
-    expect(find.text('Все состояния'), findsOneWidget);
+    expect(find.text('Не выполненные'), findsOneWidget);
     await _back(tester);
     expect(find.text('2028'), findsOneWidget);
     await _calendarCommand(tester, 'Вернуться к дням месяца');
@@ -103,7 +104,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final (locale, weekday, heading, todayLabel, allStates, back) in const [
+  for (final (locale, weekday, heading, todayLabel, _, back) in const [
     (
       Locale('ru'),
       'Среда',
@@ -135,7 +136,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(repository.queries, hasLength(1));
       expect(repository.queries.single.date, selected);
-      expect(repository.queries.single.isCompleted, isNull);
+      expect(repository.queries.single.isCompleted, isFalse);
       repository.completeFirst(0, [], total: 0);
       repository.completeDayStatuses(0, {});
       await tester.pumpAndSettle();
@@ -157,7 +158,10 @@ void main() {
       expect(find.text(weekday, findRichText: true), findsOneWidget);
       expect(find.text(heading), findsOneWidget);
       expect(find.text(todayLabel), findsNothing);
-      expect(find.text(allStates), findsOneWidget);
+      expect(
+        find.text(lookupAppLocalizations(locale).dailyChoiceCatalogIncomplete),
+        findsOneWidget,
+      );
       expect(
         tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
         AppDestination.home,
@@ -170,7 +174,10 @@ void main() {
       expect(find.text(todayLabel), findsOneWidget);
       expect(find.text(heading), findsOneWidget);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
-      expect(find.text(allStates), findsOneWidget);
+      expect(
+        find.text(lookupAppLocalizations(locale).dailyChoiceCatalogIncomplete),
+        findsOneWidget,
+      );
       expect(repository.queries, hasLength(1));
       expect(repository.dayStatusQueries, hasLength(1));
 
@@ -189,7 +196,7 @@ void main() {
     });
   }
 
-  testWidgets('два открытия одной даты разделяют фильтр, просмотр, отметки '
+  testWidgets('два открытия одной даты разделяют секции, просмотр, отметки '
       'и порции; возврат из подробностей сохраняет прокрутку', (tester) async {
     final repository = CatalogPageRepository();
     final selected = date(2026, 10, 7);
@@ -199,13 +206,8 @@ void main() {
       ControlledDailyChoiceLocalDate(date(2026, 10, 12)),
     );
     await _pushDate(tester, router, selected);
-    repository.completeFirst(0, [], total: 0);
-    repository.completeDayStatuses(0, {});
-    await tester.pumpAndSettle();
-
-    await _selectCompletion(tester, 'Выполненные');
     repository.completeFirst(
-      1,
+      0,
       [
         for (var number = 1; number <= 50; number++)
           catalogPageItem(number, date: selected, isCompleted: true),
@@ -213,6 +215,10 @@ void main() {
       total: 51,
       cursor: const CatalogPageCursor(),
     );
+    repository.completeDayStatuses(0, {});
+    await tester.pumpAndSettle();
+
+    await showDailyChoiceCatalogSection(tester, true);
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
@@ -225,11 +231,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
 
-    final footer = find.byKey(const ValueKey('daily-choice-load-more'));
+    final footer = find.byKey(const ValueKey('daily-choice-load-more-true'));
     await tester.scrollUntilVisible(footer, 500, scrollable: _verticalScroll);
     await tester.tap(footer);
     await tester.pump();
-    repository.completeMore(2, [
+    repository.completeMore(1, [
       catalogPageItem(51, date: selected, isCompleted: true),
     ]);
     await tester.pumpAndSettle();
@@ -249,29 +255,25 @@ void main() {
     expect(tester.getTopLeft(row).dy, closeTo(position, 1));
 
     await _pushDate(tester, router, selected);
-    expect(repository.queries, hasLength(4));
+    expect(repository.queries, hasLength(3));
     expect(repository.queries.last.date, selected);
-    expect(repository.queries.last.isCompleted, isNull);
+    expect(repository.queries.last.isCompleted, isFalse);
     expect(repository.queries.last.cursor, isNull);
-    repository.completeFirst(3, [
+    repository.completeFirst(2, [
       catalogPageItem(200, date: selected),
     ], total: 1);
     repository.failDayStatuses(2);
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
     expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Все состояния'), findsOneWidget);
+    expect(find.text('Не выполненные'), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
 
-    await _selectCompletion(tester, 'Не выполненные');
-    repository.completeFirst(4, [], total: 0);
-    await tester.pumpAndSettle();
     await _back(tester);
     expect(tester.getTopLeft(row).dy, closeTo(position, 1));
-    await tester.drag(_verticalScroll, const Offset(0, 5000));
+    tester.state<ScrollableState>(_verticalScroll).position.jumpTo(0);
     await tester.pumpAndSettle();
-    expect(find.text('Выполненные'), findsOneWidget);
     expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
     expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
@@ -281,7 +283,7 @@ void main() {
       scrollable: _verticalScroll,
     );
     expect(find.text('Всего дневных выборов: 51'), findsOneWidget);
-    expect(repository.queries, hasLength(5));
+    expect(repository.queries, hasLength(3));
     expect(tester.takeException(), isNull);
   });
 
@@ -298,21 +300,19 @@ void main() {
       ControlledDailyChoiceLocalDate(today),
     );
     await openDailyChoices(tester);
-    repository.completeFirst(0, [], total: 0);
+    repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 1);
     repository.completeDayStatuses(0, {});
     await tester.pumpAndSettle();
-    await _selectCompletion(tester, 'Не выполненные');
-    repository.completeFirst(1, [catalogPageItem(1, date: today)], total: 1);
+    await showDailyChoiceCatalogSection(tester, false);
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
 
     await _pushDate(tester, router, selected);
-    repository.completeFirst(2, [], total: 0);
-    await tester.pumpAndSettle();
-    await _selectCompletion(tester, 'Выполненные');
+    await tester.pump(const Duration(seconds: 1));
+    await showDailyChoiceCatalogSection(tester, true);
     await _back(tester);
-    repository.completeFirst(3, [
+    repository.completeFirst(1, [
       catalogPageItem(2, date: selected, isCompleted: true),
     ], total: 1);
     repository.failDayStatuses(1);
@@ -331,15 +331,15 @@ void main() {
 
     await _pushDate(tester, router, selected);
     expect(repository.queries.last.date, selected);
-    expect(repository.queries.last.isCompleted, isNull);
+    expect(repository.queries.last.isCompleted, isFalse);
     expect(repository.queries.last.cursor, isNull);
-    repository.completeFirst(4, [], total: 0);
+    repository.completeFirst(2, [], total: 0);
     repository.completeDayStatuses(2, {});
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
     expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Все состояния'), findsOneWidget);
-    expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
+    expect(find.text('Не выполненные'), findsOneWidget);
+    expect(find.text('На этот день нет дневных выборов.'), findsOneWidget);
     expect(
       tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
       AppDestination.dailyChoices,
@@ -366,15 +366,6 @@ Future<void> _pushDate(
   unawaited(router.push(DailyChoiceDateCatalogRoute(date: date)));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
-}
-
-Future<void> _selectCompletion(WidgetTester tester, String label) async {
-  await tester.tap(
-    find.byKey(const ValueKey('daily-choice-completion-filter')),
-  );
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
-  await tester.pump();
 }
 
 Future<void> _back(WidgetTester tester) async {

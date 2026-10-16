@@ -22,6 +22,9 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -147,70 +150,100 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('охват выполнения и сброс сохраняют выбранный день и просмотр '
-      'календаря', (tester) async {
-    final repository = _Repository();
-    await _open(tester, repository);
-    expect(repository.queries.single.date, _today);
-    expect(repository.queries.single.isCompleted, isNull);
-    repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
-    await tester.pumpAndSettle();
-    expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
-    await tester.pump();
-    expect(repository.queries[1].cursor, isA<_Cursor>());
-    expect(repository.queries[1].date, _today);
-    repository.completeMore(1, [_item(2)]);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
+  testWidgets(
+    'секции независимо раскрываются без чтения и не изображают пустой день',
+    (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      repository.completeFirst([_item(1)], total: 1);
+      await tester.pumpAndSettle();
+      final incomplete = find.byKey(
+        const ValueKey('daily-choice-section-false'),
+      );
+      final completed = find.byKey(const ValueKey('daily-choice-section-true'));
+      final semantics = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(incomplete).flagsCollection.isExpanded,
+        Tristate.isTrue,
+      );
+      expect(
+        tester.getSemantics(completed).flagsCollection.isExpanded,
+        Tristate.isFalse,
+      );
+      await tester.tap(incomplete);
+      await tester.tap(completed);
+      await tester.pumpAndSettle();
+      expect(find.text('Чтобы Основание, я сегодня Действие'), findsNothing);
+      expect(find.text('На этот день нет дневных выборов.'), findsNothing);
+      expect(repository.queries, hasLength(1));
+      expect(
+        tester.getSemantics(incomplete).flagsCollection.isExpanded,
+        Tristate.isFalse,
+      );
+      expect(
+        tester.getSemantics(completed).flagsCollection.isExpanded,
+        Tristate.isTrue,
+      );
+      final next = date(2026, 9, 25);
+      await tester.tap(calendarDay(next));
+      await tester.pump();
+      repository.completeFirst([_item(2, date: next)], index: 1, total: 1);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(incomplete).flagsCollection.isExpanded,
+        Tristate.isFalse,
+      );
+      expect(
+        tester.getSemantics(completed).flagsCollection.isExpanded,
+        Tristate.isTrue,
+      );
+      expect(find.text('Чтобы Основание, я сегодня Действие'), findsNothing);
+      semantics.dispose();
+    },
+  );
 
-    final selectedDay = date(2026, 9, 25);
-    await tester.tap(calendarDay(selectedDay));
-    await tester.pump();
-    expect(repository.queries[2].date, selectedDay);
-    repository.completeFirst([_item(2, date: selectedDay)], index: 2, total: 1);
-    await tester.pumpAndSettle();
-
-    // Просмотр другой недели не меняет условий выдачи, а смена охвата и сброс
-    // не меняют просматриваемую неделю.
-    await _swipeCalendar(tester, toNext: true);
-    final viewed = weeksFrom(date(2026, 9, 28), 1);
-    expect(visibleWeeks(tester), viewed);
-    expect(repository.queries, hasLength(3));
-
-    await tester.tap(
-      find.byKey(const ValueKey('daily-choice-completion-filter')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Выполненные').last);
-    await tester.pump();
-    expect(repository.queries, hasLength(4));
-    expect(repository.queries[3].date, selectedDay);
-    expect(repository.queries[3].isCompleted, true);
-    expect(repository.queries[3].cursor, isNull);
-    expect(visibleWeeks(tester), viewed);
-    repository.completeFirst([], index: 3, total: 0);
-    await tester.pumpAndSettle();
-    expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('daily-choice-clear-filters')));
-    await tester.pump();
-    expect(repository.queries, hasLength(5));
-    expect(repository.queries[4].date, selectedDay);
-    expect(repository.queries[4].isCompleted, isNull);
-    _expectSelected(tester, selectedDay);
-    expect(visibleWeeks(tester), viewed);
-    repository.completeFirst([_item(2, date: selectedDay)], index: 4, total: 1);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
-    expect(find.text('Все состояния'), findsOneWidget);
-
-    // Сброс при полном охвате ничего не читает и не снимает выбранный день.
-    await tester.tap(find.byKey(const ValueKey('daily-choice-clear-filters')));
-    await tester.pump();
-    expect(repository.queries, hasLength(5));
-    _expectSelected(tester, selectedDay);
-  });
+  testWidgets(
+    'подгрузка невыполненных сохраняет доступ к выполненным и их продолжению',
+    (tester) async {
+      final repository = _Repository(
+        completedItems: [_item(3, completed: true)],
+        completedTotal: 2,
+        completedCursor: const _Cursor(),
+      );
+      await _open(tester, repository);
+      repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('daily-choice-section-true')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Чтобы Основание, я сегодня Действие'),
+        findsNWidgets(2),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-load-more-false')),
+      );
+      await tester.pump();
+      expect(
+        find.text(
+          lookupAppLocalizations(const Locale('ru'))
+              .dailyChoiceCatalogLoadingMore,
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-load-more-true')),
+      );
+      await tester.pump();
+      repository.completeMore(2, [_item(4, completed: true)]);
+      repository.completeMore(1, [_item(2)]);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Чтобы Основание, я сегодня Действие'),
+        findsNWidgets(4),
+      );
+      expect(find.text('Всего дневных выборов: 4'), findsOneWidget);
+    },
+  );
 
   group('встроенный календарь', () {
     testWidgets('первое открытие выбирает сегодня в свёрнутой неделе и читает '
@@ -222,7 +255,7 @@ void main() {
       expect(find.text(_selectedDateLabel(tester, _today)), findsOneWidget);
       final query = repository.queries.single;
       expect(query.date, _today);
-      expect(query.isCompleted, isNull);
+      expect(query.isCompleted, isFalse);
       expect(query.cursor, isNull);
       expect(find.byType(TextField), findsNothing);
       expect(
@@ -231,58 +264,50 @@ void main() {
       );
     });
 
-    testWidgets('календарь стоит первым в общей прокрутке над фильтром '
-        'выполнения и выдачей', (tester) async {
-      final repository = _Repository();
-      await _open(tester, repository);
-      repository.completeFirst([_item(1)], total: 1);
-      await tester.pumpAndSettle();
+    testWidgets(
+      'календарь стоит первым в общей прокрутке над секциями и выдачей',
+      (tester) async {
+        final repository = _Repository();
+        await _open(tester, repository);
+        repository.completeFirst([_item(1)], total: 1);
+        await tester.pumpAndSettle();
 
-      final calendarBottom = tester
-          .getRect(find.byType(DailyChoiceCalendar))
-          .bottom;
-      for (final key in [..._filterKeys, 'daily-choice-row-1']) {
-        expect(
-          tester.getRect(find.byKey(ValueKey(key))).top,
-          greaterThanOrEqualTo(calendarBottom),
-          reason: key,
-        );
-      }
-    });
+        final calendarBottom = tester
+            .getRect(find.byType(DailyChoiceCalendar))
+            .bottom;
+        for (final key in [..._filterKeys, 'daily-choice-row-1']) {
+          expect(
+            tester.getRect(find.byKey(ValueKey(key))).top,
+            greaterThanOrEqualTo(calendarBottom),
+            reason: key,
+          );
+        }
+      },
+    );
 
-    testWidgets('нажатие другого дня недели синхронно начинает одну первую '
-        'порцию с прежним охватом и не показывает выдачу прежнего дня', (
+    testWidgets('нажатие другого дня недели синхронно начинает пару первых '
+        'порций с прежним раскрытием и не показывает выдачу прежнего дня', (
       tester,
     ) async {
       final repository = _Repository();
       await _open(tester, repository);
       repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-load-more-false')),
+      );
       await tester.pump();
       repository.completeMore(1, [_item(2)]);
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-completion-filter')),
-      );
+      await tester.tap(find.byKey(const ValueKey('daily-choice-section-true')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Не выполненные').last);
-      await tester.pump();
-      repository.completeFirst(
-        [_item(1), _item(2)],
-        index: 2,
-        total: 3,
-        cursor: const _Cursor(),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
 
       final nextDay = date(2026, 9, 25);
       await tester.tap(calendarDay(nextDay));
 
       // Выбор применён до следующего кадра.
-      expect(repository.queries, hasLength(4));
-      final query = repository.queries[3];
+      expect(repository.queries, hasLength(3));
+      final query = repository.queries[2];
       expect(query.date, nextDay);
       expect(query.isCompleted, false);
       expect(query.cursor, isNull);
@@ -294,15 +319,15 @@ void main() {
       expect(find.text('Всего дневных выборов: 3'), findsNothing);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsNothing);
       expect(
-        find.byKey(const ValueKey('daily-choice-load-more')),
+        find.byKey(const ValueKey('daily-choice-load-more-false')),
         findsNothing,
       );
 
-      repository.completeFirst([_item(3, date: nextDay)], index: 3, total: 1);
+      repository.completeFirst([_item(3, date: nextDay)], index: 2, total: 1);
       await tester.pumpAndSettle();
       expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
-      expect(repository.queries, hasLength(4));
+      expect(repository.queries, hasLength(3));
     });
 
     testWidgets('в раскрытом месяце день выбирается после просмотра '
@@ -328,7 +353,7 @@ void main() {
       await tester.tap(calendarDay(selectedDay));
       expect(repository.queries, hasLength(2));
       expect(repository.queries[1].date, selectedDay);
-      expect(repository.queries[1].isCompleted, isNull);
+      expect(repository.queries[1].isCompleted, isFalse);
 
       await _settleCalendar(tester);
       _expectSelected(tester, selectedDay);
@@ -404,7 +429,7 @@ void main() {
     });
 
     testWidgets('стрелки месяца возвращают неделю выбранного дня, сохраняя '
-        'фильтр и выдачу без чтения', (tester) async {
+        'секции и выдачу без чтения', (tester) async {
       final selected = date(2026, 10, 15);
       final repository = _Repository();
       await _open(tester, repository, today: selected);
@@ -412,13 +437,7 @@ void main() {
       repository.completeFirst([_item(1, date: selected)], total: 1);
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-completion-filter')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Не выполненные').last);
-      await tester.pump();
-      repository.completeFirst([_item(1, date: selected)], index: 1, total: 1);
+      await tester.tap(find.byKey(const ValueKey('daily-choice-section-true')));
       await tester.pumpAndSettle();
 
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
@@ -432,7 +451,7 @@ void main() {
       expect(find.text('Не выполненные'), findsOneWidget);
       expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
-      expect(repository.queries, hasLength(2));
+      expect(repository.queries, hasLength(1));
       expect(repository.queries.last.date, selected);
       expect(repository.queries.last.isCompleted, isFalse);
     });
@@ -536,7 +555,7 @@ void main() {
       );
       expect(find.textContaining(firstDay.toCanonicalString()), findsNothing);
       expect(
-        find.byKey(const ValueKey('daily-choice-load-more')),
+        find.byKey(const ValueKey('daily-choice-load-more-false')),
         findsNothing,
       );
       expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsNothing);
@@ -573,7 +592,9 @@ void main() {
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
 
       // Подгрузка выбранного дня ещё читается.
-      await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-load-more-false')),
+      );
       await tester.pump();
       expect(repository.queries, hasLength(3));
       expect(repository.queries[2].date, selectedDay);
@@ -600,7 +621,9 @@ void main() {
       await _open(tester, repository);
       final l10n = lookupAppLocalizations(const Locale('ru'));
       final retry = find.widgetWithText(TextButton, l10n.commonRetry);
-      final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
+      final loadMore = find.byKey(
+        const ValueKey('daily-choice-load-more-false'),
+      );
 
       repository.fail(0, const DailyChoiceCatalogCorruptionFailure());
       await tester.pumpAndSettle();
@@ -650,7 +673,7 @@ void main() {
       await tester.pump();
       expect(repository.queries, hasLength(6));
       expect(repository.queries[5].date, thirdDay);
-      expect(repository.queries[5].isCompleted, isNull);
+      expect(repository.queries[5].isCompleted, isFalse);
       expect(repository.queries[5].cursor, isA<_Cursor>());
       repository.completeMore(5, [_item(3, date: thirdDay)]);
       await tester.pumpAndSettle();
@@ -664,7 +687,7 @@ void main() {
       await _open(tester, repository);
       repository.completeFirst([], total: 0);
       await tester.pumpAndSettle();
-      expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
+      expect(find.text('На этот день нет дневных выборов.'), findsOneWidget);
       _expectSelected(tester, _today);
 
       final otherDay = date(2026, 9, 23);
@@ -700,11 +723,8 @@ void main() {
 /// каталога охватывает этот день.
 final _today = CalendarDate.fromParts(2026, 9, 24);
 
-/// Фильтры каталога под календарём: выполнение и сброс.
-const _filterKeys = [
-  'daily-choice-completion-filter',
-  'daily-choice-clear-filters',
-];
+/// Заголовки секций под календарём.
+const _filterKeys = ['daily-choice-section-false', 'daily-choice-section-true'];
 
 /// Заголовок дня называет выбранную дату [value].
 void _expectSelected(WidgetTester tester, CalendarDate value) =>
@@ -778,6 +798,15 @@ Future<AppRouter> _open(
 final class _Repository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
+  _Repository({
+    this.completedItems = const [],
+    this.completedTotal = 0,
+    this.completedCursor,
+  });
+  final List<DailyChoiceCatalogItem> completedItems;
+  final int completedTotal;
+  final DailyChoiceCatalogCursor? completedCursor;
+  // Управляемые чтения невыполненных; выполненная секция фикстуры пуста.
   final queries = <DailyChoiceCatalogQuery>[];
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
 
@@ -790,6 +819,19 @@ final class _Repository
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) {
+    if (query.isCompleted == true && query.cursor == null) {
+      return Future.value(
+        DailyChoiceCatalogPageSuccess(
+          DailyChoiceCatalogFirstPage(
+            items: completedItems,
+            totalCount: completedTotal,
+            hasTimedChoices: false,
+            nextCursor: completedCursor,
+            revision: const _Revision(),
+          ),
+        ),
+      );
+    }
     queries.add(query);
     final request = Completer<DailyChoiceCatalogPageResult>();
     _requests.add(request);
@@ -865,28 +907,31 @@ final class _Cursor implements DailyChoiceCatalogCursor {
   const _Cursor();
 }
 
-DailyChoiceCatalogItem _item(int number, {CalendarDate? date}) =>
-    DailyChoiceCatalogItem(
-      id: _id(number),
-      source: DailyChoiceCatalogParticipant(
-        id: _intentionId(1),
-        title: 'Основание',
-        archiveState: IntentionArchiveState.archived,
-        readiness: IntentionReadiness.notReady,
-      ),
-      selected: DailyChoiceCatalogParticipant(
-        id: _intentionId(2),
-        title: 'Действие',
-        archiveState: IntentionArchiveState.active,
-        readiness: IntentionReadiness.ready,
-      ),
-      date: date ?? _today,
-      isCompleted: false,
-      schedule: const DailyChoiceAllDay(),
-      priority: DailyChoicePriority.p4,
-      description: null,
-      pathIntentionCount: 2,
-    );
+DailyChoiceCatalogItem _item(
+  int number, {
+  CalendarDate? date,
+  bool completed = false,
+}) => DailyChoiceCatalogItem(
+  id: _id(number),
+  source: DailyChoiceCatalogParticipant(
+    id: _intentionId(1),
+    title: 'Основание',
+    archiveState: IntentionArchiveState.archived,
+    readiness: IntentionReadiness.notReady,
+  ),
+  selected: DailyChoiceCatalogParticipant(
+    id: _intentionId(2),
+    title: 'Действие',
+    archiveState: IntentionArchiveState.active,
+    readiness: IntentionReadiness.ready,
+  ),
+  date: date ?? _today,
+  isCompleted: completed,
+  schedule: const DailyChoiceAllDay(),
+  priority: DailyChoicePriority.p4,
+  description: null,
+  pathIntentionCount: 2,
+);
 
 DailyChoiceId _id(int number) => (DailyChoiceId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',

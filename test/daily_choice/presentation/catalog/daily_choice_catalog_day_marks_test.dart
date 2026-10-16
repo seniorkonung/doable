@@ -224,7 +224,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('отказ первого чтения отметок не мешает фильтру и выбору дня; '
+  testWidgets('отказ первого чтения отметок не мешает секции и выбору дня; '
       'перелистывание внутри окна восстанавливает отметки без смены выдачи', (
     tester,
   ) async {
@@ -244,6 +244,7 @@ void main() {
     ], total: 1);
     repository.failDayStatuses(0);
     await tester.pumpAndSettle();
+    await showDailyChoiceCatalogSection(tester, true);
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
     expect(
       find.descendant(
@@ -258,22 +259,16 @@ void main() {
     expect(find.text('Повторить'), findsNothing);
     expect(find.byType(SnackBar), findsNothing);
 
-    await tester.tap(find.byType(DropdownButtonFormField<bool?>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Выполненные').last);
-    await tester.pump();
-    repository.completeFirst(1, [
-      catalogPageItem(1, date: today, isCompleted: true),
-    ], total: 1);
+    await showDailyChoiceCatalogSection(tester, true);
     await tester.pumpAndSettle();
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
 
     await tester.tap(calendarDay(selectedDay));
     await tester.pump();
     expect(repository.queries.last.date, selectedDay);
-    expect(repository.queries.last.isCompleted, isTrue);
+    expect(repository.queries.last.isCompleted, isFalse);
     expect(repository.dayStatusQueries, hasLength(2));
-    repository.completeFirst(2, [
+    repository.completeFirst(1, [
       catalogPageItem(3, date: selectedDay, isCompleted: true),
     ], total: 1);
     repository.failDayStatuses(1);
@@ -309,7 +304,7 @@ void main() {
     expect(find.text('Выполненные'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
-    expect(repository.queries, hasLength(3));
+    expect(repository.queries, hasLength(2));
     expect(find.byType(SnackBar), findsNothing);
   });
 
@@ -332,13 +327,7 @@ void main() {
       today: DailyChoiceDayStatus.hasIncomplete,
     });
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<bool?>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Выполненные').last);
-    await tester.pump();
-    repository.completeFirst(1, [
-      catalogPageItem(2, date: today, isCompleted: true),
-    ], total: 1);
+    await showDailyChoiceCatalogSection(tester, true);
     await tester.pumpAndSettle();
     final coordinator = ProviderScope.containerOf(
       tester.element(calendarDay(today)),
@@ -349,7 +338,7 @@ void main() {
     expect(repository.dayStatusQueries, hasLength(2));
     expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
-    expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+    expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
     repository.failDayStatuses(1);
     await tester.pumpAndSettle();
@@ -357,7 +346,7 @@ void main() {
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
     expect(find.text('6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
-    expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+    expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
     expect(find.text('Повторить'), findsNothing);
     expect(find.byType(SnackBar), findsNothing);
@@ -375,14 +364,14 @@ void main() {
     expect(find.text('Отметки дней не загружены.'), findsNothing);
     expect(find.text('6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
-    expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+    expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
-    expect(repository.queries, hasLength(2));
+    expect(repository.queries, hasLength(1));
     expect(find.byType(SnackBar), findsNothing);
   });
 
   testWidgets(
-    'отметки всех выборов не зависят от фильтра выдачи и выбранного дня',
+    'отметки всех выборов не зависят от раскрытия секций выдачи и выбранного дня',
     (tester) async {
       final today = date(2026, 10, 6);
       final repository = CatalogPageRepository();
@@ -396,7 +385,10 @@ void main() {
       expect(repository.dayStatusQueries, hasLength(1));
       expect(repository.dayStatusQueries.single.firstDate, date(2026, 8, 31));
       expect(repository.dayStatusQueries.single.lastDate, date(2026, 12, 6));
-      repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 2);
+      repository.completeFirst(0, [
+        catalogPageItem(1, date: today),
+        catalogPageItem(2, date: today, isCompleted: true),
+      ], total: 2);
       repository.completeDayStatuses(0, {
         today: DailyChoiceDayStatus.hasIncomplete,
         date(2026, 10, 5): DailyChoiceDayStatus.allCompleted,
@@ -408,25 +400,17 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.byType(DropdownButtonFormField<bool?>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Выполненные').last);
-      await tester.pump();
-      expect(repository.queries, hasLength(2));
-      expect(repository.queries.last.isCompleted, isTrue);
-      repository.completeFirst(1, [
-        catalogPageItem(2, date: today, isCompleted: true),
-      ], total: 1);
+      await showDailyChoiceCatalogSection(tester, true);
       await tester.pumpAndSettle();
       expect(_mark(today, DailyChoiceDayStatus.hasIncomplete), findsOneWidget);
       expect(repository.dayStatusQueries, hasLength(1));
-      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
 
       await tester.tap(calendarDay(date(2026, 10, 5)));
       await tester.pump();
-      expect(repository.queries, hasLength(3));
+      expect(repository.queries, hasLength(2));
       expect(repository.queries.last.date, date(2026, 10, 5));
-      expect(repository.queries.last.isCompleted, isTrue);
+      expect(repository.queries.last.isCompleted, isFalse);
       expect(repository.dayStatusQueries, hasLength(1));
     },
   );
@@ -540,19 +524,16 @@ void main() {
       locale: const Locale('ru'),
       size: const Size(1200, 2400),
     );
-    repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 2);
+    repository.completeFirst(0, [
+      catalogPageItem(1, date: today),
+      catalogPageItem(2, date: today, isCompleted: true),
+    ], total: 2);
     repository.completeDayStatuses(0, {
       novemberDay: DailyChoiceDayStatus.allCompleted,
       novemberLastDay: DailyChoiceDayStatus.hasIncomplete,
     });
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<bool?>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Выполненные').last);
-    await tester.pump();
-    repository.completeFirst(1, [
-      catalogPageItem(2, date: today, isCompleted: true),
-    ], total: 1);
+    await showDailyChoiceCatalogSection(tester, true);
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('Развернуть календарь'));
     await tester.pumpAndSettle();
@@ -610,18 +591,18 @@ void main() {
     _expectVisibleMark(tester, decemberDay, DailyChoiceDayStatus.hasIncomplete);
     expect(find.text('6 октября 2026'), findsOneWidget);
     expect(find.text('Выполненные'), findsOneWidget);
-    expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+    expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
     expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
-    expect(repository.queries, hasLength(2));
+    expect(repository.queries, hasLength(1));
 
     await tester.tap(calendarDay(novemberLastDay));
     await tester.pump();
     expect(repository.dayStatusQueries, hasLength(4));
     expect(repository.dayStatusQueries.last.firstDate, date(2026, 9, 28));
     expect(repository.dayStatusQueries.last.lastDate, date(2027, 1, 10));
-    expect(repository.queries, hasLength(3));
+    expect(repository.queries, hasLength(2));
     expect(repository.queries.last.date, novemberLastDay);
-    expect(repository.queries.last.isCompleted, isTrue);
+    expect(repository.queries.last.isCompleted, isFalse);
   });
 }
 
@@ -646,13 +627,7 @@ Future<void> _pumpFilteredNovember(
     markedDay: DailyChoiceDayStatus.hasIncomplete,
   });
   await tester.pumpAndSettle();
-  await tester.tap(find.byType(DropdownButtonFormField<bool?>));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Выполненные').last);
-  await tester.pump();
-  repository.completeFirst(1, [
-    catalogPageItem(1, date: selected, isCompleted: true),
-  ], total: 1);
+  await showDailyChoiceCatalogSection(tester, true);
   await tester.pumpAndSettle();
   await _command(tester, 'Развернуть календарь');
   await _command(tester, 'Следующий месяц');
@@ -704,9 +679,9 @@ void _expectFilteredOctoberCatalog(CatalogPageRepository repository) {
   expect(find.text('Выполненные'), findsOneWidget);
   expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
   expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
-  expect(repository.queries, hasLength(2));
+  expect(repository.queries, hasLength(1));
   expect(repository.queries.last.date, date(2026, 10, 8));
-  expect(repository.queries.last.isCompleted, isTrue);
+  expect(repository.queries.last.isCompleted, isFalse);
 }
 
 Future<void> _command(WidgetTester tester, String label) async {

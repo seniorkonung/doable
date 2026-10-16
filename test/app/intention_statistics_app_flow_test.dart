@@ -50,6 +50,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_local_date.dart';
+import '../support/daily_choice_catalog_controls.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'daily_choice_calendar_test_support.dart';
+import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
@@ -237,7 +238,7 @@ void main() {
 
   for (final onDate in [false, true]) {
     final catalog = onDate ? 'каталог на дату' : 'корневой каталог';
-    testWidgets('$catalog сохраняет выбранную дату, фильтр и выдачу при '
+    testWidgets('$catalog сохраняет выбранную дату, секции и выдачу при '
         'выборе далёкого месяца', (tester) async {
       final selected = date(2026, 10, 8);
       final repository = CatalogPageRepository();
@@ -254,15 +255,7 @@ void main() {
       ], total: 1);
       repository.completeDayStatuses(0, {});
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-completion-filter')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Не выполненные').last);
-      await tester.pump();
-      repository.completeFirst(1, [
-        catalogPageItem(1, date: selected),
-      ], total: 1);
+      await showDailyChoiceCatalogSection(tester, false);
       await tester.pumpAndSettle();
 
       await _command(tester, 'Развернуть календарь');
@@ -275,7 +268,7 @@ void main() {
       expect(find.text('8 октября 2026'), findsOneWidget);
       expect(find.text('Не выполненные'), findsOneWidget);
       expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
-      expect(repository.queries, hasLength(2));
+      expect(repository.queries, hasLength(1));
       expect(repository.queries.last.date, selected);
       expect(repository.queries.last.isCompleted, isFalse);
 
@@ -289,7 +282,7 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 1));
       expect(find.text('8 октября 2026'), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
-      expect(repository.queries, hasLength(2));
+      expect(repository.queries, hasLength(1));
       expect(tester.takeException(), isNull);
     });
   }

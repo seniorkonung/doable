@@ -97,8 +97,10 @@ Future<void> pumpCatalogPage(
 final class CatalogPageRepository
     with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
+  // Управляемые чтения невыполненных; completeFirst задаёт обе секции дня.
   final queries = <DailyChoiceCatalogQuery>[];
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
+  final _completedPages = <CalendarDate, DailyChoiceCatalogFirstPage>{};
   final dayStatusQueries = <DailyChoiceDayStatusQuery>[];
   final _dayStatusRequests = <Completer<DailyChoiceDayStatusesReadResult>>[];
   late TagCommandResult _tagCommandResult;
@@ -189,6 +191,19 @@ final class CatalogPageRepository
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) {
+    if (query.isCompleted == true && query.cursor == null) {
+      return Future.value(
+        DailyChoiceCatalogPageSuccess(
+          DailyChoiceCatalogFirstPage(
+            items: _completedPages[query.date]?.items ?? const [],
+            totalCount: _completedPages[query.date]?.totalCount ?? 0,
+            hasTimedChoices: false,
+            nextCursor: _completedPages[query.date]?.nextCursor,
+            revision: const _Revision(),
+          ),
+        ),
+      );
+    }
     queries.add(query);
     final request = Completer<DailyChoiceCatalogPageResult>();
     _requests.add(request);
@@ -202,17 +217,29 @@ final class CatalogPageRepository
     List<DailyChoiceCatalogItem> items, {
     required int total,
     DailyChoiceCatalogCursor? cursor,
-  }) => _requests[index].complete(
-    DailyChoiceCatalogPageSuccess(
-      DailyChoiceCatalogFirstPage(
-        items: items,
-        totalCount: total,
-        hasTimedChoices: false,
-        nextCursor: cursor,
-        revision: const _Revision(),
+  }) {
+    final completed = items.where((item) => item.isCompleted).toList();
+    final incomplete = items.where((item) => !item.isCompleted).toList();
+    final completedOnly = items.isNotEmpty && incomplete.isEmpty;
+    _completedPages[queries[index].date!] = DailyChoiceCatalogFirstPage(
+      items: completed,
+      totalCount: completedOnly ? total : completed.length,
+      hasTimedChoices: false,
+      nextCursor: completedOnly ? cursor : null,
+      revision: const _Revision(),
+    );
+    _requests[index].complete(
+      DailyChoiceCatalogPageSuccess(
+        DailyChoiceCatalogFirstPage(
+          items: incomplete,
+          totalCount: completedOnly ? 0 : total - completed.length,
+          hasTimedChoices: false,
+          nextCursor: completedOnly ? null : cursor,
+          revision: const _Revision(),
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   /// Завершает запрос продолжения номер [index] последними строками [items].
   void completeMore(int index, List<DailyChoiceCatalogItem> items) =>

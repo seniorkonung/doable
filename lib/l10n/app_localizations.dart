@@ -4088,7 +4088,7 @@ abstract class AppLocalizations {
   /// Пустой дневной каталог
   ///
   /// In en, this message translates to:
-  /// **'No daily choices match the filters.'**
+  /// **'No daily choices for this day.'**
   String get dailyChoiceCatalogEmpty;
 
   /// Обновление подтверждённого снимка каталога

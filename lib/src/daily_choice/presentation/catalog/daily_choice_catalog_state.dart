@@ -1,29 +1,42 @@
 import '../../../graph/application/graph_revision.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
+import 'daily_choice_catalog_snapshot_assembly.dart';
 
-/// Условия пользовательского каталога: ровно один день и охват выполнения.
-///
-/// Каталог без выбранного дня непредставим: просмотр всех дат пользователю
-/// недоступен.
+/// Выбранный день и независимое раскрытие секций принадлежат экземпляру.
 final class DailyChoiceCatalogSelection {
-  const DailyChoiceCatalogSelection({required this.date, this.isCompleted});
+  const DailyChoiceCatalogSelection({
+    required this.date,
+    this.incompleteExpanded = true,
+    this.completedExpanded = false,
+  });
 
   final CalendarDate date;
+  final bool incompleteExpanded;
+  final bool completedExpanded;
 
-  /// `null` охватывает все состояния выполнения.
-  final bool? isCompleted;
+  bool isExpanded(bool isCompleted) =>
+      isCompleted ? completedExpanded : incompleteExpanded;
 
   DailyChoiceCatalogSelection withDate(CalendarDate value) =>
-      DailyChoiceCatalogSelection(date: value, isCompleted: isCompleted);
+      DailyChoiceCatalogSelection(
+        date: value,
+        incompleteExpanded: incompleteExpanded,
+        completedExpanded: completedExpanded,
+      );
 
-  DailyChoiceCatalogSelection withCompletion(bool? value) =>
-      DailyChoiceCatalogSelection(date: date, isCompleted: value);
+  DailyChoiceCatalogSelection toggle(bool isCompleted) =>
+      DailyChoiceCatalogSelection(
+        date: date,
+        incompleteExpanded: isCompleted
+            ? incompleteExpanded
+            : !incompleteExpanded,
+        completedExpanded: isCompleted ? !completedExpanded : completedExpanded,
+      );
 }
 
 sealed class DailyChoiceCatalogState {
   const DailyChoiceCatalogState(this.selection);
-
   final DailyChoiceCatalogSelection selection;
 }
 
@@ -33,7 +46,6 @@ final class DailyChoiceCatalogInitialLoad extends DailyChoiceCatalogState {
 
 final class DailyChoiceCatalogInitialFailure extends DailyChoiceCatalogState {
   const DailyChoiceCatalogInitialFailure(super.selection, this.failure);
-
   final DailyChoiceCatalogReadFailure failure;
   bool get canRetry => failure is DailyChoiceCatalogUnavailableFailure;
 }
@@ -54,78 +66,119 @@ final class DailyChoiceCatalogPageLoading extends DailyChoiceCatalogPageStatus {
 
 final class DailyChoiceCatalogPageFailure extends DailyChoiceCatalogPageStatus {
   const DailyChoiceCatalogPageFailure(this.failure);
-
   final DailyChoiceCatalogReadFailure failure;
   bool get canRetry => failure is DailyChoiceCatalogUnavailableFailure;
 }
 
-/// Строки и полное количество относятся к одной опубликованной ревизии.
-/// При обновлении прежний подтверждённый снимок остаётся доступным.
-class DailyChoiceCatalogLoaded extends DailyChoiceCatalogState {
-  DailyChoiceCatalogLoaded({
-    required DailyChoiceCatalogSelection selection,
+/// Сводка и продолжение одной секции на общей ревизии каталога.
+final class DailyChoiceCatalogSectionState {
+  DailyChoiceCatalogSectionState.fromSnapshot(
+    DailyChoiceCatalogSectionSnapshot snapshot,
+  ) : this._(
+        items: snapshot.items,
+        totalCount: snapshot.totalCount,
+        hasTimedChoices: snapshot.hasTimedChoices,
+        nextCursor: snapshot.nextCursor,
+      );
+
+  DailyChoiceCatalogSectionState._({
     required List<DailyChoiceCatalogItem> items,
     required this.totalCount,
+    required this.hasTimedChoices,
     required this.nextCursor,
-    required this.revision,
-    this.freshness = DailyChoiceCatalogFreshness.current,
-    this.refreshFailure,
     this.pageStatus = const DailyChoiceCatalogPageIdle(),
-    this.needsRebase = false,
-  }) : items = List.unmodifiable(items),
-       super(selection);
+  }) : items = List.unmodifiable(items);
 
   final List<DailyChoiceCatalogItem> items;
   final int totalCount;
+  final bool hasTimedChoices;
   final DailyChoiceCatalogCursor? nextCursor;
+  final DailyChoiceCatalogPageStatus pageStatus;
+
+  DailyChoiceCatalogSectionState withStatus(
+    DailyChoiceCatalogPageStatus status,
+  ) => DailyChoiceCatalogSectionState._(
+    items: items,
+    totalCount: totalCount,
+    hasTimedChoices: hasTimedChoices,
+    nextCursor: nextCursor,
+    pageStatus: status,
+  );
+
+  DailyChoiceCatalogSectionState append(
+    DailyChoiceCatalogContinuationPage page,
+  ) => DailyChoiceCatalogSectionState._(
+    items: [...items, ...page.items],
+    totalCount: totalCount,
+    hasTimedChoices: hasTimedChoices,
+    nextCursor: page.nextCursor,
+  );
+}
+
+/// Обе секции публикуются вместе; актуальность и ревизия принадлежат паре.
+final class DailyChoiceCatalogLoaded extends DailyChoiceCatalogState {
+  DailyChoiceCatalogLoaded.fromSnapshot({
+    required DailyChoiceCatalogSelection selection,
+    required DailyChoiceCatalogSnapshot snapshot,
+  }) : this._(
+         selection: selection,
+         incomplete: DailyChoiceCatalogSectionState.fromSnapshot(
+           snapshot.incomplete,
+         ),
+         completed: DailyChoiceCatalogSectionState.fromSnapshot(
+           snapshot.completed,
+         ),
+         revision: snapshot.revision,
+       );
+
+  const DailyChoiceCatalogLoaded._({
+    required DailyChoiceCatalogSelection selection,
+    required this.incomplete,
+    required this.completed,
+    required this.revision,
+    this.freshness = DailyChoiceCatalogFreshness.current,
+    this.refreshFailure,
+    this.needsRebase = false,
+  }) : super(selection);
+
+  final DailyChoiceCatalogSectionState incomplete;
+  final DailyChoiceCatalogSectionState completed;
   final GraphRevision revision;
   final DailyChoiceCatalogFreshness freshness;
   final DailyChoiceCatalogReadFailure? refreshFailure;
-  final DailyChoiceCatalogPageStatus pageStatus;
-
-  /// Даже посторонняя команда делает курсор прежней ревизии непригодным.
   final bool needsRebase;
 
+  int get totalCount => incomplete.totalCount + completed.totalCount;
+  Iterable<DailyChoiceCatalogItem> get items => [
+    ...incomplete.items,
+    ...completed.items,
+  ];
+  DailyChoiceCatalogSectionState section(bool isCompleted) =>
+      isCompleted ? completed : incomplete;
+
   DailyChoiceCatalogLoaded withStatus({
+    DailyChoiceCatalogSelection? selection,
+    DailyChoiceCatalogSectionState? incomplete,
+    DailyChoiceCatalogSectionState? completed,
     DailyChoiceCatalogFreshness? freshness,
     DailyChoiceCatalogReadFailure? refreshFailure,
-    DailyChoiceCatalogPageStatus? pageStatus,
     bool? needsRebase,
-  }) {
-    final nextFreshness = freshness ?? this.freshness;
-    final nextPageStatus = pageStatus ?? this.pageStatus;
-    final nextNeedsRebase = needsRebase ?? this.needsRebase;
-    if (this is DailyChoiceCatalogEmpty) {
-      return DailyChoiceCatalogEmpty(
-        selection: selection,
-        revision: revision,
-        freshness: nextFreshness,
-        refreshFailure: refreshFailure,
-        pageStatus: nextPageStatus,
-        needsRebase: nextNeedsRebase,
-      );
-    }
-    return DailyChoiceCatalogLoaded(
-      selection: selection,
-      items: items,
-      totalCount: totalCount,
-      nextCursor: nextCursor,
-      revision: revision,
-      freshness: nextFreshness,
-      refreshFailure: refreshFailure,
-      pageStatus: nextPageStatus,
-      needsRebase: nextNeedsRebase,
-    );
-  }
-}
+  }) => DailyChoiceCatalogLoaded._(
+    selection: selection ?? this.selection,
+    incomplete: incomplete ?? this.incomplete,
+    completed: completed ?? this.completed,
+    revision: revision,
+    freshness: freshness ?? this.freshness,
+    refreshFailure: refreshFailure,
+    needsRebase: needsRebase ?? this.needsRebase,
+  );
 
-final class DailyChoiceCatalogEmpty extends DailyChoiceCatalogLoaded {
-  DailyChoiceCatalogEmpty({
-    required super.selection,
-    required super.revision,
-    super.freshness,
-    super.refreshFailure,
-    super.pageStatus,
-    super.needsRebase,
-  }) : super(items: const [], totalCount: 0, nextCursor: null);
+  DailyChoiceCatalogLoaded withSection(
+    bool isCompleted,
+    DailyChoiceCatalogSectionState section,
+  ) => withStatus(
+    incomplete: isCompleted ? null : section,
+    completed: isCompleted ? section : null,
+    refreshFailure: refreshFailure,
+  );
 }

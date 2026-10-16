@@ -12,368 +12,246 @@ import '../../../intention/application/intention_catalog.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice.dart';
-import '../../domain/daily_choice_id.dart';
 import 'daily_choice_catalog_instance.dart';
+import 'daily_choice_catalog_snapshot_assembly.dart';
 import 'daily_choice_catalog_state.dart';
 
 part 'daily_choice_catalog_view_model.g.dart';
 
-/// Согласовывает ограниченную загруженную часть с подтверждённым графом.
+/// Публикует согласованную пару и независимо подгружает её секции.
 @riverpod
 final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
-  static const _maxAssemblyAttempts = 8;
-
   late PersonalGraphRepository _repository;
-  late GraphCommandCoordinator _coordinator;
   StreamSubscription<GraphCommandCompletion>? _completions;
-
-  /// Выбор появляется при первом построении, до первого чтения каталога:
-  /// начальная дата экземпляра со всеми состояниями выполнения.
-  /// Перестроения модели сохраняют текущий выбор.
   late var _selection = DailyChoiceCatalogSelection(date: instance.initialDate);
   var _generation = 0;
-  var _invalidation = 0;
   GraphRevision? _requiredRevision;
-  Object? _activeRequest;
+  Object? _assembly;
+  final _pages = <bool, Object>{};
 
-  // Семейство с автоматическим освобождением хранит состояние экземпляра:
-  // https://riverpod.dev/docs/concepts2/family
-  // https://riverpod.dev/docs/concepts2/auto_dispose
   @override
   DailyChoiceCatalogState build(DailyChoiceCatalogInstance instance) {
     unawaited(_completions?.cancel());
-    _activeRequest = null;
-    _requiredRevision = null;
-    _invalidation++;
     _repository = ref.watch(personalGraphRepositoryProvider);
-    _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
-    _completions = _coordinator.completions.listen((completion) {
-      scheduleMicrotask(() => _onCompletion(completion));
-    });
+    _completions = ref
+        .watch(graphCommandCoordinatorProvider.notifier)
+        .completions
+        .listen((completion) {
+          scheduleMicrotask(() => _onCompletion(completion));
+        });
     ref.onDispose(() => unawaited(_completions?.cancel()));
-    final selection = _selection;
-    unawaited(_loadFirst(++_generation));
-    return DailyChoiceCatalogInitialLoad(selection);
+    _pages.clear();
+    _requiredRevision = null;
+    ++_generation;
+    unawaited(_assemble());
+    return DailyChoiceCatalogInitialLoad(_selection);
   }
 
-  /// Новый день сохраняет охват выполнения и начинает выдачу с первой
-  /// порции; повторный выбор того же дня ничего не читает.
   void selectDate(CalendarDate date) {
     if (_selection.date == date) return;
-    _restart(_selection.withDate(date));
+    _selection = _selection.withDate(date);
+    ++_generation;
+    _pages.clear();
+    state = DailyChoiceCatalogInitialLoad(_selection);
+    unawaited(_assemble());
   }
 
-  void selectCompletion(bool? isCompleted) {
-    if (_selection.isCompleted == isCompleted) return;
-    _restart(_selection.withCompletion(isCompleted));
+  void toggleSection(bool isCompleted) {
+    _selection = _selection.toggle(isCompleted);
+    state = switch (state) {
+      DailyChoiceCatalogInitialLoad() => DailyChoiceCatalogInitialLoad(
+        _selection,
+      ),
+      DailyChoiceCatalogInitialFailure(:final failure) =>
+        DailyChoiceCatalogInitialFailure(_selection, failure),
+      DailyChoiceCatalogLoaded loaded => loaded.withStatus(
+        selection: _selection,
+        refreshFailure: loaded.refreshFailure,
+      ),
+    };
   }
-
-  /// Возвращает охват всех состояний выполнения за тот же день: выбранный
-  /// день сброс не снимает.
-  void clearFilters() => selectCompletion(null);
 
   Future<void> retryFirstPage() {
-    final current = state;
-    if (current is! DailyChoiceCatalogInitialFailure || !current.canRetry) {
-      return Future.value();
+    if (state case DailyChoiceCatalogInitialFailure(canRetry: true)) {
+      state = DailyChoiceCatalogInitialLoad(_selection);
+      return _assemble();
     }
-    state = DailyChoiceCatalogInitialLoad(_selection);
-    return _loadFirst(++_generation);
-  }
-
-  Future<void> loadMore() {
-    final current = state;
-    if (current is! DailyChoiceCatalogLoaded || current.nextCursor == null) {
-      return Future.value();
-    }
-    if (current.freshness != DailyChoiceCatalogFreshness.current ||
-        _activeRequest != null) {
-      return Future.value();
-    }
-    if (current.needsRebase) {
-      return _refresh(current, includeNextPage: true);
-    }
-    if (current.pageStatus is! DailyChoiceCatalogPageIdle) {
-      return Future.value();
-    }
-    return _loadMore(current);
-  }
-
-  Future<void> retryLoadMore() {
-    final current = state;
-    if (current is! DailyChoiceCatalogLoaded ||
-        current.pageStatus is! DailyChoiceCatalogPageFailure ||
-        !(current.pageStatus as DailyChoiceCatalogPageFailure).canRetry) {
-      return Future.value();
-    }
-    state = current.withStatus(pageStatus: const DailyChoiceCatalogPageIdle());
-    return loadMore();
+    return Future.value();
   }
 
   Future<void> retryRefresh() {
+    final loaded = state;
+    if (loaded is DailyChoiceCatalogLoaded &&
+        loaded.freshness == DailyChoiceCatalogFreshness.stale &&
+        loaded.refreshFailure is DailyChoiceCatalogUnavailableFailure) {
+      return _assemble(base: loaded);
+    }
+    return Future.value();
+  }
+
+  Future<void> loadMore({required bool isCompleted}) {
     final current = state;
     if (current is! DailyChoiceCatalogLoaded ||
-        current.freshness != DailyChoiceCatalogFreshness.stale ||
-        current.refreshFailure is! DailyChoiceCatalogUnavailableFailure) {
+        current.freshness != DailyChoiceCatalogFreshness.current ||
+        current.section(isCompleted).nextCursor == null ||
+        current.section(isCompleted).pageStatus
+            is! DailyChoiceCatalogPageIdle) {
       return Future.value();
     }
-    return _refresh(current, includeNextPage: false);
+    if (current.needsRebase) {
+      return _assemble(base: current, extend: {isCompleted});
+    }
+    return _loadMore(current, isCompleted);
   }
 
-  void _restart(DailyChoiceCatalogSelection selection) {
-    _selection = selection;
-    _requiredRevision = null;
-    _activeRequest = null;
-    final generation = ++_generation;
-    state = DailyChoiceCatalogInitialLoad(selection);
-    unawaited(_loadFirst(generation));
-  }
-
-  Future<void> _loadFirst(int generation) async {
-    final request = Object();
-    _activeRequest = request;
-    for (var attempt = 0; attempt < _maxAssemblyAttempts; attempt++) {
-      final result = await _readPage();
-      if (!_owns(request, generation)) return;
-      switch (result) {
-        case GraphResultSuccess(value: final DailyChoiceCatalogFirstPage page):
-          if (_precedesRequired(page.revision)) continue;
-          final items = _combine(
-            const [],
-            page.items,
-            page.nextCursor,
-            page.totalCount,
-          );
-          if (items == null) {
-            state = DailyChoiceCatalogInitialFailure(
-              _selection,
-              const DailyChoiceCatalogUnexpectedFailure(),
-            );
-          } else {
-            state = _confirmed(
-              items,
-              page.totalCount,
-              page.nextCursor,
-              page.revision,
-            );
-          }
-        case GraphResultSuccess():
-          state = DailyChoiceCatalogInitialFailure(
-            _selection,
-            const DailyChoiceCatalogUnexpectedFailure(),
-          );
-        case GraphResultFailure(:final failure):
-          state = DailyChoiceCatalogInitialFailure(_selection, failure);
+  Future<void> retryLoadMore({required bool isCompleted}) {
+    if (state case DailyChoiceCatalogLoaded loaded) {
+      if (loaded.section(isCompleted).pageStatus
+          case DailyChoiceCatalogPageFailure(canRetry: true)) {
+        state = loaded.withSection(
+          isCompleted,
+          loaded
+              .section(isCompleted)
+              .withStatus(const DailyChoiceCatalogPageIdle()),
+        );
+        return loadMore(isCompleted: isCompleted);
       }
-      _activeRequest = null;
+    }
+    return Future.value();
+  }
+
+  Future<void> _assemble({
+    DailyChoiceCatalogLoaded? base,
+    Set<bool> extend = const {},
+  }) async {
+    final request = Object();
+    _assembly = request;
+    _pages.clear();
+    final generation = _generation;
+    if (base != null) {
+      state = base.withStatus(
+        selection: _selection,
+        freshness: DailyChoiceCatalogFreshness.refreshing,
+        needsRebase: true,
+        incomplete: base.incomplete.withStatus(
+          const DailyChoiceCatalogPageIdle(),
+        ),
+        completed: base.completed.withStatus(
+          const DailyChoiceCatalogPageIdle(),
+        ),
+      );
+    }
+    int target(bool completed) =>
+        (base?.section(completed).items.length ?? 0) +
+        (extend.contains(completed)
+            ? DailyChoiceCatalogQuery.defaultPageSize
+            : 0);
+    final result = await assembleDailyChoiceCatalogSnapshot(
+      date: _selection.date,
+      incompleteItemCount: target(false),
+      completedItemCount: target(true),
+      readPage: _repository.getDailyChoiceCatalogPage,
+      isCurrent: () =>
+          ref.mounted &&
+          generation == _generation &&
+          identical(_assembly, request),
+      acceptsRevision: (revision) => !_precedesRequired(revision),
+    );
+    if (!ref.mounted ||
+        generation != _generation ||
+        !identical(_assembly, request)) {
       return;
     }
-    _activeRequest = null;
-    state = DailyChoiceCatalogInitialFailure(
-      _selection,
-      const DailyChoiceCatalogUnavailableFailure(),
-    );
+    _assembly = null;
+    switch (result) {
+      case DailyChoiceCatalogAssemblyReady(:final snapshot):
+        state = DailyChoiceCatalogLoaded.fromSnapshot(
+          selection: _selection,
+          snapshot: snapshot,
+        );
+      case DailyChoiceCatalogAssemblyFailed(:final failure):
+        state = base == null
+            ? DailyChoiceCatalogInitialFailure(_selection, failure)
+            : base.withStatus(
+                selection: _selection,
+                freshness: DailyChoiceCatalogFreshness.stale,
+                refreshFailure: failure,
+                needsRebase: true,
+                incomplete: base.incomplete.withStatus(
+                  const DailyChoiceCatalogPageIdle(),
+                ),
+                completed: base.completed.withStatus(
+                  const DailyChoiceCatalogPageIdle(),
+                ),
+              );
+      case DailyChoiceCatalogAssemblyCancelled():
+        break;
+    }
   }
 
-  Future<void> _loadMore(DailyChoiceCatalogLoaded confirmed) async {
-    final cursor = confirmed.nextCursor;
-    if (cursor == null) return;
+  Future<void> _loadMore(
+    DailyChoiceCatalogLoaded base,
+    bool isCompleted,
+  ) async {
+    final section = base.section(isCompleted);
     final request = Object();
     final generation = _generation;
-    final invalidation = _invalidation;
-    _activeRequest = request;
-    state = confirmed.withStatus(
-      pageStatus: const DailyChoiceCatalogPageLoading(),
+    _pages[isCompleted] = request;
+    state = base.withSection(
+      isCompleted,
+      section.withStatus(const DailyChoiceCatalogPageLoading()),
     );
-    final result = await _readPage(cursor: cursor);
-    if (!_owns(request, generation)) return;
-    _activeRequest = null;
-    if (invalidation != _invalidation) {
-      await _refresh(confirmed, includeNextPage: true);
+    DailyChoiceCatalogPageResult result;
+    try {
+      result = await _repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(
+          date: _selection.date,
+          isCompleted: isCompleted,
+          cursor: section.nextCursor,
+        ),
+      );
+    } on Object {
+      result = const DailyChoiceCatalogPageError(
+        DailyChoiceCatalogUnexpectedFailure(),
+      );
+    }
+    if (!ref.mounted ||
+        generation != _generation ||
+        !identical(_pages[isCompleted], request)) {
       return;
     }
+    _pages.remove(isCompleted);
+    final current = state as DailyChoiceCatalogLoaded;
     switch (result) {
       case GraphResultSuccess(
         value: final DailyChoiceCatalogContinuationPage page,
       ):
-        if (page.revision.compareTo(confirmed.revision) !=
-            GraphRevisionOrder.same) {
-          await _refresh(confirmed, includeNextPage: true);
-          return;
+        if (page.revision.compareTo(current.revision) !=
+                GraphRevisionOrder.same ||
+            _precedesRequired(page.revision)) {
+          await _assemble(base: current, extend: {isCompleted, ..._pages.keys});
+        } else {
+          state = current.withSection(
+            isCompleted,
+            current.section(isCompleted).append(page),
+          );
         }
-        final combined = _combine(
-          confirmed.items,
-          page.items,
-          page.nextCursor,
-          confirmed.totalCount,
+      case GraphResultFailure(failure: DailyChoiceCatalogSnapshotExpired()):
+        await _assemble(base: current, extend: {isCompleted, ..._pages.keys});
+      case GraphResultFailure(:final failure):
+        state = current.withSection(
+          isCompleted,
+          section.withStatus(DailyChoiceCatalogPageFailure(failure)),
         );
-        if (combined == null) {
-          state = confirmed.withStatus(
-            pageStatus: const DailyChoiceCatalogPageFailure(
+      case GraphResultSuccess():
+        state = current.withSection(
+          isCompleted,
+          section.withStatus(
+            const DailyChoiceCatalogPageFailure(
               DailyChoiceCatalogUnexpectedFailure(),
             ),
-          );
-          return;
-        }
-        state = _confirmed(
-          combined,
-          confirmed.totalCount,
-          page.nextCursor,
-          confirmed.revision,
-        );
-      case GraphResultSuccess():
-        state = confirmed.withStatus(
-          pageStatus: const DailyChoiceCatalogPageFailure(
-            DailyChoiceCatalogUnexpectedFailure(),
           ),
         );
-      case GraphResultFailure(failure: DailyChoiceCatalogSnapshotExpired()):
-        await _refresh(confirmed, includeNextPage: true);
-      case GraphResultFailure(:final failure):
-        state = confirmed.withStatus(
-          pageStatus: DailyChoiceCatalogPageFailure(failure),
-        );
-    }
-  }
-
-  Future<void> _refresh(
-    DailyChoiceCatalogLoaded base, {
-    required bool includeNextPage,
-  }) async {
-    final request = Object();
-    final generation = _generation;
-    _activeRequest = request;
-    state = base.withStatus(
-      freshness: DailyChoiceCatalogFreshness.refreshing,
-      pageStatus: const DailyChoiceCatalogPageIdle(),
-      needsRebase: true,
-    );
-    try {
-      for (var attempt = 0; attempt < _maxAssemblyAttempts; attempt++) {
-        final invalidation = _invalidation;
-        final assembled = await _assemble(
-          base.items.length +
-              (includeNextPage ? DailyChoiceCatalogQuery.defaultPageSize : 0),
-          request,
-          generation,
-          invalidation,
-        );
-        if (!_owns(request, generation)) return;
-        switch (assembled) {
-          case _AssemblyReady(:final snapshot):
-            if (invalidation != _invalidation) continue;
-            state = snapshot;
-            return;
-          case _AssemblyInterrupted():
-            continue;
-          case _AssemblyFailed(:final failure):
-            state = base.withStatus(
-              freshness: DailyChoiceCatalogFreshness.stale,
-              refreshFailure: failure,
-              pageStatus: const DailyChoiceCatalogPageIdle(),
-              needsRebase: true,
-            );
-            return;
-        }
-      }
-      state = base.withStatus(
-        freshness: DailyChoiceCatalogFreshness.stale,
-        refreshFailure: const DailyChoiceCatalogUnavailableFailure(),
-        pageStatus: const DailyChoiceCatalogPageIdle(),
-        needsRebase: true,
-      );
-    } finally {
-      if (identical(_activeRequest, request)) _activeRequest = null;
-    }
-  }
-
-  Future<_Assembly> _assemble(
-    int limit,
-    Object request,
-    int generation,
-    int invalidation,
-  ) async {
-    final firstResult = await _readPage();
-    if (!_assemblyCurrent(request, generation, invalidation)) {
-      return const _AssemblyInterrupted();
-    }
-    final DailyChoiceCatalogFirstPage first;
-    switch (firstResult) {
-      case GraphResultSuccess(value: final DailyChoiceCatalogFirstPage page):
-        first = page;
-      case GraphResultSuccess():
-        return const _AssemblyFailed(DailyChoiceCatalogUnexpectedFailure());
-      case GraphResultFailure(failure: DailyChoiceCatalogSnapshotExpired()):
-        return const _AssemblyInterrupted();
-      case GraphResultFailure(:final failure):
-        return _AssemblyFailed(failure);
-    }
-    if (_precedesRequired(first.revision)) return const _AssemblyInterrupted();
-    var cursor = first.nextCursor;
-    final firstItems = _combine(
-      const [],
-      first.items,
-      cursor,
-      first.totalCount,
-    );
-    if (firstItems == null) {
-      return const _AssemblyFailed(DailyChoiceCatalogUnexpectedFailure());
-    }
-    var items = firstItems;
-    while (cursor != null && items.length < limit) {
-      final result = await _readPage(cursor: cursor);
-      if (!_assemblyCurrent(request, generation, invalidation)) {
-        return const _AssemblyInterrupted();
-      }
-      switch (result) {
-        case GraphResultSuccess(
-          value: final DailyChoiceCatalogContinuationPage page,
-        ):
-          if (page.revision.compareTo(first.revision) !=
-              GraphRevisionOrder.same) {
-            return const _AssemblyInterrupted();
-          }
-          final combined = _combine(
-            items,
-            page.items,
-            page.nextCursor,
-            first.totalCount,
-          );
-          if (combined == null) {
-            return const _AssemblyFailed(DailyChoiceCatalogUnexpectedFailure());
-          }
-          items = combined;
-          cursor = page.nextCursor;
-        case GraphResultSuccess():
-          return const _AssemblyFailed(DailyChoiceCatalogUnexpectedFailure());
-        case GraphResultFailure(failure: DailyChoiceCatalogSnapshotExpired()):
-          return const _AssemblyInterrupted();
-        case GraphResultFailure(:final failure):
-          return _AssemblyFailed(failure);
-      }
-    }
-    return _AssemblyReady(
-      _confirmed(items, first.totalCount, cursor, first.revision),
-    );
-  }
-
-  /// Единственная точка построения запросов модели: первые порции,
-  /// продолжения, пересборка и повторы ограничены выбранным днём.
-  Future<DailyChoiceCatalogPageResult> _readPage({
-    DailyChoiceCatalogCursor? cursor,
-  }) async {
-    try {
-      return await _repository.getDailyChoiceCatalogPage(
-        DailyChoiceCatalogQuery(
-          date: _selection.date,
-          isCompleted: _selection.isCompleted,
-          cursor: cursor,
-        ),
-      );
-    } on Object {
-      return const DailyChoiceCatalogPageError(
-        DailyChoiceCatalogUnexpectedFailure(),
-      );
     }
   }
 
@@ -382,10 +260,10 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     final package = completion.confirmedChange;
     if (package == null) return;
     final current = state;
-    final confirmedRevision = current is DailyChoiceCatalogLoaded
-        ? current.revision
-        : null;
-    for (final known in [?confirmedRevision, ?_requiredRevision]) {
+    for (final known in [
+      if (current is DailyChoiceCatalogLoaded) current.revision,
+      ?_requiredRevision,
+    ]) {
       final order = package.revision.compareTo(known);
       if (order == GraphRevisionOrder.older ||
           order == GraphRevisionOrder.same) {
@@ -393,23 +271,11 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
       }
     }
     _requiredRevision = package.revision;
-    _invalidation++;
-    if (current is! DailyChoiceCatalogLoaded) return;
-    final affects = _affectsVisibleData(package.changes, current);
-    if (affects ||
+    if (current is! DailyChoiceCatalogLoaded || _assembly != null) return;
+    if (_affectsVisibleData(package.changes, current) ||
         current.freshness != DailyChoiceCatalogFreshness.current ||
-        current.pageStatus is DailyChoiceCatalogPageLoading) {
-      if (_activeRequest == null ||
-          current.pageStatus is DailyChoiceCatalogPageLoading) {
-        _activeRequest = null;
-        unawaited(
-          _refresh(
-            current,
-            includeNextPage:
-                current.pageStatus is DailyChoiceCatalogPageLoading,
-          ),
-        );
-      }
+        _pages.isNotEmpty) {
+      unawaited(_assemble(base: current, extend: _pages.keys.toSet()));
     } else {
       state = current.withStatus(needsRebase: true);
     }
@@ -445,10 +311,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   }
 
   bool _matches(DailyChoice? choice) =>
-      choice != null &&
-      choice.date == _selection.date &&
-      (_selection.isCompleted == null ||
-          choice.isCompleted == _selection.isCompleted);
+      choice != null && choice.date == _selection.date;
 
   bool _precedesRequired(GraphRevision revision) {
     final required = _requiredRevision;
@@ -457,74 +320,4 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     return order == GraphRevisionOrder.older ||
         order == GraphRevisionOrder.differentEpoch;
   }
-
-  bool _owns(Object request, int generation) =>
-      ref.mounted &&
-      generation == _generation &&
-      identical(request, _activeRequest);
-
-  bool _assemblyCurrent(Object request, int generation, int invalidation) =>
-      _owns(request, generation) && invalidation == _invalidation;
-
-  List<DailyChoiceCatalogItem>? _combine(
-    List<DailyChoiceCatalogItem> loaded,
-    List<DailyChoiceCatalogItem> page,
-    DailyChoiceCatalogCursor? cursor,
-    int totalCount,
-  ) {
-    if (page.length > DailyChoiceCatalogQuery.defaultPageSize ||
-        (page.isEmpty && cursor != null)) {
-      return null;
-    }
-    final ids = <DailyChoiceId>{for (final item in loaded) item.id};
-    final combined = [...loaded];
-    for (final item in page) {
-      if (!ids.add(item.id) ||
-          item.date != _selection.date ||
-          (_selection.isCompleted != null &&
-              item.isCompleted != _selection.isCompleted)) {
-        return null;
-      }
-      combined.add(item);
-    }
-    if (cursor == null
-        ? combined.length != totalCount
-        : combined.length >= totalCount) {
-      return null;
-    }
-    return combined;
-  }
-
-  DailyChoiceCatalogLoaded _confirmed(
-    List<DailyChoiceCatalogItem> items,
-    int total,
-    DailyChoiceCatalogCursor? cursor,
-    GraphRevision revision,
-  ) => items.isEmpty && total == 0
-      ? DailyChoiceCatalogEmpty(selection: _selection, revision: revision)
-      : DailyChoiceCatalogLoaded(
-          selection: _selection,
-          items: items,
-          totalCount: total,
-          nextCursor: cursor,
-          revision: revision,
-        );
-}
-
-sealed class _Assembly {
-  const _Assembly();
-}
-
-final class _AssemblyReady extends _Assembly {
-  const _AssemblyReady(this.snapshot);
-  final DailyChoiceCatalogLoaded snapshot;
-}
-
-final class _AssemblyInterrupted extends _Assembly {
-  const _AssemblyInterrupted();
-}
-
-final class _AssemblyFailed extends _Assembly {
-  const _AssemblyFailed(this.failure);
-  final DailyChoiceCatalogReadFailure failure;
 }

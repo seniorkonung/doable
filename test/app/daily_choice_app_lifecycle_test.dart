@@ -375,7 +375,15 @@ void main() {
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
       await openDailyChoices(tester, tap: _tap);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      await _until(
+        tester,
+        () => find
+            .byKey(const ValueKey('daily-choice-section-true'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      await showDailyChoiceCatalogSection(tester, true);
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
@@ -720,11 +728,7 @@ void main() {
         date: _futureDate,
         isCompleted: null,
       );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-completion-filter')),
-      );
-      await tester.tap(find.text(l10n.dailyChoiceCatalogIncomplete).last);
+      await showDailyChoiceCatalogSection(tester, false);
       await _catalogResult(
         tester,
         firstContainer,
@@ -748,16 +752,17 @@ void main() {
           focusedDate: CalendarDate.fromParts(2026, 12, 1),
           mode: DailyChoiceCalendarMode.month,
         ),
-        'фильтр выполнения': false,
+        'раскрытие выполненных': false,
         'сегодня': _firstToday,
         'загруженные записи': [durabilityUuid(_futureChoice)],
         'позиция прокрутки': position.maxScrollExtent,
       });
       expect(position.pixels, greaterThan(0));
       expect(first.catalogQueries.map(_conditions), [
-        (_firstToday, null, false),
-        (_futureDate, null, false),
+        (_firstToday, false, false),
+        (_firstToday, true, false),
         (_futureDate, false, false),
+        (_futureDate, true, false),
       ]);
 
       // Возврат в работающее приложение сохраняет календарь, фильтр и
@@ -777,7 +782,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(_catalogView(tester, firstContainer), configured);
-      expect(first.catalogQueries, hasLength(3));
+      expect(first.catalogQueries, hasLength(4));
       expect(first.commands, isEmpty);
       expect(durabilityFileState(harness.databaseFile), stored);
 
@@ -809,7 +814,8 @@ void main() {
       );
       // Первое и единственное чтение — новое сегодня со всеми состояниями.
       expect(second.catalogQueries.map(_conditions), [
-        (_nextToday, null, false),
+        (_nextToday, false, false),
+        (_nextToday, true, false),
       ]);
       expect(_catalogView(tester, secondContainer), {
         'выбранный день': _nextToday,
@@ -817,7 +823,7 @@ void main() {
           focusedDate: _nextToday,
           mode: DailyChoiceCalendarMode.week,
         ),
-        'фильтр выполнения': null,
+        'раскрытие выполненных': false,
         'сегодня': _nextToday,
         'загруженные записи': [durabilityUuid(_nextTodayChoice)],
         'позиция прокрутки': 0.0,
@@ -825,11 +831,12 @@ void main() {
       expect(opened.totalCount, 1);
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('daily-choice-completion-filter')),
-          matching: find.text(l10n.dailyChoiceCatalogAllStates),
+          of: find.byKey(const ValueKey('daily-choice-section-false')),
+          matching: find.text(l10n.dailyChoiceCatalogIncomplete),
         ),
         findsOneWidget,
       );
+      await showDailyChoiceCatalogSection(tester, true);
       expect(_rowLabel(tester, 1), contains(_nextToday.toCanonicalString()));
       expect(durabilityFileState(harness.databaseFile), stored);
 
@@ -846,12 +853,19 @@ void main() {
           isCompleted: null,
         );
         expect(result.items.map((item) => item.id), [durabilityChoice(choice)]);
+        await showDailyChoiceCatalogSection(
+          tester,
+          result.items.single.isCompleted,
+        );
         expect(_rowLabel(tester, 1), contains(date.toCanonicalString()));
       }
       expect(second.catalogQueries.map(_conditions), [
-        (_nextToday, null, false),
-        (durabilityChoiceDate, null, false),
-        (_futureDate, null, false),
+        (_nextToday, false, false),
+        (_nextToday, true, false),
+        (durabilityChoiceDate, false, false),
+        (durabilityChoiceDate, true, false),
+        (_futureDate, false, false),
+        (_futureDate, true, false),
       ]);
       expect(second.commands, isEmpty);
       expect(durabilityFileState(harness.databaseFile), stored);
@@ -895,7 +909,8 @@ Future<DailyChoiceCatalogLoaded> _catalogResult(
   DailyChoiceCatalogLoaded? result() => switch (current()) {
     final DailyChoiceCatalogLoaded loaded
         when loaded.selection.date == date &&
-            loaded.selection.isCompleted == isCompleted &&
+            (isCompleted == null ||
+                loaded.selection.completedExpanded == isCompleted) &&
             loaded.freshness == DailyChoiceCatalogFreshness.current =>
       loaded,
     _ => null,
@@ -908,7 +923,7 @@ Future<DailyChoiceCatalogLoaded> _catalogResult(
     fail(
       'Каталог дневных выборов не показал выдачу за $date с охватом '
       'выполнения $isCompleted: состояние ${shown.runtimeType} за '
-      '${shown.selection.date} с охватом ${shown.selection.isCompleted}.',
+      '${shown.selection.date} с охватом ${shown.selection.completedExpanded}.',
     );
   }
   await tester.pumpAndSettle();
@@ -929,11 +944,10 @@ Map<String, Object?> _catalogView(
   return {
     'выбранный день': shownDailyChoiceCatalogDate(tester),
     'просмотр календаря': shownDailyChoiceCatalogViewport(tester),
-    'фильтр выполнения': tester
-        .state<FormFieldState<bool?>>(
-          find.byType(DropdownButtonFormField<bool?>, skipOffstage: false),
-        )
-        .value,
+    'раскрытие выполненных': container
+        .read(openedDailyChoiceCatalogProvider(container))
+        .selection
+        .completedExpanded,
     'сегодня': tester.widget<DailyChoiceCalendar>(calendar).today,
     'загруженные записи': switch (container.read(
       openedDailyChoiceCatalogProvider(container),

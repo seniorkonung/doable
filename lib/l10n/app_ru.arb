@@ -738,7 +738,7 @@
   "dailyChoiceCatalogCompleted": "Выполненные",
   "dailyChoiceCatalogClearFilters": "Сбросить фильтры",
   "dailyChoiceCatalogTotalCount": "Всего дневных выборов: {count}",
-  "dailyChoiceCatalogEmpty": "Дневных выборов по фильтрам нет.",
+  "dailyChoiceCatalogEmpty": "На этот день нет дневных выборов.",
   "dailyChoiceCatalogRefreshing": "Обновляем дневные выборы…",
   "dailyChoiceCatalogLoadingMore": "Загружаем ещё дневные выборы…",
   "dailyChoiceCatalogLoadMore": "Показать ещё дневные выборы",

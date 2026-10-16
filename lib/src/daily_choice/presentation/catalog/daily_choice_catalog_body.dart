@@ -55,7 +55,7 @@ final class _DailyChoiceCatalogBodyState
   /// Тело перечитывает его при создании, возвращении приложения в
   /// активное состояние и наступлении следующей местной даты. Новый день
   /// только перестраивает календарь и заголовок: выбранная дата, просмотр,
-  /// фильтры и выдача остаются прежними.
+  /// секции и выдача остаются прежними.
   late final DailyChoiceLocalDayObserver _localDay;
 
   @override
@@ -151,51 +151,6 @@ final class _DailyChoiceCatalogBodyState
                       ),
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _CompletionFilter(
-                            label: l10n.dailyChoiceCatalogCompletionFilter,
-                            field: DropdownButtonFormField<bool?>(
-                              key: ValueKey(state.selection.isCompleted),
-                              initialValue: state.selection.isCompleted,
-                              isExpanded: true,
-                              // Выбранное состояние переносится и растягивает поле
-                              // по высоте вместо обрезки по одной строке.
-                              isDense: false,
-                              items: [
-                                DropdownMenuItem<bool?>(
-                                  value: null,
-                                  child: Text(l10n.dailyChoiceCatalogAllStates),
-                                ),
-                                DropdownMenuItem<bool?>(
-                                  value: false,
-                                  child: Text(
-                                    l10n.dailyChoiceCatalogIncomplete,
-                                  ),
-                                ),
-                                DropdownMenuItem<bool?>(
-                                  value: true,
-                                  child: Text(l10n.dailyChoiceCatalogCompleted),
-                                ),
-                              ],
-                              onChanged: model.selectCompletion,
-                            ),
-                          ),
-                          TextButton(
-                            key: const ValueKey('daily-choice-clear-filters'),
-                            onPressed: model.clearFilters,
-                            child: Text(l10n.dailyChoiceCatalogClearFilters),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   ..._content(state, model, l10n),
                 ],
               ),
@@ -228,127 +183,155 @@ final class _DailyChoiceCatalogBodyState
         .setViewport(viewport, reason: reason);
   }
 
-  /// Слайверы выдачи под фильтрами.
+  /// Слайверы согласованной пары под заголовком дня.
   List<Widget> _content(
     DailyChoiceCatalogState state,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
-  ) => switch (state) {
-    DailyChoiceCatalogInitialLoad() => [
-      _SliverStatus(
-        _Status(message: l10n.dailyChoiceCatalogLoading, loading: true),
-      ),
-    ],
-    DailyChoiceCatalogInitialFailure(:final failure, :final canRetry) => [
-      _SliverStatus(
-        _Status(
-          message: _failureMessage(failure, l10n),
-          onRetry: canRetry ? model.retryFirstPage : null,
-        ),
-      ),
-    ],
-    DailyChoiceCatalogEmpty() => _loaded(state, model, l10n),
-    DailyChoiceCatalogLoaded() => _loaded(state, model, l10n),
-  };
-
-  List<Widget> _loaded(
-    DailyChoiceCatalogLoaded state,
-    DailyChoiceCatalogViewModel model,
-    AppLocalizations l10n,
   ) {
-    final isRefreshing =
-        state.freshness == DailyChoiceCatalogFreshness.refreshing;
-    final isStale = state.freshness == DailyChoiceCatalogFreshness.stale;
+    final loaded = state is DailyChoiceCatalogLoaded ? state : null;
     return [
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Semantics(
-            liveRegion: true,
-            child: Text(l10n.dailyChoiceCatalogTotalCount(state.totalCount)),
+      if (loaded != null)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(l10n.dailyChoiceCatalogTotalCount(loaded.totalCount)),
+            ),
           ),
         ),
-      ),
-      if (isRefreshing)
+      if (loaded?.freshness == DailyChoiceCatalogFreshness.refreshing)
         SliverToBoxAdapter(
           child: _Banner(
             message: l10n.dailyChoiceCatalogRefreshing,
             loading: true,
           ),
         ),
-      if (isStale)
+      if (loaded?.freshness == DailyChoiceCatalogFreshness.stale)
         SliverToBoxAdapter(
           child: _Banner(
-            message: _failureMessage(state.refreshFailure!, l10n),
+            message: _failureMessage(loaded!.refreshFailure!, l10n),
             onRetry:
-                state.refreshFailure is DailyChoiceCatalogUnavailableFailure
+                loaded.refreshFailure is DailyChoiceCatalogUnavailableFailure
                 ? model.retryRefresh
                 : null,
           ),
         ),
-      if (state.items.isEmpty)
-        _SliverStatus(_Status(message: l10n.dailyChoiceCatalogEmpty))
-      else
-        SliverList.builder(
-          itemCount: state.items.length + (state.nextCursor == null ? 0 : 1),
-          itemBuilder: (context, index) {
-            if (index == state.items.length) {
-              return _pageFooter(state, model, l10n);
-            }
-            final item = state.items[index];
-            final phrase = l10n.dailyChoiceDetailsPhrase(
-              item.source.title,
-              item.selected.title,
-            );
-            final date = item.date.toCanonicalString();
-            final completion = item.isCompleted
-                ? l10n.dailyChoiceDetailsCompleted
-                : l10n.dailyChoiceDetailsNotCompleted;
-            void open() =>
-                context.router.push(DailyChoiceDetailsRoute(choiceId: item.id));
-            return Semantics(
-              key: ValueKey('daily-choice-row-${index + 1}'),
-              button: true,
-              label: l10n.dailyChoiceCatalogRowLabel(
-                index + 1,
-                phrase,
-                date,
-                completion,
+      for (final isCompleted in [false, true]) ...[
+        SliverToBoxAdapter(
+          child: Semantics(
+            expanded: state.selection.isExpanded(isCompleted),
+            child: ListTile(
+              key: ValueKey('daily-choice-section-$isCompleted'),
+              title: Text(
+                isCompleted
+                    ? l10n.dailyChoiceCatalogCompleted
+                    : l10n.dailyChoiceCatalogIncomplete,
               ),
-              onTap: open,
-              child: ExcludeSemantics(
-                child: ListTile(
-                  title: Text(phrase),
-                  subtitle: Text(
-                    '${l10n.dailyChoiceDetailsDate(date)} · $completion',
-                  ),
-                  onTap: open,
-                ),
+              trailing: Icon(
+                state.selection.isExpanded(isCompleted)
+                    ? Icons.expand_less
+                    : Icons.expand_more,
               ),
-            );
-          },
+              onTap: () => model.toggleSection(isCompleted),
+            ),
+          ),
         ),
+        if (loaded != null && state.selection.isExpanded(isCompleted))
+          ..._section(loaded, isCompleted, model, l10n),
+      ],
+      if (state is DailyChoiceCatalogInitialLoad)
+        _SliverStatus(
+          _Status(message: l10n.dailyChoiceCatalogLoading, loading: true),
+        ),
+      if (state case DailyChoiceCatalogInitialFailure(
+        :final failure,
+        :final canRetry,
+      ))
+        _SliverStatus(
+          _Status(
+            message: _failureMessage(failure, l10n),
+            onRetry: canRetry ? model.retryFirstPage : null,
+          ),
+        ),
+      if (loaded?.totalCount == 0)
+        _SliverStatus(_Status(message: l10n.dailyChoiceCatalogEmpty)),
+    ];
+  }
+
+  List<Widget> _section(
+    DailyChoiceCatalogLoaded state,
+    bool isCompleted,
+    DailyChoiceCatalogViewModel model,
+    AppLocalizations l10n,
+  ) {
+    final section = state.section(isCompleted);
+    return [
+      SliverList.builder(
+        itemCount: section.items.length,
+        itemBuilder: (context, index) {
+          final item = section.items[index];
+          final number =
+              index + 1 + (isCompleted ? state.incomplete.items.length : 0);
+          final phrase = l10n.dailyChoiceDetailsPhrase(
+            item.source.title,
+            item.selected.title,
+          );
+          final date = item.date.toCanonicalString();
+          final completion = item.isCompleted
+              ? l10n.dailyChoiceDetailsCompleted
+              : l10n.dailyChoiceDetailsNotCompleted;
+          void open() =>
+              context.router.push(DailyChoiceDetailsRoute(choiceId: item.id));
+          return Semantics(
+            key: ValueKey('daily-choice-row-$number'),
+            button: true,
+            label: l10n.dailyChoiceCatalogRowLabel(
+              number,
+              phrase,
+              date,
+              completion,
+            ),
+            onTap: open,
+            child: ExcludeSemantics(
+              child: ListTile(
+                title: Text(phrase),
+                subtitle: Text(
+                  '${l10n.dailyChoiceDetailsDate(date)} · $completion',
+                ),
+                onTap: open,
+              ),
+            ),
+          );
+        },
+      ),
+      if (section.nextCursor != null)
+        SliverToBoxAdapter(child: _pageFooter(state, isCompleted, model, l10n)),
     ];
   }
 
   Widget _pageFooter(
     DailyChoiceCatalogLoaded state,
+    bool isCompleted,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
-  ) => switch (state.pageStatus) {
+  ) => switch (state.section(isCompleted).pageStatus) {
     DailyChoiceCatalogPageLoading() => _Status(
       message: l10n.dailyChoiceCatalogLoadingMore,
       loading: true,
     ),
     DailyChoiceCatalogPageFailure(:final failure, :final canRetry) => _Status(
       message: _failureMessage(failure, l10n),
-      onRetry: canRetry ? model.retryLoadMore : null,
+      onRetry: canRetry
+          ? () => model.retryLoadMore(isCompleted: isCompleted)
+          : null,
     ),
     DailyChoiceCatalogPageIdle() => Center(
       child: TextButton(
-        key: const ValueKey('daily-choice-load-more'),
+        key: ValueKey('daily-choice-load-more-$isCompleted'),
         onPressed: state.freshness == DailyChoiceCatalogFreshness.current
-            ? model.loadMore
+            ? () => model.loadMore(isCompleted: isCompleted)
             : null,
         child: Text(l10n.dailyChoiceCatalogLoadMore),
       ),
@@ -367,48 +350,7 @@ final class _DailyChoiceCatalogBodyState
   };
 }
 
-/// Фильтр выполнения: название фильтра над полем выбора состояния.
-///
-/// Плавающая подпись поля ввода рассчитана на одну строку и при крупном
-/// тексте обрезается, поэтому название стоит отдельной переносимой строкой.
-/// Для вспомогательных технологий название и выбранное состояние — одна
-/// кнопка выбора. Ширина при обычном тексте вмещает самое длинное состояние
-/// в одну строку и растёт вместе с системным размером текста до ширины
-/// страницы; дальше название и состояние переносятся.
-final class _CompletionFilter extends StatelessWidget {
-  const _CompletionFilter({required this.label, required this.field});
-
-  final String label;
-  final Widget field;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return MergeSemantics(
-      child: SizedBox(
-        // Ширина больше доступной ограничивается шириной ряда фильтров.
-        width: MediaQuery.textScalerOf(context).scale(280),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            KeyedSubtree(
-              key: const ValueKey('daily-choice-completion-filter'),
-              child: field,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Состояние без строк выдачи занимает остаток высоты под фильтрами.
+/// Состояние без строк выдачи занимает остаток высоты под секциями.
 final class _SliverStatus extends StatelessWidget {
   const _SliverStatus(this.status);
 

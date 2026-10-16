@@ -2487,7 +2487,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceCatalogEmpty => 'Дневных выборов по фильтрам нет.';
+  String get dailyChoiceCatalogEmpty => 'На этот день нет дневных выборов.';
 
   @override
   String get dailyChoiceCatalogRefreshing => 'Обновляем дневные выборы…';

@@ -2126,7 +2126,7 @@
   "@dailyChoiceCatalogClearFilters": {"description": "Вернуть все даты и оба состояния выполнения"},
   "dailyChoiceCatalogTotalCount": "Total daily choices: {count}",
   "@dailyChoiceCatalogTotalCount": {"description": "Полное количество подходящих дневных выборов", "placeholders": {"count": {"type": "int"}}},
-  "dailyChoiceCatalogEmpty": "No daily choices match the filters.",
+  "dailyChoiceCatalogEmpty": "No daily choices for this day.",
   "@dailyChoiceCatalogEmpty": {"description": "Пустой дневной каталог"},
   "dailyChoiceCatalogRefreshing": "Refreshing daily choices…",
   "@dailyChoiceCatalogRefreshing": {"description": "Обновление подтверждённого снимка каталога"},

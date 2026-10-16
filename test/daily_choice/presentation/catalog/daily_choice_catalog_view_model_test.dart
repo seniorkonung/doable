@@ -28,12 +28,8 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_per
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/domain/tag.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -41,1175 +37,348 @@ import '../../../support/daily_choice_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
+final _today = CalendarDate.fromParts(2026, 9, 24);
+
 void main() {
-  test('экземпляры с одинаковой начальной датой независимо хранят условия и порции', () async {
-    final initialDate = CalendarDate.fromParts(2026, 9, 20);
-    final harness = _Harness(initialDate: initialDate);
-    addTearDown(harness.dispose);
-    final second = dailyChoiceCatalogViewModelProvider(
-      DailyChoiceCatalogInstance(initialDate: initialDate),
-    );
-    final subscription = harness.container.listen(second, (_, _) {});
-    addTearDown(subscription.close);
-    final secondModel = harness.container.read(second.notifier);
-    final secondCursor = _Cursor();
-    DailyChoiceCatalogLoaded secondState() =>
-        harness.container.read(second) as DailyChoiceCatalogLoaded;
-
-    expect(harness.repository.queries, hasLength(2));
-    for (final query in harness.repository.queries) {
-      _expectQuery(query, date: initialDate);
-    }
-    harness.repository.first(
-      0,
-      [_item(1, date: initialDate)],
-      total: 2,
-      cursor: _Cursor(),
-    );
-    harness.repository.first(
-      1,
-      [_item(10, date: initialDate)],
-      total: 2,
-      cursor: secondCursor,
-    );
+  test('первые порции публикуются только согласованной парой; раскрытие не читает граф', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.first(0, [_item(1)], total: 2, cursor: _Cursor());
     await pumpEventQueue();
-
-    final load = harness.model.loadMore();
-    harness.repository.more(2, [_item(2, date: initialDate)]);
-    await load;
-    expect(
-      (harness.state as DailyChoiceCatalogLoaded).items.map((item) => item.id),
-      [_choiceId(1), _choiceId(2)],
-    );
-    expect(secondState().items.map((item) => item.id), [_choiceId(10)]);
-    expect(secondState().totalCount, 2);
-
-    harness.model.selectCompletion(false);
-    harness.repository.first(3, [_item(1, date: initialDate)], total: 1);
+    expect(h.state, isA<DailyChoiceCatalogInitialLoad>());
+    h.repository.first(1, [_item(2, completed: true)], total: 1);
     await pumpEventQueue();
-    harness.model.selectDate(_today);
-    harness.repository.first(4, [_item(3)], total: 1);
-    await pumpEventQueue();
-    expect(harness.state.selection.date, _today);
-    expect(harness.state.selection.isCompleted, false);
-    expect(secondState().selection.date, initialDate);
-    expect(secondState().selection.isCompleted, isNull);
-
-    final secondLoad = secondModel.loadMore();
-    _expectQuery(
-      harness.repository.queries[5],
-      date: initialDate,
-      cursor: secondCursor,
-    );
-    harness.repository.more(5, [_item(11, date: initialDate)]);
-    await secondLoad;
-    expect(secondState().items.map((item) => item.id), [
-      _choiceId(10),
-      _choiceId(11),
-    ]);
-    expect(
-      (harness.state as DailyChoiceCatalogLoaded).items.map((item) => item.id),
-      [_choiceId(3)],
-    );
-  });
-
-  test('закрытие экземпляра во время подгрузки прекращает повторы и согласование только у него', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final second = dailyChoiceCatalogViewModelProvider(
-      DailyChoiceCatalogInstance(initialDate: _today),
-    );
-    final subscription = harness.container.listen(second, (_, _) {});
-    addTearDown(subscription.close);
-    final secondModel = harness.container.read(second.notifier);
-    harness.repository.first(0, [_item(1)], total: 2, cursor: _Cursor());
-    harness.repository.first(1, [_item(10)], total: 2, cursor: _Cursor());
-    await pumpEventQueue();
-
-    final lateLoad = harness.model.loadMore();
-    harness.subscription.close();
-    await harness.container.pump();
-    harness.repository.fail(2, const DailyChoiceCatalogSnapshotExpired());
-    await lateLoad;
-    expect(harness.repository.queries, hasLength(3));
-
-    final load = secondModel.loadMore();
-    harness.repository.more(3, [_item(11)]);
-    await load;
-    final completion = harness.createChoice(12, revision: 2);
-    harness.repository.succeedCreation(0, 12, revision: 2);
-    await completion.future;
-    await pumpEventQueue();
-    expect(harness.repository.queries, hasLength(5));
-    harness.repository.first(
-      4,
-      [_item(12), _item(10), _item(11)],
-      total: 3,
-      revision: 2,
-    );
-    await pumpEventQueue();
-    final current = harness.container.read(second) as DailyChoiceCatalogLoaded;
-    expect(current.items.map((item) => item.id), [
-      _choiceId(12),
-      _choiceId(10),
-      _choiceId(11),
-    ]);
-    expect(current.freshness, DailyChoiceCatalogFreshness.current);
-  });
-
-  test('перестроение модели сохраняет выбранный день и охват, когда сегодня сменилось', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.repository.first(0, [_item(1)], total: 1);
-    await pumpEventQueue();
-    harness.model.selectCompletion(false);
-    harness.repository.first(1, [_item(1)], total: 1);
-    await pumpEventQueue();
-
-    harness.localDate.today = CalendarDate.fromParts(2026, 9, 25);
-    harness.container.invalidate(harness.provider);
-    final rebuilt = harness.state;
-
-    expect(rebuilt, isA<DailyChoiceCatalogInitialLoad>());
-    expect(rebuilt.selection.date, _today);
-    expect(rebuilt.selection.isCompleted, false);
-    expect(harness.repository.queries.last.date, _today);
-    expect(harness.repository.queries.last.isCompleted, false);
-  });
-
-  test('каждый запрос модели ограничен выбранным днём: первые порции, '
-      'продолжения, пересборка и повторы', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    const unavailable = DailyChoiceCatalogUnavailableFailure();
-
-    // Первая порция и её явный повтор.
-    harness.repository.fail(0, unavailable);
-    await pumpEventQueue();
-    final retryFirst = harness.model.retryFirstPage();
-    harness.repository.first(1, [_item(1)], total: 4, cursor: _Cursor());
-    await retryFirst;
-
-    // Продолжение и его явный повтор.
-    final load = harness.model.loadMore();
-    harness.repository.fail(2, unavailable);
-    await load;
-    final retryMore = harness.model.retryLoadMore();
-    harness.repository.more(3, [_item(2)], cursor: _Cursor());
-    await retryMore;
-
-    // Пересборка после подтверждённой команды и её явный повтор.
-    final creation = harness.createChoice(5, revision: 2);
-    harness.repository.succeedCreation(0, 5, revision: 2);
-    await creation.future;
-    await pumpEventQueue();
-    harness.repository.fail(4, unavailable);
-    await pumpEventQueue();
-    expect(
-      (harness.state as DailyChoiceCatalogLoaded).freshness,
-      DailyChoiceCatalogFreshness.stale,
-    );
-    final retryRefresh = harness.model.retryRefresh();
-    harness.repository.first(
-      5,
-      [_item(5)],
-      total: 5,
-      cursor: _Cursor(),
-      revision: 2,
-    );
-    await pumpEventQueue();
-    harness.repository.more(6, [_item(1)], cursor: _Cursor(), revision: 2);
-    await retryRefresh;
-
-    // Перестроение модели.
-    harness.container.invalidate(harness.provider);
-    expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-
-    final queries = harness.repository.queries;
-    expect(queries, hasLength(8));
-    expect(
-      [
-        for (final (index, query) in queries.indexed)
-          if (query.cursor != null) index,
-      ],
-      [2, 3, 6],
-    );
-    expect(queries.map((query) => query.date), everyElement(_today));
+    expect(_loaded(h).incomplete.items.single.id, _choiceId(1));
+    expect(_loaded(h).completed.items.single.id, _choiceId(2));
+    expect(_loaded(h).totalCount, 3);
+    expect(h.state.selection.incompleteExpanded, isTrue);
+    expect(h.state.selection.completedExpanded, isFalse);
+    h.model.toggleSection(false);
+    h.model.toggleSection(true);
+    expect(h.state.selection.incompleteExpanded, isFalse);
+    expect(h.state.selection.completedExpanded, isTrue);
+    expect(h.repository.queries, hasLength(2));
+    expect(h.repository.queries.map((q) => q.isCompleted), [false, true]);
   });
 
   test(
-    'изменение выбора пересобирает загруженную часть и количество вместе',
+    'подгрузки секций независимы и ответы сохраняют обе загруженные части',
     () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final cursor = _Cursor();
-      harness.repository.first(
-        0,
-        [_item(1), _item(2)],
-        total: 3,
-        cursor: cursor,
+      final h = _Harness();
+      addTearDown(h.dispose);
+      await _pair(
+        h,
+        incomplete: [_item(1)],
+        completed: [_item(3, completed: true)],
+        more: true,
       );
-      await pumpEventQueue();
-      final load = harness.model.loadMore();
-      expect(harness.repository.queries[1].cursor, same(cursor));
-      harness.repository.more(1, [_item(3)]);
-      await load;
-
-      final completion = harness.createChoice(4, revision: 2);
-      harness.repository.succeedCreation(0, 4, revision: 2);
-      await completion.future;
-      await pumpEventQueue();
-      expect(harness.state, isA<DailyChoiceCatalogLoaded>());
+      final incomplete = h.model.loadMore(isCompleted: false);
+      final completed = h.model.loadMore(isCompleted: true);
       expect(
-        (harness.state as DailyChoiceCatalogLoaded).freshness,
-        DailyChoiceCatalogFreshness.refreshing,
+        _loaded(h).incomplete.pageStatus,
+        isA<DailyChoiceCatalogPageLoading>(),
       );
       expect(
-        (harness.state as DailyChoiceCatalogLoaded).items.map((e) => e.id),
-        [_choiceId(1), _choiceId(2), _choiceId(3)],
+        _loaded(h).completed.pageStatus,
+        isA<DailyChoiceCatalogPageLoading>(),
       );
-
-      final refreshedCursor = _Cursor();
-      harness.repository.first(
-        2,
-        [_item(4), _item(1)],
-        total: 4,
-        cursor: refreshedCursor,
-        revision: 2,
-      );
-      await pumpEventQueue();
-      expect((harness.state as DailyChoiceCatalogLoaded).totalCount, 3);
-      harness.repository.more(3, [_item(2), _item(3)], revision: 2);
-      await pumpEventQueue();
-      final current = harness.state as DailyChoiceCatalogLoaded;
-      expect(current.freshness, DailyChoiceCatalogFreshness.current);
-      expect(current.totalCount, 4);
-      expect(current.items.map((e) => e.id), [
-        _choiceId(4),
+      h.repository.more(3, [_item(4, completed: true)]);
+      await completed;
+      h.repository.more(2, [_item(2)]);
+      await incomplete;
+      expect(_loaded(h).incomplete.items.map((i) => i.id), [
         _choiceId(1),
         _choiceId(2),
+      ]);
+      expect(_loaded(h).completed.items.map((i) => i.id), [
         _choiceId(3),
+        _choiceId(4),
       ]);
     },
   );
 
-  test(
-    'ошибка сборки сохраняет прежний снимок и допускает только уместный повтор',
-    () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      harness.repository.first(0, [_item(1)], total: 1);
-      await pumpEventQueue();
-      final completion = harness.createChoice(2, revision: 2);
-      harness.repository.succeedCreation(0, 2, revision: 2);
-      await completion.future;
-      await pumpEventQueue();
-      harness.repository.fail(1, const DailyChoiceCatalogCorruptionFailure());
-      await pumpEventQueue();
-      final stale = harness.state as DailyChoiceCatalogLoaded;
-      expect(stale.items.single.id, _choiceId(1));
-      expect(stale.freshness, DailyChoiceCatalogFreshness.stale);
-      expect(stale.refreshFailure, isA<DailyChoiceCatalogCorruptionFailure>());
-      await harness.model.retryRefresh();
-      expect(harness.repository.queries, hasLength(2));
-    },
-  );
-
-  test(
-    'посторонняя ревизия требует новой основы до следующей порции',
-    () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      harness.repository.first(0, [_item(1)], total: 2, cursor: _Cursor());
-      await pumpEventQueue();
-      final completion = harness.createChoice(2, revision: 2);
-      harness.repository.succeedUnrelatedCreation(0, 2, revision: 2);
-      await completion.future;
-      await pumpEventQueue();
-      final load = harness.model.loadMore();
-      expect(harness.repository.queries[1].cursor, isNull);
-      harness.repository.first(
-        1,
-        [_item(2)],
-        total: 2,
-        revision: 2,
-        cursor: _Cursor(),
-      );
-      await pumpEventQueue();
-      harness.repository.more(2, [_item(1)], revision: 2);
-      await load;
-      expect(
-        (harness.state as DailyChoiceCatalogLoaded).items.map((e) => e.id),
-        [_choiceId(2), _choiceId(1)],
-      );
-    },
-  );
-
-  test('удаление во время подгрузки не возвращает удалённую строку', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.repository.first(
-      0,
-      [_item(1), _item(2)],
-      total: 3,
-      cursor: _Cursor(),
-    );
+  test('подтверждение между чтениями не публикует смешанную пару', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final published = <List<DailyChoiceId>>[];
+    final sub = h.container.listen(h.provider, (_, value) {
+      if (value is DailyChoiceCatalogLoaded) {
+        published.add(value.items.map((i) => i.id).toList());
+      }
+    });
+    addTearDown(sub.close);
+    h.repository.first(0, [_item(1)], total: 1);
     await pumpEventQueue();
-    final oldLoad = harness.model.loadMore();
-    final deletion = harness.coordinator.acceptDailyChoiceDelete(
-      DeleteDailyChoice(_choiceId(1)),
-    ) as DailyChoiceCommandAccepted;
-    harness.repository.succeedDeletion(0, 1, revision: 2);
-    await deletion.future;
+    final command = h.createChoice(2, revision: 2);
+    h.repository.succeedCreation(0, 2, revision: 2, isCompleted: true);
+    await command.future;
     await pumpEventQueue();
-    expect(
-      (harness.state as DailyChoiceCatalogLoaded).freshness,
-      DailyChoiceCatalogFreshness.refreshing,
-    );
-    harness.repository.more(1, [_item(3)]);
-    await oldLoad;
-    expect(
-      (harness.state as DailyChoiceCatalogLoaded).items.first.id,
-      _choiceId(1),
-    );
-    harness.repository.first(2, [_item(2), _item(3)], total: 2, revision: 2);
+    h.repository.first(1, [_item(2, completed: true)], total: 1, revision: 2);
     await pumpEventQueue();
-    final updated = harness.state as DailyChoiceCatalogLoaded;
-    expect(updated.items.map((item) => item.id), [_choiceId(2), _choiceId(3)]);
-    expect(updated.totalCount, 2);
-    expect(updated.freshness, DailyChoiceCatalogFreshness.current);
-  });
-
-  test('выполнение не меняет фильтр, а сброс возвращает все состояния того же '
-      'дня', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.model.selectCompletion(false);
-    harness.repository.first(1, [_item(1)], total: 1);
-    await pumpEventQueue();
-    harness.repository.first(0, [], total: 0);
-    await pumpEventQueue();
-    final creation = harness.createChoice(2, revision: 2);
-    harness.repository.succeedCreation(0, 2, revision: 2, isCompleted: true);
-    await creation.future;
-    await pumpEventQueue();
-    expect(harness.state.selection.isCompleted, false);
-    expect(
-      (harness.state as DailyChoiceCatalogLoaded).items.single.id,
-      _choiceId(1),
-    );
-    harness.model.clearFilters();
-    expect(harness.repository.queries.last.isCompleted, isNull);
-    expect(harness.repository.queries.last.date, _today);
-    harness.repository.first(2, [_item(2), _item(1)], total: 2, revision: 2);
-    await pumpEventQueue();
-    expect((harness.state as DailyChoiceCatalogLoaded).totalCount, 2);
-  });
-
-  test(
-    'смена даты убирает строку из выбранного дня и показывает её в новом дне',
-    () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final oldDate = CalendarDate.fromParts(2026, 9, 25);
-      final newDate = CalendarDate.fromParts(2026, 9, 26);
-      harness.model.selectDate(oldDate);
-      expect(harness.repository.queries[1].date, oldDate);
-      harness.repository.first(1, [_item(1, date: oldDate)], total: 1);
-      await pumpEventQueue();
-      harness.repository.first(0, [], total: 0);
-      await pumpEventQueue();
-
-      final update = harness.coordinator.acceptDailyChoiceUpdate(
-        UpdateDailyChoiceFields(
-          choiceId: _choiceId(1),
-          patch: DailyChoiceFieldsPatch(date: DailyChoiceFieldSet(newDate)),
-        ),
-      ) as DailyChoiceCommandAccepted;
-      harness.repository.succeedDateUpdate(0, 1, oldDate, newDate, revision: 2);
-      await update.future;
-      await pumpEventQueue();
-      expect(
-        (harness.state as DailyChoiceCatalogLoaded).freshness,
-        DailyChoiceCatalogFreshness.refreshing,
-      );
-      expect(harness.repository.queries[2].date, oldDate);
-      harness.repository.first(2, [], total: 0, revision: 2);
-      await pumpEventQueue();
-      expect(harness.state, isA<DailyChoiceCatalogEmpty>());
-      expect(harness.state.selection.date, oldDate);
-
-      harness.model.selectDate(newDate);
-      expect(harness.repository.queries[3].date, newDate);
-      harness.repository.first(
-        3,
-        [_item(1, date: newDate)],
-        total: 1,
-        revision: 2,
-      );
-      await pumpEventQueue();
-      expect(
-        (harness.state as DailyChoiceCatalogLoaded).items.single.date,
-        newDate,
-      );
-      expect(harness.state.selection.date, newDate);
-    },
-  );
-
-  test('переименование участника обновляет показанную формулировку', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.repository.first(0, [_item(1)], total: 1);
-    await pumpEventQueue();
-    final update = harness.coordinator.acceptExisting(
-      UpdateIntention(
-        id: _intentionId(1),
-        title: 'Новое основание',
-        description: null,
-      ),
-      presentationTitle: 'Основание',
-    ) as IntentionCommandAccepted;
-    harness.repository.succeedRename(1, revision: 2);
-    await update.future;
-    await pumpEventQueue();
-    final newItem = DailyChoiceCatalogItem(
-      id: _choiceId(1),
-      source: DailyChoiceCatalogParticipant(
-        id: _intentionId(1),
-        title: 'Новое основание',
-        archiveState: IntentionArchiveState.active,
-        readiness: IntentionReadiness.notReady,
-      ),
-      selected: _item(1).selected,
-      date: _today,
-      isCompleted: false,
-      schedule: const DailyChoiceAllDay(),
-      priority: DailyChoicePriority.p4,
-      description: null,
-      pathIntentionCount: 2,
-    );
-    harness.repository.first(1, [newItem], total: 1, revision: 2);
-    await pumpEventQueue();
-    expect(
-      (harness.state as DailyChoiceCatalogLoaded).items.single.source.title,
-      'Новое основание',
-    );
-  });
-
-  test('ответ до подтверждённого изменения не заменяет новую основу', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final creation = harness.createChoice(2, revision: 1);
-    harness.repository.succeedCreation(0, 2, revision: 1);
-    await creation.future;
-    await pumpEventQueue();
-    harness.repository.first(0, [_item(1)], total: 1, revision: 0);
-    await pumpEventQueue();
-    expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-    expect(harness.repository.queries, hasLength(2));
-    harness.repository.first(1, [_item(2), _item(1)], total: 2, revision: 1);
-    await pumpEventQueue();
-    final current = harness.state as DailyChoiceCatalogLoaded;
-    expect(current.items.map((item) => item.id), [_choiceId(2), _choiceId(1)]);
-  });
-
-  test('тег обновляет основу перед продолжением, совпадение имени не повторяет чтение', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    harness.repository.first(0, [_item(1)], total: 2, cursor: _Cursor());
-    await pumpEventQueue();
-
-    final tag = Tag(id: _tagId(), name: TagName.fromInput('Дом'));
-    const revision = _Revision(2);
-    final creation = harness.coordinator.acceptTagCreation(
-      TagCreationFormKey(),
-      CreateTag(tag.name),
-    ) as TagCommandAccepted;
-    harness.repository.completeTag(
-      0,
-      TagCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: TagCreated(TagCreatedChange(revision: revision, after: tag)),
-        ),
-      ),
-    );
-    await creation.future;
-    await pumpEventQueue();
-    final old = harness.state as DailyChoiceCatalogLoaded;
-    expect(old.items.map((item) => item.id), [_choiceId(1)]);
-
-    final load = harness.model.loadMore();
-    expect(harness.repository.queries[1].cursor, isNull);
-    harness.repository.first(
-      1,
-      [_item(1)],
-      total: 2,
-      cursor: _Cursor(),
+    expect(published, isEmpty);
+    await _pair(
+      h,
+      index: 2,
+      incomplete: [_item(1)],
+      completed: [_item(2, completed: true)],
       revision: 2,
     );
-    await pumpEventQueue();
-    harness.repository.more(2, [_item(2)], revision: 2);
-    await load;
-    final current = harness.state as DailyChoiceCatalogLoaded;
-    expect(current.items.map((item) => item.id), [_choiceId(1), _choiceId(2)]);
-
-    final unchanged = harness.coordinator.acceptTagRename(
-      RenameTag(tagId: tag.id, name: tag.name),
-    ) as TagCommandAccepted;
-    harness.repository.completeTag(
-      1,
-      TagCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: TagUnchanged(TagUnchangedChange(revision: revision, tag: tag)),
-        ),
-      ),
-    );
-    await unchanged.future;
-    await pumpEventQueue();
-    _expectUnchanged(harness.state, current);
-    expect(harness.repository.queries, hasLength(3));
+    expect(published, [
+      [_choiceId(1), _choiceId(2)],
+    ]);
   });
 
-  test('ответ до удаления тега не принимается как первая страница', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final accepted = harness.coordinator.acceptTagDelete(
-      DeleteTag(_tagId()),
-    ) as TagCommandAccepted;
-    const revision = _Revision(1);
-    harness.repository.completeTag(
-      0,
-      TagCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: TagDeleted(
-            TagDeletedChange(revision: revision, tagId: _tagId()),
+  test(
+    'перенос выполнения сохраняет старую пару до полной пересборки',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      await _pair(
+        h,
+        incomplete: [_item(1)],
+        completed: [_item(2, completed: true)],
+      );
+      final update = h.coordinator.acceptDailyChoiceUpdate(
+        UpdateDailyChoiceFields(
+          choiceId: _choiceId(1),
+          patch: const DailyChoiceFieldsPatch(
+            isCompleted: DailyChoiceFieldSet(true),
           ),
         ),
-      ),
+      ) as DailyChoiceCommandAccepted;
+      h.repository.succeedCompletionUpdate(0, 1, revision: 2);
+      await update.future;
+      await pumpEventQueue();
+      expect(_loaded(h).freshness, DailyChoiceCatalogFreshness.refreshing);
+      h.repository.first(2, [], total: 0, revision: 2);
+      await pumpEventQueue();
+      expect(_loaded(h).incomplete.items.single.id, _choiceId(1));
+      expect(_loaded(h).completed.items.single.id, _choiceId(2));
+      h.repository.first(
+        3,
+        [_item(1, completed: true), _item(2, completed: true)],
+        total: 2,
+        revision: 2,
+      );
+      await pumpEventQueue();
+      expect(_loaded(h).incomplete.items, isEmpty);
+      expect(_loaded(h).completed.items.map((i) => i.id), [
+        _choiceId(1),
+        _choiceId(2),
+      ]);
+    },
+  );
+
+  test('пересборка восстанавливает прежний объём каждой секции', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    await _pair(
+      h,
+      incomplete: [_item(1)],
+      completed: [_item(3, completed: true)],
+      more: true,
     );
-    await accepted.future;
+    final load = h.model.loadMore(isCompleted: false);
+    h.repository.more(2, [_item(2)]);
+    await load;
+    final command = h.createChoice(5, revision: 2);
+    h.repository.succeedCreation(0, 5, revision: 2);
+    await command.future;
     await pumpEventQueue();
-    harness.repository.first(0, [_item(1)], total: 1, revision: 0);
+    await _pair(
+      h,
+      index: 3,
+      incomplete: [_item(5)],
+      completed: [_item(3, completed: true)],
+      more: true,
+      revision: 2,
+    );
+    expect(_loaded(h).incomplete.items, hasLength(2));
+    h.repository.more(5, [_item(1)], cursor: _Cursor(), revision: 2);
     await pumpEventQueue();
-    expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-    expect(harness.repository.queries, hasLength(2));
-    harness.repository.first(1, [_item(2)], total: 1, revision: 1);
-    await pumpEventQueue();
-    final current = harness.state as DailyChoiceCatalogLoaded;
-    expect(current.items.map((item) => item.id), [_choiceId(2)]);
+    expect(_loaded(h).incomplete.items.map((i) => i.id), [
+      _choiceId(5),
+      _choiceId(1),
+    ]);
+    expect(_loaded(h).completed.items, hasLength(1));
+    expect(h.repository.queries, hasLength(6));
   });
 
-  group('поздние ответы и отказы после смены дня', () {
-    final firstDay = CalendarDate.fromParts(2026, 10, 5);
-    final secondDay = CalendarDate.fromParts(2026, 10, 6);
-    const unavailable = DailyChoiceCatalogUnavailableFailure();
-
-    List<DailyChoiceId> ids(DailyChoiceCatalogState state) => [
-      for (final item in (state as DailyChoiceCatalogLoaded).items) item.id,
-    ];
-
-    for (final late in _lateResults) {
-      test('поздняя первая порция прежних дней (${late.name}) не заменяет '
-          'загрузку и выдачу выбранного дня', () async {
-        final harness = _Harness();
-        addTearDown(harness.dispose);
-        final queries = harness.repository.queries;
-        harness.model.selectDate(firstDay);
-        harness.model.selectDate(secondDay);
-        expect(queries, hasLength(3));
-        _expectQuery(queries[1], date: firstDay);
-        _expectQuery(queries[2], date: secondDay);
-
-        // Ответ за 2026-10-05 приходит раньше ответа за 2026-10-06.
-        late.completeFirst(harness.repository, 1);
-        await pumpEventQueue();
-        expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-        expect(harness.state.selection.date, secondDay);
-
-        final cursor = _Cursor();
-        harness.repository.first(
-          2,
-          [_item(3, date: secondDay)],
-          total: 2,
-          cursor: cursor,
-        );
-        await pumpEventQueue();
-        final loaded = harness.state as DailyChoiceCatalogLoaded;
-        expect(loaded.selection.date, secondDay);
-        expect(ids(loaded), [_choiceId(3)]);
-        expect(loaded.totalCount, 2);
-
-        // Первое чтение сегодняшнего дня завершается уже после выдачи.
-        late.completeFirst(harness.repository, 0);
-        await pumpEventQueue();
-        _expectUnchanged(harness.state, loaded);
-        expect(queries, hasLength(3));
-
-        final load = harness.model.loadMore();
-        expect(queries, hasLength(4));
-        _expectQuery(queries[3], date: secondDay, cursor: cursor);
-        harness.repository.more(3, [_item(4, date: secondDay)]);
-        await load;
-        expect(ids(harness.state), [_choiceId(3), _choiceId(4)]);
-      });
-
-      test('позднее продолжение прежних дней (${late.name}) не меняет выдачу '
-          'выбранного дня и не начинает чтений', () async {
-        final harness = _Harness();
-        addTearDown(harness.dispose);
-        final queries = harness.repository.queries;
-        harness.repository.first(0, [_item(1)], total: 2, cursor: _Cursor());
-        await pumpEventQueue();
-        unawaited(harness.model.loadMore());
-        harness.model.selectDate(firstDay);
-        final firstDayCursor = _Cursor();
-        harness.repository.first(
-          2,
-          [_item(3, date: firstDay)],
-          total: 2,
-          cursor: firstDayCursor,
-        );
-        await pumpEventQueue();
-        unawaited(harness.model.loadMore());
-        _expectQuery(queries[3], date: firstDay, cursor: firstDayCursor);
-        harness.model.selectDate(secondDay);
-        expect(queries, hasLength(5));
-
-        // Продолжение сегодняшнего дня приходит до первой порции выбранного.
-        late.completeContinuation(harness.repository, 1);
-        await pumpEventQueue();
-        expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-        expect(harness.state.selection.date, secondDay);
-        expect(queries, hasLength(5));
-
-        final cursor = _Cursor();
-        harness.repository.first(
-          4,
-          [_item(5, date: secondDay)],
-          total: 2,
-          cursor: cursor,
-        );
-        await pumpEventQueue();
-        final loaded = harness.state as DailyChoiceCatalogLoaded;
-        expect(ids(loaded), [_choiceId(5)]);
-        expect(loaded.totalCount, 2);
-        expect(loaded.pageStatus, isA<DailyChoiceCatalogPageIdle>());
-
-        // Продолжение за 2026-10-05 приходит уже после выдачи выбранного дня.
-        late.completeContinuation(harness.repository, 3);
-        await pumpEventQueue();
-        _expectUnchanged(harness.state, loaded);
-        expect(queries, hasLength(5));
-
-        final load = harness.model.loadMore();
-        _expectQuery(queries[5], date: secondDay, cursor: cursor);
-        harness.repository.more(5, [_item(6, date: secondDay)]);
-        await load;
-        expect(ids(harness.state), [_choiceId(5), _choiceId(6)]);
-      });
-
-      test('поздняя пересборка прежних дней (${late.name}) не меняет выдачу '
-          'выбранного дня и не продолжает чтение', () async {
-        final harness = _Harness();
-        addTearDown(harness.dispose);
-        final queries = harness.repository.queries;
-        harness.repository.first(0, [_item(1), _item(2)], total: 2);
-        await pumpEventQueue();
-        final todayCreation = harness.createChoice(5, revision: 2);
-        harness.repository.succeedCreation(0, 5, revision: 2);
-        await todayCreation.future;
+  for (final failure in const [
+    DailyChoiceCatalogUnavailableFailure(),
+    DailyChoiceCatalogCorruptionFailure(),
+    DailyChoiceCatalogUnexpectedFailure(),
+  ]) {
+    test(
+      'отказ ${failure.runtimeType}: повтор только временного отказа и сохранение пары',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        h.repository.fail(0, failure);
         await pumpEventQueue();
         expect(
-          (harness.state as DailyChoiceCatalogLoaded).freshness,
-          DailyChoiceCatalogFreshness.refreshing,
+          (h.state as DailyChoiceCatalogInitialFailure).canRetry,
+          failure is DailyChoiceCatalogUnavailableFailure,
         );
-        _expectQuery(queries[1], date: _today);
-
-        // Пересборка сегодняшнего дня остаётся на первой странице, а
-        // пересборка 2026-10-05 — на продолжении.
-        harness.model.selectDate(firstDay);
-        harness.repository.first(
-          2,
-          [_item(3, date: firstDay), _item(4, date: firstDay)],
-          total: 2,
-          revision: 2,
+        if (failure is! DailyChoiceCatalogUnavailableFailure) {
+          await h.model.retryFirstPage();
+          expect(h.repository.queries, hasLength(1));
+          return;
+        }
+        final retry = h.model.retryFirstPage();
+        await _pair(
+          h,
+          index: 1,
+          incomplete: [_item(1)],
+          completed: [_item(3, completed: true)],
+          more: true,
         );
-        await pumpEventQueue();
-        final firstDayCreation = harness.createChoice(6, revision: 3);
-        harness.repository.succeedCreation(1, 6, revision: 3, date: firstDay);
-        await firstDayCreation.future;
-        await pumpEventQueue();
-        _expectQuery(queries[3], date: firstDay);
-        final assemblyCursor = _Cursor();
-        harness.repository.first(
-          3,
-          [_item(6, date: firstDay)],
-          total: 3,
-          cursor: assemblyCursor,
-          revision: 3,
-        );
-        await pumpEventQueue();
-        final refreshing = harness.state as DailyChoiceCatalogLoaded;
-        expect(refreshing.freshness, DailyChoiceCatalogFreshness.refreshing);
-        expect(ids(refreshing), [_choiceId(3), _choiceId(4)]);
-        _expectQuery(queries[4], date: firstDay, cursor: assemblyCursor);
-        harness.model.selectDate(secondDay);
-        expect(queries, hasLength(6));
-
-        late.completeFirst(harness.repository, 1);
-        await pumpEventQueue();
-        expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-        expect(harness.state.selection.date, secondDay);
-        expect(queries, hasLength(6));
-
-        final cursor = _Cursor();
-        harness.repository.first(
-          5,
-          [_item(7, date: secondDay)],
-          total: 2,
-          cursor: cursor,
-          revision: 3,
-        );
-        await pumpEventQueue();
-        final loaded = harness.state as DailyChoiceCatalogLoaded;
-        expect(loaded.selection.date, secondDay);
-        expect(ids(loaded), [_choiceId(7)]);
-        expect(loaded.freshness, DailyChoiceCatalogFreshness.current);
-        expect(loaded.refreshFailure, isNull);
-
-        late.completeContinuation(harness.repository, 4);
-        await pumpEventQueue();
-        _expectUnchanged(harness.state, loaded);
-        expect(queries, hasLength(6));
-
-        final load = harness.model.loadMore();
-        _expectQuery(queries[6], date: secondDay, cursor: cursor);
-        harness.repository.more(6, [_item(8, date: secondDay)], revision: 3);
+        await retry;
+        final load = h.model.loadMore(isCompleted: true);
+        h.repository.fail(3, failure);
         await load;
-        expect(ids(harness.state), [_choiceId(7), _choiceId(8)]);
-      });
-    }
-
-    test('после возврата к прежнему дню ответы его первого выбора не '
-        'публикуются и не продолжают чтение', () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final queries = harness.repository.queries;
-      harness.model.selectDate(firstDay);
-      harness.model.selectDate(secondDay);
-      harness.model.selectDate(firstDay);
-      expect(queries, hasLength(4));
-      _expectQuery(queries[3], date: firstDay);
-
-      // Порция первого выбора 2026-10-05 подходит под условия дня, но
-      // принадлежит прежнему получению.
-      harness.repository.first(
-        1,
-        [_item(1, date: firstDay)],
-        total: 3,
-        cursor: _Cursor(),
-      );
-      harness.repository.first(2, [_item(2, date: secondDay)], total: 1);
-      await pumpEventQueue();
-      expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-      expect(harness.state.selection.date, firstDay);
-      expect(queries, hasLength(4));
-
-      final cursor = _Cursor();
-      harness.repository.first(
-        3,
-        [_item(3, date: firstDay), _item(1, date: firstDay)],
-        total: 3,
-        cursor: cursor,
-        revision: 2,
-      );
-      await pumpEventQueue();
-      final loaded = harness.state as DailyChoiceCatalogLoaded;
-      expect(ids(loaded), [_choiceId(3), _choiceId(1)]);
-      expect(loaded.totalCount, 3);
-
-      final load = harness.model.loadMore();
-      expect(queries, hasLength(5));
-      _expectQuery(queries[4], date: firstDay, cursor: cursor);
-      harness.repository.more(4, [_item(4, date: firstDay)], revision: 2);
-      await load;
-      expect(ids(harness.state), [_choiceId(3), _choiceId(1), _choiceId(4)]);
-    });
-
-    test('после возврата к прежнему дню его прерванная пересборка не '
-        'продолжает чтение и не заменяет новую выдачу', () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final queries = harness.repository.queries;
-      harness.model.selectDate(firstDay);
-      harness.repository.first(1, [
-        _item(1, date: firstDay),
-        _item(2, date: firstDay),
-      ], total: 2);
-      await pumpEventQueue();
-      final creation = harness.createChoice(5, revision: 2);
-      harness.repository.succeedCreation(0, 5, revision: 2, date: firstDay);
-      await creation.future;
-      await pumpEventQueue();
-      _expectQuery(queries[2], date: firstDay);
-      harness.model.selectDate(secondDay);
-      harness.model.selectDate(firstDay);
-      expect(queries, hasLength(5));
-
-      // Первая страница прерванной пересборки подходит под условия дня и
-      // потребовала бы продолжения.
-      harness.repository.first(
-        2,
-        [_item(5, date: firstDay)],
-        total: 3,
-        cursor: _Cursor(),
-        revision: 2,
-      );
-      await pumpEventQueue();
-      expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-      expect(queries, hasLength(5));
-
-      harness.repository.first(
-        4,
-        [
-          _item(5, date: firstDay),
-          _item(1, date: firstDay),
-          _item(2, date: firstDay),
-        ],
-        total: 3,
-        revision: 2,
-      );
-      await pumpEventQueue();
-      final loaded = harness.state as DailyChoiceCatalogLoaded;
-      expect(loaded.freshness, DailyChoiceCatalogFreshness.current);
-      expect(ids(loaded), [_choiceId(5), _choiceId(1), _choiceId(2)]);
-
-      harness.repository.first(3, [], total: 0, revision: 2);
-      await pumpEventQueue();
-      _expectUnchanged(harness.state, loaded);
-      expect(queries, hasLength(5));
-    });
-
-    test(
-      'подтверждённое изменение во время первого чтения выбранного дня '
-      'повторяет его с теми же условиями, не возвращая прежний день',
-      () async {
-        final harness = _Harness();
-        addTearDown(harness.dispose);
-        final queries = harness.repository.queries;
-        harness.model.selectCompletion(false);
-        harness.model.selectDate(firstDay);
-        final creation = harness.createChoice(2, revision: 2);
-        harness.repository.succeedCreation(0, 2, revision: 2, date: firstDay);
-        await creation.future;
+        expect(
+          _loaded(h).completed.pageStatus,
+          isA<DailyChoiceCatalogPageFailure>(),
+        );
+        expect(_loaded(h).incomplete.items.single.id, _choiceId(1));
+        final more = h.model.retryLoadMore(isCompleted: true);
+        h.repository.more(4, [_item(4, completed: true)]);
+        await more;
+        final command = h.createChoice(2, revision: 2);
+        h.repository.succeedCreation(0, 2, revision: 2);
+        await command.future;
         await pumpEventQueue();
-        expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-
-        // Порция, прочитанная до изменения, требует нового чтения того же дня.
-        harness.repository.first(2, [_item(3, date: firstDay)], total: 1);
+        h.repository.fail(5, failure);
         await pumpEventQueue();
-        expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-        expect(queries, hasLength(4));
-        _expectQuery(queries[3], date: firstDay, isCompleted: false);
-
-        harness.repository.first(1, [_item(1)], total: 1, revision: 2);
-        harness.repository.first(0, [_item(1)], total: 1, revision: 2);
-        await pumpEventQueue();
-        expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-        expect(queries, hasLength(4));
-
-        harness.repository.first(
-          3,
-          [_item(2, date: firstDay), _item(3, date: firstDay)],
-          total: 2,
+        expect(_loaded(h).freshness, DailyChoiceCatalogFreshness.stale);
+        expect(_loaded(h).totalCount, 4);
+        final refresh = h.model.retryRefresh();
+        await _pair(
+          h,
+          index: 6,
+          incomplete: [_item(1), _item(2)],
+          completed: [_item(3, completed: true), _item(4, completed: true)],
           revision: 2,
         );
-        await pumpEventQueue();
-        final loaded = harness.state as DailyChoiceCatalogLoaded;
-        expect(loaded.selection.date, firstDay);
-        expect(loaded.selection.isCompleted, false);
-        expect(ids(loaded), [_choiceId(2), _choiceId(3)]);
-        expect(loaded.totalCount, 2);
-        expect(loaded.freshness, DailyChoiceCatalogFreshness.current);
+        await refresh;
+        expect(_loaded(h).freshness, DailyChoiceCatalogFreshness.current);
       },
     );
+  }
 
-    test('подтверждённое изменение во время подгрузки выбранного дня '
-        'пересобирает его выдачу, отбрасывая позднее продолжение', () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final queries = harness.repository.queries;
-      harness.model.selectDate(firstDay);
-      final cursor = _Cursor();
-      harness.repository.first(
-        1,
-        [_item(3, date: firstDay)],
-        total: 2,
-        cursor: cursor,
-      );
-      await pumpEventQueue();
-      final load = harness.model.loadMore();
-      _expectQuery(queries[2], date: firstDay, cursor: cursor);
-
-      final creation = harness.createChoice(5, revision: 2);
-      harness.repository.succeedUnrelatedCreation(0, 5, revision: 2);
-      await creation.future;
-      await pumpEventQueue();
-      final refreshing = harness.state as DailyChoiceCatalogLoaded;
-      expect(refreshing.freshness, DailyChoiceCatalogFreshness.refreshing);
-      expect(ids(refreshing), [_choiceId(3)]);
-      expect(queries, hasLength(4));
-      _expectQuery(queries[3], date: firstDay);
-
-      harness.repository.more(2, [_item(4, date: firstDay)]);
-      harness.repository.first(0, [_item(1)], total: 1);
-      await load;
-      await pumpEventQueue();
-      _expectUnchanged(harness.state, refreshing);
-      expect(queries, hasLength(4));
-
-      harness.repository.first(
-        3,
-        [_item(3, date: firstDay), _item(4, date: firstDay)],
-        total: 2,
-        revision: 2,
-      );
-      await pumpEventQueue();
-      final current = harness.state as DailyChoiceCatalogLoaded;
-      expect(current.selection.date, firstDay);
-      expect(current.freshness, DailyChoiceCatalogFreshness.current);
-      expect(ids(current), [_choiceId(3), _choiceId(4)]);
-      expect(current.totalCount, 2);
-    });
-
-    test('временный отказ каждого чтения выбранного дня повторяется явно с '
-        'его датой и охватом, сохраняя прежний снимок до замены', () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      final queries = harness.repository.queries;
-      harness.model.selectCompletion(false);
-      harness.model.selectDate(firstDay);
-
-      // Первая порция.
-      harness.repository.fail(2, unavailable);
-      await pumpEventQueue();
-      final initialFailure = harness.state as DailyChoiceCatalogInitialFailure;
-      expect(initialFailure.selection.date, firstDay);
-      expect(initialFailure.canRetry, isTrue);
-      harness.repository.first(1, [_item(1)], total: 1);
-      await pumpEventQueue();
-      _expectUnchanged(harness.state, initialFailure);
-      final retryFirst = harness.model.retryFirstPage();
-      expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
-      _expectQuery(queries[3], date: firstDay, isCompleted: false);
-      final cursor = _Cursor();
-      harness.repository.first(
-        3,
-        [_item(3, date: firstDay)],
-        total: 2,
-        cursor: cursor,
-      );
-      await retryFirst;
-
-      // Подгрузка.
-      final load = harness.model.loadMore();
-      _expectQuery(
-        queries[4],
-        date: firstDay,
-        isCompleted: false,
-        cursor: cursor,
-      );
-      harness.repository.fail(4, unavailable);
-      await load;
-      final pageFailure = harness.state as DailyChoiceCatalogLoaded;
-      expect(ids(pageFailure), [_choiceId(3)]);
-      expect(
-        (pageFailure.pageStatus as DailyChoiceCatalogPageFailure).canRetry,
-        isTrue,
-      );
-      final retryMore = harness.model.retryLoadMore();
-      _expectQuery(
-        queries[5],
-        date: firstDay,
-        isCompleted: false,
-        cursor: cursor,
-      );
-      harness.repository.more(5, [_item(4, date: firstDay)]);
-      await retryMore;
-      expect(ids(harness.state), [_choiceId(3), _choiceId(4)]);
-
-      // Обновление после подтверждённой команды того же дня.
-      final creation = harness.createChoice(5, revision: 2);
-      harness.repository.succeedCreation(0, 5, revision: 2, date: firstDay);
-      await creation.future;
-      await pumpEventQueue();
-      final refreshing = harness.state as DailyChoiceCatalogLoaded;
-      expect(refreshing.freshness, DailyChoiceCatalogFreshness.refreshing);
-      expect(ids(refreshing), [_choiceId(3), _choiceId(4)]);
-      expect(refreshing.totalCount, 2);
-      _expectQuery(queries[6], date: firstDay, isCompleted: false);
-      harness.repository.fail(6, unavailable);
-      await pumpEventQueue();
-      final stale = harness.state as DailyChoiceCatalogLoaded;
-      expect(stale.freshness, DailyChoiceCatalogFreshness.stale);
-      expect(stale.refreshFailure, isA<DailyChoiceCatalogUnavailableFailure>());
-      expect(ids(stale), [_choiceId(3), _choiceId(4)]);
-      expect(stale.totalCount, 2);
-      final retryRefresh = harness.model.retryRefresh();
-      _expectQuery(queries[7], date: firstDay, isCompleted: false);
-      harness.repository.first(
-        7,
-        [
-          _item(5, date: firstDay),
-          _item(3, date: firstDay),
-          _item(4, date: firstDay),
-        ],
-        total: 3,
-        revision: 2,
-      );
-      await retryRefresh;
-      final replaced = harness.state as DailyChoiceCatalogLoaded;
-      expect(replaced.freshness, DailyChoiceCatalogFreshness.current);
-      expect(replaced.refreshFailure, isNull);
-      expect(ids(replaced), [_choiceId(5), _choiceId(3), _choiceId(4)]);
-      expect(replaced.totalCount, 3);
-      expect(queries, hasLength(8));
-    });
-
-    // Повторять можно только временный отказ: повреждение и неизвестный отказ
-    // идут одной ветвью.
-    test('повреждение чтений выбранного дня остаётся отдельным объяснением без '
-        'повтора', () async {
-      final harness = _Harness();
-      addTearDown(harness.dispose);
-      const failure = DailyChoiceCatalogCorruptionFailure();
-      final queries = harness.repository.queries;
-      harness.model.selectDate(firstDay);
-
-      harness.repository.fail(1, failure);
-      await pumpEventQueue();
-      final initialFailure = harness.state as DailyChoiceCatalogInitialFailure;
-      expect(
-        initialFailure.failure,
-        isA<DailyChoiceCatalogCorruptionFailure>(),
-      );
-      expect(initialFailure.canRetry, isFalse);
-      await harness.model.retryFirstPage();
-      _expectUnchanged(harness.state, initialFailure);
-      expect(queries, hasLength(2));
-
-      harness.model.selectDate(secondDay);
-      harness.repository.first(
-        2,
-        [_item(3, date: secondDay)],
-        total: 2,
-        cursor: _Cursor(),
-      );
-      await pumpEventQueue();
-      final load = harness.model.loadMore();
-      harness.repository.fail(3, failure);
-      await load;
-      final pageFailure = harness.state as DailyChoiceCatalogLoaded;
-      final pageStatus =
-          pageFailure.pageStatus as DailyChoiceCatalogPageFailure;
-      expect(pageStatus.failure, isA<DailyChoiceCatalogCorruptionFailure>());
-      expect(pageStatus.canRetry, isFalse);
-      expect(ids(pageFailure), [_choiceId(3)]);
-      await harness.model.retryLoadMore();
-      _expectUnchanged(harness.state, pageFailure);
-      expect(queries, hasLength(4));
-
-      final creation = harness.createChoice(5, revision: 2);
-      harness.repository.succeedCreation(0, 5, revision: 2, date: secondDay);
-      await creation.future;
-      await pumpEventQueue();
-      _expectQuery(queries[4], date: secondDay);
-      harness.repository.fail(4, failure);
-      await pumpEventQueue();
-      final stale = harness.state as DailyChoiceCatalogLoaded;
-      expect(stale.freshness, DailyChoiceCatalogFreshness.stale);
-      expect(stale.refreshFailure, isA<DailyChoiceCatalogCorruptionFailure>());
-      expect(ids(stale), [_choiceId(3)]);
-      await harness.model.retryRefresh();
-      _expectUnchanged(harness.state, stale);
-      expect(queries, hasLength(5));
-    });
-
-    // Состояния выдачи сегодняшнего дня с охватом невыполненных: первое
-    // чтение без охвата (запрос 0) остаётся незавершённым. Выбор дня не
-    // разбирает прежнее состояние, поэтому проверены состояние без выдачи,
-    // отказ, выдача с чтением в полёте и выдача с обновлением.
-    for (final (state, prepare) in <(String, Future<void> Function(_Harness))>[
-      ('загрузка первой порции', (harness) async {}),
-      (
-        'отказ первой порции',
-        (harness) async {
-          harness.repository.fail(1, unavailable);
-          await pumpEventQueue();
-        },
-      ),
-      (
-        'подгрузка',
-        (harness) async {
-          harness.repository.first(1, [_item(1)], total: 2, cursor: _Cursor());
-          await pumpEventQueue();
-          unawaited(harness.model.loadMore());
-        },
-      ),
-      (
-        'обновление после команды',
-        (harness) async {
-          harness.repository.first(1, [_item(1)], total: 1);
-          await pumpEventQueue();
-          final creation = harness.createChoice(2, revision: 2);
-          harness.repository.succeedCreation(0, 2, revision: 2);
-          await creation.future;
-          await pumpEventQueue();
-        },
-      ),
-    ]) {
-      test('из состояния «$state» другой день выбирается с прежним охватом и '
-          'получает собственную выдачу', () async {
-        final harness = _Harness();
-        addTearDown(harness.dispose);
-        final queries = harness.repository.queries;
-        harness.model.selectCompletion(false);
-        await prepare(harness);
-        final readCount = queries.length;
-
-        harness.model.selectDate(firstDay);
-
-        final restarted = harness.state;
-        expect(restarted, isA<DailyChoiceCatalogInitialLoad>());
-        expect(restarted.selection.date, firstDay);
-        expect(restarted.selection.isCompleted, false);
-        expect(queries, hasLength(readCount + 1));
-        _expectQuery(queries.last, date: firstDay, isCompleted: false);
-
-        harness.repository.first(
-          readCount,
-          [_item(3, date: firstDay)],
-          total: 1,
-          revision: 2,
-        );
-        await pumpEventQueue();
-        final loaded = harness.state as DailyChoiceCatalogLoaded;
-        expect(loaded.selection.date, firstDay);
-        expect(ids(loaded), [_choiceId(3)]);
-        expect(loaded.freshness, DailyChoiceCatalogFreshness.current);
-        expect(loaded.pageStatus, isA<DailyChoiceCatalogPageIdle>());
-        expect(queries, hasLength(readCount + 1));
-      });
-    }
+  test('посторонняя ревизия и устаревшее продолжение пересобирают пару до расширенного объёма', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    await _pair(h, incomplete: [_item(1)], more: true);
+    final command = h.createChoice(9, revision: 2);
+    h.repository.succeedUnrelatedCreation(0, 9, revision: 2);
+    await command.future;
+    await pumpEventQueue();
+    expect(h.repository.queries, hasLength(2));
+    final load = h.model.loadMore(isCompleted: false);
+    expect(h.repository.queries.last.cursor, isNull);
+    await _pair(h, index: 2, incomplete: [_item(1)], more: true, revision: 2);
+    h.repository.more(4, [_item(2)], revision: 2);
+    await load;
+    expect(_loaded(h).incomplete.items, hasLength(2));
   });
+
+  for (final lateFailure in [false, true]) {
+    test(
+      'смена дня сохраняет раскрытие и отбрасывает позднее продолжение: отказ $lateFailure',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        await _pair(h, incomplete: [_item(1)], more: true);
+        final load = h.model.loadMore(isCompleted: false);
+        h.model.toggleSection(false);
+        h.model.toggleSection(true);
+        final next = CalendarDate.fromParts(2026, 9, 25);
+        h.model.selectDate(next);
+        expect(h.state, isA<DailyChoiceCatalogInitialLoad>());
+        expect(h.state.selection.incompleteExpanded, isFalse);
+        expect(h.state.selection.completedExpanded, isTrue);
+        h.repository.first(3, [], total: 0);
+        await pumpEventQueue();
+        h.repository.first(4, [
+          _item(5, date: next, completed: true),
+        ], total: 1);
+        await pumpEventQueue();
+        if (lateFailure) {
+          h.repository.fail(2, const DailyChoiceCatalogSnapshotExpired());
+        } else {
+          h.repository.more(2, [_item(2)]);
+        }
+        await load;
+        expect(h.state.selection.date, next);
+        expect(_loaded(h).items.single.id, _choiceId(5));
+        expect(h.repository.queries, hasLength(5));
+      },
+    );
+  }
+
+  test(
+    'переименование участника обновляет пару, перестроение сохраняет раскрытие',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      await _pair(h, incomplete: [_item(1)]);
+      h.model.toggleSection(false);
+      h.model.toggleSection(true);
+      final command = h.coordinator.acceptExisting(
+        UpdateIntention(
+          id: _intentionId(1),
+          title: 'Новое основание',
+          description: null,
+        ),
+        presentationTitle: 'Основание',
+      ) as IntentionCommandAccepted;
+      h.repository.succeedRename(1, revision: 2);
+      await command.future;
+      await pumpEventQueue();
+      await _pair(
+        h,
+        index: 2,
+        incomplete: [_item(1, title: 'Новое основание')],
+        revision: 2,
+      );
+      expect(_loaded(h).items.single.source.title, 'Новое основание');
+      h.container.invalidate(h.provider);
+      expect(h.state.selection.incompleteExpanded, isFalse);
+      expect(h.state.selection.completedExpanded, isTrue);
+    },
+  );
 }
 
-/// Локальное сегодня проверок модели и дата строк фикстуры: первое чтение
-/// каталога охватывает этот день.
-final _today = CalendarDate.fromParts(2026, 9, 24);
+DailyChoiceCatalogLoaded _loaded(_Harness h) =>
+    h.state as DailyChoiceCatalogLoaded;
+
+Future<void> _pair(
+  _Harness h, {
+  int index = 0,
+  List<DailyChoiceCatalogItem> incomplete = const [],
+  List<DailyChoiceCatalogItem> completed = const [],
+  bool more = false,
+  int revision = 1,
+}) async {
+  h.repository.first(
+    index,
+    incomplete,
+    total: incomplete.length + (more ? 1 : 0),
+    cursor: more ? _Cursor() : null,
+    revision: revision,
+  );
+  await pumpEventQueue();
+  h.repository.first(
+    index + 1,
+    completed,
+    total: completed.length + (more && completed.isNotEmpty ? 1 : 0),
+    cursor: more && completed.isNotEmpty ? _Cursor() : null,
+    revision: revision,
+  );
+  await pumpEventQueue();
+}
 
 final class _Harness {
   _Harness({CalendarDate? initialDate})
@@ -1418,23 +587,34 @@ final class _Repository
     );
   }
 
+  void succeedCompletionUpdate(int index, int id, {required int revision}) =>
+      succeedDateUpdate(
+        index,
+        id,
+        _today,
+        _today,
+        revision: revision,
+        completed: true,
+      );
+
   void succeedDateUpdate(
     int index,
     int id,
     CalendarDate beforeDate,
     CalendarDate afterDate, {
     required int revision,
+    bool completed = false,
   }) {
-    DailyChoice choice(CalendarDate date) => DailyChoice(
+    DailyChoice choice(CalendarDate date, bool isCompleted) => DailyChoice(
       id: _choiceId(id),
       sourceIntentionId: _intentionId(1),
       selectedIntentionId: _intentionId(2),
       date: date,
       description: null,
-      isCompleted: false,
+      isCompleted: isCompleted,
     );
-    final before = choice(beforeDate);
-    final after = choice(afterDate);
+    final before = choice(beforeDate, false);
+    final after = choice(afterDate, completed);
     final change = DailyChoiceChange(
       revision: _Revision(revision),
       before: before,
@@ -1529,79 +709,6 @@ final class _Repository
 
 final class _Cursor implements DailyChoiceCatalogCursor {}
 
-/// Проверяет, что выдача после позднего ответа осталась прежней: те же строки,
-/// количество, свежесть и состояние порции либо тот же отказ первой порции.
-void _expectUnchanged(
-  DailyChoiceCatalogState actual,
-  DailyChoiceCatalogState before,
-) {
-  switch (before) {
-    case DailyChoiceCatalogLoaded():
-      expect(actual, isA<DailyChoiceCatalogLoaded>());
-      final now = actual as DailyChoiceCatalogLoaded;
-      expect(now.items.map((item) => item.id), before.items.map((e) => e.id));
-      expect(now.totalCount, before.totalCount);
-      expect(now.freshness, before.freshness);
-      expect(now.pageStatus.runtimeType, before.pageStatus.runtimeType);
-    case DailyChoiceCatalogInitialFailure():
-      expect(actual, isA<DailyChoiceCatalogInitialFailure>());
-      final now = actual as DailyChoiceCatalogInitialFailure;
-      expect(now.failure.runtimeType, before.failure.runtimeType);
-      expect(now.canRetry, before.canRetry);
-    case DailyChoiceCatalogInitialLoad():
-      expect(actual, isA<DailyChoiceCatalogInitialLoad>());
-  }
-}
-
-/// Проверяет условия запроса страницы: день, охват выполнения и cursor
-/// продолжения; без [cursor] ожидается первая порция.
-void _expectQuery(
-  DailyChoiceCatalogQuery query, {
-  required CalendarDate date,
-  bool? isCompleted,
-  DailyChoiceCatalogCursor? cursor,
-}) {
-  expect(query.date, date);
-  expect(query.isCompleted, isCompleted);
-  expect(query.cursor, cursor == null ? isNull : same(cursor));
-}
-
-/// Поздний результат чтения прежней выборки: успешная порция, способная
-/// заменить выдачу или потребовать следующего чтения, либо отказ. Устаревший
-/// результат отбрасывается до разбора вида отказа, поэтому остальные виды
-/// отказов отдельных проверок не требуют.
-final class _LateResult {
-  const _LateResult(this.name, {this.failure});
-
-  final String name;
-  final DailyChoiceCatalogReadFailure? failure;
-
-  void completeFirst(_Repository repository, int index) => switch (failure) {
-    null => repository.first(
-      index,
-      [_item(7), _item(8)],
-      total: 3,
-      cursor: _Cursor(),
-      revision: 9,
-    ),
-    final failure => repository.fail(index, failure),
-  };
-
-  void completeContinuation(_Repository repository, int index) =>
-      switch (failure) {
-        null => repository.more(index, [_item(7)], cursor: _Cursor()),
-        final failure => repository.fail(index, failure),
-      };
-}
-
-const _lateResults = [
-  _LateResult('успех'),
-  _LateResult(
-    'временный отказ',
-    failure: DailyChoiceCatalogUnavailableFailure(),
-  ),
-];
-
 final class _UnrelatedChange implements GraphChange {
   const _UnrelatedChange(this.revision);
   @override
@@ -1640,28 +747,32 @@ final class _Revision implements GraphRevision {
       : GraphRevisionOrder.same;
 }
 
-DailyChoiceCatalogItem _item(int id, {CalendarDate? date}) =>
-    DailyChoiceCatalogItem(
-      id: _choiceId(id),
-      source: DailyChoiceCatalogParticipant(
-        id: _intentionId(1),
-        title: 'Основание',
-        archiveState: IntentionArchiveState.active,
-        readiness: IntentionReadiness.notReady,
-      ),
-      selected: DailyChoiceCatalogParticipant(
-        id: _intentionId(2),
-        title: 'Действие',
-        archiveState: IntentionArchiveState.active,
-        readiness: IntentionReadiness.ready,
-      ),
-      date: date ?? _today,
-      isCompleted: false,
-      schedule: const DailyChoiceAllDay(),
-      priority: DailyChoicePriority.p4,
-      description: null,
-      pathIntentionCount: 2,
-    );
+DailyChoiceCatalogItem _item(
+  int id, {
+  CalendarDate? date,
+  bool completed = false,
+  String title = 'Основание',
+}) => DailyChoiceCatalogItem(
+  id: _choiceId(id),
+  source: DailyChoiceCatalogParticipant(
+    id: _intentionId(1),
+    title: title,
+    archiveState: IntentionArchiveState.active,
+    readiness: IntentionReadiness.notReady,
+  ),
+  selected: DailyChoiceCatalogParticipant(
+    id: _intentionId(2),
+    title: 'Действие',
+    archiveState: IntentionArchiveState.active,
+    readiness: IntentionReadiness.ready,
+  ),
+  date: date ?? _today,
+  isCompleted: completed,
+  schedule: const DailyChoiceAllDay(),
+  priority: DailyChoicePriority.p4,
+  description: null,
+  pathIntentionCount: 2,
+);
 
 RelationCounts _counts() => RelationCounts(
   activeNeedIncoming: 0,
@@ -1680,11 +791,6 @@ IntentionId _intentionId(int value) => switch (IntentionId.decode(
   IntentionIdDecodingSuccess(:final id) => id,
   _ => throw StateError('ID'),
 };
-TagId _tagId() =>
-    switch (TagId.decode('018f1400-0000-7000-8000-000000000001')) {
-      TagIdDecodingSuccess(:final id) => id,
-      InvalidTagIdDecoding() => throw StateError('ID тега'),
-    };
 LongTermRelationId _relationId(int value) => switch (LongTermRelationId.decode(
   '018f1300-0000-7000-8000-${value.toString().padLeft(12, '0')}',
 )) {
