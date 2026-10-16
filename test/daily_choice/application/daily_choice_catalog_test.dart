@@ -1,6 +1,8 @@
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -29,46 +31,79 @@ void main() {
     }
   });
 
-  test('краткая проекция проверяет участников и сохраняет дубликаты', () {
-    final source = _participant(
-      1,
-      ' Основание ',
-      IntentionArchiveState.archived,
-    );
-    final selected = _participant(2, 'Действие', IntentionArchiveState.active);
-    final date = CalendarDate.fromParts(2026, 9, 24);
-    final first = DailyChoiceCatalogItem(
-      id: _choice(1),
-      source: source,
-      selected: selected,
-      date: date,
-      isCompleted: true,
-    );
-    final duplicate = DailyChoiceCatalogItem(
-      id: _choice(2),
-      source: source,
-      selected: selected,
-      date: date,
-      isCompleted: true,
-    );
-
-    expect(first.source.title, 'Основание');
-    expect(first.source.archiveState, IntentionArchiveState.archived);
-    expect(first.selected.title, 'Действие');
-    expect(first.date, date);
-    expect(first.isCompleted, true);
-    expect(first.id, isNot(duplicate.id));
-    expect(
-      () => DailyChoiceCatalogItem(
-        id: _choice(3),
+  test(
+    'краткая проекция проверяет участников и размер пути, сохраняет дубликаты',
+    () {
+      final source = _participant(
+        1,
+        ' Основание ',
+        IntentionArchiveState.archived,
+      );
+      final selected = _participant(
+        2,
+        'Действие',
+        IntentionArchiveState.active,
+      );
+      final date = CalendarDate.fromParts(2026, 9, 24);
+      final first = DailyChoiceCatalogItem(
+        id: _choice(1),
         source: source,
-        selected: source,
+        selected: selected,
         date: date,
-        isCompleted: false,
-      ),
-      throwsArgumentError,
-    );
-  });
+        isCompleted: true,
+        schedule: const DailyChoiceAllDay(),
+        priority: DailyChoicePriority.p4,
+        description: null,
+        pathIntentionCount: 2,
+      );
+      final duplicate = DailyChoiceCatalogItem(
+        id: _choice(2),
+        source: source,
+        selected: selected,
+        date: date,
+        isCompleted: true,
+        schedule: const DailyChoiceAllDay(),
+        priority: DailyChoicePriority.p4,
+        description: null,
+        pathIntentionCount: 2,
+      );
+
+      expect(first.source.title, 'Основание');
+      expect(first.source.archiveState, IntentionArchiveState.archived);
+      expect(first.selected.title, 'Действие');
+      expect(first.date, date);
+      expect(first.isCompleted, true);
+      expect(first.id, isNot(duplicate.id));
+      expect(
+        () => DailyChoiceCatalogItem(
+          id: _choice(3),
+          source: source,
+          selected: source,
+          date: date,
+          isCompleted: false,
+          schedule: const DailyChoiceAllDay(),
+          priority: DailyChoicePriority.p4,
+          description: null,
+          pathIntentionCount: 2,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => DailyChoiceCatalogItem(
+          id: _choice(3),
+          source: source,
+          selected: selected,
+          date: date,
+          isCompleted: false,
+          schedule: const DailyChoiceAllDay(),
+          priority: DailyChoicePriority.p4,
+          description: null,
+          pathIntentionCount: 1,
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
 
   test('первая порция копирует список и проверяет согласованность', () async {
     final items = [_item(1), _item(2)];
@@ -108,6 +143,10 @@ DailyChoiceCatalogItem _item(int value) => DailyChoiceCatalogItem(
   selected: _participant(2, 'Действие', IntentionArchiveState.active),
   date: CalendarDate.fromParts(2026, 9, 24),
   isCompleted: false,
+  schedule: const DailyChoiceAllDay(),
+  priority: DailyChoicePriority.p4,
+  description: null,
+  pathIntentionCount: 2,
 );
 
 DailyChoiceCatalogParticipant _participant(

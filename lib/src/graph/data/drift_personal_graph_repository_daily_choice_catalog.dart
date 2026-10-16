@@ -350,6 +350,10 @@ DailyChoiceCatalogItem _catalogItemFor(
         (throw const _StoredIntentionCorruption()),
     date: choice.date,
     isCompleted: choice.isCompleted,
+    schedule: choice.schedule,
+    priority: choice.priority,
+    description: choice.description,
+    pathIntentionCount: steps.length + 1,
   );
 }
 

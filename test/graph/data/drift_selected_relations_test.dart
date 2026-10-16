@@ -5,6 +5,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -387,6 +389,12 @@ void main() {
     _insertChoice(raw, sameUuid, source: _owner, selected: _neighbor);
     _insertChoice(raw, selectedRole, source: _other, selected: _owner);
     _insertChoice(raw, foreign, source: _neighbor, selected: _other);
+    const description = 'Описание выбранной связи\nПолный текст';
+    raw.execute(
+      '''UPDATE daily_choices
+      SET scheduled_minute = 1080, priority = 2, description = ? WHERE id = ?''',
+      [description, sameUuid.toCanonicalString()],
+    );
     final query = SelectedRelationsQuery.mixed(
       intentionId: _owner,
       references: [
@@ -411,6 +419,10 @@ void main() {
     expect((daily as SelectedDailyChoicePresent).item.source.id, _owner);
     expect(daily.item.selected.id, _neighbor);
     expect(daily.item.date, CalendarDate.fromParts(2026, 9, 23));
+    expect(daily.item.schedule, DailyChoiceTime(hour: 18, minute: 0));
+    expect(daily.item.priority, DailyChoicePriority.p2);
+    expect(daily.item.description?.value, description);
+    expect(daily.item.pathIntentionCount, 2);
     expect(daily.canDelete, isTrue);
     final incoming =
         entries[DailyChoiceBlockingRelationReference(selectedRole)]

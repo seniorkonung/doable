@@ -1,6 +1,8 @@
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -84,6 +86,10 @@ void main() {
               selected: _participant(_intentionId(4)),
               date: _date(),
               isCompleted: false,
+              schedule: const DailyChoiceAllDay(),
+              priority: DailyChoicePriority.p4,
+              description: null,
+              pathIntentionCount: 2,
             ),
           ),
         },
@@ -107,6 +113,10 @@ void main() {
             selected: _participant(owner),
             date: _date(),
             isCompleted: false,
+            schedule: const DailyChoiceAllDay(),
+            priority: DailyChoicePriority.p4,
+            description: null,
+            pathIntentionCount: 2,
           ),
         ),
       },

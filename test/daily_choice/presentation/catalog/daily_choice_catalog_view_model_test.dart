@@ -8,6 +8,8 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
@@ -481,6 +483,10 @@ void main() {
       selected: _item(1).selected,
       date: _today,
       isCompleted: false,
+      schedule: const DailyChoiceAllDay(),
+      priority: DailyChoicePriority.p4,
+      description: null,
+      pathIntentionCount: 2,
     );
     harness.repository.first(1, [newItem], total: 1, revision: 2);
     await pumpEventQueue();
@@ -1650,6 +1656,10 @@ DailyChoiceCatalogItem _item(int id, {CalendarDate? date}) =>
       ),
       date: date ?? _today,
       isCompleted: false,
+      schedule: const DailyChoiceAllDay(),
+      priority: DailyChoicePriority.p4,
+      description: null,
+      pathIntentionCount: 2,
     );
 
 RelationCounts _counts() => RelationCounts(

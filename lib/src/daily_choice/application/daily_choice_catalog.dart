@@ -4,7 +4,10 @@ import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
 import '../domain/calendar_date.dart';
+import '../domain/daily_choice_description.dart';
 import '../domain/daily_choice_id.dart';
+import '../domain/daily_choice_priority.dart';
+import '../domain/daily_choice_schedule.dart';
 
 enum DailyChoiceCatalogQueryValidationFailure { pageSizeOutOfRange }
 
@@ -89,9 +92,16 @@ final class DailyChoiceCatalogItem {
     required DailyChoiceCatalogParticipant selected,
     required CalendarDate date,
     required bool isCompleted,
+    required DailyChoiceSchedule schedule,
+    required DailyChoicePriority priority,
+    required DailyChoiceDescription? description,
+    required int pathIntentionCount,
   }) {
     if (source.id == selected.id) {
       throw ArgumentError.value(selected.id, 'selected');
+    }
+    if (pathIntentionCount < 2) {
+      throw ArgumentError.value(pathIntentionCount, 'pathIntentionCount');
     }
     return DailyChoiceCatalogItem._(
       id: id,
@@ -99,6 +109,10 @@ final class DailyChoiceCatalogItem {
       selected: selected,
       date: date,
       isCompleted: isCompleted,
+      schedule: schedule,
+      priority: priority,
+      description: description,
+      pathIntentionCount: pathIntentionCount,
     );
   }
 
@@ -108,6 +122,10 @@ final class DailyChoiceCatalogItem {
     required this.selected,
     required this.date,
     required this.isCompleted,
+    required this.schedule,
+    required this.priority,
+    required this.description,
+    required this.pathIntentionCount,
   });
 
   final DailyChoiceId id;
@@ -115,6 +133,12 @@ final class DailyChoiceCatalogItem {
   final DailyChoiceCatalogParticipant selected;
   final CalendarDate date;
   final bool isCompleted;
+  final DailyChoiceSchedule schedule;
+  final DailyChoicePriority priority;
+  final DailyChoiceDescription? description;
+
+  /// Число намерений проверенного сохранённого пути, включая обоих участников.
+  final int pathIntentionCount;
 }
 
 /// Репозиторий выдаёт записи по date DESC, creation_sequence DESC.

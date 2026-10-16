@@ -1,6 +1,8 @@
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -72,13 +74,25 @@ void main() {
     String date = '2026-09-23',
     int completed = 0,
     bool longPath = false,
+    String? description = 'Описание выбора',
+    int? scheduledMinute,
+    int priority = 4,
   }) {
     raw.execute(
       '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
-          description, is_completed)
-         VALUES (?, ?, ?, ?, 'Описание выбора', ?)''',
-      [_uuid(number), _uuid(1), _uuid(longPath ? 3 : 2), date, completed],
+          description, is_completed, scheduled_minute, priority)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+      [
+        _uuid(number),
+        _uuid(1),
+        _uuid(longPath ? 3 : 2),
+        date,
+        description,
+        completed,
+        scheduledMinute,
+        priority,
+      ],
     );
     raw.execute(
       '''INSERT INTO daily_choice_path_steps
@@ -98,6 +112,68 @@ void main() {
 
   DailyChoiceCatalogPage page(DailyChoiceCatalogPageResult result) =>
       (result as DailyChoiceCatalogPageSuccess).value;
+
+  test(
+    'краткая проекция читает сохранённые поля и число намерений пути',
+    () async {
+      const description = '  Первая строка\nВторая строка\nТретья строка  ';
+      addChoice(
+        201,
+        longPath: true,
+        description: description,
+        scheduledMinute: 18 * 60,
+        priority: 2,
+      );
+      raw.execute(
+        '''INSERT INTO intentions
+      (id, title, is_action_ready, is_archived, created_at, updated_at)
+      VALUES (?, 'Конечное действие', 1, 0, 1, 1)''',
+        [_uuid(4)],
+      );
+      raw.execute(
+        '''INSERT INTO long_term_relations
+      (id, source_intention_id, related_intention_id, type, priority, is_archived)
+      VALUES (?, ?, ?, 'can', 1, 0)''',
+        [_uuid(103), _uuid(3), _uuid(4)],
+      );
+      raw.execute(
+        '''INSERT INTO daily_choice_path_steps
+      (id, daily_choice_id, long_term_relation_id, previous_step_id)
+      VALUES (?, ?, ?, ?)''',
+        [_uuid(3201), _uuid(201), _uuid(103), _uuid(2201)],
+      );
+      raw.execute(
+        'UPDATE daily_choices SET selected_intention_id = ? WHERE id = ?',
+        [_uuid(4), _uuid(201)],
+      );
+      addChoice(202, description: null, scheduledMinute: 0, priority: 1);
+      addChoice(203);
+
+      final items = page(
+        await repository.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
+      ).items;
+      final timed = items.singleWhere(
+        (item) => item.id.toCanonicalString() == _uuid(201),
+      );
+      expect(timed.schedule, DailyChoiceTime(hour: 18, minute: 0));
+      expect(timed.priority, DailyChoicePriority.p2);
+      expect(timed.description?.value, description);
+      expect(timed.pathIntentionCount, 4);
+      final midnight = items.singleWhere(
+        (item) => item.id.toCanonicalString() == _uuid(202),
+      );
+      expect(midnight.schedule, DailyChoiceTime(hour: 0, minute: 0));
+      expect(midnight.priority, DailyChoicePriority.p1);
+      expect(midnight.description, isNull);
+      expect(midnight.pathIntentionCount, 2);
+      final allDay = items.singleWhere(
+        (item) => item.id.toCanonicalString() == _uuid(203),
+      );
+      expect(allDay.schedule, const DailyChoiceAllDay());
+      expect(allDay.priority, DailyChoicePriority.p4);
+      expect(allDay.pathIntentionCount, 2);
+    },
+  );
 
   test('читает все даты и дубликаты по убыванию даты и создания', () async {
     addChoice(201, date: '2026-09-22');

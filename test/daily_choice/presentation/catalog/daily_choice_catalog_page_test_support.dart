@@ -9,6 +9,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -276,6 +278,10 @@ DailyChoiceCatalogItem catalogPageItem(
   ),
   date: date,
   isCompleted: isCompleted,
+  schedule: const DailyChoiceAllDay(),
+  priority: DailyChoicePriority.p4,
+  description: null,
+  pathIntentionCount: 2,
 );
 
 String _uuid(int number) =>

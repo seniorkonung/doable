@@ -8,6 +8,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart'
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
@@ -627,6 +629,10 @@ List<DailyChoiceCatalogItem> _items(CalendarDate day) => [
       ),
       date: day,
       isCompleted: false,
+      schedule: const DailyChoiceAllDay(),
+      priority: DailyChoicePriority.p4,
+      description: null,
+      pathIntentionCount: 2,
     ),
 ];
 
