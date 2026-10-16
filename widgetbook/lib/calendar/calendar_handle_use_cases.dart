@@ -22,7 +22,7 @@ class _HandlePreview extends StatefulWidget {
 }
 
 class _HandlePreviewState extends State<_HandlePreview> {
-  late var _expanded = widget.initiallyExpanded;
+  late double _progress = widget.initiallyExpanded ? 1 : 0;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -34,14 +34,19 @@ class _HandlePreviewState extends State<_HandlePreview> {
           padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
           children: [
             CalendarHandle(
-              isExpanded: _expanded,
-              semanticLabel: _expanded
+              isExpanded: _progress == 1,
+              expansionProgress: _progress,
+              semanticLabel: _progress == 1
                   ? 'Свернуть календарь'
                   : 'Раскрыть календарь',
-              onTap: () => setState(() => _expanded = !_expanded),
+              onTap: () => setState(() => _progress = _progress == 1 ? 0 : 1),
             ),
             const SizedBox(height: DoableMetrics.space4),
-            Text(_expanded ? 'Календарь раскрыт' : 'Календарь свёрнут'),
+            const Text('Степень раскрытия ручки'),
+            Slider(
+              value: _progress,
+              onChanged: (value) => setState(() => _progress = value),
+            ),
           ],
         ),
       ),

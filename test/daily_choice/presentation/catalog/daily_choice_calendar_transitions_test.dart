@@ -12,6 +12,303 @@ double _calendarHeight(WidgetTester tester) =>
     tester.getSize(find.byType(DailyChoiceCalendar)).height;
 
 void main() {
+  testWidgets('перетягивание следует за пальцем в обе стороны, '
+      'включая обратный ход после достижения края', (tester) async {
+    final focused = date(2026, 11, 15);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: date(2026, 10, 4),
+      viewport: week(focused),
+      today: date(2026, 10, 4),
+      contentBelow: const [
+        SliverToBoxAdapter(child: Text('Выдача под календарём')),
+      ],
+    );
+    final weekHeight = _calendarHeight(tester);
+    consumer.replaceInputs(viewport: month(focused));
+    await tester.pumpAndSettle();
+    final monthHeight = _calendarHeight(tester);
+    final extent = monthHeight - weekHeight;
+    consumer.replaceInputs(viewport: week(focused));
+    await tester.pumpAndSettle();
+    final contentTop = tester.getTopLeft(find.text('Выдача под календарём')).dy;
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CalendarHandle)),
+    );
+    await gesture.moveBy(const Offset(0, 20));
+    await gesture.moveBy(Offset(0, extent * 0.3));
+    await tester.pump();
+    expect(
+      _calendarHeight(tester),
+      moreOrLessEquals(weekHeight + extent * 0.3),
+    );
+    expect(
+      tester.getTopLeft(find.text('Выдача под календарём')).dy,
+      moreOrLessEquals(contentTop + extent * 0.3),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      _calendarHeight(tester),
+      moreOrLessEquals(weekHeight + extent * 0.3),
+    );
+    await gesture.moveBy(Offset(0, extent * 0.8));
+    await tester.pump();
+    expect(_calendarHeight(tester), moreOrLessEquals(monthHeight));
+    expect(consumer.events, isEmpty);
+    await gesture.moveBy(Offset(0, -extent * 0.2));
+    await tester.pump();
+    expect(
+      _calendarHeight(tester),
+      moreOrLessEquals(monthHeight - extent * 0.2),
+    );
+    await gesture.moveBy(Offset(0, -extent));
+    await tester.pump();
+    expect(_calendarHeight(tester), moreOrLessEquals(weekHeight));
+    await gesture.moveBy(Offset(0, extent * 0.1));
+    await tester.pump();
+    expect(
+      _calendarHeight(tester),
+      moreOrLessEquals(weekHeight + extent * 0.1),
+    );
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(_calendarHeight(tester), weekHeight);
+    expect(consumer.events, isEmpty);
+    expect(consumer.viewport, week(focused));
+    expect(consumer.selectedDate, date(2026, 10, 4));
+  });
+
+  for (final (fraction, description) in [
+    (0.25, 'короткое медленное движение возвращает исходное представление'),
+    (0.5, 'медленное отпускание на середине сохраняет исходное представление'),
+    (0.75, 'длинное медленное движение завершает смену представления'),
+  ]) {
+    testWidgets('$description в обе стороны', (tester) async {
+      final focused = date(2026, 11, 15);
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: date(2026, 10, 4),
+        viewport: week(focused),
+        today: focused,
+      );
+      final weekHeight = _calendarHeight(tester);
+      consumer.replaceInputs(viewport: month(focused));
+      await tester.pumpAndSettle();
+      final monthHeight = _calendarHeight(tester);
+      final extent = monthHeight - weekHeight;
+
+      for (final expanded in [false, true]) {
+        final start = expanded ? month(focused) : week(focused);
+        final destination = fraction > 0.5
+            ? (expanded ? week(focused) : month(focused))
+            : start;
+        consumer.replaceInputs(viewport: start);
+        consumer.events.clear();
+        await tester.pumpAndSettle();
+        final direction = expanded ? -1.0 : 1.0;
+        final startHeight = _calendarHeight(tester);
+        final gesture = await tester.startGesture(
+          tester.getTopLeft(find.byType(CalendarHandle)) +
+              Offset(
+                expanded
+                    ? tester.getSize(find.byType(CalendarHandle)).width - 1
+                    : 1,
+                18,
+              ),
+        );
+        await gesture.moveBy(Offset(0, direction * 20));
+        await gesture.moveBy(
+          Offset(0, direction * fraction * extent),
+          timeStamp: const Duration(seconds: 1),
+        );
+        await tester.pump();
+        final releaseHeight = _calendarHeight(tester);
+        expect(
+          releaseHeight,
+          moreOrLessEquals(startHeight + direction * fraction * extent),
+        );
+        expect(consumer.events, isEmpty);
+        await gesture.up(timeStamp: const Duration(seconds: 2));
+        await tester.pump();
+        expect(_calendarHeight(tester), moreOrLessEquals(releaseHeight));
+        await tester.pump(const Duration(milliseconds: 20));
+        final targetHeight = destination == week(focused)
+            ? weekHeight
+            : monthHeight;
+        final durationFraction = (targetHeight - releaseHeight).abs() / extent;
+        expect(
+          _calendarHeight(tester),
+          moreOrLessEquals(
+            releaseHeight +
+                Curves.easeOut.transform(0.1 / durationFraction) *
+                    (targetHeight - releaseHeight),
+          ),
+        );
+        expect(consumer.events, isEmpty);
+        await tester.pumpAndSettle();
+        expect(_calendarHeight(tester), moreOrLessEquals(targetHeight));
+        expect(consumer.viewport, destination);
+        expect(
+          consumer.events,
+          destination == start ? isEmpty : [ViewportChanged(destination)],
+        );
+        expect(consumer.selectedDate, date(2026, 10, 4));
+        expect(tester.hasRunningAnimations, isFalse);
+      }
+    });
+  }
+
+  testWidgets('скорость завершает короткий жест в направлении движения, '
+      'а медленный жест возвращается', (tester) async {
+    final focused = date(2026, 11, 15);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: focused,
+      viewport: week(focused),
+      today: focused,
+    );
+    for (final expanded in [false, true]) {
+      final start = expanded ? month(focused) : week(focused);
+      final opposite = expanded ? week(focused) : month(focused);
+      final direction = expanded ? -1.0 : 1.0;
+      for (final speed in [599.0, 601.0]) {
+        consumer.replaceInputs(viewport: start);
+        consumer.events.clear();
+        await tester.pumpAndSettle();
+        await tester.fling(
+          find.byType(CalendarHandle),
+          Offset(0, direction * 60),
+          speed,
+        );
+        await tester.pumpAndSettle();
+        expect(consumer.viewport, speed < 600 ? start : opposite);
+        expect(
+          consumer.events,
+          speed < 600 ? isEmpty : [ViewportChanged(opposite)],
+        );
+      }
+    }
+  });
+
+  testWidgets('отмена жеста возвращает подтверждённое представление, '
+      'даже после середины перехода', (tester) async {
+    final focused = date(2026, 11, 15);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: focused,
+      viewport: week(focused),
+      today: focused,
+    );
+    for (final expanded in [false, true]) {
+      final start = expanded ? month(focused) : week(focused);
+      consumer.replaceInputs(viewport: start);
+      await tester.pumpAndSettle();
+      final startHeight = _calendarHeight(tester);
+      final direction = expanded ? -1.0 : 1.0;
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await gesture.moveBy(Offset(0, direction * 20));
+      await gesture.moveBy(Offset(0, direction * 200));
+      await tester.pump();
+      expect(_calendarHeight(tester), isNot(startHeight));
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(_calendarHeight(tester), startHeight);
+      expect(consumer.viewport, start);
+      expect(consumer.events, isEmpty);
+    }
+  });
+
+  testWidgets('новый жест останавливает завершающую анимацию '
+      'на текущей высоте и управляет обратным движением', (tester) async {
+    final focused = date(2026, 11, 15);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: focused,
+      viewport: week(focused),
+      today: focused,
+    );
+    final weekHeight = _calendarHeight(tester);
+    await tester.fling(find.byType(CalendarHandle), const Offset(0, 60), 1000);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 30));
+    final turningHeight = _calendarHeight(tester);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CalendarHandle)),
+    );
+    await gesture.moveBy(const Offset(0, -20));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(_calendarHeight(tester), moreOrLessEquals(turningHeight));
+    expect(consumer.events, isEmpty);
+    await gesture.moveBy(const Offset(0, -30));
+    await tester.pump();
+    expect(_calendarHeight(tester), moreOrLessEquals(turningHeight - 30));
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(_calendarHeight(tester), weekHeight);
+    expect(consumer.events, isEmpty);
+  });
+
+  testWidgets('внешний просмотр прекращает удерживаемый жест '
+      'и игнорирует его дальнейшее движение и отпускание', (tester) async {
+    final focused = date(2026, 11, 15);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: focused,
+      viewport: week(focused),
+      today: focused,
+    );
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CalendarHandle)),
+    );
+    await gesture.moveBy(const Offset(0, 20));
+    await gesture.moveBy(const Offset(0, 100));
+    await tester.pump();
+    final replacement = month(date(2028, 3, 1));
+    consumer.replaceInputs(viewport: replacement);
+    await tester.pump();
+    final replacementHeight = _calendarHeight(tester);
+    await gesture.moveBy(const Offset(0, -200));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(_calendarHeight(tester), replacementHeight);
+    expect(consumer.viewport, replacement);
+    expect(consumer.events, isEmpty);
+    expect(visibleWeeks(tester), weeksFrom(date(2028, 2, 28), 6));
+  });
+
+  testWidgets('жест на выдаче прокручивает её, сохраняя высоту и просмотр', (
+    tester,
+  ) async {
+    final focused = date(2026, 11, 15);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: focused,
+      viewport: month(focused),
+      today: focused,
+      contentBelow: [
+        SliverFixedExtentList(
+          itemExtent: 48,
+          delegate: SliverChildBuilderDelegate(
+            (_, index) => Text('Дневной выбор $index'),
+            childCount: 40,
+          ),
+        ),
+      ],
+    );
+    final height = _calendarHeight(tester);
+    final row = find.text('Дневной выбор 0');
+    final top = tester.getTopLeft(row).dy;
+    await tester.drag(row, const Offset(0, -100));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(row).dy, lessThan(top));
+    expect(_calendarHeight(tester), height);
+    expect(consumer.viewport, month(focused));
+    expect(consumer.events, isEmpty);
+  });
+
   testWidgets('нажатие непрерывно меняет высоту и сдвигает содержимое, '
       'сообщая просмотр только в конце перехода', (tester) async {
     final focused = date(2026, 11, 15);

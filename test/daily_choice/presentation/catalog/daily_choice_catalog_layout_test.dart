@@ -99,7 +99,7 @@ void main() {
 
           await _tapCommand(tester, l10n.dailyChoiceCalendarExpand);
           final month = _measure(tester);
-          expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
+          expect(visibleWeeks(tester), shown.weeks);
           expect(month.rows, shown.weeks.length);
           expect(week.rowHeight, greaterThanOrEqualTo(54));
           expect(month.rowHeight, moreOrLessEquals(44));
@@ -115,10 +115,7 @@ void main() {
           await _expectWholeTexts(tester);
 
           for (final row in shown.weeks) {
-            _expectReachable(
-              tester,
-              calendarDay(row.first, skipOffstage: false),
-            );
+            _expectReachable(tester, calendarDay(row.first));
             for (final day in row) {
               _expectTappable(tester, calendarDay(day));
             }
@@ -128,14 +125,14 @@ void main() {
           final lastDay = shown.weeks
               .expand((week) => week)
               .lastWhere((day) => day.month == shown.today.month);
-          _expectReachable(tester, calendarDay(lastDay, skipOffstage: false));
+          _expectReachable(tester, calendarDay(lastDay));
           await tester.tap(calendarDay(lastDay));
           await tester.pump();
           repository.completeFirst(1, [
             catalogPageItem(2, date: lastDay),
           ], total: 1);
           await _settle(tester);
-          expect(visibleWeeks(tester, skipOffstage: false), shown.weeks);
+          expect(visibleWeeks(tester), shown.weeks);
           expect(
             find.bySemanticsLabel(l10n.dailyChoiceCalendarCollapse),
             findsOneWidget,
@@ -179,17 +176,14 @@ void main() {
         expect(_pageScroll, findsOneWidget);
         final scroll = tester.state<ScrollableState>(_pageScroll).position;
 
-        final day = calendarDay(date(2026, 10, 1), skipOffstage: false);
+        final day = calendarDay(date(2026, 10, 1));
         _expectReachable(tester, day);
         final before = scroll.pixels;
         final calendarRect = tester.getRect(find.byType(DailyChoiceCalendar));
         await tester.drag(day, const Offset(0, -150));
         await tester.pumpAndSettle();
         expect(scroll.pixels, before);
-        expect(
-          visibleWeeks(tester, skipOffstage: false),
-          weeksFrom(date(2026, 9, 28), 1),
-        );
+        expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 1));
 
         _expectReachable(tester, day);
         final scrolled = scroll.pixels;
@@ -337,10 +331,7 @@ void main() {
           find.text(l10n.dailyChoiceCatalogEmpty, skipOffstage: false),
         );
         await _expectWholeTexts(tester);
-        await _dragUntilReachable(
-          tester,
-          calendarDay(date(2026, 10, 1), skipOffstage: false),
-        );
+        await _dragUntilReachable(tester, calendarDay(date(2026, 10, 1)));
         expect(tester.takeException(), isNull);
       });
 
@@ -586,13 +577,10 @@ _Layout _measure(WidgetTester tester) {
     tester,
     find.byType(DailyChoiceCalendar, skipOffstage: false),
   );
-  final weeks = visibleWeeks(tester, skipOffstage: false);
+  final weeks = visibleWeeks(tester);
   final firstDay = _rect(
     tester,
-    calendarDay(
-      weeks.first.firstWhere((day) => day != null)!,
-      skipOffstage: false,
-    ),
+    calendarDay(weeks.first.firstWhere((day) => day != null)!),
   );
   final count = _rect(
     tester,
@@ -612,7 +600,7 @@ _Layout _measure(WidgetTester tester) {
 /// Видимые недели календаря — семь смежных колонок во всю ширину экрана;
 /// строки одна под другой, каждая ячейка не меньше области нажатия.
 void _expectColumns(WidgetTester tester, List<List<CalendarDate>> weeks) {
-  expect(visibleWeeks(tester, skipOffstage: false), weeks);
+  expect(visibleWeeks(tester), weeks);
   final calendar = _rect(
     tester,
     find.byType(DailyChoiceCalendar, skipOffstage: false),
@@ -621,10 +609,7 @@ void _expectColumns(WidgetTester tester, List<List<CalendarDate>> weeks) {
   expect(calendar.right, moreOrLessEquals(_screen.width));
   final rows = [
     for (final week in weeks)
-      [
-        for (final day in week)
-          _rect(tester, calendarDay(day, skipOffstage: false)),
-      ],
+      [for (final day in week) _rect(tester, calendarDay(day))],
   ];
   for (final (index, row) in rows.indexed) {
     expect(row, hasLength(DateTime.daysPerWeek));

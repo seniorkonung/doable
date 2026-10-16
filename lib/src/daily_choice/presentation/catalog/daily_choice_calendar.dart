@@ -46,8 +46,10 @@ import 'daily_choice_calendar_viewport.dart';
 /// точно, поэтому раскрывается месяц и сворачивается неделя этой даты.
 /// Событие приходит после завершения анимации; повторное нажатие меняет её
 /// цель из текущего положения. Возврат не создаёт события.
-/// Вертикальные жесты представление не переключают. Изменения входов
-/// потребителем отражаются без обратных событий.
+/// Перетягивание полосы с ручкой управляет высотой напрямую; после отпускания
+/// переход завершается по расстоянию и скорости, а отмена возвращает
+/// подтверждённое представление. Жесты вне полосы раскрытием не управляют.
+/// Изменения входов потребителем отражаются без обратных событий.
 ///
 /// Шапка только месячного представления называет месяц и год даты просмотра;
 /// у недели шапки и команд соседней недели нет. Полную выбранную дату называет
@@ -129,11 +131,13 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
   /// ключом календарь делил бы с ней одну запись: после пересоздания показал
   /// бы период по её смещению и испортил бы сохранённое смещение. Запись в
   /// собственном хранилище не переживает календарь.
-  var _weekStorage = PageStorageBucket();
+  final _weekStorage = PageStorageBucket();
   var _monthStorage = PageStorageBucket();
 
   bool _isPeriodPickerOpen = false;
   bool _isTransitioning = false;
+  late double _expansionExtent;
+  double? _dragGlobalY;
   late DailyChoiceCalendarMode _targetMode = widget.viewport.mode;
   late final _expansion = AnimationController(
     vsync: this,
@@ -157,10 +161,11 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
     super.didUpdateWidget(oldWidget);
     if (widget.viewport != oldWidget.viewport) {
       _expansion.stop();
+      _dragGlobalY = null;
       _isTransitioning = false;
       _targetMode = widget.viewport.mode;
       _expansion.value = _progressFor(_targetMode);
-      _discardInactiveGrid();
+      _closePeriodPickerIfCollapsed();
     }
   }
 
@@ -169,15 +174,9 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
     final viewport = widget.viewport;
     final localizations = AppLocalizations.of(context);
     final isExpanded = _targetMode == DailyChoiceCalendarMode.month;
-    final showWeek = _isTransitioning || !isExpanded;
-    final showExpanded = _isTransitioning || isExpanded;
-    final week = showWeek
-        ? _buildGrid(DailyChoiceCalendarMode.week)
-        : const SizedBox.shrink();
+    final week = _buildGrid(DailyChoiceCalendarMode.week);
     final Widget expanded;
-    if (!showExpanded) {
-      expanded = const SizedBox.shrink();
-    } else if (_isPeriodPickerOpen) {
+    if (_isPeriodPickerOpen) {
       expanded = PageStorage(
         bucket: _monthStorage,
         child: DailyChoiceCalendarPeriodPicker(
@@ -229,6 +228,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
                 ignoring: _isTransitioning,
                 child: DailyChoiceCalendarExpansion(
                   progress: _expansion.value,
+                  onExtentChanged: (value) => _expansionExtent = value,
                   week: week,
                   expanded: expanded,
                 ),
@@ -236,12 +236,20 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
             ),
           ),
         ),
-        CalendarHandle(
-          isExpanded: isExpanded,
-          semanticLabel: isExpanded
-              ? localizations.dailyChoiceCalendarCollapse
-              : localizations.dailyChoiceCalendarExpand,
-          onTap: _toggleMode,
+        AnimatedBuilder(
+          animation: _expansion,
+          builder: (context, _) => CalendarHandle(
+            isExpanded: isExpanded,
+            expansionProgress: _expansion.value,
+            semanticLabel: isExpanded
+                ? localizations.dailyChoiceCalendarCollapse
+                : localizations.dailyChoiceCalendarExpand,
+            onTap: _toggleMode,
+            onVerticalDragStart: _startDrag,
+            onVerticalDragUpdate: _updateDrag,
+            onVerticalDragEnd: _endDrag,
+            onVerticalDragCancel: _cancelDrag,
+          ),
         ),
         if (widget.hasDayMarksReadFailure)
           Padding(
@@ -324,16 +332,62 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
   );
 
   void _toggleMode() {
+    _beginTransition();
+    _animateTo(switch (_targetMode) {
+      DailyChoiceCalendarMode.week => DailyChoiceCalendarMode.month,
+      DailyChoiceCalendarMode.month => DailyChoiceCalendarMode.week,
+    });
+  }
+
+  void _beginTransition() {
     if (!_isTransitioning && !_isPeriodPickerOpen) {
       _stopPaging();
     }
-    setState(() {
-      _targetMode = switch (_targetMode) {
-        DailyChoiceCalendarMode.week => DailyChoiceCalendarMode.month,
-        DailyChoiceCalendarMode.month => DailyChoiceCalendarMode.week,
-      };
-      _isTransitioning = true;
-    });
+    _expansion.stop();
+    setState(() => _isTransitioning = true);
+  }
+
+  void _startDrag(DragStartDetails details) {
+    _beginTransition();
+    _dragGlobalY = details.globalPosition.dy;
+  }
+
+  void _updateDrag(DragUpdateDetails details) {
+    final previousY = _dragGlobalY;
+    if (previousY == null) return;
+    _dragGlobalY = details.globalPosition.dy;
+    // Ручка сама движется при раскладке, поэтому локальные координаты
+    // не подходят: https://api.flutter.dev/flutter/gestures/DragUpdateDetails/globalPosition.html
+    _expansion.value =
+        (_expansion.value + (_dragGlobalY! - previousY) / _expansionExtent)
+            .clamp(0.0, 1.0);
+  }
+
+  void _endDrag(DragEndDetails details) {
+    if (_dragGlobalY == null) return;
+    _dragGlobalY = null;
+    final velocity = details.primaryVelocity!;
+    _animateTo(
+      velocity.abs() >= 600
+          ? (velocity > 0
+                ? DailyChoiceCalendarMode.month
+                : DailyChoiceCalendarMode.week)
+          : switch (_expansion.value) {
+              > 0.5 => DailyChoiceCalendarMode.month,
+              < 0.5 => DailyChoiceCalendarMode.week,
+              _ => widget.viewport.mode,
+            },
+    );
+  }
+
+  void _cancelDrag() {
+    if (_dragGlobalY == null) return;
+    _dragGlobalY = null;
+    _animateTo(widget.viewport.mode);
+  }
+
+  void _animateTo(DailyChoiceCalendarMode mode) {
+    setState(() => _targetMode = mode);
     final target = _progressFor(_targetMode);
     // animateTo начинает из текущего значения и отменяет прежнее завершение:
     // https://api.flutter.dev/flutter/animation/AnimationController/animateTo.html
@@ -350,7 +404,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
           .then((_) {
             setState(() {
               _isTransitioning = false;
-              _discardInactiveGrid();
+              _closePeriodPickerIfCollapsed();
             });
             if (_targetMode != widget.viewport.mode) {
               widget.onViewportChanged(widget.viewport.withMode(_targetMode));
@@ -359,13 +413,9 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
     );
   }
 
-  void _discardInactiveGrid() {
-    switch (_targetMode) {
-      case DailyChoiceCalendarMode.week:
-        _closePeriodPicker();
-      case DailyChoiceCalendarMode.month:
-        _weekStorage = PageStorageBucket();
-        _weekPages = null;
+  void _closePeriodPickerIfCollapsed() {
+    if (_targetMode == DailyChoiceCalendarMode.week && _isPeriodPickerOpen) {
+      _closePeriodPicker();
     }
   }
 

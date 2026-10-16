@@ -26,6 +26,7 @@ void main() {
               child: StatefulBuilder(
                 builder: (context, setState) => CalendarHandle(
                   isExpanded: expanded,
+                  expansionProgress: expanded ? 1 : 0,
                   semanticLabel: expanded
                       ? 'Свернуть календарь'
                       : 'Раскрыть календарь',
@@ -112,6 +113,7 @@ void main() {
                   width: 360,
                   child: CalendarHandle(
                     isExpanded: false,
+                    expansionProgress: 0,
                     semanticLabel: 'Раскрыть календарь',
                     onTap: () {},
                   ),
