@@ -568,7 +568,13 @@ void main() {
           mode: DailyChoiceCalendarMode.month,
         ),
       );
-      expect(_dailyChoiceRow(tester, 1), _completion(app.l10n, wasCompleted));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('daily-choice-row-1')),
+          matching: find.text(_completion(app.l10n, wasCompleted)),
+        ),
+        findsOneWidget,
+      );
       final before = _dailyChoiceParameters(tester, app);
 
       // Строка открывается нажатием без прокрутки страницы.
@@ -1263,18 +1269,6 @@ Finder _catalogRow(String title) => find.descendant(
   of: find.byType(catalog_page.IntentionCatalogPage),
   matching: find.widgetWithText(IntentionSummaryView, title),
 );
-
-/// Подпись строки каталога дневных выборов с номером [number].
-String? _dailyChoiceRow(WidgetTester tester, int number) => tester
-    .widget<Text>(
-      find
-          .descendant(
-            of: find.byKey(ValueKey('daily-choice-row-$number')),
-            matching: find.byType(Text),
-          )
-          .last,
-    )
-    .data;
 
 String _completion(AppLocalizations l10n, bool completed) =>
     '${l10n.dailyChoiceDetailsDate(_choiceDate.toCanonicalString())} · '

@@ -460,6 +460,7 @@ void _expectCatalogUnchanged(
   expect(now.items.map((item) => item.id), was.items.map((item) => item.id));
   expect(now.totalCount, was.totalCount);
   expect(now.selection.date, was.selection.date);
+  expect(now.selection.incompleteExpanded, was.selection.incompleteExpanded);
   expect(now.selection.completedExpanded, was.selection.completedExpanded);
 }
 

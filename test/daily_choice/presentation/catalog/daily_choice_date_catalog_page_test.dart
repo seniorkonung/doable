@@ -8,6 +8,10 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
+import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -24,6 +28,92 @@ import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  for (final onDate in [false, true]) {
+    testWidgets(
+      '${onDate ? 'каталог на дату' : 'корневой каталог'}: смена дня после двух порций сохраняет свёрнутые невыполненные и раскрытые выполненные',
+      (tester) async {
+        final repository = CatalogPageRepository();
+        final selected = date(2026, 10, 7);
+        final next = date(2026, 10, 8);
+        await pumpCatalogPage(
+          tester,
+          repository,
+          today: selected,
+          locale: const Locale('ru'),
+          size: const Size(360, 900),
+          catalogDate: onDate ? selected : null,
+        );
+        repository.completeFirst(
+          0,
+          [
+            for (var number = 1; number <= 50; number++)
+              catalogPageItem(number, date: selected, isCompleted: true),
+          ],
+          total: 60,
+          cursor: const CatalogPageCursor(),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-section-false')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-section-true')),
+        );
+        await tester.pumpAndSettle();
+        final body = tester.widget<DailyChoiceCatalogBody>(
+          find.byType(DailyChoiceCatalogBody),
+        );
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(DailyChoiceCatalogBody)),
+        );
+        final provider = dailyChoiceCatalogViewModelProvider(body.instance);
+        final scrollable = find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final position = tester.state<ScrollableState>(scrollable).position;
+        final footer = find.byKey(
+          const ValueKey('daily-choice-load-more-true'),
+        );
+        await tester.scrollUntilVisible(footer, 1000, scrollable: scrollable);
+        await tester.tap(footer);
+        repository.completeMore(1, [
+          for (var number = 51; number <= 60; number++)
+            catalogPageItem(number, date: selected, isCompleted: true),
+        ]);
+        await tester.pumpAndSettle();
+        expect(
+          (container.read(
+            provider,
+          ) as DailyChoiceCatalogLoaded).completed.items,
+          hasLength(60),
+        );
+        expect(position.pixels, greaterThan(0));
+        await tester.tap(calendarDay(next));
+        await tester.pump();
+        expect(container.read(provider), isA<DailyChoiceCatalogInitialLoad>());
+        expect(container.read(provider).selection.incompleteExpanded, isFalse);
+        expect(container.read(provider).selection.completedExpanded, isTrue);
+        expect(position.pixels, 0);
+        expect(repository.queries.last.date, next);
+        expect(repository.queries.last.cursor, isNull);
+        repository.completeFirst(2, [
+          catalogPageItem(201, date: next, isCompleted: true),
+        ], total: 1);
+        await tester.pumpAndSettle();
+        final loaded = container.read(provider) as DailyChoiceCatalogLoaded;
+        expect(loaded.completed.items.single.date, next);
+        expect(loaded.completed.nextCursor, isNull);
+        expect(loaded.selection.incompleteExpanded, isFalse);
+        expect(loaded.selection.completedExpanded, isTrue);
+        expect(find.byType(DayHeading).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('выбор года и месяца независим у двух каталогов одной даты '
       'и корневого; новый экземпляр начинает с недели', (tester) async {
     final repository = CatalogPageRepository();

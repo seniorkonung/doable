@@ -752,6 +752,7 @@ void main() {
           focusedDate: CalendarDate.fromParts(2026, 12, 1),
           mode: DailyChoiceCalendarMode.month,
         ),
+        'раскрытие невыполненных': true,
         'раскрытие выполненных': false,
         'сегодня': _firstToday,
         'загруженные записи': [durabilityUuid(_futureChoice)],
@@ -823,6 +824,7 @@ void main() {
           focusedDate: _nextToday,
           mode: DailyChoiceCalendarMode.week,
         ),
+        'раскрытие невыполненных': true,
         'раскрытие выполненных': false,
         'сегодня': _nextToday,
         'загруженные записи': [durabilityUuid(_nextTodayChoice)],
@@ -944,6 +946,10 @@ Map<String, Object?> _catalogView(
   return {
     'выбранный день': shownDailyChoiceCatalogDate(tester),
     'просмотр календаря': shownDailyChoiceCatalogViewport(tester),
+    'раскрытие невыполненных': container
+        .read(openedDailyChoiceCatalogProvider(container))
+        .selection
+        .incompleteExpanded,
     'раскрытие выполненных': container
         .read(openedDailyChoiceCatalogProvider(container))
         .selection
