@@ -1,0 +1,110 @@
+# OpenSpec Implementation Review: enrich-daily-choice-catalog
+
+## Assessment
+
+**Format version:** 1
+**Result:** No unresolved findings
+**Coverage status:** Complete
+**Summary:** Этап 1 проверен полностью: модель, обновление установки, долговечное хранение, создание, редактирование и подробности сохраняют запланированное время и собственный приоритет дневного выбора. Нерешённых замечаний и принятых остаточных рисков нет. Результат не распространяется на будущие этапы 2 и 3.
+
+## Review target
+
+- **Baseline ref:** 1f1d08177ecddb863b1a6dbe8ead8884bd7e9d8b
+- **Base commit:** 1f1d08177ecddb863b1a6dbe8ead8884bd7e9d8b
+- **Reviewed head:** 944fdb7a460495d6686e0cc90227812353b90be5
+- **Target commits:** ["b447a60bee10122d34193837f5fe9226ea2e14cf","837554c518adbd7ef6e4d8e455ec5b4bf8188c0b","023fddeb110a23d31739bdc104669674187cc330","e0dcd9ab2c1626b57d157b0da62277627008eb35","db1d9b0048d1f34d04c169e63956572024d33886","87426f2b5ce0df6e9271766ca859f07ded556659","bfa0eafdc597b2b226206a37a9e85b998aa85ed9","3fcfb230b9470722e6a87f2a7a35c2b8d27997a2","679acab0d8233d8c4028c1155b2a312fa221d435","211c72912d7ca8631eebe5a133474d9bb36d814b","1345e388da9df1e2fd27488669e79a6b81d9f4b5","e28cce1ecc0cc3270c7c814f5abd4d980a0e5d98","944fdb7a460495d6686e0cc90227812353b90be5"]
+- **Reviewable paths:** ["drift_schemas/drift_schema_v2.json","lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb","lib/src/daily_choice/application/daily_choice_command.dart","lib/src/daily_choice/domain/daily_choice.dart","lib/src/daily_choice/domain/daily_choice_priority.dart","lib/src/daily_choice/domain/daily_choice_schedule.dart","lib/src/daily_choice/presentation/details/daily_choice_details_page.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_state.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.g.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_state.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.g.dart","lib/src/daily_choice/presentation/editor/daily_choice_planning_fields.dart","lib/src/data/local/app_database.dart","lib/src/data/local/app_database.g.dart","lib/src/data/local/migrations/migration_strategy.dart","lib/src/data/local/schema/daily_choice_schema.drift","lib/src/graph/data/drift_personal_graph_repository.dart","lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart","lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart","lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart","lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart","lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart","openspec/changes/enrich-daily-choice-catalog/tasks.md","test/daily_choice/application/daily_choice_contract_test.dart","test/daily_choice/presentation/daily_choice_creation_flow_test.dart","test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart","test/daily_choice/presentation/details/daily_choice_details_page_test.dart","test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart","test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart","test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart","test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart","test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart","test/daily_choice/presentation/path/choice_path_page_test.dart","test/data/local/bootstrap/local_data_bootstrap_test.dart","test/data/local/daily_choice_schema_test.dart","test/data/local/migrations/file_backed_migration_test.dart","test/data/local/schema_verifier_test.dart","test/graph/data/drift_daily_choice_create_test.dart","test/graph/data/drift_daily_choice_read_test.dart","test/graph/data/drift_daily_choice_replace_test.dart","test/graph/data/drift_daily_choice_update_test.dart","test/graph/data/drift_daily_choice_watch_test.dart","test/graph/data/file_backed_daily_choice_durability_test.dart","test/support/daily_choice_durability_fixture.dart"]
+- **OpenSpec change:** enrich-daily-choice-catalog
+- **OpenSpec schema:** intent-driven
+- **Target scope:** User-requested bounded range
+- **Baseline freshness:** Local ref state; no fetch performed
+- **Planning evidence paths:** ["openspec/changes/enrich-daily-choice-catalog/tasks.md"]
+
+## Reviewed increment
+
+### U1 · Корректные время и приоритет без потери данных установленного приложения
+
+- **Work items:** ["1.1","1.2","1.3","1.4","1.13"]
+- **Requirements and scenarios:** ["Запланированное время дневного выбора","Приоритет дневного выбора","Локальная долговечность и проверка целостности дневных выборов / Существующие выборы получают время и приоритет по умолчанию","local-data-lifecycle / Создание и версионирование локального хранилища"]
+- **Affected boundary:** Предметная модель дневного выбора, прикладные команды и локальное хранилище существующей и новой установки.
+- **Implementation target:** ["drift_schemas/drift_schema_v2.json","lib/src/daily_choice/application/daily_choice_command.dart","lib/src/daily_choice/domain/daily_choice.dart","lib/src/daily_choice/domain/daily_choice_priority.dart","lib/src/daily_choice/domain/daily_choice_schedule.dart","lib/src/data/local/app_database.dart","lib/src/data/local/app_database.g.dart","lib/src/data/local/migrations/migration_strategy.dart","lib/src/data/local/schema/daily_choice_schema.drift","test/daily_choice/application/daily_choice_contract_test.dart","test/data/local/bootstrap/local_data_bootstrap_test.dart","test/data/local/daily_choice_schema_test.dart","test/data/local/migrations/file_backed_migration_test.dart","test/data/local/schema_verifier_test.dart"]
+- **Applicable constraints and non-goals:** Полночь отличается от всего дня; дата и часовой пояс не входят во время. P1–P4 принадлежат выбору независимо от долговременных связей. Миграция сохраняет идентичность, пользовательский текст, выполнение, шаги и последовательности; отказ не удаляет базу. Применимы ADR-0002 и ADR-0006.
+- **Excluded change scope:** Новый порядок каталога и использование индекса при чтении секций относятся к этапу 2; напоминания, длительность, синхронизация и downgrade не входят в изменение.
+
+### U2 · Новые поля долговечны и независимы во всех операциях выбора
+
+- **Work items:** ["1.5","1.6","1.7","1.8","1.13"]
+- **Requirements and scenarios:** ["Запланированное время дневного выбора / Новый выбор сохраняется на весь день по умолчанию","Приоритет дневного выбора / Новый выбор получает P4 независимо от приоритетов пути","Атомарная замена участников и пути / Замена действия сохраняет выполнение","Атомарность и согласованность операций дневного выбора","Локальная долговечность и проверка целостности дневных выборов / Перезапуск сохраняет весь выбор"]
+- **Affected boundary:** Создание, независимое изменение, замена пути, подробное и порционное чтение через PersonalGraphRepository.
+- **Implementation target:** ["lib/src/daily_choice/application/daily_choice_command.dart","lib/src/daily_choice/domain/daily_choice.dart","lib/src/daily_choice/domain/daily_choice_priority.dart","lib/src/daily_choice/domain/daily_choice_schedule.dart","lib/src/graph/data/drift_personal_graph_repository.dart","lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart","lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart","lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart","lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart","lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart","test/graph/data/drift_daily_choice_create_test.dart","test/graph/data/drift_daily_choice_read_test.dart","test/graph/data/drift_daily_choice_replace_test.dart","test/graph/data/drift_daily_choice_update_test.dart","test/graph/data/drift_daily_choice_watch_test.dart","test/graph/data/file_backed_daily_choice_durability_test.dart","test/support/daily_choice_durability_fixture.dart"]
+- **Applicable constraints and non-goals:** Репозиторий владеет проверками и атомарной записью; общая ревизия продвигается только при фактическом изменении. Архивированный путь и поздняя утрата готовности допустимы для независимой правки. Незапрошенные поля сохраняются; хранимые значения проходят типизированную границу без молчаливой подстановки. Применим ADR-0009.
+- **Excluded change scope:** Прежние порции и порядок выдачи сохраняются до этапа 2; расширенная карточка и пара секций сейчас не заявлены.
+
+### U3 · Человек вводит, редактирует и видит подтверждённые значения
+
+- **Work items:** ["1.9","1.10","1.11","1.12","1.13"]
+- **Requirements and scenarios:** ["Запланированное время дневного выбора / Создание на конкретное время","Запланированное время дневного выбора / Конкретное время заменяется на весь день","Приоритет дневного выбора","Подтверждённые результаты и безопасные ошибки дневного выбора / Конфликт пути сохраняет независимые поля создания","Локализация и доступность дневного выбора","Открытие созданного дневного выбора"]
+- **Affected boundary:** Черновик и подтверждение создания, редактор и подробный просмотр, локализация и вспомогательные технологии.
+- **Implementation target:** ["lib/src/daily_choice/application/daily_choice_command.dart","lib/src/daily_choice/domain/daily_choice.dart","lib/src/daily_choice/domain/daily_choice_priority.dart","lib/src/daily_choice/domain/daily_choice_schedule.dart","lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb","lib/src/daily_choice/presentation/details/daily_choice_details_page.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_state.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart","lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.g.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_state.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart","lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.g.dart","lib/src/daily_choice/presentation/editor/daily_choice_planning_fields.dart","test/daily_choice/presentation/daily_choice_creation_flow_test.dart","test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart","test/daily_choice/presentation/details/daily_choice_details_page_test.dart","test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart","test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart","test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart","test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart","test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart","test/daily_choice/presentation/path/choice_path_page_test.dart"]
+- **Applicable constraints and non-goals:** Новое создание начинается со всего дня/P4; конкретное время появляется только после подтверждения корректных часов и минут. Отмена сохраняет прежнее значение; редактор отправляет только изменённые поля. Сохраняются независимые поля конфликтного черновика, владение принятой операцией и общая поверхность ошибок по ADR-0009/ADR-0012. Поддерживаются ru/en и крупный текст.
+- **Excluded change scope:** Перенос переключения выполнения из редактора на карточку относится к этапу 3; выполнение при создании сохраняется.
+
+## Pass coverage
+
+| Pass | Status | Evidence or limitation |
+|---|---|---|
+| Independent decision review | Complete | Свежий контекст /root/independent_decisions, fork_turns=none, навык implementation-decision-review. U1–U3 объединены из-за общих изменённых файлов модели и команд: проверено объединение ровно 51 пути Implementation target на сохранённом base..head. Рецензент получил нейтральное намерение и границы; планирование, история коммитов и прежние замечания не передавались. Итог: No substantive findings, Coverage: Complete. |
+| OpenSpec conformance | Complete | Артефакты и диффы прочитаны из сохранённых Git-снимков; все 13 задач и коммитов сопоставлены ниже. В корне репозитория на 944fdb7a460495d6686e0cc90227812353b90be5 выполнены mise run check (exit 0, 2738 тестов), mise run codegen-check (exit 0, без изменений файлов) и mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict --json (exit 0, 1/1 valid, без замечаний). |
+| Code quality | Complete | Координатор применил code-review-and-quality ко всем 51 путям поставляемого кода и тестов: корректность, читаемость, архитектура, безопасность и производительность. Проверены границы доменных типов, все вызовы декодера, параметризованные SQL-запросы, транзакции и ревизии, владение командой, точность правок, локализация и доступность. Генерация воспроизводима; git diff --check base head завершился с exit 0. |
+
+## Findings
+
+No unresolved findings remain in the implementation review.
+
+## Review coverage
+
+Граница проверки — исключительно 1f1d08177ecddb863b1a6dbe8ead8884bd7e9d8b..944fdb7a460495d6686e0cc90227812353b90be5. Просмотрены изменения каждого целевого коммита, включая коммиты проверок, и итоговые затронутые файлы. Рабочее дерево до проверок и после повторной генерации чистое, HEAD совпадал с Reviewed head; незакоммиченные данные не использовались как доказательство. Из 52 изменённых путей tasks.md относится к планирующим данным, остальные 51 — к модели, командам, хранению, миграции, интерфейсу, локализации, генерируемым файлам или тестам U1–U3. Несопоставленных или посторонних изменений нет. Пересечение единиц по общим типам и контрактам учтено одним независимым рецензентом с полным объединением путей.
+
+Контекст соответствия получен из proposal.md, specs/daily-choice-management/spec.md, design.md, adr.md, plan.md и tasks.md этого изменения на Reviewed head, а также CONTEXT.md, канонических спецификаций daily-choice-management и local-data-lifecycle и применимых ADR. CLI status и instructions apply использованы только для определения графа артефактов и задач; байты доказательств взяты из Git. Изменённый tasks.md сохраняет все исходные номера, описания и порядок: каждый из 13 коммитов меняет отметку только своей задачи. Отметки готовности проверены по коду и повторной верификации, а не приняты как доказательство сами по себе.
+
+Задача 1.1 (ID 1, коммит b447a60bee10122d34193837f5fe9226ea2e14cf) → U1. Типизированные варианты времени, независимый приоритет и правки проверены контрактными тестами.
+
+Задача 1.2 (ID 2, коммит 837554c518adbd7ef6e4d8e455ec5b4bf8188c0b) → U1. Схема, миграция, ограничения и снимок версии 2 проверены вместе с генерацией; удалённый bootstrap-тест с маркером 2 больше не описывает более новую версию, а действующий тест несовместимости сохранён.
+
+Задача 1.3 (ID 3, коммит 023fddeb110a23d31739bdc104669674187cc330) → U1. Файловые тесты проверяют данные, удалённый максимум AUTOINCREMENT, прерывание процесса и повторное обновление.
+
+Задача 1.4 (ID 4, коммит e0dcd9ab2c1626b57d157b0da62277627008eb35) → U1. Коммит содержит только отметку задачи; её контрольные условия подтверждены тестами схемы, миграции, контрактов и анализом.
+
+Задача 1.5 (ID 5, коммит db1d9b0048d1f34d04c169e63956572024d33886) → U2. Проверены общий декодер и все четыре SQL-проекции его вызовов; новые поля и повреждённые значения покрыты тестами чтения.
+
+Задача 1.6 (ID 6, коммит 87426f2b5ce0df6e9271766ca859f07ded556659) → U2. Создание записывает новые поля в общей транзакции; проверены подтверждённый результат, приоритеты пути и повторное открытие файла.
+
+Задача 1.7 (ID 7, коммит bfa0eafdc597b2b226206a37a9e85b998aa85ed9) → U2. Проверены независимые правки, отказ, отсутствие изменений, текущие поля при замене пути и публикация наблюдателям.
+
+Задача 1.8 (ID 8, коммит 3fcfb230b9470722e6a87f2a7a35c2b8d27997a2) → U2. Файловый сценарий проходит создание 18:00/P2, замену пути, правку приоритета, весь день и повторное открытие.
+
+Задача 1.9 (ID 9, коммит 679acab0d8233d8c4028c1155b2a312fa221d435) → U3. Тест модели подтверждает сохранение 18:00/P2 после конфликта, нового пути и отдельного подтверждения создания.
+
+Задача 1.10 (ID 10, коммит 211c72912d7ca8631eebe5a133474d9bb36d814b) → U3. Проверены ввод и отмена времени, недопустимый ввод, полночь, приоритет, блокировка, семантика, обе локали и крупный текст.
+
+Задача 1.11 (ID 11, коммит 1345e388da9df1e2fd27488669e79a6b81d9f4b5) → U3. Проверены инициализация редактора, точный состав правки, возврат исходных значений и сохранение независимого изменения из другого представления.
+
+Задача 1.12 (ID 12, коммит e28cce1ecc0cc3270c7c814f5abd4d980a0e5d98) → U3. Проверены значения и семантика подробностей в ru/en, обновление подтверждённой модели и замена пути.
+
+Задача 1.13 (ID 13, коммит 944fdb7a460495d6686e0cc90227812353b90be5) → U1, U2, U3. Сквозной тест соединяет форму 18:00/P2, подробности, правку на весь день и замену пути; файловые проверки, генерация и полные проверки подтверждают готовность этапа 1.
+
+Сценарий «Новый выбор сохраняется на весь день по умолчанию» показан тестом «неполное время и отмена сохраняют весь день и P4» в test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart; фактическое сохранение значений по умолчанию проверяется в test/graph/data/drift_daily_choice_create_test.dart. Сценарии «Создание на конкретное время» и «Конкретное время заменяется на весь день» показаны сквозным сценарием в test/daily_choice/presentation/daily_choice_creation_flow_test.dart: ввод 18:00/P2 проходит через реальный репозиторий к подробностям, затем редактор сохраняет весь день.
+
+Сценарий «Новый выбор получает P4 независимо от приоритетов пути» показан проверкой дубликатов в test/graph/data/drift_daily_choice_create_test.dart: у созданных выборов P4, у связей пути P1. Независимые правки времени и приоритета при архивированном пути, неизменность другого выбора и приоритета связи проверены в test/graph/data/drift_daily_choice_update_test.dart. Замена действия с сохранением выполнения и новых полей показана в test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart и поддержана проверками атомарности и текущих значений в test/graph/data/drift_daily_choice_replace_test.dart.
+
+Сценарий «Конфликт пути сохраняет независимые поля создания» показан тестом «конфликт пути сохраняет ввод и требует нового подтверждения» в test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart. Блокировка принятых операций и повтор после временного отказа проверяются существующими сценариями моделей и форм с добавленными полями. Общий протокол предъявления ошибок не дублируется; новые элементы используют существующие модели и координатор.
+
+Сценарий «Перезапуск сохраняет весь выбор» показан файловой проверкой в test/graph/data/file_backed_daily_choice_durability_test.dart. Сценарий «Существующие выборы получают время и приоритет по умолчанию» показан переходом 1 → 2 в test/data/local/migrations/file_backed_migration_test.dart: сохраняются выполненные и невыполненные выборы с разными путями и полным текстом; удалённый максимум 65 приводит к следующему номеру 66. Отдельный сценарий принудительно завершает процесс до commit, проверяет неизменную схему 1 и данные и успешно повторяет обновление. Эквивалентность свежей и мигрированной схем доказана существующим verifier и test/data/local/schema_verifier_test.dart. Снимок drift_schema_v1.json не изменён; в SQL снимка версии 2 изменена только таблица daily_choices и добавлен индекс её порядка.
+
+Локализация и доступность новых элементов проверены в test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart, test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart и test/daily_choice/presentation/details/daily_choice_details_page_test.dart: ru/en, сохранение черновика при смене локали, семантические состояния, масштаб текста 2 и открытая клавиатура. Смена локали влияет на формат представления времени, но не на доменные часы и минуты.
+
+Полный mise run check выполнен в /home/seniorkonung/.paseo/worktrees/1id27gtb/lawful-dodo на Reviewed head; он включает форматирование (667 файлов, 0 изменений), проверки CI scope, разрешение зависимостей Widgetbook по lockfile, flutter analyze без замечаний и полный flutter test --concurrency=2. mise run codegen-check повторил генерацию локализаций, Riverpod/Drift/маршрутов и снимка схемы и подтвердил отсутствие изменений. Оба прогона относятся к тому же сохранённому коду. DTD не обнаружил запущенного приложения; проверка через CLI является предусмотренной задачей 1.13 альтернативой. Ручная проверка на устройстве и hot reload в этой сессии не выполнялись.
+
+Проверены также отсутствие лишних механизмов и сохранение владельцев общей диагностики, ошибок и транзакций. Новые значения не добавлены в события диагностики; новые зависимости и отдельные каналы обновлений не вводятся. Индекс схемы обусловлен согласованным порядком будущего каталога, а текущие чтения остаются совместимыми. Требования секций, группировки, расширенной карточки и флажка относятся к этапам 2–3 и не объявляются реализованными этим диапазоном.
+
+Прежнего implementation-review.md и принятых рисков для переноса нет. Исправления кода или планирующих артефактов по результатам этой проверки не потребовались; новых задач нет, все исходные завершённые задачи остаются завершёнными. Отчёт фиксирует проверку этапа 1 и не означает завершение всего изменения, принятие риска или разрешение на публикацию, слияние либо архивацию.
