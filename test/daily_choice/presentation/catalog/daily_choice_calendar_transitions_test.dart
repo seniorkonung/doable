@@ -1,6 +1,10 @@
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_expansion.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
+import 'package:doable/src/design_system/components/calendar_header.dart';
 import 'package:doable/src/design_system/components/notice.dart';
+import 'package:doable/src/design_system/components/week_strip_day.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -638,6 +642,74 @@ void main() {
         ViewportChanged(month(date(2026, 11, 1))),
       ]);
       expect(consumer.selectedDate, date(2026, 10, 4));
+    });
+
+    testWidgets('месяц надвигается на неделю своим фоном', (tester) async {
+      final focused = date(2026, 11, 15);
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: focused,
+        viewport: month(focused),
+        today: focused,
+      );
+      final expansion = find.byType(DailyChoiceCalendarExpansion);
+      Finder insideExpansion(Type type) =>
+          find.descendant(of: expansion, matching: find.byType(type));
+      final monthHeight = tester.getSize(expansion).height;
+      consumer.replaceInputs(viewport: week(focused));
+      await tester.pumpAndSettle();
+      final weekRect = tester.getRect(expansion);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await gesture.moveBy(const Offset(0, 20));
+      await gesture.moveBy(Offset(0, (monthHeight - weekRect.height) * 0.5));
+      await tester.pump();
+      final progress =
+          (tester.getSize(expansion).height - weekRect.height) /
+          (monthHeight - weekRect.height);
+      expect(progress, moreOrLessEquals(0.5));
+
+      final background = find.ancestor(
+        of: find.byType(CalendarHeader),
+        matching: insideExpansion(ColoredBox),
+      );
+      expect(background, findsOneWidget);
+      expect(
+        tester.widget<ColoredBox>(background).color,
+        DoableColors.light.bg,
+      );
+      final backgroundRect = tester.getRect(background);
+      expect(
+        backgroundRect.top,
+        moreOrLessEquals(weekRect.top + (1 - progress) * weekRect.height),
+      );
+      expect(backgroundRect.left, weekRect.left);
+      expect(backgroundRect.right, weekRect.right);
+      expect(backgroundRect.bottom, greaterThan(weekRect.bottom));
+      expect(
+        find.ancestor(of: background, matching: insideExpansion(Opacity)),
+        findsNothing,
+      );
+
+      final monthContentOpacity = find.ancestor(
+        of: find.byType(CalendarHeader),
+        matching: insideExpansion(Opacity),
+      );
+      expect(
+        tester.widget<Opacity>(monthContentOpacity).opacity,
+        moreOrLessEquals(progress),
+      );
+      final weekOpacity = find.ancestor(
+        of: find.byType(WeekStripDay).first,
+        matching: insideExpansion(Opacity),
+      );
+      expect(
+        tester.widget<Opacity>(weekOpacity).opacity,
+        moreOrLessEquals(1 - progress),
+      );
+      await gesture.cancel();
     });
   });
 
