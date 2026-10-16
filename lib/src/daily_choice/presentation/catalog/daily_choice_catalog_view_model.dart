@@ -110,11 +110,13 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   }
 
   /// Отправляет только выполнение; сохранённая карточка меняется вместе с парой.
-  /// Возвращает освобождение права карточки, которое не отменяет команду.
+  /// Отказ показывается у карточки лишь в открытой [session]; без неё его
+  /// предъявляет общая поверхность. Возвращает освобождение права карточки,
+  /// которое не отменяет команду.
   void Function()? changeCompletion(
     DailyChoiceId id,
     bool isCompleted, {
-    bool Function()? canPresentFailure,
+    DailyChoiceCompletionSession? session,
   }) {
     final current = state;
     if (current is! DailyChoiceCatalogLoaded ||
@@ -138,23 +140,31 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
       case DailyChoiceCommandAccepted(:final token, :final future):
         _completionTokens[id] = token;
         _setCompletionOperation(id, const DailyChoiceCompletionSubmitting());
-        unawaited(_finishCompletion(id, future, canPresentFailure));
+        unawaited(_finishCompletion(id, future, session));
         final coordinator = _coordinator;
         return () => coordinator.releaseInitiatorPresentation(token);
       case DailyChoiceCommandAlreadyRunning():
         _setCompletionOperation(
           id,
-          const DailyChoiceCompletionFailed(
-            DailyChoiceConflictFailure(
+          DailyChoiceCompletionFailed(
+            const DailyChoiceConflictFailure(
               DailyChoiceConflictReason.dependencyChanged,
             ),
+            inline: session == null
+                ? null
+                : DailyChoiceCompletionInlineFailure(session),
           ),
         );
         return null;
       case GraphCommandCoordinatorDraining():
         _setCompletionOperation(
           id,
-          const DailyChoiceCompletionFailed(DailyChoiceUnexpectedFailure()),
+          DailyChoiceCompletionFailed(
+            const DailyChoiceUnexpectedFailure(),
+            inline: session == null
+                ? null
+                : DailyChoiceCompletionInlineFailure(session),
+          ),
         );
         return null;
     }
@@ -186,7 +196,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   Future<void> _finishCompletion(
     DailyChoiceId id,
     Future<DailyChoiceCommandCompletion> future,
-    bool Function()? canPresentFailure,
+    DailyChoiceCompletionSession? session,
   ) async {
     final completion = await future;
     if (!ref.mounted || !identical(_completionTokens[id], completion.token)) {
@@ -213,18 +223,21 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
           );
         }
       case GraphResultFailure(:final failure):
-        if (canPresentFailure != null && !canPresentFailure()) {
+        if (session == null || !session.canPresentFailure) {
           _coordinator.releaseInitiatorPresentation(completion.token);
-        }
-        _setCompletionOperation(
-          id,
-          DailyChoiceCompletionFailed(
-            failure,
-            failurePresentation: _coordinator.claimInitiatorFailure(
-              completion.token,
+          _setCompletionOperation(id, DailyChoiceCompletionFailed(failure));
+        } else {
+          _setCompletionOperation(
+            id,
+            DailyChoiceCompletionFailed(
+              failure,
+              inline: DailyChoiceCompletionInlineFailure(
+                session,
+                claim: _coordinator.claimInitiatorFailure(completion.token),
+              ),
             ),
-          ),
-        );
+          );
+        }
     }
   }
 

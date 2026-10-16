@@ -127,14 +127,16 @@ void _completionScenarios() {
         final h = _Harness();
         addTearDown(h.dispose);
         await _pair(h, incomplete: [_item(1)]);
-        h.model.changeCompletion(_choiceId(1), true);
+        final session = DailyChoiceCompletionSession(isCurrent: () => true);
+        h.model.changeCompletion(_choiceId(1), true, session: session);
         h.repository.failCommand(0, failure);
         await pumpEventQueue();
         final failed =
             h.state.completionOperations[_choiceId(1)]
                 as DailyChoiceCompletionFailed;
         expect(failed.failure, same(failure));
-        expect(failed.failurePresentation, isNotNull);
+        expect(failed.inline?.session, same(session));
+        expect(failed.inline?.claim, isNotNull);
         expect(failed.canRetry, failure is DailyChoiceUnavailableFailure);
         expect(failed.requiresRefresh, failure is DailyChoiceConflictFailure);
         expect(_loaded(h).incomplete.items.single.isCompleted, isFalse);
@@ -199,7 +201,7 @@ void _completionScenarios() {
             as DailyChoiceCompletionFailed;
     expect(rejected.failure, isA<DailyChoiceConflictFailure>());
     expect(rejected.requiresRefresh, isTrue);
-    expect(rejected.failurePresentation, isNull);
+    expect(rejected.inline, isNull);
     h.repository.failCommand(0, const DailyChoiceUnavailableFailure());
     await pumpEventQueue();
   });

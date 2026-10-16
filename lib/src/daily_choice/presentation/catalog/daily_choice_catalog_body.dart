@@ -450,26 +450,31 @@ final class _DailyChoiceCatalogBodyState
       message: l10n.dailyChoiceCompletionSynchronizing,
       loading: true,
     ),
+    // Сообщение и его повтор принадлежат только сессии, получившей отказ;
+    // вернувшейся карточке остаётся действие, без которого флажок недоступен.
     DailyChoiceCompletionFailed(
       :final failure,
-      :final failurePresentation,
+      :final inline,
       :final canRetry,
       :final requiresRefresh,
-    ) =>
+    )
+        when (inline?.session.isOpen ?? false) || requiresRefresh =>
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            OperationFailurePresentation(
-              claim: failurePresentation,
-              message: dailyChoiceCommandFailureMessage(l10n, failure),
-            ),
-            if (canRetry)
-              TextButton(
-                onPressed: () => changeCompletion(!isCompleted),
-                child: Text(l10n.commonRetry),
+            if (inline != null && inline.session.isOpen) ...[
+              OperationFailurePresentation(
+                claim: inline.claim,
+                message: dailyChoiceCommandFailureMessage(l10n, failure),
               ),
+              if (canRetry)
+                TextButton(
+                  onPressed: () => changeCompletion(!isCompleted),
+                  child: Text(l10n.commonRetry),
+                ),
+            ],
             if (requiresRefresh)
               TextButton(
                 onPressed: () => model.refreshCompletion(id),
@@ -478,6 +483,7 @@ final class _DailyChoiceCatalogBodyState
           ],
         ),
       ),
+    DailyChoiceCompletionFailed() => const SizedBox.shrink(),
   };
 
   Widget _pageFooter(
@@ -593,7 +599,8 @@ final class _Banner extends StatelessWidget {
   );
 }
 
-/// Карточка удерживает только право будущей ошибки; команда живёт в координаторе.
+/// Карточка удерживает только право будущей ошибки в своей экранной сессии;
+/// команда живёт в координаторе.
 final class _CompletionSurface extends StatefulWidget {
   const _CompletionSurface({
     required this.id,
@@ -611,30 +618,46 @@ final class _CompletionSurface extends StatefulWidget {
 }
 
 final class _CompletionSurfaceState extends State<_CompletionSurface> {
+  DailyChoiceCompletionSession? _session;
   VoidCallback? _releasePresentation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Скрытая вкладка и маршрут под непрозрачным отключают тикеры, оставляя
+    // карточку в дереве; уход с экрана завершает её сессию:
+    // https://api.flutter.dev/flutter/widgets/TickerMode/valuesOf.html
+    if (!TickerMode.valuesOf(context).enabled) _closeSession();
+  }
 
   @override
   void dispose() {
     // Освобождаем право даже до построения первого сообщения ошибки:
     // https://api.flutter.dev/flutter/widgets/State/dispose.html
-    _releasePresentation?.call();
+    _closeSession();
     super.dispose();
+  }
+
+  void _closeSession() {
+    _session?.close();
+    _session = null;
+    _releasePresentation?.call();
+    _releasePresentation = null;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Читаем актуальную доступность вкладки и маршрута при получении отказа,
-    // даже если скрытый потребитель Riverpod приостановил перестроения:
-    // https://api.flutter.dev/flutter/widgets/TickerMode/getValuesNotifier.html
-    final tickerMode = TickerMode.getValuesNotifier(context);
+    // Маршрут может перестать быть верхним раньше, чем отключатся тикеры:
+    // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
     final route = ModalRoute.of(context);
     return widget.builder((isCompleted) {
       _releasePresentation?.call();
       _releasePresentation = widget.model.changeCompletion(
         widget.id,
         isCompleted,
-        canPresentFailure: () =>
-            mounted && tickerMode.value.enabled && (route?.isCurrent ?? true),
+        session: _session ??= DailyChoiceCompletionSession(
+          isCurrent: () => route?.isCurrent ?? true,
+        ),
       );
     });
   }

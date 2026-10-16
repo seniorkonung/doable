@@ -74,7 +74,10 @@ void main() {
           await openDailyChoices(tester);
         }
         await tester.pumpAndSettle();
-        expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+        expect(checkbox.value, isFalse);
+        expect(checkbox.onChanged, isNotNull);
+        expect(find.byType(OperationFailurePresentation), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
         expect(tester.takeException(), isNull);
@@ -151,6 +154,11 @@ void main() {
           find.byKey(const ValueKey('daily-choice-section-false')),
         );
         await tester.pumpAndSettle();
+        expect(find.byType(OperationFailurePresentation), findsNothing);
+        expect(
+          tester.widget<Checkbox>(find.byType(Checkbox)).onChanged,
+          isNotNull,
+        );
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
         expect(tester.takeException(), isNull);
@@ -215,13 +223,64 @@ void main() {
           );
         }
         await tester.pumpAndSettle();
-        expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+        expect(checkbox.value, isFalse);
+        expect(checkbox.onChanged, isNotNull);
+        expect(find.byType(OperationFailurePresentation), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
         expect(tester.takeException(), isNull);
       },
     );
   }
+
+  testWidgets(
+    'флажок: конфликт, переданный оболочке при уходе из корневого каталога, '
+    'не показывается у вернувшейся карточки и требует актуализации выбора',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      final repository = CatalogPageRepository();
+      final selected = date(2026, 10, 7);
+      await _start(
+        tester,
+        repository,
+        ControlledDailyChoiceLocalDate(selected),
+      );
+      await openDailyChoices(tester);
+      final item = catalogPageItem(1, date: selected);
+      repository.completeFirst(0, [item], total: 1);
+      repository.completeDayStatuses(0, {});
+      await tester.pumpAndSettle();
+      final checkbox = find.byType(Checkbox);
+      await tester.tap(checkbox);
+      await tester.pump();
+      await openHome(tester);
+      repository.failCompletion(
+        0,
+        const DailyChoiceConflictFailure(
+          DailyChoiceConflictReason.dependencyChanged,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsOneWidget);
+      await _dismissCompletionMessage(tester);
+
+      await openDailyChoices(tester);
+      await tester.pumpAndSettle();
+      expect(find.byType(OperationFailurePresentation), findsNothing);
+      expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+      await tester.tap(find.widgetWithText(TextButton, 'Обновить выбор'));
+      await tester.pump();
+      repository.completeFirst(1, [item], total: 1);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+      expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
+      expect(find.byType(OperationFailurePresentation), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(repository.completionCommands, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final onDate in [false, true]) {
     testWidgets(

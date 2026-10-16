@@ -68,7 +68,7 @@ final class DailyChoiceCatalogViewModelProvider
 }
 
 String _$dailyChoiceCatalogViewModelHash() =>
-    r'3d692088e235c6d2c78e6926e89a0733cab3c66e';
+    r'5db3fb21970fc0b600a403b03a046981b5b26e0e';
 
 /// Публикует согласованную пару и независимо подгружает её секции.
 

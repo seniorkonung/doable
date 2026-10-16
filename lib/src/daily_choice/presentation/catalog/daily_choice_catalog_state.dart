@@ -117,11 +117,41 @@ final class DailyChoiceCompletionAwaitingSnapshot
 }
 
 final class DailyChoiceCompletionFailed extends DailyChoiceCompletionOperation {
-  const DailyChoiceCompletionFailed(this.failure, {this.failurePresentation});
+  const DailyChoiceCompletionFailed(this.failure, {this.inline});
   final DailyChoiceCommandFailure failure;
-  final GraphInitiatorPresentationClaim? failurePresentation;
+
+  /// Сообщение у карточки; без него отказ предъявляет общая поверхность.
+  final DailyChoiceCompletionInlineFailure? inline;
   bool get canRetry => failure is DailyChoiceUnavailableFailure;
   bool get requiresRefresh => failure is DailyChoiceConflictFailure;
+}
+
+/// Отказ, который карточка предъявляет только в получившей его сессии.
+final class DailyChoiceCompletionInlineFailure {
+  const DailyChoiceCompletionInlineFailure(this.session, {this.claim});
+  final DailyChoiceCompletionSession session;
+
+  /// Право принятой команды; отклонённое до принятия изменение его не имеет.
+  final GraphInitiatorPresentationClaim? claim;
+}
+
+/// Экранная сессия карточки, начавшей изменение выполнения.
+///
+/// Удаление карточки и уход с её экрана закрывают сессию навсегда, поэтому
+/// вернувшаяся карточка не повторяет отказ, уже предъявленный у неё или
+/// переданный общей поверхности.
+final class DailyChoiceCompletionSession {
+  DailyChoiceCompletionSession({required this._isCurrent});
+
+  final bool Function() _isCurrent;
+  var _isOpen = true;
+
+  bool get isOpen => _isOpen;
+
+  /// Отказ, полученный сейчас, можно предъявить у карточки.
+  bool get canPresentFailure => _isOpen && _isCurrent();
+
+  void close() => _isOpen = false;
 }
 
 sealed class DailyChoiceCatalogPageStatus {
