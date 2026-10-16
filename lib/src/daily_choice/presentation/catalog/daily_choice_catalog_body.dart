@@ -254,15 +254,30 @@ final class _DailyChoiceCatalogBodyState
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
+    final snapshot = _scrollSnapshot;
+    if (notification.depth != 0 || snapshot == null) return false;
     // Коррекция геометрии не является пользовательской прокруткой:
     // https://api.flutter.dev/flutter/widgets/UserScrollNotification-class.html
     final isUserScroll = switch (notification) {
+      ScrollStartNotification(:final dragDetails) => dragDetails != null,
       UserScrollNotification(:final direction) =>
         direction != ScrollDirection.idle,
-      ScrollUpdateNotification(:final dragDetails) => dragDetails != null,
+      // Инерция продолжает пользовательскую прокрутку без dragDetails:
+      // https://api.flutter.dev/flutter/widgets/ScrollEndNotification/dragDetails.html
+      ScrollUpdateNotification(:final dragDetails) =>
+        dragDetails != null ||
+            _scrollController.position.userScrollDirection !=
+                ScrollDirection.idle,
       _ => false,
     };
-    if (notification.depth == 0 && isUserScroll) _scrollSnapshot = null;
+    if (isUserScroll) {
+      // Новая цель отменяет отложенное восстановление старой, но сохраняет
+      // исходное представление до итога удерживаемого перехода календаря.
+      _scrollSnapshot = _CalendarTransitionScrollSnapshot(
+        mode: snapshot.mode,
+        offset: notification.metrics.pixels,
+      );
+    }
     return false;
   }
 

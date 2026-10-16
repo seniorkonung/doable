@@ -84,6 +84,68 @@ void main() {
         expect(repository.queries.single.isCompleted, isNull);
         expect(tester.takeException(), isNull);
       });
+
+      testWidgets('$catalog: $ending после продолжения движения ручки '
+          'сохраняет последнюю отдельную прокрутку выдачи', (tester) async {
+        final repository = await _openExpandedCatalogAtEnd(tester, onDate);
+        final calendar = find.byType(DailyChoiceCalendar);
+        final height = tester.getSize(calendar).height;
+        final viewport = tester.widget<DailyChoiceCalendar>(calendar).viewport;
+        final list = find.byType(CustomScrollView);
+        final position = tester.state<ScrollableState>(_pageScroll).position;
+        final originalOffset = position.pixels;
+        final gesture = await _startShortCollapse(tester);
+        final clampedOffset = position.pixels;
+
+        final scrolling = await tester.startGesture(
+          tester.getCenter(list),
+          pointer: 2,
+        );
+        await scrolling.moveBy(const Offset(0, 20));
+        for (final elapsed in [20, 40, 60, 80]) {
+          await scrolling.moveBy(
+            const Offset(0, 5),
+            timeStamp: Duration(milliseconds: elapsed),
+          );
+        }
+        await scrolling.up(timeStamp: const Duration(milliseconds: 80));
+        final dragOffset = position.pixels;
+        await tester.pumpAndSettle();
+        final userOffset = position.pixels;
+        expect(userOffset, lessThan(dragOffset));
+        expect(userOffset, lessThan(clampedOffset));
+        final row = find.byKey(const ValueKey('daily-choice-row-20'));
+        final rowOffset =
+            tester.getTopLeft(row).dy - tester.getTopLeft(list).dy;
+        final intermediateHeight = tester.getSize(calendar).height;
+
+        await gesture.moveBy(
+          const Offset(0, -60),
+          timeStamp: const Duration(seconds: 3),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getSize(calendar).height, lessThan(intermediateHeight));
+        expect(position.pixels, lessThan(userOffset));
+        if (cancel) {
+          await gesture.cancel();
+        } else {
+          await gesture.up(timeStamp: const Duration(seconds: 4));
+        }
+        await tester.pumpAndSettle();
+
+        expect(tester.getSize(calendar).height, height);
+        expect(position.pixels, closeTo(userOffset, _epsilon));
+        expect(position.pixels, lessThan(originalOffset));
+        expect(
+          tester.getTopLeft(row).dy - tester.getTopLeft(list).dy,
+          closeTo(rowOffset, _epsilon),
+        );
+        expect(tester.widget<DailyChoiceCalendar>(calendar).viewport, viewport);
+        expect(repository.queries, hasLength(1));
+        expect(repository.queries.single.date, _today);
+        expect(repository.queries.single.isCompleted, isNull);
+        expect(tester.takeException(), isNull);
+      });
     }
 
     testWidgets('$catalog: возврат календаря сохраняет прокрутку выдачи '
