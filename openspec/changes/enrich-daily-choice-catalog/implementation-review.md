@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 3 в диапазоне задач 3.1–3.10 переносит выполнение на флажок карточки и убирает его из редактора; сквозные сценарии и все тесты проекта проходят. Завершить фазу пока нельзя: `mise run check` на Reviewed head падает на `flutter analyze` в модели каталога (F1), хотя задача 3.10 заявляет успешные полные проверки. Отказ флажка, уже переданный общей поверхности, повторно показывается и объявляется у вернувшейся карточки (F2). Отказ без обычного повтора бессрочно блокирует флажок в экземпляре каталога даже после подтверждённого изменения того же выбора (F3); для F3 нужно продуктовое решение. Принятых остаточных рисков нет.
+**Summary:** Фаза 3 в диапазоне задач 3.1–3.10 переносит выполнение на флажок карточки и убирает его из редактора; сквозные сценарии и все тесты проекта проходят. `mise run check` на Reviewed head падает на `flutter analyze` в модели каталога, хотя задача 3.10 заявляет успешные полные проверки; устранение и повторную проверку готовности фазы отслеживают задачи 3.11–3.12. Отказ флажка, уже переданный общей поверхности, повторно показывается и объявляется у вернувшейся карточки (F2). Отказ без обычного повтора бессрочно блокирует флажок в экземпляре каталога даже после подтверждённого изменения того же выбора (F3); для F3 нужно продуктовое решение. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -52,19 +52,10 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | U1–U3 образуют одну группу пересечения: общие пути test/app/daily_choice_app_lifecycle_test.dart и test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart. Один свежий изолированный контекст по навыку implementation-decision-review получил нейтральный объединённый бриф трёх единиц, точные base/head и полный список 32 delivery-путей; planning, прежний отчёт, ID задач и описания коммитов не передавались. Результат: Changes needed; Coverage: Complete. Пробу ревьюер выполнил во временной копии head из git archive вне worktree и удалил её. |
-| OpenSpec conformance | Complete | Все 10 Target commits сопоставлены с задачами 3.1–3.10 по артефактам на сохранённом head. Отдельный помощник сверил тестовые доказательства каждой задачи и сценариев. В worktree при HEAD = Reviewed head и чистом дереве: mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict --json — exit 0, 1/1 valid, issues []; mise run codegen-check — exit 0; mise run check — exit 1 на flutter analyze (F1), предыдущие шаги format и CI scope успешны. Оставшиеся шаги check выполнены отдельно: flutter test --concurrency=2 --exclude-tags=flutter_process — 2769 тестов, All tests passed; flutter test --concurrency=1 --tags=flutter_process — 14 тестов, All tests passed; flutter pub get --enforce-lockfile --directory widgetbook — exit 0. |
+| OpenSpec conformance | Complete | Все 10 Target commits сопоставлены с задачами 3.1–3.10 по артефактам на сохранённом head. Отдельный помощник сверил тестовые доказательства каждой задачи и сценариев. В worktree при HEAD = Reviewed head и чистом дереве: mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict --json — exit 0, 1/1 valid, issues []; mise run codegen-check — exit 0; mise run check — exit 1 на flutter analyze (5 замечаний в daily_choice_catalog_view_model.dart, устранение отслеживают задачи 3.11–3.12), предыдущие шаги format и CI scope успешны. Оставшиеся шаги check выполнены отдельно: flutter test --concurrency=2 --exclude-tags=flutter_process — 2769 тестов, All tests passed; flutter test --concurrency=1 --tags=flutter_process — 14 тестов, All tests passed; flutter pub get --enforce-lockfile --directory widgetbook — exit 0. |
 | Code quality | Complete | Весь delivery-поднабор проверен по пяти осям code-review-and-quality: жизненный цикл операции флажка и прав предъявления, согласование с потоком завершений и ревизиями, семантика и локализация карточки, удаление выполнения из редактора, качество и избыточность тестов. Прослежены неизменённые graph_command_coordinator.dart, operation_failure_presentation.dart, graph_operation_presenter.dart, daily_choice_details_page.dart и редактор. git diff --check для точного base..head — exit 0. |
 
 ## Findings
-
-### F1 · High — Полные проверки проекта не проходят на Reviewed head
-
-- **Evidence:** `mise run check` в worktree при HEAD = d6d0ab5f0e2fe4d7485caf0e53be5b842a9a8f41 завершается exit 1 на шаге `flutter analyze` (5 issues). Warning `body_might_complete_normally_nullable` указывает на `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart:114`: `changeCompletion` объявлен как `void Function()?`, а ветки `DailyChoiceCommandAlreadyRunning` и `GraphCommandCoordinatorDraining` завершаются без `return`. Четыре info `curly_braces_in_flow_control_structures` указывают на `:122`, `:125`, `:167` и `:188`. Отдельный `mise exec --no-deps -- flutter analyze lib/src/daily_choice/presentation/catalog/` воспроизводит те же 5 замечаний с exit 1. Все строки добавлены в диапазоне задач 3.1 и 3.3. Задача 3.10 отмечена выполненной, хотя её верификация требует успешного `mise run check`. Задача `Run full project checks` в `.github/workflows/ci.yml:72-73` запускает `mise run --skip-tools check`. Тесты при отдельном запуске проходят.
-- **Evidence revisions:** ["d6d0ab5f0e2fe4d7485caf0e53be5b842a9a8f41"]
-- **Impact:** Обязательная проверка CI для ветки упадёт. Фаза 3 не удовлетворяет правилу репозитория и условию Plan Constraints: переход к следующему этапу требует успешных полных проверок. Отметка 3.10 сообщает невыполненное условие готовности.
-- **Required outcome:** `flutter analyze` не сообщает замечаний по изменённым файлам, и `mise run check` завершается успешно на исправленном head. Утверждение о готовности фазы подтверждается свежим успешным запуском полных проверок.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart","openspec/changes/enrich-daily-choice-catalog/tasks.md#3.10"]
 
 ### F2 · Medium — Отказ флажка повторно предъявляется у вернувшейся карточки
 
@@ -107,7 +98,7 @@ Target commits проверены в порядке workflow. Задача ID 26
 
 Задача ID 34, 3.9 → U3, диапазон 9c900f95..f8d0b4e0: фикстура схемы 1, переход 1 → 2, `changeCompletion` в обе стороны через реальный координатор, повторное открытие файла новым контейнером.
 
-Задача ID 35, 3.10 → U3, диапазон f8d0b4e0..d6d0ab5f: checkpoint только с отметкой. Его условие полных проверок не выполнено (F1).
+Задача ID 35, 3.10 → U3, диапазон f8d0b4e0..d6d0ab5f: checkpoint только с отметкой. Его условие полных проверок не выполнено; исправление и повторную проверку готовности отслеживают задачи 3.11–3.12.
 
 Контекст намерения и соответствия: proposal.md, specs/daily-choice-management/spec.md, design.md (решения 5–6), adr.md, plan.md (Phase 3) и tasks.md на сохранённом head, ADR-0009, ADR-0012 и ADR-0033. CLI status и instructions apply использованы только для графа и путей; незакоммиченных расхождений планирования нет.
 
@@ -117,4 +108,4 @@ Target commits проверены в порядке workflow. Задача ID 26
 
 Два наблюдения рассмотрены и находками не записаны. Баннер ожидания согласования «Выполнение сохранено. Обновляем каталог…» с `liveRegion` (`body.dart:449-452`, `:571-573`) и SnackBar оболочки «Дневной выбор изменён.» могут оба объявить успех. Различимость ожидания требует задача 3.2, а баннер показывает состояние согласования, а не владеет результатом; если повторное объявление успеха нежелательно, это решает человек при разборе F2. Ветка `_assemble` в успехе `_finishCompletion` (`view_model.dart:197-207`) перечитывает текущую пару, только если выбора нет в показанном снимке; цена — одна ограниченная пара порций, и она нужна только для снятия признака ожидания.
 
-DTD и запущенное приложение не использовались: в этом этапе код не изменялся, проверки выполнены CLI. Отчёт — единственный изменённый файл этого этапа. ID, номера, описания, порядок и отметки задач сохранены, новые задачи не добавлены. Находки F1–F3 оставлены для последующих этапов разрешения замечаний; F3 требует продуктового решения до планирования исправления. Фаза 3 не завершена, пока не устранён F1 и не повторены полные проверки.
+DTD и запущенное приложение не использовались: в этом этапе код не изменялся, проверки выполнены CLI. Существующие ID, номера, описания, порядок и отметки задач сохранены. Находки F2 и F3 оставлены для последующих этапов разрешения замечаний; F3 требует продуктового решения до планирования исправления. Фаза 3 не завершена: задачи 3.11–3.12 не выполнены, F2 и F3 остаются активными.

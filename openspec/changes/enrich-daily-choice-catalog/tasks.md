@@ -406,3 +406,25 @@
   - **Dependencies:** 3.4, 3.5, 3.6, 3.7, 3.8, 3.9.
   - **Files likely touched:** Нет, только проверка.
   - **Estimated scope:** XS.
+
+- [ ] 3.11 Устранить замечания анализатора в модели каталога без изменения поведения флажка выполнения
+  - **Acceptance criteria:**
+    - `changeCompletion` в `DailyChoiceCatalogViewModel` явно возвращает отсутствие освобождения права карточки во всех ветках, где команда не принята, включая занятость выбора и завершение работы координатора. Принятая команда по-прежнему возвращает освобождение права, которое не отменяет команду; состояния операции и категории отказов не меняются.
+    - Условия с переносом строки в `changeCompletion`, `refreshCompletion` и `_finishCompletion` оформлены блоками в фигурных скобках. `flutter analyze` не сообщает замечаний по модели каталога; правила анализатора не ослаблены, подавлений не добавлено.
+  - **Verification:**
+    - Выполнить `mise exec --no-deps -- flutter analyze lib/src/daily_choice/presentation/catalog/` и убедиться в отсутствии замечаний.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`.
+  - **Dependencies:** 3.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`.
+  - **Estimated scope:** XS.
+
+- [ ] 3.12 Подтвердить готовность результата фазы 3 к повторной проверке реализации после устранения замечаний анализатора
+  - **Acceptance criteria:**
+    - Результат задачи 3.11 и актуальные проверки подтверждают условие Ready to advance фазы 3 из [плана](plan.md). Прежние результаты задачи 3.10 не подменяют проверку исправленной реализации.
+    - Полные проверки проекта, согласованность генерации и строгая валидация изменения проходят; результат готов к implementation review. Завершение фазы определяет последующий review после последней задачи, а не отметка этого checkpoint.
+  - **Verification:**
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart, проверить флажок в обоих входах и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 3.10, 3.11.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
