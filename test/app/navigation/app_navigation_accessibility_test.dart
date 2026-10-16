@@ -15,6 +15,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -141,7 +142,7 @@ void main() {
       AppDestination.intentionGraph,
       AppDestination.home,
     ]) {
-      await tester.tap(_icon(selected, isSelected: false));
+      await tester.tap(appNavigationDestination(selected));
       await tester.pumpAndSettle();
 
       expect(_selected(tester), selected);
@@ -162,13 +163,13 @@ void main() {
         '$code → ${otherLocale.languageCode}', (tester) async {
       final semantics = tester.ensureSemantics();
       await _start(tester, locale);
-      await tester.tap(_icon(AppDestination.intentionGraph, isSelected: false));
+      await tester.tap(appNavigationDestination(AppDestination.intentionGraph));
       await tester.pumpAndSettle();
       final layout = _barLayout(tester);
       expect(layout.map((icon) => icon.$1), [
-        Icons.home_outlined,
-        Icons.calendar_month_outlined,
-        Icons.hub,
+        DoableIconData.home,
+        DoableIconData.calendarDays,
+        DoableIconData.graphFilled,
       ]);
       _expectAnnounced(tester, names, selected: AppDestination.intentionGraph);
 
@@ -231,8 +232,11 @@ final _bar = find.byType(AppNavigationBar);
 Finder _icon(AppDestination destination, {required bool isSelected}) =>
     find.descendant(
       of: appNavigationDestination(destination),
-      matching: find.byIcon(
-        isSelected ? destination.selectedIcon : destination.icon,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is DoableIcon &&
+            widget.icon ==
+                (isSelected ? destination.selectedIcon : destination.icon),
       ),
     );
 
@@ -410,15 +414,15 @@ void _expectRootContent(
 }
 
 /// Значки панели слева направо вместе с их положением.
-List<(IconData?, Rect)> _barLayout(WidgetTester tester) {
+List<(DoableIconData, Rect)> _barLayout(WidgetTester tester) {
   final icons = find.descendant(
     of: appNavigationDestinations(),
-    matching: find.byType(Icon),
+    matching: find.byType(DoableIcon),
   );
   return [
     for (final element in icons.evaluate())
       (
-        (element.widget as Icon).icon,
+        (element.widget as DoableIcon).icon,
         tester.getRect(find.byWidget(element.widget)),
       ),
   ]..sort((a, b) => a.$2.left.compareTo(b.$2.left));

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -245,15 +246,11 @@ void _expectHome(WidgetTester tester) {
   expect(find.byType(AppNavigationBar), findsOneWidget);
   for (final destination in AppDestination.values) {
     expect(
-      find.descendant(
-        of: appNavigationDestination(destination),
-        matching: find.byIcon(
-          destination == AppDestination.home
-              ? destination.selectedIcon
-              : destination.icon,
-        ),
-      ),
-      findsOneWidget,
+      tester
+          .getSemantics(appNavigationDestination(destination))
+          .flagsCollection
+          .isSelected,
+      destination == AppDestination.home ? Tristate.isTrue : Tristate.isFalse,
       reason: destination.name,
     );
   }

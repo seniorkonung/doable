@@ -1,7 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:flutter/material.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 
 /// Пункт основной навигации.
 ///
@@ -31,18 +31,18 @@ enum AppDestination {
   };
 
   /// Контурный значок невыбранного пункта.
-  IconData get icon => switch (this) {
-    AppDestination.home => Icons.home_outlined,
-    AppDestination.dailyChoices => Icons.calendar_month_outlined,
+  DoableIconData get icon => switch (this) {
+    AppDestination.home => DoableIconData.home,
+    AppDestination.dailyChoices => DoableIconData.calendarDays,
     // Центральный узел соединён с внешними во все стороны: значок изображает
     // граф, а не иерархию уровней.
-    AppDestination.intentionGraph => Icons.hub_outlined,
+    AppDestination.intentionGraph => DoableIconData.graph,
   };
 
   /// Залитый значок выбранного пункта: выбор различим не только цветом.
-  IconData get selectedIcon => switch (this) {
-    AppDestination.home => Icons.home,
-    AppDestination.dailyChoices => Icons.calendar_month,
-    AppDestination.intentionGraph => Icons.hub,
+  DoableIconData get selectedIcon => switch (this) {
+    AppDestination.home => DoableIconData.homeFilled,
+    AppDestination.dailyChoices => DoableIconData.calendarDaysFilled,
+    AppDestination.intentionGraph => DoableIconData.graphFilled,
   };
 }

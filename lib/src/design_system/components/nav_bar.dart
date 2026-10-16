@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import '../doable_colors.dart';
+import '../doable_icon.dart';
 import '../doable_metrics.dart';
 
 /// Готовое представление пункта нижней панели.
@@ -12,8 +13,8 @@ final class NavBarItem {
     required this.title,
   });
 
-  final IconData icon;
-  final IconData selectedIcon;
+  final DoableIconData icon;
+  final DoableIconData selectedIcon;
   final String title;
 }
 
@@ -123,7 +124,7 @@ final class NavBarCreateButton extends StatelessWidget {
     super.key,
   });
 
-  final IconData icon;
+  final DoableIconData icon;
   final String label;
   final String hint;
   final String longPressLabel;
@@ -167,24 +168,22 @@ final class NavBarCreateButton extends StatelessWidget {
           excludeFromSemantics: true,
           customBorder: const StadiumBorder(),
           child: Center(
-            child: IconTheme(
-              data: IconThemeData(color: colors.muted),
-              child: SizedBox.square(
-                dimension: 48,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const Icon(
-                      Icons.add_outlined,
-                      size: DoableMetrics.iconSize,
-                    ),
-                    Positioned(
-                      right: 4,
-                      bottom: 8,
-                      child: Icon(icon, size: 14),
-                    ),
-                  ],
-                ),
+            child: SizedBox.square(
+              dimension: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  DoableIcon(
+                    DoableIconData.plus,
+                    size: DoableMetrics.iconSize,
+                    color: colors.muted,
+                  ),
+                  Positioned(
+                    right: 4,
+                    bottom: 8,
+                    child: DoableIcon(icon, size: 14, color: colors.muted),
+                  ),
+                ],
               ),
             ),
           ),
@@ -233,7 +232,7 @@ final class _NavBarTab extends StatelessWidget {
             excludeFromSemantics: true,
             customBorder: const StadiumBorder(),
             child: Center(
-              child: Icon(
+              child: DoableIcon(
                 selected ? item.selectedIcon : item.icon,
                 size: DoableMetrics.iconSize,
                 color: selected ? colors.ink : colors.muted,

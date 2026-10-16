@@ -15,6 +15,7 @@ library;
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
@@ -51,27 +52,27 @@ Finder appNavigationDestinations({bool skipOffstage = true}) => find.descendant(
   skipOffstage: skipOffstage,
 );
 
-/// Пункт [destination] по назначению, роли и любому из его двух значков.
+/// Пункт [destination] по роли и локализованному доступному названию.
 ///
 /// Возвращает весь пункт: он доступен для нажатия и проверки семантики как
 /// до выбора, так и после него, независимо от внутреннего виджета панели.
 Finder appNavigationDestination(
   AppDestination destination, {
   bool skipOffstage = true,
-}) => find.ancestor(
-  of: find.descendant(
-    of: appNavigationDestinations(skipOffstage: skipOffstage),
-    matching: find.byWidgetPredicate(
-      (widget) =>
-          widget is Icon &&
-          (widget.icon == destination.icon ||
-              widget.icon == destination.selectedIcon),
-      description: 'значок пункта ${destination.name}',
-      skipOffstage: skipOffstage,
-    ),
+}) => find.descendant(
+  of: find.byType(AppNavigationBar, skipOffstage: skipOffstage),
+  matching: find.byElementPredicate(
+    (element) {
+      final widget = element.widget;
+      return widget is Semantics &&
+          widget.properties.role == SemanticsRole.tab &&
+          widget.properties.label?.split('\n').first ==
+              destination.title(AppLocalizations.of(element));
+    },
+    description: 'пункт ${destination.name}',
     skipOffstage: skipOffstage,
   ),
-  matching: appNavigationDestinations(skipOffstage: skipOffstage),
+  skipOffstage: skipOffstage,
 );
 
 /// Ожидание по умолчанию: кадры без реального времени.

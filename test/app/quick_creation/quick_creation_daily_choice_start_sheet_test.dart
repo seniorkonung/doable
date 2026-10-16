@@ -4,11 +4,15 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/app_root_pages.dart';
 
 const _russianOptions = [
   ('От намерения', 'Сначала намерение, затем действие для него'),
@@ -16,6 +20,27 @@ const _russianOptions = [
 ];
 
 void main() {
+  testWidgets('варианты показывают исходные составные значки начала '
+      'и шевроны продолжения', (tester) async {
+    await _openApp(tester);
+    await _openSheet(tester);
+
+    for (final (name, icon) in [
+      ('От намерения', DoableIconData.fromIntention),
+      ('От действия', DoableIconData.fromAction),
+    ]) {
+      final row = find.widgetWithText(OptionRow, name);
+      expect(
+        tester
+            .widgetList<DoableIcon>(
+              find.descendant(of: row, matching: find.byType(DoableIcon)),
+            )
+            .map((widget) => widget.icon),
+        [icon, DoableIconData.chevronRight],
+      );
+    }
+  });
+
   for (final (language, title, subtitle, options, chosen, direction) in [
     (
       'ru',
@@ -101,7 +126,9 @@ void main() {
       'от нажатий, клавиатуры и экранного диктора', (tester) async {
     final app = await _openApp(tester);
     final clearPosition = tester.getCenter(find.text('Очистить ввод'));
-    final homePosition = tester.getCenter(find.byIcon(Icons.home_outlined));
+    final homePosition = tester.getCenter(
+      appNavigationDestination(AppDestination.home),
+    );
     await _openSheet(tester);
 
     expect(find.semantics.byLabel('Очистить ввод'), findsNothing);
