@@ -324,7 +324,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 3.4 Подтвердить готовность управления выполнением из карточки перед удалением прежнего поля редактора
+- [x] 3.4 Подтвердить готовность управления выполнением из карточки перед удалением прежнего поля редактора
   - **Acceptance criteria:**
     - Актуальные результаты задач 3.1–3.3 подтверждают переключение в обе стороны, отдельное доступное действие, блокировку до согласования и сохранность результата при исчезновении карточки или страницы в обоих входах.
     - Отказ записи и отказ последующего чтения различаются; повтор не дублирует сохранённую команду, а подключение общей поверхности не создаёт второго владельца сообщений.
