@@ -7,6 +7,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/components/period_picker.dart';
@@ -111,6 +112,7 @@ Future<void> _expectUsableCatalog(
   await tester.pumpAndSettle();
   final calendar = find.byType(DailyChoiceCalendar);
   final l10n = AppLocalizations.of(tester.element(calendar));
+  _expectCalendarSpacing(tester);
   await tester.tap(find.bySemanticsLabel(l10n.dailyChoiceCalendarExpand));
   await tester.pumpAndSettle();
   repository.failDayStatuses(0);
@@ -153,6 +155,7 @@ Future<void> _expectUsableCatalog(
   expect(listRect.bottom, usableBody.bottom);
 
   final calendarRect = tester.getRect(calendar);
+  _expectCalendarSpacing(tester);
   expect(calendarRect.intersect(usableBody.inflate(0.01)), calendarRect);
   final weeks = weeksFrom(date(2026, 9, 28), 6);
   expect(visibleWeeks(tester), weeks);
@@ -196,6 +199,7 @@ Future<void> _expectUsableCatalog(
       expect(find.text('2036'), findsOneWidget);
     }
     final periodRect = tester.getRect(calendar);
+    _expectCalendarSpacing(tester);
     final periodListRect = tester.getRect(list);
     expect(periodRect.intersect(usableBody.inflate(0.01)), periodRect);
     expect(periodListRect.height, greaterThanOrEqualTo(48));
@@ -253,6 +257,7 @@ Future<void> _expectUsableCatalog(
   await tester.tap(collapse);
   await tester.pumpAndSettle();
   expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
+  _expectCalendarSpacing(tester);
   expect(
     find.bySemanticsLabel(l10n.dailyChoiceCalendarExpand).hitTestable(),
     findsOneWidget,
@@ -263,6 +268,18 @@ Future<void> _expectUsableCatalog(
   );
   await _scrollToLastRow(tester, list);
   expect(tester.takeException(), isNull);
+}
+
+/// Отступ и ручка сохраняют прежние 52 dp во всех представлениях каталогов.
+void _expectCalendarSpacing(WidgetTester tester) {
+  final body = find.byType(DailyChoiceCatalogBody);
+  final safeTop =
+      tester.getTopLeft(body).dy +
+      MediaQuery.paddingOf(tester.element(body)).top;
+  final calendarTop = tester.getTopLeft(find.byType(DailyChoiceCalendar)).dy;
+  final topPadding = calendarTop - safeTop;
+  expect(topPadding, 16);
+  expect(topPadding + tester.getSize(find.byType(CalendarHandle)).height, 52);
 }
 
 Future<void> _scrollToLastRow(WidgetTester tester, Finder list) async {

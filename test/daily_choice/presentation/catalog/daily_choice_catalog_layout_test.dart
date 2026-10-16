@@ -645,21 +645,22 @@ void _expectColumns(WidgetTester tester, List<List<CalendarDate>> weeks) {
   expect(rows.last.last.bottom, lessThanOrEqualTo(calendar.bottom + _epsilon));
 }
 
-/// Команды месяца и ручка лежат в ширине экрана и не меньше области нажатия.
+/// Команды месяца сохраняют область нажатия, ручка занимает полосу 36 dp.
 void _expectCommands(WidgetTester tester) {
   final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
   final isExpanded =
       tester.widget<DailyChoiceCalendar>(calendar).viewport.mode ==
       DailyChoiceCalendarMode.month;
   final texts = AppLocalizations.of(tester.element(calendar));
+  final handleName = isExpanded
+      ? texts.dailyChoiceCalendarCollapse
+      : texts.dailyChoiceCalendarExpand;
   final names = [
     if (isExpanded) ...[
       texts.dailyChoiceCalendarPreviousMonth,
       texts.dailyChoiceCalendarNextMonth,
     ],
-    isExpanded
-        ? texts.dailyChoiceCalendarCollapse
-        : texts.dailyChoiceCalendarExpand,
+    handleName,
   ];
   for (final name in names) {
     final command = find.bySemanticsLabel(name, skipOffstage: false);
@@ -668,7 +669,12 @@ void _expectCommands(WidgetTester tester) {
     expect(rect.left, greaterThanOrEqualTo(-_epsilon));
     expect(rect.right, lessThanOrEqualTo(_screen.width + _epsilon));
     expect(rect.width, greaterThanOrEqualTo(DoableMetrics.tapMin));
-    expect(rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
+    expect(
+      rect.height,
+      name == handleName
+          ? equals(36)
+          : greaterThanOrEqualTo(DoableMetrics.tapMin),
+    );
   }
 }
 

@@ -571,7 +571,7 @@ void _expectLaidOut(
   expect(handle.top, greaterThanOrEqualTo(rows.last.first.bottom));
   expect(handle.bottom, lessThanOrEqualTo(calendar.bottom));
   expect(handle.width, calendar.width);
-  expect(handle.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
+  expect(handle.height, 36);
   final commands = find.descendant(
     of: find.byType(DailyChoiceCalendar),
     matching: find.byType(IconButton),

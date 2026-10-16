@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/day_heading.dart';
+import '../../../design_system/doable_metrics.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar.dart';
@@ -114,7 +115,7 @@ final class _DailyChoiceCatalogBodyState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: DoableMetrics.space4),
               child: DailyChoiceCalendar(
                 selectedDate: state.selection.date,
                 viewport: _viewport,
