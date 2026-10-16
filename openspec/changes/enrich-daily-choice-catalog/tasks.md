@@ -262,3 +262,26 @@
   - **Dependencies:** 2.3, 2.7, 2.8, 2.9.
   - **Files likely touched:** Нет, только проверка; выявленные пробелы исправляются в соответствующих файлах задач фазы.
   - **Estimated scope:** XS.
+
+- [ ] 2.11 Сделать обе секции каталога доступными заголовками для экранного диктора
+  - **Acceptance criteria:**
+    - По требованию «Локализация и доступность дневного выбора» [спецификации](specs/daily-choice-management/spec.md) и решению 6 [дизайна](design.md) заголовки обеих секций передают роль заголовка вместе с локализованным названием, текущим раскрытым или свёрнутым состоянием и доступным действием переключения.
+    - Семантика принадлежит общему `DailyChoiceCatalogBody`, используемому корневым каталогом и каталогом на заданную дату; роль сохраняется при сворачивании и раскрытии. Визуальное представление, порядок карточек и поведение переключения сохраняются.
+    - Существующая проверка доступности в ru/en показывает сценарий «Обе секции доступны при переходе по заголовкам» и обнаруживает потерю роли у любой секции; доступная активация продолжает менять её состояние.
+  - **Verification:**
+    - Расширить существующую проверку семантики обеими секциями до и после доступной активации. Убедиться, что проверка роли падает на прежней реализации и проходит после исправления; сохранить проверки названий, состояний, действий и порядка чтения.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+  - **Dependencies:** 2.10.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`.
+  - **Estimated scope:** S.
+
+- [ ] 2.12 Подтвердить готовность согласованных секций к повторному review после исправления доступности
+  - **Acceptance criteria:**
+    - Результат задачи 2.11 и актуальные проверки подтверждают условие Ready to advance фазы 2 из [плана](plan.md), включая доступную навигацию по заголовкам обеих секций и сохранение управления раскрытием. Прежние результаты задачи 2.10 не подменяют проверку изменённой реализации.
+    - Полные проверки проекта и строгая валидация изменения проходят; результат готов к implementation review. Завершение фазы определяет последующий review после последней задачи, а не отметка этого checkpoint.
+  - **Verification:**
+    - Сопоставить результаты задачи 2.11 с обновлённым требованием доступности; выполнить `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Если доступно запущенное приложение, применить hot reload или restart, проверить оба входа, переход по заголовкам секций, раскрытие и сворачивание и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии.
+  - **Dependencies:** 2.10, 2.11.
+  - **Files likely touched:** Нет, только проверка.
+  - **Estimated scope:** XS.
