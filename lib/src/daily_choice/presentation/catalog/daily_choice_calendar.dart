@@ -12,6 +12,7 @@ import '../../../design_system/components/notice.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
+import 'daily_choice_calendar_expansion.dart';
 import 'daily_choice_calendar_paging.dart';
 import 'daily_choice_calendar_period_picker.dart';
 import 'daily_choice_calendar_viewport.dart';
@@ -43,6 +44,8 @@ import 'daily_choice_calendar_viewport.dart';
 /// Ручка раскрытия или сворачивания также сообщает только
 /// [onViewportChanged]: меняется представление, а дата просмотра сохраняется
 /// точно, поэтому раскрывается месяц и сворачивается неделя этой даты.
+/// Событие приходит после завершения анимации; повторное нажатие меняет её
+/// цель из текущего положения. Возврат не создаёт события.
 /// Вертикальные жесты представление не переключают. Изменения входов
 /// потребителем отражаются без обратных событий.
 ///
@@ -115,9 +118,10 @@ final class DailyChoiceCalendar extends StatefulWidget {
   State<DailyChoiceCalendar> createState() => _DailyChoiceCalendarState();
 }
 
-final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
-  /// Собственное хранилище страниц, которое живёт столько же, сколько
-  /// календарь.
+final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
+    with SingleTickerProviderStateMixin {
+  /// Изолированные хранилища недельной и раскрытой сеток живут вместе
+  /// с календарём; выбор периода также не обращается к хранилищу предков.
   ///
   /// Сетка библиотеки сохраняет номер страницы в ближайшем [PageStorage] и при
   /// создании заменяет им начальную страницу. Запись в хранилище предков
@@ -125,21 +129,38 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   /// ключом календарь делил бы с ней одну запись: после пересоздания показал
   /// бы период по её смещению и испортил бы сохранённое смещение. Запись в
   /// собственном хранилище не переживает календарь.
-  var _pageStorage = PageStorageBucket();
+  var _weekStorage = PageStorageBucket();
+  var _monthStorage = PageStorageBucket();
 
   bool _isPeriodPickerOpen = false;
+  bool _isTransitioning = false;
+  late DailyChoiceCalendarMode _targetMode = widget.viewport.mode;
+  late final _expansion = AnimationController(
+    vsync: this,
+    value: _progressFor(widget.viewport.mode),
+  );
 
   /// Контроллер страниц принадлежит библиотеке: она создаёт его вместе с
   /// сеткой и сама освобождает. Кнопки шапки перелистывают им страницы, чтобы
   /// переход шёл тем же путём, что и свайп.
-  late PageController _pages;
+  PageController? _weekPages;
+  PageController? _monthPages;
+
+  @override
+  void dispose() {
+    _expansion.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(DailyChoiceCalendar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.viewport.mode == DailyChoiceCalendarMode.week &&
-        _isPeriodPickerOpen) {
-      _closePeriodPicker();
+    if (widget.viewport != oldWidget.viewport) {
+      _expansion.stop();
+      _isTransitioning = false;
+      _targetMode = widget.viewport.mode;
+      _expansion.value = _progressFor(_targetMode);
+      _discardInactiveGrid();
     }
   }
 
@@ -147,81 +168,74 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   Widget build(BuildContext context) {
     final viewport = widget.viewport;
     final localizations = AppLocalizations.of(context);
-    final isExpanded = viewport.mode == DailyChoiceCalendarMode.month;
-    final calendar = Column(
+    final isExpanded = _targetMode == DailyChoiceCalendarMode.month;
+    final showWeek = _isTransitioning || !isExpanded;
+    final showExpanded = _isTransitioning || isExpanded;
+    final week = showWeek
+        ? _buildGrid(DailyChoiceCalendarMode.week)
+        : const SizedBox.shrink();
+    final Widget expanded;
+    if (!showExpanded) {
+      expanded = const SizedBox.shrink();
+    } else if (_isPeriodPickerOpen) {
+      expanded = PageStorage(
+        bucket: _monthStorage,
+        child: DailyChoiceCalendarPeriodPicker(
+          focusedDate: viewport.focusedDate,
+          today: widget.today,
+          onMonthSelected: _completeMonthSelection,
+          onClose: () => setState(_closePeriodPicker),
+        ),
+      );
+    } else {
+      expanded = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CalendarHeader(
+            title: _monthTitle(context, viewport.focusedDate),
+            previousLabel: localizations.dailyChoiceCalendarPreviousMonth,
+            nextLabel: localizations.dailyChoiceCalendarNextMonth,
+            onPrevious: _hasPreviousMonth(viewport.focusedDate)
+                ? _showPreviousPeriod
+                : null,
+            onNext: _hasNextMonth(viewport.focusedDate)
+                ? _showNextPeriod
+                : null,
+            titleAction: (
+              semanticLabel:
+                  localizations.dailyChoiceCalendarChooseYearAndMonth,
+              isExpanded: false,
+              onTap: _openPeriodPicker,
+            ),
+          ),
+          _buildGrid(DailyChoiceCalendarMode.month),
+        ],
+      );
+    }
+    return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_isPeriodPickerOpen)
-          DailyChoiceCalendarPeriodPicker(
-            focusedDate: viewport.focusedDate,
-            today: widget.today,
-            onMonthSelected: _completeMonthSelection,
-            onClose: () => setState(_closePeriodPicker),
-          )
-        else ...[
-          if (isExpanded)
-            CalendarHeader(
-              title: _monthTitle(context, viewport.focusedDate),
-              previousLabel: localizations.dailyChoiceCalendarPreviousMonth,
-              nextLabel: localizations.dailyChoiceCalendarNextMonth,
-              onPrevious: _hasPreviousMonth(viewport.focusedDate)
-                  ? _showPreviousPeriod
-                  : null,
-              onNext: _hasNextMonth(viewport.focusedDate)
-                  ? _showNextPeriod
-                  : null,
-              titleAction: (
-                semanticLabel:
-                    localizations.dailyChoiceCalendarChooseYearAndMonth,
-                isExpanded: false,
-                onTap: _openPeriodPicker,
+        // Дети сохраняют экземпляры между кадрами: анимация перестраивает
+        // только раскладку, а не сетки и не выдачу потребителя.
+        AnimatedBuilder(
+          animation: _expansion,
+          builder: (context, _) => ExcludeFocus(
+            excluding: _isTransitioning,
+            child: ExcludeSemantics(
+              excluding: _isTransitioning,
+              child: IgnorePointer(
+                ignoring: _isTransitioning,
+                child: DailyChoiceCalendarExpansion(
+                  progress: _expansion.value,
+                  week: week,
+                  expanded: expanded,
+                ),
               ),
             ),
-          // Библиотека задаёт строкам фиксированную высоту, поэтому её
-          // рассчитывает календарь: по ширине колонки и масштабу текста.
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columnWidth = _columnWidth(constraints.maxWidth);
-              // Основа библиотеки без готовых ячеек: ячейка `TableCalendar`
-              // задаёт собственную подпись даты, скрывает содержимое от
-              // вспомогательных технологий и объявляет пустое долгое нажатие.
-              // Дни и подписи дней недели строит календарь, а страницы, жесты и
-              // сетка остаются за библиотекой.
-              return TableCalendarBase(
-                firstDay: _firstDay,
-                lastDay: _lastDay,
-                focusedDay: _technicalDate(viewport.focusedDate),
-                calendarFormat: switch (viewport.mode) {
-                  DailyChoiceCalendarMode.week => CalendarFormat.week,
-                  DailyChoiceCalendarMode.month => CalendarFormat.month,
-                },
-                startingDayOfWeek: StartingDayOfWeek.monday,
-                // Постоянные шесть строк включают дни соседних месяцев:
-                // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase/sixWeekMonthsEnforced.html
-                sixWeekMonthsEnforced: true,
-                // Представление переключает только потребитель, поэтому
-                // вертикальные жесты не управляют календарём.
-                availableGestures: AvailableGestures.horizontalSwipe,
-                rowHeight: DailyChoiceCalendarDay.rowHeight(
-                  context,
-                  columnWidth: columnWidth,
-                  mode: viewport.mode,
-                ),
-                // В неделе подпись дня входит в ячейку:
-                // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase-class.html
-                dowVisible: viewport.mode == DailyChoiceCalendarMode.month,
-                dowHeight: _weekdayHeight(context, columnWidth: columnWidth),
-                dowBuilder: _buildWeekday,
-                dayBuilder: _buildDay,
-                pageAnimationDuration: calendarPageAnimationDuration,
-                pageAnimationCurve: calendarPageAnimationCurve,
-                onCalendarCreated: (pages) => _pages = pages,
-                onPageChanged: _reportFocusedDay,
-              );
-            },
           ),
-        ],
+        ),
         CalendarHandle(
           isExpanded: isExpanded,
           semanticLabel: isExpanded
@@ -238,39 +252,121 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
           ),
       ],
     );
-    return PageStorage(bucket: _pageStorage, child: calendar);
   }
+
+  Widget _buildGrid(DailyChoiceCalendarMode mode) => PageStorage(
+    key: ValueKey(mode),
+    bucket: mode == DailyChoiceCalendarMode.week ? _weekStorage : _monthStorage,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        // Библиотека задаёт строкам фиксированную высоту; календарь вычисляет
+        // её по ширине колонки и масштабу текста и строит собственные ячейки.
+        final columnWidth = _columnWidth(constraints.maxWidth);
+        return TableCalendarBase(
+          firstDay: _firstDay,
+          lastDay: _lastDay,
+          focusedDay: _technicalDate(widget.viewport.focusedDate),
+          calendarFormat: switch (mode) {
+            DailyChoiceCalendarMode.week => CalendarFormat.week,
+            DailyChoiceCalendarMode.month => CalendarFormat.month,
+          },
+          startingDayOfWeek: StartingDayOfWeek.monday,
+          // Постоянные шесть строк включают дни соседних месяцев:
+          // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase/sixWeekMonthsEnforced.html
+          sixWeekMonthsEnforced: true,
+          availableGestures: AvailableGestures.horizontalSwipe,
+          rowHeight: DailyChoiceCalendarDay.rowHeight(
+            context,
+            columnWidth: columnWidth,
+            mode: mode,
+          ),
+          // В неделе подпись дня входит в ячейку:
+          // https://pub.dev/documentation/table_calendar/latest/table_calendar/TableCalendarBase-class.html
+          dowVisible: mode == DailyChoiceCalendarMode.month,
+          dowHeight: _weekdayHeight(context, columnWidth: columnWidth),
+          dowBuilder: _buildWeekday,
+          dayBuilder: (context, day, focusedDay) =>
+              _buildDay(context, day, focusedDay, mode),
+          formatAnimationDuration: Duration.zero,
+          pageAnimationEnabled: _isActive(mode),
+          pageAnimationDuration: calendarPageAnimationDuration,
+          pageAnimationCurve: calendarPageAnimationCurve,
+          onCalendarCreated: (pages) {
+            switch (mode) {
+              case DailyChoiceCalendarMode.week:
+                _weekPages = pages;
+              case DailyChoiceCalendarMode.month:
+                _monthPages = pages;
+            }
+          },
+          onPageChanged: (day) => _reportFocusedDay(day, mode),
+        );
+      },
+    ),
+  );
+
+  bool _isActive(DailyChoiceCalendarMode mode) =>
+      !_isTransitioning && widget.viewport.mode == mode;
 
   // О смене страницы, как и после свайпа, сообщает _reportFocusedDay.
   void _showPreviousPeriod() => unawaited(
-    _pages.previousPage(
+    _monthPages!.previousPage(
       duration: calendarPageAnimationDuration,
       curve: calendarPageAnimationCurve,
     ),
   );
 
   void _showNextPeriod() => unawaited(
-    _pages.nextPage(
+    _monthPages!.nextPage(
       duration: calendarPageAnimationDuration,
       curve: calendarPageAnimationCurve,
     ),
   );
 
-  // Дата просмотра сохраняется, а к периоду нового представления библиотека
-  // переходит без сообщения о смене страницы.
   void _toggleMode() {
-    if (_isPeriodPickerOpen) {
-      setState(_closePeriodPicker);
-    } else {
+    if (!_isTransitioning && !_isPeriodPickerOpen) {
       _stopPaging();
     }
-    final viewport = widget.viewport;
-    widget.onViewportChanged(
-      viewport.withMode(switch (viewport.mode) {
+    setState(() {
+      _targetMode = switch (_targetMode) {
         DailyChoiceCalendarMode.week => DailyChoiceCalendarMode.month,
         DailyChoiceCalendarMode.month => DailyChoiceCalendarMode.week,
-      }),
+      };
+      _isTransitioning = true;
+    });
+    final target = _progressFor(_targetMode);
+    // animateTo начинает из текущего значения и отменяет прежнее завершение:
+    // https://api.flutter.dev/flutter/animation/AnimationController/animateTo.html
+    unawaited(
+      _expansion
+          .animateTo(
+            target,
+            duration: Duration(
+              microseconds: (200000 * (target - _expansion.value).abs())
+                  .round(),
+            ),
+            curve: Curves.easeOut,
+          )
+          .then((_) {
+            setState(() {
+              _isTransitioning = false;
+              _discardInactiveGrid();
+            });
+            if (_targetMode != widget.viewport.mode) {
+              widget.onViewportChanged(widget.viewport.withMode(_targetMode));
+            }
+          }),
     );
+  }
+
+  void _discardInactiveGrid() {
+    switch (_targetMode) {
+      case DailyChoiceCalendarMode.week:
+        _closePeriodPicker();
+      case DailyChoiceCalendarMode.month:
+        _weekStorage = PageStorageBucket();
+        _weekPages = null;
+    }
   }
 
   void _openPeriodPicker() {
@@ -283,7 +379,8 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
     // При возвращении сетка создаётся с итоговым просмотром, без сохранённого
     // номера прежней страницы или представления:
     // https://api.flutter.dev/flutter/widgets/PageController/keepPage.html
-    _pageStorage = PageStorageBucket();
+    _monthStorage = PageStorageBucket();
+    _monthPages = null;
   }
 
   void _completeMonthSelection(CalendarDate firstDate) {
@@ -313,8 +410,12 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   void _stopPaging() {
     // PageView сообщает о странице, ближайшей к текущему положению, поэтому
     // переход к ней не создаёт нового сообщения.
-    if (_pages.page case final page?) {
-      _pages.jumpToPage(page.round());
+    final pages = switch (widget.viewport.mode) {
+      DailyChoiceCalendarMode.week => _weekPages!,
+      DailyChoiceCalendarMode.month => _monthPages!,
+    };
+    if (pages.page case final page?) {
+      pages.jumpToPage(page.round());
     }
   }
 
@@ -326,7 +427,12 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
     );
   }
 
-  Widget _buildDay(BuildContext context, DateTime day, DateTime focusedDay) {
+  Widget _buildDay(
+    BuildContext context,
+    DateTime day,
+    DateTime focusedDay,
+    DailyChoiceCalendarMode mode,
+  ) {
     final date = _availableDate(day);
     // Позиция крайней недели за пределами CalendarDate сохраняет место в
     // строке, но не показывает несуществующую дату, не объявляется и не
@@ -340,16 +446,19 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
       status: widget.dayStatusForDate?.call(date),
       isSelected: date == widget.selectedDate,
       isToday: date == widget.today,
-      mode: widget.viewport.mode,
+      mode: mode,
       isOutsideMonth:
-          widget.viewport.mode == DailyChoiceCalendarMode.month &&
+          mode == DailyChoiceCalendarMode.month &&
           (day.year != focusedDay.year || day.month != focusedDay.month),
       // Дату просмотра в нажатый день переносит потребитель.
-      onSelected: () => widget.onDateSelected(date),
+      onSelected: () {
+        if (_isActive(mode)) widget.onDateSelected(date);
+      },
     );
   }
 
-  void _reportFocusedDay(DateTime focusedDay) {
+  void _reportFocusedDay(DateTime focusedDay, DailyChoiceCalendarMode mode) {
+    if (!_isActive(mode)) return;
     // Технический фокус крайней недели может выйти за предел диапазона;
     // ближайший допустимый день принадлежит той же неделе.
     var focusedDate = _calendarDate(_clampToRange(focusedDay));
@@ -366,6 +475,11 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
     }
   }
 }
+
+double _progressFor(DailyChoiceCalendarMode mode) => switch (mode) {
+  DailyChoiceCalendarMode.week => 0,
+  DailyChoiceCalendarMode.month => 1,
+};
 
 /// Пределы календаря совпадают с допустимым диапазоном [CalendarDate].
 final _firstDay = _technicalDate(CalendarDate.earliest);

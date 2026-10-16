@@ -311,18 +311,14 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
-        expect(consumer.events, [
-          ViewportChanged(month(date(2026, 11, 15))),
-          ViewportChanged(week(date(2026, 11, 15))),
-          ViewportChanged(month(date(2026, 11, 15))),
-        ]);
+        expect(consumer.events, [ViewportChanged(month(date(2026, 11, 15)))]);
         expect(consumer.viewport, month(date(2026, 11, 15)));
         expect(consumer.selectedDate, date(2026, 10, 4));
       },
     );
 
     testWidgets(
-      'выбор дня во время раскрытия даёт одно событие и сохраняет месяц',
+      'нажатие дня при раскрытии игнорируется, после завершения выбирает день',
       (tester) async {
         final consumer = await pumpCalendarConsumer(
           tester,
@@ -335,6 +331,14 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 50));
         expect(tester.hasRunningAnimations, isTrue);
+        await tester.tapAt(
+          tester.getCenter(calendarDay(date(2026, 10, 1)).first),
+        );
+        expect(consumer.events, isEmpty);
+        await tester.pumpAndSettle();
+
+        expect(consumer.events, [ViewportChanged(month(date(2026, 10, 4)))]);
+        expect(consumer.selectedDate, date(2026, 10, 4));
         await tester.tap(calendarDay(date(2026, 10, 1)));
         await tester.pumpAndSettle();
 
@@ -350,7 +354,7 @@ void main() {
     );
 
     testWidgets(
-      'выбор дня во время сворачивания даёт одно событие и сохраняет неделю',
+      'нажатие дня при сворачивании игнорируется, после завершения выбирает день',
       (tester) async {
         final consumer = await pumpCalendarConsumer(
           tester,
@@ -363,6 +367,14 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 50));
         expect(tester.hasRunningAnimations, isTrue);
+        await tester.tapAt(
+          tester.getCenter(calendarDay(date(2026, 11, 12)).first),
+        );
+        expect(consumer.events, isEmpty);
+        await tester.pumpAndSettle();
+
+        expect(consumer.events, [ViewportChanged(week(date(2026, 11, 15)))]);
+        expect(consumer.selectedDate, date(2026, 10, 4));
         await tester.tap(calendarDay(date(2026, 11, 12)));
         await tester.pumpAndSettle();
 

@@ -92,6 +92,32 @@ final _localizedTexts = [
 ];
 
 void main() {
+  testWidgets('переход оставляет доступной только ручку, '
+      'сохраняя доступную смену цели', (tester) async {
+    final texts = _localizedTexts.first;
+    final semantics = tester.ensureSemantics();
+    final focused = date(2026, 10, 4);
+    final consumer = await pumpCalendarConsumer(
+      tester,
+      selectedDate: focused,
+      viewport: week(focused),
+      today: focused,
+      locale: texts.locale,
+    );
+    tester.semantics.tap(_command(texts.expand));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(_announced(tester), [texts.collapse]);
+    expect(_actionable(tester), [texts.collapse]);
+    expect(consumer.events, isEmpty);
+    tester.semantics.tap(_command(texts.collapse));
+    await tester.pumpAndSettle();
+    expect(consumer.events, isEmpty);
+    expect(_dayNodes(tester), hasLength(7));
+    expect(_actionable(tester).last, texts.expand);
+    semantics.dispose();
+  });
+
   for (final texts in _localizedTexts) {
     final language = texts.locale.languageCode;
 
