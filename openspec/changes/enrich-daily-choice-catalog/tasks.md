@@ -335,18 +335,32 @@
   - **Files likely touched:** Нет, только проверка.
   - **Estimated scope:** XS.
 
-- [ ] 3.5 Убрать поле выполнения из формы редактирования, сохранив его при создании
+- [ ] 3.5 Перенести сквозные проверки выполнения на флажок карточки до удаления поля редактора
+  - **Acceptance criteria:**
+    - По требованию «Календарная дата и независимое выполнение» и решениям 5–6 дизайна существующий сценарий `daily_choice_app_flow_test.dart` переключает выполнение флажком нужной карточки каталога, сохраняя проверки независимой правки после архивирования пути и утраты готовности, идентичности и шагов, перезапуска и удаления только выбранного дубликата. Помощник редактора меняет только оставшиеся поля.
+    - Сценарии `app_shell_state_test.dart` и `intention_statistics_catalog_scenarios.dart` используют флажок вместо `daily-choice-edit-completed`, сохраняя согласование скрытого корневого каталога до возвращения, отметок дней и нескольких живых экземпляров каталога, их выбранных дат, секций, загруженного объёма и прокрутки. Для проверки скрытого корневого каталога выполнение меняется из другого видимого каталога на заданную дату; возврат в корневой каталог не подменяет условие скрытости.
+    - Сценарий задержанного подсчёта статистики сохраняет доказательство, что выполнение и отдельная правка даты подтверждаются до окончания подсчёта, скрытая статистика не начинает чтение или пересчёт до возврата, а затем показывает актуальные числа и дату. Проверки переходят на доступные пользовательские действия без прямой подмены выполнения в хранилище и без удаления прежних наблюдаемых гарантий.
+  - **Verification:**
+    - Перенести существующие вызовы и помощники, не создавая дублирующих наборов; действие флажка адресовать по устойчивому идентификатору. Проверить сохранение исходных условий скрытости и независимости страниц, а также утверждений о сохранённых данных и согласованных представлениях.
+    - Выполнить `mise exec --no-deps -- flutter test test/app/daily_choice_app_flow_test.dart test/app/navigation/app_shell_state_test.dart test/app/intention_statistics_app_flow_test.dart`. Последний файл включает `intention_statistics_catalog_scenarios.dart` через `part` и служит точкой запуска его сценариев.
+  - **Dependencies:** 3.4.
+  - **Files likely touched:** `test/app/daily_choice_app_flow_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/app/intention_statistics_catalog_scenarios.dart`; существующие помощники навигации используются повторно.
+  - **Estimated scope:** M.
+
+- [ ] 3.6 Убрать поле выполнения из формы редактирования с переносом оставшихся проверок редактора
   - **Acceptance criteria:**
     - По требованию «Календарная дата и независимое выполнение» форма редактирования сохранённого выбора больше не показывает элемент изменения выполнения и не предоставляет соответствующего доступного действия в ru/en; дата, время, приоритет и описание остаются редактируемыми.
     - Возможность явно указать выполнение при создании и показ сохранённого выполнения в подробностях сохраняются; используемые ими общие строки локализации не удаляются вместе с элементом редактора.
+    - Оставшиеся прямые потребители поля перенесены вместе с его удалением: `daily_choice_details_page_test.dart` проверяет правку даты и описания и `DailyChoiceFieldUnchanged` для `isCompleted`; сценарий отказа записи после ухода из редактора в `daily_choice_app_lifecycle_test.dart` использует дату и описание, сохраняя проверки отката данных и однократного предъявления результата после возвращения фокуса. Сквозные сценарии задачи 3.5 продолжают проверять прежние гарантии через флажок карточки.
   - **Verification:**
     - Дополнить существующую проверку страницы отсутствием поля выполнения в обеих локалях при сохранении остальных правок. Сохранность создания проверить существующим сценарием явной отметки, без повторения проверок механизма создания.
-    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart test/daily_choice/presentation/details/daily_choice_details_page_test.dart`.
-  - **Dependencies:** 3.4.
-  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`.
-  - **Estimated scope:** S.
+    - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart test/daily_choice/presentation/details/daily_choice_details_page_test.dart test/app/daily_choice_app_lifecycle_test.dart test/app/daily_choice_app_flow_test.dart test/app/navigation/app_shell_state_test.dart test/app/intention_statistics_app_flow_test.dart` после удаления поля, до перехода к следующей задаче.
+    - Проверить оставшиеся упоминания через `rg -n 'daily-choice-edit-completed' lib test widgetbook`: допустимы только проверки отсутствия удалённого элемента; действующих обращений к нему нет. Перенос потребителей не откладывается до итоговой проверки фазы.
+  - **Dependencies:** 3.5.
+  - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Estimated scope:** M.
 
-- [ ] 3.6 Исключить выполнение из изменяемого состояния и правки редактора
+- [ ] 3.7 Исключить выполнение из изменяемого состояния и правки редактора
   - **Acceptance criteria:**
     - Решение 6 дизайна завершено внутри редактора: удалены изменяемое поле выполнения, `withCompletion`, `changeCompletion` и их участие в `hasEdits` и `toPatch`. Исходный сохранённый `DailyChoice` остаётся полноценной предметной моделью, а команда каталога и создание сохраняют право изменять или задавать выполнение.
     - Любая правка редактора передаёт только действительно изменённые дату, время, приоритет или описание; `isCompleted` всегда остаётся `DailyChoiceFieldUnchanged`. Сохранение ранее открытого редактора не откатывает выполнение, подтверждённое флажком, а отсутствие правок не создаёт команду.
@@ -354,11 +368,11 @@
   - **Verification:**
     - Дополнить проверки состояния и модели составом правки для оставшихся полей при обоих исходных значениях выполнения; проверить отсутствие производственных вызовов прежних методов редактора.
     - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`; при изменении входов генератора выполнить `mise run codegen`.
-  - **Dependencies:** 3.5.
+  - **Dependencies:** 3.6.
   - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_state.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_edit_view_model.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_view_model_test.dart`; соответствующий сгенерированный файл модели при необходимости.
   - **Estimated scope:** M.
 
-- [ ] 3.7 Подтвердить сквозное согласование флажка с секциями, календарём, подробностями и независимой правкой
+- [ ] 3.8 Подтвердить сквозное согласование флажка с секциями, календарём, подробностями и независимой правкой
   - **Acceptance criteria:**
     - С реальными `DriftPersonalGraphRepository` и координатором нажатие флажка в корневом каталоге и каталоге на заданную дату устанавливает и снимает выполнение. Выбор с 18:00/P2, многошаговым путём и полным описанием занимает положенное место в другой секции; за загруженной границей он доступен через продолжение, а полный дубликат остаётся самостоятельным.
     - Выполнение последнего невыполненного выбора меняет отметку дня на галочку, снятие — обратно; подробности и другой живой экземпляр каталога получают подтверждённое состояние без ручного обновления и сброса своих параметров просмотра. Перенос в свёрнутую секцию не раскрывает её автоматически.
@@ -366,29 +380,29 @@
   - **Verification:**
     - Расширить существующий сценарий карточки реальными нажатиями и возвратом из подробностей; интеграционную проверку нескольких представлений запускать через действие модели каталога, а не прямую подмену результата команды. В проверке редактора подтвердить сохранение после выполнения, изменённого другим экземпляром каталога.
     - Выполнить `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart`. Повторно проверять алгоритм порядка и внутренний протокол отметок отдельными новыми наборами не требуется.
-  - **Dependencies:** 3.4, 3.6.
+  - **Dependencies:** 3.4, 3.7.
   - **Files likely touched:** `test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 3.8 Подтвердить изменение выполнения через каталог после обновления установки и повторного открытия файла
+- [ ] 3.9 Подтвердить изменение выполнения через каталог после обновления установки и повторного открытия файла
   - **Acceptance criteria:**
     - На существующей файловой фикстуре схемы 1 после штатного перехода 1 → 2 выполненный и невыполненный выборы доступны в секциях с прежними идентификаторами и данными, временем «Весь день» и приоритетом P4. Действие модели каталога через реальный координатор меняет их выполнение в обе стороны.
     - После завершения команд, закрытия объектов хранилища и повторного открытия того же файла сохраняются подтверждённое выполнение, дата, описание, участники, шаги пути и порядок создания. Новый экземпляр каталога читает сохранённые данные без памяти прежней модели; архивированные участники или шаги не мешают независимой правке.
   - **Verification:**
     - Дополнить `file_backed_migration_test.dart` сценарием использования обновлённой базы через модель каталога и координатор, переиспользуя имеющуюся фикстуру схемы 1 и `LocalDatabaseHarness`. Не дублировать проверки прерывания миграции и не менять снимок версии 1; проверяется соединение обновления с новым пользовательским действием.
     - Выполнить `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/data/local/migrations/file_backed_migration_test.dart` и `mise exec --no-deps -- flutter test test/graph/data/file_backed_daily_choice_durability_test.dart`.
-  - **Dependencies:** 3.7.
+  - **Dependencies:** 3.8.
   - **Files likely touched:** `test/data/local/migrations/file_backed_migration_test.dart`; существующие помощники в `test/support/local_database_harness.dart` только при необходимости подключения сценария.
   - **Estimated scope:** M.
 
-- [ ] 3.9 Подтвердить готовность результата фазы 3 к проверке реализации
+- [ ] 3.10 Подтвердить готовность результата фазы 3 к проверке реализации
   - **Acceptance criteria:**
-    - Условие Ready to advance фазы 3 из [плана](plan.md) подтверждено результатами задач 3.1–3.8: путь от планирования до обратимого выполнения работает в обоих каталогах и на обновлённой установке; отказы, ожидание согласования и уход со страницы не оставляют ложного выполнения, повторной операции или рассогласованных представлений.
+    - Условие Ready to advance фазы 3 из [плана](plan.md) подтверждено результатами задач 3.1–3.9: путь от планирования до обратимого выполнения работает в обоих каталогах и на обновлённой установке; отказы, ожидание согласования и уход со страницы не оставляют ложного выполнения, повторной операции или рассогласованных представлений.
     - Редактор сохраняет независимые правки без управления выполнением, создание сохраняет явную отметку; доступность и локализация нового действия проверены. Полные проверки проекта, согласованность генерации и строгая валидация изменения проходят.
     - Результат готов к последующей проверке реализации после последней задачи; отметка этого checkpoint сама по себе не завершает фазу `plan.md`.
   - **Verification:**
-    - Сопоставить актуальные результаты задач с требованиями фазы и сквозными сценариями 3.7–3.8; выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
+    - Сопоставить актуальные результаты задач с требованиями фазы, переносом существующих проверок в 3.5–3.6 и сквозными сценариями 3.8–3.9; выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate enrich-daily-choice-catalog --strict`.
     - Если доступно запущенное приложение, выполнить hot reload или restart и проверить флажок в обоих входах, его недоступность во время операции, перемещение между секциями, отметку дня, возврат и `get_runtime_errors`; иначе использовать предусмотренные CLI-проверки. Результаты и ограничения сообщить в сессии без отдельного отчёта.
-  - **Dependencies:** 3.4, 3.5, 3.6, 3.7, 3.8.
+  - **Dependencies:** 3.4, 3.5, 3.6, 3.7, 3.8, 3.9.
   - **Files likely touched:** Нет, только проверка.
   - **Estimated scope:** XS.
