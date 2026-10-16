@@ -50,7 +50,6 @@ final class DailyChoiceEditState {
     required this.original,
     required this.date,
     required this.description,
-    required this.isCompleted,
     required this.schedule,
     required this.priority,
     required this.operation,
@@ -60,7 +59,6 @@ final class DailyChoiceEditState {
   DailyChoiceEditState.initial(this.original)
     : date = original.date,
       description = original.description?.value ?? '',
-      isCompleted = original.isCompleted,
       schedule = original.schedule,
       priority = original.priority,
       operation = const DailyChoiceEditIdle(),
@@ -69,7 +67,6 @@ final class DailyChoiceEditState {
   final DailyChoice original;
   final CalendarDate date;
   final String description;
-  final bool isCompleted;
   final DailyChoiceSchedule schedule;
   final DailyChoicePriority priority;
   final DailyChoiceEditOperation operation;
@@ -78,7 +75,6 @@ final class DailyChoiceEditState {
   bool get hasEdits =>
       date != original.date ||
       description != (original.description?.value ?? '') ||
-      isCompleted != original.isCompleted ||
       schedule != original.schedule ||
       priority != original.priority;
 
@@ -105,7 +101,6 @@ final class DailyChoiceEditState {
         : DailyChoiceDescriptionSet(parsedDescription);
     if (date == original.date &&
         descriptionPatch is DailyChoiceDescriptionUnchanged &&
-        isCompleted == original.isCompleted &&
         schedule == original.schedule &&
         priority == original.priority) {
       return null;
@@ -115,9 +110,6 @@ final class DailyChoiceEditState {
           ? const DailyChoiceFieldUnchanged<CalendarDate>()
           : DailyChoiceFieldSet(date),
       description: descriptionPatch,
-      isCompleted: isCompleted == original.isCompleted
-          ? const DailyChoiceFieldUnchanged<bool>()
-          : DailyChoiceFieldSet(isCompleted),
       schedule: schedule == original.schedule
           ? const DailyChoiceFieldUnchanged<DailyChoiceSchedule>()
           : DailyChoiceFieldSet(schedule),
@@ -135,9 +127,6 @@ final class DailyChoiceEditState {
     corrects: DailyChoiceValidationField.description,
   );
 
-  DailyChoiceEditState withCompletion(bool value) =>
-      _withField(isCompleted: value);
-
   DailyChoiceEditState withSchedule(DailyChoiceSchedule value) =>
       _withField(schedule: value);
 
@@ -151,7 +140,6 @@ final class DailyChoiceEditState {
     original: original,
     date: date,
     description: description,
-    isCompleted: isCompleted,
     schedule: schedule,
     priority: priority,
     operation: value,
@@ -161,7 +149,6 @@ final class DailyChoiceEditState {
   DailyChoiceEditState _withField({
     CalendarDate? date,
     String? description,
-    bool? isCompleted,
     DailyChoiceSchedule? schedule,
     DailyChoicePriority? priority,
     DailyChoiceValidationField? corrects,
@@ -187,7 +174,6 @@ final class DailyChoiceEditState {
       original: original,
       date: date ?? this.date,
       description: description ?? this.description,
-      isCompleted: isCompleted ?? this.isCompleted,
       schedule: schedule ?? this.schedule,
       priority: priority ?? this.priority,
       operation: nextOperation,

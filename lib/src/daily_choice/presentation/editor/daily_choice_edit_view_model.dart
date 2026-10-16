@@ -51,13 +51,6 @@ final class DailyChoiceEditViewModel extends _$DailyChoiceEditViewModel {
     state = next;
   }
 
-  void changeCompletion(bool value) {
-    if (state.isCompleted == value) return;
-    final next = state.withCompletion(value);
-    _releaseDroppedClaim(next);
-    state = next;
-  }
-
   void changeSchedule(DailyChoiceSchedule value) {
     if (state.schedule == value) return;
     state = state.withSchedule(value);

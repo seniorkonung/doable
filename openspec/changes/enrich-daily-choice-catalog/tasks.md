@@ -360,7 +360,7 @@
   - **Files likely touched:** `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 3.7 Исключить выполнение из изменяемого состояния и правки редактора
+- [x] 3.7 Исключить выполнение из изменяемого состояния и правки редактора
   - **Acceptance criteria:**
     - Решение 6 дизайна завершено внутри редактора: удалены изменяемое поле выполнения, `withCompletion`, `changeCompletion` и их участие в `hasEdits` и `toPatch`. Исходный сохранённый `DailyChoice` остаётся полноценной предметной моделью, а команда каталога и создание сохраняют право изменять или задавать выполнение.
     - Любая правка редактора передаёт только действительно изменённые дату, время, приоритет или описание; `isCompleted` всегда остаётся `DailyChoiceFieldUnchanged`. Сохранение ранее открытого редактора не откатывает выполнение, подтверждённое флажком, а отсутствие правок не создаёт команду.
