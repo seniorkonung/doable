@@ -111,6 +111,7 @@ void main() {
           final height = _expectPeriodGrid(tester, years);
           yearsHeight ??= height;
           expect(height, moreOrLessEquals(yearsHeight));
+          if (year == 2026) await _expectPeriodReturn(tester, years);
 
           await tester.tap(find.text('$year'));
           await tester.pumpAndSettle();
@@ -121,11 +122,13 @@ void main() {
                 locale.toLanguageTag(),
               ).format(DateTime.utc(year, month)),
           ];
-          final monthHeight = _expectPeriodGrid(tester, [
+          final labels = [
             for (final name in names) name[0].toUpperCase() + name.substring(1),
-          ]);
+          ];
+          final monthHeight = _expectPeriodGrid(tester, labels);
           monthsHeight ??= monthHeight;
           expect(monthHeight, moreOrLessEquals(monthsHeight));
+          if (year == 2026) await _expectPeriodReturn(tester, labels);
           expect(consumer.events, isEmpty);
         }
       });
@@ -386,6 +389,38 @@ void main() {
       );
     });
   }
+}
+
+Future<void> _expectPeriodReturn(
+  WidgetTester tester,
+  List<String?> labels,
+) async {
+  final handle = find.byType(CalendarHandle);
+  await _reveal(tester, handle);
+  final calendar = find.byType(DailyChoiceCalendar);
+  final expandedHeight = tester.getSize(calendar).height;
+  final gridHeight = _expectPeriodGrid(tester, labels);
+  final gesture = await tester.startGesture(tester.getCenter(handle));
+  await gesture.moveBy(const Offset(0, -20));
+  await gesture.moveBy(const Offset(0, -40));
+  await tester.pump();
+  expect(
+    tester.getSize(calendar).height,
+    closeTo(expandedHeight - 40, _epsilon),
+  );
+  expect(_expectPeriodGrid(tester, labels), gridHeight);
+  await gesture.moveBy(const Offset(0, 20));
+  await tester.pump();
+  expect(
+    tester.getSize(calendar).height,
+    closeTo(expandedHeight - 20, _epsilon),
+  );
+  expect(_expectPeriodGrid(tester, labels), gridHeight);
+  await gesture.cancel();
+  await tester.pumpAndSettle();
+  expect(tester.getSize(calendar).height, expandedHeight);
+  expect(_expectPeriodGrid(tester, labels), gridHeight);
+  await _reveal(tester, find.text(labels.first!));
 }
 
 /// Допуск сравнения координат.
@@ -686,7 +721,12 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
   // Ближайшая прокрутка дня — горизонтальная страница периода, поэтому
   // положение в общей прокрутке определяется через календарь целиком.
   await tester
-      .state<ScrollableState>(_pageScroll)
+      .state<ScrollableState>(
+        find.ancestor(
+          of: find.byType(DailyChoiceCalendar),
+          matching: _pageScroll,
+        ),
+      )
       .position
       .ensureVisible(
         tester.renderObject(find.byType(DailyChoiceCalendar)),

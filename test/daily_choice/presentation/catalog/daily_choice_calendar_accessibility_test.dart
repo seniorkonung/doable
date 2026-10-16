@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -92,34 +93,79 @@ final _localizedTexts = [
 ];
 
 void main() {
-  testWidgets('переход оставляет доступной только ручку, '
-      'сохраняя доступную смену цели', (tester) async {
-    final texts = _localizedTexts.first;
-    final semantics = tester.ensureSemantics();
-    final focused = date(2026, 10, 4);
-    final consumer = await pumpCalendarConsumer(
-      tester,
-      selectedDate: focused,
-      viewport: week(focused),
-      today: focused,
-      locale: texts.locale,
-    );
-    tester.semantics.tap(_command(texts.expand));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 60));
-    expect(_announced(tester), [texts.collapse]);
-    expect(_actionable(tester), [texts.collapse]);
-    expect(consumer.events, isEmpty);
-    tester.semantics.tap(_command(texts.collapse));
-    await tester.pumpAndSettle();
-    expect(consumer.events, isEmpty);
-    expect(_dayNodes(tester), hasLength(7));
-    expect(_actionable(tester).last, texts.expand);
-    semantics.dispose();
-  });
-
   for (final texts in _localizedTexts) {
     final language = texts.locale.languageCode;
+
+    testWidgets('переход и возврат скрывают ячейки дней и выбора периода, '
+        'сохраняя ручку и отказ отметок ($language)', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final focused = date(2026, 10, 4);
+      await pumpCalendarConsumer(
+        tester,
+        selectedDate: focused,
+        viewport: week(focused),
+        today: focused,
+        locale: texts.locale,
+        hasDayMarksReadFailure: true,
+      );
+      final weekLabels = _announced(tester);
+      tester.semantics.tap(_command(texts.expand));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      _expectTransitionSemantics(
+        tester,
+        texts.collapse,
+        texts.marksUnavailable,
+      );
+      tester.semantics.tap(_command(texts.collapse));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 30));
+      _expectTransitionSemantics(tester, texts.expand, texts.marksUnavailable);
+      await tester.pumpAndSettle();
+      expect(_announced(tester), weekLabels);
+      expect(_dayNodes(tester), hasLength(7));
+
+      await _activate(tester, texts.expand);
+      expect(_dayNodes(tester), hasLength(42));
+      await _activate(tester, texts.choosePeriod);
+      await _activate(tester, texts.nextYears);
+      for (final fromMonths in [false, true]) {
+        if (fromMonths) await _activate(tester, '2035');
+        final labels = _announced(tester);
+        final actions = _actionable(tester);
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(CalendarHandle)),
+        );
+        await gesture.moveBy(const Offset(0, -20));
+        await gesture.moveBy(const Offset(0, -40));
+        await tester.pump();
+        _expectTransitionSemantics(
+          tester,
+          texts.collapse,
+          texts.marksUnavailable,
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        await gesture.up();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 15));
+        _expectTransitionSemantics(
+          tester,
+          texts.collapse,
+          texts.marksUnavailable,
+        );
+        await tester.pumpAndSettle();
+        expect(_announced(tester), labels);
+        expect(_actionable(tester), actions);
+      }
+      tester.semantics.tap(_command(texts.collapse));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      _expectTransitionSemantics(tester, texts.expand, texts.marksUnavailable);
+      await tester.pumpAndSettle();
+      expect(_announced(tester), weekLabels);
+      expect(_dayNodes(tester), hasLength(7));
+      semantics.dispose();
+    });
 
     group('экранный диктор ($language)', () {
       testWidgets(
@@ -670,6 +716,18 @@ void main() {
       semantics.dispose();
     },
   );
+}
+
+void _expectTransitionSemantics(
+  WidgetTester tester,
+  String handleLabel,
+  String noticeLabel,
+) {
+  expect(_announced(tester), [handleLabel, noticeLabel]);
+  expect(_actionable(tester), [handleLabel]);
+  final notice = find.semantics.byLabel(noticeLabel).evaluate().single;
+  expect(notice.flagsCollection.isLiveRegion, isTrue);
+  expect(notice.getSemanticsData().actions, 0);
 }
 
 /// Узлы, которые экранный диктор читает в порядке обхода: доступное название
