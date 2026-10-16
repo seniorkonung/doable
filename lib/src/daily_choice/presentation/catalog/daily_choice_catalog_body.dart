@@ -144,6 +144,7 @@ final class _DailyChoiceCatalogBodyState
                 onNotification: _onScrollNotification,
                 child: CustomScrollView(
                   controller: _scrollController,
+                  physics: const _CalendarResizeScrollPhysics(),
                   key: const PageStorageKey<String>('daily-choice-catalog'),
                   slivers: [
                     SliverToBoxAdapter(
@@ -262,7 +263,9 @@ final class _DailyChoiceCatalogBodyState
       ScrollStartNotification(:final dragDetails) => dragDetails != null,
       UserScrollNotification(:final direction) =>
         direction != ScrollDirection.idle,
-      // Инерция продолжает пользовательскую прокрутку без dragDetails:
+      // Инерция продолжает пользовательскую прокрутку без dragDetails.
+      // Изменение высоты согласует _CalendarResizeScrollPhysics, поэтому
+      // геометрический возврат не создаёт здесь обновлений со старым направлением.
       // https://api.flutter.dev/flutter/widgets/ScrollEndNotification/dragDetails.html
       ScrollUpdateNotification(:final dragDetails) =>
         dragDetails != null ||
@@ -440,6 +443,43 @@ final class _DailyChoiceCatalogBodyState
     DailyChoiceCatalogSnapshotExpired() => l10n.dailyChoiceCatalogExpired,
     DailyChoiceCatalogUnexpectedFailure() => l10n.dailyChoiceCatalogUnexpected,
   };
+}
+
+/// Согласует рост области выдачи с её позицией до перезапуска инерции.
+final class _CalendarResizeScrollPhysics extends ScrollPhysics {
+  const _CalendarResizeScrollPhysics({super.parent});
+
+  @override
+  _CalendarResizeScrollPhysics applyTo(ScrollPhysics? ancestor) =>
+      _CalendarResizeScrollPhysics(parent: buildParent(ancestor));
+
+  @override
+  double adjustPositionForNewDimensions({
+    required ScrollMetrics oldPosition,
+    required ScrollMetrics newPosition,
+    required bool isScrolling,
+    required double velocity,
+  }) {
+    final adjusted = super.adjustPositionForNewDimensions(
+      oldPosition: oldPosition,
+      newPosition: newPosition,
+      isScrolling: isScrolling,
+      velocity: velocity,
+    );
+    // RangeMaintainingScrollPhysics пропускает ограничение при инерции.
+    // При сворачивании календаря применяем его через correctPixels в раскладке,
+    // без ScrollUpdateNotification и пружинного возврата со старым направлением.
+    // Движение внутри диапазона остаётся у штатной физики Flutter.
+    // https://api.flutter.dev/flutter/widgets/ScrollPhysics/adjustPositionForNewDimensions.html
+    if (newPosition.viewportDimension > oldPosition.viewportDimension &&
+        newPosition.maxScrollExtent < oldPosition.maxScrollExtent) {
+      return adjusted.clamp(
+        newPosition.minScrollExtent,
+        newPosition.maxScrollExtent,
+      );
+    }
+    return adjusted;
+  }
 }
 
 /// Идентичность снимка не даёт отложенному возврату отменить новый переход,
