@@ -5,11 +5,11 @@
     - По решению 1 [дизайна](design.md) `Sheet` сначала учитывает системный нижний отступ, а затем добавляет свои 16 dp (`DoableMetrics.space4`). Итоговый нижний отступ равен системному плюс 16 dp как при нулевом, так и при ненулевом системном отступе. Боковые 12 dp и верхние 8 dp сохраняются, фон листа по-прежнему доходит до нижнего края экрана.
     - Меню режимов быстрого создания и лист «Новый дневной выбор» получают отступ через `Sheet` без правок у потребителей. Функция показа листа по [ADR-0032](../../../docs/adr/0032-present-design-system-sheets-over-root-navigator.md) не меняется. Их выбор, закрытие и доступность прежние.
   - **Проверка:**
-    - Добавить тест компонента `Sheet`: при нулевом и ненулевом нижнем системном отступе нижний край последнего варианта отстоит от нижнего края экрана на системный отступ плюс 16 dp. Тест должен падать на текущей реализации.
-    - Выполнить `mise exec -- flutter test test/design_system/sheet_test.dart test/app/quick_creation/quick_creation_mode_menu_test.dart test/app/quick_creation/quick_creation_daily_choice_start_sheet_test.dart`.
+    - Отдельный тест отступа не добавлять: по решению 4 [дизайна](design.md) отступ проверяется на телефоне в задаче 1.3.
+    - Выполнить `mise exec -- flutter test test/app/quick_creation/quick_creation_mode_menu_test.dart test/app/quick_creation/quick_creation_daily_choice_start_sheet_test.dart`.
   - **Зависимости:** Нет.
-  - **Вероятные файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart` (новый).
-  - **Оценка объёма:** S.
+  - **Вероятные файлы:** `lib/src/design_system/components/sheet.dart`.
+  - **Оценка объёма:** XS.
 
 - [ ] 1.2 Надвигать месяц снизу на неделю непрозрачным фоном без наложения надписей
   - **Критерии приёмки:**
