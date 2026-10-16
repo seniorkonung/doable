@@ -218,7 +218,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 3.9 Устранить лишний импорт в проверках ручки календаря и подтвердить успешный mise run check
+- [x] 3.9 Устранить лишний импорт в проверках ручки календаря и подтвердить успешный mise run check
   - **Критерии приёмки:**
     - В `test/design_system/calendar_handle_test.dart` удалён избыточный импорт `package:flutter/semantics.dart`: используемые семантические типы остаются доступны через `package:flutter/rendering.dart`. Тела существующих тестов и поведение ручки сохраняются; анализатор больше не сообщает `unnecessary_import` для этого файла.
     - После задачи 3.8 обязательная команда `mise run check` завершается с кодом 0, включая форматирование, статический анализ и тесты. Успешность полных проверок, требуемая контрольной точкой 3.7, подтверждена на результате корректирующих задач третьей фазы.
