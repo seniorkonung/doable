@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
@@ -8,7 +9,6 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/file_quick_creation_mode_store.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/quick_creation.dart';
 import 'controlled_mode_io.dart';
 
 void main() {
@@ -152,15 +153,15 @@ void main() {
       await _settle(tester);
       for (final mode in modes.skip(1)) {
         await _choose(tester, mode);
-        _expectVisiblePanel(tester, mode);
+        expectQuickCreationMode(tester, mode);
         // Скрытый Consumer приостанавливается вместе с маршрутом.
         // Проверяем обе панели при показе, пока запись всё ещё удержана.
         await tester.binding.handlePopRoute();
         await _settle(tester);
-        _expectVisiblePanel(tester, mode);
+        expectQuickCreationMode(tester, mode);
         await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
         await _settle(tester);
-        _expectVisiblePanel(tester, mode);
+        expectQuickCreationMode(tester, mode);
       }
       expect(await tester.runAsync(modeFile.readAsString), initial.storageKey);
       await _openMenu(tester);
@@ -172,11 +173,8 @@ void main() {
         modes.last.title(localizations),
       );
       expect(
-        find.descendant(
-          of: selected,
-          matching: find.byIcon(Icons.check_outlined),
-        ),
-        findsOneWidget,
+        tester.getSemantics(selected).flagsCollection.isSelected,
+        Tristate.isTrue,
       );
 
       var expected = initial;
@@ -197,13 +195,10 @@ void main() {
           await tester.runAsync(modeFile.readAsString),
           expected.storageKey,
         );
-        _expectVisiblePanel(tester, modes.last);
+        expectQuickCreationMode(tester, modes.last);
         expect(
-          find.descendant(
-            of: selected,
-            matching: find.byIcon(Icons.check_outlined),
-          ),
-          findsOneWidget,
+          tester.getSemantics(selected).flagsCollection.isSelected,
+          Tristate.isTrue,
         );
         expect(find.byType(SnackBar), findsNothing);
         expect(tester.takeException(), isNull);
@@ -217,7 +212,7 @@ void main() {
       _expectSelected(tester, AppDestination.intentionGraph);
       await tester.binding.handlePopRoute();
       await _settle(tester);
-      _expectVisiblePanel(tester, modes.last);
+      expectQuickCreationMode(tester, modes.last);
       await _close(tester, first);
 
       final restored = await _mount(tester, store(), diagnostics);
@@ -227,26 +222,15 @@ void main() {
   }
 }
 
-void _expectVisiblePanel(WidgetTester tester, QuickCreationMode mode) {
-  final button = find.byType(QuickCreationButton);
-  expect(button, findsOneWidget);
-  expect(
-    find.descendant(of: button, matching: find.byIcon(mode.icon)),
-    findsOneWidget,
-  );
-}
-
-/// Панель показывает выбранным пункт [destination]: залитый значок у него.
+/// Панель объявляет выбранным только пункт [destination].
 void _expectSelected(WidgetTester tester, AppDestination destination) {
   for (final item in AppDestination.values) {
     expect(
-      find.descendant(
-        of: appNavigationDestination(item),
-        matching: find.byIcon(
-          item == destination ? item.selectedIcon : item.icon,
-        ),
-      ),
-      findsOneWidget,
+      tester
+          .getSemantics(appNavigationDestination(item))
+          .flagsCollection
+          .isSelected,
+      item == destination ? Tristate.isTrue : Tristate.isFalse,
       reason: item.name,
     );
   }
@@ -312,26 +296,20 @@ Future<void> _settle(WidgetTester tester) async {
 }
 
 Future<void> _openMenu(WidgetTester tester) async {
-  await tester.longPress(find.byType(QuickCreationButton));
+  await tester.longPress(quickCreationAction());
   await tester.pumpAndSettle();
   expect(find.byType(BottomSheet), findsOneWidget);
 }
 
 Future<void> _choose(WidgetTester tester, QuickCreationMode mode) async {
   final localizations = AppLocalizations.of(
-    tester.element(find.byType(QuickCreationButton)),
+    tester.element(quickCreationAction()),
   );
   await _openMenu(tester);
   await tester.tap(find.widgetWithText(OptionRow, mode.title(localizations)));
   await tester.pumpAndSettle();
   expect(find.byType(BottomSheet), findsNothing);
-  expect(
-    find.descendant(
-      of: find.byType(QuickCreationButton),
-      matching: find.byIcon(mode.icon),
-    ),
-    findsOneWidget,
-  );
+  expectQuickCreationMode(tester, mode);
 }
 
 void _expectHome(
@@ -341,12 +319,9 @@ void _expectHome(
 ) {
   expect(find.byType(HomePage), findsOneWidget);
   _expectSelected(tester, AppDestination.home);
-  final button = find.byType(QuickCreationButton);
+  final button = quickCreationAction();
   expect(button.hitTestable(), findsOneWidget);
-  expect(
-    find.descendant(of: button, matching: find.byIcon(mode.icon)),
-    findsOneWidget,
-  );
+  expectQuickCreationMode(tester, mode);
   expect(find.byType(SnackBar), findsNothing);
   expect(tester.takeException(), isNull);
 }
@@ -356,7 +331,7 @@ Future<void> _expectLaunch(
   _Session session,
   QuickCreationMode mode,
 ) async {
-  await tester.tap(find.byType(QuickCreationButton));
+  await tester.tap(quickCreationAction());
   await _settle(tester);
   expect(
     find.byType(switch (mode) {

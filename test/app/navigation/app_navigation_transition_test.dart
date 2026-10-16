@@ -5,9 +5,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/ordinary_page_scaffold.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -19,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/quick_creation.dart';
 
 void main() {
   setUp(() {
@@ -43,7 +42,7 @@ void main() {
       for (final title in ['Первая страница', 'Вторая страница']) {
         unawaited(router.pushNativeRoute<void>(_ordinary(title)));
         await _expectStationaryFrames(tester, rect, mode: mode);
-        await tester.longPress(find.byType(QuickCreationButton));
+        await tester.longPress(quickCreationAction());
         await tester.pumpAndSettle();
         final nextTitle = title == 'Первая страница'
             ? 'Новая связь'
@@ -170,21 +169,14 @@ Future<void> _expectStationaryFrames(
     expect(_bar, findsOneWidget, reason: 'кадр $frame');
     expect(tester.getRect(_bar), rect, reason: 'кадр $frame');
     expect(
-      find.descendant(
-        of: appNavigationDestination(AppDestination.home),
-        matching: find.byIcon(AppDestination.home.selectedIcon),
-      ),
-      findsOneWidget,
+      tester
+          .widget<Semantics>(appNavigationDestination(AppDestination.home))
+          .properties
+          .selected,
+      isTrue,
       reason: 'кадр $frame',
     );
-    expect(
-      find.descendant(
-        of: find.byType(QuickCreationButton),
-        matching: find.byIcon(mode.icon),
-      ),
-      findsOneWidget,
-      reason: 'кадр $frame',
-    );
+    expectQuickCreationMode(tester, mode);
     expect(tester.takeException(), isNull, reason: 'кадр $frame');
   }
   await tester.pumpAndSettle();

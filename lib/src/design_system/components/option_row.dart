@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../doable_colors.dart';
+import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
 
@@ -20,7 +21,7 @@ final class OptionRow extends StatelessWidget {
     super.key,
   });
 
-  final IconData icon;
+  final DoableIconData icon;
   final String name;
   final String hint;
   final VoidCallback onPressed;
@@ -39,13 +40,13 @@ final class OptionRow extends StatelessWidget {
     final selected = trailing == OptionRowTrailing.selected;
     final trailingIcon = switch (trailing) {
       OptionRowTrailing.none => null,
-      OptionRowTrailing.selected => Icon(
-        Icons.check_outlined,
+      OptionRowTrailing.selected => DoableIcon(
+        DoableIconData.check,
         size: 20,
         color: colors.accent,
       ),
-      OptionRowTrailing.forward => Icon(
-        Icons.chevron_right_outlined,
+      OptionRowTrailing.forward => DoableIcon(
+        DoableIconData.chevronRight,
         size: 20,
         color: colors.muted,
       ),
@@ -81,10 +82,12 @@ final class OptionRow extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: selected ? colors.accent : colors.fill,
                       ),
-                      child: Icon(
-                        icon,
-                        size: 22,
-                        color: selected ? colors.onAccent : colors.ink,
+                      child: Center(
+                        child: DoableIcon(
+                          icon,
+                          size: 22,
+                          color: selected ? colors.onAccent : colors.ink,
+                        ),
                       ),
                     ),
                     const SizedBox(width: DoableMetrics.space3),

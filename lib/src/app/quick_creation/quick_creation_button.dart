@@ -25,7 +25,7 @@ final class QuickCreationButton extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
 
     return NavBarCreateButton(
-      icon: mode.icon,
+      icon: mode.miniIcon,
       label:
           '${localizations.quickCreationLabel}, ${mode.title(localizations)}',
       hint: localizations.quickCreationLongPressHint,

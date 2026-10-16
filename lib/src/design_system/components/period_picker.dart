@@ -27,39 +27,69 @@ final class PeriodPickerCell {
   final bool isCurrent;
 }
 
+/// Геометрия сетки, рассчитанная через [PeriodPicker.layoutFor].
+final class PeriodPickerLayout {
+  const PeriodPickerLayout._(this.rowHeight);
+
+  final double rowHeight;
+
+  /// Четыре строки, включая пустые позиции, и верхний отступ сетки.
+  double get height => rowHeight * 4 + _gridPadding.vertical;
+}
+
 /// Двенадцать позиций по три в ряд; null оставляет пустое место без команды.
 ///
 /// Шапка и ручка добавляются потребителем. Сетка не листается и не хранит
 /// состояние выбора. Размеры растут от минимальных при увеличении текста.
 final class PeriodPicker extends StatelessWidget {
-  const PeriodPicker({super.key, required this.cells})
+  const PeriodPicker({super.key, required this.cells, this.layout})
     : assert(cells.length == 12);
 
   final List<PeriodPickerCell?> cells;
 
+  /// Общая геометрия страниц при тех же ширине и настройках текста.
+  /// Без неё сетка измеряет только собственные ячейки.
+  final PeriodPickerLayout? layout;
+
+  /// Измеряет сетку по всем подписям, которые должны помещаться на страницах.
+  /// Пересчитывается при изменении ширины, локали или настроек текста.
+  static PeriodPickerLayout layoutFor(
+    BuildContext context, {
+    required double width,
+    required Iterable<String> texts,
+  }) => PeriodPickerLayout._(
+    math.max(
+      48.0,
+      tallestTextHeight(
+            context,
+            texts: texts,
+            style: _cellStyle(const FontWeight(650)),
+            maxWidth: width / 3 - _boxPadding.horizontal,
+          ) +
+          _boxPadding.vertical +
+          _inset.vertical,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final rowHeight = math.max(
-        48.0,
-        tallestTextHeight(
-              context,
-              texts: cells.nonNulls.map((cell) => cell.text),
-              style: _cellStyle(const FontWeight(650)),
-              maxWidth: constraints.maxWidth / 3 - _boxPadding.horizontal,
-            ) +
-            _boxPadding.vertical +
-            _inset.vertical,
-      );
+      final geometry =
+          layout ??
+          layoutFor(
+            context,
+            width: constraints.maxWidth,
+            texts: cells.nonNulls.map((cell) => cell.text),
+          );
       // Фиксированное число колонок и высота строки без внутренней прокрутки:
       // https://api.flutter.dev/flutter/widgets/GridView/GridView.count.html
       return GridView.count(
         crossAxisCount: 3,
-        mainAxisExtent: rowHeight,
+        mainAxisExtent: geometry.rowHeight,
         shrinkWrap: true,
         primary: false,
         physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(top: DoableMetrics.space1),
+        padding: _gridPadding,
         children: [
           for (final cell in cells)
             if (cell == null) const SizedBox.shrink() else _Cell(cell: cell),
@@ -134,6 +164,7 @@ final class _Cell extends StatelessWidget {
 
 const _inset = EdgeInsets.symmetric(vertical: 6);
 const _boxPadding = EdgeInsets.symmetric(horizontal: 14, vertical: 7);
+const _gridPadding = EdgeInsets.only(top: DoableMetrics.space1);
 
 TextStyle _cellStyle(FontWeight weight) => DoableType.title.copyWith(
   fontWeight: weight,

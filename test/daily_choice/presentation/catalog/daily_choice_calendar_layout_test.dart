@@ -6,6 +6,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/components/month_grid_weekday.dart';
+import 'package:doable/src/design_system/components/period_picker.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -80,6 +81,60 @@ final _pageScroll = find.byWidgetPredicate(
 );
 
 void main() {
+  for (final locale in const [Locale('ru'), Locale('en')]) {
+    for (final scale in [1.0, 2.5]) {
+      testWidgets('выбор периода в ${locale.languageCode} при масштабе $scale '
+          'вмещает подписи и сохраняет высоту страниц', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        double? yearsHeight;
+        double? monthsHeight;
+        for (final year in [1, 9999, 2026]) {
+          final consumer = await _pumpOnPhone(
+            tester,
+            locale: locale,
+            viewport: month(date(year, 1, 1)),
+          );
+          await tester.tap(
+            find.bySemanticsLabel(
+              locale.languageCode == 'ru'
+                  ? 'Выбрать год и месяц'
+                  : 'Choose year and month',
+            ),
+          );
+          await tester.pumpAndSettle();
+          final firstYear = 2020 + ((year - 2020) / 12).floor() * 12;
+          final years = <String?>[
+            for (var value = firstYear; value < firstYear + 12; value++)
+              value < 1 || value > 9999 ? null : '$value',
+          ];
+          final height = _expectPeriodGrid(tester, years);
+          yearsHeight ??= height;
+          expect(height, moreOrLessEquals(yearsHeight));
+          if (year == 2026) await _expectPeriodReturn(tester, years);
+
+          await tester.tap(find.text('$year'));
+          await tester.pumpAndSettle();
+          final names = [
+            for (var month = 1; month <= 12; month++)
+              DateFormat(
+                'LLLL',
+                locale.toLanguageTag(),
+              ).format(DateTime.utc(year, month)),
+          ];
+          final labels = [
+            for (final name in names) name[0].toUpperCase() + name.substring(1),
+          ];
+          final monthHeight = _expectPeriodGrid(tester, labels);
+          monthsHeight ??= monthHeight;
+          expect(monthHeight, moreOrLessEquals(monthsHeight));
+          if (year == 2026) await _expectPeriodReturn(tester, labels);
+          expect(consumer.events, isEmpty);
+        }
+      });
+    }
+  }
+
   testWidgets('отметки помещаются под числами '
       'без изменения высоты строк недели и месяца', (tester) async {
     final consumer = await _pumpOnPhone(
@@ -336,8 +391,75 @@ void main() {
   }
 }
 
+Future<void> _expectPeriodReturn(
+  WidgetTester tester,
+  List<String?> labels,
+) async {
+  final handle = find.byType(CalendarHandle);
+  await _reveal(tester, handle);
+  final calendar = find.byType(DailyChoiceCalendar);
+  final expandedHeight = tester.getSize(calendar).height;
+  final gridHeight = _expectPeriodGrid(tester, labels);
+  final gesture = await tester.startGesture(tester.getCenter(handle));
+  await gesture.moveBy(const Offset(0, -20));
+  await gesture.moveBy(const Offset(0, -40));
+  await tester.pump();
+  expect(
+    tester.getSize(calendar).height,
+    closeTo(expandedHeight - 40, _epsilon),
+  );
+  expect(_expectPeriodGrid(tester, labels), gridHeight);
+  await gesture.moveBy(const Offset(0, 20));
+  await tester.pump();
+  expect(
+    tester.getSize(calendar).height,
+    closeTo(expandedHeight - 20, _epsilon),
+  );
+  expect(_expectPeriodGrid(tester, labels), gridHeight);
+  await gesture.cancel();
+  await tester.pumpAndSettle();
+  expect(tester.getSize(calendar).height, expandedHeight);
+  expect(_expectPeriodGrid(tester, labels), gridHeight);
+  await _reveal(tester, find.text(labels.first!));
+}
+
 /// Допуск сравнения координат.
 const _epsilon = 0.01;
+
+/// Все подписи размещены в своих позициях, включая пустые места на краях
+/// диапазона. Контейнер вмещает ровно четыре строки с верхним отступом.
+double _expectPeriodGrid(WidgetTester tester, List<String?> labels) {
+  final picker = find.byType(PeriodPicker);
+  final grid = _rect(tester, picker);
+  final buttons = find.descendant(of: picker, matching: find.byType(InkWell));
+  expect(buttons, findsNWidgets(labels.nonNulls.length));
+  final rowHeight = _rect(tester, buttons.first).height;
+  expect(rowHeight, greaterThanOrEqualTo(48));
+  expect(grid.width, moreOrLessEquals(360));
+  expect(grid.height, moreOrLessEquals(rowHeight * 4 + DoableMetrics.space1));
+  var buttonIndex = 0;
+  for (final (index, label) in labels.indexed) {
+    if (label == null) continue;
+    final button = buttons.at(buttonIndex++);
+    final cell = _rect(tester, button);
+    expect(cell.height, moreOrLessEquals(rowHeight));
+    expect(cell.width, moreOrLessEquals(grid.width / 3));
+    expect(cell.left, moreOrLessEquals(grid.left + index % 3 * cell.width));
+    expect(
+      cell.top,
+      moreOrLessEquals(
+        grid.top + DoableMetrics.space1 + index ~/ 3 * rowHeight,
+      ),
+    );
+    _expectFullyShown(
+      tester,
+      find.descendant(of: button, matching: find.text(label)),
+      within: cell,
+    );
+  }
+  expect(tester.takeException(), isNull);
+  return grid.height;
+}
 
 /// Показывает календарь в общей прокрутке с содержимым под ним на узком
 /// телефоне.
@@ -484,7 +606,7 @@ void _expectLaidOut(
   expect(handle.top, greaterThanOrEqualTo(rows.last.first.bottom));
   expect(handle.bottom, lessThanOrEqualTo(calendar.bottom));
   expect(handle.width, calendar.width);
-  expect(handle.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
+  expect(handle.height, 36);
   final commands = find.descendant(
     of: find.byType(DailyChoiceCalendar),
     matching: find.byType(IconButton),
@@ -599,7 +721,12 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
   // Ближайшая прокрутка дня — горизонтальная страница периода, поэтому
   // положение в общей прокрутке определяется через календарь целиком.
   await tester
-      .state<ScrollableState>(_pageScroll)
+      .state<ScrollableState>(
+        find.ancestor(
+          of: find.byType(DailyChoiceCalendar),
+          matching: _pageScroll,
+        ),
+      )
       .position
       .ensureVisible(
         tester.renderObject(find.byType(DailyChoiceCalendar)),

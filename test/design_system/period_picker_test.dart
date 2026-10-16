@@ -8,6 +8,79 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
+    'рассчитанная высота совпадает с естественной сеткой при смене ширины',
+    (tester) async {
+      final cells = [
+        for (final text in const [
+          'Январь',
+          'Февраль',
+          'Март',
+          'Апрель',
+          'Май',
+          'Июнь',
+          'Июль',
+          'Август',
+          'Сентябрь',
+          'Октябрь',
+          'Ноябрь',
+          'Декабрь',
+        ])
+          PeriodPickerCell(text: text, semanticLabel: text, onTap: () {}),
+      ];
+      const naturalKey = ValueKey('естественная сетка');
+      const boundedKey = ValueKey('ограниченная сетка');
+      late PeriodPickerLayout layout;
+      final heights = <double>[];
+      for (final width in [360.0, 540.0]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: doableTheme(Brightness.light),
+            home: Scaffold(
+              body: MediaQuery(
+                data: const MediaQueryData(textScaler: TextScaler.linear(2.5)),
+                child: SingleChildScrollView(
+                  child: SizedBox(
+                    width: width,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        layout = PeriodPicker.layoutFor(
+                          context,
+                          width: constraints.maxWidth,
+                          texts: cells.map((cell) => cell.text),
+                        );
+                        return Column(
+                          children: [
+                            PeriodPicker(key: naturalKey, cells: cells),
+                            SizedBox(
+                              height: layout.height,
+                              child: PeriodPicker(
+                                key: boundedKey,
+                                cells: cells,
+                                layout: layout,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        final natural = tester.getSize(find.byKey(naturalKey));
+        expect(natural.width, width);
+        expect(natural.height, moreOrLessEquals(layout.height));
+        expect(tester.getSize(find.byKey(boundedKey)), natural);
+        heights.add(natural.height);
+        expect(tester.takeException(), isNull);
+      }
+      expect(heights.first, greaterThan(heights.last));
+    },
+  );
+
+  testWidgets(
     'пустые позиции не выбираются, показанный текущий период доступен',
     (tester) async {
       final semantics = tester.ensureSemantics();

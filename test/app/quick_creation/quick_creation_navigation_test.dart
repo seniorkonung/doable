@@ -5,7 +5,6 @@ import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -28,7 +27,7 @@ void main() {
     (tester) async {
       final router = await _start(tester);
       await _selectMode(tester, QuickCreationMode.dailyChoice);
-      await tester.tap(find.byType(QuickCreationButton));
+      await tester.tap(quickCreationAction());
       await tester.pumpAndSettle();
       await chooseQuickCreationDailyChoiceStart(
         tester,
@@ -40,8 +39,8 @@ void main() {
         router.push(IntentionDetailsRoute(intentionId: durabilityIntention(3))),
       );
       await tester.pumpAndSettle();
-      _expectMode(QuickCreationMode.dailyChoice);
-      await tester.tap(find.byType(QuickCreationButton));
+      expectQuickCreationMode(tester, QuickCreationMode.dailyChoice);
+      await tester.tap(quickCreationAction());
       await tester.pumpAndSettle();
       await chooseQuickCreationDailyChoiceStart(
         tester,
@@ -70,7 +69,7 @@ void main() {
       );
       await tester.tap(find.text('Отменить создание'));
       await tester.pumpAndSettle();
-      _expectMode(QuickCreationMode.relation);
+      expectQuickCreationMode(tester, QuickCreationMode.relation);
       expect(tester.takeException(), isNull);
     },
   );
@@ -82,22 +81,11 @@ Future<void> _selectMode(WidgetTester tester, QuickCreationMode mode) async {
   final localizations = AppLocalizations.of(
     tester.element(find.byType(AppNavigationBar)),
   );
-  await tester.longPress(find.byType(QuickCreationButton));
+  await tester.longPress(quickCreationAction());
   await tester.pumpAndSettle();
   await tester.tap(find.widgetWithText(OptionRow, mode.title(localizations)));
   await tester.pumpAndSettle();
-  _expectMode(mode);
-}
-
-/// Кнопка показывает значок режима [mode].
-void _expectMode(QuickCreationMode mode) {
-  expect(
-    find.descendant(
-      of: find.byType(QuickCreationButton),
-      matching: find.byIcon(mode.icon),
-    ),
-    findsOneWidget,
-  );
+  expectQuickCreationMode(tester, mode);
 }
 
 Future<AppRouter> _start(WidgetTester tester) async {

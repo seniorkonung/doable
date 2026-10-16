@@ -1,5 +1,6 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
@@ -15,6 +16,91 @@ import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  for (final onDate in [false, true]) {
+    final catalog = onDate ? 'каталог на дату' : 'корневой каталог';
+    testWidgets('$catalog: перетягивание и возврат сохраняют выдачу, '
+        'отказ и отметки; только завершённый переход повторяет чтение', (
+      tester,
+    ) async {
+      final repository = CatalogPageRepository();
+      final focused = date(2026, 11, 1);
+      await _pumpFilteredNovember(
+        tester,
+        repository,
+        hasReadFailure: true,
+        onDate: onDate,
+      );
+      final calendar = find.byType(DailyChoiceCalendar);
+      final monthHeight = tester.getSize(calendar).height;
+
+      for (final collapse in [false, true]) {
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(CalendarHandle)),
+        );
+        await gesture.moveBy(const Offset(0, -20));
+        await gesture.moveBy(
+          Offset(0, collapse ? -200 : -40),
+          timeStamp: const Duration(seconds: 1),
+        );
+        await tester.pump();
+        expect(tester.getSize(calendar).height, lessThan(monthHeight));
+        expect(
+          tester.widget<DailyChoiceCalendar>(calendar).viewport,
+          month(focused),
+        );
+        expect(repository.dayStatusQueries, hasLength(2));
+        expect(
+          _mark(focused, DailyChoiceDayStatus.hasIncomplete),
+          findsWidgets,
+        );
+        expect(find.byType(Notice), findsOneWidget);
+        _expectFilteredOctoberCatalog(repository);
+
+        await gesture.up(timeStamp: const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(
+          visibleWeeks(tester),
+          weeksFrom(date(2026, 10, 26), collapse ? 1 : 6),
+        );
+        expect(repository.dayStatusQueries, hasLength(collapse ? 3 : 2));
+        expect(find.byType(Notice), findsOneWidget);
+        _expectFilteredOctoberCatalog(repository);
+      }
+
+      expect(repository.dayStatusQueries.last.firstDate, date(2026, 9, 28));
+      expect(repository.dayStatusQueries.last.lastDate, date(2027, 1, 10));
+      repository.completeDayStatuses(2, {
+        focused: DailyChoiceDayStatus.allCompleted,
+      });
+      await tester.pumpAndSettle();
+      expect(_mark(focused, DailyChoiceDayStatus.allCompleted), findsOneWidget);
+      expect(find.byType(Notice), findsNothing);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await gesture.moveBy(const Offset(0, 20));
+      await gesture.moveBy(
+        const Offset(0, 200),
+        timeStamp: const Duration(seconds: 1),
+      );
+      await tester.pump();
+      expect(
+        tester.widget<DailyChoiceCalendar>(calendar).viewport,
+        week(focused),
+      );
+      expect(_mark(focused, DailyChoiceDayStatus.allCompleted), findsWidgets);
+      expect(repository.dayStatusQueries, hasLength(3));
+      _expectFilteredOctoberCatalog(repository);
+      await gesture.up(timeStamp: const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+      expect(repository.dayStatusQueries, hasLength(3));
+      _expectFilteredOctoberCatalog(repository);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('повторный выбор ноября после отказа восстанавливает отметки; '
       'перестройка, промежуточные шаги, закрытие заголовком и повтор после '
       'успеха не читают', (tester) async {
@@ -610,6 +696,7 @@ Future<void> _pumpFilteredNovember(
   WidgetTester tester,
   CatalogPageRepository repository, {
   required bool hasReadFailure,
+  bool onDate = false,
 }) async {
   final selected = date(2026, 10, 8);
   final markedDay = date(2026, 11, 1);
@@ -617,6 +704,7 @@ Future<void> _pumpFilteredNovember(
     tester,
     repository,
     today: selected,
+    catalogDate: onDate ? selected : null,
     locale: const Locale('ru'),
     size: const Size(1200, 2400),
   );

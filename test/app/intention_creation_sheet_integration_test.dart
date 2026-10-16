@@ -872,14 +872,7 @@ Future<void> _selectOption(
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {
-  final item = find.descendant(
-    of: find.byType(AppNavigationBar),
-    matching: find.byIcon(
-      _selected(tester) == destination
-          ? destination.selectedIcon
-          : destination.icon,
-    ),
-  );
+  final item = appNavigationDestination(destination);
   await _until(tester, item);
   await tester.tap(item);
   await tester.pump();

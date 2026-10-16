@@ -3,6 +3,7 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 
@@ -19,7 +20,13 @@ List<WidgetbookUseCase> appNavigationBarUseCases() => [
           title: Text(destination.title(AppLocalizations.of(context))),
         ),
         body: SafeArea(
-          child: Center(child: Icon(destination.selectedIcon, size: 64)),
+          child: Center(
+            child: DoableIcon(
+              destination.selectedIcon,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
         ),
         bottomNavigationBar: AppNavigationBar(
           selected: destination,

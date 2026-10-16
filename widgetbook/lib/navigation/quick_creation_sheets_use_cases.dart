@@ -5,6 +5,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.d
 import 'package:doable/src/design_system/components/action_sheet.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
@@ -70,7 +71,7 @@ List<WidgetbookUseCase> optionRowUseCases() => [
               child: Padding(
                 padding: const EdgeInsets.all(DoableMetrics.space3),
                 child: OptionRow(
-                  icon: forward ? Icons.arrow_downward_outlined : mode.icon,
+                  icon: forward ? DoableIconData.fromIntention : mode.icon,
                   name: forward
                       ? localizations.quickCreationDailyChoiceFromIntention
                       : mode.title(localizations),

@@ -53,6 +53,8 @@ void _catalogNavigationScenarios() {
           500,
           scrollable: _catalogScrollable,
         );
+        await tester.ensureVisible(footer);
+        await tester.pumpAndSettle();
         final held = app.probe.holdNextCatalogRead();
         await tester.tap(footer);
         await _wait(tester, () => held.started.isCompleted);
