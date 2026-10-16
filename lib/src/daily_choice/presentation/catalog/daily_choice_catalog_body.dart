@@ -222,6 +222,7 @@ final class _DailyChoiceCatalogBodyState
       for (final isCompleted in [false, true]) ...[
         SliverToBoxAdapter(
           child: Semantics(
+            header: true,
             expanded: state.selection.isExpanded(isCompleted),
             child: ListTile(
               key: ValueKey('daily-choice-section-$isCompleted'),

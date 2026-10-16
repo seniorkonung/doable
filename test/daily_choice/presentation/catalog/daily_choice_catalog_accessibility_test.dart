@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
@@ -38,7 +40,8 @@ void main() {
     final language = texts.locale.languageCode;
 
     group('экранный диктор на странице каталога ($language)', () {
-      testWidgets('читает дни календаря, заголовок дня, секции, количество, '
+      testWidgets('обе секции доступны при переходе по заголовкам; '
+          'читает дни календаря, заголовок дня, секции, количество, '
           'строки и подгрузку по порядку, затем общую панель, '
           'без отдельных чисел дней', (tester) async {
         final semantics = tester.ensureSemantics();
@@ -90,6 +93,34 @@ void main() {
           isTrue,
         );
         _expectEveryActionNamed(tester);
+
+        for (final section in [
+          (label: l10n.dailyChoiceCatalogIncomplete, expanded: true),
+          (label: l10n.dailyChoiceCatalogCompleted, expanded: false),
+        ]) {
+          final command = find.semantics.byLabel(section.label);
+          for (final expanded in [section.expanded, !section.expanded]) {
+            final node = command.evaluate().single;
+            expect(
+              node.flagsCollection.isHeader,
+              isTrue,
+              reason: section.label,
+            );
+            expect(
+              node.flagsCollection.isExpanded,
+              expanded ? Tristate.isTrue : Tristate.isFalse,
+              reason: section.label,
+            );
+            expect(
+              node.getSemanticsData().hasAction(SemanticsAction.tap),
+              isTrue,
+              reason: section.label,
+            );
+            tester.semantics.tap(command);
+            await tester.pumpAndSettle();
+          }
+        }
+        expect(_announced(tester), announced);
         semantics.dispose();
       });
 
@@ -301,7 +332,7 @@ List<String> _announcedInScroll(WidgetTester tester) {
 /// без панели основной навигации.
 List<String> _afterDayHeading(WidgetTester tester) {
   final nodes = tester.semantics.simulatedAccessibilityTraversal().toList();
-  final heading = nodes.lastIndexWhere((node) => node.flagsCollection.isHeader);
+  final heading = nodes.indexWhere((node) => node.flagsCollection.isHeader);
   final navigation = nodes.indexWhere(
     (node) => node.getSemanticsData().role == SemanticsRole.tab,
   );
