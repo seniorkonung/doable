@@ -1,10 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
+
+import '../../../design_system/doable_colors.dart';
 
 /// Раскладка двух представлений календаря без сжатия их содержимого.
 ///
 /// Оба ребёнка получают одну ширину и естественную высоту в текущем проходе;
 /// обрезка и видимость следуют той же степени раскрытия, что и высота.
+/// Раскрытое представление надвигается снизу на неделю и закрывает её
+/// непрозрачным фоном, поэтому надписи двух представлений не накладываются.
 final class DailyChoiceCalendarExpansion extends StatelessWidget {
   const DailyChoiceCalendarExpansion({
     super.key,
@@ -39,7 +43,13 @@ final class DailyChoiceCalendarExpansion extends StatelessWidget {
           offstage: progress == 0,
           child: ExcludeFocus(
             excluding: progress != 1,
-            child: Opacity(opacity: progress, child: expanded),
+            // Фон вне прозрачности: проявляются только надписи, а неделя под
+            // ними закрыта при любой степени раскрытия.
+            // https://api.flutter.dev/flutter/widgets/Opacity-class.html
+            child: ColoredBox(
+              color: Theme.of(context).extension<DoableColors>()!.bg,
+              child: Opacity(opacity: progress, child: expanded),
+            ),
           ),
         ),
       ],
@@ -131,6 +141,11 @@ final class _RenderExpansionLayout extends RenderBox
     week.layout(childConstraints, parentUsesSize: true);
     expanded.layout(childConstraints, parentUsesSize: true);
     onExtentChanged(expanded.size.height - week.size.height);
+    // Край раскрытого представления начинает путь от нижнего края недели.
+    (expanded.parentData! as _ExpansionParentData).offset = Offset(
+      0,
+      (1 - _progress) * week.size.height,
+    );
     size = constraints.constrain(
       Size(
         constraints.maxWidth,
