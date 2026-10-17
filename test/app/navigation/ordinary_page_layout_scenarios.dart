@@ -321,7 +321,9 @@ void _registerOrdinaryPaginationTests() {
       final end = find.text(l10n.relationNeighborhoodConfirmedEnd);
       _expectFullyVisible(tester, end, insets);
       final row = find.byKey(
-        ValueKey('relation-neighborhood-row-${tagFixtureId(5105)}'),
+        ValueKey(
+          'relation-neighborhood-row-${tagFixtureId(5000 + _lastLayoutRelation)}',
+        ),
       );
       final last = find
           .descendant(of: row, matching: find.byType(InkWell))
@@ -430,7 +432,9 @@ void _seedLayoutTagCatalog(sqlite.Database database) {
   }
 }
 
-/// Три порции помеченных намерений и связей одной исходящей группы.
+const _lastLayoutRelation = 53;
+
+/// Три порции помеченных намерений и две порции связей одной исходящей группы.
 void _seedOrdinaryLayout(sqlite.Database database) {
   database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
     tagFixtureId(8000),
@@ -441,7 +445,9 @@ void _seedOrdinaryLayout(sqlite.Database database) {
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
       [tagFixtureId(8000), tagFixtureId(number)],
     );
-    if (number <= 2) continue;
+  }
+  // Вместе со связью из основного засева у первого намерения 52 связи.
+  for (var number = 3; number <= _lastLayoutRelation; number++) {
     database.execute(
       'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
       [
