@@ -51,14 +51,9 @@ MigrationStrategy localDataMigrationStrategy(
             detectedSchemaVersion: from,
           );
         }
-        if (from != 1 || to != 2) {
-          throw const CorruptLocalDataSchemaException();
-        }
-        await runAtomicMigration(
-          database,
-          targetSchemaVersion: to,
-          migrate: () => _migrateFrom1To2(database),
-        );
+        // Схема 3 — базовая версия без путей обновления: меньший маркер
+        // оставили предварительные сборки или повреждение.
+        throw const CorruptLocalDataSchemaException();
       },
     ),
     beforeOpen: (details) async {
@@ -69,30 +64,6 @@ MigrationStrategy localDataMigrationStrategy(
       await database.customStatement('PRAGMA foreign_keys = ON');
     },
   );
-}
-
-Future<void> _migrateFrom1To2(GeneratedDatabase database) async {
-  // Определения версии 2 фиксированы: дальнейшие изменения текущей схемы
-  // не должны менять этот переход. Столбцы добавляются без пересоздания таблицы:
-  // https://www.sqlite.org/lang_altertable.html#alter_table_add_column
-  await database.customStatement('''
-    ALTER TABLE daily_choices ADD COLUMN scheduled_minute INTEGER CHECK (
-      scheduled_minute IS NULL OR
-      (typeof(scheduled_minute) = 'integer' AND scheduled_minute BETWEEN 0 AND 1439)
-    )
-  ''');
-  await database.customStatement('''
-    ALTER TABLE daily_choices ADD COLUMN priority INTEGER NOT NULL DEFAULT 4 CHECK (
-      typeof(priority) = 'integer' AND priority BETWEEN 1 AND 4
-    )
-  ''');
-  await database.customStatement('''
-    CREATE INDEX daily_choices_date_completion_schedule_order
-      ON daily_choices (
-        choice_date, is_completed, COALESCE(scheduled_minute, -1),
-        priority, creation_sequence
-      )
-  ''');
 }
 
 Future<void> _recordMigration(
