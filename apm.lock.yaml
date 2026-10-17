@@ -1625,6 +1625,15 @@ deployments:
   content_hash: sha256:ed9cb715db1642bdde7f01d94a410518986c55c0356a67549a6bb81bab499539
 - kind: project-relative
   target: claude
+  value: .claude/rules/timing-in-benchmarks.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:c5865a1c7eb308b006e2cca7008cdb96d64523e31866199c94bb36f2718dcc5a
+- kind: project-relative
+  target: claude
   value: .claude/rules/type-safe-design.md
   runtime: null
   scope: project
@@ -2615,9 +2624,11 @@ local_deployed_files:
 - .claude/rules/dart-mcp.md
 - .claude/rules/language-preferences.md
 - .claude/rules/testing-scope.md
+- .claude/rules/timing-in-benchmarks.md
 - .claude/rules/type-safe-design.md
 local_deployed_file_hashes:
   .claude/rules/dart-mcp.md: sha256:2fe787079b658fa1fba9f8bfbdd219858c3fd18e5997f01d43e8ddec488ca8e9
   .claude/rules/language-preferences.md: sha256:e500f4facb5fc936b79aa3b7eb140bbd2f456d5d497da76a269ae7d5322ca1e8
   .claude/rules/testing-scope.md: sha256:ed9cb715db1642bdde7f01d94a410518986c55c0356a67549a6bb81bab499539
+  .claude/rules/timing-in-benchmarks.md: sha256:c5865a1c7eb308b006e2cca7008cdb96d64523e31866199c94bb36f2718dcc5a
   .claude/rules/type-safe-design.md: sha256:91e3d48f0eb3d7f65f523e59c7734221f93208c91557d07ddc40dc2a9c8dd867
