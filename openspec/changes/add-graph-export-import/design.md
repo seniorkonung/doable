@@ -405,7 +405,7 @@ SettingsUI          DataTransfer         DocAccess          Coordinator        S
 
 ### 13. Доступ к документам Android
 
-- **Плагин.** Встроенный Kotlin-плагин (`FlutterPlugin` + `ActivityAware`) добавляется к движку при его создании в `DisplayHostActivity.configureFlutterEngine`, с защитой от повторной регистрации на перенесённом движке.
+- **Плагин.** Встроенный Kotlin-плагин (`FlutterPlugin` + `ActivityAware`) добавляется к движку в `DisplayHostActivity.configureFlutterEngine`. Flutter вызывает её при каждом подключении движка к Activity, в том числе после переноса, но реестр плагинов движка не добавляет плагин уже подключённого класса, и остаётся прежний экземпляр. Отдельная защита от повторной регистрации не нужна.
   - Канал методов: создать документ, открыть документ, скопировать документ во временный файл, скопировать временный файл в документ.
   - Диалоги — `ACTION_CREATE_DOCUMENT` и `ACTION_OPEN_DOCUMENT` через `startActivityForResult` и слушатель результатов.
   - Копирование идёт потоками `ContentResolver` в фоновом потоке. Байты через канал не передаются.
