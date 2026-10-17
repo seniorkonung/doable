@@ -1,0 +1,271 @@
+package software.doable.doable
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineGroup
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.FlutterException
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.PluginRegistry
+import io.flutter.plugin.common.StandardMethodCodec
+import io.flutter.plugin.platform.PlatformViewRegistry
+import io.flutter.view.TextureRegistry
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
+import java.io.OutputStream
+import java.nio.ByteBuffer
+import java.util.concurrent.Executor
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.util.ReflectionHelpers
+import org.robolectric.util.ReflectionHelpers.ClassParameter
+
+@RunWith(RobolectricTestRunner::class)
+class DocumentAccessPluginTest {
+    private val context = RuntimeEnvironment.getApplication()
+    private val messenger = ChannelMessenger()
+    private val copies = mutableListOf<Runnable>()
+    private val plugin = DocumentAccessPlugin(Executor { copies += it })
+    private val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+    private val activityBinding = ResultActivityBinding(activity)
+    private val document = Uri.parse(
+        "content://com.android.externalstorage.documents/document/" +
+            "primary%3ADownload%2FDoable%202026-10-18.jsonl.gz",
+    )
+
+    init {
+        plugin.onAttachedToEngine(pluginBinding(context, messenger))
+        plugin.onAttachedToActivity(activityBinding)
+    }
+
+    @Test
+    fun `Диалог сохранения создаёт документ gzip с именем по умолчанию`() {
+        val reply = messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+
+        val dialog = shadowOf(activity).nextStartedActivityForResult
+        assertEquals(Intent.ACTION_CREATE_DOCUMENT, dialog.intent.action)
+        assertEquals(setOf(Intent.CATEGORY_OPENABLE), dialog.intent.categories)
+        assertEquals("application/gzip", dialog.intent.type)
+        assertEquals("Doable 2026-10-18.jsonl.gz", dialog.intent.getStringExtra(Intent.EXTRA_TITLE))
+        assertFalse(reply.received)
+
+        activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        assertEquals(document.toString(), reply.value())
+    }
+
+    @Test
+    fun `Закрытие диалога без выбора места завершает создание отменой`() {
+        val reply = messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+        val dialog = shadowOf(activity).nextStartedActivityForResult
+
+        activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_CANCELED, null)
+
+        assertNull(reply.value())
+    }
+
+    @Test
+    fun `Отсоединение Activity с ожидающим диалогом завершает создание отменой`() {
+        val reply = messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+
+        plugin.onDetachedFromActivity()
+
+        assertNull(reply.value())
+    }
+
+    @Test
+    fun `Пересоздание Activity при смене конфигурации получает ответ ожидающего диалога`() {
+        val reply = messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+        val dialog = shadowOf(activity).nextStartedActivityForResult
+        val recreated = ResultActivityBinding(Robolectric.buildActivity(Activity::class.java).setup().get())
+
+        plugin.onDetachedFromActivityForConfigChanges()
+        plugin.onReattachedToActivityForConfigChanges(recreated)
+        assertFalse(reply.received)
+        recreated.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+
+        assertEquals(document.toString(), reply.value())
+    }
+
+    @Test
+    fun `Копирование в фоне записывает все байты файла и закрывает документ до ответа`() {
+        // Больше буфера копирования, чтобы запись шла несколькими порциями.
+        val bytes = ByteArray(20_000) { it.toByte() }
+        val source = File.createTempFile("export", ".jsonl.gz").apply {
+            deleteOnExit()
+            writeBytes(bytes)
+        }
+        val written = ClosingOutputStream()
+        shadowOf(context.contentResolver).registerOutputStream(document, written)
+
+        val reply = messenger.invoke(
+            "writeDocument", mapOf("source" to source.path, "document" to document.toString()),
+        )
+        assertEquals(0, written.size())
+        assertFalse(reply.received)
+
+        copies.single().run()
+
+        assertNull(reply.value())
+        assertArrayEquals(bytes, written.toByteArray())
+        assertTrue(written.closedBeforeReply)
+    }
+
+    @Test
+    fun `Ошибка потока документа завершает копирование отказом записи`() {
+        val source = File.createTempFile("export", ".jsonl.gz").apply {
+            deleteOnExit()
+            writeBytes(ByteArray(10))
+        }
+        shadowOf(context.contentResolver).registerOutputStream(
+            document,
+            object : OutputStream() {
+                override fun write(b: Int) = throw IOException("ENOSPC")
+            },
+        )
+
+        val reply = messenger.invoke(
+            "writeDocument", mapOf("source" to source.path, "document" to document.toString()),
+        )
+        copies.single().run()
+
+        assertEquals("document_not_written", reply.errorCode())
+    }
+
+    private inner class ClosingOutputStream : ByteArrayOutputStream() {
+        var closedBeforeReply = false
+
+        override fun close() {
+            closedBeforeReply = !messenger.anyReplyReceived
+        }
+    }
+}
+
+private fun pluginBinding(
+    context: Context,
+    messenger: BinaryMessenger,
+): FlutterPlugin.FlutterPluginBinding =
+    // Плагину нужны только контекст и канал, а движок требует нативной библиотеки.
+    ReflectionHelpers.callConstructor(
+        FlutterPlugin.FlutterPluginBinding::class.java,
+        ClassParameter.from(Context::class.java, context),
+        ClassParameter.from(FlutterEngine::class.java, null),
+        ClassParameter.from(BinaryMessenger::class.java, messenger),
+        ClassParameter.from(TextureRegistry::class.java, null),
+        ClassParameter.from(PlatformViewRegistry::class.java, null),
+        ClassParameter.from(FlutterPlugin.FlutterAssets::class.java, null),
+        ClassParameter.from(FlutterEngineGroup::class.java, null),
+    )
+
+private const val CHANNEL = "software.doable.doable/document_access"
+
+/** Передаёт вызовы Dart плагину через его канал и кодек. */
+private class ChannelMessenger : BinaryMessenger {
+    private val handlers = mutableMapOf<String, BinaryMessenger.BinaryMessageHandler>()
+    private val replies = mutableListOf<ChannelReply>()
+    val anyReplyReceived get() = replies.any { it.received }
+
+    fun invoke(method: String, arguments: Map<String, String>): ChannelReply {
+        val reply = ChannelReply().also { replies += it }
+        val message = StandardMethodCodec.INSTANCE.encodeMethodCall(MethodCall(method, arguments))
+        message.rewind()
+        requireNotNull(handlers[CHANNEL]).onMessage(message, reply)
+        return reply
+    }
+
+    override fun send(channel: String, message: ByteBuffer?) = Unit
+
+    override fun send(channel: String, message: ByteBuffer?, callback: BinaryMessenger.BinaryReply?) =
+        Unit
+
+    override fun setMessageHandler(channel: String, handler: BinaryMessenger.BinaryMessageHandler?) {
+        if (handler == null) handlers.remove(channel) else handlers[channel] = handler
+    }
+}
+
+private class ChannelReply : BinaryMessenger.BinaryReply {
+    private var envelope: ByteBuffer? = null
+    val received get() = envelope != null
+
+    override fun reply(reply: ByteBuffer?) {
+        envelope = requireNotNull(reply)
+    }
+
+    fun value(): Any? {
+        val envelope = requireNotNull(envelope) { "Плагин не ответил" }
+        envelope.rewind()
+        return StandardMethodCodec.INSTANCE.decodeEnvelope(envelope)
+    }
+
+    fun errorCode(): String {
+        val error = runCatching { value() }.exceptionOrNull()
+        return (error as? FlutterException)?.code
+            ?: throw AssertionError("Ожидался отказ канала, получено $error")
+    }
+}
+
+/** Привязка к Activity, которая, как Flutter, передаёт ответы Activity слушателям. */
+private class ResultActivityBinding(private val activity: Activity) : ActivityPluginBinding {
+    private val resultListeners = mutableSetOf<PluginRegistry.ActivityResultListener>()
+
+    fun deliverResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        resultListeners.toList().forEach { it.onActivityResult(requestCode, resultCode, data) }
+    }
+
+    override fun getActivity(): Activity = activity
+
+    override fun getLifecycle(): Any = Unit
+
+    override fun addActivityResultListener(listener: PluginRegistry.ActivityResultListener) {
+        resultListeners += listener
+    }
+
+    override fun removeActivityResultListener(listener: PluginRegistry.ActivityResultListener) {
+        resultListeners -= listener
+    }
+
+    override fun addRequestPermissionsResultListener(
+        listener: PluginRegistry.RequestPermissionsResultListener,
+    ) = Unit
+
+    override fun removeRequestPermissionsResultListener(
+        listener: PluginRegistry.RequestPermissionsResultListener,
+    ) = Unit
+
+    override fun addOnNewIntentListener(listener: PluginRegistry.NewIntentListener) = Unit
+
+    override fun removeOnNewIntentListener(listener: PluginRegistry.NewIntentListener) = Unit
+
+    override fun addOnUserLeaveHintListener(listener: PluginRegistry.UserLeaveHintListener) = Unit
+
+    override fun removeOnUserLeaveHintListener(listener: PluginRegistry.UserLeaveHintListener) = Unit
+
+    override fun addOnWindowFocusChangedListener(
+        listener: PluginRegistry.WindowFocusChangedListener,
+    ) = Unit
+
+    override fun removeOnWindowFocusChangedListener(
+        listener: PluginRegistry.WindowFocusChangedListener,
+    ) = Unit
+
+    override fun addOnSaveStateListener(listener: ActivityPluginBinding.OnSaveInstanceStateListener) =
+        Unit
+
+    override fun removeOnSaveStateListener(
+        listener: ActivityPluginBinding.OnSaveInstanceStateListener,
+    ) = Unit
+}
