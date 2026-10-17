@@ -69,18 +69,15 @@ extension DriftStatisticsSeedGroupsReading on DriftPersonalGraphRepository {
             for (final row in rows)
               ContributionSeedGroup(
                 seeds: [
-                  for (final id in _requiredStoredString(
+                  for (final id in requiredStoredString(
                     row.data,
                     'seed_key',
                   ).split(','))
-                    _decodeStoredRelationIntentionId(id),
+                    decodeStoredIntentionId(id),
                 ],
                 counts: ContributionCounts(
-                  planned: _requiredStoredInteger(row.data, 'planned'),
-                  contribution: _requiredStoredInteger(
-                    row.data,
-                    'contribution',
-                  ),
+                  planned: requiredStoredInteger(row.data, 'planned'),
+                  contribution: requiredStoredInteger(row.data, 'contribution'),
                 ),
               ),
           ];

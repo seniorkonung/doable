@@ -90,7 +90,7 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
         return GraphSnapshot(value: null, revision: _currentRevision);
       }
 
-      final stored = _StoredRelationGroupRow.fromRawRow(rawRow);
+      final stored = StoredLongTermRelation.decode(rawRow.data);
       final relation = stored.toDomain();
       if (relation.id != registration.id) {
         throw const StoredGraphCorruption();

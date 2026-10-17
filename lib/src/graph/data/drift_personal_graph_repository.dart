@@ -18,7 +18,6 @@ import '../../daily_choice/application/daily_choice_result.dart';
 import '../../daily_choice/domain/calendar_date.dart';
 import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
-import '../../daily_choice/domain/daily_choice_description.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../daily_choice/domain/daily_choice_priority.dart';
 import '../../daily_choice/domain/daily_choice_schedule.dart';
@@ -65,7 +64,6 @@ import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
-import '../../tag/domain/tag_name.dart';
 import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
@@ -562,7 +560,7 @@ final class DriftPersonalGraphRepository
       }
       return GraphSnapshot(
         value: IntentionDetails(
-          intention: _rehydrateDetailRow(row),
+          intention: decodeStoredIntention(row.data),
           relationCounts: await _readVerifiedRelationCounts(id),
         ),
         revision: _currentRevision,
@@ -876,7 +874,7 @@ final class DriftPersonalGraphRepository
     onStage(IntentionCreationCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(intention.id);
     if (stored == null) throw const StoredGraphCorruption();
-    final storedIntention = _rehydrateStored(stored.detail);
+    final storedIntention = stored.intention;
     final counts = await _readVerifiedRelationCounts(intention.id);
     final after = await _catalogEntrySnapshot(stored, counts);
     final assignedTagIds = [for (final tag in after.summary.tags) tag.id];
@@ -928,7 +926,7 @@ final class DriftPersonalGraphRepository
     final storedBefore = await _readCommandSnapshot(command.id);
     if (storedBefore == null) throw const _IntentionNotFound();
 
-    final existing = _rehydrateStored(storedBefore.detail);
+    final existing = storedBefore.intention;
     final counts = await _readVerifiedRelationCounts(command.id);
     final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.title == title && existing.description == description) {
@@ -956,7 +954,7 @@ final class DriftPersonalGraphRepository
     final stored = await _readCommandSnapshot(command.id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
-      intention: _rehydrateStored(stored.detail),
+      intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored, counts),
     );
@@ -970,7 +968,7 @@ final class DriftPersonalGraphRepository
     final storedBefore = await _readCommandSnapshot(id);
     if (storedBefore == null) throw const _IntentionNotFound();
 
-    final existing = _rehydrateStored(storedBefore.detail);
+    final existing = storedBefore.intention;
     final counts = await _readVerifiedRelationCounts(id);
     final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.readiness == readiness) {
@@ -997,7 +995,7 @@ final class DriftPersonalGraphRepository
     final stored = await _readCommandSnapshot(id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
-      intention: _rehydrateStored(stored.detail),
+      intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored, counts),
     );
@@ -1011,7 +1009,7 @@ final class DriftPersonalGraphRepository
     final storedBefore = await _readCommandSnapshot(id);
     if (storedBefore == null) throw const _IntentionNotFound();
 
-    final existing = _rehydrateStored(storedBefore.detail);
+    final existing = storedBefore.intention;
     final counts = await _readVerifiedRelationCounts(id);
     final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.archiveState == archiveState) {
@@ -1051,7 +1049,7 @@ final class DriftPersonalGraphRepository
         ? await _readVerifiedRelationCountsFor([id, ...cascadedNeighborIds])
         : const <IntentionId, RelationCounts>{};
     return _CommittedIntentionUpdated(
-      intention: _rehydrateStored(stored.detail),
+      intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored, affectedCounts[id] ?? counts),
       affectedCounts: affectedCounts,
@@ -1087,7 +1085,7 @@ final class DriftPersonalGraphRepository
         .get();
     return [
       for (final row in rows)
-        _decodeStoredNeighborIntentionId(row.data['neighbor_id']),
+        decodeStoredIntentionId(requiredStoredString(row.data, 'neighbor_id')),
     ];
   }
 
@@ -1118,8 +1116,8 @@ final class DriftPersonalGraphRepository
     final archived = [
       for (final row in rows)
         _CascadedRelationArchive(
-          _StoredRelationGroupRow.fromRawRow(row).toDomain(),
-          switch (_requiredStoredInteger(row.data, 'is_referenced')) {
+          StoredLongTermRelation.decode(row.data).toDomain(),
+          switch (requiredStoredInteger(row.data, 'is_referenced')) {
             0 => const LongTermRelationPermissions.unrestricted(),
             1 => const LongTermRelationPermissions.referencedByDailyPath(),
             _ => throw const StoredGraphCorruption(),
@@ -1141,11 +1139,6 @@ final class DriftPersonalGraphRepository
       updates: {_database.longTermRelations},
     );
     return archived;
-  }
-
-  IntentionId _decodeStoredNeighborIntentionId(Object? value) {
-    if (value is! String) throw const StoredGraphCorruption();
-    return _decodeStoredIntentionId(value);
   }
 
   Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
@@ -1214,7 +1207,9 @@ final class DriftPersonalGraphRepository
           readsFrom: {_database.intentions},
         )
         .getSingleOrNull();
-    return row == null ? null : _StoredIntentionCommandSnapshot.fromRawRow(row);
+    return row == null
+        ? null
+        : _StoredIntentionCommandSnapshot.fromRow(row.data);
   }
 
   Future<IntentionCatalogFirstPage> _readFirstCatalogPage(
@@ -1575,9 +1570,12 @@ final class DriftPersonalGraphRepository
     List<TypedResult> rows,
     int pageSize,
   ) async {
-    final validatedRows = [for (final row in rows) _validateCatalogRow(row)];
-    final itemRows = validatedRows.take(pageSize).toList(growable: false);
-    final intentionIds = [for (final row in itemRows) row.intentionId];
+    final intentions = [
+      for (final row in rows)
+        decodeStoredIntention(row.rawData.data, 'intentions.'),
+    ];
+    final itemRows = intentions.take(pageSize).toList(growable: false);
+    final intentionIds = [for (final intention in itemRows) intention.id];
     final aggregates = await _relationCountAggregates.read(intentionIds);
     final tags = await _readIntentionTags(intentionIds);
     return [
@@ -1597,50 +1595,19 @@ final class DriftPersonalGraphRepository
     return aggregate.counts;
   }
 
-  IntentionId _decodeStoredIntentionId(String value) =>
-      switch (IntentionId.decode(value)) {
-        IntentionIdDecodingSuccess(:final id) => id,
-        InvalidIntentionIdDecoding() => throw const StoredGraphCorruption(),
-      };
-
-  ({IntentionId intentionId, _StoredIntentionDetail stored})
-  _validateCatalogRow(TypedResult row) {
-    final stored = _StoredIntentionDetail.fromCatalogRow(row);
-    final intentionId = _decodeStoredIntentionId(stored.id);
-
-    try {
-      final normalizedTitle = IntentionText.normalizeTitle(stored.title);
-      final normalizedDescription = stored.description == null
-          ? null
-          : IntentionText.normalizeDescription(stored.description!);
-      if (normalizedTitle != stored.title ||
-          normalizedDescription != stored.description) {
-        throw const StoredGraphCorruption();
-      }
-      return (intentionId: intentionId, stored: stored);
-    } on Object catch (error) {
-      if (error is IntentionTextValidationException ||
-          error is ArgumentError ||
-          error is RangeError) {
-        throw const StoredGraphCorruption();
-      }
-      rethrow;
-    }
-  }
-
   IntentionSummary _rehydrateSummary(
-    ({IntentionId intentionId, _StoredIntentionDetail stored}) row,
+    domain.Intention intention,
     RelationCounts relationCounts,
     List<tag_domain.Tag> tags,
   ) => IntentionSummary(
-    id: row.intentionId,
-    title: row.stored.title,
-    hasDescription: row.stored.description != null,
-    readiness: row.stored.readiness,
-    archiveState: row.stored.archiveState,
+    id: intention.id,
+    title: intention.title,
+    hasDescription: intention.description != null,
+    readiness: intention.readiness,
+    archiveState: intention.archiveState,
     activeRelationCount: relationCounts.active,
-    createdAt: row.stored.createdAt,
-    updatedAt: row.stored.updatedAt,
+    createdAt: intention.createdAt,
+    updatedAt: intention.updatedAt,
     tags: tags,
   );
 
@@ -1655,22 +1622,11 @@ final class DriftPersonalGraphRepository
     boundaryId: boundary.id,
   );
 
-  domain.Intention _rehydrateStored(_StoredIntentionDetail stored) =>
-      _rehydrateValues(
-        id: stored.id,
-        title: stored.title,
-        description: stored.description,
-        readiness: stored.readiness,
-        archiveState: stored.archiveState,
-        createdAt: stored.createdAt,
-        updatedAt: stored.updatedAt,
-      );
-
   Future<IntentionCatalogEntrySnapshot> _catalogEntrySnapshot(
     _StoredIntentionCommandSnapshot stored,
     RelationCounts relationCounts,
   ) async {
-    final intention = _rehydrateStored(stored.detail);
+    final intention = stored.intention;
     final tags = await _readIntentionTags([intention.id]);
     return _DriftIntentionCatalogEntrySnapshot(
       summary: IntentionSummary(
@@ -1687,227 +1643,15 @@ final class DriftPersonalGraphRepository
       storedTitleSearchKey: stored.titleSearchKey,
     );
   }
-
-  domain.Intention _rehydrateDetailRow(QueryRow row) {
-    return _rehydrateStored(_StoredIntentionDetail.fromRawRow(row));
-  }
-
-  domain.Intention _rehydrateValues({
-    required String id,
-    required String title,
-    required String? description,
-    required domain.IntentionReadiness readiness,
-    required domain.IntentionArchiveState archiveState,
-    required domain.IntentionTimestamp createdAt,
-    required domain.IntentionTimestamp updatedAt,
-  }) {
-    final decodedId = switch (IntentionId.decode(id)) {
-      IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw const StoredGraphCorruption(),
-    };
-
-    try {
-      final normalizedTitle = IntentionText.normalizeTitle(title);
-      final normalizedDescription = description == null
-          ? null
-          : IntentionText.normalizeDescription(description);
-      if (normalizedTitle != title || normalizedDescription != description) {
-        throw const StoredGraphCorruption();
-      }
-      return domain.Intention(
-        id: decodedId,
-        title: normalizedTitle,
-        description: normalizedDescription,
-        readiness: readiness,
-        archiveState: archiveState,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-      );
-    } on Object catch (error) {
-      if (error is IntentionTextValidationException ||
-          error is ArgumentError ||
-          error is RangeError) {
-        throw const StoredGraphCorruption();
-      }
-      rethrow;
-    }
-  }
 }
 
 final class _StoredIntentionCommandSnapshot {
-  const _StoredIntentionCommandSnapshot({
-    required this.detail,
-    required this.titleSearchKey,
-  });
+  _StoredIntentionCommandSnapshot.fromRow(Map<String, Object?> data)
+    : intention = decodeStoredIntention(data),
+      titleSearchKey = decodeStoredTitleSearchKey(data);
 
-  factory _StoredIntentionCommandSnapshot.fromRawRow(QueryRow row) {
-    final data = row.data;
-    final titleSearchKey = _StoredIntentionDetail._requiredString(
-      data,
-      _StoredIntentionColumnNames.titleSearchKey,
-    );
-    try {
-      IntentionText.ensureValidUnicodeRepertoire(
-        titleSearchKey,
-        field: IntentionTextField.title,
-      );
-    } on IntentionTextValidationException catch (_) {
-      throw const StoredGraphCorruption();
-    }
-    if (titleSearchKey.isEmpty) throw const StoredGraphCorruption();
-
-    return _StoredIntentionCommandSnapshot(
-      detail: _StoredIntentionDetail._fromRawData(
-        data,
-        _StoredIntentionColumnNames.detail,
-      ),
-      titleSearchKey: titleSearchKey,
-    );
-  }
-
-  final _StoredIntentionDetail detail;
+  final domain.Intention intention;
   final String titleSearchKey;
-}
-
-final class _StoredIntentionDetail {
-  const _StoredIntentionDetail({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.readiness,
-    required this.archiveState,
-    required this.createdAt,
-    required this.updatedAt,
-  });
-
-  factory _StoredIntentionDetail.fromRawRow(QueryRow row) {
-    return _StoredIntentionDetail._fromRawData(
-      row.data,
-      _StoredIntentionColumnNames.detail,
-    );
-  }
-
-  factory _StoredIntentionDetail.fromCatalogRow(TypedResult row) {
-    return _StoredIntentionDetail._fromRawData(
-      row.rawData.data,
-      _StoredIntentionColumnNames.catalog,
-    );
-  }
-
-  factory _StoredIntentionDetail._fromRawData(
-    Map<String, dynamic> data,
-    _StoredIntentionColumnNames columns,
-  ) {
-    return _StoredIntentionDetail(
-      id: _requiredString(data, columns.id),
-      title: _requiredString(data, columns.title),
-      description: _nullableString(data, columns.description),
-      readiness: _readiness(data, columns.isActionReady),
-      archiveState: _archiveState(data, columns.isArchived),
-      createdAt: _timestamp(data, columns.createdAt),
-      updatedAt: _timestamp(data, columns.updatedAt),
-    );
-  }
-
-  final String id;
-  final String title;
-  final String? description;
-  final domain.IntentionReadiness readiness;
-  final domain.IntentionArchiveState archiveState;
-  final domain.IntentionTimestamp createdAt;
-  final domain.IntentionTimestamp updatedAt;
-
-  static String _requiredString(Map<String, dynamic> data, String column) {
-    final value = data[column];
-    if (value is String) return value;
-    throw const StoredGraphCorruption();
-  }
-
-  static String? _nullableString(Map<String, dynamic> data, String column) {
-    final value = data[column];
-    if (value == null || value is String) return value;
-    throw const StoredGraphCorruption();
-  }
-
-  static domain.IntentionReadiness _readiness(
-    Map<String, dynamic> data,
-    String column,
-  ) => switch (_integer(data, column)) {
-    0 => domain.IntentionReadiness.notReady,
-    1 => domain.IntentionReadiness.ready,
-    _ => throw const StoredGraphCorruption(),
-  };
-
-  static domain.IntentionArchiveState _archiveState(
-    Map<String, dynamic> data,
-    String column,
-  ) => switch (_integer(data, column)) {
-    0 => domain.IntentionArchiveState.active,
-    1 => domain.IntentionArchiveState.archived,
-    _ => throw const StoredGraphCorruption(),
-  };
-
-  static domain.IntentionTimestamp _timestamp(
-    Map<String, dynamic> data,
-    String column,
-  ) {
-    final microseconds = _integer(data, column);
-    try {
-      return domain.IntentionTimestamp(
-        DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true),
-      );
-    } on ArgumentError catch (_) {
-      throw const StoredGraphCorruption();
-    }
-  }
-
-  static int _integer(Map<String, dynamic> data, String column) {
-    final value = data[column];
-    if (value is int) return value;
-    throw const StoredGraphCorruption();
-  }
-}
-
-final class _StoredIntentionColumnNames {
-  const _StoredIntentionColumnNames({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.isActionReady,
-    required this.isArchived,
-    required this.createdAt,
-    required this.updatedAt,
-  });
-
-  static const detail = _StoredIntentionColumnNames(
-    id: 'id',
-    title: 'title',
-    description: 'description',
-    isActionReady: 'is_action_ready',
-    isArchived: 'is_archived',
-    createdAt: 'created_at',
-    updatedAt: 'updated_at',
-  );
-
-  static const catalog = _StoredIntentionColumnNames(
-    id: 'intentions.id',
-    title: 'intentions.title',
-    description: 'intentions.description',
-    isActionReady: 'intentions.is_action_ready',
-    isArchived: 'intentions.is_archived',
-    createdAt: 'intentions.created_at',
-    updatedAt: 'intentions.updated_at',
-  );
-
-  static const titleSearchKey = 'title_search_key';
-
-  final String id;
-  final String title;
-  final String description;
-  final String isActionReady;
-  final String isArchived;
-  final String createdAt;
-  final String updatedAt;
 }
 
 /// Различает ревизии разных экземпляров репозитория: понадобится при

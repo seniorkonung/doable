@@ -723,7 +723,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           DailyChoiceConflictReason.confirmedPathChanged,
         );
       }
-      final intention = _rehydrateDetailRow(row);
+      final intention = decodeStoredIntention(row.data);
       if (intention.archiveState == domain.IntentionArchiveState.archived) {
         throw const DailyChoiceConflictFailure(
           DailyChoiceConflictReason.participantArchived,

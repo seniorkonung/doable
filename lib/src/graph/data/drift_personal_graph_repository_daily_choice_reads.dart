@@ -163,7 +163,8 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
         )
         .getSingleOrNull();
     if (choiceRow == null) return null;
-    final choice = _decodeStoredDailyChoice(choiceRow, id);
+    final choice = decodeStoredDailyChoice(choiceRow.data);
+    if (choice.id != id) throw const StoredGraphCorruption();
 
     final stepRows = await _database
         .customSelect(
@@ -173,12 +174,14 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
           readsFrom: {_database.dailyChoicePathSteps},
         )
         .get();
-    final steps = [for (final row in stepRows) _decodeStoredChoiceStep(row)];
+    final steps = [
+      for (final row in stepRows) decodeStoredChoicePathStep(row.data),
+    ];
     if (steps.isEmpty) throw const StoredGraphCorruption();
 
     final relationIds = steps.map((step) => step.relationId).toSet();
     final orderedRelationIds = relationIds.toList();
-    final relations = <LongTermRelationId, _StoredRelationGroupRow>{};
+    final relations = <LongTermRelationId, StoredLongTermRelation>{};
     for (var start = 0; start < orderedRelationIds.length; start += 400) {
       final batch = orderedRelationIds.skip(start).take(400).toList();
       final rows = await _database
@@ -195,7 +198,7 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
           )
           .get();
       for (final row in rows) {
-        final stored = _StoredRelationGroupRow.fromRawRow(row);
+        final stored = StoredLongTermRelation.decode(row.data);
         if (!relationIds.contains(stored.id) ||
             relations.containsKey(stored.id)) {
           throw const StoredGraphCorruption();
@@ -232,7 +235,7 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
           )
           .get();
       for (final row in rows) {
-        final intention = _rehydrateDetailRow(row);
+        final intention = decodeStoredIntention(row.data);
         if (!intentionIds.contains(intention.id) ||
             intentions.containsKey(intention.id)) {
           throw const StoredGraphCorruption();
@@ -281,103 +284,4 @@ final class _DailyChoiceWatchRegistration {
         ? const {}
         : Set.unmodifiable({for (final step in details.path) step.relation.id});
   }
-}
-
-DailyChoice _decodeStoredDailyChoice(QueryRow row, DailyChoiceId requestedId) {
-  final data = row.data;
-  if (_requiredStoredInteger(data, 'creation_sequence') <= 0) {
-    throw const StoredGraphCorruption();
-  }
-  final id = switch (DailyChoiceId.decode(_requiredStoredString(data, 'id'))) {
-    DailyChoiceIdDecodingSuccess(:final id) => id,
-    InvalidDailyChoiceIdDecoding() => throw const StoredGraphCorruption(),
-  };
-  if (id != requestedId) throw const StoredGraphCorruption();
-  final sourceId = _decodeStoredRelationIntentionId(
-    _requiredStoredString(data, 'source_intention_id'),
-  );
-  final selectedId = _decodeStoredRelationIntentionId(
-    _requiredStoredString(data, 'selected_intention_id'),
-  );
-  final description = data['description'];
-  if (description != null && description is! String) {
-    throw const StoredGraphCorruption();
-  }
-  final completed = switch (_requiredStoredInteger(data, 'is_completed')) {
-    0 => false,
-    1 => true,
-    _ => throw const StoredGraphCorruption(),
-  };
-  final schedule = switch (data['scheduled_minute']) {
-    null => const DailyChoiceAllDay(),
-    final int minute when minute >= 0 && minute <= 1439 => DailyChoiceTime(
-      hour: minute ~/ 60,
-      minute: minute % 60,
-    ),
-    _ => throw const StoredGraphCorruption(),
-  };
-  final priority = switch (_requiredStoredInteger(data, 'priority')) {
-    1 => DailyChoicePriority.p1,
-    2 => DailyChoicePriority.p2,
-    3 => DailyChoicePriority.p3,
-    4 => DailyChoicePriority.p4,
-    _ => throw const StoredGraphCorruption(),
-  };
-  try {
-    return DailyChoice(
-      id: id,
-      sourceIntentionId: sourceId,
-      selectedIntentionId: selectedId,
-      date: CalendarDate.parseCanonical(
-        _requiredStoredString(data, 'choice_date'),
-      ),
-      description: description == null
-          ? null
-          : DailyChoiceDescription.fromStored(description),
-      isCompleted: completed,
-      schedule: schedule,
-      priority: priority,
-    );
-  } on CalendarDateValidationException catch (_) {
-    throw const StoredGraphCorruption();
-  } on DailyChoiceDescriptionValidationException catch (_) {
-    throw const StoredGraphCorruption();
-  } on ArgumentError catch (_) {
-    throw const StoredGraphCorruption();
-  }
-}
-
-ChoicePathStep _decodeStoredChoiceStep(QueryRow row) {
-  final data = row.data;
-  final id = switch (ChoicePathStepId.decode(
-    _requiredStoredString(data, 'id'),
-  )) {
-    ChoicePathStepIdDecodingSuccess(:final id) => id,
-    InvalidChoicePathStepIdDecoding() => throw const StoredGraphCorruption(),
-  };
-  final owner = switch (DailyChoiceId.decode(
-    _requiredStoredString(data, 'daily_choice_id'),
-  )) {
-    DailyChoiceIdDecodingSuccess(:final id) => id,
-    InvalidDailyChoiceIdDecoding() => throw const StoredGraphCorruption(),
-  };
-  final previousRaw = data['previous_step_id'];
-  if (previousRaw != null && previousRaw is! String) {
-    throw const StoredGraphCorruption();
-  }
-  final previous = previousRaw == null
-      ? null
-      : switch (ChoicePathStepId.decode(previousRaw)) {
-          ChoicePathStepIdDecodingSuccess(:final id) => id,
-          InvalidChoicePathStepIdDecoding() =>
-            throw const StoredGraphCorruption(),
-        };
-  return ChoicePathStep(
-    id: id,
-    dailyChoiceId: owner,
-    relationId: _decodeStoredRelationId(
-      _requiredStoredString(data, 'long_term_relation_id'),
-    ),
-    previousStepId: previous,
-  );
 }

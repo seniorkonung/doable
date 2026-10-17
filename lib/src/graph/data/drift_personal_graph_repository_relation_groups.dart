@@ -158,16 +158,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     final selectedRows = rawRows.take(query.pageSize).toList(growable: false);
     final choices = <DailyChoice>[];
     for (final row in selectedRows) {
-      if (_requiredStoredInteger(row.data, 'creation_sequence') <= 0) {
-        throw const StoredGraphCorruption();
-      }
-      final id = switch (DailyChoiceId.decode(
-        _requiredStoredString(row.data, 'id'),
-      )) {
-        DailyChoiceIdDecodingSuccess(:final id) => id,
-        InvalidDailyChoiceIdDecoding() => throw const StoredGraphCorruption(),
-      };
-      final choice = _decodeStoredDailyChoice(row, id);
+      final choice = decodeStoredDailyChoice(row.data);
       final directParticipant = switch (query.role) {
         DailyChoiceRelationRole.source => choice.sourceIntentionId,
         DailyChoiceRelationRole.selected => choice.selectedIntentionId,
@@ -191,11 +182,11 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     final nextCursor = hasNextPage
         ? _DriftDailyChoiceGroupCursor(
             revision: revision,
-            boundaryDate: _requiredStoredString(
+            boundaryDate: requiredStoredString(
               selectedRows.last.data,
               'choice_date',
             ),
-            boundaryCreationSequence: _requiredStoredInteger(
+            boundaryCreationSequence: requiredStoredInteger(
               selectedRows.last.data,
               'creation_sequence',
             ),
@@ -341,7 +332,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     required Map<IntentionId, int> knownActiveCounts,
   }) async {
     final rows = [
-      for (final rawRow in rawRows) _StoredRelationGroupRow.fromRawRow(rawRow),
+      for (final rawRow in rawRows) StoredLongTermRelation.decode(rawRow.data),
     ];
     final relations = [for (final row in rows) row.toDomain()];
     for (final relation in relations) {
@@ -390,8 +381,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   }) async {
     if (ids.isEmpty) return const {};
     final orderedIds = ids.toList(growable: false);
-    final validatedRows =
-        <({IntentionId intentionId, _StoredIntentionDetail stored})>[];
+    final participants = <domain.Intention>[];
     const batchSize = 400;
     for (var start = 0; start < orderedIds.length; start += batchSize) {
       final end = start + batchSize < orderedIds.length
@@ -414,8 +404,9 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
               id.toCanonicalString(),
           ]),
         );
-      validatedRows.addAll([
-        for (final row in await query.get()) _validateCatalogRow(row),
+      participants.addAll([
+        for (final row in await query.get())
+          decodeStoredIntention(row.rawData.data, 'intentions.'),
       ]);
     }
     final idsWithoutKnownCount = ids.difference(knownActiveCounts.keys.toSet());
@@ -426,13 +417,13 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
       for (final entry in counts.entries) entry.key: entry.value.active,
     };
     return Map.unmodifiable({
-      for (final row in validatedRows)
-        row.intentionId: RelationParticipantSummary(
-          id: row.intentionId,
-          title: row.stored.title,
-          archiveState: row.stored.archiveState,
+      for (final participant in participants)
+        participant.id: RelationParticipantSummary(
+          id: participant.id,
+          title: participant.title,
+          archiveState: participant.archiveState,
           activeRelationCount:
-              activeCounts[row.intentionId] ??
+              activeCounts[participant.id] ??
               (throw const StoredGraphCorruption()),
         ),
     });
@@ -468,106 +459,6 @@ void _verifyRelationGroupProgress({
       ? returnedCount >= expectedCount
       : returnedCount != expectedCount;
   if (invalid) throw const StoredGraphCorruption();
-}
-
-final class _StoredRelationGroupRow {
-  const _StoredRelationGroupRow({
-    required this.creationSequence,
-    required this.id,
-    required this.sourceIntentionId,
-    required this.relatedIntentionId,
-    required this.type,
-    required this.priority,
-    required this.scope,
-    required this.description,
-  });
-
-  factory _StoredRelationGroupRow.fromRawRow(QueryRow row) {
-    final data = row.data;
-    final creationSequence = _requiredStoredInteger(data, 'creation_sequence');
-    if (creationSequence <= 0) throw const StoredGraphCorruption();
-    final id = _decodeStoredRelationId(_requiredStoredString(data, 'id'));
-    final sourceIntentionId = _decodeStoredRelationIntentionId(
-      _requiredStoredString(data, 'source_intention_id'),
-    );
-    final relatedIntentionId = _decodeStoredRelationIntentionId(
-      _requiredStoredString(data, 'related_intention_id'),
-    );
-    final type = switch (_requiredStoredString(data, 'type')) {
-      'need' => relation_domain.LongTermRelationType.need,
-      'can' => relation_domain.LongTermRelationType.can,
-      _ => throw const StoredGraphCorruption(),
-    };
-    final priority = switch (_requiredStoredInteger(data, 'priority')) {
-      1 => relation_domain.RelationPriority.p1,
-      2 => relation_domain.RelationPriority.p2,
-      3 => relation_domain.RelationPriority.p3,
-      4 => relation_domain.RelationPriority.p4,
-      _ => throw const StoredGraphCorruption(),
-    };
-    final scope = switch (_requiredStoredInteger(data, 'is_archived')) {
-      0 => relation_domain.RelationScope.active,
-      1 => relation_domain.RelationScope.archived,
-      _ => throw const StoredGraphCorruption(),
-    };
-    final description = data['description'];
-    if (description != null && description is! String) {
-      throw const StoredGraphCorruption();
-    }
-    LongTermRelationDescription? verifiedDescription;
-    if (description case final String value) {
-      try {
-        verifiedDescription = LongTermRelationDescription.fromInput(value);
-        if (verifiedDescription == null) {
-          throw const StoredGraphCorruption();
-        }
-      } on LongTermRelationTextValidationException {
-        throw const StoredGraphCorruption();
-      }
-    }
-
-    return _StoredRelationGroupRow(
-      creationSequence: creationSequence,
-      id: id,
-      sourceIntentionId: sourceIntentionId,
-      relatedIntentionId: relatedIntentionId,
-      type: type,
-      priority: priority,
-      scope: scope,
-      description: verifiedDescription,
-    );
-  }
-
-  final int creationSequence;
-  final LongTermRelationId id;
-  final IntentionId sourceIntentionId;
-  final IntentionId relatedIntentionId;
-  final relation_domain.LongTermRelationType type;
-  final relation_domain.RelationPriority priority;
-  final relation_domain.RelationScope scope;
-  final LongTermRelationDescription? description;
-
-  bool get hasDescription => description != null;
-
-  relation_domain.LongTermRelation toDomain() {
-    try {
-      return relation_domain.LongTermRelation(
-        id: id,
-        sourceIntentionId: sourceIntentionId,
-        relatedIntentionId: relatedIntentionId,
-        type: type,
-        priority: priority,
-        scope: scope,
-        creationSequence: relation_domain.RelationCreationSequence(
-          creationSequence,
-        ),
-      );
-    } on relation_domain.LongTermRelationValidationException {
-      throw const StoredGraphCorruption();
-    } on relation_domain.RelationCreationSequenceValidationException {
-      throw const StoredGraphCorruption();
-    }
-  }
 }
 
 final class _DriftRelationGroupCursor implements RelationGroupCursor {
@@ -635,31 +526,6 @@ DiagnosticsFailureCode _relationGroupDiagnosticsFailureCode(
   GraphFailureCategory.corruption => DiagnosticsFailureCode.corruption,
   GraphFailureCategory.unexpected => DiagnosticsFailureCode.unexpected,
 };
-
-String _requiredStoredString(Map<String, Object?> data, String column) {
-  final value = data[column];
-  if (value is String) return value;
-  throw const StoredGraphCorruption();
-}
-
-int _requiredStoredInteger(Map<String, Object?> data, String column) {
-  final value = data[column];
-  if (value is int) return value;
-  throw const StoredGraphCorruption();
-}
-
-LongTermRelationId _decodeStoredRelationId(String value) =>
-    switch (LongTermRelationId.decode(value)) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() =>
-        throw const StoredGraphCorruption(),
-    };
-
-IntentionId _decodeStoredRelationIntentionId(String value) =>
-    switch (IntentionId.decode(value)) {
-      IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw const StoredGraphCorruption(),
-    };
 
 final class _RelationGroupSnapshotHasExpired implements Exception {
   const _RelationGroupSnapshotHasExpired();

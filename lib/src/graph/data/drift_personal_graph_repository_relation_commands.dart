@@ -401,7 +401,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
-  Future<_StoredRelationGroupRow?> _readStoredRelation(
+  Future<StoredLongTermRelation?> _readStoredRelation(
     LongTermRelationId id,
   ) async {
     final row = await _database
@@ -423,7 +423,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
           readsFrom: {_database.longTermRelations},
         )
         .getSingleOrNull();
-    return row == null ? null : _StoredRelationGroupRow.fromRawRow(row);
+    return row == null ? null : StoredLongTermRelation.decode(row.data);
   }
 
   Future<void> _requireRelationParticipant(
@@ -439,11 +439,11 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         )
         .getSingleOrNull();
     if (row == null) throw _LongTermRelationParticipantNotFound(role, id);
-    final archivedValue = row.data['is_archived'];
-    if (archivedValue is! int || (archivedValue != 0 && archivedValue != 1)) {
-      throw const StoredGraphCorruption();
-    }
-    if (mustBeActive && archivedValue == 1) {
+    final archiveState = decodeStoredIntentionArchiveState(
+      row.data,
+      'is_archived',
+    );
+    if (mustBeActive && archiveState == domain.IntentionArchiveState.archived) {
       throw _LongTermRelationParticipantArchived(role, id);
     }
   }
@@ -472,13 +472,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         )
         .getSingleOrNull();
     if (row == null) return null;
-    final serializedId = row.data['id'];
-    if (serializedId is! String) throw const StoredGraphCorruption();
-    return switch (LongTermRelationId.decode(serializedId)) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() =>
-        throw const StoredGraphCorruption(),
-    };
+    return decodeStoredRelationId(requiredStoredString(row.data, 'id'));
   }
 }
 

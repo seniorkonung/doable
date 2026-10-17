@@ -5,7 +5,7 @@ part of 'drift_personal_graph_repository.dart';
 List<DailyChoicePathStepDetails> _validateStoredChoicePath({
   required DailyChoice choice,
   required List<ChoicePathStep> steps,
-  required Map<LongTermRelationId, _StoredRelationGroupRow> relations,
+  required Map<LongTermRelationId, StoredLongTermRelation> relations,
   required Map<IntentionId, domain.Intention> intentions,
 }) {
   final path = verifyStoredChoicePath(

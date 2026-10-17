@@ -23,9 +23,7 @@ extension _DailyChoiceDayStatusesReading on DriftPersonalGraphRepository {
       );
       return DailyChoiceDayStatusesReadSuccess(snapshot);
     } on Object catch (error) {
-      final code =
-          error is StoredGraphCorruption ||
-              error is CalendarDateValidationException
+      final code = error is StoredGraphCorruption
           ? DiagnosticsFailureCode.corruption
           : switch (classifySqliteFailure(error)) {
               SqliteCorruptionFailure() => DiagnosticsFailureCode.corruption,
@@ -60,12 +58,12 @@ extension _DailyChoiceDayStatusesReading on DriftPersonalGraphRepository {
         .get();
     final statuses = <CalendarDate, DailyChoiceDayStatus>{};
     for (final row in rows) {
-      final storedDate = _requiredStoredString(row.data, 'choice_date');
-      final date = CalendarDate.parseCanonical(storedDate);
+      final date = decodeStoredChoiceDate(row.data);
+      final storedDate = date.toCanonicalString();
       if (storedDate.compareTo(first) < 0 || storedDate.compareTo(last) > 0) {
         throw const StoredGraphCorruption();
       }
-      statuses[date] = switch (_requiredStoredInteger(
+      statuses[date] = switch (requiredStoredInteger(
         row.data,
         'all_completed',
       )) {

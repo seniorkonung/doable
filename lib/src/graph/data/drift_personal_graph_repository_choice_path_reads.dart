@@ -77,7 +77,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
         .get();
     final intentions = <IntentionId, domain.Intention>{};
     for (final row in intentionRows) {
-      final intention = _rehydrateDetailRow(row);
+      final intention = decodeStoredIntention(row.data);
       intentions[intention.id] = intention;
     }
     if (!intentions.containsKey(draft.startingIntentionId) ||
@@ -116,9 +116,9 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
             readsFrom: {_database.longTermRelations},
           )
           .get();
-      final relations = <LongTermRelationId, _StoredRelationGroupRow>{};
+      final relations = <LongTermRelationId, StoredLongTermRelation>{};
       for (final row in relationRows) {
-        final relation = _StoredRelationGroupRow.fromRawRow(row);
+        final relation = StoredLongTermRelation.decode(row.data);
         relations[relation.id] = relation;
       }
       if (relations.length != draft.steps.length) {
@@ -195,7 +195,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
         )
         .get();
     final stored = [
-      for (final row in rawRows) _StoredRelationGroupRow.fromRawRow(row),
+      for (final row in rawRows) StoredLongTermRelation.decode(row.data),
     ];
     if (stored.any(
       (row) =>
@@ -255,7 +255,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
 final class _DriftChoicePathCursor implements ChoicePathContinuationCursor {
   _DriftChoicePathCursor.fromBoundary({
     required this.revision,
-    required _StoredRelationGroupRow boundary,
+    required StoredLongTermRelation boundary,
   }) : boundaryGroup =
            boundary.type == relation_domain.LongTermRelationType.need ? 0 : 1,
        boundaryPriority = boundary.priority.index + 1,

@@ -270,7 +270,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         )
         .getSingleOrNull();
     if (row == null) return null;
-    final tag = _decodeStoredTag(row.data);
+    final tag = decodeStoredTag(row.data);
     if (tag.id != id) throw const StoredGraphCorruption();
     return tag;
   }
@@ -294,7 +294,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         .get();
     final found = <TagId, tag_domain.Tag>{};
     for (final row in rows) {
-      final tag = _decodeStoredTag(row.data);
+      final tag = decodeStoredTag(row.data);
       if (!ids.contains(tag.id) || found.containsKey(tag.id)) {
         throw const StoredGraphCorruption();
       }
@@ -312,7 +312,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         )
         .getSingleOrNull();
     if (row == null) return null;
-    final tag = _decodeStoredTag(row.data);
+    final tag = decodeStoredTag(row.data);
     if (tag.name.matchingKey != key) throw const StoredGraphCorruption();
     return tag;
   }
