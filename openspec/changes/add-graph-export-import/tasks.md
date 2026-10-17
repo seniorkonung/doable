@@ -367,7 +367,7 @@
   - **Files likely touched:** новые файлы в `test/support/` (названия рабочие: `forwarding_graph_fact_log.dart`, `failing_snapshot_temporary_files.dart`), `test/graph_snapshots/graph_snapshot_store_test.dart`, `test/graph_snapshots/graph_log_compaction_test.dart`, `test/graph_snapshots/graph_snapshot_rebuild_test.dart`, `test/app/bootstrap/app_runtime_graph_snapshots_test.dart`, `test/support/graph_snapshot_process_worker.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.32 Повторно подтвердить готовность этапа после объединения тестовых подмен лога фактов и файлов снимков
+- [x] 1.32 Повторно подтвердить готовность этапа после объединения тестовых подмен лога фактов и файлов снимков
   - **Acceptance criteria:**
     - После задачи 1.31 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено. В том числе прерывание процесса при записи снимка оставляет реестр снимков согласованным с файлами, повреждённый последний снимок пересобирается из базы, а неудачное сжатие не повторяется на каждом новом пакете. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
     - Полные проверки проекта проходят.
