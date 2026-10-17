@@ -1,0 +1,328 @@
+import 'tag_schema.drift';
+
+-- Захват выключает только замена графа; новая установка начинает с
+-- включённым захватом.
+CREATE TABLE graph_log_control (
+  id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  capture BOOLEAN NOT NULL CHECK (
+    typeof(capture) = 'integer' AND
+    capture IN (0, 1)
+  )
+);
+
+@create: INSERT INTO graph_log_control (id, capture) VALUES (1, 1);
+
+-- Отметки сущностей, затронутых текущей транзакцией. INSERT OR IGNORE
+-- сохраняет первую операцию: по ней и текущему существованию сущность
+-- классифицируется как созданная, изменённая или удалённая.
+CREATE TABLE graph_log_tag_marks (
+  tag_id TEXT NOT NULL PRIMARY KEY,
+  first_operation TEXT NOT NULL CHECK (
+    first_operation IN ('insert', 'update', 'delete')
+  )
+);
+
+CREATE TABLE graph_log_intention_marks (
+  intention_id TEXT NOT NULL PRIMARY KEY,
+  first_operation TEXT NOT NULL CHECK (
+    first_operation IN ('insert', 'update', 'delete')
+  )
+);
+
+CREATE TABLE graph_log_tag_assignment_marks (
+  tag_id TEXT NOT NULL,
+  intention_id TEXT NOT NULL,
+  first_operation TEXT NOT NULL CHECK (
+    first_operation IN ('insert', 'update', 'delete')
+  ),
+  PRIMARY KEY (tag_id, intention_id)
+);
+
+CREATE TABLE graph_log_long_term_relation_marks (
+  long_term_relation_id TEXT NOT NULL PRIMARY KEY,
+  first_operation TEXT NOT NULL CHECK (
+    first_operation IN ('insert', 'update', 'delete')
+  )
+);
+
+CREATE TABLE graph_log_daily_choice_marks (
+  daily_choice_id TEXT NOT NULL PRIMARY KEY,
+  first_operation TEXT NOT NULL CHECK (
+    first_operation IN ('insert', 'update', 'delete')
+  )
+);
+
+-- Позиция 0 — пустой граф новой установки. Пакет «изменение» несёт факты
+-- в версии формата, которой они записаны; пакет «сброс» ссылается на
+-- снимок заменившего графа, версию которого хранит реестр снимков.
+CREATE TABLE graph_log_packages (
+  position INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (position > 0),
+  recorded_at INTEGER NOT NULL CHECK (typeof(recorded_at) = 'integer'),
+  kind TEXT NOT NULL CHECK (
+    typeof(kind) = 'text' AND
+    kind IN ('change', 'reset')
+  ),
+  format_version INTEGER CHECK (
+    format_version IS NULL OR
+    (typeof(format_version) = 'integer' AND format_version > 0)
+  ),
+  facts BLOB CHECK (facts IS NULL OR typeof(facts) = 'blob'),
+  snapshot_id INTEGER
+    REFERENCES graph_snapshots(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  CHECK (
+    (
+      kind = 'change' AND
+      format_version IS NOT NULL AND
+      facts IS NOT NULL AND
+      snapshot_id IS NULL
+    ) OR
+    (
+      kind = 'reset' AND
+      format_version IS NULL AND
+      facts IS NULL AND
+      snapshot_id IS NOT NULL
+    )
+  )
+);
+
+-- Снимок регистрируется после надёжной записи файла. Позиция может
+-- совпадать у нескольких снимков: пересборка повреждённого снимка
+-- регистрирует новый на той же позиции, и из них выбирается снимок с
+-- большим номером.
+-- Имя строки отличается от GraphSnapshot согласования представлений.
+CREATE TABLE graph_snapshots (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
+  position INTEGER NOT NULL CHECK (
+    typeof(position) = 'integer' AND
+    position >= 0
+  ),
+  format_version INTEGER NOT NULL CHECK (
+    typeof(format_version) = 'integer' AND
+    format_version > 0
+  ),
+  file_name TEXT NOT NULL UNIQUE CHECK (
+    typeof(file_name) = 'text' AND
+    file_name <> ''
+  ),
+  byte_size INTEGER NOT NULL CHECK (
+    typeof(byte_size) = 'integer' AND
+    byte_size > 0
+  ),
+  -- SHA-256 файла снимка.
+  checksum BLOB NOT NULL CHECK (
+    typeof(checksum) = 'blob' AND
+    length(checksum) = 32
+  )
+) AS RegisteredGraphSnapshot;
+
+-- Копия хранит позицию лога, а не данные. Сводка изменений с предыдущей
+-- копии считается при создании; если между ними граф заменялся, вместо
+-- сводки хранится признак замены.
+CREATE TABLE graph_backups (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
+  position INTEGER NOT NULL CHECK (
+    typeof(position) = 'integer' AND
+    position >= 0
+  ),
+  kind TEXT NOT NULL CHECK (
+    typeof(kind) = 'text' AND
+    kind IN ('daily', 'manual', 'before_replacement')
+  ),
+  made_at INTEGER NOT NULL CHECK (typeof(made_at) = 'integer'),
+  graph_replaced BOOLEAN NOT NULL CHECK (
+    typeof(graph_replaced) = 'integer' AND
+    graph_replaced IN (0, 1)
+  ),
+  added_count INTEGER CHECK (
+    added_count IS NULL OR
+    (typeof(added_count) = 'integer' AND added_count >= 0)
+  ),
+  changed_count INTEGER CHECK (
+    changed_count IS NULL OR
+    (typeof(changed_count) = 'integer' AND changed_count >= 0)
+  ),
+  deleted_count INTEGER CHECK (
+    deleted_count IS NULL OR
+    (typeof(deleted_count) = 'integer' AND deleted_count >= 0)
+  ),
+  CHECK (
+    (
+      graph_replaced = 0 AND
+      added_count IS NOT NULL AND
+      changed_count IS NOT NULL AND
+      deleted_count IS NOT NULL
+    ) OR
+    (
+      graph_replaced = 1 AND
+      added_count IS NULL AND
+      changed_count IS NULL AND
+      deleted_count IS NULL
+    )
+  )
+);
+
+CREATE TRIGGER graph_log_mark_tag_insert
+AFTER INSERT ON tags
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation)
+  VALUES (new.id, 'insert');
+END;
+
+CREATE TRIGGER graph_log_mark_tag_update
+AFTER UPDATE ON tags
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation)
+  VALUES (new.id, 'update');
+END;
+
+CREATE TRIGGER graph_log_mark_tag_delete
+AFTER DELETE ON tags
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation)
+  VALUES (old.id, 'delete');
+END;
+
+CREATE TRIGGER graph_log_mark_intention_insert
+AFTER INSERT ON intentions
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_intention_marks (
+    intention_id, first_operation
+  ) VALUES (new.id, 'insert');
+END;
+
+CREATE TRIGGER graph_log_mark_intention_update
+AFTER UPDATE ON intentions
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_intention_marks (
+    intention_id, first_operation
+  ) VALUES (new.id, 'update');
+END;
+
+CREATE TRIGGER graph_log_mark_intention_delete
+AFTER DELETE ON intentions
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_intention_marks (
+    intention_id, first_operation
+  ) VALUES (old.id, 'delete');
+END;
+
+CREATE TRIGGER graph_log_mark_tag_assignment_insert
+AFTER INSERT ON tag_assignments
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_tag_assignment_marks (
+    tag_id, intention_id, first_operation
+  ) VALUES (new.tag_id, new.intention_id, 'insert');
+END;
+
+-- Заполнение порядка тега — часть вставки назначения, а не его изменение.
+-- Его UPDATE срабатывает раньше отметки вставки, и без этого условия
+-- первой операцией нового назначения оказалось бы изменение.
+CREATE TRIGGER graph_log_mark_tag_assignment_update
+AFTER UPDATE ON tag_assignments
+WHEN
+  old.tag_creation_sequence <> 0 AND
+  (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_tag_assignment_marks (
+    tag_id, intention_id, first_operation
+  ) VALUES (new.tag_id, new.intention_id, 'update');
+END;
+
+CREATE TRIGGER graph_log_mark_tag_assignment_delete
+AFTER DELETE ON tag_assignments
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_tag_assignment_marks (
+    tag_id, intention_id, first_operation
+  ) VALUES (old.tag_id, old.intention_id, 'delete');
+END;
+
+CREATE TRIGGER graph_log_mark_long_term_relation_insert
+AFTER INSERT ON long_term_relations
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_long_term_relation_marks (
+    long_term_relation_id, first_operation
+  ) VALUES (new.id, 'insert');
+END;
+
+CREATE TRIGGER graph_log_mark_long_term_relation_update
+AFTER UPDATE ON long_term_relations
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_long_term_relation_marks (
+    long_term_relation_id, first_operation
+  ) VALUES (new.id, 'update');
+END;
+
+CREATE TRIGGER graph_log_mark_long_term_relation_delete
+AFTER DELETE ON long_term_relations
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_long_term_relation_marks (
+    long_term_relation_id, first_operation
+  ) VALUES (old.id, 'delete');
+END;
+
+CREATE TRIGGER graph_log_mark_daily_choice_insert
+AFTER INSERT ON daily_choices
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
+    daily_choice_id, first_operation
+  ) VALUES (new.id, 'insert');
+END;
+
+CREATE TRIGGER graph_log_mark_daily_choice_update
+AFTER UPDATE ON daily_choices
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
+    daily_choice_id, first_operation
+  ) VALUES (new.id, 'update');
+END;
+
+CREATE TRIGGER graph_log_mark_daily_choice_delete
+AFTER DELETE ON daily_choices
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
+    daily_choice_id, first_operation
+  ) VALUES (old.id, 'delete');
+END;
+
+-- Путь — часть записи дневного выбора, поэтому изменение шага отмечает
+-- изменение своего выбора.
+CREATE TRIGGER graph_log_mark_daily_choice_path_step_insert
+AFTER INSERT ON daily_choice_path_steps
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
+    daily_choice_id, first_operation
+  ) VALUES (new.daily_choice_id, 'update');
+END;
+
+CREATE TRIGGER graph_log_mark_daily_choice_path_step_update
+AFTER UPDATE ON daily_choice_path_steps
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
+    daily_choice_id, first_operation
+  ) VALUES (old.daily_choice_id, 'update'), (new.daily_choice_id, 'update');
+END;
+
+CREATE TRIGGER graph_log_mark_daily_choice_path_step_delete
+AFTER DELETE ON daily_choice_path_steps
+WHEN (SELECT capture FROM graph_log_control) = 1
+BEGIN
+  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
+    daily_choice_id, first_operation
+  ) VALUES (old.daily_choice_id, 'update');
+END;
