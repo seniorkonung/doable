@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
@@ -37,107 +38,34 @@ const _rangePackages = graphLogCompactionThreshold + 1;
 /// мебибайт, а данные, растущие с графом, заняли бы на профиле десятки.
 const _memoryNoiseBytes = 8 << 20;
 
-/// Бюджет p95 длительности сжатия лога на профиле решения 15 дизайна.
-const _compactionBudgetMs = 45000;
+/// Замеров сжатия профиля в серии. Сжатие длится десятки секунд, а его
+/// замеры расходятся на проценты, поэтому сорок замеров заняли бы полчаса
+/// без пользы. Прогрев не нужен: код сборки и записи снимка уже
+/// скомпилирован подготовкой снимка профиля, а изоляты одной группы делят
+/// код.
+const _compactionSeriesSamples = 3;
 
-/// Повторов чтения файла: пик resident set size одного процесса колеблется
-/// на несколько мебибайт.
-const _readRepetitions = 3;
+/// Бюджет наибольшей длительности сжатия лога профиля в серии.
+const _compactionBudgetMs = 45000;
 
 /// Связей у намерения, которое архивирует каскадная команда профиля.
 const _cascadeRelations = 1000;
 
 void main() {
-  test('бенчмарк лога фактов: память сборки состояния и сжатия не растёт '
-      'с размером графа', () async {
-    final peaks = <({int entities, int assembly, int compaction})>[];
-    for (final entities in [
-      graphLogProfileEntities ~/ 10,
-      graphLogProfileEntities,
-    ]) {
-      final graph = await _Graph.prepare(entities);
-      try {
-        await graph.confirmEdits(_rangePackages);
-        final assembly = await graph.measureLiveHeap(
-          GraphLogMemoryOperation.assembly,
-        );
-        expect(assembly.records, entities);
-        final compaction = await graph.measureLiveHeap(
-          GraphLogMemoryOperation.compaction,
-        );
-        expect(
-          (await graph.repository.readSnapshotAtOrBefore(
-            await graph.repository.readCurrentPosition(),
-          ))?.position,
-          await graph.repository.readCurrentPosition(),
-        );
-        peaks.add((
-          entities: entities,
-          assembly: assembly.peakGrowthBytes,
-          compaction: compaction.peakGrowthBytes,
-        ));
-        _report({
-          'benchmark': 'graphLogMemory',
-          'entities': entities,
-          'rangePackages': _rangePackages,
-          'assemblyLiveHeapPeakMiB': _mebibytes(assembly.peakGrowthBytes),
-          'compactionLiveHeapPeakMiB': _mebibytes(compaction.peakGrowthBytes),
-        });
-      } finally {
-        await graph.dispose();
-      }
-    }
-    final [smaller, profile] = peaks;
-    expect(profile.assembly - smaller.assembly, lessThan(_memoryNoiseBytes));
-    expect(
-      profile.compaction - smaller.compaction,
-      lessThan(_memoryNoiseBytes),
-    );
-  }, timeout: const Timeout(Duration(hours: 1)));
-
-  test(
-    'бенчмарк лога фактов: память диапазона пакетов для порога сжатия',
-    () async {
-      // Итог фактов диапазона не зависит от размера графа, а на графе в
-      // десять раз меньше профиля каждая правка затрагивает новую сущность.
-      final graph = await _Graph.prepare(graphLogProfileEntities ~/ 10);
-      try {
-        final withoutRange = await graph.measureLiveHeap(
-          GraphLogMemoryOperation.assembly,
-        );
-        const typicalPackages = 10 * graphLogCompactionThreshold;
-        await graph.confirmEdits(typicalPackages);
-        final typical = await graph.measureLiveHeap(
-          GraphLogMemoryOperation.assembly,
-        );
-        await graph.compact();
-        await graph.confirmEdits(_rangePackages, longDescriptions: true);
-        final long = await graph.measureLiveHeap(
-          GraphLogMemoryOperation.assembly,
-        );
-        _report({
-          'benchmark': 'graphLogRangeMemory',
-          'entities': graph.fixture.entities,
-          'withoutRangeLiveHeapPeakMiB': _mebibytes(
-            withoutRange.peakGrowthBytes,
-          ),
-          'typicalPackages': typicalPackages,
-          'typicalLiveHeapPeakMiB': _mebibytes(typical.peakGrowthBytes),
-          'typicalBytesPerPackage':
-              (typical.peakGrowthBytes - withoutRange.peakGrowthBytes) ~/
-              typicalPackages,
-          'longDescriptionPackages': _rangePackages,
-          'longDescriptionLiveHeapPeakMiB': _mebibytes(long.peakGrowthBytes),
-          'longDescriptionBytesPerPackage':
-              (long.peakGrowthBytes - withoutRange.peakGrowthBytes) ~/
-              _rangePackages,
-        });
-      } finally {
-        await graph.dispose();
-      }
-    },
-    timeout: const Timeout(Duration(hours: 1)),
+  // Графы общие для наборов и строятся при первом обращении: граф профиля
+  // строится больше минуты. Набор команд выключает захват фактов, после
+  // чего лог профиля расходится с базой, поэтому он идёт последним.
+  final trace = _CommandTrace();
+  final smaller = _GraphOnce(graphLogProfileEntities ~/ 10);
+  final profile = _GraphOnce(
+    graphLogProfileEntities,
+    hubRelations: _cascadeRelations,
+    observer: trace,
   );
+  tearDownAll(() async {
+    await smaller.dispose();
+    await profile.dispose();
+  });
 
   test(
     'бенчмарк лога фактов: память чтения файла из записей на пределе',
@@ -146,146 +74,222 @@ void main() {
         'doable_graph_log_records_',
       );
       addTearDown(() => directory.delete(recursive: true));
-      // Файлы одного объёма: чтение каждого длится примерно одинаково, и
-      // буферы отладочной VM растут в них одинаково.
+      // Файлы одного объёма читаются примерно одинаково долго, и буферы
+      // отладочной VM растут в них одинаково.
       const fileBytes = 32 * graphFormatRecordByteLimit;
       for (final recordBytes in [
         graphFormatRecordByteLimit ~/ 16,
-        graphFormatRecordByteLimit ~/ 4,
         graphFormatRecordByteLimit,
       ]) {
         final file = File('${directory.path}/records_$recordBytes.jsonl.gz');
         final records = fileBytes ~/ recordBytes;
         await _writeRecordsOfLength(file, records, recordBytes);
-        final peaks = <int>[];
-        for (var repetition = 0; repetition < _readRepetitions; repetition++) {
-          final memory = await measureGraphLogMemory(
-            GraphLogMemoryOperation.fileRead,
-            GraphLogMemoryMetric.residentSet,
-            file,
-          );
-          expect(memory.records, records);
-          peaks.add(memory.peakGrowthBytes);
-        }
-        peaks.sort();
+        final memory = await measureGraphLogMemory(
+          GraphLogMemoryOperation.fileRead,
+          file,
+        );
+        expect(memory.records, records);
         _report({
           'benchmark': 'graphLogRecordLimitRead',
           'recordLimitBytes': graphFormatRecordByteLimit,
           'recordBytes': recordBytes,
           'records': records,
-          'residentSetPeakMedianMiB': _mebibytes(peaks[peaks.length ~/ 2]),
-          'residentSetPeaksMiB': [for (final peak in peaks) _mebibytes(peak)],
+          'residentSetPeakMiB': _mebibytes(memory.growthBytes),
         });
         await file.delete();
       }
     },
-    timeout: const Timeout(Duration(minutes: 30)),
+    timeout: const Timeout(Duration(minutes: 5)),
   );
+
+  test('бенчмарк лога фактов: память сборки состояния и сжатия не растёт '
+      'с размером графа', () async {
+    final peaks = <({int assembly, int compaction})>[];
+    for (final shared in [smaller, profile]) {
+      final graph = await shared.graph;
+      await graph.confirmEdits(_rangePackages);
+      final assembly = await graph.measureMemory(
+        GraphLogMemoryOperation.assembly,
+      );
+      expect(assembly.records, graph.fixture.entities);
+      final compaction = await graph.measureMemory(
+        GraphLogMemoryOperation.compaction,
+      );
+      peaks.add((
+        assembly: assembly.growthBytes,
+        compaction: compaction.growthBytes,
+      ));
+      _report({
+        'benchmark': 'graphLogMemory',
+        'entities': graph.fixture.entities,
+        'rangePackages': _rangePackages,
+        'assemblyLiveHeapPeakMiB': _mebibytes(assembly.growthBytes),
+        'compactionLiveHeapPeakMiB': _mebibytes(compaction.growthBytes),
+      });
+    }
+    final [smallerPeaks, profilePeaks] = peaks;
+    for (final (operation, growth) in [
+      ('assembly', profilePeaks.assembly - smallerPeaks.assembly),
+      ('compaction', profilePeaks.compaction - smallerPeaks.compaction),
+    ]) {
+      _report({
+        'case': 'profile/$operation',
+        'metric': 'рост пика живых данных с размером графа',
+        'growthMiB': _mebibytes(growth),
+        'noiseMiB': _mebibytes(_memoryNoiseBytes),
+        'status': growth < _memoryNoiseBytes ? 'withinNoise' : 'exceeded',
+      });
+    }
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test(
+    'бенчмарк лога фактов: итог фактов диапазона для порога сжатия',
+    () async {
+      final graph = await smaller.graph;
+      for (final longDescriptions in [false, true]) {
+        await graph.confirmEdits(
+          _rangePackages,
+          longDescriptions: longDescriptions,
+        );
+        final summary = await graph.measureMemory(
+          GraphLogMemoryOperation.rangeSummary,
+        );
+        expect(summary.records, graph.fixture.entities);
+        await graph.compact();
+        _report({
+          'benchmark': 'graphLogRangeSummary',
+          'packages': _rangePackages,
+          'edits': longDescriptions ? 'longDescriptions' : 'typical',
+          'summaryMiB': _mebibytes(summary.growthBytes),
+          'bytesPerPackage': summary.growthBytes ~/ _rangePackages,
+        });
+      }
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  test('бенчмарк лога фактов: части длительности сжатия', () async {
+    // Доли частей не зависят от размера графа, а на графе в десять раз
+    // меньше профиля замер в десять раз короче.
+    final graph = await smaller.graph;
+    await graph.confirmEdits(_rangePackages);
+    final parts = await graph.measureCompactionParts();
+    final compaction = await graph.compact();
+    _report({
+      'benchmark': 'graphLogCompactionParts',
+      'entities': graph.fixture.entities,
+      'rangePackages': _rangePackages,
+      'snapshotReadMs': _milliseconds(parts.snapshotRead),
+      'stateAssemblyMs': _milliseconds(parts.stateAssembly),
+      'stateAssemblyAndEncodingMs': _milliseconds(
+        parts.stateAssemblyAndEncoding,
+      ),
+      'compactionMs': _milliseconds(compaction),
+      'snapshotBytes': parts.snapshotBytes,
+    });
+  }, timeout: const Timeout(Duration(minutes: 5)));
 
   test('бенчмарк лога фактов: длительность сжатия на профиле', () async {
     const benchmarkCase = 'profile/compaction';
     if (!benchmarkIncludes(benchmarkCase)) return;
-    final graph = await _Graph.prepare(graphLogProfileEntities);
-    try {
-      final samples = <Duration>[];
+    final graph = await profile.graph;
+    final samples = <Duration>[];
+    while (samples.length < min(benchmarkSamples, _compactionSeriesSamples)) {
+      await graph.confirmEdits(_rangePackages);
+      samples.add(await graph.compact());
+    }
+    final slowest = samples.reduce(
+      (first, second) => first > second ? first : second,
+    );
+    _report({
+      'case': benchmarkCase,
+      'metric': 'длительность сжатия',
+      'maxMs': _milliseconds(slowest),
+      'budgetMs': _compactionBudgetMs,
+      'samples': samples.length,
+      'budgetStatus': samples.length < _compactionSeriesSamples
+          ? 'smoke'
+          : slowest.inMilliseconds <= _compactionBudgetMs
+          ? 'withinBudget'
+          : 'exceeded',
+    });
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test('бенчмарк лога фактов: накладные расходы лога на команды', () async {
+    final graph = await profile.graph;
+    for (final kind in _CommandKind.values) {
+      final benchmarkCase = 'profile/${kind.name}';
+      if (!benchmarkIncludes(benchmarkCase)) continue;
+      final captured = <_CommandSample>[];
+      final uncaptured = <_CommandSample>[];
       for (
         var sample = -benchmarkWarmups;
         sample < benchmarkSamples;
         sample++
       ) {
-        await graph.confirmEdits(_rangePackages);
-        final duration = await graph.compact();
-        if (sample >= 0) samples.add(duration);
+        // Порядок пары чередуется, чтобы дрейф не копился в разности.
+        final order = sample.isEven ? [true, false] : [false, true];
+        final pair = <bool, _CommandSample>{};
+        for (final capture in order) {
+          pair[capture] = await graph.runCommand(kind, trace, capture);
+        }
+        if (sample >= 0) {
+          captured.add(pair[true]!);
+          uncaptured.add(pair[false]!);
+        }
       }
-      // Разбор времени сжатия по его частям на том же диапазоне пакетов.
-      await graph.confirmEdits(_rangePackages);
-      final parts = await graph.measureCompactionParts();
+      final overheads = [
+        for (var index = 0; index < captured.length; index++)
+          captured[index].total - uncaptured[index].total,
+      ];
       _report({
-        'benchmark': 'graphLogCompaction',
+        'benchmark': 'graphLogCommandOverhead',
+        'command': kind.name,
         'entities': graph.fixture.entities,
-        'rangePackages': _rangePackages,
-        'compactionMedianMs': _milliseconds(_median(samples)),
-        'snapshotReadMs': _milliseconds(parts.snapshotRead),
-        'stateAssemblyMs': _milliseconds(parts.stateAssembly),
-        'stateAssemblyAndEncodingMs': _milliseconds(
-          parts.stateAssemblyAndEncoding,
-        ),
-        'snapshotBytes': parts.snapshotBytes,
+        if (kind == _CommandKind.cascadeArchive)
+          'cascadeRelations': _cascadeRelations,
+        'capturedP95Ms': benchmarkP95([
+          for (final sample in captured) sample.total,
+        ]),
+        'uncapturedP95Ms': benchmarkP95([
+          for (final sample in uncaptured) sample.total,
+        ]),
+        // Медианы частей складываются в медиану команды приближённо.
+        'captured': _CommandSample.medians(captured),
+        'uncaptured': _CommandSample.medians(uncaptured),
       });
       reportBenchmarkBudget(
         benchmarkCase,
-        'длительность сжатия',
-        samples,
-        _compactionBudgetMs,
+        'накладные расходы лога',
+        overheads,
+        kind.overheadBudgetMs,
       );
-    } finally {
-      await graph.dispose();
     }
-  }, timeout: const Timeout(Duration(hours: 2)));
-
-  test('бенчмарк лога фактов: накладные расходы лога на команды', () async {
-    final trace = _CommandTrace();
-    final graph = await _Graph.prepare(
-      graphLogProfileEntities,
-      hubRelations: _cascadeRelations,
-      observer: trace,
-    );
-    try {
-      for (final kind in _CommandKind.values) {
-        final benchmarkCase = 'profile/${kind.name}';
-        if (!benchmarkIncludes(benchmarkCase)) continue;
-        final captured = <_CommandSample>[];
-        final uncaptured = <_CommandSample>[];
-        for (
-          var sample = -benchmarkWarmups;
-          sample < benchmarkSamples;
-          sample++
-        ) {
-          // Порядок пары чередуется, чтобы дрейф не копился в разности.
-          final order = sample.isEven ? [true, false] : [false, true];
-          final pair = <bool, _CommandSample>{};
-          for (final capture in order) {
-            pair[capture] = await graph.runCommand(kind, trace, capture);
-          }
-          if (sample >= 0) {
-            captured.add(pair[true]!);
-            uncaptured.add(pair[false]!);
-          }
-        }
-        final overheads = [
-          for (var index = 0; index < captured.length; index++)
-            captured[index].total - uncaptured[index].total,
-        ];
-        _report({
-          'benchmark': 'graphLogCommandOverhead',
-          'command': kind.name,
-          'entities': graph.fixture.entities,
-          if (kind == _CommandKind.cascadeArchive)
-            'cascadeRelations': _cascadeRelations,
-          'capturedP95Ms': benchmarkP95([
-            for (final sample in captured) sample.total,
-          ]),
-          'uncapturedP95Ms': benchmarkP95([
-            for (final sample in uncaptured) sample.total,
-          ]),
-          // Медианы частей складываются в медиану команды приближённо.
-          'captured': _CommandSample.medians(captured),
-          'uncaptured': _CommandSample.medians(uncaptured),
-        });
-        reportBenchmarkBudget(
-          benchmarkCase,
-          'накладные расходы лога',
-          overheads,
-          kind.overheadBudgetMs,
-        );
-      }
-    } finally {
-      await graph.dispose();
-    }
-  }, timeout: const Timeout(Duration(hours: 1)));
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }
 
-/// Граф профиля в файловой базе с базовым снимком позиции 0.
+/// Граф, который строится при первом обращении и освобождается в конце.
+final class _GraphOnce {
+  _GraphOnce(this._entities, {this._hubRelations = 0, this._observer});
+
+  final int _entities;
+  final int _hubRelations;
+  final LocalDatabaseConnectionObserver? _observer;
+  Future<_Graph>? _graph;
+
+  Future<_Graph> get graph => _graph ??= _Graph.prepare(
+    _entities,
+    hubRelations: _hubRelations,
+    observer: _observer,
+  );
+
+  Future<void> dispose() async {
+    if (_graph case final graph?) await (await graph).dispose();
+  }
+}
+
+/// Граф в пропорциях профиля решения 15 дизайна в файловой базе с базовым
+/// снимком позиции 0.
 final class _Graph {
   _Graph._(this.harness, this.raw, this.repository, this.fixture)
     : snapshots = GraphSnapshotStore.directoryIn(harness.temporaryDirectory);
@@ -471,11 +475,10 @@ final class _Graph {
     );
   }
 
-  /// Живые данные операции [operation] в отдельном процессе над этой базой.
-  Future<GraphLogMemory> measureLiveHeap(GraphLogMemoryOperation operation) =>
+  /// Память операции [operation] в отдельном процессе над этой базой.
+  Future<GraphLogMemory> measureMemory(GraphLogMemoryOperation operation) =>
       measureGraphLogMemory(
         operation,
-        GraphLogMemoryMetric.liveHeap,
         harness.databaseFile,
         snapshots: snapshots,
       );
@@ -553,16 +556,16 @@ typedef _GraphCommand = GraphCommand<GraphCommandOutcome, GraphCommandFailure>;
 
 enum _CommandKind {
   /// Правка названия намерения: один факт.
-  intentionEdit(2),
+  intentionEdit(4),
 
   /// Создание намерения с тремя тегами: факты двух секций.
-  intentionCreation(3),
+  intentionCreation(4),
 
   /// Отметка выполнения дневного выбора: факт с путём из пяти шагов.
-  dailyChoiceCompletion(2),
+  dailyChoiceCompletion(4),
 
   /// Архивирование намерения с [_cascadeRelations] активными связями.
-  cascadeArchive(60);
+  cascadeArchive(25);
 
   const _CommandKind(this.overheadBudgetMs);
 

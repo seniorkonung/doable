@@ -92,6 +92,12 @@ mise run --skip-tools benchmark -- \
   --dart-define=BENCHMARK_CASE=longPaths/archived/year/throughRelations/computeRace
 ```
 
+The fact log benchmark (`--plain-name 'бенчмарк лога фактов'`) builds graphs of
+up to 1,000,000 entities and measures memory in separate Flutter processes; its
+resident set size measurement reads Linux `/proc`. Its timed series are
+`profile/compaction` and `profile/<command>`. The measurement method, results
+and budgets are recorded in decision 15 of the `add-graph-export-import` design.
+
 The remaining eight `slow` suites were reviewed when benchmarks were separated:
 
 | Suite | Checks retained in regular tests |

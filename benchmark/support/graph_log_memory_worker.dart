@@ -16,46 +16,41 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../test/support/in_memory_diagnostics_sink.dart';
 
 const _operationVariable = 'DOABLE_GRAPH_LOG_OPERATION';
-const _metricVariable = 'DOABLE_GRAPH_LOG_METRIC';
 const _pathVariable = 'DOABLE_GRAPH_LOG_PATH';
 const _snapshotsVariable = 'DOABLE_GRAPH_LOG_SNAPSHOTS';
 const _resultMarker = 'DOABLE_GRAPH_LOG_MEMORY:';
 
 /// Операция, память которой измеряет отдельный процесс.
+///
+/// Сравнение графов разного размера ведётся по живым данным кучи Dart после
+/// принудительной сборки мусора: они не зависят от того, когда сборщик
+/// успел освободить мусор. Пик resident set size отладочной VM Flutter для
+/// этого не годится: он растёт с длительностью работы, пока буферы
+/// профилировщика и таймлайна и арены malloc не выйдут на плато.
 enum GraphLogMemoryOperation {
   /// Сборка состояния на текущей позиции из последнего снимка и пакетов
-  /// после него до последней записи.
+  /// после него до последней записи: наибольший объём живых данных за время
+  /// сборки.
   assembly,
 
-  /// Сжатие лога в новый снимок в отдельном изоляте, как в приложении.
+  /// Сжатие лога в новый снимок в отдельном изоляте, как в приложении:
+  /// наибольший объём живых данных за время сжатия.
   compaction,
 
-  /// Чтение файла формата до последней записи.
+  /// Итог фактов пакетов после последнего снимка: живые данные, которые
+  /// собранное состояние удерживает до выдачи записей.
+  rangeSummary,
+
+  /// Чтение файла формата до последней записи: пик resident set size,
+  /// то есть память вместе с мусором до его сборки.
   fileRead,
 }
 
-/// Что считается памятью операции.
-enum GraphLogMemoryMetric {
-  /// Наибольший объём живых объектов кучи Dart и внешних данных после
-  /// принудительной сборки мусора, которую процесс выполняет непрерывно.
-  ///
-  /// Не зависит от того, когда сборщик успел освободить мусор, а пик
-  /// resident set size отладочной VM Flutter растёт с длительностью работы:
-  /// буферы профилировщика и таймлайна и арены malloc заполняются, пока не
-  /// выйдут на плато. Поэтому сравнение графов разного размера ведётся по
-  /// живым данным.
-  liveHeap,
+/// Прирост памяти операции над её значением перед операцией и число
+/// выданных операцией записей; у сжатия записей нет.
+typedef GraphLogMemory = ({int growthBytes, int records});
 
-  /// Пик resident set size процесса: память, которую операция занимает
-  /// вместе с мусором до его сборки. Подходит для коротких операций.
-  residentSet,
-}
-
-/// Прирост памяти операции по метрике замера над её значением перед
-/// операцией и число выданных операцией записей; у сжатия записей нет.
-typedef GraphLogMemory = ({int peakGrowthBytes, int records});
-
-/// Выполняет [operation] в новом процессе Flutter: сборку и сжатие — над
+/// Выполняет [operation] в новом процессе Flutter: операции лога — над
 /// базой [path] с каталогом снимков [snapshots], чтение — над файлом
 /// формата [path].
 ///
@@ -64,7 +59,6 @@ typedef GraphLogMemory = ({int peakGrowthBytes, int records});
 /// операции на её месте не виден.
 Future<GraphLogMemory> measureGraphLogMemory(
   GraphLogMemoryOperation operation,
-  GraphLogMemoryMetric metric,
   File path, {
   Directory? snapshots,
 }) async {
@@ -73,7 +67,7 @@ Future<GraphLogMemory> measureGraphLogMemory(
     [
       'test',
       '--no-pub',
-      if (metric == GraphLogMemoryMetric.liveHeap) '--enable-vmservice',
+      if (operation != GraphLogMemoryOperation.fileRead) '--enable-vmservice',
       '--reporter',
       'compact',
       'benchmark/support/graph_log_memory_worker.dart',
@@ -81,7 +75,6 @@ Future<GraphLogMemory> measureGraphLogMemory(
     workingDirectory: Directory.current.path,
     environment: {
       _operationVariable: operation.name,
-      _metricVariable: metric.name,
       _pathVariable: path.path,
       _snapshotsVariable: ?snapshots?.path,
     },
@@ -101,7 +94,7 @@ Future<GraphLogMemory> measureGraphLogMemory(
     line.substring(line.indexOf(_resultMarker) + _resultMarker.length),
   ) as Map<String, Object?>;
   return (
-    peakGrowthBytes: json['peakGrowthBytes']! as int,
+    growthBytes: json['growthBytes']! as int,
     records: json['records']! as int,
   );
 }
@@ -110,77 +103,87 @@ void main() {
   test('процесс измеряет память операции лога фактов', () async {
     final environment = Platform.environment;
     final path = File(environment[_pathVariable]!);
-    final operation = switch (GraphLogMemoryOperation.values.byName(
+    final operation = GraphLogMemoryOperation.values.byName(
       environment[_operationVariable]!,
-    )) {
-      GraphLogMemoryOperation.assembly => await _openAssembly(
-        path,
-        Directory(environment[_snapshotsVariable]!),
-      ),
-      GraphLogMemoryOperation.compaction => await _openCompaction(
-        path,
-        Directory(environment[_snapshotsVariable]!),
-      ),
+    );
+    final run = switch (operation) {
       GraphLogMemoryOperation.fileRead => () => _readFile(path),
+      _ => await _openGraphOperation(
+        operation,
+        path,
+        Directory(environment[_snapshotsVariable]!),
+      ),
     };
-    final measurement = switch (GraphLogMemoryMetric.values.byName(
-      environment[_metricVariable]!,
-    )) {
-      GraphLogMemoryMetric.liveHeap => await _LiveHeapPeak.start(),
-      GraphLogMemoryMetric.residentSet => _ResidentSetPeak.start(),
+    final measurement = switch (operation) {
+      GraphLogMemoryOperation.assembly ||
+      GraphLogMemoryOperation.compaction => await _LiveHeapPeak.start(),
+      GraphLogMemoryOperation.rangeSummary => await _RetainedLiveHeap.start(),
+      GraphLogMemoryOperation.fileRead => _ResidentSetPeak.start(),
     };
     // Приложение работает в корневой зоне, а зона теста в несколько раз
     // замедляет потоки.
-    final records = await Zone.root.run(operation);
-    final peakGrowth = await measurement.finish();
+    final outcome = await Zone.root.run(run);
+    final growth = await measurement.finish();
+    final records = await Zone.root.run(outcome);
     stdout.writeln(
-      '$_resultMarker${jsonEncode({'peakGrowthBytes': peakGrowth, 'records': records})}',
+      '$_resultMarker${jsonEncode({'growthBytes': growth, 'records': records})}',
     );
   }, timeout: Timeout.none);
 }
 
-typedef _Operation = Future<int> Function();
+/// Замеряемая операция. Её итог читается после замера, поэтому данные,
+/// которые он удерживает, живы до конца замера.
+typedef _Operation = Future<_Outcome> Function();
 
-Future<_Operation> _openAssembly(File databaseFile, Directory snapshots) async {
-  final repository = await _openRepository(databaseFile);
-  final position = await repository.readCurrentPosition();
-  return () async {
-    final state = await GraphSnapshotStore(
-      log: repository,
-      directory: snapshots,
-      clock: () => DateTime.utc(2026, 10, 17, 12),
-      diagnosticsSink: InMemoryDiagnosticsSink(),
-    ).readStateAt(position);
-    return state.records.length;
-  };
-}
+/// Число записей операции.
+typedef _Outcome = Future<int> Function();
 
-Future<_Operation> _openCompaction(
+Future<_Operation> _openGraphOperation(
+  GraphLogMemoryOperation operation,
   File databaseFile,
   Directory snapshots,
 ) async {
   final repository = await _openRepository(databaseFile);
   final position = await repository.readCurrentPosition();
   final diagnostics = InMemoryDiagnosticsSink();
-  return () async {
-    final compaction = GraphLogCompaction(
-      log: repository,
-      directory: snapshots,
-      clock: () => DateTime.utc(2026, 10, 17, 12),
-      diagnosticsSink: diagnostics,
-    )..start();
-    await compaction.shutdown();
-    final outcomes = diagnostics.events
-        .whereType<GraphLogCompactionDiagnosticsEvent>()
-        .map((event) => event.status);
-    final snapshot = await repository.readSnapshotAtOrBefore(position);
-    if (outcomes.single is! DiagnosticsSucceeded ||
-        snapshot?.position != position) {
-      throw StateError('Сжатие не записало снимок текущей позиции.');
-    }
-    return 0;
+  final store = GraphSnapshotStore(
+    log: repository,
+    directory: snapshots,
+    clock: () => _now,
+    diagnosticsSink: diagnostics,
+  );
+  return switch (operation) {
+    GraphLogMemoryOperation.assembly => () async {
+      final records = await (await store.readStateAt(position)).records.length;
+      return () async => records;
+    },
+    GraphLogMemoryOperation.rangeSummary => () async {
+      final state = await store.readStateAt(position);
+      return () => state.records.length;
+    },
+    GraphLogMemoryOperation.compaction => () async {
+      final compaction = GraphLogCompaction(
+        log: repository,
+        directory: snapshots,
+        clock: () => _now,
+        diagnosticsSink: diagnostics,
+      )..start();
+      await compaction.shutdown();
+      final outcomes = diagnostics.events
+          .whereType<GraphLogCompactionDiagnosticsEvent>()
+          .map((event) => event.status);
+      final snapshot = await repository.readSnapshotAtOrBefore(position);
+      if (outcomes.single is! DiagnosticsSucceeded ||
+          snapshot?.position != position) {
+        throw StateError('Сжатие не записало снимок текущей позиции.');
+      }
+      return () async => 0;
+    },
+    GraphLogMemoryOperation.fileRead => throw ArgumentError.value(operation),
   };
 }
+
+final _now = DateTime.utc(2026, 10, 17, 12);
 
 Future<DriftPersonalGraphRepository> _openRepository(File databaseFile) async {
   final database = AppDatabase(openFileBackedLocalDatabase(databaseFile));
@@ -188,7 +191,7 @@ Future<DriftPersonalGraphRepository> _openRepository(File databaseFile) async {
   final repository = DriftPersonalGraphRepository(
     database,
     UuidV7IntentionIdGenerator(),
-    () => DateTime.utc(2026, 10, 17, 12),
+    () => _now,
     InMemoryDiagnosticsSink(),
   );
   // Первое обращение открывает базу до замера.
@@ -196,9 +199,11 @@ Future<DriftPersonalGraphRepository> _openRepository(File databaseFile) async {
   return repository;
 }
 
-Future<int> _readFile(File file) async {
-  final reading = await GraphFormatFile.read(file.openRead());
-  return reading.records.length;
+Future<_Outcome> _readFile(File file) async {
+  final records = await (await GraphFormatFile.read(file.openRead()))
+      .records
+      .length;
+  return () async => records;
 }
 
 /// Замер памяти от начала операции до [finish].
@@ -207,8 +212,8 @@ sealed class _Measurement {
   Future<int> finish();
 }
 
-/// Живые данные кучи после принудительной сборки мусора, которую процесс
-/// повторяет, пока идёт операция.
+/// Наибольший объём живых данных кучи после принудительной сборки мусора,
+/// которую процесс повторяет, пока идёт операция.
 ///
 /// У изолятов одной группы общая куча, поэтому замер охватывает и изолят
 /// записи снимка.
@@ -222,6 +227,10 @@ final class _LiveHeapPeak implements _Measurement {
     return _LiveHeapPeak._(service, await service.readLiveBytes());
   }
 
+  /// Пауза между сборками: непрерывная сборка мусора замедлила бы сжатие
+  /// вдвое.
+  static const _interval = Duration(milliseconds: 50);
+
   /// Без нескольких замеров во время операции её пик неизвестен.
   static const _minimumSamples = 3;
 
@@ -229,7 +238,6 @@ final class _LiveHeapPeak implements _Measurement {
   final int _baseline;
   int _peak;
   var _samples = 0;
-  final _trace = <int>[];
   var _finished = false;
   late final Future<void> _sampling;
 
@@ -238,8 +246,8 @@ final class _LiveHeapPeak implements _Measurement {
       final live = await _service.readLiveBytes();
       if (_finished) break;
       if (live > _peak) _peak = live;
-      _trace.add((live - _baseline) >> 20);
       _samples++;
+      await Future<void>.delayed(_interval);
     }
   }
 
@@ -248,14 +256,31 @@ final class _LiveHeapPeak implements _Measurement {
     _finished = true;
     await _sampling;
     await _service.close();
-    final sorted = [..._trace]..sort();
-    stdout.writeln(
-      'TRACE n=${_trace.length} median=${sorted[sorted.length ~/ 2]} p90=${sorted[(sorted.length * 9) ~/ 10]} max=${sorted.last} first=${_trace.take(15).join(',')} last=${_trace.skip(_trace.length - 15).join(',')}',
-    );
     if (_samples < _minimumSamples) {
       throw StateError('Операция завершилась за $_samples замеров памяти.');
     }
     return _peak - _baseline;
+  }
+}
+
+/// Живые данные кучи после принудительной сборки мусора в конце операции,
+/// пока её итог удерживает свои данные.
+final class _RetainedLiveHeap implements _Measurement {
+  _RetainedLiveHeap._(this._service, this._baseline);
+
+  static Future<_RetainedLiveHeap> start() async {
+    final service = await _VmService.connect();
+    return _RetainedLiveHeap._(service, await service.readLiveBytes());
+  }
+
+  final _VmService _service;
+  final int _baseline;
+
+  @override
+  Future<int> finish() async {
+    final retained = await _service.readLiveBytes() - _baseline;
+    await _service.close();
+    return retained;
   }
 }
 
