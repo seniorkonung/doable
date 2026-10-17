@@ -447,12 +447,14 @@ Future<(_DraftSearchHost, sqlite.Database)> _pumpStoredDraftHost(
   );
   await database.open();
   seedTagNavigationFixture(raw, extraPairsPerScope: 0);
-  for (final (number, name) in [
-    (303, 'Дом без назначений'),
-    (304, 'Дом в архиве'),
-  ]) {
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [name, _id(number)]);
-  }
+  seedRawGraph(raw, () {
+    for (final (number, name) in [
+      (303, 'Дом без назначений'),
+      (304, 'Дом в архиве'),
+    ]) {
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [name, _id(number)]);
+    }
+  });
   final host = _DraftSearchHost(
     DriftPersonalGraphRepository(
       database,

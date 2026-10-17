@@ -20,6 +20,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -70,32 +71,34 @@ void main() {
       () => DateTime.utc(2026, 9, 23),
       diagnostics,
     );
-    for (var number = 1; number <= 5; number++) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (var number = 1; number <= 5; number++) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, 1)''',
-        [
-          _uuid(number),
-          'Намерение $number',
-          number == 3 || number == 4 ? 1 : 0,
-        ],
-      );
-    }
-    for (final (number, source, selected) in [
-      (101, 1, 2),
-      (102, 2, 3),
-      (103, 2, 4),
-      (104, 5, 4),
-    ]) {
-      raw.execute(
-        '''INSERT INTO long_term_relations
+          [
+            _uuid(number),
+            'Намерение $number',
+            number == 3 || number == 4 ? 1 : 0,
+          ],
+        );
+      }
+      for (final (number, source, selected) in [
+        (101, 1, 2),
+        (102, 2, 3),
+        (103, 2, 4),
+        (104, 5, 4),
+      ]) {
+        raw.execute(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id,
             type, priority, is_archived)
            VALUES (?, ?, ?, 'need', 2, 0)''',
-        [_uuid(number), _uuid(source), _uuid(selected)],
-      );
-    }
+          [_uuid(number), _uuid(source), _uuid(selected)],
+        );
+      }
+    });
   });
   tearDown(() => database.close());
 
@@ -172,9 +175,13 @@ void main() {
       'SELECT creation_sequence FROM daily_choices WHERE id = ?',
       [id.toCanonicalString()],
     ).single['creation_sequence'];
-    raw.execute('UPDATE long_term_relations SET is_archived = 1 WHERE id = ?', [
-      _uuid(102),
-    ]);
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_uuid(102)],
+      ),
+    );
 
     final result = await repository.execute(replacement);
 
@@ -287,13 +294,15 @@ void main() {
     'недопустимый новый путь оставляет архивный старый путь целым',
     () async {
       final id = await createChoice();
-      raw.execute(
-        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
-        [_uuid(102)],
-      );
-      raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
-        _uuid(4),
-      ]);
+      seedRawGraph(raw, () {
+        raw.execute(
+          'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+          [_uuid(102)],
+        );
+        raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
+          _uuid(4),
+        ]);
+      });
       final before = await read(id);
 
       final result = await repository.execute(replace(id));
@@ -330,14 +339,21 @@ void main() {
 
   test('архивирование связи до замены не повреждает прежний выбор', () async {
     final id = await createChoice();
-    raw.execute(
-      'UPDATE daily_choices SET choice_date = ?, description = ?, is_completed = 0 WHERE id = ?',
-      ['2026-09-25', 'Новые независимые поля', id.toCanonicalString()],
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        'UPDATE daily_choices SET choice_date = ?, description = ?, is_completed = 0 WHERE id = ?',
+        ['2026-09-25', 'Новые независимые поля', id.toCanonicalString()],
+      ),
     );
     final before = (await read(id)).value!;
-    raw.execute('UPDATE long_term_relations SET is_archived = 1 WHERE id = ?', [
-      _uuid(104),
-    ]);
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_uuid(104)],
+      ),
+    );
 
     final result = await repository.execute(replace(id));
 
@@ -399,10 +415,13 @@ void main() {
     () async {
       final id = await createChoice();
       final before = await read(id);
-      raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
-        'can',
-        _uuid(104),
-      ]);
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE long_term_relations SET type = ? WHERE id = ?',
+          ['can', _uuid(104)],
+        ),
+      );
 
       final result = await repository.execute(replace(id));
 
@@ -467,9 +486,12 @@ void main() {
       isA<DailyChoiceNotFoundFailure>(),
     );
     final id = await createChoice();
-    raw.execute(
-      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [id.toCanonicalString()],
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [id.toCanonicalString()],
+      ),
     );
     final corrupt = await repository.execute(replace(id));
     expect(

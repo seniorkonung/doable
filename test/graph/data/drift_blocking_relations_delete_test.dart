@@ -23,6 +23,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/large_blocking_relations_fixture.dart';
 
@@ -45,18 +46,20 @@ void main() {
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     intentions = [for (var i = 1; i <= 12; i++) _intentionId(i)];
-    for (final id in intentions) {
-      await database
-          .into(database.intentions)
-          .insert(
-            IntentionsCompanion.insert(
-              id: id.toCanonicalString(),
-              title: 'Намерение ${intentions.indexOf(id)}',
-              createdAt: 1000000,
-              updatedAt: 2000000,
-            ),
-          );
-    }
+    await seedGraph(database, () async {
+      for (final id in intentions) {
+        await database
+            .into(database.intentions)
+            .insert(
+              IntentionsCompanion.insert(
+                id: id.toCanonicalString(),
+                title: 'Намерение ${intentions.indexOf(id)}',
+                createdAt: 1000000,
+                updatedAt: 2000000,
+              ),
+            );
+      }
+    });
     relationIds = _RelationIds();
     repository = _repository(database, diagnostics, relationIds);
   });
@@ -363,13 +366,16 @@ void main() {
       final first = await _create(repository, owner, intentions[1]);
       final corrupted = await _create(repository, owner, intentions[2]);
       final revision = await _revision(repository, intentions[3]);
-      await database.customUpdate(
-        'UPDATE long_term_relations SET description = ? WHERE id = ?',
-        variables: [
-          const Variable<String>('   '),
-          Variable<String>(corrupted.toCanonicalString()),
-        ],
-        updates: {database.longTermRelations},
+      await seedGraph(
+        database,
+        () => database.customUpdate(
+          'UPDATE long_term_relations SET description = ? WHERE id = ?',
+          variables: [
+            const Variable<String>('   '),
+            Variable<String>(corrupted.toCanonicalString()),
+          ],
+          updates: {database.longTermRelations},
+        ),
       );
 
       final failure = _failure(
@@ -409,13 +415,16 @@ void main() {
       final selected = await _create(repository, owner, intentions[1]);
       final unselected = await _create(repository, owner, intentions[2]);
       final revision = await _revision(repository, intentions[3]);
-      await database.customUpdate(
-        'UPDATE long_term_relations SET description = ? WHERE id = ?',
-        variables: [
-          const Variable<String>('   '),
-          Variable<String>(unselected.toCanonicalString()),
-        ],
-        updates: {database.longTermRelations},
+      await seedGraph(
+        database,
+        () => database.customUpdate(
+          'UPDATE long_term_relations SET description = ? WHERE id = ?',
+          variables: [
+            const Variable<String>('   '),
+            Variable<String>(unselected.toCanonicalString()),
+          ],
+          updates: {database.longTermRelations},
+        ),
       );
 
       expect(
@@ -497,9 +506,12 @@ void main() {
     final owner = intentions.first;
     await LargeBlockingRelationsFixture.seed(database, owner);
     final selected = LargeBlockingRelationsFixture.selectedIds;
-    await database.customStatement(
-      'DELETE FROM long_term_relations WHERE id = ?',
-      [selected.last.toCanonicalString()],
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        'DELETE FROM long_term_relations WHERE id = ?',
+        [selected.last.toCanonicalString()],
+      ),
     );
     final before = await _rows(database, 'long_term_relations');
     final revision = await _revision(repository, owner);
@@ -693,23 +705,25 @@ void main() {
           DailyChoiceBlockingRelationReference(choice),
         ],
       );
-      await database.customUpdate(
-        'UPDATE daily_choice_path_steps SET long_term_relation_id = ? WHERE daily_choice_id = ?',
-        variables: [
-          Variable<String>(movedPath.toCanonicalString()),
-          Variable<String>(choice.toCanonicalString()),
-        ],
-        updates: {database.dailyChoicePathSteps},
-      );
-      await database.customUpdate(
-        'UPDATE daily_choices SET source_intention_id = ?, selected_intention_id = ? WHERE id = ?',
-        variables: [
-          Variable<String>(intentions[3].toCanonicalString()),
-          Variable<String>(intentions[4].toCanonicalString()),
-          Variable<String>(choice.toCanonicalString()),
-        ],
-        updates: {database.dailyChoices},
-      );
+      await seedGraph(database, () async {
+        await database.customUpdate(
+          'UPDATE daily_choice_path_steps SET long_term_relation_id = ? WHERE daily_choice_id = ?',
+          variables: [
+            Variable<String>(movedPath.toCanonicalString()),
+            Variable<String>(choice.toCanonicalString()),
+          ],
+          updates: {database.dailyChoicePathSteps},
+        );
+        await database.customUpdate(
+          'UPDATE daily_choices SET source_intention_id = ?, selected_intention_id = ? WHERE id = ?',
+          variables: [
+            Variable<String>(intentions[3].toCanonicalString()),
+            Variable<String>(intentions[4].toCanonicalString()),
+            Variable<String>(choice.toCanonicalString()),
+          ],
+          updates: {database.dailyChoices},
+        );
+      });
       final revision = await _revision(repository, owner);
 
       final failure = _failure(await repository.execute(command));
@@ -787,9 +801,12 @@ void main() {
         await _assignIntentionTag(database, 3001, id);
       }
       final assignmentsBefore = await _assignments(database);
-      await database.customStatement(
-        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
-        [newAction.toCanonicalString()],
+      await seedGraph(
+        database,
+        () => database.customStatement(
+          'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+          [newAction.toCanonicalString()],
+        ),
       );
       final choice = _dailyChoiceId(905);
       await _insertChoice(database, choice, oldSource, oldAction, oldPath);
@@ -906,28 +923,30 @@ Future<void> _insertChoice(
   IntentionId selected,
   LongTermRelationId path,
 ) async {
-  await database.customInsert(
-    '''INSERT INTO daily_choices
+  await seedGraph(database, () async {
+    await database.customInsert(
+      '''INSERT INTO daily_choices
        (id, source_intention_id, selected_intention_id, choice_date,
         description, is_completed) VALUES (?, ?, ?, '2026-09-23', NULL, 0)''',
-    variables: [
-      Variable<String>(id.toCanonicalString()),
-      Variable<String>(source.toCanonicalString()),
-      Variable<String>(selected.toCanonicalString()),
-    ],
-    updates: {database.dailyChoices},
-  );
-  await database.customInsert(
-    '''INSERT INTO daily_choice_path_steps
+      variables: [
+        Variable<String>(id.toCanonicalString()),
+        Variable<String>(source.toCanonicalString()),
+        Variable<String>(selected.toCanonicalString()),
+      ],
+      updates: {database.dailyChoices},
+    );
+    await database.customInsert(
+      '''INSERT INTO daily_choice_path_steps
        (id, daily_choice_id, long_term_relation_id, previous_step_id)
        VALUES (?, ?, ?, NULL)''',
-    variables: [
-      Variable<String>(id.toCanonicalString()),
-      Variable<String>(id.toCanonicalString()),
-      Variable<String>(path.toCanonicalString()),
-    ],
-    updates: {database.dailyChoicePathSteps},
-  );
+      variables: [
+        Variable<String>(id.toCanonicalString()),
+        Variable<String>(id.toCanonicalString()),
+        Variable<String>(path.toCanonicalString()),
+      ],
+      updates: {database.dailyChoicePathSteps},
+    );
+  });
 }
 
 Future<Map<String, Object?>?> _choice(
@@ -1037,10 +1056,13 @@ Future<List<Map<String, Object?>>> _rows(
 ];
 
 Future<void> _insertTag(AppDatabase database, int number, String name) =>
-    database.customStatement('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(number),
-      name,
-    ]);
+    seedGraph(
+      database,
+      () => database.customStatement(
+        'INSERT INTO tags (id, name) VALUES (?, ?)',
+        [_uuid(number), name],
+      ),
+    );
 
 Future<List<Map<String, Object?>>> _assignments(AppDatabase database) async => [
   for (final row
@@ -1056,9 +1078,12 @@ Future<void> _assignIntentionTag(
   AppDatabase database,
   int tagNumber,
   IntentionId intentionId,
-) => database.customStatement(
-  'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-  [_uuid(tagNumber), intentionId.toCanonicalString()],
+) => seedGraph(
+  database,
+  () => database.customStatement(
+    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+    [_uuid(tagNumber), intentionId.toCanonicalString()],
+  ),
 );
 
 Future<Map<String, List<Map<String, Object?>>>> _graphSnapshot(

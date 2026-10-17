@@ -31,6 +31,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -149,79 +150,83 @@ Future<void> _restartPath(
 
 Future<void> _seed(LocalDatabaseHarness harness) async {
   final database = await harness.openReadyDatabase();
-  for (final (number, title, ready) in [
-    (1, 'Основание', false),
-    (2, 'Действие в середине', true),
-    (3, 'Продолжение действия', true),
-    (4, 'Другая ветвь', false),
-    (5, 'Другое действие', true),
-  ]) {
-    await database.customInsert(
-      '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, ?, ?, 0, ?, ?)''',
-      variables: [
-        Variable.withString(_uuid(number)),
-        Variable.withString(title),
-        Variable.withInt(ready ? 1 : 0),
-        Variable.withInt(number),
-        Variable.withInt(number),
-      ],
-    );
-  }
-  for (final (number, source, related, type) in [
-    (101, 1, 2, 'need'),
-    (102, 2, 3, 'can'),
-    (103, 1, 4, 'can'),
-    (104, 4, 5, 'need'),
-  ]) {
-    await database.customInsert(
-      '''INSERT INTO long_term_relations
-         (id, source_intention_id, related_intention_id, type, priority,
-          is_archived) VALUES (?, ?, ?, ?, 2, 0)''',
-      variables: [
-        Variable.withString(_uuid(number)),
-        Variable.withString(_uuid(source)),
-        Variable.withString(_uuid(related)),
-        Variable.withString(type),
-      ],
-    );
-  }
+  await seedGraph(database, () async {
+    for (final (number, title, ready) in [
+      (1, 'Основание', false),
+      (2, 'Действие в середине', true),
+      (3, 'Продолжение действия', true),
+      (4, 'Другая ветвь', false),
+      (5, 'Другое действие', true),
+    ]) {
+      await database.customInsert(
+        '''INSERT INTO intentions
+           (id, title, is_action_ready, is_archived, created_at, updated_at)
+           VALUES (?, ?, ?, 0, ?, ?)''',
+        variables: [
+          Variable.withString(_uuid(number)),
+          Variable.withString(title),
+          Variable.withInt(ready ? 1 : 0),
+          Variable.withInt(number),
+          Variable.withInt(number),
+        ],
+      );
+    }
+    for (final (number, source, related, type) in [
+      (101, 1, 2, 'need'),
+      (102, 2, 3, 'can'),
+      (103, 1, 4, 'can'),
+      (104, 4, 5, 'need'),
+    ]) {
+      await database.customInsert(
+        '''INSERT INTO long_term_relations
+           (id, source_intention_id, related_intention_id, type, priority,
+            is_archived) VALUES (?, ?, ?, ?, 2, 0)''',
+        variables: [
+          Variable.withString(_uuid(number)),
+          Variable.withString(_uuid(source)),
+          Variable.withString(_uuid(related)),
+          Variable.withString(type),
+        ],
+      );
+    }
+  });
   await harness.closePersistenceObjectGraph();
 }
 
 Future<void> _seedPreviousChoice(LocalDatabaseHarness harness) async {
   final database = await harness.openReadyDatabase();
-  await database.customInsert(
-    '''INSERT INTO daily_choices
-       (id, source_intention_id, selected_intention_id, choice_date,
-        description, is_completed) VALUES (?, ?, ?, ?, ?, 1)''',
-    variables: [
-      Variable.withString(_uuid(201)),
-      Variable.withString(_uuid(1)),
-      Variable.withString(_uuid(3)),
-      Variable.withString('2030-09-24'),
-      Variable.withString('Описание источника'),
-    ],
-  );
-  for (final (step, relation, previous) in [
-    (301, 101, null),
-    (302, 102, 301),
-  ]) {
+  await seedGraph(database, () async {
     await database.customInsert(
-      '''INSERT INTO daily_choice_path_steps
-         (id, daily_choice_id, long_term_relation_id, previous_step_id)
-         VALUES (?, ?, ?, ?)''',
+      '''INSERT INTO daily_choices
+         (id, source_intention_id, selected_intention_id, choice_date,
+          description, is_completed) VALUES (?, ?, ?, ?, ?, 1)''',
       variables: [
-        Variable.withString(_uuid(step)),
         Variable.withString(_uuid(201)),
-        Variable.withString(_uuid(relation)),
-        previous == null
-            ? const Variable<String>(null)
-            : Variable.withString(_uuid(previous)),
+        Variable.withString(_uuid(1)),
+        Variable.withString(_uuid(3)),
+        Variable.withString('2030-09-24'),
+        Variable.withString('Описание источника'),
       ],
     );
-  }
+    for (final (step, relation, previous) in [
+      (301, 101, null),
+      (302, 102, 301),
+    ]) {
+      await database.customInsert(
+        '''INSERT INTO daily_choice_path_steps
+           (id, daily_choice_id, long_term_relation_id, previous_step_id)
+           VALUES (?, ?, ?, ?)''',
+        variables: [
+          Variable.withString(_uuid(step)),
+          Variable.withString(_uuid(201)),
+          Variable.withString(_uuid(relation)),
+          previous == null
+              ? const Variable<String>(null)
+              : Variable.withString(_uuid(previous)),
+        ],
+      );
+    }
+  });
   await harness.closePersistenceObjectGraph();
 }
 

@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -47,11 +48,14 @@ void main() {
     );
     repository = container.read(personalGraphRepositoryProvider);
     await seedDurabilityGraph(database);
-    await database.customStatement(
-      '''INSERT INTO long_term_relations
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority)
          VALUES (?, ?, ?, 'need', 2)''',
-      [durabilityUuid(105), durabilityUuid(3), durabilityUuid(4)],
+        [durabilityUuid(105), durabilityUuid(3), durabilityUuid(4)],
+      ),
     );
   });
   tearDown(() async {
@@ -67,31 +71,33 @@ void main() {
     int selected = 4,
     List<int> path = const [101, 102, 105],
   }) async {
-    await database.customStatement(
-      '''INSERT INTO daily_choices
+    await seedGraph(database, () async {
+      await database.customStatement(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
           is_completed) VALUES (?, ?, ?, ?, ?)''',
-      [
-        durabilityUuid(number),
-        durabilityUuid(source),
-        durabilityUuid(selected),
-        date,
-        completed ? 1 : 0,
-      ],
-    );
-    for (var index = 0; index < path.length; index++) {
-      await database.customStatement(
-        '''INSERT INTO daily_choice_path_steps
-           (id, daily_choice_id, long_term_relation_id, previous_step_id)
-           VALUES (?, ?, ?, ?)''',
         [
-          durabilityUuid(number * 10 + index),
           durabilityUuid(number),
-          durabilityUuid(path[index]),
-          index == 0 ? null : durabilityUuid(number * 10 + index - 1),
+          durabilityUuid(source),
+          durabilityUuid(selected),
+          date,
+          completed ? 1 : 0,
         ],
       );
-    }
+      for (var index = 0; index < path.length; index++) {
+        await database.customStatement(
+          '''INSERT INTO daily_choice_path_steps
+           (id, daily_choice_id, long_term_relation_id, previous_step_id)
+           VALUES (?, ?, ?, ?)''',
+          [
+            durabilityUuid(number * 10 + index),
+            durabilityUuid(number),
+            durabilityUuid(path[index]),
+            index == 0 ? null : durabilityUuid(number * 10 + index - 1),
+          ],
+        );
+      }
+    });
   }
 
   Future<StatisticsFirstPage> first(
@@ -249,31 +255,33 @@ void main() {
     final weights = [(3, 2), (2, 2), (2, 1), (2, 1), (2, 0), (2, 0)];
     for (var index = 0; index < weights.length; index++) {
       final source = 10 + index * 10;
-      for (var offset = 0; offset < 3; offset++) {
-        await database.customStatement(
-          '''INSERT INTO intentions
+      final relation = 1000 + index * 2;
+      await seedGraph(database, () async {
+        for (var offset = 0; offset < 3; offset++) {
+          await database.customStatement(
+            '''INSERT INTO intentions
              (id, title, is_action_ready, created_at, updated_at)
              VALUES (?, ?, ?, 1, 1)''',
-          [
-            durabilityUuid(source + offset),
-            'Участник ${source + offset}',
-            offset == 2 ? 1 : 0,
-          ],
-        );
-      }
-      final relation = 1000 + index * 2;
-      for (var offset = 0; offset < 2; offset++) {
-        await database.customStatement(
-          '''INSERT INTO long_term_relations
+            [
+              durabilityUuid(source + offset),
+              'Участник ${source + offset}',
+              offset == 2 ? 1 : 0,
+            ],
+          );
+        }
+        for (var offset = 0; offset < 2; offset++) {
+          await database.customStatement(
+            '''INSERT INTO long_term_relations
              (id, source_intention_id, related_intention_id, type, priority)
              VALUES (?, ?, ?, 'need', 1)''',
-          [
-            durabilityUuid(relation + offset),
-            durabilityUuid(source + offset),
-            durabilityUuid(source + offset + 1),
-          ],
-        );
-      }
+            [
+              durabilityUuid(relation + offset),
+              durabilityUuid(source + offset),
+              durabilityUuid(source + offset + 1),
+            ],
+          );
+        }
+      });
       for (var copy = 0; copy < weights[index].$1; copy++) {
         await addChoice(
           300 + index * 3 + copy,

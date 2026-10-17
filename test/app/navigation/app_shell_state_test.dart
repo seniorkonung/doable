@@ -65,6 +65,7 @@ import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_catalog_provider.dart';
 import '../../support/daily_choice_local_date.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -599,10 +600,12 @@ void main() {
       // Последний созданный выбор — первая строка каталога.
       const changed = _firstChoice + _choiceCount - 1;
       // Только он не выполнен: его изменение должно заменить кружок галочкой.
-      app.raw.execute(
-        'UPDATE daily_choices SET is_completed = CASE WHEN id = ? THEN 0 ELSE 1 END',
-        [tagFixtureId(changed)],
-      );
+      seedRawGraph(app.raw, () {
+        app.raw.execute(
+          'UPDATE daily_choices SET is_completed = CASE WHEN id = ? THEN 0 ELSE 1 END',
+          [tagFixtureId(changed)],
+        );
+      });
       const wasCompleted = false;
       await _select(tester, AppDestination.dailyChoices);
       await _selectDay(tester, app, _choiceDate, total: _choiceCount);
@@ -965,73 +968,75 @@ Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
 
 void _seed(sqlite.Database database) {
   database.execute('BEGIN');
-  void insertIntention(int number, String title, {bool archived = false}) =>
-      database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
-        'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), title, 1, archived ? 1 : 0, number, number],
-      );
-  void assignHealth(int number) => database.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagFixtureId(_healthTag), tagFixtureId(number)],
-  );
+  seedRawGraph(database, () {
+    void insertIntention(int number, String title, {bool archived = false}) =>
+        database.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+          'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [tagFixtureId(number), title, 1, archived ? 1 : 0, number, number],
+        );
+    void assignHealth(int number) => database.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(_healthTag), tagFixtureId(number)],
+    );
 
-  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-    tagFixtureId(_healthTag),
-    'Здоровье',
-  ]);
-  for (var number = 1; number <= _activeCount; number++) {
-    insertIntention(number, _activeTitle(number));
-  }
-  for (var number = 1; number <= _plainCount; number++) {
-    insertIntention(_plain(number), _plainTitle(number));
-  }
-  for (var index = 0; index < _archivedCount; index++) {
-    final number = _firstArchived + index;
-    insertIntention(
-      number,
-      'Архив ${(index + 1).toString().padLeft(3, '0')}',
-      archived: true,
-    );
-    assignHealth(number);
-  }
-  for (var index = 0; index < _untaggedCount; index++) {
-    insertIntention(
-      _firstUntagged + index,
-      'Архив без тега ${(index + 1).toString().padLeft(2, '0')}',
-      archived: true,
-    );
-  }
-  database.execute(
-    'INSERT INTO long_term_relations (id, source_intention_id, '
-    'related_intention_id, type, priority, is_archived) '
-    'VALUES (?, ?, ?, ?, ?, ?)',
-    [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
-  );
-  for (var index = 0; index < _choiceCount; index++) {
-    final choice = _firstChoice + index;
+    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagFixtureId(_healthTag),
+      'Здоровье',
+    ]);
+    for (var number = 1; number <= _activeCount; number++) {
+      insertIntention(number, _activeTitle(number));
+    }
+    for (var number = 1; number <= _plainCount; number++) {
+      insertIntention(_plain(number), _plainTitle(number));
+    }
+    for (var index = 0; index < _archivedCount; index++) {
+      final number = _firstArchived + index;
+      insertIntention(
+        number,
+        'Архив ${(index + 1).toString().padLeft(3, '0')}',
+        archived: true,
+      );
+      assignHealth(number);
+    }
+    for (var index = 0; index < _untaggedCount; index++) {
+      insertIntention(
+        _firstUntagged + index,
+        'Архив без тега ${(index + 1).toString().padLeft(2, '0')}',
+        archived: true,
+      );
+    }
     database.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, '
-      'selected_intention_id, choice_date, is_completed) '
-      'VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(choice),
-        tagFixtureId(1),
-        tagFixtureId(2),
-        _choiceDate.toCanonicalString(),
-        _isCompleted(choice) ? 1 : 0,
-      ],
+      'INSERT INTO long_term_relations (id, source_intention_id, '
+      'related_intention_id, type, priority, is_archived) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
     );
-    database.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-      'long_term_relation_id) VALUES (?, ?, ?)',
-      [
-        tagFixtureId(_firstPathStep + index),
-        tagFixtureId(choice),
-        tagFixtureId(_relation),
-      ],
-    );
-  }
+    for (var index = 0; index < _choiceCount; index++) {
+      final choice = _firstChoice + index;
+      database.execute(
+        'INSERT INTO daily_choices (id, source_intention_id, '
+        'selected_intention_id, choice_date, is_completed) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(choice),
+          tagFixtureId(1),
+          tagFixtureId(2),
+          _choiceDate.toCanonicalString(),
+          _isCompleted(choice) ? 1 : 0,
+        ],
+      );
+      database.execute(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
+        'long_term_relation_id) VALUES (?, ?, ?)',
+        [
+          tagFixtureId(_firstPathStep + index),
+          tagFixtureId(choice),
+          tagFixtureId(_relation),
+        ],
+      );
+    }
+  });
   database.execute('COMMIT');
 }
 

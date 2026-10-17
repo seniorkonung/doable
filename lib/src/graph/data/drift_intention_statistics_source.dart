@@ -97,8 +97,8 @@ extension DriftIntentionStatisticsSourceReading
           final chosen = _IntentionStatisticsTotal();
           for (final row in rows) {
             final data = row.data;
-            final action = _decodeStoredRelationIntentionId(
-              _requiredStoredString(data, 'selected_intention_id'),
+            final action = decodeStoredIntentionId(
+              requiredStoredString(data, 'selected_intention_id'),
             );
             final predecessor = _nullableStatisticsId(data, 'predecessor_id');
             final following = _nullableStatisticsId(
@@ -112,8 +112,8 @@ extension DriftIntentionStatisticsSourceReading
                 : ContributionBeforeSelectedAction(
                     predecessorId: predecessor == null
                         ? null
-                        : _decodeStoredRelationIntentionId(predecessor),
-                    followingRelationId: _decodeStoredRelationId(following),
+                        : decodeStoredIntentionId(predecessor),
+                    followingRelationId: decodeStoredRelationId(following),
                   );
             final archivedSeeds = _nullableStatisticsId(
               data,
@@ -121,19 +121,19 @@ extension DriftIntentionStatisticsSourceReading
             );
             final summary = StatisticsPeriodSummary(
               counts: ContributionCounts(
-                planned: _requiredStoredInteger(data, 'planned'),
-                contribution: _requiredStoredInteger(data, 'contribution'),
+                planned: requiredStoredInteger(data, 'planned'),
+                contribution: requiredStoredInteger(data, 'contribution'),
               ),
               uncompleted: UncompletedSplit(
-                missed: _requiredStoredInteger(data, 'missed'),
-                upcoming: _requiredStoredInteger(data, 'upcoming'),
+                missed: requiredStoredInteger(data, 'missed'),
+                upcoming: requiredStoredInteger(data, 'upcoming'),
               ),
             );
             if (summary.counts.planned == 0) {
               throw const StatisticsDataValidationException();
             }
             final part = CalendarDate.parseCanonical(
-              _requiredStoredString(data, 'calendar_part'),
+              requiredStoredString(data, 'calendar_part'),
             );
             if (!query.period.contains(part) ||
                 (query.period is StatisticsYear && part.day != 1)) {
@@ -145,7 +145,7 @@ extension DriftIntentionStatisticsSourceReading
                   action,
                   if (archivedSeeds != null)
                     for (final seed in archivedSeeds.split(','))
-                      _decodeStoredRelationIntentionId(seed),
+                      decodeStoredIntentionId(seed),
                 ],
                 selectedActionId: action,
                 calendarPart: part,
@@ -174,10 +174,9 @@ extension DriftIntentionStatisticsSourceReading
             (calendar[part] ??= _IntentionStatisticsTotal()).add(summary);
             for (final entry in breakdowns.entries) {
               final id = switch (entry.key) {
-                StatisticsBreakdown.sourceIntentions =>
-                  _decodeStoredRelationIntentionId(
-                    _requiredStoredString(data, 'breakdown_source_id'),
-                  ),
+                StatisticsBreakdown.sourceIntentions => decodeStoredIntentionId(
+                  requiredStoredString(data, 'breakdown_source_id'),
+                ),
                 StatisticsBreakdown.selectedActions => action,
                 StatisticsBreakdown.relations =>
                   throw const StatisticsDataValidationException(),
@@ -220,11 +219,11 @@ extension DriftIntentionStatisticsSourceReading
             activeOutgoingRelations: [
               for (final row in outgoing)
                 (
-                  relationId: _decodeStoredRelationId(
-                    _requiredStoredString(row.data, 'id'),
+                  relationId: decodeStoredRelationId(
+                    requiredStoredString(row.data, 'id'),
                   ),
-                  targetId: _decodeStoredRelationIntentionId(
-                    _requiredStoredString(row.data, 'related_intention_id'),
+                  targetId: decodeStoredIntentionId(
+                    requiredStoredString(row.data, 'related_intention_id'),
                   ),
                 ),
             ],

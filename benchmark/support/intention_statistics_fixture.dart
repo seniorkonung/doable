@@ -4,6 +4,7 @@ import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/graph_seed.dart';
 import 'contribution_statistics_fixture.dart';
 
 typedef FixtureCounts = ({int planned, int contribution});
@@ -39,92 +40,92 @@ final class IntentionStatisticsFixture {
     final step = database.prepare('''INSERT INTO daily_choice_path_steps
       (id, daily_choice_id, long_term_relation_id, previous_step_id)
       VALUES (?, ?, ?, ?)''');
-    database.execute('BEGIN');
     try {
-      for (var node = 1; node <= 50000; node++) {
-        intention.execute([
-          ContributionStatisticsFixture.id(node),
-          'Намерение $node',
-        ]);
-      }
-      for (var number = 0; number < 150000; number++) {
-        final band = number ~/ 50000;
-        final source = number % 50000 + 1;
-        final (from, to) = switch (number) {
-          >= 50000 && < 50500 => (20001 + number - 50000, target),
-          >= 50500 && < 51000 => (target, 30001 + number - 50500),
-          999 => (1000, 1),
-          _ => (source, (source + band) % 50000 + 1),
-        };
-        relation.execute([
-          ContributionStatisticsFixture.id(100000 + number),
-          ContributionStatisticsFixture.id(from),
-          ContributionStatisticsFixture.id(to),
-        ]);
-      }
-      var choiceNumber = 0, stepNumber = 0;
-      for (
-        var day = DateTime.utc(2025);
-        day.year <= 2027;
-        day = day.add(const Duration(days: 1))
-      ) {
-        final date = CalendarDate.fromParts(
-          day.year,
-          day.month,
-          day.day,
-        ).toCanonicalString();
-        for (var slot = 0; slot < 100; slot++) {
-          final index = (choiceNumber ~/ 6) % 500;
-          final incoming = 50000 + index;
-          final outgoing = 50500 + index;
-          final relations = switch ((choiceNumber ~/ 2) % 3) {
-            0 => [incoming, outgoing],
-            1 => [outgoing],
-            _ => [incoming],
-          };
-          final source = relations.first == incoming ? 20001 + index : target;
-          final selected = relations.last == outgoing ? 30001 + index : target;
-          final choiceId = ContributionStatisticsFixture.id(
-            300000 + choiceNumber,
-          );
-          choice.execute([
-            choiceId,
-            ContributionStatisticsFixture.id(source),
-            ContributionStatisticsFixture.id(selected),
-            date,
-            slot < 50 ? 1 : 0,
+      seedRawGraph(database, () {
+        for (var node = 1; node <= 50000; node++) {
+          intention.execute([
+            ContributionStatisticsFixture.id(node),
+            'Намерение $node',
           ]);
-          String? previous;
-          for (final link in relations) {
-            final stepId = ContributionStatisticsFixture.id(
-              1000000 + stepNumber++,
-            );
-            step.execute([
-              stepId,
-              choiceId,
-              ContributionStatisticsFixture.id(100000 + link),
-              previous,
-            ]);
-            previous = stepId;
-          }
-          choiceNumber++;
         }
-      }
-      database.execute(
-        '''UPDATE long_term_relations SET is_archived = 1
-        WHERE source_intention_id >= ? OR related_intention_id >= ?''',
-        [
-          ContributionStatisticsFixture.id(45001),
-          ContributionStatisticsFixture.id(45001),
-        ],
-      );
-      database.execute('UPDATE intentions SET is_archived = 1 WHERE id >= ?', [
-        ContributionStatisticsFixture.id(45001),
-      ]);
-      database.execute('COMMIT');
-    } on Object {
-      database.execute('ROLLBACK');
-      rethrow;
+        for (var number = 0; number < 150000; number++) {
+          final band = number ~/ 50000;
+          final source = number % 50000 + 1;
+          final (from, to) = switch (number) {
+            >= 50000 && < 50500 => (20001 + number - 50000, target),
+            >= 50500 && < 51000 => (target, 30001 + number - 50500),
+            999 => (1000, 1),
+            _ => (source, (source + band) % 50000 + 1),
+          };
+          relation.execute([
+            ContributionStatisticsFixture.id(100000 + number),
+            ContributionStatisticsFixture.id(from),
+            ContributionStatisticsFixture.id(to),
+          ]);
+        }
+        var choiceNumber = 0, stepNumber = 0;
+        for (
+          var day = DateTime.utc(2025);
+          day.year <= 2027;
+          day = day.add(const Duration(days: 1))
+        ) {
+          final date = CalendarDate.fromParts(
+            day.year,
+            day.month,
+            day.day,
+          ).toCanonicalString();
+          for (var slot = 0; slot < 100; slot++) {
+            final index = (choiceNumber ~/ 6) % 500;
+            final incoming = 50000 + index;
+            final outgoing = 50500 + index;
+            final relations = switch ((choiceNumber ~/ 2) % 3) {
+              0 => [incoming, outgoing],
+              1 => [outgoing],
+              _ => [incoming],
+            };
+            final source = relations.first == incoming ? 20001 + index : target;
+            final selected = relations.last == outgoing
+                ? 30001 + index
+                : target;
+            final choiceId = ContributionStatisticsFixture.id(
+              300000 + choiceNumber,
+            );
+            choice.execute([
+              choiceId,
+              ContributionStatisticsFixture.id(source),
+              ContributionStatisticsFixture.id(selected),
+              date,
+              slot < 50 ? 1 : 0,
+            ]);
+            String? previous;
+            for (final link in relations) {
+              final stepId = ContributionStatisticsFixture.id(
+                1000000 + stepNumber++,
+              );
+              step.execute([
+                stepId,
+                choiceId,
+                ContributionStatisticsFixture.id(100000 + link),
+                previous,
+              ]);
+              previous = stepId;
+            }
+            choiceNumber++;
+          }
+        }
+        database.execute(
+          '''UPDATE long_term_relations SET is_archived = 1
+          WHERE source_intention_id >= ? OR related_intention_id >= ?''',
+          [
+            ContributionStatisticsFixture.id(45001),
+            ContributionStatisticsFixture.id(45001),
+          ],
+        );
+        database.execute(
+          'UPDATE intentions SET is_archived = 1 WHERE id >= ?',
+          [ContributionStatisticsFixture.id(45001)],
+        );
+      });
     } finally {
       intention.close();
       relation.close();
@@ -137,9 +138,11 @@ final class IntentionStatisticsFixture {
     if (_base case final base?) {
       base.archivePathParts(database);
     } else {
-      database.execute('''UPDATE long_term_relations SET is_archived = 1
-        WHERE creation_sequence BETWEEN 50501 AND 51000
-          AND creation_sequence % 10 = 0''');
+      seedRawGraph(database, () {
+        database.execute('''UPDATE long_term_relations SET is_archived = 1
+          WHERE creation_sequence BETWEEN 50501 AND 51000
+            AND creation_sequence % 10 = 0''');
+      });
     }
   }
 

@@ -29,6 +29,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/local_database_harness.dart';
@@ -942,7 +943,7 @@ Future<void> _scrollTo(WidgetTester tester, Finder row) async {
 }
 
 Future<void> _seedCatalog(AppDatabase database) =>
-    database.transaction(() async {
+    seedGraph(database, () async {
       for (var index = 1; index <= 220; index++) {
         final middle = 1000 + index;
         final firstRelation = 2000 + index * 2;

@@ -356,10 +356,12 @@ Future<void> _showAccessibleSearch(
   addTearDown(database.close);
   seedTagStorageFixture(raw);
   if (tagName != null) {
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-      tagName,
-      tagFixtureId(lastTagNumber),
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+        tagName,
+        tagFixtureId(lastTagNumber),
+      ]);
+    });
   }
   final repository = DriftPersonalGraphRepository(
     database,

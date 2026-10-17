@@ -25,6 +25,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -77,47 +78,46 @@ void main() {
   });
 
   group('Порция каталога — отказы получения собственных тегов', () {
-    test(
-      'ошибка после получения назначений не публикует частичный успех',
-      () async {
-        for (final (error, expected, code)
-            in <(Object, Matcher, DiagnosticsFailureCode)>[
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_BUSY,
-                  message: 'CANARY-недоступность',
-                ),
-                isA<IntentionUnavailableFailure>(),
-                DiagnosticsFailureCode.unavailable,
+    test('ошибка после получения назначений не публикует частичный успех', () async {
+      for (final (error, expected, code)
+          in <(Object, Matcher, DiagnosticsFailureCode)>[
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_BUSY,
+                message: 'CANARY-недоступность',
               ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_CORRUPT,
-                  message: 'CANARY-повреждение',
-                ),
-                isA<IntentionCorruptionFailure>(),
-                DiagnosticsFailureCode.corruption,
+              isA<IntentionUnavailableFailure>(),
+              DiagnosticsFailureCode.unavailable,
+            ),
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_CORRUPT,
+                message: 'CANARY-повреждение',
               ),
-              (
-                StateError('CANARY-неизвестный-отказ'),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
-            ]) {
-          final interceptor = _TagAssignmentReadInterceptor(failure: error);
-          final replacement = await _replaceDatabase(
-            interceptor,
-            database,
-            diagnostics,
-          );
-          database = replacement.database;
-          repository = replacement.repository;
-          await _insertIntention(
-            database,
-            id: _id(_firstUuid),
-            title: 'CANARY-намерение',
-            createdAt: DateTime.utc(2026, 9, 2, 10),
-          );
+              isA<IntentionCorruptionFailure>(),
+              DiagnosticsFailureCode.corruption,
+            ),
+            (
+              StateError('CANARY-неизвестный-отказ'),
+              isA<IntentionUnexpectedFailure>(),
+              DiagnosticsFailureCode.unexpected,
+            ),
+          ]) {
+        final interceptor = _TagAssignmentReadInterceptor(failure: error);
+        final replacement = await _replaceDatabase(
+          interceptor,
+          database,
+          diagnostics,
+        );
+        database = replacement.database;
+        repository = replacement.repository;
+        await _insertIntention(
+          database,
+          id: _id(_firstUuid),
+          title: 'CANARY-намерение',
+          createdAt: DateTime.utc(2026, 9, 2, 10),
+        );
+        await seedGraph(database, () async {
           await database.customStatement(
             'INSERT INTO tags (id, name) VALUES (?, ?)',
             [_relationUuid, 'CANARY-тег'],
@@ -126,46 +126,48 @@ void main() {
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [_relationUuid, _firstUuid],
           );
-          final result = await repository.getCatalogPage(
-            IntentionCatalogQuery(
-              scope: IntentionScope.all,
-              titleFilter: null,
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 1,
-            ),
-          );
+        });
+        final result = await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+          ),
+        );
 
-          expect(
-            result,
-            isA<ResultFailure<IntentionCatalogPage>>().having(
-              (result) => result.failure,
-              'причина',
-              expected,
+        expect(
+          result,
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'причина',
+            expected,
+          ),
+        );
+        expect(
+          diagnostics.events.last,
+          isA<CatalogPageReadDiagnosticsEvent>().having(
+            (event) => event.status,
+            'исход',
+            isA<DiagnosticsFailed>().having(
+              (status) => status.code,
+              'категория',
+              code,
             ),
-          );
-          expect(
-            diagnostics.events.last,
-            isA<CatalogPageReadDiagnosticsEvent>().having(
-              (event) => event.status,
-              'исход',
-              isA<DiagnosticsFailed>().having(
-                (status) => status.code,
-                'категория',
-                code,
-              ),
-            ),
-          );
-          expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-        }
-      },
-    );
+          ),
+        );
+        expect(diagnostics.events.toString(), isNot(contains('CANARY')));
+      }
+    });
   });
 
   group('DriftPersonalGraphRepository.execute — откат после DML', () {
     test(
       'откатывает update вместе с title search key, FTS и timestamps',
       () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
+        final interceptor = _FailAfterDmlInterceptor(
+          _GraphWrite.intentionUpdate,
+        );
         final replacement = await _replaceDatabase(
           interceptor,
           database,
@@ -214,7 +216,10 @@ void main() {
     test(
       'откатывает связи и намерение при отказе между шагами каскада',
       () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
+        // Архивирование связей предшествует изменению намерения.
+        final interceptor = _FailAfterDmlInterceptor(
+          _GraphWrite.relationUpdate,
+        );
         final replacement = await _replaceDatabase(
           interceptor,
           database,
@@ -332,14 +337,16 @@ void main() {
         isArchived: true,
         createdAt: DateTime.utc(2026, 9, 2),
       );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        homeTagId.toCanonicalString(),
-        'Дом',
-      ]);
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        weekendTagId.toCanonicalString(),
-        'Выходные',
-      ]);
+      seedRawGraph(raw, () {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          homeTagId.toCanonicalString(),
+          'Дом',
+        ]);
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          weekendTagId.toCanonicalString(),
+          'Выходные',
+        ]);
+      });
       final created = await repository.execute(
         CreateTag(TagName.fromInput('Спорт')),
       );
@@ -412,20 +419,22 @@ void main() {
       // читает окончательный результат.
       final writeIndexes = [
         for (var index = 0; index < operations.length; index++)
-          if (operations[index].operation != LocalDatabaseSqlOperation.select)
-            index,
+          if (_writesGraph(operations[index])) index,
       ];
+      final firstRead = operations.indexWhere(
+        (operation) => operation.operation == LocalDatabaseSqlOperation.select,
+      );
       final firstWrite = writeIndexes.first;
       final lastWrite = writeIndexes.last;
       expect(writeIndexes.length, greaterThan(1));
-      expect(firstWrite, greaterThan(0));
+      expect(firstRead, inInclusiveRange(0, firstWrite - 1));
       expect(operations.skip(lastWrite + 1), isNotEmpty);
 
       // Точки с разным исходом: первая проверка, первая запись (намерение),
       // первое назначение и первое чтение окончательного результата.
       // Остальные операции повторяют те же ветки.
       for (final failAfter in <int>{
-        1,
+        firstRead + 1,
         firstWrite + 1,
         writeIndexes[1] + 1,
         lastWrite + 2,
@@ -627,7 +636,7 @@ void main() {
             SqlError.SQLITE_CONSTRAINT | (99 << 8),
           ]) {
             final interceptor = _FailBeforeDmlInterceptor(
-              _DmlOperation.update,
+              _GraphWrite.intentionUpdate,
               SqliteException(
                 extendedResultCode: extendedCode,
                 message: 'CANARY-constraint',
@@ -684,7 +693,7 @@ void main() {
             StateError('CANARY-dart-error'),
           ]) {
             final interceptor = _FailBeforeDmlInterceptor(
-              _DmlOperation.delete,
+              _GraphWrite.intentionDelete,
               failure,
             );
             final replacement = await _replaceDatabase(
@@ -770,19 +779,22 @@ Future<void> _insertIntention(
   bool isActionReady = false,
   bool isArchived = false,
   required DateTime createdAt,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        description: Value(description),
-        isActionReady: Value(isActionReady),
-        isArchived: Value(isArchived),
-        createdAt: createdAt.microsecondsSinceEpoch,
-        updatedAt: createdAt.microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          description: Value(description),
+          isActionReady: Value(isActionReady),
+          isArchived: Value(isArchived),
+          createdAt: createdAt.microsecondsSinceEpoch,
+          updatedAt: createdAt.microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<void> _expectStoredIntention(
   AppDatabase database, {
@@ -811,8 +823,10 @@ Future<void> _insertRelation(
   required String id,
   required IntentionId sourceId,
   required IntentionId relatedId,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO long_term_relations (
       id,
       source_intention_id,
@@ -822,7 +836,8 @@ Future<void> _insertRelation(
       is_archived
     ) VALUES (?, ?, ?, 'need', 1, 0)
   ''',
-  [id, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
+    [id, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
+  ),
 );
 
 Future<bool> _relationIsArchived(AppDatabase database, String id) async {
@@ -961,12 +976,27 @@ final class _TagAssignmentReadInterceptor
   }
 }
 
-enum _DmlOperation { update, delete }
+/// Запись команды в названную таблицу графа, на которой перехватчик
+/// внедряет отказ. Служебные записи лога фактов, в том числе признак записи
+/// единого пути, с ней не совпадают и точку отказа не смещают.
+enum _GraphWrite {
+  intentionUpdate(LocalDatabaseSqlOperation.update, Intentions.$name),
+  intentionDelete(LocalDatabaseSqlOperation.delete, Intentions.$name),
+  relationUpdate(LocalDatabaseSqlOperation.update, LongTermRelations.$name);
+
+  const _GraphWrite(this._operation, this._table);
+
+  final LocalDatabaseSqlOperation _operation;
+  final String _table;
+
+  bool matches(LocalDatabaseSqlStatement statement) =>
+      statement.operation == _operation && _writtenTable(statement) == _table;
+}
 
 final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
-  _FailAfterDmlInterceptor(this._operation);
+  _FailAfterDmlInterceptor(this._write);
 
-  final _DmlOperation _operation;
+  final _GraphWrite _write;
   var _armed = false;
   var _hasFailed = false;
 
@@ -974,23 +1004,18 @@ final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (!_matches(statement.operation)) return;
+    if (!_write.matches(statement)) return;
     if (_armed && !_hasFailed) {
       _hasFailed = true;
       throw StateError('CANARY-after-dml-failure');
     }
   }
-
-  bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
-    _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
-  };
 }
 
 final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
-  _FailBeforeDmlInterceptor(this._operation, this._failure);
+  _FailBeforeDmlInterceptor(this._write, this._failure);
 
-  final _DmlOperation _operation;
+  final _GraphWrite _write;
   final Object _failure;
   var _armed = false;
 
@@ -998,13 +1023,8 @@ final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (_armed && _matches(statement.operation)) throw _failure;
+    if (_armed && _write.matches(statement)) throw _failure;
   }
-
-  bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
-    _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
-  };
 }
 
 /// Наблюдает операции хранилища и по запросу прерывает транзакцию сразу
@@ -1047,8 +1067,9 @@ final class _StatementFaultInjector extends LocalDatabaseConnectionObserver {
 }
 
 /// После [arm] задерживает на [delay] каждое чтение, выполненное после первой
-/// записи, то есть чтения окончательного результата создания. При заданном
-/// [failure] первое такое чтение после задержки завершается этим отказом.
+/// записи в таблицы графа, то есть чтения окончательного результата
+/// создания. При заданном [failure] первое такое чтение после задержки
+/// завершается этим отказом.
 final class _ResultReadDelay extends LocalDatabaseConnectionObserver {
   _ResultReadDelay(this.delay, {this.failure});
 
@@ -1062,9 +1083,7 @@ final class _ResultReadDelay extends LocalDatabaseConnectionObserver {
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (_armed && statement.operation != LocalDatabaseSqlOperation.select) {
-      _wrote = true;
-    }
+    if (_armed && _writesGraph(statement)) _wrote = true;
   }
 
   @override
@@ -1138,6 +1157,12 @@ final class _SelectedTagsReadInterceptor
     return rows;
   }
 }
+
+/// Запись команды в таблицы графа, а не служебная запись лога фактов:
+/// признак записи, отметки и пакет.
+bool _writesGraph(LocalDatabaseSqlStatement statement) =>
+    statement.operation != LocalDatabaseSqlOperation.select &&
+    !statement.statements.any((sql) => sql.contains('graph_log_'));
 
 /// Таблица, в которую пишет операция, либо название операции чтения.
 String _writtenTable(LocalDatabaseSqlStatement statement) {

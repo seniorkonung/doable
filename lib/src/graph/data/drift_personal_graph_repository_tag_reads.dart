@@ -12,9 +12,7 @@ extension _TagReading on DriftPersonalGraphRepository {
     };
     final rows = await _database
         .customSelect(
-          '''SELECT a.intention_id, a.tag_id AS assigned_tag_id, t.id, t.name,
-         CASE WHEN substr(t.id, 1, 1) = char(65279)
-           THEN 1 ELSE 0 END AS has_leading_bom
+          '''SELECT a.intention_id, a.tag_id AS assigned_tag_id, t.id, t.name
        FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
        WHERE a.intention_id IN (${List.filled(requested.length, '?').join(', ')})
        ORDER BY a.intention_id ASC, a.tag_creation_sequence ASC''',
@@ -24,9 +22,9 @@ extension _TagReading on DriftPersonalGraphRepository {
         .get();
     final tags = {for (final id in intentionIds) id: <tag_domain.Tag>[]};
     for (final row in rows) {
-      final id = requested[_requiredStoredString(row.data, 'intention_id')];
-      if (id == null) throw const _StoredIntentionCorruption();
-      tags[id]!.add(_decodeStoredTagAssignment(row.data));
+      final id = requested[requiredStoredString(row.data, 'intention_id')];
+      if (id == null) throw const StoredGraphCorruption();
+      tags[id]!.add(_decodeAssignedTag(row.data));
     }
     return tags;
   }
@@ -65,16 +63,16 @@ extension _TagReading on DriftPersonalGraphRepository {
                 },
               )
               .getSingle();
-          final tagExists = _requiredStoredInteger(row.data, 'tag_exists');
-          final intentionExists = _requiredStoredInteger(
+          final tagExists = requiredStoredInteger(row.data, 'tag_exists');
+          final intentionExists = requiredStoredInteger(
             row.data,
             'intention_exists',
           );
-          final assigned = _requiredStoredInteger(row.data, 'is_assigned');
+          final assigned = requiredStoredInteger(row.data, 'is_assigned');
           if ((tagExists != 0 && tagExists != 1) ||
               (intentionExists != 0 && intentionExists != 1) ||
               (assigned != 0 && assigned != 1)) {
-            throw const _StoredIntentionCorruption();
+            throw const StoredGraphCorruption();
           }
           if (tagExists == 0) throw const _TagStatusTagMissing();
           if (intentionExists == 0) throw const _TagReadIntentionMissing();
@@ -139,12 +137,12 @@ extension _TagReading on DriftPersonalGraphRepository {
           final decoded = <tag_domain.Tag>[];
           final selectionRows = <TagSelectionRow>[];
           for (final row in rows) {
-            final tag = _decodeStoredTag(row.data);
+            final tag = decodeStoredTag(row.data);
             decoded.add(tag);
             if (intentionId != null) {
-              final assigned = _requiredStoredInteger(row.data, 'is_assigned');
+              final assigned = requiredStoredInteger(row.data, 'is_assigned');
               if (assigned != 0 && assigned != 1) {
-                throw const _StoredIntentionCorruption();
+                throw const StoredGraphCorruption();
               }
               selectionRows.add(
                 TagSelectionRow(tag: tag, isAssigned: assigned == 1),
@@ -192,9 +190,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           await _validateTagReadIntention(intentionId);
           final rows = await _database
               .customSelect(
-                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name,
-                 CASE WHEN substr(t.id, 1, 1) = char(65279)
-                   THEN 1 ELSE 0 END AS has_leading_bom
+                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.intention_id = ?
                ORDER BY a.tag_creation_sequence ASC''',
@@ -202,9 +198,7 @@ extension _TagReading on DriftPersonalGraphRepository {
                 readsFrom: {_database.tags, _database.tagAssignments},
               )
               .get();
-          final tags = [
-            for (final row in rows) _decodeStoredTagAssignment(row.data),
-          ];
+          final tags = [for (final row in rows) _decodeAssignedTag(row.data)];
           final revision = _currentRevision;
           return TagAssignmentsSnapshot(
             intentionId: intentionId,
@@ -267,9 +261,9 @@ extension _TagReading on DriftPersonalGraphRepository {
                   readsFrom: {_database.tags},
                 )
                 .getSingleOrNull();
-            final tag = row == null ? null : _decodeStoredTag(row.data);
+            final tag = row == null ? null : decodeStoredTag(row.data);
             if (tag != null && tag.id != id) {
-              throw const _StoredIntentionCorruption();
+              throw const StoredGraphCorruption();
             }
             return GraphSnapshot(value: tag, revision: _currentRevision);
           }),
@@ -302,31 +296,13 @@ extension _TagReading on DriftPersonalGraphRepository {
 /// Порядок назначений и существование тега гарантируют схема: ключ порядка
 /// назначения совпадает с порядком создания тега (триггеры), а внешний ключ не
 /// допускает назначения без тега.
-tag_domain.Tag _decodeStoredTagAssignment(Map<String, Object?> data) {
-  // SQLite удаляет начальный BOM при декодировании; проверяем исходный TEXT.
-  if (_requiredStoredInteger(data, 'has_leading_bom') != 0) {
-    throw const _StoredIntentionCorruption();
-  }
-  final tag = _decodeStoredTag(data);
-  if (_requiredStoredString(data, 'assigned_tag_id') !=
+tag_domain.Tag _decodeAssignedTag(Map<String, Object?> data) {
+  final tag = decodeStoredTag(data);
+  if (requiredStoredString(data, 'assigned_tag_id') !=
       tag.id.toCanonicalString()) {
-    throw const _StoredIntentionCorruption();
+    throw const StoredGraphCorruption();
   }
   return tag;
-}
-
-/// Название тега проверяет `CHECK` схемы той же функцией [TagName.fromStored],
-/// поэтому здесь оно только преобразуется в тип; идентификатор схема не
-/// проверяет.
-tag_domain.Tag _decodeStoredTag(Map<String, Object?> data) {
-  final id = switch (TagId.decode(_requiredStoredString(data, 'id'))) {
-    TagIdDecodingSuccess(:final id) => id,
-    InvalidTagIdDecoding() => throw const _StoredIntentionCorruption(),
-  };
-  return tag_domain.Tag(
-    id: id,
-    name: TagName.fromStored(_requiredStoredString(data, 'name')),
-  );
 }
 
 final class _TagReadIntentionMissing implements Exception {
@@ -344,7 +320,7 @@ TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
   if (error is _TagReadIntentionMissing) {
     return const TagAssignmentStatusIntentionNotFound();
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagAssignmentStatusCorruption();
   }
   return switch (classifySqliteFailure(error)) {
@@ -359,7 +335,7 @@ TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {
   if (error is _TagReadIntentionMissing) {
     return const TagCatalogIntentionNotFound();
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagCatalogCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {
@@ -374,7 +350,7 @@ TagAssignmentsReadFailure _classifyTagAssignmentsReadFailure(Object error) {
   if (error is _TagReadIntentionMissing) {
     return const TagAssignmentsIntentionNotFound();
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagAssignmentsCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {
@@ -386,7 +362,7 @@ TagAssignmentsReadFailure _classifyTagAssignmentsReadFailure(Object error) {
 }
 
 TagReadFailure _classifyTagReadFailure(Object error) {
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagReadCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {

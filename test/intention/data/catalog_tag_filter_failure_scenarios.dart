@@ -57,14 +57,16 @@ void _catalogTagFilterFailureScenarios(
         );
         seedTagStorageFixture(raw);
         // Продолжению навигации активного охвата нужен второй получатель тега.
-        raw.execute(
-          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-          [tagFixtureId(4), 'Намерение 4', 104, 204],
-        );
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [tagFixtureId(firstTagNumber), tagFixtureId(4)],
-        );
+        seedRawGraph(raw, () {
+          raw.execute(
+            'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+            [tagFixtureId(4), 'Намерение 4', 104, 204],
+          );
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(firstTagNumber), tagFixtureId(4)],
+          );
+        });
         final required = _fixtureTag(firstTagNumber);
         final excluded = _fixtureTag(lastTagNumber);
         IntentionCatalogQuery query(TagId required, TagId excluded) =>

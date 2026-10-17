@@ -15,6 +15,7 @@ import 'package:doable/src/statistics/application/statistics_read_contract.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
@@ -316,16 +317,18 @@ void main() {
   });
 
   test('каскад архивирования делает загруженный снимок непригодным', () async {
-    await database.customStatement(
-      '''INSERT INTO long_term_relations
+    await seedGraph(database, () async {
+      await database.customStatement(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority)
          VALUES (?, ?, ?, 'need', 4)''',
-      [durabilityUuid(105), durabilityUuid(4), durabilityUuid(2)],
-    );
-    await database.customStatement(
-      'UPDATE long_term_relations SET description = ?',
-      ['  Описание связи\n'],
-    );
+        [durabilityUuid(105), durabilityUuid(4), durabilityUuid(2)],
+      );
+      await database.customStatement(
+        'UPDATE long_term_relations SET description = ?',
+        ['  Описание связи\n'],
+      );
+    });
     await repository.execute(durabilityCreate());
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
@@ -438,7 +441,7 @@ Set<(int, int)> _edges(
 }
 
 Future<void> _addRelations(AppDatabase database, int count) async {
-  await database.transaction(() async {
+  await seedGraph(database, () async {
     for (var i = 0; i < count; i++) {
       await database.customStatement(
         '''INSERT INTO intentions

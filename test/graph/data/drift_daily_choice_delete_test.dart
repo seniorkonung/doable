@@ -18,6 +18,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -64,23 +65,25 @@ void main() {
       () => DateTime.utc(2026, 9, 23),
       diagnostics,
     );
-    for (var number = 1; number <= 3; number++) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (var number = 1; number <= 3; number++) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, 1)''',
-        [_uuid(number), 'Намерение $number', number == 3 ? 1 : 0],
-      );
-    }
-    for (final (number, source, target) in [(101, 1, 2), (102, 2, 3)]) {
-      raw.execute(
-        '''INSERT INTO long_term_relations
+          [_uuid(number), 'Намерение $number', number == 3 ? 1 : 0],
+        );
+      }
+      for (final (number, source, target) in [(101, 1, 2), (102, 2, 3)]) {
+        raw.execute(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id,
             type, priority, is_archived)
            VALUES (?, ?, ?, 'need', 2, 0)''',
-        [_uuid(number), _uuid(source), _uuid(target)],
-      );
-    }
+          [_uuid(number), _uuid(source), _uuid(target)],
+        );
+      }
+    });
   });
   tearDown(() => database.close());
 
@@ -114,13 +117,15 @@ void main() {
   test('удаляет выполненный выбор с архивным путём и все его шаги', () async {
     final id = await createChoice();
     final before = await read(id);
-    raw.execute('UPDATE long_term_relations SET is_archived = 1');
-    raw.execute('UPDATE intentions SET is_archived = 1 WHERE id = ?', [
-      _uuid(1),
-    ]);
-    raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
-      _uuid(3),
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE long_term_relations SET is_archived = 1');
+      raw.execute('UPDATE intentions SET is_archived = 1 WHERE id = ?', [
+        _uuid(1),
+      ]);
+      raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
+        _uuid(3),
+      ]);
+    });
 
     final result = await repository.execute(DeleteDailyChoice(id));
 
@@ -175,23 +180,25 @@ void main() {
 
   test('удаляет длинную цепочку без ограничения длины пути', () async {
     const length = 405;
-    for (var index = 4; index <= length + 1; index++) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (var index = 4; index <= length + 1; index++) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, 1)''',
-        [_uuid(index), 'Намерение $index', index == length + 1 ? 1 : 0],
-      );
-    }
-    for (var index = 3; index <= length; index++) {
-      raw.execute(
-        '''INSERT INTO long_term_relations
+          [_uuid(index), 'Намерение $index', index == length + 1 ? 1 : 0],
+        );
+      }
+      for (var index = 3; index <= length; index++) {
+        raw.execute(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id,
             type, priority, is_archived)
            VALUES (?, ?, ?, 'need', 2, 0)''',
-        [_uuid(100 + index), _uuid(index), _uuid(index + 1)],
-      );
-    }
+          [_uuid(100 + index), _uuid(index), _uuid(index + 1)],
+        );
+      }
+    });
     final id = await createChoice(length: length);
 
     final result = await repository.execute(DeleteDailyChoice(id));

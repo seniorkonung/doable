@@ -26,6 +26,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -111,9 +112,12 @@ void main() {
 
     expect(_snapshot(missing).value, isNull);
 
-    await database.customStatement(
-      'UPDATE long_term_relations SET description = ? WHERE id = ?',
-      [' ', relationId.toCanonicalString()],
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        'UPDATE long_term_relations SET description = ? WHERE id = ?',
+        [' ', relationId.toCanonicalString()],
+      ),
     );
     final corrupted = await repository.watchRelation(relationId).first;
 
@@ -122,22 +126,24 @@ void main() {
 
   test('подробности вычисляют запрет по шагу сохранённого пути', () async {
     final choiceId = _uuid(201);
-    await database.customStatement(
-      '''
+    await seedGraph(database, () async {
+      await database.customStatement(
+        '''
         INSERT INTO daily_choices
           (id, source_intention_id, selected_intention_id, choice_date, is_completed)
         VALUES (?, ?, ?, '2026-09-23', 1)
       ''',
-      [choiceId, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
-    );
-    await database.customStatement(
-      '''
+        [choiceId, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
+      );
+      await database.customStatement(
+        '''
         INSERT INTO daily_choice_path_steps
           (id, daily_choice_id, long_term_relation_id)
         VALUES (?, ?, ?)
       ''',
-      [_uuid(202), choiceId, relationId.toCanonicalString()],
-    );
+        [_uuid(202), choiceId, relationId.toCanonicalString()],
+      );
+    });
     final snapshot = _snapshot(
       await repository.watchRelation(relationId).first,
     );
@@ -193,9 +199,12 @@ void main() {
       isFalse,
     );
 
-    await database.customStatement('DELETE FROM daily_choices WHERE id = ?', [
-      choiceId,
-    ]);
+    await seedGraph(
+      database,
+      () => database.customStatement('DELETE FROM daily_choices WHERE id = ?', [
+        choiceId,
+      ]),
+    );
     final released = _snapshot(
       await repository.watchRelation(relationId).first,
     );
@@ -229,9 +238,12 @@ void main() {
   test(
     'наблюдает появление и исчезновение ссылки пути без правки связи',
     () async {
-      await database.customStatement(
-        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
-        [relatedId.toCanonicalString()],
+      await seedGraph(
+        database,
+        () => database.customStatement(
+          'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+          [relatedId.toCanonicalString()],
+        ),
       );
       final events = StreamIterator(repository.watchRelation(relationId));
       addTearDown(events.cancel);
@@ -593,16 +605,19 @@ Future<void> _insertIntention(
   AppDatabase database,
   IntentionId id, {
   required String title,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        createdAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
-        updatedAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          createdAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
+          updatedAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<void> _insertRelation(
   AppDatabase database, {
@@ -610,19 +625,22 @@ Future<void> _insertRelation(
   required IntentionId sourceId,
   required IntentionId relatedId,
   String? description,
-}) => database
-    .into(database.longTermRelations)
-    .insert(
-      LongTermRelationsCompanion.insert(
-        id: id.toCanonicalString(),
-        sourceIntentionId: sourceId.toCanonicalString(),
-        relatedIntentionId: relatedId.toCanonicalString(),
-        type: 'need',
-        priority: 2,
-        description: Value(description),
-        isArchived: const Value(false),
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.longTermRelations)
+      .insert(
+        LongTermRelationsCompanion.insert(
+          id: id.toCanonicalString(),
+          sourceIntentionId: sourceId.toCanonicalString(),
+          relatedIntentionId: relatedId.toCanonicalString(),
+          type: 'need',
+          priority: 2,
+          description: Value(description),
+          isArchived: const Value(false),
+        ),
       ),
-    );
+);
 
 DriftPersonalGraphRepository _repository(
   AppDatabase database,

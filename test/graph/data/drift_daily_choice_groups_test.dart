@@ -11,6 +11,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -37,22 +38,24 @@ void main() {
       () => DateTime.utc(2026, 9, 23),
       diagnostics,
     );
-    for (final number in [1, 2, 3, 4]) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (final number in [1, 2, 3, 4]) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, 1)''',
-        [_uuid(number), 'Намерение $number', number == 2 ? 1 : 0],
-      );
-    }
-    for (final (number, source, related) in [(101, 1, 2), (102, 3, 1)]) {
-      raw.execute(
-        '''INSERT INTO long_term_relations
+          [_uuid(number), 'Намерение $number', number == 2 ? 1 : 0],
+        );
+      }
+      for (final (number, source, related) in [(101, 1, 2), (102, 3, 1)]) {
+        raw.execute(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
             is_archived) VALUES (?, ?, ?, 'need', 2, 0)''',
-        [_uuid(number), _uuid(source), _uuid(related)],
-      );
-    }
+          [_uuid(number), _uuid(source), _uuid(related)],
+        );
+      }
+    });
   });
 
   tearDown(() => database.close());
@@ -65,25 +68,27 @@ void main() {
     String date = '2026-09-23',
     int completed = 0,
   }) {
-    raw.execute(
-      '''INSERT INTO daily_choices
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
           is_completed) VALUES (?, ?, ?, ?, ?)''',
-      [_uuid(number), _uuid(source), _uuid(selected), date, completed],
-    );
-    for (var index = 0; index < path.length; index++) {
-      raw.execute(
-        '''INSERT INTO daily_choice_path_steps
+        [_uuid(number), _uuid(source), _uuid(selected), date, completed],
+      );
+      for (var index = 0; index < path.length; index++) {
+        raw.execute(
+          '''INSERT INTO daily_choice_path_steps
            (id, daily_choice_id, long_term_relation_id, previous_step_id)
            VALUES (?, ?, ?, ?)''',
-        [
-          _uuid(number * 10 + index + 10000),
-          _uuid(number),
-          _uuid(path[index]),
-          index == 0 ? null : _uuid(number * 10 + index + 9999),
-        ],
-      );
-    }
+          [
+            _uuid(number * 10 + index + 10000),
+            _uuid(number),
+            _uuid(path[index]),
+            index == 0 ? null : _uuid(number * 10 + index + 9999),
+          ],
+        );
+      }
+    });
   }
 
   DailyChoiceGroupQuery query(
@@ -111,13 +116,17 @@ void main() {
     addChoice(206, source: 1, selected: 2, path: [101]);
     addChoice(204, source: 3, selected: 1, path: [102]);
     addChoice(205, source: 3, selected: 2, path: [102, 101]);
-    raw.execute('UPDATE long_term_relations SET is_archived = 1');
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE long_term_relations SET is_archived = 1');
+    });
     const description = 'Описание дневной группы\nПолный текст';
-    raw.execute(
-      '''UPDATE daily_choices
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''UPDATE daily_choices
       SET scheduled_minute = 1080, priority = 2, description = ? WHERE id = ?''',
-      [description, _uuid(206)],
-    );
+        [description, _uuid(206)],
+      );
+    });
 
     final source = page(
       await repository.getRelationGroupPage(
@@ -160,10 +169,12 @@ void main() {
     }
     addChoice(500, source: 3, selected: 1, path: [102]);
     addChoice(501, source: 3, selected: 2, path: [102, 101]);
-    raw.execute(
-      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [_uuid(500)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(500)],
+      );
+    });
 
     final ids = <String>[];
     RelationGroupCursor? cursor;
@@ -201,10 +212,12 @@ void main() {
     addChoice(201, source: 3, selected: 1, path: [102], date: '2026-09-22');
     addChoice(202, source: 3, selected: 1, path: [102]);
     addChoice(203, source: 3, selected: 2, path: [102, 101]);
-    raw.execute(
-      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [_uuid(203)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(203)],
+      );
+    });
 
     final first = page(
       await repository.getRelationGroupPage(
@@ -288,10 +301,12 @@ void main() {
 
     addChoice(201, source: 1, selected: 2, path: [101]);
     addChoice(202, source: 1, selected: 2, path: [101]);
-    raw.execute(
-      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [_uuid(201)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(201)],
+      );
+    });
     final first = page(
       await repository.getRelationGroupPage(
         query(DailyChoiceRelationRole.source, pageSize: 1),

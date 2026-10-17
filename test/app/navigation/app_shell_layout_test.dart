@@ -40,6 +40,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -731,42 +732,44 @@ void _seed(
   required int intentions,
   required int dailyChoices,
 }) {
-  for (var number = 1; number <= intentions; number++) {
+  seedRawGraph(database, () {
+    for (var number = 1; number <= intentions; number++) {
+      database.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [tagFixtureId(number), _intentionTitle(number), 1, 0, number, number],
+      );
+    }
     database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
-      'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(number), _intentionTitle(number), 1, 0, number, number],
+      'INSERT INTO long_term_relations (id, source_intention_id, '
+      'related_intention_id, type, priority, is_archived) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
     );
-  }
-  database.execute(
-    'INSERT INTO long_term_relations (id, source_intention_id, '
-    'related_intention_id, type, priority, is_archived) '
-    'VALUES (?, ?, ?, ?, ?, ?)',
-    [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
-  );
-  for (var index = 0; index < dailyChoices; index++) {
-    database.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, '
-      'selected_intention_id, choice_date, is_completed) '
-      'VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(_firstChoice + index),
-        tagFixtureId(1),
-        tagFixtureId(2),
-        _today.toCanonicalString(),
-        0,
-      ],
-    );
-    database.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-      'long_term_relation_id) VALUES (?, ?, ?)',
-      [
-        tagFixtureId(_firstPathStep + index),
-        tagFixtureId(_firstChoice + index),
-        tagFixtureId(_relation),
-      ],
-    );
-  }
+    for (var index = 0; index < dailyChoices; index++) {
+      database.execute(
+        'INSERT INTO daily_choices (id, source_intention_id, '
+        'selected_intention_id, choice_date, is_completed) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(_firstChoice + index),
+          tagFixtureId(1),
+          tagFixtureId(2),
+          _today.toCanonicalString(),
+          0,
+        ],
+      );
+      database.execute(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
+        'long_term_relation_id) VALUES (?, ?, ?)',
+        [
+          tagFixtureId(_firstPathStep + index),
+          tagFixtureId(_firstChoice + index),
+          tagFixtureId(_relation),
+        ],
+      );
+    }
+  });
 }
 
 /// Принимает архивирование: его успех предъявляет общая поверхность на

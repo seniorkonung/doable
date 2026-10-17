@@ -20,6 +20,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -76,20 +77,22 @@ void main() {
       () => DateTime.utc(2026, 9, 23),
       diagnostics,
     );
-    for (var number = 1; number <= 2; number++) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (var number = 1; number <= 2; number++) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, 1)''',
-        [_uuid(number), 'Намерение $number', number == 2 ? 1 : 0],
-      );
-    }
-    raw.execute(
-      '''INSERT INTO long_term_relations
+          [_uuid(number), 'Намерение $number', number == 2 ? 1 : 0],
+        );
+      }
+      raw.execute(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority, is_archived)
          VALUES (?, ?, ?, 'need', 2, 0)''',
-      [_uuid(101), _uuid(1), _uuid(2)],
-    );
+        [_uuid(101), _uuid(1), _uuid(2)],
+      );
+    });
   });
 
   tearDown(() => database.close());
@@ -135,13 +138,15 @@ void main() {
         'SELECT creation_sequence FROM daily_choices WHERE id = ?',
         [id.toCanonicalString()],
       ).single['creation_sequence'];
-      raw.execute(
-        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
-        [_uuid(101)],
-      );
-      raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
-        _uuid(2),
-      ]);
+      seedRawGraph(raw, () {
+        raw.execute(
+          'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+          [_uuid(101)],
+        );
+        raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
+          _uuid(2),
+        ]);
+      });
 
       final result = await repository.execute(
         UpdateDailyChoiceFields(
@@ -206,12 +211,15 @@ void main() {
         id.toCanonicalString(),
       ]).single,
     );
-    raw.execute('UPDATE long_term_relations SET is_archived = 1 WHERE id = ?', [
-      _uuid(101),
-    ]);
-    raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
-      _uuid(2),
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_uuid(101)],
+      );
+      raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
+        _uuid(2),
+      ]);
+    });
 
     final midnight = DailyChoiceTime(hour: 0, minute: 0);
     for (final (patch, schedule, priority, storedMinute) in [
@@ -448,10 +456,13 @@ void main() {
     'повреждённое сохранённое описание отклоняет составную правку',
     () async {
       final id = await createChoice();
-      raw.execute('UPDATE daily_choices SET description = ? WHERE id = ?', [
-        '   ',
-        id.toCanonicalString(),
-      ]);
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE daily_choices SET description = ? WHERE id = ?',
+          ['   ', id.toCanonicalString()],
+        ),
+      );
       final result = await repository.execute(
         UpdateDailyChoiceFields(
           choiceId: id,

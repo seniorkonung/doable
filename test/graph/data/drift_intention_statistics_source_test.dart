@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
 const _relations = [
@@ -42,19 +43,23 @@ void main() {
     probe = _SourceProbe();
     database = await harness.openReadyDatabase(observer: probe);
     await seedDurabilityGraph(database);
-    await database.customStatement('UPDATE intentions SET is_action_ready = 1');
-    for (final (number, source, target) in _relations.skip(4)) {
+    await seedGraph(database, () async {
       await database.customStatement(
-        '''INSERT INTO long_term_relations
+        'UPDATE intentions SET is_action_ready = 1',
+      );
+      for (final (number, source, target) in _relations.skip(4)) {
+        await database.customStatement(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority)
            VALUES (?, ?, ?, 'need', 2)''',
-        [
-          durabilityUuid(number),
-          durabilityUuid(source),
-          durabilityUuid(target),
-        ],
-      );
-    }
+          [
+            durabilityUuid(number),
+            durabilityUuid(source),
+            durabilityUuid(target),
+          ],
+        );
+      }
+    });
     repository = durabilityRepository(database);
   });
   tearDown(() => harness.dispose());
@@ -64,7 +69,7 @@ void main() {
     List<int> path, {
     String date = '2026-10-12',
     bool completed = true,
-  }) async {
+  }) => seedGraph(database, () async {
     await database.customStatement(
       '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date, is_completed)
@@ -90,7 +95,7 @@ void main() {
         ],
       );
     }
-  }
+  });
 
   Future<IntentionStatisticsSourceSnapshot?> read({
     StatisticsView view = StatisticsView.throughRelations,
@@ -156,12 +161,14 @@ void main() {
   test(
     'группы SQLite различают предшественников в контрольном цикле',
     () async {
-      for (final number in [103, 104, 107, 108, 109]) {
-        await database.customStatement(
-          'DELETE FROM long_term_relations WHERE id = ?',
-          [durabilityUuid(number)],
-        );
-      }
+      await seedGraph(database, () async {
+        for (final number in [103, 104, 107, 108, 109]) {
+          await database.customStatement(
+            'DELETE FROM long_term_relations WHERE id = ?',
+            [durabilityUuid(number)],
+          );
+        }
+      });
       await addChoice(201, [101, 102]);
       final first = (await read())!;
       final graph = await repository.loadStatisticsRelationSnapshot();

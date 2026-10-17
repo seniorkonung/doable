@@ -34,8 +34,8 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
               )
               .getSingleOrNull();
           if (tagRow == null) throw const _TaggedIntentionsTagMissing();
-          final tag = _decodeStoredTag(tagRow.data);
-          if (tag.id != query.tagId) throw const _StoredIntentionCorruption();
+          final tag = decodeStoredTag(tagRow.data);
+          if (tag.id != query.tagId) throw const StoredGraphCorruption();
 
           final boundary = cursor?.boundarySequence;
           final archiveFlag = query.scope == TaggedIntentionsScope.archived
@@ -46,10 +46,7 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
                 '''SELECT a.creation_sequence AS assignment_sequence,
                  a.intention_id AS assigned_intention_id,
                  i.id AS intention_id, i.title AS intention_title,
-                 i.is_archived AS intention_archived,
-                 CASE WHEN substr(a.intention_id, 1, 1) = char(65279)
-                   OR substr(i.title, 1, 1) = char(65279)
-                   THEN 1 ELSE 0 END AS has_leading_bom
+                 i.is_archived AS intention_archived
                FROM tag_assignments a
                JOIN intentions i ON i.id = a.intention_id
                WHERE a.tag_id = ?
@@ -68,12 +65,12 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
           var previousSequence = boundary ?? 0;
           final decoded = <TaggedIntention>[];
           for (final row in rows) {
-            final sequence = _requiredStoredInteger(
+            final sequence = requiredStoredInteger(
               row.data,
               'assignment_sequence',
             );
             if (sequence <= previousSequence) {
-              throw const _StoredIntentionCorruption();
+              throw const StoredGraphCorruption();
             }
             previousSequence = sequence;
             decoded.add(_decodeTaggedIntention(row.data));
@@ -87,7 +84,7 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
             nextCursor: decoded.length > query.pageSize
                 ? _DriftTaggedIntentionsCursor(
                     revision: revision,
-                    boundarySequence: _requiredStoredInteger(
+                    boundarySequence: requiredStoredInteger(
                       rows[query.pageSize - 1].data,
                       'assignment_sequence',
                     ),
@@ -113,46 +110,17 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
 }
 
 TaggedIntention _decodeTaggedIntention(Map<String, Object?> data) {
-  _checkTaggedTextEncoding(data);
-  final assignedIntention = _requiredStoredString(
-    data,
-    'assigned_intention_id',
-  );
-  final id = _decodeTaggedIntentionId(assignedIntention);
-  if (_requiredStoredString(data, 'intention_id') != assignedIntention) {
-    throw const _StoredIntentionCorruption();
+  final assignedIntention = requiredStoredString(data, 'assigned_intention_id');
+  final id = decodeStoredIntentionId(assignedIntention);
+  if (requiredStoredString(data, 'intention_id') != assignedIntention) {
+    throw const StoredGraphCorruption();
   }
   return TaggedIntention(
     id: id,
-    title: _strictTaggedTitle(data, 'intention_title'),
-    archiveState: switch (_requiredStoredInteger(data, 'intention_archived')) {
-      0 => domain.IntentionArchiveState.active,
-      1 => domain.IntentionArchiveState.archived,
-      _ => throw const _StoredIntentionCorruption(),
-    },
+    title: decodeStoredIntentionTitle(data, 'intention_title'),
+    archiveState: decodeStoredIntentionArchiveState(data, 'intention_archived'),
   );
 }
-
-void _checkTaggedTextEncoding(Map<String, Object?> data) {
-  // Декодер SQLite удаляет начальный BOM; проверяем исходный TEXT до этого.
-  if (_requiredStoredInteger(data, 'has_leading_bom') != 0) {
-    throw const _StoredIntentionCorruption();
-  }
-}
-
-String _strictTaggedTitle(Map<String, Object?> data, String column) {
-  final value = _requiredStoredString(data, column);
-  if (IntentionText.normalizeTitle(value) != value) {
-    throw const _StoredIntentionCorruption();
-  }
-  return value;
-}
-
-IntentionId _decodeTaggedIntentionId(String value) =>
-    switch (IntentionId.decode(value)) {
-      IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw const _StoredIntentionCorruption(),
-    };
 
 final class _DriftTaggedIntentionsCursor implements TaggedIntentionsCursor {
   const _DriftTaggedIntentionsCursor({
@@ -179,9 +147,8 @@ TaggedIntentionsReadFailure _classifyTaggedIntentionsReadFailure(Object error) {
   if (error is _TaggedIntentionsTagMissing) {
     return const TaggedIntentionsTagNotFound();
   }
-  if (error is _StoredIntentionCorruption ||
+  if (error is StoredGraphCorruption ||
       error is TaggedIntentionsPageValidationException ||
-      error is IntentionTextValidationException ||
       unwrapDriftRemoteException(error) is FormatException) {
     return const TaggedIntentionsCorruptionFailure();
   }

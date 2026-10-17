@@ -11,6 +11,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -264,9 +265,12 @@ void main() {
       scope: RelationScope.active,
       priority: RelationPriority.p1,
     );
-    await database.customStatement(
-      'UPDATE intentions SET title = ? WHERE id = ?',
-      ['   ', participantId.toCanonicalString()],
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        'UPDATE intentions SET title = ? WHERE id = ?',
+        ['   ', participantId.toCanonicalString()],
+      ),
     );
     final corrupted = await repository.getRelationGroupPage(
       _query(ownerId, pageSize: 10),
@@ -321,16 +325,19 @@ Future<void> _insertIntention(
   AppDatabase database,
   IntentionId id, {
   required String title,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        createdAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
-        updatedAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          createdAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
+          updatedAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<void> _insertRelation(
   AppDatabase database, {
@@ -342,31 +349,38 @@ Future<void> _insertRelation(
   required RelationScope scope,
   required RelationPriority priority,
   String? description,
-}) => database
-    .into(database.longTermRelations)
-    .insert(
-      LongTermRelationsCompanion.insert(
-        id: id.toCanonicalString(),
-        sourceIntentionId:
-            (direction == RelationDirection.outgoing ? ownerId : participantId)
-                .toCanonicalString(),
-        relatedIntentionId:
-            (direction == RelationDirection.outgoing ? participantId : ownerId)
-                .toCanonicalString(),
-        type: switch (type) {
-          LongTermRelationType.need => 'need',
-          LongTermRelationType.can => 'can',
-        },
-        priority: switch (priority) {
-          RelationPriority.p1 => 1,
-          RelationPriority.p2 => 2,
-          RelationPriority.p3 => 3,
-          RelationPriority.p4 => 4,
-        },
-        description: Value(description),
-        isArchived: Value(scope == RelationScope.archived),
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.longTermRelations)
+      .insert(
+        LongTermRelationsCompanion.insert(
+          id: id.toCanonicalString(),
+          sourceIntentionId:
+              (direction == RelationDirection.outgoing
+                      ? ownerId
+                      : participantId)
+                  .toCanonicalString(),
+          relatedIntentionId:
+              (direction == RelationDirection.outgoing
+                      ? participantId
+                      : ownerId)
+                  .toCanonicalString(),
+          type: switch (type) {
+            LongTermRelationType.need => 'need',
+            LongTermRelationType.can => 'can',
+          },
+          priority: switch (priority) {
+            RelationPriority.p1 => 1,
+            RelationPriority.p2 => 2,
+            RelationPriority.p3 => 3,
+            RelationPriority.p4 => 4,
+          },
+          description: Value(description),
+          isArchived: Value(scope == RelationScope.archived),
+        ),
       ),
-    );
+);
 
 DriftPersonalGraphRepository _repository(
   AppDatabase database,

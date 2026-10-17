@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 
@@ -575,10 +576,12 @@ Future<RootStackRouter> _openApp(
   final database = AppDatabase(openInMemoryLocalDatabase());
   if (!empty) await seedDurabilityGraph(database);
   if (duplicateTitles) {
-    await database.customStatement(
-      'UPDATE intentions SET title = ? WHERE id = ?',
-      ['Намерение 3', durabilityUuid(4)],
-    );
+    await seedGraph(database, () async {
+      await database.customStatement(
+        'UPDATE intentions SET title = ? WHERE id = ?',
+        ['Намерение 3', durabilityUuid(4)],
+      );
+    });
   }
   final container = ProviderContainer(
     overrides: [

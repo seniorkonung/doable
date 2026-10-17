@@ -2,6 +2,8 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/graph_seed.dart';
+
 const _nextSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
 void main() {
@@ -21,9 +23,12 @@ void main() {
             await database.customStatement(
               'ALTER TABLE intentions ADD COLUMN migration_probe TEXT',
             );
-            await database.customStatement(
-              'UPDATE intentions SET migration_probe = ?',
-              ['частично изменённые данные'],
+            await seedGraph(
+              database,
+              () => database.customStatement(
+                'UPDATE intentions SET migration_probe = ?',
+                ['частично изменённые данные'],
+              ),
             );
             throw const _InjectedMigrationFailure();
           },
@@ -67,18 +72,21 @@ void main() {
 }
 
 Future<void> _insertIntention(AppDatabase database) {
-  return database.customStatement(
-    '''
+  return seedGraph(
+    database,
+    () => database.customStatement(
+      '''
       INSERT INTO intentions (
         id, title, created_at, updated_at
       ) VALUES (?, ?, ?, ?)
     ''',
-    [
-      '018f0b5d-6b2e-7c80-8000-000000000201',
-      'Сохранённое намерение',
-      1000000,
-      1000000,
-    ],
+      [
+        '018f0b5d-6b2e-7c80-8000-000000000201',
+        'Сохранённое намерение',
+        1000000,
+        1000000,
+      ],
+    ),
   );
 }
 

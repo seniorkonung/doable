@@ -77,7 +77,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
         .get();
     final intentions = <IntentionId, domain.Intention>{};
     for (final row in intentionRows) {
-      final intention = _rehydrateDetailRow(row);
+      final intention = decodeStoredIntention(row.data);
       intentions[intention.id] = intention;
     }
     if (!intentions.containsKey(draft.startingIntentionId) ||
@@ -116,9 +116,9 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
             readsFrom: {_database.longTermRelations},
           )
           .get();
-      final relations = <LongTermRelationId, _StoredRelationGroupRow>{};
+      final relations = <LongTermRelationId, StoredLongTermRelation>{};
       for (final row in relationRows) {
-        final relation = _StoredRelationGroupRow.fromRawRow(row);
+        final relation = StoredLongTermRelation.decode(row.data);
         relations[relation.id] = relation;
       }
       if (relations.length != draft.steps.length) {
@@ -195,7 +195,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
         )
         .get();
     final stored = [
-      for (final row in rawRows) _StoredRelationGroupRow.fromRawRow(row),
+      for (final row in rawRows) StoredLongTermRelation.decode(row.data),
     ];
     if (stored.any(
       (row) =>
@@ -207,7 +207,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
           row.scope != relation_domain.RelationScope.active ||
           row.sourceIntentionId == row.relatedIntentionId,
     )) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     final pageRows = stored.take(query.pageSize).toList(growable: false);
     final participants = await _readRelationParticipants({
@@ -222,10 +222,10 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
           relation: row.toDomain(),
           source:
               participants[row.sourceIntentionId] ??
-              (throw const _StoredIntentionCorruption()),
+              (throw const StoredGraphCorruption()),
           related:
               participants[row.relatedIntentionId] ??
-              (throw const _StoredIntentionCorruption()),
+              (throw const StoredGraphCorruption()),
           hasDescription: row.hasDescription,
         ),
     ];
@@ -234,7 +234,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
           (isBottomUp ? item.source : item.related).archiveState !=
           domain.IntentionArchiveState.active,
     )) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     final revision = _currentRevision;
     return ChoicePathContinuationsPage(
@@ -255,7 +255,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
 final class _DriftChoicePathCursor implements ChoicePathContinuationCursor {
   _DriftChoicePathCursor.fromBoundary({
     required this.revision,
-    required _StoredRelationGroupRow boundary,
+    required StoredLongTermRelation boundary,
   }) : boundaryGroup =
            boundary.type == relation_domain.LongTermRelationType.need ? 0 : 1,
        boundaryPriority = boundary.priority.index + 1,
@@ -282,7 +282,7 @@ ChoicePathContinuationFailure _classifyChoicePathReadFailure(Object error) {
   if (error is _ChoicePathIntentionNotFound) {
     return const ChoicePathContinuationIntentionNotFoundFailure();
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const ChoicePathContinuationCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {

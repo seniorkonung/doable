@@ -137,6 +137,124 @@ void main() {
       expect(attempts, 1);
     });
 
+    for (final (description, event, expected)
+        in <(String, DiagnosticsEvent, Map<String, Object>)>[
+          (
+            'успех записи снимка',
+            GraphSnapshotWriteDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 11),
+            ),
+            {
+              'operation': 'graphSnapshotWrite',
+              'outcome': 'succeeded',
+              'durationMicros': 11,
+            },
+          ),
+          (
+            'отказ записи снимка из-за повреждённого прежнего снимка',
+            GraphSnapshotWriteDiagnosticsEvent.failed(
+              stage: GraphSnapshotWriteDiagnosticsStage.stateAssembly,
+              duration: const Duration(microseconds: 12),
+              code: DiagnosticsFailureCode.snapshotCorruption,
+            ),
+            {
+              'operation': 'graphSnapshotWrite',
+              'stage': 'stateAssembly',
+              'outcome': 'failed',
+              'durationMicros': 12,
+              'failureCode': 'snapshotCorruption',
+            },
+          ),
+          (
+            'успех пересборки снимка',
+            GraphSnapshotRebuildDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 21),
+            ),
+            {
+              'operation': 'graphSnapshotRebuild',
+              'outcome': 'succeeded',
+              'durationMicros': 21,
+            },
+          ),
+          (
+            'отказ пересборки снимка',
+            GraphSnapshotRebuildDiagnosticsEvent.failed(
+              stage: GraphSnapshotRebuildDiagnosticsStage.databaseRead,
+              duration: const Duration(microseconds: 22),
+              code: DiagnosticsFailureCode.unavailable,
+            ),
+            {
+              'operation': 'graphSnapshotRebuild',
+              'stage': 'databaseRead',
+              'outcome': 'failed',
+              'durationMicros': 22,
+              'failureCode': 'unavailable',
+            },
+          ),
+          (
+            'успех сжатия лога',
+            GraphLogCompactionDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 31),
+            ),
+            {
+              'operation': 'graphLogCompaction',
+              'outcome': 'succeeded',
+              'durationMicros': 31,
+            },
+          ),
+          (
+            'отказ сжатия лога',
+            GraphLogCompactionDiagnosticsEvent.failed(
+              stage: GraphLogCompactionDiagnosticsStage.historyRemoval,
+              duration: const Duration(microseconds: 32),
+              code: DiagnosticsFailureCode.unexpected,
+            ),
+            {
+              'operation': 'graphLogCompaction',
+              'stage': 'historyRemoval',
+              'outcome': 'failed',
+              'durationMicros': 32,
+              'failureCode': 'unexpected',
+            },
+          ),
+          (
+            'успех очистки каталога снимков',
+            GraphSnapshotCleanupDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 41),
+            ),
+            {
+              'operation': 'graphSnapshotCleanup',
+              'outcome': 'succeeded',
+              'durationMicros': 41,
+            },
+          ),
+          (
+            'отказ очистки каталога снимков',
+            GraphSnapshotCleanupDiagnosticsEvent.failed(
+              stage: GraphSnapshotCleanupDiagnosticsStage.fileRemoval,
+              duration: const Duration(microseconds: 42),
+              code: DiagnosticsFailureCode.unavailable,
+            ),
+            {
+              'operation': 'graphSnapshotCleanup',
+              'stage': 'fileRemoval',
+              'outcome': 'failed',
+              'durationMicros': 42,
+              'failureCode': 'unavailable',
+            },
+          ),
+        ]) {
+      test('$description кодируется только операцией, этапом отказа, исходом, '
+          'длительностью и категорией отказа', () {
+        final messages = <String>[];
+        final sink = DeveloperDiagnosticsSink(messages.add);
+
+        sink.record(event);
+
+        expect(jsonDecode(messages.single), expected);
+      });
+    }
+
     test(
       'защитная запись подавляет ошибку произвольного получателя без повтора',
       () {

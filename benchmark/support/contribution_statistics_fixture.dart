@@ -3,6 +3,8 @@ import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/graph_seed.dart';
+
 enum ContributionStatisticsProfile { shortPaths, longPaths }
 
 typedef FixtureContribution = ({String id, int planned, int contribution});
@@ -33,91 +35,89 @@ final class ContributionStatisticsFixture {
     final insertStep = database.prepare('''INSERT INTO daily_choice_path_steps
       (id, daily_choice_id, long_term_relation_id, previous_step_id)
       VALUES (?, ?, ?, ?)''');
-    database.execute('BEGIN');
     try {
-      for (var node = 0; node < 50000; node++) {
-        insertIntention.execute([id(node + 1), 'Намерение $node']);
-      }
-      // Первая полоса — цепочка всех узлов с замыканием в цикл.
-      // Остальные полосы дают 150 000 разных направленных пар.
-      for (var relation = 0; relation < 150000; relation++) {
-        final source = relation % 50000;
-        final offset = relation ~/ 50000 + 1;
-        final target = relation == 50999 ? 0 : (source + offset) % 50000;
-        insertRelation.execute([
-          id(100000 + relation),
-          id(source + 1),
-          id(target + 1),
-        ]);
-      }
-      graphBytes =
-          (database.select('PRAGMA page_count').single.values.single as int) *
-          (database.select('PRAGMA page_size').single.values.single as int);
-      var stepNumber = 0;
-      for (
-        var day = DateTime.utc(2025);
-        day.year <= 2027;
-        day = day.add(const Duration(days: 1))
-      ) {
-        final date = CalendarDate.fromParts(
-          day.year,
-          day.month,
-          day.day,
-        ).toCanonicalString();
-        for (var slot = 0; slot < 100; slot++) {
-          final short = profile == ContributionStatisticsProfile.shortPaths;
-          final bucket = (_choices.length ~/ 2) % (short ? 500 : 5);
-          // Пять длинных цепочек дают 145 промежуточных намерений:
-          // проверка охватывает продолжение, а не только первую порцию.
-          final source = short ? bucket * 8 : bucket * 100;
-          final length = short ? bucket % 6 + 1 : 30;
-          final choiceId = id(300000 + _choices.length);
-          final completed = slot < 50;
-          insertChoice.execute([
-            choiceId,
-            id(source + 1),
-            id(source + length + 1),
-            date,
-            completed ? 1 : 0,
-          ]);
-          String? previous;
-          for (var step = 0; step < length; step++) {
-            final stepId = id(1000000 + stepNumber++);
-            insertStep.execute([
-              stepId,
-              choiceId,
-              id(100000 + source + step),
-              previous,
-            ]);
-            previous = stepId;
-          }
-          _choices.add((
-            date: date,
-            source: source,
-            length: length,
-            completed: completed,
-          ));
+      seedRawGraph(database, () {
+        for (var node = 0; node < 50000; node++) {
+          insertIntention.execute([id(node + 1), 'Намерение $node']);
         }
-      }
-      database.execute(
-        '''UPDATE long_term_relations SET is_archived = 1
-          WHERE source_intention_id >= ? OR related_intention_id >= ?''',
-        [id(45001), id(45001)],
-      );
-      database.execute('UPDATE intentions SET is_archived = 1 WHERE id >= ?', [
-        id(45001),
-      ]);
-      if (profile == ContributionStatisticsProfile.shortPaths) {
-        // Первые шаги ровно 5% из 500 коротких цепочек архивированы
-        // после сохранения выборов; ограничения схемы остаются включены.
-        database.execute('''UPDATE long_term_relations SET is_archived = 1
-          WHERE creation_sequence <= 4000
-          AND (creation_sequence - 1) % 160 = 0''');
-      }
-      database.execute('COMMIT');
-    } on Object {
-      database.execute('ROLLBACK');
-      rethrow;
+        // Первая полоса — цепочка всех узлов с замыканием в цикл.
+        // Остальные полосы дают 150 000 разных направленных пар.
+        for (var relation = 0; relation < 150000; relation++) {
+          final source = relation % 50000;
+          final offset = relation ~/ 50000 + 1;
+          final target = relation == 50999 ? 0 : (source + offset) % 50000;
+          insertRelation.execute([
+            id(100000 + relation),
+            id(source + 1),
+            id(target + 1),
+          ]);
+        }
+        graphBytes =
+            (database.select('PRAGMA page_count').single.values.single as int) *
+            (database.select('PRAGMA page_size').single.values.single as int);
+        var stepNumber = 0;
+        for (
+          var day = DateTime.utc(2025);
+          day.year <= 2027;
+          day = day.add(const Duration(days: 1))
+        ) {
+          final date = CalendarDate.fromParts(
+            day.year,
+            day.month,
+            day.day,
+          ).toCanonicalString();
+          for (var slot = 0; slot < 100; slot++) {
+            final short = profile == ContributionStatisticsProfile.shortPaths;
+            final bucket = (_choices.length ~/ 2) % (short ? 500 : 5);
+            // Пять длинных цепочек дают 145 промежуточных намерений:
+            // проверка охватывает продолжение, а не только первую порцию.
+            final source = short ? bucket * 8 : bucket * 100;
+            final length = short ? bucket % 6 + 1 : 30;
+            final choiceId = id(300000 + _choices.length);
+            final completed = slot < 50;
+            insertChoice.execute([
+              choiceId,
+              id(source + 1),
+              id(source + length + 1),
+              date,
+              completed ? 1 : 0,
+            ]);
+            String? previous;
+            for (var step = 0; step < length; step++) {
+              final stepId = id(1000000 + stepNumber++);
+              insertStep.execute([
+                stepId,
+                choiceId,
+                id(100000 + source + step),
+                previous,
+              ]);
+              previous = stepId;
+            }
+            _choices.add((
+              date: date,
+              source: source,
+              length: length,
+              completed: completed,
+            ));
+          }
+        }
+        database.execute(
+          '''UPDATE long_term_relations SET is_archived = 1
+            WHERE source_intention_id >= ? OR related_intention_id >= ?''',
+          [id(45001), id(45001)],
+        );
+        database.execute(
+          'UPDATE intentions SET is_archived = 1 WHERE id >= ?',
+          [id(45001)],
+        );
+        if (profile == ContributionStatisticsProfile.shortPaths) {
+          // Первые шаги ровно 5% из 500 коротких цепочек архивированы
+          // после сохранения выборов; ограничения схемы остаются включены.
+          database.execute('''UPDATE long_term_relations SET is_archived = 1
+            WHERE creation_sequence <= 4000
+            AND (creation_sequence - 1) % 160 = 0''');
+        }
+      });
     } finally {
       insertIntention.close();
       insertRelation.close();
@@ -127,8 +127,10 @@ final class ContributionStatisticsFixture {
   }
 
   void archivePathParts(sqlite.Database database) {
-    database.execute('''UPDATE long_term_relations SET is_archived = 1
-      WHERE creation_sequence % 10 = 0''');
+    seedRawGraph(database, () {
+      database.execute('''UPDATE long_term_relations SET is_archived = 1
+        WHERE creation_sequence % 10 = 0''');
+    });
   }
 
   Map<String, Object> distribution(StatisticsPeriod? period) {

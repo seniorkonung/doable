@@ -12,22 +12,20 @@ The product model is maintained in
 
 ## Local data before launch and rollback
 
-The SQLite schema remains version 1 (`user_version = 1`), with favorite-intention
-storage removed. Earlier builds used an incompatible structure with that storage
-under the same version. The version cannot distinguish the two structures, so
-compatibility with or detection of an older database is not guaranteed. No data
-migration is provided; the app does not automatically delete or recreate an
-existing database.
+The SQLite schema is version 3 (`user_version = 3`), a new baseline that a fresh
+installation creates in one step. Pre-release builds created schema versions 1
+and 2. No data migration from them is provided: the app reports such a database
+as damaged local data and does not change, delete, or recreate it.
 
-Before first launching this build over an older installation, stop Doable and
-manually clear its local app data. On Android, clear Doable's storage through the
-system app settings. This permanently deletes the installation's local data;
-the next launch creates a fresh database with the current structure.
+Before first launching this build over a pre-release installation, stop Doable
+and manually clear its local app data. On Android, clear Doable's storage
+through the system app settings. This permanently deletes the installation's
+local data; the next launch creates a fresh database with schema version 3.
 
-Before rolling back to an earlier build, stop Doable and manually clear local app
-data again if this build has created a database: the earlier code expects the
-removed favorite-intention table. Rolling back the build cannot restore data
-already deleted during either cleanup.
+Before rolling back to a build without schema version 3, stop Doable and
+manually clear local app data again if this build has created a database: the
+earlier builds do not open schema version 3. Rolling back the build cannot
+restore data already deleted during either cleanup.
 
 ## Reproducible generation
 
@@ -98,6 +96,12 @@ mise run --skip-tools benchmark -- \
   --plain-name 'бенчмарк раздела: longPaths' \
   --dart-define=BENCHMARK_CASE=longPaths/archived/year/throughRelations/computeRace
 ```
+
+The fact log benchmark (`--plain-name 'бенчмарк лога фактов'`) builds graphs of
+up to 1,000,000 entities and measures memory in separate Flutter processes; its
+resident set size measurement reads Linux `/proc`. Its timed series are
+`profile/compaction` and `profile/<command>`. The measurement method, results
+and budgets are recorded in decision 15 of the `add-graph-export-import` design.
 
 Timing measurements live only in benchmarks. Regular tests have no elapsed-time
 measurements or budgets and use the smallest fixtures their assertions need,

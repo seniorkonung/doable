@@ -8,6 +8,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
+
 void main() {
   late AppDatabase database;
   late DriftRelationCountAggregates aggregates;
@@ -187,9 +189,12 @@ void main() {
           previousId: _uuid(3030 + index * 2),
         );
       }
-      await database.customStatement(
-        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
-        [firstRelation],
+      await seedGraph(
+        database,
+        () => database.customStatement(
+          'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+          [firstRelation],
+        ),
       );
 
       final counts = await aggregates.read([
@@ -219,21 +224,27 @@ void main() {
         expect(value.canChangeArchiveState, isTrue);
       }
 
-      await database.customStatement('DELETE FROM daily_choices WHERE id = ?', [
-        _uuid(3020),
-      ]);
+      await seedGraph(
+        database,
+        () => database.customStatement(
+          'DELETE FROM daily_choices WHERE id = ?',
+          [_uuid(3020)],
+        ),
+      );
       expect(
         (await aggregates.readPermissions([
           _relationId(firstRelation),
         ]))[_relationId(firstRelation)]!.canDelete,
         isFalse,
       );
-      for (var index = 1; index < 3; index++) {
-        await database.customStatement(
-          'DELETE FROM daily_choices WHERE id = ?',
-          [_uuid(3020 + index)],
-        );
-      }
+      await seedGraph(database, () async {
+        for (var index = 1; index < 3; index++) {
+          await database.customStatement(
+            'DELETE FROM daily_choices WHERE id = ?',
+            [_uuid(3020 + index)],
+          );
+        }
+      });
       expect(
         (await aggregates.readPermissions([
           _relationId(firstRelation),
@@ -287,8 +298,10 @@ void main() {
       );
 
       final malformedUtf8Description = await participants(3);
-      await database.customStatement(
-        '''
+      await seedGraph(
+        database,
+        () => database.customStatement(
+          '''
           INSERT INTO long_term_relations (
             id,
             source_intention_id,
@@ -299,7 +312,12 @@ void main() {
             is_archived
           ) VALUES (?, ?, ?, 'need', 1, CAST(x'80' AS TEXT), 0)
         ''',
-        [_uuid(906), malformedUtf8Description.$1, malformedUtf8Description.$2],
+          [
+            _uuid(906),
+            malformedUtf8Description.$1,
+            malformedUtf8Description.$2,
+          ],
+        ),
       );
 
       final relationIdStorage = await participants(4);
@@ -373,23 +391,27 @@ IntentionId _id(String value) =>
 LongTermRelationId _relationId(String value) =>
     (LongTermRelationId.decode(value) as LongTermRelationIdDecodingSuccess).id;
 
-Future<void> _insertIntention(AppDatabase database, String id) =>
-    database.customStatement(
-      '''
+Future<void> _insertIntention(AppDatabase database, String id) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
         INSERT INTO intentions (id, title, created_at, updated_at)
         VALUES (?, ?, ?, ?)
       ''',
-      [id, 'Намерение $id', 1000000, 1000000],
-    );
+    [id, 'Намерение $id', 1000000, 1000000],
+  ),
+);
 
-Future<void> _insertRawIntention(AppDatabase database, Object id) =>
-    database.customStatement(
-      '''
+Future<void> _insertRawIntention(AppDatabase database, Object id) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
         INSERT INTO intentions (id, title, created_at, updated_at)
         VALUES (?, ?, ?, ?)
       ''',
-      [id, 'Намерение с raw id', 1000000, 1000000],
-    );
+    [id, 'Намерение с raw id', 1000000, 1000000],
+  ),
+);
 
 Future<void> _insertRelation(
   AppDatabase database, {
@@ -398,8 +420,10 @@ Future<void> _insertRelation(
   required String relatedId,
   required String type,
   required bool isArchived,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO long_term_relations (
       id,
       source_intention_id,
@@ -409,7 +433,8 @@ Future<void> _insertRelation(
       is_archived
     ) VALUES (?, ?, ?, ?, ?, ?)
   ''',
-  [id, sourceId, relatedId, type, 1, isArchived ? 1 : 0],
+    [id, sourceId, relatedId, type, 1, isArchived ? 1 : 0],
+  ),
 );
 
 Future<void> _insertDailyChoice(
@@ -418,13 +443,16 @@ Future<void> _insertDailyChoice(
   required String sourceId,
   required String selectedId,
   required bool completed,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO daily_choices
       (id, source_intention_id, selected_intention_id, choice_date, is_completed)
     VALUES (?, ?, ?, '2026-09-23', ?)
   ''',
-  [id, sourceId, selectedId, completed ? 1 : 0],
+    [id, sourceId, selectedId, completed ? 1 : 0],
+  ),
 );
 
 Future<void> _insertStep(
@@ -433,13 +461,16 @@ Future<void> _insertStep(
   required String choiceId,
   required String relationId,
   String? previousId,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO daily_choice_path_steps
       (id, daily_choice_id, long_term_relation_id, previous_step_id)
     VALUES (?, ?, ?, ?)
   ''',
-  [id, choiceId, relationId, previousId],
+    [id, choiceId, relationId, previousId],
+  ),
 );
 
 Future<void> _insertRawRelation(
@@ -448,8 +479,10 @@ Future<void> _insertRawRelation(
   required Object sourceId,
   required Object relatedId,
   Object? description,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO long_term_relations (
       id,
       source_intention_id,
@@ -460,7 +493,8 @@ Future<void> _insertRawRelation(
       is_archived
     ) VALUES (?, ?, ?, 'need', 1, ?, 0)
   ''',
-  [id, sourceId, relatedId, description],
+    [id, sourceId, relatedId, description],
+  ),
 );
 
 String _uuid(int suffix) =>

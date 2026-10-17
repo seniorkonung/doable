@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import 'package_consumers_test_support.dart';
 
@@ -48,11 +49,14 @@ void main() {
     database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
     await seedDurabilityGraph(database);
-    await database.customStatement(
-      '''INSERT INTO intentions
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        '''INSERT INTO intentions
          (id, title, is_action_ready, is_archived, created_at, updated_at)
          VALUES (?, 'Намерение 6', 0, 0, 1, 1)''',
-      [durabilityUuid(6)],
+        [durabilityUuid(6)],
+      ),
     );
     diagnostics = InMemoryDiagnosticsSink();
     repository = DriftPersonalGraphRepository(

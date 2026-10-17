@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -38,11 +39,13 @@ void main() {
         await database.open();
         addTearDown(database.close);
         seedTagStorageFixture(raw);
-        raw.execute('UPDATE intentions SET title = ? WHERE id IN (?, ?)', [
-          'Общее название',
-          tagFixtureId(1),
-          tagFixtureId(2),
-        ]);
+        seedRawGraph(raw, () {
+          raw.execute('UPDATE intentions SET title = ? WHERE id IN (?, ?)', [
+            'Общее название',
+            tagFixtureId(1),
+            tagFixtureId(2),
+          ]);
+        });
         final graphBefore = retainedTagFixtureGraph(raw);
         final assignmentsBefore = raw
             .select('SELECT * FROM tag_assignments ORDER BY creation_sequence')

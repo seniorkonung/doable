@@ -214,8 +214,7 @@ extension _IntentionStatisticsReading on DriftPersonalGraphRepository {
         .get();
     final byId = {
       for (final row in rows)
-        _decodeStoredRelationId(_requiredStoredString(row.data, 'id')):
-            row.data,
+        decodeStoredRelationId(requiredStoredString(row.data, 'id')): row.data,
     };
     return [
       for (final counted in selected)
@@ -231,21 +230,14 @@ StatisticsRelationItem _statisticsRelationItem(
   if (row == null) throw const StatisticsDataValidationException();
   return StatisticsRelationItem(
     id: counted.relationId,
-    scope: switch (_requiredStoredInteger(row, 'is_archived')) {
-      0 => relation_domain.RelationScope.active,
-      1 => relation_domain.RelationScope.archived,
-      _ => throw const StatisticsDataValidationException(),
-    },
+    scope: decodeStoredRelationScope(row),
     relatedIntention: StatisticsItem(
-      id: _decodeStoredRelationIntentionId(
-        _requiredStoredString(row, 'intention_id'),
+      id: decodeStoredIntentionId(requiredStoredString(row, 'intention_id')),
+      title: requiredStoredString(row, 'title'),
+      archiveState: decodeStoredIntentionArchiveState(
+        row,
+        'intention_archived',
       ),
-      title: _requiredStoredString(row, 'title'),
-      archiveState: switch (_requiredStoredInteger(row, 'intention_archived')) {
-        0 => domain.IntentionArchiveState.active,
-        1 => domain.IntentionArchiveState.archived,
-        _ => throw const StatisticsDataValidationException(),
-      },
       counts: counted.counts,
     ),
   );

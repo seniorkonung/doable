@@ -53,6 +53,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/local_database_harness.dart';
@@ -442,58 +443,60 @@ Iterable<int> get _activeSketches =>
 
 /// Активные и архивированные намерения, этюды и три тега.
 void _seedGraph(sqlite.Database database) {
-  for (final MapEntry(key: number, value: name) in _tagNames.entries) {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(number),
-      name,
-    ]);
-  }
-  void intention(
-    int number,
-    String title, {
-    required bool ready,
-    bool archived = false,
-    List<int> tags = const [],
-  }) {
-    database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [
+  seedRawGraph(database, () {
+    for (final MapEntry(key: number, value: name) in _tagNames.entries) {
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
         tagFixtureId(number),
-        title,
-        ready ? 1 : 0,
-        archived ? 1 : 0,
-        number,
-        number,
-      ],
-    );
-    for (final tag in tags) {
+        name,
+      ]);
+    }
+    void intention(
+      int number,
+      String title, {
+      required bool ready,
+      bool archived = false,
+      List<int> tags = const [],
+    }) {
       database.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(tag), tagFixtureId(number)],
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(number),
+          title,
+          ready ? 1 : 0,
+          archived ? 1 : 0,
+          number,
+          number,
+        ],
+      );
+      for (final tag in tags) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(tag), tagFixtureId(number)],
+        );
+      }
+    }
+
+    intention(_walk, 'Гулять', ready: true, tags: [_homeTag]);
+    intention(_swim, 'Плавать', ready: false);
+    intention(_read, 'Читать', ready: true, archived: true);
+    intention(
+      _atWork,
+      'Рисовать на работе',
+      ready: true,
+      tags: [_homeTag, _workTag],
+    );
+    intention(_inGarden, 'Рисовать в саду', ready: false, tags: [_gardenTag]);
+    intention(_namesake, _title, ready: false);
+    for (final number in _sketches) {
+      intention(
+        number,
+        'Рисовать этюд ${number - _firstSketch + 1}',
+        ready: number.isEven,
+        archived: _isArchivedSketch(number),
+        tags: [_homeTag],
       );
     }
-  }
-
-  intention(_walk, 'Гулять', ready: true, tags: [_homeTag]);
-  intention(_swim, 'Плавать', ready: false);
-  intention(_read, 'Читать', ready: true, archived: true);
-  intention(
-    _atWork,
-    'Рисовать на работе',
-    ready: true,
-    tags: [_homeTag, _workTag],
-  );
-  intention(_inGarden, 'Рисовать в саду', ready: false, tags: [_gardenTag]);
-  intention(_namesake, _title, ready: false);
-  for (final number in _sketches) {
-    intention(
-      number,
-      'Рисовать этюд ${number - _firstSketch + 1}',
-      ready: number.isEven,
-      archived: _isArchivedSketch(number),
-      tags: [_homeTag],
-    );
-  }
+  });
 }
 
 /// Установка приложения: постоянное хранилище, переживающее перезапуски.

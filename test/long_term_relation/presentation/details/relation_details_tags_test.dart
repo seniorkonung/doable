@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -44,36 +45,38 @@ void main() {
         await database.open();
         addTearDown(database.close);
         seedTagStorageFixture(raw);
-        if (number == 101) {
-          raw.execute('DELETE FROM daily_choices WHERE id = ?', [
-            tagFixtureId(201),
-          ]);
-        }
-        raw.execute(
-          'UPDATE long_term_relations SET type = ?, description = ? WHERE id = ?',
-          [type, 'Описание связи $number', tagFixtureId(number)],
-        );
-        if (usedByDailyPath) {
-          final choiceNumber = number == 101 ? 201 : 203;
+        seedRawGraph(raw, () {
+          if (number == 101) {
+            raw.execute('DELETE FROM daily_choices WHERE id = ?', [
+              tagFixtureId(201),
+            ]);
+          }
           raw.execute(
-            'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-            [
-              tagFixtureId(choiceNumber),
-              tagFixtureId(1),
-              tagFixtureId(number == 101 ? 3 : 2),
-              '2026-09-26',
-              1,
-            ],
+            'UPDATE long_term_relations SET type = ?, description = ? WHERE id = ?',
+            [type, 'Описание связи $number', tagFixtureId(number)],
           );
-          raw.execute(
-            'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-            [
-              tagFixtureId(choiceNumber + 1),
-              tagFixtureId(choiceNumber),
-              tagFixtureId(number),
-            ],
-          );
-        }
+          if (usedByDailyPath) {
+            final choiceNumber = number == 101 ? 201 : 203;
+            raw.execute(
+              'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+              [
+                tagFixtureId(choiceNumber),
+                tagFixtureId(1),
+                tagFixtureId(number == 101 ? 3 : 2),
+                '2026-09-26',
+                1,
+              ],
+            );
+            raw.execute(
+              'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+              [
+                tagFixtureId(choiceNumber + 1),
+                tagFixtureId(choiceNumber),
+                tagFixtureId(number),
+              ],
+            );
+          }
+        });
         final graphBefore = _storedGraph(raw);
         final repository = DriftPersonalGraphRepository(
           database,

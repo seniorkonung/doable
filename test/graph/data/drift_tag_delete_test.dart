@@ -13,6 +13,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -67,47 +68,49 @@ void main() {
   };
 
   test('удаление по id охватывает назначения за пределами страницы и сохраняет граф', () async {
-    for (var i = 1; i <= 106; i++) {
+    seedRawGraph(raw, () {
+      for (var i = 1; i <= 106; i++) {
+        raw.execute(
+          'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [_uuid(i), 'Намерение $i', 'Описание $i', 1, i.isEven ? 1 : 0, i, i],
+        );
+      }
       raw.execute(
-        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [_uuid(i), 'Намерение $i', 'Описание $i', 1, i.isEven ? 1 : 0, i, i],
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [_uuid(201), _uuid(1), _uuid(3), 'need', 2, 1],
       );
-    }
-    raw.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-      [_uuid(201), _uuid(1), _uuid(3), 'need', 2, 1],
-    );
-    raw.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-      [_uuid(202), _uuid(1), _uuid(3), '2026-09-25', 0],
-    );
-    raw.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-      [_uuid(203), _uuid(202), _uuid(201)],
-    );
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(301),
-      'Дом',
-    ]);
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(302),
-      'Работа',
-    ]);
-    for (var i = 1; i <= 104; i++) {
+      raw.execute(
+        'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+        [_uuid(202), _uuid(1), _uuid(3), '2026-09-25', 0],
+      );
+      raw.execute(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+        [_uuid(203), _uuid(202), _uuid(201)],
+      );
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(301),
+        'Дом',
+      ]);
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(302),
+        'Работа',
+      ]);
+      for (var i = 1; i <= 104; i++) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(301), _uuid(i)],
+        );
+      }
+      // Назначение архивному намерению за пределами первой сотни тоже удаляется.
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(301), _uuid(i)],
+        [_uuid(301), _uuid(106)],
       );
-    }
-    // Назначение архивному намерению за пределами первой сотни тоже удаляется.
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [_uuid(301), _uuid(106)],
-    );
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [_uuid(302), _uuid(105)],
-    );
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_uuid(302), _uuid(105)],
+      );
+    });
     // Назначение после подготовки подтверждения тоже входит в удаление.
     final id = _tagId(301);
     final before = retainedGraph();
@@ -116,10 +119,12 @@ void main() {
     addTearDown(watched.cancel);
     expect(await watched.moveNext(), isTrue);
     expect((watched.current as TagReadSuccess).value.value!.id, id);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [_uuid(301), _uuid(105)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_uuid(301), _uuid(105)],
+      );
+    });
 
     final result = await repository.execute(DeleteTag(id));
     expect(result, isA<TagCommandSucceeded>());
@@ -156,22 +161,24 @@ void main() {
   });
 
   test('отказ внутри каскада откатывает весь граф без новой ревизии', () async {
-    for (var i = 1; i <= 2; i++) {
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_uuid(i), 'Намерение $i', 0, i - 1, i, i],
-      );
-    }
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(401),
-      'Дом',
-    ]);
-    for (var i = 1; i <= 2; i++) {
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(401), _uuid(i)],
-      );
-    }
+    seedRawGraph(raw, () {
+      for (var i = 1; i <= 2; i++) {
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [_uuid(i), 'Намерение $i', 0, i - 1, i, i],
+        );
+      }
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(401),
+        'Дом',
+      ]);
+      for (var i = 1; i <= 2; i++) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(401), _uuid(i)],
+        );
+      }
+    });
     raw.execute('''
       CREATE TEMP TRIGGER fail_tag_cascade
       AFTER DELETE ON tag_assignments
@@ -195,16 +202,20 @@ void main() {
   });
 
   test('устаревший id не удаляет новый одноимённый тег', () async {
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(501),
-      'Дом',
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(501),
+        'Дом',
+      ]);
+    });
     final deleted = await repository.execute(DeleteTag(_tagId(501)));
     expect(deleted, isA<TagCommandSucceeded>());
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(502),
-      'Дом',
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(502),
+        'Дом',
+      ]);
+    });
     final revision = await currentRevision();
 
     final result = await repository.execute(DeleteTag(_tagId(501)));

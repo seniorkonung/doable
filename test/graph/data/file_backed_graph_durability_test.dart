@@ -25,6 +25,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -59,10 +60,9 @@ void main() {
     await _insertIntention(database, _sourceId, title: 'Изучать язык');
     await _insertIntention(database, _firstNeighborId, title: 'Читать');
     await _insertIntention(database, _secondNeighborId, title: 'Говорить');
-    final firstClock = _RecordingClock(DateTime.utc(2026, 9, 20, 12));
     final firstRepository = _repository(database, [
       _firstRelationId,
-    ], now: firstClock.call);
+    ], now: () => DateTime.utc(2026, 9, 20, 12));
 
     expect(
       await firstRepository.execute(
@@ -75,14 +75,12 @@ void main() {
       ),
       isA<GraphCommandSucceeded>(),
     );
-    expect(firstClock.readCount, 0);
     await harness.closePersistenceObjectGraph();
 
     database = await harness.openReadyDatabase();
-    final earlierClock = _RecordingClock(DateTime.utc(2026, 9, 19, 12));
     final secondRepository = _repository(database, [
       _secondRelationId,
-    ], now: earlierClock.call);
+    ], now: () => DateTime.utc(2026, 9, 19, 12));
     expect(
       await secondRepository.execute(
         _createCommand(
@@ -94,7 +92,6 @@ void main() {
       ),
       isA<GraphCommandSucceeded>(),
     );
-    expect(earlierClock.readCount, 0);
     await harness.closePersistenceObjectGraph();
 
     database = await harness.openReadyDatabase();
@@ -120,6 +117,23 @@ void main() {
         'is_archived': 0,
       },
     ]);
+    // Показания часов — наблюдения (ADR-0006): лог хранит более раннее время
+    // второго создания, а порядок задаёт последовательность создания.
+    expect(
+      [
+        for (final row
+            in await database
+                .customSelect(
+                  'SELECT recorded_at FROM graph_log_packages ORDER BY position',
+                )
+                .get())
+          DateTime.fromMicrosecondsSinceEpoch(
+            row.read<int>('recorded_at'),
+            isUtc: true,
+          ),
+      ],
+      [DateTime.utc(2026, 9, 20, 12), DateTime.utc(2026, 9, 19, 12)],
+    );
     final reopenedRepository = _repository(database, const []);
     final sourceCounts = await _counts(reopenedRepository, _sourceId);
     final firstCounts = await _counts(reopenedRepository, _firstNeighborId);
@@ -339,17 +353,20 @@ Future<void> _insertIntention(
   IntentionId id, {
   required String title,
   bool isArchived = false,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        isArchived: Value(isArchived),
-        createdAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
-        updatedAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          isArchived: Value(isArchived),
+          createdAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+          updatedAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<void> _insertRelation(
   AppDatabase database, {
@@ -360,19 +377,22 @@ Future<void> _insertRelation(
   RelationPriority priority = RelationPriority.p2,
   String? description,
   bool isArchived = false,
-}) => database
-    .into(database.longTermRelations)
-    .insert(
-      LongTermRelationsCompanion.insert(
-        id: id.toCanonicalString(),
-        sourceIntentionId: sourceId.toCanonicalString(),
-        relatedIntentionId: relatedId.toCanonicalString(),
-        type: type == LongTermRelationType.need ? 'need' : 'can',
-        priority: priority.index + 1,
-        description: Value(description),
-        isArchived: Value(isArchived),
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.longTermRelations)
+      .insert(
+        LongTermRelationsCompanion.insert(
+          id: id.toCanonicalString(),
+          sourceIntentionId: sourceId.toCanonicalString(),
+          relatedIntentionId: relatedId.toCanonicalString(),
+          type: type == LongTermRelationType.need ? 'need' : 'can',
+          priority: priority.index + 1,
+          description: Value(description),
+          isArchived: Value(isArchived),
+        ),
       ),
-    );
+);
 
 Future<void> _seedCascade(AppDatabase database) async {
   await _insertIntention(database, _sourceId, title: 'Изучать язык');
@@ -490,7 +510,8 @@ Future<void> _createStoredIntentions(LocalDatabaseHarness harness) async {
 }
 
 void _seedStoredIntentions(sqlite.Database database) {
-  database.execute('''
+  seedRawGraph(database, () {
+    database.execute('''
     INSERT INTO intentions (
       id,
       title,
@@ -537,6 +558,7 @@ void _seedStoredIntentions(sqlite.Database database) {
         1704153600000000
       )
   ''');
+  });
 }
 
 /// Запускает каскадное архивирование в отдельном процессе и принудительно
@@ -663,18 +685,6 @@ enum _GraphProcessStopPoint {
   final String testDescription;
 
   bool get isAfterCommit => this == afterCommit;
-}
-
-final class _RecordingClock {
-  _RecordingClock(this.value);
-
-  final DateTime value;
-  var readCount = 0;
-
-  DateTime call() {
-    readCount++;
-    return value;
-  }
 }
 
 final class _DeterministicRelationIdGenerator

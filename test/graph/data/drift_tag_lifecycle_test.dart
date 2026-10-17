@@ -13,6 +13,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -60,33 +61,38 @@ void main() {
   };
 
   test('создание и переименование сохраняют граф и все назначения', () async {
-    raw.execute(
-      'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [_uuid(1), 'Исходное', 'Описание', 1, 0, 100, 200],
-    );
-    raw.execute(
-      'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [_uuid(2), 'Выбранное', null, 1, 0, 300, 400],
-    );
-    raw.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description) VALUES (?, ?, ?, ?, ?, ?)',
-      [_uuid(3), _uuid(1), _uuid(2), 'need', 1, 'Связь'],
-    );
-    raw.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-      [_uuid(4), _uuid(1), _uuid(2), '2026-09-25', 1],
-    );
-    raw.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-      [_uuid(5), _uuid(4), _uuid(3)],
-    );
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_uuid(6), 'Дом']);
-    for (final intention in [1, 2]) {
+    seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(6), _uuid(intention)],
+        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [_uuid(1), 'Исходное', 'Описание', 1, 0, 100, 200],
       );
-    }
+      raw.execute(
+        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [_uuid(2), 'Выбранное', null, 1, 0, 300, 400],
+      );
+      raw.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description) VALUES (?, ?, ?, ?, ?, ?)',
+        [_uuid(3), _uuid(1), _uuid(2), 'need', 1, 'Связь'],
+      );
+      raw.execute(
+        'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+        [_uuid(4), _uuid(1), _uuid(2), '2026-09-25', 1],
+      );
+      raw.execute(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+        [_uuid(5), _uuid(4), _uuid(3)],
+      );
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(6),
+        'Дом',
+      ]);
+      for (final intention in [1, 2]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(6), _uuid(intention)],
+        );
+      }
+    });
     final before = graphState();
     final initialRevision = await currentRevision();
 
