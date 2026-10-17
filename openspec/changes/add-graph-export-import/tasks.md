@@ -377,3 +377,16 @@
   - **Dependencies:** 1.30, 1.31.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 1.31.
   - **Estimated scope:** XS.
+
+- [ ] 1.33 Внедрять отказ в тестах отката и классификации отказов команд намерений на названной записи таблицы графа, а не на служебной записи лога фактов
+  - **Acceptance criteria:**
+    - В `test/intention/data/drift_intention_repository_fault_test.dart` тест «откатывает update вместе с title search key, FTS и timestamps» прерывает `UpdateIntention` после изменения строки `intentions`, а тест «откатывает связи и намерение при отказе между шагами каскада» прерывает `ArchiveIntention` после архивирования связи в `long_term_relations` и до изменения строки `intentions`. Тест «не считает constraint вне утверждённых контекстов conflict» внедряет отказ перед изменением строки `intentions`.
+    - Перехватчики выбирают точку отказа по записи в таблицу графа, а не только по виду операции, поэтому установка и снятие признака записи единого пути по решению 5 [дизайна](design.md) и другие служебные записи лога фактов её не смещают.
+    - Код приложения, проверяемые сценарии, ожидания и названия тестов не меняются. Условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+  - **Verification:**
+    - Временной печатью в перехватчиках убедиться, что в каждом из трёх тестов отказ внедряется на названной записи таблицы графа; печать удалить.
+    - Выполнить `mise exec --no-deps -- flutter test test/intention/data/drift_intention_repository_fault_test.dart`.
+    - Сопоставить актуальные результаты проверок задачи 1.32 с условием готовности. Выполнить `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 1.22, 1.32.
+  - **Files likely touched:** `test/intention/data/drift_intention_repository_fault_test.dart`.
+  - **Estimated scope:** S.
