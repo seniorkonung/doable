@@ -170,33 +170,29 @@ void main() {
     expect(_lines(await state.records.toList()), _lines(expected));
   });
 
-  test(
-    'снимок регистрируется, когда его файл уже записан под окончательным '
-    'именем, с позицией, версией формата, размером и SHA-256 файла',
-    () async {
-      await createTag('Дом');
-      late Set<String> namesAtRegistration;
-      late Uint8List bytesAtRegistration;
-      final store = storeOver(
-        _InterceptingLog(
-          repository,
-          beforeRegistration: (snapshot) async {
-            namesAtRegistration = await _fileNamesIn(snapshots);
-            bytesAtRegistration = await snapshotFile(snapshot).readAsBytes();
-          },
-        ),
-      );
+  test('снимок регистрируется, когда его файл уже записан под окончательным '
+      'именем, с позицией, размером и SHA-256 файла', () async {
+    await createTag('Дом');
+    late Set<String> namesAtRegistration;
+    late Uint8List bytesAtRegistration;
+    final store = storeOver(
+      _InterceptingLog(
+        repository,
+        beforeRegistration: (snapshot) async {
+          namesAtRegistration = await _fileNamesIn(snapshots);
+          bytesAtRegistration = await snapshotFile(snapshot).readAsBytes();
+        },
+      ),
+    );
 
-      final snapshot = await store.writeSnapshot(1);
+    final snapshot = await store.writeSnapshot(1);
 
-      expect(namesAtRegistration, {snapshot.fileName});
-      expect(snapshot.position, 1);
-      expect(snapshot.formatVersion, GraphFormatVersion.current.number);
-      expect(snapshot.byteSize, bytesAtRegistration.length);
-      expect(snapshot.checksum, sha256.convert(bytesAtRegistration).bytes);
-      expect(await repository.readSnapshotFileNames(), {snapshot.fileName});
-    },
-  );
+    expect(namesAtRegistration, {snapshot.fileName});
+    expect(snapshot.position, 1);
+    expect(snapshot.byteSize, bytesAtRegistration.length);
+    expect(snapshot.checksum, sha256.convert(bytesAtRegistration).bytes);
+    expect(await repository.readSnapshotFileNames(), {snapshot.fileName});
+  });
 
   test('отказ регистрации удаляет записанный файл снимка', () async {
     await createTag('Дом');

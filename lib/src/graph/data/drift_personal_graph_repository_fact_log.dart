@@ -261,7 +261,6 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
             .insert(
               local.GraphSnapshotsCompanion.insert(
                 position: snapshot.position,
-                formatVersion: snapshot.formatVersion,
                 fileName: snapshot.fileName,
                 byteSize: snapshot.byteSize,
                 checksum: snapshot.checksum,
@@ -335,7 +334,6 @@ StoredGraphFactPackage _storedFactPackage(local.GraphLogPackage row) =>
 GraphSnapshotEntry _snapshotEntry(local.RegisteredGraphSnapshot row) =>
     GraphSnapshotEntry(
       position: row.position,
-      formatVersion: row.formatVersion,
       fileName: row.fileName,
       byteSize: row.byteSize,
       checksum: row.checksum,

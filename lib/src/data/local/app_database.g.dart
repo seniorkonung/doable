@@ -1529,17 +1529,6 @@ class GraphSnapshots extends Table
     $customConstraints:
         'NOT NULL CHECK (typeof(position) = \'integer\' AND position >= 0)',
   );
-  static const VerificationMeta _formatVersionMeta = const VerificationMeta(
-    'formatVersion',
-  );
-  late final GeneratedColumn<int> formatVersion = GeneratedColumn<int>(
-    'format_version',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (typeof(format_version) = \'integer\' AND format_version > 0)',
-  );
   static const VerificationMeta _fileNameMeta = const VerificationMeta(
     'fileName',
   );
@@ -1578,7 +1567,6 @@ class GraphSnapshots extends Table
   List<GeneratedColumn> get $columns => [
     id,
     position,
-    formatVersion,
     fileName,
     byteSize,
     checksum,
@@ -1605,17 +1593,6 @@ class GraphSnapshots extends Table
       );
     } else if (isInserting) {
       context.missing(_positionMeta);
-    }
-    if (data.containsKey('format_version')) {
-      context.handle(
-        _formatVersionMeta,
-        formatVersion.isAcceptableOrUnknown(
-          data['format_version']!,
-          _formatVersionMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_formatVersionMeta);
     }
     if (data.containsKey('file_name')) {
       context.handle(
@@ -1661,10 +1638,6 @@ class GraphSnapshots extends Table
         DriftSqlType.int,
         data['${effectivePrefix}position'],
       )!,
-      formatVersion: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}format_version'],
-      )!,
       fileName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}file_name'],
@@ -1693,7 +1666,6 @@ class RegisteredGraphSnapshot extends DataClass
     implements Insertable<RegisteredGraphSnapshot> {
   final int id;
   final int position;
-  final int formatVersion;
   final String fileName;
   final int byteSize;
 
@@ -1702,7 +1674,6 @@ class RegisteredGraphSnapshot extends DataClass
   const RegisteredGraphSnapshot({
     required this.id,
     required this.position,
-    required this.formatVersion,
     required this.fileName,
     required this.byteSize,
     required this.checksum,
@@ -1712,7 +1683,6 @@ class RegisteredGraphSnapshot extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['position'] = Variable<int>(position);
-    map['format_version'] = Variable<int>(formatVersion);
     map['file_name'] = Variable<String>(fileName);
     map['byte_size'] = Variable<int>(byteSize);
     map['checksum'] = Variable<Uint8List>(checksum);
@@ -1723,7 +1693,6 @@ class RegisteredGraphSnapshot extends DataClass
     return GraphSnapshotsCompanion(
       id: Value(id),
       position: Value(position),
-      formatVersion: Value(formatVersion),
       fileName: Value(fileName),
       byteSize: Value(byteSize),
       checksum: Value(checksum),
@@ -1738,7 +1707,6 @@ class RegisteredGraphSnapshot extends DataClass
     return RegisteredGraphSnapshot(
       id: serializer.fromJson<int>(json['id']),
       position: serializer.fromJson<int>(json['position']),
-      formatVersion: serializer.fromJson<int>(json['format_version']),
       fileName: serializer.fromJson<String>(json['file_name']),
       byteSize: serializer.fromJson<int>(json['byte_size']),
       checksum: serializer.fromJson<Uint8List>(json['checksum']),
@@ -1750,7 +1718,6 @@ class RegisteredGraphSnapshot extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'position': serializer.toJson<int>(position),
-      'format_version': serializer.toJson<int>(formatVersion),
       'file_name': serializer.toJson<String>(fileName),
       'byte_size': serializer.toJson<int>(byteSize),
       'checksum': serializer.toJson<Uint8List>(checksum),
@@ -1760,14 +1727,12 @@ class RegisteredGraphSnapshot extends DataClass
   RegisteredGraphSnapshot copyWith({
     int? id,
     int? position,
-    int? formatVersion,
     String? fileName,
     int? byteSize,
     Uint8List? checksum,
   }) => RegisteredGraphSnapshot(
     id: id ?? this.id,
     position: position ?? this.position,
-    formatVersion: formatVersion ?? this.formatVersion,
     fileName: fileName ?? this.fileName,
     byteSize: byteSize ?? this.byteSize,
     checksum: checksum ?? this.checksum,
@@ -1776,9 +1741,6 @@ class RegisteredGraphSnapshot extends DataClass
     return RegisteredGraphSnapshot(
       id: data.id.present ? data.id.value : this.id,
       position: data.position.present ? data.position.value : this.position,
-      formatVersion: data.formatVersion.present
-          ? data.formatVersion.value
-          : this.formatVersion,
       fileName: data.fileName.present ? data.fileName.value : this.fileName,
       byteSize: data.byteSize.present ? data.byteSize.value : this.byteSize,
       checksum: data.checksum.present ? data.checksum.value : this.checksum,
@@ -1790,7 +1752,6 @@ class RegisteredGraphSnapshot extends DataClass
     return (StringBuffer('RegisteredGraphSnapshot(')
           ..write('id: $id, ')
           ..write('position: $position, ')
-          ..write('formatVersion: $formatVersion, ')
           ..write('fileName: $fileName, ')
           ..write('byteSize: $byteSize, ')
           ..write('checksum: $checksum')
@@ -1802,7 +1763,6 @@ class RegisteredGraphSnapshot extends DataClass
   int get hashCode => Object.hash(
     id,
     position,
-    formatVersion,
     fileName,
     byteSize,
     $driftBlobEquality.hash(checksum),
@@ -1813,7 +1773,6 @@ class RegisteredGraphSnapshot extends DataClass
       (other is RegisteredGraphSnapshot &&
           other.id == this.id &&
           other.position == this.position &&
-          other.formatVersion == this.formatVersion &&
           other.fileName == this.fileName &&
           other.byteSize == this.byteSize &&
           $driftBlobEquality.equals(other.checksum, this.checksum));
@@ -1822,14 +1781,12 @@ class RegisteredGraphSnapshot extends DataClass
 class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
   final Value<int> id;
   final Value<int> position;
-  final Value<int> formatVersion;
   final Value<String> fileName;
   final Value<int> byteSize;
   final Value<Uint8List> checksum;
   const GraphSnapshotsCompanion({
     this.id = const Value.absent(),
     this.position = const Value.absent(),
-    this.formatVersion = const Value.absent(),
     this.fileName = const Value.absent(),
     this.byteSize = const Value.absent(),
     this.checksum = const Value.absent(),
@@ -1837,19 +1794,16 @@ class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
   GraphSnapshotsCompanion.insert({
     this.id = const Value.absent(),
     required int position,
-    required int formatVersion,
     required String fileName,
     required int byteSize,
     required Uint8List checksum,
   }) : position = Value(position),
-       formatVersion = Value(formatVersion),
        fileName = Value(fileName),
        byteSize = Value(byteSize),
        checksum = Value(checksum);
   static Insertable<RegisteredGraphSnapshot> custom({
     Expression<int>? id,
     Expression<int>? position,
-    Expression<int>? formatVersion,
     Expression<String>? fileName,
     Expression<int>? byteSize,
     Expression<Uint8List>? checksum,
@@ -1857,7 +1811,6 @@ class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (position != null) 'position': position,
-      if (formatVersion != null) 'format_version': formatVersion,
       if (fileName != null) 'file_name': fileName,
       if (byteSize != null) 'byte_size': byteSize,
       if (checksum != null) 'checksum': checksum,
@@ -1867,7 +1820,6 @@ class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
   GraphSnapshotsCompanion copyWith({
     Value<int>? id,
     Value<int>? position,
-    Value<int>? formatVersion,
     Value<String>? fileName,
     Value<int>? byteSize,
     Value<Uint8List>? checksum,
@@ -1875,7 +1827,6 @@ class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
     return GraphSnapshotsCompanion(
       id: id ?? this.id,
       position: position ?? this.position,
-      formatVersion: formatVersion ?? this.formatVersion,
       fileName: fileName ?? this.fileName,
       byteSize: byteSize ?? this.byteSize,
       checksum: checksum ?? this.checksum,
@@ -1890,9 +1841,6 @@ class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
     }
     if (position.present) {
       map['position'] = Variable<int>(position.value);
-    }
-    if (formatVersion.present) {
-      map['format_version'] = Variable<int>(formatVersion.value);
     }
     if (fileName.present) {
       map['file_name'] = Variable<String>(fileName.value);
@@ -1911,7 +1859,6 @@ class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
     return (StringBuffer('GraphSnapshotsCompanion(')
           ..write('id: $id, ')
           ..write('position: $position, ')
-          ..write('formatVersion: $formatVersion, ')
           ..write('fileName: $fileName, ')
           ..write('byteSize: $byteSize, ')
           ..write('checksum: $checksum')
@@ -7234,7 +7181,6 @@ typedef $GraphSnapshotsCreateCompanionBuilder =
     GraphSnapshotsCompanion Function({
       Value<int> id,
       required int position,
-      required int formatVersion,
       required String fileName,
       required int byteSize,
       required Uint8List checksum,
@@ -7243,7 +7189,6 @@ typedef $GraphSnapshotsUpdateCompanionBuilder =
     GraphSnapshotsCompanion Function({
       Value<int> id,
       Value<int> position,
-      Value<int> formatVersion,
       Value<String> fileName,
       Value<int> byteSize,
       Value<Uint8List> checksum,
@@ -7291,11 +7236,6 @@ class $GraphSnapshotsFilterComposer
 
   ColumnFilters<int> get position => $composableBuilder(
     column: $table.position,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get formatVersion => $composableBuilder(
-    column: $table.formatVersion,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7359,11 +7299,6 @@ class $GraphSnapshotsOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get formatVersion => $composableBuilder(
-    column: $table.formatVersion,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get fileName => $composableBuilder(
     column: $table.fileName,
     builder: (column) => ColumnOrderings(column),
@@ -7394,11 +7329,6 @@ class $GraphSnapshotsAnnotationComposer
 
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
-
-  GeneratedColumn<int> get formatVersion => $composableBuilder(
-    column: $table.formatVersion,
-    builder: (column) => column,
-  );
 
   GeneratedColumn<String> get fileName =>
       $composableBuilder(column: $table.fileName, builder: (column) => column);
@@ -7465,14 +7395,12 @@ class $GraphSnapshotsTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int> position = const Value.absent(),
-                Value<int> formatVersion = const Value.absent(),
                 Value<String> fileName = const Value.absent(),
                 Value<int> byteSize = const Value.absent(),
                 Value<Uint8List> checksum = const Value.absent(),
               }) => GraphSnapshotsCompanion(
                 id: id,
                 position: position,
-                formatVersion: formatVersion,
                 fileName: fileName,
                 byteSize: byteSize,
                 checksum: checksum,
@@ -7481,14 +7409,12 @@ class $GraphSnapshotsTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required int position,
-                required int formatVersion,
                 required String fileName,
                 required int byteSize,
                 required Uint8List checksum,
               }) => GraphSnapshotsCompanion.insert(
                 id: id,
                 position: position,
-                formatVersion: formatVersion,
                 fileName: fileName,
                 byteSize: byteSize,
                 checksum: checksum,

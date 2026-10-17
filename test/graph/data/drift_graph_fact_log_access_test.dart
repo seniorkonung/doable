@@ -313,7 +313,6 @@ void main() {
     await appendPackages(9);
     final registered = GraphSnapshotEntry(
       position: 2,
-      formatVersion: GraphFormatVersion.current.number,
       fileName: 'снимок-2',
       byteSize: 4096,
       checksum: Uint8List.fromList(List.generate(32, (index) => index)),
@@ -326,7 +325,6 @@ void main() {
 
     expect(await repository.readSnapshotAtOrBefore(1), isNull);
     expect(atTwo?.position, registered.position);
-    expect(atTwo?.formatVersion, registered.formatVersion);
     expect(atTwo?.fileName, registered.fileName);
     expect(atTwo?.byteSize, registered.byteSize);
     expect(atTwo?.checksum, registered.checksum);
@@ -407,7 +405,6 @@ List<String> _lines(Iterable<GraphEntityRecord> records) => [
 GraphSnapshotEntry _snapshot(int position, {String? fileName}) =>
     GraphSnapshotEntry(
       position: position,
-      formatVersion: GraphFormatVersion.current.number,
       fileName: fileName ?? 'снимок-$position',
       byteSize: 1,
       checksum: Uint8List(32),

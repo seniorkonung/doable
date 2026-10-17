@@ -614,8 +614,8 @@ void _addChangePackage(sqlite.Database db) {
 void _addSnapshot(sqlite.Database db, String fileName) {
   db.execute(
     'INSERT INTO graph_snapshots '
-    '(position, format_version, file_name, byte_size, checksum) '
-    'VALUES (0, 1, ?, 20, zeroblob(32))',
+    '(position, file_name, byte_size, checksum) '
+    'VALUES (0, ?, 20, zeroblob(32))',
     [fileName],
   );
 }

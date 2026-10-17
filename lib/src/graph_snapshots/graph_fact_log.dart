@@ -28,19 +28,18 @@ final class StoredGraphFactPackage {
 }
 
 /// Снимок в реестре снимков: файл состояния графа на позиции лога.
+///
+/// Версию формата записей снимка несёт заголовок его файла, который
+/// защищает контрольная сумма.
 final class GraphSnapshotEntry {
   const GraphSnapshotEntry({
     required this.position,
-    required this.formatVersion,
     required this.fileName,
     required this.byteSize,
     required this.checksum,
   });
 
   final int position;
-
-  /// Номер версии формата записей снимка.
-  final int formatVersion;
 
   /// Имя файла в каталоге снимков, уникальное в реестре.
   final String fileName;

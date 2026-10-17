@@ -216,7 +216,6 @@ final class GraphSnapshotStore {
       _syncDirectory(_directory);
       final snapshot = GraphSnapshotEntry(
         position: position,
-        formatVersion: GraphFormatVersion.current.number,
         fileName: fileName,
         byteSize: byteSize,
         checksum: checksum,

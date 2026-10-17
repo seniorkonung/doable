@@ -60,7 +60,7 @@ CREATE TABLE graph_log_daily_choice_marks (
 
 -- Позиция 0 — пустой граф новой установки. Пакет «изменение» несёт факты
 -- в версии формата, которой они записаны; пакет «сброс» ссылается на
--- снимок заменившего графа, версию которого хранит реестр снимков.
+-- снимок заменившего графа, версию которого несёт заголовок файла снимка.
 CREATE TABLE graph_log_packages (
   position INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (position > 0),
   recorded_at INTEGER NOT NULL CHECK (typeof(recorded_at) = 'integer'),
@@ -101,10 +101,6 @@ CREATE TABLE graph_snapshots (
   position INTEGER NOT NULL CHECK (
     typeof(position) = 'integer' AND
     position >= 0
-  ),
-  format_version INTEGER NOT NULL CHECK (
-    typeof(format_version) = 'integer' AND
-    format_version > 0
   ),
   file_name TEXT NOT NULL UNIQUE CHECK (
     typeof(file_name) = 'text' AND

@@ -289,16 +289,6 @@
             "dsl_features": []
           },
           {
-            "name": "format_version",
-            "getter_name": "formatVersion",
-            "moor_type": "int",
-            "nullable": false,
-            "customConstraints": "NOT NULL CHECK (typeof(format_version) = 'integer' AND format_version > 0)",
-            "default_dart": null,
-            "default_client_dart": null,
-            "dsl_features": []
-          },
-          {
             "name": "file_name",
             "getter_name": "fileName",
             "moor_type": "string",
@@ -2169,7 +2159,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"graph_snapshots\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (id > 0), \"position\" INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0), \"format_version\" INTEGER NOT NULL CHECK (typeof(format_version) = 'integer' AND format_version > 0), \"file_name\" TEXT NOT NULL UNIQUE CHECK (typeof(file_name) = 'text' AND file_name <> ''), \"byte_size\" INTEGER NOT NULL CHECK (typeof(byte_size) = 'integer' AND byte_size > 0), \"checksum\" BLOB NOT NULL CHECK (typeof(checksum) = 'blob' AND length(checksum) = 32));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"graph_snapshots\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (id > 0), \"position\" INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0), \"file_name\" TEXT NOT NULL UNIQUE CHECK (typeof(file_name) = 'text' AND file_name <> ''), \"byte_size\" INTEGER NOT NULL CHECK (typeof(byte_size) = 'integer' AND byte_size > 0), \"checksum\" BLOB NOT NULL CHECK (typeof(checksum) = 'blob' AND length(checksum) = 32));"
         }
       ]
     },
