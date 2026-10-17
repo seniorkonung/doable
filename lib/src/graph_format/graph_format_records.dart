@@ -119,6 +119,7 @@ final class GraphEntityDeletion extends GraphFact {
   final GraphEntityKey entity;
 }
 
+/// Ключ сущности графа. Ключи равны, когда указывают на одну сущность.
 sealed class GraphEntityKey {
   const GraphEntityKey();
 }
@@ -127,28 +128,60 @@ final class TagKey extends GraphEntityKey {
   const TagKey(this.id);
 
   final TagId id;
+
+  @override
+  bool operator ==(Object other) => other is TagKey && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 final class IntentionKey extends GraphEntityKey {
   const IntentionKey(this.id);
 
   final IntentionId id;
+
+  @override
+  bool operator ==(Object other) => other is IntentionKey && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 final class TagAssignmentKey extends GraphEntityKey {
   const TagAssignmentKey(this.assignment);
 
   final TagAssignment assignment;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TagAssignmentKey && other.assignment == assignment;
+
+  @override
+  int get hashCode => assignment.hashCode;
 }
 
 final class LongTermRelationKey extends GraphEntityKey {
   const LongTermRelationKey(this.id);
 
   final LongTermRelationId id;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LongTermRelationKey && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 final class DailyChoiceKey extends GraphEntityKey {
   const DailyChoiceKey(this.id);
 
   final DailyChoiceId id;
+
+  @override
+  bool operator ==(Object other) => other is DailyChoiceKey && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
