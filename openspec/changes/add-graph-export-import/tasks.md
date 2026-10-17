@@ -198,3 +198,75 @@
   - **Dependencies:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах соответствующих задач этапа.
   - **Estimated scope:** XS.
+
+- [ ] 1.19 Заполнять граф в общих фикстурах, бенчмарках и тестах локального хранилища через общий помощник с выключенным захватом
+  - **Acceptance criteria:**
+    - По решению 5 [дизайна](design.md) общий помощник `test/support/graph_seed.dart` (название рабочее) заполняет граф через соединение Drift и через низкоуровневое соединение `sqlite3`. В одной транзакции или точке сохранения он выключает захват, выполняет переданные записи и снова включает захват. Отказ записи откатывает и записи, и выключение захвата и доходит до вызывающего кода без замены. Бенчмарки используют тот же помощник.
+    - Каждая прямая запись в таблицы графа `tags`, `intentions`, `tag_assignments`, `long_term_relations`, `daily_choices` и `daily_choice_path_steps` в `test/support/`, `benchmark/` и `test/data/local/` идёт через помощник, а местные пары переключения `graph_log_control.capture` вокруг заполнения заменены им. Исключение — записи `test/data/local/graph_log_schema_test.dart`, которые проверяют отметки: их переводит задача 1.22. Выключение захвата на время замера команд в `benchmark/graph_log/graph_log_benchmark.dart` остаётся методикой замера решения 15 и не заменяется.
+    - Записываемые данные, их порядок, ожидания и названия тестов не меняются; ожидаемый отказ записи проверяется на вызове помощника с прежним видом отказа.
+  - **Execution:**
+    - По решению владельца продукта механический перевод мест заполнения в этой задаче и в задачах 1.20 и 1.21 выполняют субагенты модели Sonnet 5.5 (`model: sonnet`) с усилием `xhigh`. Координатор сам пишет помощник, делит файлы на непересекающиеся группы по 5–10 файлов и даёт каждому субагенту точный список файлов, путь помощника, команду проверки и инструкцию:
+      1. Найди в файлах каждую прямую запись в таблицы `tags`, `intentions`, `tag_assignments`, `long_term_relations`, `daily_choices` и `daily_choice_path_steps`: `into(...).insert`, `update(...)`, `delete(...)`, записи внутри `batch`, а также `customInsert`, `customUpdate`, `customStatement` и `execute` с `INSERT`, `UPDATE` или `DELETE`. Вызовы репозиториев и других модулей приложения и записи в базу без таблицы `graph_log_control`, например в схеме другой версии, не трогай.
+      2. Оберни идущие подряд записи заполнения одним вызовом помощника. Если файл заполняет граф местной функцией, оберни её тело, а не каждое место вызова. Пары `UPDATE graph_log_control SET capture = 0` и `capture = 1` вокруг заполнения замени помощником.
+      3. Не меняй записываемые значения, их порядок, ожидания и названия тестов. Ожидаемый отказ записи проверяй на вызове помощника с прежним видом отказа.
+      4. Запусти тесты изменённых файлов командой проверки. Если тест падает, не меняй ожидания и не обходи помощник: верни координатору файл, тест и вывод.
+      5. Верни список изменённых файлов, число обёрнутых мест и каждое оставленное без изменений место с причиной.
+    - Координатор проверяет дифф каждого субагента: данные и ожидания не изменились, все места заполнения обёрнуты. Возвращённые падения он разбирает сам.
+  - **Verification:**
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/data/local/` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/data/local/ test/graph/data/`.
+    - Выполнить `mise run --skip-tools benchmark -- --dart-define=BENCHMARK_SAMPLES=1 --dart-define=BENCHMARK_WARMUPS=0` и убедиться, что бенчмарки с изменёнными фикстурами проходят.
+  - **Dependencies:** 1.4.
+  - **Files likely touched:** `test/support/graph_seed.dart` (новый), `test/support/tag_storage_fixture.dart`, `test/support/daily_choice_durability_fixture.dart`, `test/support/graph_operation_process_worker.dart`, `benchmark/support/graph_log_fixture.dart`, `benchmark/support/contribution_statistics_fixture.dart`, `benchmark/support/intention_statistics_fixture.dart`, `benchmark/graph_log/graph_log_benchmark.dart`, `benchmark/statistics/drift_intention_statistics_benchmark.dart`, `benchmark/statistics/drift_through_relations_statistics_benchmark.dart`, тесты `test/data/local/`, кроме `graph_log_schema_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 1.20 Заполнять граф в тестах `test/graph/` через общий помощник с выключенным захватом
+  - **Acceptance criteria:**
+    - Каждая прямая запись в таблицы графа в `test/graph/` идёт через помощник задачи 1.19, а местные пары переключения захвата вокруг заполнения заменены им. Исключение — записи `test/graph/data/graph_fact_capture_test.dart`, которые изображают транзакцию единого пути: их переводит задача 1.22.
+    - Записываемые данные, их порядок, ожидания и названия тестов не меняются; ожидаемый отказ записи проверяется на вызове помощника с прежним видом отказа.
+  - **Execution:**
+    - Механический перевод выполняют субагенты Sonnet 5.5 с усилием `xhigh` по разделу Execution задачи 1.19; координатор проверяет каждый дифф и сам разбирает возвращённые падения.
+  - **Verification:**
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/graph/` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph/data/`.
+  - **Dependencies:** 1.19.
+  - **Files likely touched:** тесты `test/graph/data/` и `test/graph/presentation/`, которые заполняют граф напрямую, кроме `graph_fact_capture_test.dart`: около 45 файлов.
+  - **Estimated scope:** M.
+
+- [ ] 1.21 Заполнять граф в тестах намерений, тегов, дневных выборов, долговременных связей и приложения через общий помощник с выключенным захватом
+  - **Acceptance criteria:**
+    - Каждая прямая запись в таблицы графа в `test/intention/`, `test/tag/`, `test/daily_choice/`, `test/long_term_relation/` и `test/app/` идёт через помощник задачи 1.19, а местные пары переключения захвата вокруг заполнения, в том числе в `test/intention/data/drift_intention_repository_command_test.dart`, заменены им.
+    - Записываемые данные, их порядок, ожидания и названия тестов не меняются; ожидаемый отказ записи проверяется на вызове помощника с прежним видом отказа.
+  - **Execution:**
+    - Механический перевод выполняют субагенты Sonnet 5.5 с усилием `xhigh` по разделу Execution задачи 1.19; координатор проверяет каждый дифф и сам разбирает возвращённые падения.
+  - **Verification:**
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/intention/ test/tag/ test/daily_choice/ test/long_term_relation/ test/app/`.
+  - **Dependencies:** 1.19.
+  - **Files likely touched:** тесты `test/intention/`, `test/tag/`, `test/daily_choice/`, `test/long_term_relation/` и `test/app/`, которые заполняют граф напрямую: около 40 файлов.
+  - **Estimated scope:** M.
+
+- [ ] 1.22 Отклонять в базе изменение графа в обход единого пути записи
+  - **Acceptance criteria:**
+    - По решениям 4 и 5 [дизайна](design.md) и [ADR-0034](../../../docs/adr/0034-record-confirmed-graph-changes-in-local-fact-log.md) управляющая строка лога фактов схемы версии 3 хранит, кроме флага захвата, признак записи единого пути; новая установка создаёт его снятым. Единый путь `DriftPersonalGraphRepository` ставит признак в своей транзакции до тела команды и снимает его после записи пакета перед COMMIT. Поэтому подтверждённая база признака не содержит, а отказ команды откатывает его вместе с изменениями.
+    - Пока захват включён, вставка, изменение и удаление строк таблиц графа и шагов пути без признака записи прерываются триггерами схемы и не оставляют ни изменений, ни отметок. С признаком отметки ставятся как прежде, а при выключенном захвате записи проходят без отметок. Команды графа, их результаты, `GraphChange`, классификация отказов команд и пакеты фактов не меняются.
+    - Недостижимая проверка оставшихся отметок после записи пакета удалена из единого пути вместе с `GraphFactCapture.hasMarks`.
+    - Тесты отметок схемы и механизма фактов ставят признак записи так же, как единый путь, и проверяют прежние отметки и факты.
+    - Накладные расходы лога на команду укладываются в бюджеты решения 15, включая архивирование намерения с 1000 активных связей.
+  - **Verification:**
+    - Выполнить `mise run codegen`.
+    - Проверить на настоящем SQLite для каждой таблицы графа и шагов пути, что при включённом захвате без признака записи вставка, изменение и удаление отклоняются, а строки и отметки остаются прежними; что с признаком отметки ставятся, а при выключенном захвате их нет. Проверить через репозиторий, что прямая запись в таблицу графа отклоняется и после подтверждённой команды, и после отказа команды.
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/data/local/ test/graph/data/ test/graph_snapshots/`.
+    - Выполнить серию бенчмарка лога фактов по методике решения 15: `mise run --skip-tools benchmark -- --plain-name 'бенчмарк лога фактов' --dart-define=BENCHMARK_SAMPLES=40 --dart-define=BENCHMARK_WARMUPS=3`; сообщить в сессии замеры и бюджеты.
+  - **Dependencies:** 1.19, 1.20, 1.21.
+  - **Files likely touched:** `lib/src/data/local/schema/graph_log_schema.drift`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/graph_fact_capture.dart`, `test/support/graph_seed.dart`, `test/data/local/graph_log_schema_test.dart`, `test/graph/data/graph_fact_capture_test.dart`, `test/graph/data/drift_graph_fact_log_write_test.dart`; результаты генерации `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v3.json`.
+  - **Estimated scope:** M.
+
+- [ ] 1.23 Повторно подтвердить готовность этапа после запрета записи графа в обход единого пути
+  - **Acceptance criteria:**
+    - После задач 1.19–1.22 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено, в том числе после каждого вида команды база совпадает с состоянием, собранным из снимка и лога, а накладные расходы лога на команды укладываются в бюджеты дизайна. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 1.8 и 1.22 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `mise run codegen` и убедиться, что сгенерированные файлы не изменились; после фиксации изменений выполнить `mise run codegen-check`. Выполнить `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+    - Собрать `mise exec --no-deps -- flutter build apk --release` для ручной проверки. Если доступно запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; иначе ограничиться CLI-проверками. Сообщить в сессии результаты и оставшиеся ручные проверки на устройстве: перед установкой очистить данные сборки этапа 1, потому что её схема версии 3 не содержит признака записи, затем проверить работу команд графа.
+  - **Dependencies:** 1.19, 1.20, 1.21, 1.22.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах соответствующих задач этапа.
+  - **Estimated scope:** XS.
