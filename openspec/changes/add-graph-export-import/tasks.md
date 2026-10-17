@@ -308,3 +308,27 @@
   - **Dependencies:** 1.13.
   - **Files likely touched:** `test/graph/data/drift_graph_fact_log_access_test.dart`.
   - **Estimated scope:** XS.
+
+- [ ] 1.27 Хранить версию формата снимка только в заголовке его файла
+  - **Acceptance criteria:**
+    - По решениям 4 и 6 [дизайна](design.md) и [ADR-0035](../../../docs/adr/0035-keep-graph-data-in-versioned-domain-format.md) в таблице `graph_snapshots` схемы версии 3 нет столбца `format_version`, а в `GraphSnapshotEntry` нет версии формата. Регистрация снимка сохраняет позицию, имя файла, размер и контрольную сумму. Эта задача заменяет часть критерия задачи 1.11 о регистрации версии формата.
+    - Снимок по-прежнему читается по версии из заголовка своего файла и повышается до текущей. Запись и проверка снимка, сборка состояния, сжатие, пересборка, очистка и удаление истории работают как прежде. Версия формата пакетов в `graph_log_packages` не меняется.
+  - **Verification:**
+    - Выполнить `mise run codegen`.
+    - Проверить, что снимок, зарегистрированный после команд, читается в состояние, совпадающее с выгрузкой задачи 1.8, а изменённый байт и обрезанный файл по-прежнему дают отказ повреждения.
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/data/local/ test/graph/data/ test/graph_snapshots/ test/app/bootstrap/` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/data/local/ test/graph/data/ test/graph_snapshots/`.
+  - **Dependencies:** 1.11, 1.22.
+  - **Files likely touched:** `lib/src/data/local/schema/graph_log_schema.drift`, `lib/src/graph_snapshots/graph_fact_log.dart`, `lib/src/graph_snapshots/graph_snapshot_store.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `test/data/local/graph_log_schema_test.dart`, `test/graph/data/drift_graph_fact_log_access_test.dart`, `test/graph_snapshots/graph_snapshot_store_test.dart`; результаты генерации `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v3.json`.
+  - **Estimated scope:** S.
+
+- [ ] 1.28 Повторно подтвердить готовность этапа после удаления версии формата из реестра снимков
+  - **Acceptance criteria:**
+    - После задач 1.26 и 1.27 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено, в том числе база совпадает с состоянием, собранным из снимка и лога, реестр снимков согласован с файлами, а повреждённый снимок обнаруживается и не становится графом. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 1.8, 1.16 и 1.27 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+    - Собрать `mise exec --no-deps -- flutter build apk --release` для ручной проверки. Если доступно запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; иначе ограничиться CLI-проверками. Сообщить в сессии результаты и оставшиеся ручные проверки на устройстве: перед установкой очистить данные прежней сборки этапа 1, потому что её реестр снимков содержит удалённый столбец, затем проверить работу команд графа.
+  - **Dependencies:** 1.25, 1.26, 1.27.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 1.27.
+  - **Estimated scope:** XS.
