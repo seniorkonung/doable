@@ -98,48 +98,53 @@ final class Sheet extends StatelessWidget {
             DoableMetrics.space3,
             DoableMetrics.space2,
             DoableMetrics.space3,
-            DoableMetrics.space3,
+            0,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.grip,
-                    borderRadius: BorderRadius.circular(
-                      DoableMetrics.radiusFull,
+          // Нижний minimum не прибавлялся бы к системному отступу:
+          // https://api.flutter.dev/flutter/widgets/SafeArea/minimum.html
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: DoableMetrics.space4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.grip,
+                      borderRadius: BorderRadius.circular(
+                        DoableMetrics.radiusFull,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Semantics(
-                header: true,
-                namesRoute: true,
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: DoableType.title.copyWith(color: colors.ink),
+                const SizedBox(height: 14),
+                Semantics(
+                  header: true,
+                  namesRoute: true,
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: DoableType.title.copyWith(color: colors.ink),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DoableMetrics.space4,
+                const SizedBox(height: 2),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DoableMetrics.space4,
+                  ),
+                  child: Text(
+                    text,
+                    textAlign: TextAlign.center,
+                    style: DoableType.hint.copyWith(color: colors.muted),
+                  ),
                 ),
-                child: Text(
-                  text,
-                  textAlign: TextAlign.center,
-                  style: DoableType.hint.copyWith(color: colors.muted),
-                ),
-              ),
-              const SizedBox(height: DoableMetrics.space3),
-              Flexible(child: SingleChildScrollView(child: child)),
-            ],
+                const SizedBox(height: DoableMetrics.space3),
+                Flexible(child: SingleChildScrollView(child: child)),
+              ],
+            ),
           ),
         ),
       ),
