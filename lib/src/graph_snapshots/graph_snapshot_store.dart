@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -41,6 +42,19 @@ DiagnosticsFailureCode graphSnapshotFailureCode(Object error) =>
       },
     };
 
+/// Чтение истории, отмеченное [GraphSnapshotStore.readHistory]: позиция, на
+/// которой собирается состояние, и её базовый снимок.
+final class GraphHistoryRead {
+  const GraphHistoryRead._(this.position, this.base);
+
+  /// Позиция, текущая в начале чтения.
+  final int position;
+
+  /// Ближайший зарегистрированный снимок не новее [position]; `null` — такого
+  /// снимка нет, и базой служит пустой граф позиции 0.
+  final GraphSnapshotEntry? base;
+}
+
 /// Файлы снимков в собственном каталоге и сборка состояния графа на позиции
 /// из снимка и лога фактов.
 ///
@@ -74,13 +88,52 @@ final class GraphSnapshotStore {
   final DateTime Function() _clock;
   final DiagnosticsSink _diagnosticsSink;
 
+  /// Идущие чтения истории [readHistory]. Отметки не сохраняются: после
+  /// завершения процесса идущих чтений нет.
+  final _historyReads = <_HistoryReadMark>{};
+
   /// Состояние графа на позиции [position], не новее текущей, из ближайшего
   /// зарегистрированного снимка не новее неё и пакетов после него.
   ///
   /// Снимок, не прошедший проверку, даёт [GraphSnapshotCorruption] здесь или
   /// в [AssembledGraphState.records] до завершения записей.
-  Future<AssembledGraphState> readStateAt(int position) async {
-    final snapshot = await _log.readSnapshotAtOrBefore(position);
+  Future<AssembledGraphState> readStateAt(int position) async =>
+      _assemble(position, await _log.readSnapshotAtOrBefore(position));
+
+  /// Отмечает чтение истории на время [read]: пока оно идёт,
+  /// [removeHistoryBefore] этого хранилища сохраняет его базовый снимок и
+  /// пакеты после него, а отложенное ради чтения удаление выполняет вызов
+  /// после его окончания.
+  ///
+  /// Отметка ставится до чтения текущей позиции и выбора базового снимка,
+  /// поэтому удаление истории не затрагивает ни снимок, который чтение
+  /// выберет базой, ни пакеты после него. Состояние на позиции чтения
+  /// собирает [readState] этого или другого хранилища того же каталога, пока
+  /// [read] не завершилось.
+  Future<T> readHistory<T>(
+    Future<T> Function(GraphHistoryRead history) read,
+  ) async {
+    final mark = _HistoryReadMark();
+    _historyReads.add(mark);
+    try {
+      final position = await _log.readCurrentPosition();
+      final base = await _log.readSnapshotAtOrBefore(position);
+      mark.basePosition = base?.position ?? 0;
+      return await read(GraphHistoryRead._(position, base));
+    } finally {
+      _historyReads.remove(mark);
+    }
+  }
+
+  /// Состояние графа на позиции чтения истории [history] из его базового
+  /// снимка и пакетов после него по правилу [readStateAt].
+  Future<AssembledGraphState> readState(GraphHistoryRead history) =>
+      _assemble(history.position, history.base);
+
+  Future<AssembledGraphState> _assemble(
+    int position,
+    GraphSnapshotEntry? snapshot,
+  ) {
     final base = snapshot == null
         ? const GraphStateBase.empty()
         : GraphStateBase(
@@ -232,8 +285,19 @@ final class GraphSnapshotStore {
   /// [GraphFactLog.removeHistoryBefore]: сначала из реестра, затем файлы
   /// удалённых из него снимков. Файл, который не удалось удалить, удаляет
   /// очистка.
+  ///
+  /// Граница не позже базовых снимков идущих чтений истории [readHistory],
+  /// а пока базовый снимок какого-либо из них не выбран, история не
+  /// удаляется: позиция такого чтения может предшествовать [boundary], и
+  /// тогда ему нужна история до неё.
   Future<void> removeHistoryBefore(int boundary) async {
-    for (final fileName in await _log.removeHistoryBefore(boundary)) {
+    var retained = boundary;
+    for (final read in _historyReads) {
+      final basePosition = read.basePosition;
+      if (basePosition == null) return;
+      retained = min(retained, basePosition);
+    }
+    for (final fileName in await _log.removeHistoryBefore(retained)) {
       await _deleteLeftover(_file(fileName));
     }
   }
@@ -377,6 +441,13 @@ const _temporaryExtension = '.tmp';
 
 String _temporaryFileName() =>
     '${const Uuid().v4()}$_snapshotExtension$_temporaryExtension';
+
+/// Отметка идущего чтения истории.
+final class _HistoryReadMark {
+  /// Позиция базового снимка чтения, 0 — пустой граф; `null` — снимок ещё
+  /// не выбран.
+  int? basePosition;
+}
 
 /// Порция файла пересборки, позиция которой отличается от предыдущей: её
 /// записи, начиная с записи номер [firstRecord], отражают состояние на
