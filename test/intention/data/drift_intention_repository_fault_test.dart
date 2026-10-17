@@ -165,7 +165,9 @@ void main() {
     test(
       'откатывает update вместе с title search key, FTS и timestamps',
       () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
+        final interceptor = _FailAfterDmlInterceptor(
+          _GraphWrite.intentionUpdate,
+        );
         final replacement = await _replaceDatabase(
           interceptor,
           database,
@@ -214,7 +216,10 @@ void main() {
     test(
       'откатывает связи и намерение при отказе между шагами каскада',
       () async {
-        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
+        // Архивирование связей предшествует изменению намерения.
+        final interceptor = _FailAfterDmlInterceptor(
+          _GraphWrite.relationUpdate,
+        );
         final replacement = await _replaceDatabase(
           interceptor,
           database,
@@ -631,7 +636,7 @@ void main() {
             SqlError.SQLITE_CONSTRAINT | (99 << 8),
           ]) {
             final interceptor = _FailBeforeDmlInterceptor(
-              _DmlOperation.update,
+              _GraphWrite.intentionUpdate,
               SqliteException(
                 extendedResultCode: extendedCode,
                 message: 'CANARY-constraint',
@@ -688,7 +693,7 @@ void main() {
             StateError('CANARY-dart-error'),
           ]) {
             final interceptor = _FailBeforeDmlInterceptor(
-              _DmlOperation.delete,
+              _GraphWrite.intentionDelete,
               failure,
             );
             final replacement = await _replaceDatabase(
@@ -971,12 +976,27 @@ final class _TagAssignmentReadInterceptor
   }
 }
 
-enum _DmlOperation { update, delete }
+/// Запись команды в названную таблицу графа, на которой перехватчик
+/// внедряет отказ. Служебные записи лога фактов, в том числе признак записи
+/// единого пути, с ней не совпадают и точку отказа не смещают.
+enum _GraphWrite {
+  intentionUpdate(LocalDatabaseSqlOperation.update, Intentions.$name),
+  intentionDelete(LocalDatabaseSqlOperation.delete, Intentions.$name),
+  relationUpdate(LocalDatabaseSqlOperation.update, LongTermRelations.$name);
+
+  const _GraphWrite(this._operation, this._table);
+
+  final LocalDatabaseSqlOperation _operation;
+  final String _table;
+
+  bool matches(LocalDatabaseSqlStatement statement) =>
+      statement.operation == _operation && _writtenTable(statement) == _table;
+}
 
 final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
-  _FailAfterDmlInterceptor(this._operation);
+  _FailAfterDmlInterceptor(this._write);
 
-  final _DmlOperation _operation;
+  final _GraphWrite _write;
   var _armed = false;
   var _hasFailed = false;
 
@@ -984,23 +1004,18 @@ final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (!_matches(statement.operation)) return;
+    if (!_write.matches(statement)) return;
     if (_armed && !_hasFailed) {
       _hasFailed = true;
       throw StateError('CANARY-after-dml-failure');
     }
   }
-
-  bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
-    _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
-  };
 }
 
 final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
-  _FailBeforeDmlInterceptor(this._operation, this._failure);
+  _FailBeforeDmlInterceptor(this._write, this._failure);
 
-  final _DmlOperation _operation;
+  final _GraphWrite _write;
   final Object _failure;
   var _armed = false;
 
@@ -1008,13 +1023,8 @@ final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (_armed && _matches(statement.operation)) throw _failure;
+    if (_armed && _write.matches(statement)) throw _failure;
   }
-
-  bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
-    _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
-    _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
-  };
 }
 
 /// Наблюдает операции хранилища и по запросу прерывает транзакцию сразу
