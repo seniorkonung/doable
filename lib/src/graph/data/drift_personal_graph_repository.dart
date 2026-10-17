@@ -24,6 +24,8 @@ import '../../daily_choice/domain/daily_choice_priority.dart';
 import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
+import '../../graph_format/graph_format_records.dart'
+    show GraphEntityRecord, TagAssignmentRecord;
 import '../../graph_snapshots/graph_fact_log.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
@@ -74,6 +76,7 @@ import '../application/selected_relations.dart';
 import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
+import 'graph_record_rows.dart';
 import 'stored_choice_path_verification.dart';
 
 import 'package:drift/drift.dart';
@@ -238,6 +241,10 @@ final class DriftPersonalGraphRepository
     required int after,
     required int upTo,
   }) => _readStoredFactPackages(after: after, upTo: upTo);
+
+  @override
+  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
+      _readGraphRecords(after);
 
   @override
   Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>

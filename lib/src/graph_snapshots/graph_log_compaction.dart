@@ -179,6 +179,10 @@ final class _PortGraphFactLog implements GraphFactLog {
   }) => _call((log) => log.readPackages(after: after, upTo: upTo));
 
   @override
+  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
+      _call((log) => log.readGraphRecords(after: after));
+
+  @override
   Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
       _call((log) => log.readSnapshotAtOrBefore(position));
 

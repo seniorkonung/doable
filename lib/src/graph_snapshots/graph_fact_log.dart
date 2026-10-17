@@ -1,6 +1,11 @@
 import 'dart:typed_data';
 
-/// Наибольшее число пакетов в одной порции [GraphFactLog.readPackages].
+import '../graph_format/graph_format_records.dart';
+import '../intention/domain/intention.dart';
+import '../intention/domain/intention_id.dart';
+
+/// Наибольшее число пакетов в одной порции [GraphFactLog.readPackages] и
+/// записей в одной порции [GraphFactLog.readGraphRecords].
 const int graphFactLogPortionLimit = 100;
 
 /// Пакет фактов в том виде, в каком его хранит лог.
@@ -46,6 +51,65 @@ final class GraphSnapshotEntry {
   final Uint8List checksum;
 }
 
+/// Место строки графа в каноническом порядке файла формата: секция и ключ
+/// порядка строки в ней. Ключ строки не меняется, пока строка есть в базе.
+///
+/// Ключи выдаёт [GraphFactLog.readGraphRecords], а вызывающий передаёт их
+/// обратно без изменений.
+sealed class GraphRecordOrderKey {
+  const GraphRecordOrderKey();
+}
+
+final class TagOrderKey extends GraphRecordOrderKey {
+  const TagOrderKey(this.creationSequence);
+
+  final int creationSequence;
+}
+
+final class IntentionOrderKey extends GraphRecordOrderKey {
+  const IntentionOrderKey({required this.createdAt, required this.id});
+
+  final IntentionTimestamp createdAt;
+  final IntentionId id;
+}
+
+final class TagAssignmentOrderKey extends GraphRecordOrderKey {
+  const TagAssignmentOrderKey(this.creationSequence);
+
+  final int creationSequence;
+}
+
+final class LongTermRelationOrderKey extends GraphRecordOrderKey {
+  const LongTermRelationOrderKey(this.creationSequence);
+
+  final int creationSequence;
+}
+
+final class DailyChoiceOrderKey extends GraphRecordOrderKey {
+  const DailyChoiceOrderKey(this.creationSequence);
+
+  final int creationSequence;
+}
+
+/// Порция записей графа, прочитанная одним коротким обращением к базе.
+final class GraphRecordPortion {
+  const GraphRecordPortion({
+    required this.position,
+    required this.records,
+    required this.next,
+  });
+
+  /// Позиция лога, состояние графа на которой отражают записи порции.
+  final int position;
+
+  /// Записи в каноническом порядке файла формата.
+  final List<GraphEntityRecord> records;
+
+  /// Ключ последней записи, после которого читается следующая порция;
+  /// `null` — порция дошла до конца записей графа.
+  final GraphRecordOrderKey? next;
+}
+
 /// Доступ хранилища снимков к логу фактов и реестру снимков.
 ///
 /// Позиция 0 — пустой граф новой установки, каждый подтверждённый пакет
@@ -70,6 +134,15 @@ abstract interface class GraphFactLog {
     required int after,
     required int upTo,
   });
+
+  /// Порция записей текущего состояния графа после ключа [after], а без
+  /// него — с начала, не больше [graphFactLogPortionLimit] записей.
+  ///
+  /// Каждая порция отражает состояние графа на своей позиции, а граф может
+  /// меняться между порциями. Строки читаются по возрастанию неизменных
+  /// ключей порядка, поэтому порции не повторяют строк и не пропускают
+  /// строку, которая была в базе на протяжении всего чтения.
+  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after});
 
   /// Ближайший зарегистрированный снимок не новее [position]; из снимков
   /// одной позиции — зарегистрированный последним. `null` — такого снимка

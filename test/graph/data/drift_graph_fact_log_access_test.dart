@@ -1,18 +1,31 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, GraphLogPackagesCompanion;
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
+import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_fact_log.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_log_completeness_reference.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -20,14 +33,16 @@ void main() {
   late LocalDatabaseHarness harness;
   late AppDatabase database;
   late DriftPersonalGraphRepository repository;
+  late DateTime now;
 
   setUp(() async {
     harness = LocalDatabaseHarness.inMemory();
     database = await harness.openReadyDatabase();
+    now = DateTime.utc(2026, 10, 17, 12);
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 10, 17, 12),
+      () => now,
       InMemoryDiagnosticsSink(),
     );
   });
@@ -49,6 +64,31 @@ void main() {
             ),
           );
     }
+  }
+
+  Future<T> confirm<T extends GraphCommandOutcome>(
+    GraphCommand<GraphCommandOutcome, GraphCommandFailure> command,
+  ) async {
+    final result = await repository.execute(command);
+    final confirmed =
+        (result as GraphResultSuccess<Object?, GraphCommandFailure>).value!
+            as ConfirmedGraphResult;
+    return confirmed.value as T;
+  }
+
+  Future<Tag> createTag(String name) async =>
+      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+
+  /// Все порции записей графа от начала до конца.
+  Future<List<GraphRecordPortion>> readAllRecordPortions() async {
+    final portions = <GraphRecordPortion>[];
+    GraphRecordOrderKey? after;
+    do {
+      final portion = await repository.readGraphRecords(after: after);
+      portions.add(portion);
+      after = portion.next;
+    } while (after != null);
+    return portions;
   }
 
   Future<void> registerSnapshotsAt(List<int> positions) async {
@@ -152,6 +192,115 @@ void main() {
     },
   );
 
+  test('записи графа отдаются полными порциями в каноническом порядке с '
+      'границами внутри каждой секции', () async {
+    // По 100 записей в порции границы приходятся на середину секции тегов,
+    // намерений, назначений, связей и дневных выборов.
+    expect(graphFactLogPortionLimit, 100);
+    final tags = [
+      for (var index = 0; index < 150; index++) await createTag('Тег $index'),
+    ];
+    final root = (await confirm<IntentionSaved>(
+      CreateIntention.withInitialState(
+        title: 'Корень',
+        description: null,
+        readiness: IntentionReadiness.notReady,
+        tagIds: const {},
+      ),
+    )).intention;
+    final clockStart = now;
+    final related = <Intention>[];
+    for (var index = 0; index < 100; index++) {
+      // Часы идут назад, и пары намерений получают одно время создания:
+      // порядок по времени создания и идентификатору расходится с порядком
+      // создания.
+      now = clockStart.subtract(Duration(seconds: index ~/ 2 + 1));
+      related.add(
+        (await confirm<IntentionSaved>(
+          CreateIntention.withInitialState(
+            title: 'Намерение $index',
+            description: null,
+            readiness: IntentionReadiness.ready,
+            tagIds: {tags[index].id},
+          ),
+        )).intention,
+      );
+    }
+    for (final intention in related) {
+      final relation = (await confirm<LongTermRelationCreated>(
+        CreateLongTermRelation(
+          sourceIntentionId: root.id,
+          relatedIntentionId: intention.id,
+          type: LongTermRelationType.need,
+          priority: RelationPriority.p2,
+          description: null,
+        ),
+      )).relation;
+      await confirm(
+        CreateDailyChoice(
+          sourceIntentionId: root.id,
+          selectedIntentionId: intention.id,
+          path: ConfirmedChoicePath([
+            ConfirmedChoicePathStep(
+              relationId: relation.id,
+              sourceIntentionId: root.id,
+              type: relation.type,
+              relatedIntentionId: intention.id,
+            ),
+          ]),
+          date: CalendarDate.fromParts(2026, 10, 17),
+          description: null,
+          isCompleted: false,
+        ),
+      );
+    }
+
+    final portions = await readAllRecordPortions();
+
+    expect(portions.map((portion) => portion.records.length), [
+      100,
+      100,
+      100,
+      100,
+      100,
+      51,
+    ]);
+    expect(
+      portions.map((portion) => portion.position),
+      everyElement(await repository.readCurrentPosition()),
+    );
+    expect(
+      _lines(portions.expand((portion) => portion.records)),
+      _lines(await referenceGraphRecords(database)),
+    );
+  });
+
+  test('команда, отправленная между порциями записей, подтверждается до '
+      'следующей порции и попадает в неё', () async {
+    for (var index = 0; index <= graphFactLogPortionLimit; index++) {
+      await createTag('Тег $index');
+    }
+    final completions = <String>[];
+
+    final first = await repository.readGraphRecords();
+    final command = repository
+        .execute(CreateTag(TagName.fromInput('Новый')))
+        .whenComplete(() => completions.add('команда'));
+    final second = repository
+        .readGraphRecords(after: first.next)
+        .whenComplete(() => completions.add('следующая порция'));
+    await Future.wait([command, second]);
+
+    expect(completions, ['команда', 'следующая порция']);
+    final rest = await second;
+    expect(rest.position, first.position + 1);
+    expect(
+      [for (final record in rest.records) (record as TagRecord).tag.name.value],
+      ['Тег $graphFactLogPortionLimit', 'Новый'],
+    );
+    expect(rest.next, isNull);
+  });
+
   test('регистрация сохраняет снимок, а поиск выбирает ближайший не новее позиции и последний из одной позиции', () async {
     await appendPackages(9);
     final registered = GraphSnapshotEntry(
@@ -242,6 +391,10 @@ void main() {
 }
 
 Uint8List _facts(String text) => utf8.encode('$text\n');
+
+List<String> _lines(Iterable<GraphEntityRecord> records) => [
+  for (final record in records) utf8.decode(GraphFormatCodec.encode(record)),
+];
 
 GraphSnapshotEntry _snapshot(int position, {String? fileName}) =>
     GraphSnapshotEntry(

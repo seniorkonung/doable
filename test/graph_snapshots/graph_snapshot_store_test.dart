@@ -291,6 +291,10 @@ final class _RegistrationObservingLog implements GraphFactLog {
   }) => _log.readPackages(after: after, upTo: upTo);
 
   @override
+  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
+      _log.readGraphRecords(after: after);
+
+  @override
   Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
       _log.readSnapshotAtOrBefore(position);
 

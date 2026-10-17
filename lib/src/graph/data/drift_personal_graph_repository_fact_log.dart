@@ -4,14 +4,17 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
   /// Позиции выдаёт AUTOINCREMENT, а sqlite_sequence хранит наибольшую
   /// выданную, поэтому позиция сохраняется и после удаления пакетов границей
   /// хранения.
-  Future<int> _readCurrentLogPosition() => _sequencer.run(() async {
+  Future<int> _readCurrentLogPosition() =>
+      _sequencer.run(_selectCurrentLogPosition);
+
+  Future<int> _selectCurrentLogPosition() async {
     final row = await _database
         .customSelect(
           "SELECT seq FROM sqlite_sequence WHERE name = 'graph_log_packages'",
         )
         .getSingleOrNull();
     return row?.read<int>('seq') ?? 0;
-  });
+  }
 
   Future<List<StoredGraphFactPackage>> _readStoredFactPackages({
     required int after,
@@ -30,6 +33,228 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
             .get();
     return [for (final row in rows) _storedFactPackage(row)];
   });
+
+  /// Порция заполняется секциями по порядку файла формата, поэтому неполная
+  /// порция дошла до конца последней секции. Транзакция согласует строки
+  /// порции, в том числе дневные выборы с шагами их путей, с позицией лога.
+  Future<GraphRecordPortion> _readGraphRecords(
+    GraphRecordOrderKey? after,
+  ) => _sequencer.run(
+    () => _database.transaction(() async {
+      final position = await _selectCurrentLogPosition();
+      final sections = <Future<List<_OrderedRecord>> Function(int limit)>[
+        (limit) => _readTagRecords(
+          after: after is TagOrderKey ? after.creationSequence : 0,
+          limit: limit,
+        ),
+        (limit) => _readIntentionRecords(
+          after: after is IntentionOrderKey ? after : null,
+          limit: limit,
+        ),
+        (limit) => _readTagAssignmentRecords(
+          after: after is TagAssignmentOrderKey ? after.creationSequence : 0,
+          limit: limit,
+        ),
+        (limit) => _readRelationRecords(
+          after: after is LongTermRelationOrderKey ? after.creationSequence : 0,
+          limit: limit,
+        ),
+        (limit) => _readDailyChoiceRecords(
+          after: after is DailyChoiceOrderKey ? after.creationSequence : 0,
+          limit: limit,
+        ),
+      ];
+      final firstSection = switch (after) {
+        null || TagOrderKey() => 0,
+        IntentionOrderKey() => 1,
+        TagAssignmentOrderKey() => 2,
+        LongTermRelationOrderKey() => 3,
+        DailyChoiceOrderKey() => 4,
+      };
+      final records = <_OrderedRecord>[];
+      for (final read in sections.skip(firstSection)) {
+        records.addAll(await read(graphFactLogPortionLimit - records.length));
+        if (records.length == graphFactLogPortionLimit) break;
+      }
+      return GraphRecordPortion(
+        position: position,
+        records: [for (final (_, record) in records) record],
+        next: records.length < graphFactLogPortionLimit
+            ? null
+            : records.last.$1,
+      );
+    }),
+  );
+
+  Future<List<_OrderedRecord>> _readTagRecords({
+    required int after,
+    required int limit,
+  }) async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT creation_sequence, id, name FROM tags
+         WHERE creation_sequence > ?
+         ORDER BY creation_sequence
+         LIMIT ?''',
+          variables: [Variable.withInt(after), Variable.withInt(limit)],
+          readsFrom: {_database.tags},
+        )
+        .get();
+    return [
+      for (final row in rows)
+        (
+          TagOrderKey(row.read<int>('creation_sequence')),
+          storedTagRecord(decodeStoredTagId(row.read<String>('id')), row),
+        ),
+    ];
+  }
+
+  /// Порядок намерений — время создания и идентификатор; отдельное
+  /// сравнение времени ограничивает обход индекса этого порядка.
+  Future<List<_OrderedRecord>> _readIntentionRecords({
+    required IntentionOrderKey? after,
+    required int limit,
+  }) async {
+    final (afterKey, keyVariables) = switch (after) {
+      null => ('', const <Variable<Object>>[]),
+      IntentionOrderKey(:final createdAt, :final id) => (
+        'WHERE created_at >= ? AND (created_at > ? OR id > ?)',
+        [
+          Variable.withInt(createdAt.value.microsecondsSinceEpoch),
+          Variable.withInt(createdAt.value.microsecondsSinceEpoch),
+          Variable.withString(id.toCanonicalString()),
+        ],
+      ),
+    };
+    final rows = await _database
+        .customSelect(
+          '''SELECT id, title, description, is_action_ready, is_archived,
+                created_at, updated_at
+         FROM intentions
+         $afterKey
+         ORDER BY created_at, id
+         LIMIT ?''',
+          variables: [...keyVariables, Variable.withInt(limit)],
+          readsFrom: {_database.intentions},
+        )
+        .get();
+    return [for (final row in rows) _orderedIntention(row)];
+  }
+
+  _OrderedRecord _orderedIntention(QueryRow row) {
+    final record = storedIntentionRecord(
+      decodeStoredIntentionId(row.read<String>('id')),
+      row,
+    );
+    final intention = record.intention;
+    return (
+      IntentionOrderKey(createdAt: intention.createdAt, id: intention.id),
+      record,
+    );
+  }
+
+  Future<List<_OrderedRecord>> _readTagAssignmentRecords({
+    required int after,
+    required int limit,
+  }) async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT creation_sequence, tag_id, intention_id
+         FROM tag_assignments
+         WHERE creation_sequence > ?
+         ORDER BY creation_sequence
+         LIMIT ?''',
+          variables: [Variable.withInt(after), Variable.withInt(limit)],
+          readsFrom: {_database.tagAssignments},
+        )
+        .get();
+    return [
+      for (final row in rows)
+        (
+          TagAssignmentOrderKey(row.read<int>('creation_sequence')),
+          TagAssignmentRecord(
+            TagAssignment(
+              tagId: decodeStoredTagId(row.read<String>('tag_id')),
+              intentionId: decodeStoredIntentionId(
+                row.read<String>('intention_id'),
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  Future<List<_OrderedRecord>> _readRelationRecords({
+    required int after,
+    required int limit,
+  }) async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT creation_sequence, id, source_intention_id,
+                related_intention_id, type, priority, description, is_archived
+         FROM long_term_relations
+         WHERE creation_sequence > ?
+         ORDER BY creation_sequence
+         LIMIT ?''',
+          variables: [Variable.withInt(after), Variable.withInt(limit)],
+          readsFrom: {_database.longTermRelations},
+        )
+        .get();
+    return [
+      for (final row in rows)
+        (
+          LongTermRelationOrderKey(row.read<int>('creation_sequence')),
+          storedRelationRecord(
+            decodeStoredRelationId(row.read<String>('id')),
+            row,
+          ),
+        ),
+    ];
+  }
+
+  Future<List<_OrderedRecord>> _readDailyChoiceRecords({
+    required int after,
+    required int limit,
+  }) async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT creation_sequence, id, source_intention_id,
+                selected_intention_id, choice_date, description, is_completed,
+                scheduled_minute, priority
+         FROM daily_choices
+         WHERE creation_sequence > ?
+         ORDER BY creation_sequence
+         LIMIT ?''',
+          variables: [Variable.withInt(after), Variable.withInt(limit)],
+          readsFrom: {_database.dailyChoices},
+        )
+        .get();
+    if (rows.isEmpty) return const [];
+    final paths = await readStoredChoicePaths(
+      _database,
+      choiceIds:
+          'SELECT id FROM daily_choices '
+          'WHERE creation_sequence > ? AND creation_sequence <= ?',
+      variables: [
+        Variable.withInt(after),
+        Variable.withInt(rows.last.read<int>('creation_sequence')),
+      ],
+      readsFrom: {_database.dailyChoices},
+    );
+    return [
+      for (final row in rows)
+        (
+          DailyChoiceOrderKey(row.read<int>('creation_sequence')),
+          storedDailyChoiceRecord(
+            storedDailyChoice(
+              decodeStoredDailyChoiceId(row.read<String>('id')),
+              row,
+            ),
+            paths,
+          ),
+        ),
+    ];
+  }
 
   Future<GraphSnapshotEntry?> _readSnapshotAtOrBefore(int position) =>
       _sequencer.run(() async {
@@ -102,6 +327,9 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
     return query;
   }
 }
+
+/// Запись графа с ключом порядка её строки.
+typedef _OrderedRecord = (GraphRecordOrderKey, GraphEntityRecord);
 
 /// Пакеты «сброс» пишет только замена графа, а хранилище снимков их пока не
 /// читает. Схема гарантирует пакету «изменение» версию формата и факты.
