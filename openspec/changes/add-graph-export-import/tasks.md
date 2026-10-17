@@ -490,7 +490,7 @@
   - **Files likely touched:** `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/graph/presentation/graph_operation_message_plan.dart`, `lib/l10n/app_ru.arb` и `lib/l10n/app_en.arb` с результатами генерации `lib/l10n/app_localizations*.dart`, `test/graph/application/graph_command_coordinator_export_test.dart` (новый), `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.6 Сохранять граф в документ, выбранный в системном диалоге, фоновой операцией экспорта с наблюдаемым ходом
+- [x] 2.6 Сохранять граф в документ, выбранный в системном диалоге, фоновой операцией экспорта с наблюдаемым ходом
   - **Acceptance criteria:**
     - По решениям 9 и 13 [дизайна](design.md) модуль операций с данными (название рабочее `lib/src/data_transfer/`) по запуску экспорта открывает диалог задачи 2.4 с именем по умолчанию `Doable <местная дата>.jsonl.gz`, например `Doable 2026-10-17.jsonl.gz`: дата не зависит от языка и не содержит знаков, недопустимых в имени файла. Отмена диалога ничего не меняет, не принимает операцию и не даёт сообщения.
     - Выбранный документ запускает экспорт, принятый координатором задачи 2.5: состояние на текущей позиции пишется задачей 2.2 с моментом экспорта в заголовке во временный файл в `app_flutter/tmp/`, затем копируется в документ, а временный файл удаляется при любом исходе. Отказ любого шага даёт отказ экспорта, а повтор из сообщения — новый запуск с диалогом.

@@ -30,6 +30,21 @@ GraphStateWriteRunner writeGraphStateFailingOn(File file) {
   );
 }
 
+/// Запись состояния графа в отдельном изоляте, как
+/// [runGraphStateWriteInIsolate], при которой файлы каталога [directory]
+/// появляются, а запись в них отказывает, как при нехватке места.
+GraphStateWriteRunner writeGraphStateFailingIn(Directory directory) {
+  // Путь из адреса каталога заканчивается разделителем, поэтому файлы
+  // каталога с похожим именем не совпадают.
+  final failingPrefix = directory.uri.toFilePath();
+  return (write) => Isolate.run(
+    () => IOOverrides.runWithIOOverrides(
+      write.run,
+      _FailingFiles((path) => path.startsWith(failingPrefix)),
+    ),
+  );
+}
+
 final class _FailingFiles extends IOOverrides {
   _FailingFiles(this._fails);
 
