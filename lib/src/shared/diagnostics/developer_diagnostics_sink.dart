@@ -197,6 +197,26 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'operation': 'blockingRelationsDelete',
     ..._encodeStatus(event.status),
   },
+  GraphSnapshotWriteDiagnosticsEvent(:final stage) => {
+    'operation': 'graphSnapshotWrite',
+    'stage': ?stage?.name,
+    ..._encodeStatus(event.status),
+  },
+  GraphSnapshotRebuildDiagnosticsEvent(:final stage) => {
+    'operation': 'graphSnapshotRebuild',
+    'stage': ?stage?.name,
+    ..._encodeStatus(event.status),
+  },
+  GraphLogCompactionDiagnosticsEvent(:final stage) => {
+    'operation': 'graphLogCompaction',
+    'stage': ?stage?.name,
+    ..._encodeStatus(event.status),
+  },
+  GraphSnapshotCleanupDiagnosticsEvent(:final stage) => {
+    'operation': 'graphSnapshotCleanup',
+    'stage': ?stage?.name,
+    ..._encodeStatus(event.status),
+  },
 };
 
 Map<String, Object> _encodeStatus(DiagnosticsStatus status) => switch (status) {
