@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 const _catalogChoices = 401;
@@ -96,11 +97,7 @@ final class _Fixture {
       trace.clear();
       return;
     }
-    raw.execute('BEGIN');
-    try {
-      // Сохранённый граф фикстуры не оставляет отметок лога фактов, иначе
-      // первая команда читала бы его целиком.
-      raw.execute('UPDATE graph_log_control SET capture = 0');
+    seedRawGraph(raw, () {
       for (var number = 1; number <= _pathLength + 1; number++) {
         _addIntention(number, ready: number == 2 || number == 151);
       }
@@ -127,12 +124,7 @@ final class _Fixture {
       raw.execute('UPDATE daily_choices SET priority = 1 WHERE id = ?', [
         _uuid(10400),
       ]);
-      raw.execute('UPDATE graph_log_control SET capture = 1');
-      raw.execute('COMMIT');
-    } on Object {
-      raw.execute('ROLLBACK');
-      rethrow;
-    }
+    });
     trace.clear();
   }
 
@@ -311,17 +303,20 @@ void main() {
   tearDown(() => fixture.close());
 
   test('две секции читают только свои порции и структуру выбранных путей через индекс', () async {
-    fixture.raw.execute(
-      'UPDATE daily_choices SET is_completed = 1 WHERE source_intention_id = ?',
-      [_uuid(200)],
-    );
-    fixture.raw.execute('UPDATE daily_choices SET priority = 1 WHERE id = ?', [
-      _uuid(10400),
-    ]);
-    fixture.raw.execute(
-      'UPDATE daily_choices SET scheduled_minute = ?, priority = 2 WHERE id = ?',
-      [18 * 60, _uuid(10399)],
-    );
+    seedRawGraph(fixture.raw, () {
+      fixture.raw.execute(
+        'UPDATE daily_choices SET is_completed = 1 WHERE source_intention_id = ?',
+        [_uuid(200)],
+      );
+      fixture.raw.execute(
+        'UPDATE daily_choices SET priority = 1 WHERE id = ?',
+        [_uuid(10400)],
+      );
+      fixture.raw.execute(
+        'UPDATE daily_choices SET scheduled_minute = ?, priority = 2 WHERE id = ?',
+        [18 * 60, _uuid(10399)],
+      );
+    });
     final day = CalendarDate.fromParts(2026, 9, 24);
 
     for (final (completed, totalCount, hasTimedChoices) in [
@@ -677,26 +672,26 @@ void main() {
 
   test('каталог одного дня читает только этот день порциями по 50', () async {
     // Сотни записей соседних дней созданы после записей выбранного дня.
-    fixture.raw.execute('BEGIN');
-    for (var number = 40000; number < 40300; number++) {
-      fixture._addChoice(
-        number,
-        1,
-        2,
-        [900],
-        stepBase: number + 10000,
-        date: '2026-09-23',
-      );
-      fixture._addChoice(
-        number + 1000,
-        1,
-        2,
-        [900],
-        stepBase: number + 11000,
-        date: '2026-09-25',
-      );
-    }
-    fixture.raw.execute('COMMIT');
+    seedRawGraph(fixture.raw, () {
+      for (var number = 40000; number < 40300; number++) {
+        fixture._addChoice(
+          number,
+          1,
+          2,
+          [900],
+          stepBase: number + 10000,
+          date: '2026-09-23',
+        );
+        fixture._addChoice(
+          number + 1000,
+          1,
+          2,
+          [900],
+          stepBase: number + 11000,
+          date: '2026-09-25',
+        );
+      }
+    });
     final day = CalendarDate.fromParts(2026, 9, 24);
     const dayChoices = _catalogChoices + _otherGroupChoices;
     const pageSize = DailyChoiceCatalogQuery.defaultPageSize;
@@ -740,9 +735,12 @@ void main() {
     expect(ids, hasLength(dayChoices));
 
     // Охват выполнения остаётся внутри выбранного дня.
-    fixture.raw.execute(
-      'UPDATE daily_choices SET is_completed = 1 WHERE source_intention_id = ?',
-      [_uuid(200)],
+    seedRawGraph(
+      fixture.raw,
+      () => fixture.raw.execute(
+        'UPDATE daily_choices SET is_completed = 1 WHERE source_intention_id = ?',
+        [_uuid(200)],
+      ),
     );
     fixture.trace.clear();
     final completed =

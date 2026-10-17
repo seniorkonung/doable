@@ -16,6 +16,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/contribution_reachability_reference.dart';
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
 const _relations = [
@@ -40,18 +41,20 @@ void main() {
     probe = _SeedProbe();
     database = await harness.openReadyDatabase(observer: probe);
     await seedDurabilityGraph(database);
-    for (final (number, source, target) in _relations.skip(4)) {
-      await database.customStatement(
-        '''INSERT INTO long_term_relations
+    await seedGraph(database, () async {
+      for (final (number, source, target) in _relations.skip(4)) {
+        await database.customStatement(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority)
            VALUES (?, ?, ?, 'need', 2)''',
-        [
-          durabilityUuid(number),
-          durabilityUuid(source),
-          durabilityUuid(target),
-        ],
-      );
-    }
+          [
+            durabilityUuid(number),
+            durabilityUuid(source),
+            durabilityUuid(target),
+          ],
+        );
+      }
+    });
     repository = durabilityRepository(database);
   });
   tearDown(() => harness.dispose());
@@ -63,31 +66,33 @@ void main() {
     List<int> path = const [101, 102, 105],
   }) async {
     final selected = _relations.singleWhere((r) => r.$1 == path.last).$3;
-    await database.customStatement(
-      '''INSERT INTO daily_choices
+    await seedGraph(database, () async {
+      await database.customStatement(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date, is_completed)
          VALUES (?, ?, ?, ?, ?)''',
-      [
-        durabilityUuid(number),
-        durabilityUuid(1),
-        durabilityUuid(selected),
-        date,
-        completed ? 1 : 0,
-      ],
-    );
-    for (var index = 0; index < path.length; index++) {
-      await database.customStatement(
-        '''INSERT INTO daily_choice_path_steps
-           (id, daily_choice_id, long_term_relation_id, previous_step_id)
-           VALUES (?, ?, ?, ?)''',
         [
-          durabilityUuid(number * 10 + index),
           durabilityUuid(number),
-          durabilityUuid(path[index]),
-          index == 0 ? null : durabilityUuid(number * 10 + index - 1),
+          durabilityUuid(1),
+          durabilityUuid(selected),
+          date,
+          completed ? 1 : 0,
         ],
       );
-    }
+      for (var index = 0; index < path.length; index++) {
+        await database.customStatement(
+          '''INSERT INTO daily_choice_path_steps
+           (id, daily_choice_id, long_term_relation_id, previous_step_id)
+           VALUES (?, ?, ?, ?)''',
+          [
+            durabilityUuid(number * 10 + index),
+            durabilityUuid(number),
+            durabilityUuid(path[index]),
+            index == 0 ? null : durabilityUuid(number * 10 + index - 1),
+          ],
+        );
+      }
+    });
   }
 
   Future<StatisticsSeedGroupsSnapshot> read({StatisticsPeriod? period}) =>

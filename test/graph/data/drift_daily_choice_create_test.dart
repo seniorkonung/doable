@@ -22,6 +22,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int n) =>
@@ -71,34 +72,36 @@ void main() {
       dailyChoiceIdGenerator: choiceIds,
       choicePathStepIdGenerator: stepIds,
     );
-    for (var n = 1; n <= 3; n++) {
-      await database.customInsert(
-        '''INSERT INTO intentions
+    await seedGraph(database, () async {
+      for (var n = 1; n <= 3; n++) {
+        await database.customInsert(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, 1)''',
-        variables: [
-          Variable.withString(_uuid(n)),
-          Variable.withString('Намерение $n'),
-          Variable.withInt(n == 3 ? 1 : 0),
-        ],
-      );
-    }
-    for (final (n, source, target, type) in [
-      (101, 1, 2, 'need'),
-      (102, 2, 3, 'can'),
-    ]) {
-      await database.customInsert(
-        '''INSERT INTO long_term_relations
+          variables: [
+            Variable.withString(_uuid(n)),
+            Variable.withString('Намерение $n'),
+            Variable.withInt(n == 3 ? 1 : 0),
+          ],
+        );
+      }
+      for (final (n, source, target, type) in [
+        (101, 1, 2, 'need'),
+        (102, 2, 3, 'can'),
+      ]) {
+        await database.customInsert(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority, is_archived)
            VALUES (?, ?, ?, ?, 1, 0)''',
-        variables: [
-          Variable.withString(_uuid(n)),
-          Variable.withString(_uuid(source)),
-          Variable.withString(_uuid(target)),
-          Variable.withString(type),
-        ],
-      );
-    }
+          variables: [
+            Variable.withString(_uuid(n)),
+            Variable.withString(_uuid(source)),
+            Variable.withString(_uuid(target)),
+            Variable.withString(type),
+          ],
+        );
+      }
+    });
   });
   tearDown(() => database.close());
 
@@ -236,9 +239,12 @@ void main() {
   );
 
   test('изменённый смысл маршрута возвращает конфликт без записи', () async {
-    await database.customUpdate(
-      "UPDATE long_term_relations SET type = 'need' WHERE id = ?",
-      variables: [Variable.withString(_uuid(102))],
+    await seedGraph(
+      database,
+      () => database.customUpdate(
+        "UPDATE long_term_relations SET type = 'need' WHERE id = ?",
+        variables: [Variable.withString(_uuid(102))],
+      ),
     );
     final result = await repository.execute(command());
     expect(
@@ -258,14 +264,16 @@ void main() {
   });
 
   test('допускает готовое исходное действие и один переход', () async {
-    await database.customUpdate(
-      'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
-      variables: [Variable.withString(_uuid(1))],
-    );
-    await database.customUpdate(
-      'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
-      variables: [Variable.withString(_uuid(2))],
-    );
+    await seedGraph(database, () async {
+      await database.customUpdate(
+        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+        variables: [Variable.withString(_uuid(1))],
+      );
+      await database.customUpdate(
+        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+        variables: [Variable.withString(_uuid(2))],
+      );
+    });
     final result = await repository.execute(
       command(path: route(1), selected: 2),
     );
@@ -279,9 +287,12 @@ void main() {
   });
 
   test('архив и утрата готовности дают разные конфликты', () async {
-    await database.customUpdate(
-      'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
-      variables: [Variable.withString(_uuid(102))],
+    await seedGraph(
+      database,
+      () => database.customUpdate(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        variables: [Variable.withString(_uuid(102))],
+      ),
     );
     var result = await repository.execute(command());
     expect(
@@ -292,14 +303,16 @@ void main() {
         DailyChoiceConflictReason.relationArchived,
       ),
     );
-    await database.customUpdate(
-      'UPDATE long_term_relations SET is_archived = 0 WHERE id = ?',
-      variables: [Variable.withString(_uuid(102))],
-    );
-    await database.customUpdate(
-      'UPDATE intentions SET is_action_ready = 0 WHERE id = ?',
-      variables: [Variable.withString(_uuid(3))],
-    );
+    await seedGraph(database, () async {
+      await database.customUpdate(
+        'UPDATE long_term_relations SET is_archived = 0 WHERE id = ?',
+        variables: [Variable.withString(_uuid(102))],
+      );
+      await database.customUpdate(
+        'UPDATE intentions SET is_action_ready = 0 WHERE id = ?',
+        variables: [Variable.withString(_uuid(3))],
+      );
+    });
     result = await repository.execute(command());
     expect(
       (result as GraphCommandFailed).failure,
@@ -316,12 +329,15 @@ void main() {
     'повреждение сохранённой связи отличается от конфликта маршрута',
     () async {
       // Пробельное описание связи приложение не сохраняет, а схема допускает.
-      await database.customUpdate(
-        'UPDATE long_term_relations SET description = ? WHERE id = ?',
-        variables: [
-          Variable.withString('   '),
-          Variable.withString(_uuid(102)),
-        ],
+      await seedGraph(
+        database,
+        () => database.customUpdate(
+          'UPDATE long_term_relations SET description = ? WHERE id = ?',
+          variables: [
+            Variable.withString('   '),
+            Variable.withString(_uuid(102)),
+          ],
+        ),
       );
       final result = await repository.execute(command());
       expect(

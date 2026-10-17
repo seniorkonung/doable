@@ -14,6 +14,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -95,10 +96,12 @@ void main() {
   test(
     'правки намерения, каскад архива и восстановление сохраняют назначения',
     () async {
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
-        [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 3],
-      );
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+          [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 3],
+        );
+      });
       final intentionBeforeAssignments = row('intentions', 1);
       expect(
         await repository.execute(
@@ -262,23 +265,25 @@ void main() {
   test(
     'правки участников, типа и архива связи сохраняют назначения намерениям',
     () async {
-      for (final number in [4, 5]) {
+      seedRawGraph(raw, () {
+        for (final number in [4, 5]) {
+          raw.execute(
+            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
+            [tagFixtureId(number), 'Намерение $number'],
+          );
+        }
         raw.execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
-          [tagFixtureId(number), 'Намерение $number'],
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            tagFixtureId(103),
+            tagFixtureId(3),
+            tagFixtureId(4),
+            'need',
+            2,
+            'Прежнее',
+          ],
         );
-      }
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(103),
-          tagFixtureId(3),
-          tagFixtureId(4),
-          'need',
-          2,
-          'Прежнее',
-        ],
-      );
+      });
       for (final (tag, intention) in [
         (firstTagNumber, 3),
         (firstTagNumber, 4),
@@ -385,10 +390,12 @@ void main() {
   test(
     'теги участников дневного пути меняются без обхода защиты смысла связи',
     () async {
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
-        [tagFixtureId(4), 'Новое намерение'],
-      );
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
+          [tagFixtureId(4), 'Новое намерение'],
+        );
+      });
       final relationBefore = row('long_term_relations', 101);
       final intentionsBefore = rows('intentions');
       final choicesBefore = rows('daily_choices');

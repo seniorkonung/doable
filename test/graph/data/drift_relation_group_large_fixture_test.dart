@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -138,8 +139,10 @@ void main() {
     final database = await harness.openReadyDatabase();
     await _insertIntention(database, _ownerIdValue, 'Владелец');
     await _insertIntention(database, _participantId(1), 'Участник');
-    await database.customStatement(
-      '''
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        '''
           INSERT INTO long_term_relations (
             id,
             source_intention_id,
@@ -150,7 +153,8 @@ void main() {
             is_archived
           ) VALUES (?, ?, ?, 'can', 1, CAST(x'80' AS TEXT), 1)
         ''',
-      [_relationId(1), _participantId(1), _ownerIdValue],
+        [_relationId(1), _participantId(1), _ownerIdValue],
+      ),
     );
     await harness.closePersistenceObjectGraph();
 
@@ -339,45 +343,47 @@ void main() {
   );
 }
 
-Future<void> _populateLargeFixture(AppDatabase database) =>
-    database.batch((batch) {
-      const timestamp = 1789862400000000;
-      batch.insert(
-        database.intentions,
-        IntentionsCompanion.insert(
-          id: _ownerIdValue,
-          title: 'Владелец большого соседства',
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        ),
-      );
-      final total = _activeGroupSize + _archivedGroupSize;
-      for (var index = 0; index < total; index++) {
-        final participantId = _participantId(index);
-        batch
-          ..insert(
-            database.intentions,
-            IntentionsCompanion.insert(
-              id: participantId,
-              title: 'Участник $index',
-              createdAt: timestamp + index + 1,
-              updatedAt: timestamp + index + 1,
-            ),
-          )
-          ..insert(
-            database.longTermRelations,
-            LongTermRelationsCompanion.insert(
-              id: _relationId(index),
-              sourceIntentionId: _ownerIdValue,
-              relatedIntentionId: participantId,
-              type: 'need',
-              priority: index % 4 + 1,
-              description: Value(index % 17 == 0 ? 'Описание $index' : null),
-              isArchived: Value(index >= _activeGroupSize),
-            ),
-          );
-      }
-    });
+Future<void> _populateLargeFixture(AppDatabase database) => seedGraph(
+  database,
+  () => database.batch((batch) {
+    const timestamp = 1789862400000000;
+    batch.insert(
+      database.intentions,
+      IntentionsCompanion.insert(
+        id: _ownerIdValue,
+        title: 'Владелец большого соседства',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      ),
+    );
+    final total = _activeGroupSize + _archivedGroupSize;
+    for (var index = 0; index < total; index++) {
+      final participantId = _participantId(index);
+      batch
+        ..insert(
+          database.intentions,
+          IntentionsCompanion.insert(
+            id: participantId,
+            title: 'Участник $index',
+            createdAt: timestamp + index + 1,
+            updatedAt: timestamp + index + 1,
+          ),
+        )
+        ..insert(
+          database.longTermRelations,
+          LongTermRelationsCompanion.insert(
+            id: _relationId(index),
+            sourceIntentionId: _ownerIdValue,
+            relatedIntentionId: participantId,
+            type: 'need',
+            priority: index % 4 + 1,
+            description: Value(index % 17 == 0 ? 'Описание $index' : null),
+            isArchived: Value(index >= _activeGroupSize),
+          ),
+        );
+    }
+  }),
+);
 
 /// Обходит всю группу порциями и возвращает идентификаторы связей в порядке
 /// выдачи.
@@ -468,12 +474,15 @@ Future<List<String>> _traverseGroup(
 }
 
 Future<void> _insertIntention(AppDatabase database, String id, String title) =>
-    database.customStatement(
-      '''
+    seedGraph(
+      database,
+      () => database.customStatement(
+        '''
     INSERT INTO intentions (id, title, created_at, updated_at)
     VALUES (?, ?, ?, ?)
   ''',
-      [id, title, 1789862400000000, 1789862400000000],
+        [id, title, 1789862400000000, 1789862400000000],
+      ),
     );
 
 DriftPersonalGraphRepository _repository(AppDatabase database) =>

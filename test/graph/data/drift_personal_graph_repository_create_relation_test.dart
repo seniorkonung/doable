@@ -22,6 +22,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -149,9 +150,16 @@ void main() {
     'сохраняет занятой архивную пару и возвращает её идентификатор',
     () async {
       await repository.execute(_createCommand(sourceId, relatedId));
-      await (database.update(database.longTermRelations)
-            ..where((row) => row.id.equals(relationId.toCanonicalString())))
-          .write(const LongTermRelationsCompanion(isArchived: Value(true)));
+      await seedGraph(
+        database,
+        () =>
+            (database.update(database.longTermRelations)..where(
+                  (row) => row.id.equals(relationId.toCanonicalString()),
+                ))
+                .write(
+                  const LongTermRelationsCompanion(isArchived: Value(true)),
+                ),
+      );
 
       final result = await repository.execute(
         _createCommand(sourceId, relatedId, type: LongTermRelationType.can),
@@ -415,17 +423,20 @@ Future<void> _insertIntention(
   IntentionId id, {
   required String title,
   bool isArchived = false,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        isArchived: Value(isArchived),
-        createdAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
-        updatedAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          isArchived: Value(isArchived),
+          createdAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+          updatedAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<Map<String, Object?>> _storedIntention(
   AppDatabase database,

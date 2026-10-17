@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -188,12 +189,13 @@ void main() {
 
   test('некорректная календарная дата отклоняет весь период', () async {
     // Формат этой даты допускается схемой, но календарный день не существует.
-    // Повреждение возникает вне команд графа и отметок лога не оставляет.
-    await database.customStatement('UPDATE graph_log_control SET capture = 0');
-    await database.customStatement('UPDATE daily_choices SET choice_date = ?', [
-      '2026-02-30',
-    ]);
-    await database.customStatement('UPDATE graph_log_control SET capture = 1');
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        'UPDATE daily_choices SET choice_date = ?',
+        ['2026-02-30'],
+      ),
+    );
     for (final month in [1, 12]) {
       expect(
         await repository.execute(

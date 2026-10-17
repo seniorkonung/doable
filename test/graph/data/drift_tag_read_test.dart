@@ -14,6 +14,7 @@ import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -59,10 +60,12 @@ void main() {
   tearDown(() => database.close());
 
   void addTag(int number, String name) {
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(number),
-      name,
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(number),
+        name,
+      ]);
+    });
   }
 
   TagCatalogSnapshot snapshot(TagCatalogResult result) =>
@@ -150,10 +153,12 @@ void main() {
     for (var number = 1; number <= 137; number++) {
       addTag(number, 'Тег $number');
     }
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      'некорректный UUID',
-      'Повреждённый',
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        'некорректный UUID',
+        'Повреждённый',
+      ]);
+    });
     final result = await repository.getTagCatalog(const TagCatalogBrowseMode());
     expect(
       result,
@@ -181,18 +186,24 @@ void main() {
     final absent = (events.current as TagReadSuccess).value;
     expect(absent.value, isNull);
 
-    await database.customUpdate(
-      'INSERT INTO tags (id, name) VALUES (?, ?)',
-      variables: [Variable<String>(_uuid(1)), const Variable<String>('Дом')],
-      updates: {database.tags},
+    await seedGraph(
+      database,
+      () => database.customUpdate(
+        'INSERT INTO tags (id, name) VALUES (?, ?)',
+        variables: [Variable<String>(_uuid(1)), const Variable<String>('Дом')],
+        updates: {database.tags},
+      ),
     );
     expect(await events.moveNext(), isTrue);
     expect((events.current as TagReadSuccess).value.value!.name.value, 'Дом');
 
-    await database.customUpdate(
-      'DELETE FROM tags WHERE id = ?',
-      variables: [Variable<String>(_uuid(1))],
-      updates: {database.tags},
+    await seedGraph(
+      database,
+      () => database.customUpdate(
+        'DELETE FROM tags WHERE id = ?',
+        variables: [Variable<String>(_uuid(1))],
+        updates: {database.tags},
+      ),
     );
     expect(await events.moveNext(), isTrue);
     expect((events.current as TagReadSuccess).value.value, isNull);
@@ -286,13 +297,16 @@ void main() {
           (restored.current as TagReadSuccess).value.value!.name.value,
           'Дом',
         );
-        await database.customUpdate(
-          'UPDATE tags SET name = ? WHERE id = ?',
-          variables: [
-            const Variable<String>('Быт'),
-            Variable<String>(_uuid(1)),
-          ],
-          updates: {database.tags},
+        await seedGraph(
+          database,
+          () => database.customUpdate(
+            'UPDATE tags SET name = ? WHERE id = ?',
+            variables: [
+              const Variable<String>('Быт'),
+              Variable<String>(_uuid(1)),
+            ],
+            updates: {database.tags},
+          ),
         );
         expect(await restored.moveNext(), isTrue);
         expect(

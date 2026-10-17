@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -65,26 +66,25 @@ void main() {
       }
     }
 
-    raw.execute('BEGIN');
     try {
-      for (var day = 0; day < dates.length; day++) {
-        for (var choice = 0; choice < 20; choice++) {
-          addChoice(dates[day], day.isEven || choice != 0);
+      seedRawGraph(raw, () {
+        for (var day = 0; day < dates.length; day++) {
+          for (var choice = 0; choice < 20; choice++) {
+            addChoice(dates[day], day.isEven || choice != 0);
+          }
         }
-      }
-      for (var choice = 0; choice < 3000; choice++) {
-        addChoice(_date(first.subtract(const Duration(days: 1))), false);
-        addChoice(
-          _date(
-            first.add(const Duration(days: DailyChoiceDayStatusQuery.maxDays)),
-          ),
-          false,
-        );
-      }
-      raw.execute('COMMIT');
-    } on Object {
-      raw.execute('ROLLBACK');
-      rethrow;
+        for (var choice = 0; choice < 3000; choice++) {
+          addChoice(_date(first.subtract(const Duration(days: 1))), false);
+          addChoice(
+            _date(
+              first.add(
+                const Duration(days: DailyChoiceDayStatusQuery.maxDays),
+              ),
+            ),
+            false,
+          );
+        }
+      });
     } finally {
       insertChoice.close();
       insertStep.close();

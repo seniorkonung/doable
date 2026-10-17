@@ -25,6 +25,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -352,17 +353,20 @@ Future<void> _insertIntention(
   IntentionId id, {
   required String title,
   bool isArchived = false,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        isArchived: Value(isArchived),
-        createdAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
-        updatedAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          isArchived: Value(isArchived),
+          createdAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+          updatedAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<void> _insertRelation(
   AppDatabase database, {
@@ -373,19 +377,22 @@ Future<void> _insertRelation(
   RelationPriority priority = RelationPriority.p2,
   String? description,
   bool isArchived = false,
-}) => database
-    .into(database.longTermRelations)
-    .insert(
-      LongTermRelationsCompanion.insert(
-        id: id.toCanonicalString(),
-        sourceIntentionId: sourceId.toCanonicalString(),
-        relatedIntentionId: relatedId.toCanonicalString(),
-        type: type == LongTermRelationType.need ? 'need' : 'can',
-        priority: priority.index + 1,
-        description: Value(description),
-        isArchived: Value(isArchived),
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.longTermRelations)
+      .insert(
+        LongTermRelationsCompanion.insert(
+          id: id.toCanonicalString(),
+          sourceIntentionId: sourceId.toCanonicalString(),
+          relatedIntentionId: relatedId.toCanonicalString(),
+          type: type == LongTermRelationType.need ? 'need' : 'can',
+          priority: priority.index + 1,
+          description: Value(description),
+          isArchived: Value(isArchived),
+        ),
       ),
-    );
+);
 
 Future<void> _seedCascade(AppDatabase database) async {
   await _insertIntention(database, _sourceId, title: 'Изучать язык');
@@ -503,7 +510,8 @@ Future<void> _createStoredIntentions(LocalDatabaseHarness harness) async {
 }
 
 void _seedStoredIntentions(sqlite.Database database) {
-  database.execute('''
+  seedRawGraph(database, () {
+    database.execute('''
     INSERT INTO intentions (
       id,
       title,
@@ -550,6 +558,7 @@ void _seedStoredIntentions(sqlite.Database database) {
         1704153600000000
       )
   ''');
+  });
 }
 
 /// Запускает каскадное архивирование в отдельном процессе и принудительно

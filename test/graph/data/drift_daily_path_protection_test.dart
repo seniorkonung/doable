@@ -15,6 +15,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -51,45 +52,47 @@ void main() {
       () => DateTime.utc(2026, 9, 23),
       InMemoryDiagnosticsSink(),
     );
-    for (var number = 1; number <= 5; number++) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (var number = 1; number <= 5; number++) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, 0, 0, 1, 1)''',
-        [_uuid(number), 'Намерение $number'],
-      );
-    }
-    raw.execute(
-      '''INSERT INTO long_term_relations
+          [_uuid(number), 'Намерение $number'],
+        );
+      }
+      raw.execute(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
           description, is_archived)
          VALUES (?, ?, ?, 'need', 2, 'Прежнее', 0)''',
-      [_uuid(101), _uuid(1), _uuid(2)],
-    );
-    raw.execute(
-      '''INSERT INTO long_term_relations
+        [_uuid(101), _uuid(1), _uuid(2)],
+      );
+      raw.execute(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
           description, is_archived)
          VALUES (?, ?, ?, 'can', 2, NULL, 0)''',
-      [_uuid(102), _uuid(2), _uuid(3)],
-    );
-    raw.execute(
-      '''INSERT INTO long_term_relations
+        [_uuid(102), _uuid(2), _uuid(3)],
+      );
+      raw.execute(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
           description, is_archived)
          VALUES (?, ?, ?, 'need', 2, NULL, 0)''',
-      [_uuid(103), _uuid(1), _uuid(4)],
-    );
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(301),
-      'Путь',
-    ]);
-    for (var number = 1; number <= 5; number++) {
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(301), _uuid(number)],
+        [_uuid(103), _uuid(1), _uuid(4)],
       );
-    }
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(301),
+        'Путь',
+      ]);
+      for (var number = 1; number <= 5; number++) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(301), _uuid(number)],
+        );
+      }
+    });
     tagsBefore = storedRows('tags');
     assignmentsBefore = storedRows('tag_assignments');
   });
@@ -97,25 +100,27 @@ void main() {
   tearDown(() => database.close());
 
   void addChoice(int number, {bool completed = false}) {
-    raw.execute(
-      '''INSERT INTO daily_choices
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
           description, is_completed)
          VALUES (?, ?, ?, '2026-09-23', 'Выбор', ?)''',
-      [_uuid(number), _uuid(1), _uuid(3), completed ? 1 : 0],
-    );
-    raw.execute(
-      '''INSERT INTO daily_choice_path_steps
+        [_uuid(number), _uuid(1), _uuid(3), completed ? 1 : 0],
+      );
+      raw.execute(
+        '''INSERT INTO daily_choice_path_steps
          (id, daily_choice_id, long_term_relation_id, previous_step_id)
          VALUES (?, ?, ?, NULL)''',
-      [_uuid(number + 100), _uuid(number), _uuid(101)],
-    );
-    raw.execute(
-      '''INSERT INTO daily_choice_path_steps
+        [_uuid(number + 100), _uuid(number), _uuid(101)],
+      );
+      raw.execute(
+        '''INSERT INTO daily_choice_path_steps
          (id, daily_choice_id, long_term_relation_id, previous_step_id)
          VALUES (?, ?, ?, ?)''',
-      [_uuid(number + 200), _uuid(number), _uuid(102), _uuid(number + 100)],
-    );
+        [_uuid(number + 200), _uuid(number), _uuid(102), _uuid(number + 100)],
+      );
+    });
   }
 
   int count(String table) =>
@@ -278,7 +283,10 @@ void main() {
   test('защита исчезает только после последней ссылки', () async {
     addChoice(201);
     addChoice(202);
-    raw.execute('DELETE FROM daily_choices WHERE id = ?', [_uuid(201)]);
+    seedRawGraph(
+      raw,
+      () => raw.execute('DELETE FROM daily_choices WHERE id = ?', [_uuid(201)]),
+    );
 
     final blocked = await repository.execute(
       DeleteLongTermRelation(_relation(101)),
@@ -288,7 +296,10 @@ void main() {
       GraphFailureCategory.conflict,
     );
     expectAssignments();
-    raw.execute('DELETE FROM daily_choices WHERE id = ?', [_uuid(202)]);
+    seedRawGraph(
+      raw,
+      () => raw.execute('DELETE FROM daily_choices WHERE id = ?', [_uuid(202)]),
+    );
 
     expect(
       await repository.execute(DeleteLongTermRelation(_relation(101))),
@@ -299,13 +310,15 @@ void main() {
   });
 
   test('удаление намерения повторно учитывает прямую дневную ссылку', () async {
-    raw.execute(
-      '''INSERT INTO daily_choices
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date, is_completed)
          VALUES (?, ?, ?, '2026-09-23', 0)''',
-      [_uuid(201), _uuid(1), _uuid(3)],
-    );
-    raw.execute('DELETE FROM long_term_relations');
+        [_uuid(201), _uuid(1), _uuid(3)],
+      );
+      raw.execute('DELETE FROM long_term_relations');
+    });
 
     final result = await repository.execute(DeleteIntention(_intention(1)));
 
@@ -322,15 +335,17 @@ void main() {
   test('замена и удаление дубликата снимают только последние ссылки', () async {
     addChoice(201);
     addChoice(202);
-    raw.execute('UPDATE intentions SET is_action_ready = 1 WHERE id = ?', [
-      _uuid(4),
-    ]);
-    raw.execute(
-      '''INSERT INTO long_term_relations
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE intentions SET is_action_ready = 1 WHERE id = ?', [
+        _uuid(4),
+      ]);
+      raw.execute(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
           is_archived) VALUES (?, ?, ?, 'can', 2, 0)''',
-      [_uuid(104), _uuid(5), _uuid(4)],
-    );
+        [_uuid(104), _uuid(5), _uuid(4)],
+      );
+    });
 
     final replacement = await repository.execute(
       ReplaceDailyChoicePath(

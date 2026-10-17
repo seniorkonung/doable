@@ -12,6 +12,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -30,10 +31,12 @@ void main() {
     database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     seedTagStorageFixture(raw);
-    raw.execute(
-      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-      [tagFixtureId(4), 'Намерение без готовности', 104, 204],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+        [tagFixtureId(4), 'Намерение без готовности', 104, 204],
+      );
+    });
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -273,13 +276,15 @@ void main() {
   test('удалённый тег не подменяется новым одноимённым тегом', () async {
     final oldId = _tagId(firstTagNumber);
     final intentionId = _intention(2);
-    raw.execute('DELETE FROM tags WHERE id = ?', [
-      tagFixtureId(firstTagNumber),
-    ]);
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(999),
-      'Дом',
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('DELETE FROM tags WHERE id = ?', [
+        tagFixtureId(firstTagNumber),
+      ]);
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(999),
+        'Дом',
+      ]);
+    });
     final before = graph();
     final beforeRevision = await revision();
 

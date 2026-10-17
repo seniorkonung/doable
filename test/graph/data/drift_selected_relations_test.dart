@@ -24,6 +24,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -49,30 +50,32 @@ void main() {
       () => DateTime.utc(2026, 9, 23),
       diagnostics,
     );
-    for (final (id, title) in [
-      (_owner, 'Владелец'),
-      (_neighbor, 'Сосед'),
-      (_other, 'Другой'),
-    ]) {
-      await database.customStatement(
-        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-        [id.toCanonicalString(), title],
-      );
-    }
-    for (final (id, source, related) in [
-      (_first, _owner, _neighbor),
-      (_second, _other, _owner),
-      (_foreign, _neighbor, _other),
-    ]) {
-      await database.customStatement(
-        "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, 'need', 2, 0)",
-        [
-          id.toCanonicalString(),
-          source.toCanonicalString(),
-          related.toCanonicalString(),
-        ],
-      );
-    }
+    await seedGraph(database, () async {
+      for (final (id, title) in [
+        (_owner, 'Владелец'),
+        (_neighbor, 'Сосед'),
+        (_other, 'Другой'),
+      ]) {
+        await database.customStatement(
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+          [id.toCanonicalString(), title],
+        );
+      }
+      for (final (id, source, related) in [
+        (_first, _owner, _neighbor),
+        (_second, _other, _owner),
+        (_foreign, _neighbor, _other),
+      ]) {
+        await database.customStatement(
+          "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, 'need', 2, 0)",
+          [
+            id.toCanonicalString(),
+            source.toCanonicalString(),
+            related.toCanonicalString(),
+          ],
+        );
+      }
+    });
   });
 
   tearDown(() => database.close());
@@ -110,22 +113,24 @@ void main() {
     () async {
       const choiceId = '018f0b5d-6b2e-7c80-8000-000000000201';
       const stepId = '018f0b5d-6b2e-7c80-8000-000000000202';
-      await database.customStatement(
-        '''
+      await seedGraph(database, () async {
+        await database.customStatement(
+          '''
         INSERT INTO daily_choices
           (id, source_intention_id, selected_intention_id, choice_date, is_completed)
         VALUES (?, ?, ?, '2026-09-23', 0)
       ''',
-        [choiceId, _owner.toCanonicalString(), _neighbor.toCanonicalString()],
-      );
-      await database.customStatement(
-        '''
+          [choiceId, _owner.toCanonicalString(), _neighbor.toCanonicalString()],
+        );
+        await database.customStatement(
+          '''
         INSERT INTO daily_choice_path_steps
           (id, daily_choice_id, long_term_relation_id)
         VALUES (?, ?, ?)
       ''',
-        [stepId, choiceId, _first.toCanonicalString()],
-      );
+          [stepId, choiceId, _first.toCanonicalString()],
+        );
+      });
 
       final result = await repository.getSelectedRelations(
         SelectedRelationsQuery(
@@ -187,9 +192,12 @@ void main() {
   test(
     'наблюдает разрешение ранее выбранной связи при изменении пути',
     () async {
-      await database.customStatement(
-        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
-        [_neighbor.toCanonicalString()],
+      await seedGraph(
+        database,
+        () => database.customStatement(
+          'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+          [_neighbor.toCanonicalString()],
+        ),
       );
       final query = SelectedRelationsQuery(
         intentionId: _owner,
@@ -335,9 +343,12 @@ void main() {
   });
 
   test('повреждение одной выбранной связи отказывает всему набору', () async {
-    await database.customStatement(
-      'UPDATE long_term_relations SET description = ? WHERE id = ?',
-      [' ', _second.toCanonicalString()],
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        'UPDATE long_term_relations SET description = ? WHERE id = ?',
+        [' ', _second.toCanonicalString()],
+      ),
     );
     final result = await repository.getSelectedRelations(
       SelectedRelationsQuery(
@@ -390,10 +401,13 @@ void main() {
     _insertChoice(raw, selectedRole, source: _other, selected: _owner);
     _insertChoice(raw, foreign, source: _neighbor, selected: _other);
     const description = 'Описание выбранной связи\nПолный текст';
-    raw.execute(
-      '''UPDATE daily_choices
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        '''UPDATE daily_choices
       SET scheduled_minute = 1080, priority = 2, description = ? WHERE id = ?''',
-      [description, sameUuid.toCanonicalString()],
+        [description, sameUuid.toCanonicalString()],
+      ),
     );
     final query = SelectedRelationsQuery.mixed(
       intentionId: _owner,
@@ -444,9 +458,13 @@ void main() {
     () async {
       final choiceId = _choice(_relation(32).toCanonicalString());
       _insertChoice(raw, choiceId, source: _owner, selected: _neighbor);
-      raw.execute('UPDATE intentions SET is_action_ready = 1 WHERE id = ?', [
-        _other.toCanonicalString(),
-      ]);
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+          [_other.toCanonicalString()],
+        ),
+      );
       final reference = DailyChoiceBlockingRelationReference(choiceId);
       final events = StreamIterator(
         repository.watchSelectedRelations(
@@ -634,9 +652,12 @@ void main() {
     );
     observer.failDailyReadAt = null;
 
-    raw.execute(
-      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [ids.last.toCanonicalString()],
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [ids.last.toCanonicalString()],
+      ),
     );
     final corrupted = await repository.getSelectedRelations(query);
     expect(
@@ -704,30 +725,32 @@ void _insertChoice(
   required IntentionId source,
   required IntentionId selected,
 }) {
-  raw.execute(
-    '''INSERT INTO daily_choices
+  seedRawGraph(raw, () {
+    raw.execute(
+      '''INSERT INTO daily_choices
        (id, source_intention_id, selected_intention_id, choice_date, is_completed)
        VALUES (?, ?, ?, '2026-09-23', 0)''',
-    [
-      id.toCanonicalString(),
-      source.toCanonicalString(),
-      selected.toCanonicalString(),
-    ],
-  );
-  raw.execute(
-    '''INSERT INTO daily_choice_path_steps
+      [
+        id.toCanonicalString(),
+        source.toCanonicalString(),
+        selected.toCanonicalString(),
+      ],
+    );
+    raw.execute(
+      '''INSERT INTO daily_choice_path_steps
        (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)''',
-    [
-      id.toCanonicalString(),
-      id.toCanonicalString(),
-      (source == _owner
-              ? _first
-              : source == _neighbor
-              ? _foreign
-              : _second)
-          .toCanonicalString(),
-    ],
-  );
+      [
+        id.toCanonicalString(),
+        id.toCanonicalString(),
+        (source == _owner
+                ? _first
+                : source == _neighbor
+                ? _foreign
+                : _second)
+            .toCanonicalString(),
+      ],
+    );
+  });
 }
 
 final class _SelectedReadFailureObserver

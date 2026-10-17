@@ -14,6 +14,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -59,22 +60,24 @@ void main() {
     );
     await database.open();
     seedTagStorageFixture(raw);
-    raw.execute(
-      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-      [tagFixtureId(4), 'Намерение 4'],
-    );
-    // Назначения другого тега тем же намерениям чередуются с назначениями
-    // выбранного тега.
-    for (final (tagNumber, intentionNumber) in [
-      (lastTagNumber, 1),
-      (lastTagNumber, 4),
-      (firstTagNumber, 4),
-    ]) {
+    seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(tagNumber), tagFixtureId(intentionNumber)],
+        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+        [tagFixtureId(4), 'Намерение 4'],
       );
-    }
+      // Назначения другого тега тем же намерениям чередуются с назначениями
+      // выбранного тега.
+      for (final (tagNumber, intentionNumber) in [
+        (lastTagNumber, 1),
+        (lastTagNumber, 4),
+        (firstTagNumber, 4),
+      ]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(tagNumber), tagFixtureId(intentionNumber)],
+        );
+      }
+    });
     diagnostics = InMemoryDiagnosticsSink();
     graph = DriftPersonalGraphRepository(
       database,
@@ -131,10 +134,12 @@ void main() {
   }
 
   test('повреждение дополнительного намерения отклоняет всю порцию', () async {
-    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-      ' CANARY-название ',
-      tagFixtureId(4),
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+        ' CANARY-название ',
+        tagFixtureId(4),
+      ]);
+    });
     await expectCorruption(TaggedIntentionsScope.active);
     final events = diagnostics.events
         .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
@@ -151,41 +156,47 @@ void main() {
   });
 
   test('начальный BOM сохранённого названия не удаляется при чтении', () async {
-    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-      '\uFEFFНамерение',
-      tagFixtureId(1),
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+        '\uFEFFНамерение',
+        tagFixtureId(1),
+      ]);
+    });
     await expectCorruption(TaggedIntentionsScope.active);
   });
 
   test('недопустимый UTF-8 идентичности даёт повреждение', () async {
-    raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
-      tagFixtureId(firstTagNumber),
-    ]);
-    raw.execute('''INSERT INTO intentions (id, title, created_at, updated_at)
+    seedRawGraph(raw, () {
+      raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
+        tagFixtureId(firstTagNumber),
+      ]);
+      raw.execute('''INSERT INTO intentions (id, title, created_at, updated_at)
       VALUES (CAST(x'FF' AS TEXT), 'Намерение', 1, 1)''');
-    raw.execute(
-      '''INSERT INTO tag_assignments (tag_id, intention_id)
+      raw.execute(
+        '''INSERT INTO tag_assignments (tag_id, intention_id)
       VALUES (?, CAST(x'FF' AS TEXT))''',
-      [tagFixtureId(firstTagNumber)],
-    );
+        [tagFixtureId(firstTagNumber)],
+      );
+    });
     await expectCorruption(TaggedIntentionsScope.active);
   });
 
   test(
     'неверная идентичность намерения отклоняет дополнительную строку',
     () async {
-      raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
-        tagFixtureId(4),
-      ]);
-      raw.execute(
-        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-        ['CANARY-неверный-id', 'Намерение'],
-      );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), 'CANARY-неверный-id'],
-      );
+      seedRawGraph(raw, () {
+        raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
+          tagFixtureId(4),
+        ]);
+        raw.execute(
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+          ['CANARY-неверный-id', 'Намерение'],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(firstTagNumber), 'CANARY-неверный-id'],
+        );
+      });
       await expectCorruption(TaggedIntentionsScope.active);
     },
   );
@@ -193,22 +204,24 @@ void main() {
   test('совместный поиск по обязательному и исключённому тегам сохраняет '
       'курсор навигации', () async {
     final additionalIds = <IntentionId>[];
-    for (var number = 10; number < 17; number++) {
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        [tagFixtureId(number), 'Намерение $number', 0, number, number],
-      );
-      additionalIds.add(_intention(number));
-      for (final tagNumber in [
-        firstTagNumber,
-        if (number.isEven) lastTagNumber,
-      ]) {
+    seedRawGraph(raw, () {
+      for (var number = 10; number < 17; number++) {
         raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [tagFixtureId(tagNumber), tagFixtureId(number)],
+          'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+          [tagFixtureId(number), 'Намерение $number', 0, number, number],
         );
+        additionalIds.add(_intention(number));
+        for (final tagNumber in [
+          firstTagNumber,
+          if (number.isEven) lastTagNumber,
+        ]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(tagNumber), tagFixtureId(number)],
+          );
+        }
       }
-    }
+    });
     Map<String, List<List<Object?>>> storedGraph() => {
       ...retainedTagFixtureGraph(raw),
       for (final table in ['tags', 'tag_assignments', 'sqlite_sequence'])
@@ -318,21 +331,23 @@ void main() {
 
   test('успешные и отказавшие чтения каталога с обязательным и '
       'исключёнными тегами не меняют сохранённый граф', () async {
-    for (var number = 10; number < 17; number++) {
-      raw.execute(
-        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-        [tagFixtureId(number), 'Намерение $number', number, number],
-      );
-      for (final tagNumber in [
-        firstTagNumber,
-        if (number.isEven) lastTagNumber,
-      ]) {
+    seedRawGraph(raw, () {
+      for (var number = 10; number < 17; number++) {
         raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [tagFixtureId(tagNumber), tagFixtureId(number)],
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+          [tagFixtureId(number), 'Намерение $number', number, number],
         );
+        for (final tagNumber in [
+          firstTagNumber,
+          if (number.isEven) lastTagNumber,
+        ]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(tagNumber), tagFixtureId(number)],
+          );
+        }
       }
-    }
+    });
     Map<String, List<List<Object?>>> storedGraph() => {
       ...retainedTagFixtureGraph(raw),
       for (final table in ['tags', 'tag_assignments'])
@@ -398,14 +413,16 @@ void main() {
   test(
     'оба охвата содержат только прямые назначения намерениям в их порядке',
     () async {
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 2, 1],
-      );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(lastTagNumber), tagFixtureId(2)],
-      );
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 2, 1],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(lastTagNumber), tagFixtureId(2)],
+        );
+      });
       for (final size in [1, 50, 100]) {
         final active = await collect(
           _tag(firstTagNumber),
@@ -435,10 +452,12 @@ void main() {
   );
 
   test('тег без назначений пуст в обоих охватах при помеченных связанных намерениях', () async {
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(305),
-      'Без назначений',
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(305),
+        'Без назначений',
+      ]);
+    });
     for (final scope in TaggedIntentionsScope.values) {
       final empty = page(
         await graph.getTaggedIntentionsPage(
@@ -463,14 +482,16 @@ void main() {
     expect(empty.items, isEmpty);
     expect(empty.nextCursor, isNull);
     expect(empty.tag.id, _tag(lastTagNumber));
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(303),
-      'Только архив',
-    ]);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(303), tagFixtureId(2)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(303),
+        'Только архив',
+      ]);
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(303), tagFixtureId(2)],
+      );
+    });
     expect(
       page(
         await graph.getTaggedIntentionsPage(
@@ -509,10 +530,12 @@ void main() {
   });
 
   test('одноимённые намерения одного охвата остаются разными', () async {
-    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-      'Намерение 1',
-      tagFixtureId(4),
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+        'Намерение 1',
+        tagFixtureId(4),
+      ]);
+    });
     final active = await collect(
       _tag(firstTagNumber),
       TaggedIntentionsScope.active,
@@ -523,14 +546,16 @@ void main() {
   });
 
   test('новое назначение следует за оставшимися', () async {
-    raw.execute(
-      'DELETE FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
-      [tagFixtureId(firstTagNumber), tagFixtureId(1)],
-    );
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(1)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'DELETE FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+        [tagFixtureId(firstTagNumber), tagFixtureId(1)],
+      );
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), tagFixtureId(1)],
+      );
+    });
     final active = await collect(
       _tag(firstTagNumber),
       TaggedIntentionsScope.active,
@@ -617,13 +642,12 @@ void main() {
     expect(updated.map((item) => item.id), [_intention(4)]);
   });
 
-  test(
-    'порции 1, 50 и 100 обходят намерения обоих охватов среди чужих назначений',
-    () async {
-      final expected = <TaggedIntentionsScope, List<IntentionId>>{
-        TaggedIntentionsScope.active: [_intention(1), _intention(4)],
-        TaggedIntentionsScope.archived: [_intention(2)],
-      };
+  test('порции 1, 50 и 100 обходят намерения обоих охватов среди чужих назначений', () async {
+    final expected = <TaggedIntentionsScope, List<IntentionId>>{
+      TaggedIntentionsScope.active: [_intention(1), _intention(4)],
+      TaggedIntentionsScope.archived: [_intention(2)],
+    };
+    seedRawGraph(raw, () {
       for (var number = 5; number <= 209; number++) {
         final archived = number.isOdd;
         final relationNumber = number + 1000;
@@ -660,16 +684,18 @@ void main() {
                 : TaggedIntentionsScope.active]!
             .add(_intention(number));
       }
-      for (final size in [1, 50, 100]) {
-        for (final scope in TaggedIntentionsScope.values) {
-          final rows = await collect(_tag(firstTagNumber), scope, size);
-          expect(rows.map((row) => row.id), expected[scope]);
-          expect(
-            rows.map((row) => row.id).toSet(),
-            hasLength(expected[scope]!.length),
-          );
-        }
+    });
+    for (final size in [1, 50, 100]) {
+      for (final scope in TaggedIntentionsScope.values) {
+        final rows = await collect(_tag(firstTagNumber), scope, size);
+        expect(rows.map((row) => row.id), expected[scope]);
+        expect(
+          rows.map((row) => row.id).toSet(),
+          hasLength(expected[scope]!.length),
+        );
       }
+    }
+    seedRawGraph(raw, () {
       raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
         'Изменённое название',
         tagFixtureId(6),
@@ -678,16 +704,13 @@ void main() {
         'Изменённый тег',
         tagFixtureId(firstTagNumber),
       ]);
-      final after = await collect(
-        _tag(firstTagNumber),
-        TaggedIntentionsScope.active,
-        100,
-      );
-      expect(
-        after.map((row) => row.id),
-        expected[TaggedIntentionsScope.active],
-      );
-      expect(after[2].title, 'Изменённое название');
-    },
-  );
+    });
+    final after = await collect(
+      _tag(firstTagNumber),
+      TaggedIntentionsScope.active,
+      100,
+    );
+    expect(after.map((row) => row.id), expected[TaggedIntentionsScope.active]);
+    expect(after[2].title, 'Изменённое название');
+  });
 }

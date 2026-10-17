@@ -219,7 +219,7 @@
   - **Files likely touched:** `test/support/graph_seed.dart` (новый), `test/support/tag_storage_fixture.dart`, `test/support/daily_choice_durability_fixture.dart`, `test/support/graph_operation_process_worker.dart`, `benchmark/support/graph_log_fixture.dart`, `benchmark/support/contribution_statistics_fixture.dart`, `benchmark/support/intention_statistics_fixture.dart`, `benchmark/graph_log/graph_log_benchmark.dart`, `benchmark/statistics/drift_intention_statistics_benchmark.dart`, `benchmark/statistics/drift_through_relations_statistics_benchmark.dart`, тесты `test/data/local/`, кроме `graph_log_schema_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.20 Заполнять граф в тестах `test/graph/` через общий помощник с выключенным захватом
+- [x] 1.20 Заполнять граф в тестах `test/graph/` через общий помощник с выключенным захватом
   - **Acceptance criteria:**
     - Каждая прямая запись в таблицы графа в `test/graph/` идёт через помощник задачи 1.19, а местные пары переключения захвата вокруг заполнения заменены им. Исключение — записи `test/graph/data/graph_fact_capture_test.dart`, которые изображают транзакцию единого пути: их переводит задача 1.22.
     - Записываемые данные, их порядок, ожидания и названия тестов не меняются; ожидаемый отказ записи проверяется на вызове помощника с прежним видом отказа.

@@ -67,6 +67,7 @@ import '../../intention/presentation/catalog/catalog_test_support.dart'
     as catalog_support;
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/daily_choice_local_date.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
@@ -378,12 +379,15 @@ void main() {
       await database.open();
       addTearDown(database.close);
       await seedDurabilityGraph(database);
-      await database.customStatement(
-        '''INSERT INTO long_term_relations
+      await seedGraph(
+        database,
+        () => database.customStatement(
+          '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id,
           type, priority, is_archived)
          VALUES (?, ?, ?, 'need', 2, 0)''',
-        [durabilityUuid(105), durabilityUuid(5), durabilityUuid(4)],
+          [durabilityUuid(105), durabilityUuid(5), durabilityUuid(4)],
+        ),
       );
       final repository = DriftPersonalGraphRepository(
         database,
@@ -757,18 +761,20 @@ void main() {
       final ids = [
         for (var index = 1; index <= 4; index++) testIntentionId(index),
       ];
-      for (var index = 0; index < ids.length; index++) {
-        await database
-            .into(database.intentions)
-            .insert(
-              IntentionsCompanion.insert(
-                id: ids[index].toCanonicalString(),
-                title: 'Намерение ${index + 1}',
-                createdAt: 1000000 + index,
-                updatedAt: 2000000 + index,
-              ),
-            );
-      }
+      await seedGraph(database, () async {
+        for (var index = 0; index < ids.length; index++) {
+          await database
+              .into(database.intentions)
+              .insert(
+                IntentionsCompanion.insert(
+                  id: ids[index].toCanonicalString(),
+                  title: 'Намерение ${index + 1}',
+                  createdAt: 1000000 + index,
+                  updatedAt: 2000000 + index,
+                ),
+              );
+        }
+      });
       final repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),

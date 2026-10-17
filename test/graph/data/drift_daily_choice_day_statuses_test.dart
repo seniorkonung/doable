@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -42,31 +43,33 @@ void main() {
   tearDown(() => database.close());
 
   void addChoice(int number, String date, {bool completed = false}) {
-    raw.execute(
-      '''INSERT INTO daily_choices
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
           is_completed) VALUES (?, ?, ?, ?, ?)''',
-      [
-        durabilityUuid(number),
-        durabilityUuid(1),
-        durabilityUuid(3),
-        date,
-        completed ? 1 : 0,
-      ],
-    );
-    for (var index = 0; index < 2; index++) {
-      raw.execute(
-        '''INSERT INTO daily_choice_path_steps
-           (id, daily_choice_id, long_term_relation_id, previous_step_id)
-           VALUES (?, ?, ?, ?)''',
         [
-          durabilityUuid(number * 10 + index),
           durabilityUuid(number),
-          durabilityUuid(101 + index),
-          index == 0 ? null : durabilityUuid(number * 10),
+          durabilityUuid(1),
+          durabilityUuid(3),
+          date,
+          completed ? 1 : 0,
         ],
       );
-    }
+      for (var index = 0; index < 2; index++) {
+        raw.execute(
+          '''INSERT INTO daily_choice_path_steps
+           (id, daily_choice_id, long_term_relation_id, previous_step_id)
+           VALUES (?, ?, ?, ?)''',
+          [
+            durabilityUuid(number * 10 + index),
+            durabilityUuid(number),
+            durabilityUuid(101 + index),
+            index == 0 ? null : durabilityUuid(number * 10),
+          ],
+        );
+      }
+    });
   }
 
   test('различает состояния всех выборов и включает обе границы', () async {
@@ -153,8 +156,10 @@ void main() {
     () async {
       addChoice(201, '2026-10-05', completed: true);
       addChoice(202, '2026-10-06');
-      raw.execute('UPDATE long_term_relations SET is_archived = 1');
-      raw.execute('UPDATE intentions SET is_archived = 1');
+      seedRawGraph(raw, () {
+        raw.execute('UPDATE long_term_relations SET is_archived = 1');
+        raw.execute('UPDATE intentions SET is_archived = 1');
+      });
 
       final result = await repository.getDailyChoiceDayStatuses(
         DailyChoiceDayStatusQuery(
