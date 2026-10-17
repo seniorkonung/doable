@@ -90,3 +90,10 @@ abstract interface class GraphFactLog {
   /// удалённых снимков: их удаляет вызывающий.
   Future<List<String>> removeHistoryBefore(int boundary);
 }
+
+/// Лог фактов, который сообщает о подтверждённых пакетах: по сигналу сжатие
+/// узнаёт о росте лога, не читая базу после каждой команды.
+abstract interface class ObservableGraphFactLog implements GraphFactLog {
+  /// Позиции пакетов, подтверждённых после подписки, по возрастанию.
+  Stream<int> get confirmedPositions;
+}

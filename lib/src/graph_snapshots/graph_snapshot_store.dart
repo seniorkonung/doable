@@ -96,6 +96,16 @@ final class GraphSnapshotStore {
     }
   }
 
+  /// Удаляет историю за границей хранения [boundary] по правилу
+  /// [GraphFactLog.removeHistoryBefore]: сначала из реестра, затем файлы
+  /// удалённых из него снимков. Файл, который не удалось удалить, удаляет
+  /// очистка.
+  Future<void> removeHistoryBefore(int boundary) async {
+    for (final fileName in await _log.removeHistoryBefore(boundary)) {
+      await _deleteLeftover(_file(fileName));
+    }
+  }
+
   /// Удаляет из каталога снимков незарегистрированные и временные файлы,
   /// которые оставили прерванные и неудачные записи и удаление истории.
   Future<void> removeUnregisteredFiles() async {
@@ -202,7 +212,7 @@ Stream<List<int>> _checked(Stream<List<int>> file, Uint8List checksum) async* {
 }
 
 /// Оставшийся файл удаляет следующая очистка, поэтому отказ удаления не
-/// заменяет исходный отказ записи.
+/// прерывает удаление истории и не заменяет исходный отказ записи.
 Future<void> _deleteLeftover(File file) async {
   try {
     await file.delete();

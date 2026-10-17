@@ -102,7 +102,7 @@ part 'drift_intention_statistics_reader.dart';
 part 'drift_through_relations_statistics_reader.dart';
 
 final class DriftPersonalGraphRepository
-    implements PersonalGraphRepository, GraphFactLog {
+    implements PersonalGraphRepository, ObservableGraphFactLog {
   DriftPersonalGraphRepository(
     this._database,
     this._idGenerator,
@@ -132,6 +132,8 @@ final class DriftPersonalGraphRepository
   final TagIdGenerator _tagIdGenerator;
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
+  final StreamController<int> _confirmedPositions =
+      StreamController.broadcast();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
   final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
   _dailyChoiceWatchers = {};
@@ -224,6 +226,9 @@ final class DriftPersonalGraphRepository
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);
+
+  @override
+  Stream<int> get confirmedPositions => _confirmedPositions.stream;
 
   @override
   Future<int> readCurrentPosition() => _readCurrentLogPosition();
@@ -690,7 +695,8 @@ final class DriftPersonalGraphRepository
   /// Единый путь записи графа (ADR-0034): в последовательном исполнителе
   /// выполняет [body] в транзакции, дописывает в неё пакет фактов о
   /// затронутых сущностях и подтверждает её. После подтверждения ревизия
-  /// продвигается на единицу, а наблюдатели получают изменения команды.
+  /// продвигается на единицу, наблюдатели получают изменения команды, а
+  /// [confirmedPositions] — позицию пакета.
   ///
   /// Команда без изменений не пишет пакет и сохраняет ревизию. Любой отказ, в
   /// том числе запись сущности длиннее предела записи формата, откатывает и
@@ -701,14 +707,16 @@ final class DriftPersonalGraphRepository
     Future<void> Function(Object error)? afterRollback,
   }) => _sequencer.run(() async {
     final clock = _GraphWriteClock(_now);
-    final (bool, ConfirmedGraphResult<T>) committed;
+    final (bool, int?, ConfirmedGraphResult<T>) committed;
     try {
       committed = await _database.transaction(() async {
         final write = await body(clock);
         final capture = GraphFactCapture(_database);
         final facts = await capture.takeFacts();
+        int? packagePosition;
         if (facts.isNotEmpty) {
-          await _database
+          // Позиция — rowid пакета: INTEGER PRIMARY KEY AUTOINCREMENT.
+          packagePosition = await _database
               .into(_database.graphLogPackages)
               .insert(
                 local.GraphLogPackagesCompanion.insert(
@@ -728,6 +736,7 @@ final class DriftPersonalGraphRepository
             : _currentRevision;
         return (
           write.didMutate,
+          packagePosition,
           ConfirmedGraphResult(
             revision: revision,
             value: write.toSuccess(revision),
@@ -738,11 +747,12 @@ final class DriftPersonalGraphRepository
       await afterRollback?.call(error);
       rethrow;
     }
-    final (didMutate, confirmed) = committed;
+    final (didMutate, packagePosition, confirmed) = committed;
     if (didMutate) {
       _mutationSequence++;
       _notifyGraphWatchersFor(confirmed.changes);
     }
+    if (packagePosition != null) _confirmedPositions.add(packagePosition);
     return confirmed;
   });
 
