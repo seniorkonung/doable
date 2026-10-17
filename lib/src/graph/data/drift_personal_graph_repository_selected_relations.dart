@@ -74,7 +74,7 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
         final row = _StoredRelationGroupRow.fromRawRow(rawRow);
         if (!query.relationIds.contains(row.id) ||
             selected.containsKey(row.id)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         selected[row.id] = row;
       }
@@ -106,18 +106,17 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
           _requiredStoredString(row.data, 'id'),
         )) {
           DailyChoiceIdDecodingSuccess(:final id) => id,
-          InvalidDailyChoiceIdDecoding() =>
-            throw const _StoredIntentionCorruption(),
+          InvalidDailyChoiceIdDecoding() => throw const StoredGraphCorruption(),
         };
         if (!query.dailyChoiceIds.contains(id) ||
             selectedChoices.containsKey(id)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         choices.add(_decodeStoredDailyChoice(row, id));
       }
       for (final item in await _verifyDailyChoiceCatalogItems(choices)) {
         if (selectedChoices.containsKey(item.id)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         selectedChoices[item.id] = item;
       }
@@ -181,13 +180,13 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
               relation: relation,
               source:
                   participants[relation.sourceIntentionId] ??
-                  (throw const _StoredIntentionCorruption()),
+                  (throw const StoredGraphCorruption()),
               related:
                   participants[relation.relatedIntentionId] ??
-                  (throw const _StoredIntentionCorruption()),
+                  (throw const StoredGraphCorruption()),
               description: row.description,
               permissions:
-                  permissions[id] ?? (throw const _StoredIntentionCorruption()),
+                  permissions[id] ?? (throw const StoredGraphCorruption()),
             ),
           );
         case DailyChoiceBlockingRelationReference(:final id):
@@ -321,7 +320,7 @@ final class _SelectedRelationsWatchRegistration {
 SelectedRelationsReadFailure _classifySelectedRelationsReadFailure(
   Object error,
 ) {
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const SelectedRelationsReadCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {

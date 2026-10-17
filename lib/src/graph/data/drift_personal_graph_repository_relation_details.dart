@@ -93,7 +93,7 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
       final stored = _StoredRelationGroupRow.fromRawRow(rawRow);
       final relation = stored.toDomain();
       if (relation.id != registration.id) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       final participantIds = {
         relation.sourceIntentionId,
@@ -109,10 +109,10 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
           relation: relation,
           source:
               participants[relation.sourceIntentionId] ??
-              (throw const _StoredIntentionCorruption()),
+              (throw const StoredGraphCorruption()),
           related:
               participants[relation.relatedIntentionId] ??
-              (throw const _StoredIntentionCorruption()),
+              (throw const StoredGraphCorruption()),
           description: stored.description,
           permissions: await _readRelationPermissions(relation.id),
         ),
@@ -185,7 +185,7 @@ final class _RelationWatchRegistration {
 }
 
 LongTermRelationReadFailure _classifyLongTermRelationReadFailure(Object error) {
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const LongTermRelationReadCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {

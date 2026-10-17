@@ -32,6 +32,7 @@ import 'package:uuid/uuid.dart';
 
 import '../support/encoded_diagnostics_log.dart';
 import '../support/graph_log_completeness_reference.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 
@@ -347,6 +348,46 @@ void main() {
         'stage': 'snapshotWrite',
         'outcome': 'failed',
         'failureCode': 'unavailable',
+      },
+    ]);
+  });
+
+  test('строка графа вне формы хранения диагностируется отказом пересборки и '
+      'сжатия с категорией повреждения', () async {
+    await createTag('Дом');
+    final damaged = await storeOver(repository).writeSnapshot(1);
+    await snapshotFile(damaged).delete();
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        'INSERT INTO intentions (id, title, created_at, updated_at) '
+        'VALUES (?, ?, 100, 100)',
+        ['намерение вне формы', 'Изучать язык'],
+      ),
+    );
+    final compaction = compactionOver(repository)..start();
+
+    await confirmCommands(_threshold + 1);
+    await compaction.shutdown();
+
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphSnapshotWrite',
+        'stage': 'stateAssembly',
+        'outcome': 'failed',
+        'failureCode': 'snapshotCorruption',
+      },
+      {
+        'operation': 'graphSnapshotRebuild',
+        'stage': 'databaseRead',
+        'outcome': 'failed',
+        'failureCode': 'corruption',
+      },
+      {
+        'operation': 'graphLogCompaction',
+        'stage': 'snapshotWrite',
+        'outcome': 'failed',
+        'failureCode': 'corruption',
       },
     ]);
   });

@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local/sqlite_failure_classifier.dart';
+import '../graph/data/stored_graph_rows.dart';
 import '../graph_format/graph_format_codec.dart';
 import '../graph_format/graph_format_file.dart';
 import '../graph_format/graph_format_records.dart';
@@ -25,12 +26,13 @@ final class GraphSnapshotCorruption implements Exception {
 /// Безопасная категория отказа операции со снимками для диагностики.
 ///
 /// Снимок, не прошедший проверку, отличается от повреждения данных лога и
-/// базы; отказы файлов снимков относятся к недоступности хранилища, как у
-/// файла настройки установки.
+/// базы, в том числе строк графа вне формы хранения; отказы файлов снимков
+/// относятся к недоступности хранилища, как у файла настройки установки.
 DiagnosticsFailureCode graphSnapshotFailureCode(Object error) =>
     switch (error) {
       GraphSnapshotCorruption() => DiagnosticsFailureCode.snapshotCorruption,
-      GraphFormatCorruption() => DiagnosticsFailureCode.corruption,
+      GraphFormatCorruption() ||
+      StoredGraphCorruption() => DiagnosticsFailureCode.corruption,
       FileSystemException() => DiagnosticsFailureCode.unavailable,
       _ => switch (classifySqliteFailure(error)) {
         SqliteCorruptionFailure() => DiagnosticsFailureCode.corruption,

@@ -25,7 +25,7 @@ import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
 import '../../graph_format/graph_format_records.dart'
-    show GraphEntityRecord, TagAssignmentRecord;
+    show GraphEntityRecord, IntentionRecord, TagAssignmentRecord, TagRecord;
 import '../../graph_snapshots/graph_fact_log.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
@@ -78,6 +78,7 @@ import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
 import 'graph_record_rows.dart';
 import 'stored_choice_path_verification.dart';
+import 'stored_graph_rows.dart';
 
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -591,7 +592,7 @@ final class DriftPersonalGraphRepository
     for (final id in uniqueIds) {
       final aggregate = aggregates[id];
       if (aggregate == null || aggregate.hasIntegrityViolation) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       counts[id] = aggregate.counts;
     }
@@ -602,7 +603,7 @@ final class DriftPersonalGraphRepository
     LongTermRelationId id,
   ) async =>
       (await _relationCountAggregates.readPermissions([id]))[id] ??
-      (throw const _StoredIntentionCorruption());
+      (throw const StoredGraphCorruption());
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
@@ -874,7 +875,7 @@ final class DriftPersonalGraphRepository
     }
     onStage(IntentionCreationCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(intention.id);
-    if (stored == null) throw const _StoredIntentionCorruption();
+    if (stored == null) throw const StoredGraphCorruption();
     final storedIntention = _rehydrateStored(stored.detail);
     final counts = await _readVerifiedRelationCounts(intention.id);
     final after = await _catalogEntrySnapshot(stored, counts);
@@ -882,7 +883,7 @@ final class DriftPersonalGraphRepository
     if (!_sameIntention(storedIntention, intention) ||
         assignedTagIds.length != command.tagIds.length ||
         !command.tagIds.containsAll(assignedTagIds)) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     return _CommittedIntentionCreated(
       intention: storedIntention,
@@ -953,7 +954,7 @@ final class DriftPersonalGraphRepository
       ),
     );
     final stored = await _readCommandSnapshot(command.id);
-    if (stored == null) throw const _StoredIntentionCorruption();
+    if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
@@ -994,7 +995,7 @@ final class DriftPersonalGraphRepository
       ),
     );
     final stored = await _readCommandSnapshot(id);
-    if (stored == null) throw const _StoredIntentionCorruption();
+    if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
@@ -1045,7 +1046,7 @@ final class DriftPersonalGraphRepository
       ),
     );
     final stored = await _readCommandSnapshot(id);
-    if (stored == null) throw const _StoredIntentionCorruption();
+    if (stored == null) throw const StoredGraphCorruption();
     final affectedCounts = archiveState == domain.IntentionArchiveState.archived
         ? await _readVerifiedRelationCountsFor([id, ...cascadedNeighborIds])
         : const <IntentionId, RelationCounts>{};
@@ -1121,7 +1122,7 @@ final class DriftPersonalGraphRepository
           switch (_requiredStoredInteger(row.data, 'is_referenced')) {
             0 => const LongTermRelationPermissions.unrestricted(),
             1 => const LongTermRelationPermissions.referencedByDailyPath(),
-            _ => throw const _StoredIntentionCorruption(),
+            _ => throw const StoredGraphCorruption(),
           },
         ),
     ];
@@ -1143,7 +1144,7 @@ final class DriftPersonalGraphRepository
   }
 
   IntentionId _decodeStoredNeighborIntentionId(Object? value) {
-    if (value is! String) throw const _StoredIntentionCorruption();
+    if (value is! String) throw const StoredGraphCorruption();
     return _decodeStoredIntentionId(value);
   }
 
@@ -1584,15 +1585,14 @@ final class DriftPersonalGraphRepository
         _rehydrateSummary(
           itemRows[index],
           _requireValidAggregate(aggregates[intentionIds[index]]),
-          tags[intentionIds[index]] ??
-              (throw const _StoredIntentionCorruption()),
+          tags[intentionIds[index]] ?? (throw const StoredGraphCorruption()),
         ),
     ];
   }
 
   RelationCounts _requireValidAggregate(RelationCountAggregate? aggregate) {
     if (aggregate == null || aggregate.hasIntegrityViolation) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     return aggregate.counts;
   }
@@ -1600,8 +1600,7 @@ final class DriftPersonalGraphRepository
   IntentionId _decodeStoredIntentionId(String value) =>
       switch (IntentionId.decode(value)) {
         IntentionIdDecodingSuccess(:final id) => id,
-        InvalidIntentionIdDecoding() =>
-          throw const _StoredIntentionCorruption(),
+        InvalidIntentionIdDecoding() => throw const StoredGraphCorruption(),
       };
 
   ({IntentionId intentionId, _StoredIntentionDetail stored})
@@ -1616,14 +1615,14 @@ final class DriftPersonalGraphRepository
           : IntentionText.normalizeDescription(stored.description!);
       if (normalizedTitle != stored.title ||
           normalizedDescription != stored.description) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       return (intentionId: intentionId, stored: stored);
     } on Object catch (error) {
       if (error is IntentionTextValidationException ||
           error is ArgumentError ||
           error is RangeError) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       rethrow;
     }
@@ -1683,7 +1682,7 @@ final class DriftPersonalGraphRepository
         activeRelationCount: relationCounts.active,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
-        tags: tags[intention.id] ?? (throw const _StoredIntentionCorruption()),
+        tags: tags[intention.id] ?? (throw const StoredGraphCorruption()),
       ),
       storedTitleSearchKey: stored.titleSearchKey,
     );
@@ -1704,7 +1703,7 @@ final class DriftPersonalGraphRepository
   }) {
     final decodedId = switch (IntentionId.decode(id)) {
       IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw const _StoredIntentionCorruption(),
+      InvalidIntentionIdDecoding() => throw const StoredGraphCorruption(),
     };
 
     try {
@@ -1713,7 +1712,7 @@ final class DriftPersonalGraphRepository
           ? null
           : IntentionText.normalizeDescription(description);
       if (normalizedTitle != title || normalizedDescription != description) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       return domain.Intention(
         id: decodedId,
@@ -1728,7 +1727,7 @@ final class DriftPersonalGraphRepository
       if (error is IntentionTextValidationException ||
           error is ArgumentError ||
           error is RangeError) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       rethrow;
     }
@@ -1753,9 +1752,9 @@ final class _StoredIntentionCommandSnapshot {
         field: IntentionTextField.title,
       );
     } on IntentionTextValidationException catch (_) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
-    if (titleSearchKey.isEmpty) throw const _StoredIntentionCorruption();
+    if (titleSearchKey.isEmpty) throw const StoredGraphCorruption();
 
     return _StoredIntentionCommandSnapshot(
       detail: _StoredIntentionDetail._fromRawData(
@@ -1821,13 +1820,13 @@ final class _StoredIntentionDetail {
   static String _requiredString(Map<String, dynamic> data, String column) {
     final value = data[column];
     if (value is String) return value;
-    throw const _StoredIntentionCorruption();
+    throw const StoredGraphCorruption();
   }
 
   static String? _nullableString(Map<String, dynamic> data, String column) {
     final value = data[column];
     if (value == null || value is String) return value;
-    throw const _StoredIntentionCorruption();
+    throw const StoredGraphCorruption();
   }
 
   static domain.IntentionReadiness _readiness(
@@ -1836,7 +1835,7 @@ final class _StoredIntentionDetail {
   ) => switch (_integer(data, column)) {
     0 => domain.IntentionReadiness.notReady,
     1 => domain.IntentionReadiness.ready,
-    _ => throw const _StoredIntentionCorruption(),
+    _ => throw const StoredGraphCorruption(),
   };
 
   static domain.IntentionArchiveState _archiveState(
@@ -1845,7 +1844,7 @@ final class _StoredIntentionDetail {
   ) => switch (_integer(data, column)) {
     0 => domain.IntentionArchiveState.active,
     1 => domain.IntentionArchiveState.archived,
-    _ => throw const _StoredIntentionCorruption(),
+    _ => throw const StoredGraphCorruption(),
   };
 
   static domain.IntentionTimestamp _timestamp(
@@ -1858,14 +1857,14 @@ final class _StoredIntentionDetail {
         DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true),
       );
     } on ArgumentError catch (_) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
   }
 
   static int _integer(Map<String, dynamic> data, String column) {
     final value = data[column];
     if (value is int) return value;
-    throw const _StoredIntentionCorruption();
+    throw const StoredGraphCorruption();
   }
 }
 
@@ -2268,7 +2267,7 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
 }
 
 IntentionFailure _classifyDetailReadFailure(Object error) {
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const IntentionCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {
@@ -2305,7 +2304,7 @@ IntentionFailure _classifyCommandFailure(
   if (error case _IntentionCreationTagsMissing(:final tagIds)) {
     return IntentionCreationTagsMissingFailure(tagIds);
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const IntentionCorruptionFailure();
   }
 
@@ -2381,10 +2380,6 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
       IntentionCorruptionFailure() => DiagnosticsFailureCode.corruption,
       IntentionUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
     };
-
-final class _StoredIntentionCorruption implements Exception {
-  const _StoredIntentionCorruption();
-}
 
 final class _IntentionNotFound implements Exception {
   const _IntentionNotFound();

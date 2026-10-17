@@ -204,7 +204,7 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
       };
       for (final counted in selected) {
         final row = byId[counted.intentionId];
-        if (row == null) throw const _StoredIntentionCorruption();
+        if (row == null) throw const StoredGraphCorruption();
         items.add(
           StatisticsItem(
             id: counted.intentionId,
@@ -215,7 +215,7 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
             )) {
               0 => domain.IntentionArchiveState.active,
               1 => domain.IntentionArchiveState.archived,
-              _ => throw const _StoredIntentionCorruption(),
+              _ => throw const StoredGraphCorruption(),
             },
             counts: counted.counts,
           ),
@@ -261,7 +261,7 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
       )) {
         0 => false,
         1 => true,
-        _ => throw const _StoredIntentionCorruption(),
+        _ => throw const StoredGraphCorruption(),
       };
       final count = _requiredStoredInteger(row.data, 'planned');
       final group = StatisticsPeriodSummary(
@@ -349,7 +349,7 @@ final class _DriftStatisticsCursor implements StatisticsCursor {
 
 StatisticsReadFailure _classifyStatisticsReadFailure(Object error) {
   if (error is StatisticsReadFailure) return error;
-  if (error is _StoredIntentionCorruption ||
+  if (error is StoredGraphCorruption ||
       error is StatisticsDataValidationException ||
       error is CalendarDateValidationException ||
       error is IntentionTextValidationException) {

@@ -110,7 +110,7 @@ extension _BlockingRelationsDeletion on DriftPersonalGraphRepository {
       );
       for (final relation in batch) {
         final permission = permissions[relation.id];
-        if (permission == null) throw const _StoredIntentionCorruption();
+        if (permission == null) throw const StoredGraphCorruption();
         if (!permission.canDelete) {
           throw DeleteBlockingRelationsSelectionConflictFailure.longTerm(
             relationId: relation.id,
@@ -127,7 +127,7 @@ extension _BlockingRelationsDeletion on DriftPersonalGraphRepository {
                 (row) => row.id.equals(details.choice.id.toCanonicalString()),
               ))
               .go();
-      if (deletedRows != 1) throw const _StoredIntentionCorruption();
+      if (deletedRows != 1) throw const StoredGraphCorruption();
     }
 
     for (var start = 0; start < selected.length; start += batchSize) {
@@ -162,7 +162,7 @@ extension _BlockingRelationsDeletion on DriftPersonalGraphRepository {
           .getSingle();
       if (remaining.read<int>('remaining_steps') != 0 ||
           await _readVerifiedDailyChoice(details.choice.id) != null) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
     }
 
@@ -181,7 +181,7 @@ extension _BlockingRelationsDeletion on DriftPersonalGraphRepository {
       );
     }
     if (releasedPermissions.length != releasedIds.length) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
 
     return _SelectedBlockingRelationsDeletion(
@@ -243,7 +243,7 @@ DeleteBlockingRelationsFailure _classifyBlockingRelationsDeleteFailure(
       case final DeleteBlockingRelationsSelectionConflictFailure failure) {
     return failure;
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const DeleteBlockingRelationsCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {

@@ -2,8 +2,8 @@ import 'package:drift/drift.dart';
 
 import '../../data/local/app_database.dart' show AppDatabase;
 import '../../graph_format/graph_format_records.dart';
-import '../../tag/domain/tag_assignment.dart';
 import 'graph_record_rows.dart';
+import 'stored_graph_rows.dart';
 
 /// Превращает отметки, которые триггеры схемы ставят затронутым сущностям
 /// графа, в пакет фактов текущей транзакции.
@@ -18,7 +18,8 @@ final class GraphFactCapture {
   /// Факт — запись с полным состоянием сущности после транзакции или её
   /// удаление; созданная и удалённая в этой же транзакции сущность факта не
   /// даёт. Факты идут в порядке секций формата, внутри секции — в порядке
-  /// создания сущностей, как их перечисляет база, а затем удаления.
+  /// создания сущностей, как их перечисляет база, а затем удаления. Строка
+  /// отмеченной сущности вне формы хранения даёт [StoredGraphCorruption].
   ///
   /// Вызывать внутри транзакции записи после изменений графа.
   Future<List<GraphFact>> takeFacts() async {
@@ -47,7 +48,7 @@ final class GraphFactCapture {
     final rows = await _database
         .customSelect(
           '''SELECT mark.tag_id AS mark_id, mark.first_operation,
-                tag.id IS NOT NULL AS present, tag.name
+                tag.id IS NOT NULL AS present, tag.id, tag.name
          FROM graph_log_tag_marks AS mark
          LEFT JOIN tags AS tag ON tag.id = mark.tag_id
          ORDER BY tag.creation_sequence IS NULL, tag.creation_sequence,
@@ -59,9 +60,10 @@ final class GraphFactCapture {
       for (final row in rows)
         ?_factOf(
           row,
-          decodeStoredTagId(row.read<String>('mark_id')),
-          TagKey.new,
-          (id) => storedTagRecord(id, row),
+          record: () => TagRecord(decodeStoredTag(row.data)),
+          key: () => TagKey(
+            decodeStoredTagId(requiredStoredString(row.data, 'mark_id')),
+          ),
         ),
     ];
   }
@@ -70,10 +72,10 @@ final class GraphFactCapture {
     final rows = await _database
         .customSelect(
           '''SELECT mark.intention_id AS mark_id, mark.first_operation,
-                intention.id IS NOT NULL AS present, intention.title,
-                intention.description, intention.is_action_ready,
-                intention.is_archived, intention.created_at,
-                intention.updated_at
+                intention.id IS NOT NULL AS present, intention.id,
+                intention.title, intention.description,
+                intention.is_action_ready, intention.is_archived,
+                intention.created_at, intention.updated_at
          FROM graph_log_intention_marks AS mark
          LEFT JOIN intentions AS intention ON intention.id = mark.intention_id
          ORDER BY intention.id IS NULL, intention.created_at, intention.id,
@@ -85,9 +87,10 @@ final class GraphFactCapture {
       for (final row in rows)
         ?_factOf(
           row,
-          decodeStoredIntentionId(row.read<String>('mark_id')),
-          IntentionKey.new,
-          (id) => storedIntentionRecord(id, row),
+          record: () => IntentionRecord(decodeStoredIntention(row.data)),
+          key: () => IntentionKey(
+            decodeStoredIntentionId(requiredStoredString(row.data, 'mark_id')),
+          ),
         ),
     ];
   }
@@ -95,8 +98,7 @@ final class GraphFactCapture {
   Future<Iterable<GraphFact>> _tagAssignmentFacts() async {
     final rows = await _database
         .customSelect(
-          '''SELECT mark.tag_id AS mark_tag_id,
-                mark.intention_id AS mark_intention_id, mark.first_operation,
+          '''SELECT mark.tag_id, mark.intention_id, mark.first_operation,
                 assignment.creation_sequence IS NOT NULL AS present
          FROM graph_log_tag_assignment_marks AS mark
          LEFT JOIN tag_assignments AS assignment
@@ -115,14 +117,9 @@ final class GraphFactCapture {
       for (final row in rows)
         ?_factOf(
           row,
-          TagAssignment(
-            tagId: decodeStoredTagId(row.read<String>('mark_tag_id')),
-            intentionId: decodeStoredIntentionId(
-              row.read<String>('mark_intention_id'),
-            ),
-          ),
-          TagAssignmentKey.new,
-          TagAssignmentRecord.new,
+          record: () =>
+              TagAssignmentRecord(decodeStoredTagAssignment(row.data)),
+          key: () => TagAssignmentKey(decodeStoredTagAssignment(row.data)),
         ),
     ];
   }
@@ -131,10 +128,10 @@ final class GraphFactCapture {
     final rows = await _database
         .customSelect(
           '''SELECT mark.long_term_relation_id AS mark_id, mark.first_operation,
-                relation.id IS NOT NULL AS present,
-                relation.source_intention_id, relation.related_intention_id,
-                relation.type, relation.priority, relation.description,
-                relation.is_archived
+                relation.id IS NOT NULL AS present, relation.creation_sequence,
+                relation.id, relation.source_intention_id,
+                relation.related_intention_id, relation.type, relation.priority,
+                relation.description, relation.is_archived
          FROM graph_log_long_term_relation_marks AS mark
          LEFT JOIN long_term_relations AS relation
            ON relation.id = mark.long_term_relation_id
@@ -150,9 +147,11 @@ final class GraphFactCapture {
       for (final row in rows)
         ?_factOf(
           row,
-          decodeStoredRelationId(row.read<String>('mark_id')),
-          LongTermRelationKey.new,
-          (id) => storedRelationRecord(id, row),
+          record: () =>
+              storedRelationRecord(StoredLongTermRelation.decode(row.data)),
+          key: () => LongTermRelationKey(
+            decodeStoredRelationId(requiredStoredString(row.data, 'mark_id')),
+          ),
         ),
     ];
   }
@@ -161,7 +160,8 @@ final class GraphFactCapture {
     final rows = await _database
         .customSelect(
           '''SELECT mark.daily_choice_id AS mark_id, mark.first_operation,
-                choice.id IS NOT NULL AS present, choice.source_intention_id,
+                choice.id IS NOT NULL AS present, choice.creation_sequence,
+                choice.id, choice.source_intention_id,
                 choice.selected_intention_id, choice.choice_date,
                 choice.description, choice.is_completed,
                 choice.scheduled_minute, choice.priority
@@ -185,25 +185,28 @@ final class GraphFactCapture {
       for (final row in rows)
         ?_factOf(
           row,
-          decodeStoredDailyChoiceId(row.read<String>('mark_id')),
-          DailyChoiceKey.new,
-          (id) => storedDailyChoiceRecord(storedDailyChoice(id, row), paths),
+          record: () =>
+              storedDailyChoiceRecord(decodeStoredDailyChoice(row.data), paths),
+          key: () => DailyChoiceKey(
+            decodeStoredDailyChoiceId(
+              requiredStoredString(row.data, 'mark_id'),
+            ),
+          ),
         ),
     ];
   }
 }
 
-/// Факт сущности с отметкой [row] и ключом [key]: запись, если сущность есть
-/// после транзакции, иначе удаление, если сущность не создана в этой же
-/// транзакции.
-GraphFact? _factOf<K>(
-  QueryRow row,
-  K key,
-  GraphEntityKey Function(K key) entityKey,
-  GraphEntityRecord Function(K key) record,
-) {
-  if (row.read<bool>('present')) return record(key);
+/// Факт сущности с отметкой [row]: её запись [record], если сущность есть
+/// после транзакции, иначе удаление сущности с ключом [key], если она не
+/// создана в этой же транзакции.
+GraphFact? _factOf(
+  QueryRow row, {
+  required GraphEntityRecord Function() record,
+  required GraphEntityKey Function() key,
+}) {
+  if (row.read<bool>('present')) return record();
   return row.read<String>('first_operation') == 'insert'
       ? null
-      : GraphEntityDeletion(entityKey(key));
+      : GraphEntityDeletion(key());
 }

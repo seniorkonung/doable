@@ -8,7 +8,7 @@ List<DailyChoicePathStepDetails> _validateStoredChoicePath({
   required Map<LongTermRelationId, _StoredRelationGroupRow> relations,
   required Map<IntentionId, domain.Intention> intentions,
 }) {
-  final path = _validateStoredChoicePathLinks(
+  final path = verifyStoredChoicePath(
     choice: choice,
     steps: steps,
     relations: {
@@ -30,17 +30,3 @@ List<DailyChoicePathStepDetails> _validateStoredChoicePath({
       ),
   ]);
 }
-
-/// Общая проверка цепочки; для каталога достаточно только ссылок её порции.
-StoredChoicePath _validateStoredChoicePathLinks({
-  required DailyChoice choice,
-  required List<ChoicePathStep> steps,
-  required Map<LongTermRelationId, ({IntentionId source, IntentionId related})>
-  relations,
-}) =>
-    verifyStoredChoicePath(
-      choice: choice,
-      steps: steps,
-      relations: relations,
-    ) ??
-    (throw const _StoredIntentionCorruption());

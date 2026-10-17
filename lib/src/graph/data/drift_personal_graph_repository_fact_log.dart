@@ -104,7 +104,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
       for (final row in rows)
         (
           TagOrderKey(row.read<int>('creation_sequence')),
-          storedTagRecord(decodeStoredTagId(row.read<String>('id')), row),
+          TagRecord(decodeStoredTag(row.data)),
         ),
     ];
   }
@@ -142,14 +142,10 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
   }
 
   _OrderedRecord _orderedIntention(QueryRow row) {
-    final record = storedIntentionRecord(
-      decodeStoredIntentionId(row.read<String>('id')),
-      row,
-    );
-    final intention = record.intention;
+    final intention = decodeStoredIntention(row.data);
     return (
       IntentionOrderKey(createdAt: intention.createdAt, id: intention.id),
-      record,
+      IntentionRecord(intention),
     );
   }
 
@@ -172,14 +168,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
       for (final row in rows)
         (
           TagAssignmentOrderKey(row.read<int>('creation_sequence')),
-          TagAssignmentRecord(
-            TagAssignment(
-              tagId: decodeStoredTagId(row.read<String>('tag_id')),
-              intentionId: decodeStoredIntentionId(
-                row.read<String>('intention_id'),
-              ),
-            ),
-          ),
+          TagAssignmentRecord(decodeStoredTagAssignment(row.data)),
         ),
     ];
   }
@@ -200,14 +189,14 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
           readsFrom: {_database.longTermRelations},
         )
         .get();
+    final relations = [
+      for (final row in rows) StoredLongTermRelation.decode(row.data),
+    ];
     return [
-      for (final row in rows)
+      for (final relation in relations)
         (
-          LongTermRelationOrderKey(row.read<int>('creation_sequence')),
-          storedRelationRecord(
-            decodeStoredRelationId(row.read<String>('id')),
-            row,
-          ),
+          LongTermRelationOrderKey(relation.creationSequence),
+          storedRelationRecord(relation),
         ),
     ];
   }
@@ -245,13 +234,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
       for (final row in rows)
         (
           DailyChoiceOrderKey(row.read<int>('creation_sequence')),
-          storedDailyChoiceRecord(
-            storedDailyChoice(
-              decodeStoredDailyChoiceId(row.read<String>('id')),
-              row,
-            ),
-            paths,
-          ),
+          storedDailyChoiceRecord(decodeStoredDailyChoice(row.data), paths),
         ),
     ];
   }

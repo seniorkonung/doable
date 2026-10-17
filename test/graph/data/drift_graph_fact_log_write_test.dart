@@ -26,6 +26,7 @@ import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -249,6 +250,46 @@ void main() {
     await expectLater(insertTag(), bypassRejection);
 
     expect(await database.select(database.tags).get(), isEmpty);
+  });
+
+  test('удаление тега, назначенного намерению с идентификатором вне формы, '
+      'отклоняется повреждением без изменения базы и лога фактов', () async {
+    final tag = _confirmed<TagCreated>(
+      await repository.execute(CreateTag(TagName.fromInput('Дом'))),
+    ).tag;
+    await seedGraph(database, () async {
+      await database.customStatement(
+        'INSERT INTO intentions (id, title, created_at, updated_at) '
+        'VALUES (?, ?, 100, 100)',
+        ['намерение вне формы', 'Изучать язык'],
+      );
+      await database.customStatement(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tag.id.toCanonicalString(), 'намерение вне формы'],
+      );
+    });
+    final packagesBefore = await packages();
+    final tagsBefore = await database.select(database.tags).get();
+    final assignmentsBefore = await database
+        .select(database.tagAssignments)
+        .get();
+
+    final result = await repository.execute(DeleteTag(tag.id));
+
+    expect(
+      result,
+      isA<TagCommandFailed>().having(
+        (result) => result.failure,
+        'failure',
+        isA<TagCorruptionFailure>(),
+      ),
+    );
+    expect(await database.select(database.tags).get(), tagsBefore);
+    expect(
+      await database.select(database.tagAssignments).get(),
+      assignmentsBefore,
+    );
+    expect(await packages(), hasLength(packagesBefore.length));
   });
 
   group('предел записи', () {

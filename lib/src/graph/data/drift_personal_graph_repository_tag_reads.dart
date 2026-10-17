@@ -25,7 +25,7 @@ extension _TagReading on DriftPersonalGraphRepository {
     final tags = {for (final id in intentionIds) id: <tag_domain.Tag>[]};
     for (final row in rows) {
       final id = requested[_requiredStoredString(row.data, 'intention_id')];
-      if (id == null) throw const _StoredIntentionCorruption();
+      if (id == null) throw const StoredGraphCorruption();
       tags[id]!.add(_decodeStoredTagAssignment(row.data));
     }
     return tags;
@@ -74,7 +74,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           if ((tagExists != 0 && tagExists != 1) ||
               (intentionExists != 0 && intentionExists != 1) ||
               (assigned != 0 && assigned != 1)) {
-            throw const _StoredIntentionCorruption();
+            throw const StoredGraphCorruption();
           }
           if (tagExists == 0) throw const _TagStatusTagMissing();
           if (intentionExists == 0) throw const _TagReadIntentionMissing();
@@ -144,7 +144,7 @@ extension _TagReading on DriftPersonalGraphRepository {
             if (intentionId != null) {
               final assigned = _requiredStoredInteger(row.data, 'is_assigned');
               if (assigned != 0 && assigned != 1) {
-                throw const _StoredIntentionCorruption();
+                throw const StoredGraphCorruption();
               }
               selectionRows.add(
                 TagSelectionRow(tag: tag, isAssigned: assigned == 1),
@@ -269,7 +269,7 @@ extension _TagReading on DriftPersonalGraphRepository {
                 .getSingleOrNull();
             final tag = row == null ? null : _decodeStoredTag(row.data);
             if (tag != null && tag.id != id) {
-              throw const _StoredIntentionCorruption();
+              throw const StoredGraphCorruption();
             }
             return GraphSnapshot(value: tag, revision: _currentRevision);
           }),
@@ -305,12 +305,12 @@ extension _TagReading on DriftPersonalGraphRepository {
 tag_domain.Tag _decodeStoredTagAssignment(Map<String, Object?> data) {
   // SQLite удаляет начальный BOM при декодировании; проверяем исходный TEXT.
   if (_requiredStoredInteger(data, 'has_leading_bom') != 0) {
-    throw const _StoredIntentionCorruption();
+    throw const StoredGraphCorruption();
   }
   final tag = _decodeStoredTag(data);
   if (_requiredStoredString(data, 'assigned_tag_id') !=
       tag.id.toCanonicalString()) {
-    throw const _StoredIntentionCorruption();
+    throw const StoredGraphCorruption();
   }
   return tag;
 }
@@ -321,7 +321,7 @@ tag_domain.Tag _decodeStoredTagAssignment(Map<String, Object?> data) {
 tag_domain.Tag _decodeStoredTag(Map<String, Object?> data) {
   final id = switch (TagId.decode(_requiredStoredString(data, 'id'))) {
     TagIdDecodingSuccess(:final id) => id,
-    InvalidTagIdDecoding() => throw const _StoredIntentionCorruption(),
+    InvalidTagIdDecoding() => throw const StoredGraphCorruption(),
   };
   return tag_domain.Tag(
     id: id,
@@ -344,7 +344,7 @@ TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
   if (error is _TagReadIntentionMissing) {
     return const TagAssignmentStatusIntentionNotFound();
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagAssignmentStatusCorruption();
   }
   return switch (classifySqliteFailure(error)) {
@@ -359,7 +359,7 @@ TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {
   if (error is _TagReadIntentionMissing) {
     return const TagCatalogIntentionNotFound();
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagCatalogCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {
@@ -374,7 +374,7 @@ TagAssignmentsReadFailure _classifyTagAssignmentsReadFailure(Object error) {
   if (error is _TagReadIntentionMissing) {
     return const TagAssignmentsIntentionNotFound();
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagAssignmentsCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {
@@ -386,7 +386,7 @@ TagAssignmentsReadFailure _classifyTagAssignmentsReadFailure(Object error) {
 }
 
 TagReadFailure _classifyTagReadFailure(Object error) {
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const TagReadCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {

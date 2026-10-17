@@ -88,7 +88,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     onStage(TagCommandDiagnosticsStage.resultRead);
     final tag = await _findTagById(id);
     if (tag == null || tag.name != command.name) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     return _CommittedTagCreated(tag);
   }
@@ -111,7 +111,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     onStage(TagCommandDiagnosticsStage.resultRead);
     final after = await _findTagById(command.tagId);
     if (after == null || after.name != command.name) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     return _CommittedTagRenamed(before: before, after: after);
   }
@@ -190,7 +190,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
                   ),
             ))
             .go();
-    if (rows != 1) throw const _StoredIntentionCorruption();
+    if (rows != 1) throw const StoredGraphCorruption();
     return _CommittedTagAssignmentChanged(
       assignment,
       TagAssignmentState.absent,
@@ -207,7 +207,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     IntentionId intentionId,
   ) async {
     final stored = await _readCommandSnapshot(intentionId);
-    if (stored == null) throw const _StoredIntentionCorruption();
+    if (stored == null) throw const StoredGraphCorruption();
     final counts = await _readVerifiedRelationCounts(intentionId);
     return (
       id: intentionId,
@@ -224,7 +224,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   }) async {
     onStage(TagCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(before.id);
-    if (stored == null) throw const _StoredIntentionCorruption();
+    if (stored == null) throw const StoredGraphCorruption();
     return (
       before: before.entry,
       after: await _catalogEntrySnapshot(stored, before.counts),
@@ -271,7 +271,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         .getSingleOrNull();
     if (row == null) return null;
     final tag = _decodeStoredTag(row.data);
-    if (tag.id != id) throw const _StoredIntentionCorruption();
+    if (tag.id != id) throw const StoredGraphCorruption();
     return tag;
   }
 
@@ -296,7 +296,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     for (final row in rows) {
       final tag = _decodeStoredTag(row.data);
       if (!ids.contains(tag.id) || found.containsKey(tag.id)) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       found[tag.id] = tag;
     }
@@ -313,7 +313,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         .getSingleOrNull();
     if (row == null) return null;
     final tag = _decodeStoredTag(row.data);
-    if (tag.name.matchingKey != key) throw const _StoredIntentionCorruption();
+    if (tag.name.matchingKey != key) throw const StoredGraphCorruption();
     return tag;
   }
 }
@@ -449,7 +449,7 @@ TagCommandFailure _classifyTagCommandFailure(Object error) {
     return TagIntentionNotFoundFailure(error.intentionId);
   }
   if (error is _TagNameOccupied) return TagNameOccupiedFailure(error.id);
-  if (error is _StoredIntentionCorruption) return const TagCorruptionFailure();
+  if (error is StoredGraphCorruption) return const TagCorruptionFailure();
   return switch (classifySqliteFailure(error)) {
     SqliteCorruptionFailure() => const TagCorruptionFailure(),
     SqliteUnavailableFailure() => const TagUnavailableFailure(),

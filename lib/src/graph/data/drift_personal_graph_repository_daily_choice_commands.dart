@@ -123,13 +123,13 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
             details.choice.schedule != command.schedule ||
             details.choice.priority != command.priority ||
             details.path.length != command.path.steps.length) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         for (var index = 0; index < details.path.length; index++) {
           if (details.path[index].step.id != generatedStepIds[index] ||
               details.path[index].relation.id !=
                   command.path.steps[index].relationId) {
-            throw const _StoredIntentionCorruption();
+            throw const StoredGraphCorruption();
           }
         }
         final affectedCounts = await _readVerifiedRelationCountsFor([
@@ -146,7 +146,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
             selectedAfter.dailySource != selectedBefore.dailySource ||
             sourceAfter.longTermTotal != sourceBefore.longTermTotal ||
             selectedAfter.longTermTotal != selectedBefore.longTermTotal) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         final relationIds = command.path.steps
             .map((step) => step.relationId)
@@ -161,7 +161,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           );
         }
         if (permissions.values.any((permission) => permission.canDelete)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         record(DiagnosticsSucceeded(stopwatch.elapsed));
         return _GraphWriteResult(
@@ -295,13 +295,13 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                       },
                     ),
                   );
-          if (updatedRows != 1) throw const _StoredIntentionCorruption();
+          if (updatedRows != 1) throw const StoredGraphCorruption();
           record(DiagnosticsSucceeded(stopwatch.elapsed));
           stage = DailyChoiceCommandDiagnosticsStage.resultRead;
           record(const DiagnosticsStarted());
           verified =
               await _readVerifiedDailyChoice(command.choiceId) ??
-              (throw const _StoredIntentionCorruption());
+              (throw const StoredGraphCorruption());
           final after = verified.choice;
           if (after.sourceIntentionId != before.sourceIntentionId ||
               after.selectedIntentionId != before.selectedIntentionId ||
@@ -311,7 +311,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
               after.schedule != schedule ||
               after.priority != priority ||
               verified.path.length != existing.path.length) {
-            throw const _StoredIntentionCorruption();
+            throw const StoredGraphCorruption();
           }
           for (var index = 0; index < existing.path.length; index++) {
             final oldStep = existing.path[index].step;
@@ -320,7 +320,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                 newStep.dailyChoiceId != oldStep.dailyChoiceId ||
                 newStep.relationId != oldStep.relationId ||
                 newStep.previousStepId != oldStep.previousStepId) {
-              throw const _StoredIntentionCorruption();
+              throw const StoredGraphCorruption();
             }
           }
         }
@@ -458,7 +458,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                       ),
                     ),
                   );
-          if (updatedRows != 1) throw const _StoredIntentionCorruption();
+          if (updatedRows != 1) throw const StoredGraphCorruption();
           ChoicePathStepId? previousId;
           final generatedStepIds = <ChoicePathStepId>[];
           for (final expected in command.path.steps) {
@@ -483,7 +483,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           record(const DiagnosticsStarted());
           verified =
               await _readVerifiedDailyChoice(command.choiceId) ??
-              (throw const _StoredIntentionCorruption());
+              (throw const StoredGraphCorruption());
           final after = verified.choice;
           if (after.id != before.id ||
               after.sourceIntentionId != command.sourceIntentionId ||
@@ -494,12 +494,12 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
               after.schedule != before.schedule ||
               after.priority != before.priority ||
               verified.path.length != generatedStepIds.length) {
-            throw const _StoredIntentionCorruption();
+            throw const StoredGraphCorruption();
           }
           for (var index = 0; index < generatedStepIds.length; index++) {
             if (verified.path[index].step.id != generatedStepIds[index] ||
                 verified.path[index].relation.id != newIds[index]) {
-              throw const _StoredIntentionCorruption();
+              throw const StoredGraphCorruption();
             }
           }
         }
@@ -517,7 +517,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                       (id == command.selectedIntentionId ? 1 : 0) -
                       (id == before.selectedIntentionId ? 1 : 0) ||
               current.longTermTotal != previous.longTermTotal) {
-            throw const _StoredIntentionCorruption();
+            throw const StoredGraphCorruption();
           }
         }
         final released = oldIds.toSet().difference(newIds.toSet());
@@ -532,7 +532,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           );
         }
         if (occupied.any((id) => permissions[id]!.canDelete)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         if (didMutate) record(DiagnosticsSucceeded(stopwatch.elapsed));
         return _GraphWriteResult(
@@ -603,13 +603,13 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                   (row) => row.id.equals(command.choiceId.toCanonicalString()),
                 ))
                 .go();
-        if (deletedRows != 1) throw const _StoredIntentionCorruption();
+        if (deletedRows != 1) throw const StoredGraphCorruption();
         record(DiagnosticsSucceeded(stopwatch.elapsed));
         stage = DailyChoiceCommandDiagnosticsStage.resultRead;
         record(const DiagnosticsStarted());
 
         if (await _readVerifiedDailyChoice(command.choiceId) != null) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         final remainingSteps = await _database
             .customSelect(
@@ -622,7 +622,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
             )
             .getSingle();
         if (remainingSteps.read<int>('remaining_steps') != 0) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         final counts = await _readVerifiedRelationCountsFor(participants);
         for (final id in participants) {
@@ -635,7 +635,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                   previous.dailySelected -
                       (id == before.selectedIntentionId ? 1 : 0) ||
               current.longTermTotal != previous.longTermTotal) {
-            throw const _StoredIntentionCorruption();
+            throw const StoredGraphCorruption();
           }
         }
         final permissions = <LongTermRelationId, LongTermRelationPermissions>{};
@@ -648,7 +648,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           );
         }
         if (permissions.length != released.length) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
         record(DiagnosticsSucceeded(stopwatch.elapsed));
         return _GraphWriteResult(
@@ -741,7 +741,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
 
 DailyChoiceCommandFailure _classifyDailyChoiceCommandFailure(Object error) {
   if (error is DailyChoiceCommandFailure) return error;
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const DailyChoiceCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {
