@@ -239,6 +239,65 @@ void main() {
     await expectStateMatchesDatabase();
   });
 
+  test('отказ удаления истории оставляет новый снимок зарегистрированным, а '
+      'прежние снимок и пакеты — в реестре и каталоге, пока их не удалит '
+      'следующее успешное сжатие', () async {
+    await confirmCommands(1);
+    final previous = await GraphSnapshotStore(
+      log: repository,
+      directory: snapshots,
+      clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    ).writeSnapshot(1);
+    // Отказ внутри транзакции удаления истории, когда пакеты до нового
+    // снимка уже удалены.
+    await database.customStatement('''
+      CREATE TEMP TRIGGER fail_history_removal
+      BEFORE DELETE ON graph_snapshots
+      BEGIN
+        SELECT RAISE(ABORT, 'injected history removal failure');
+      END
+    ''');
+    final failing = compactionOver(repository)..start();
+    await confirmCommands(_threshold + 1);
+    await failing.shutdown();
+    await confirmCommands(1);
+
+    const snapshotPosition = _threshold + 2;
+    final snapshot = await attempts.single;
+    expect(snapshot.position, snapshotPosition);
+    expect(await repository.readSnapshotFileNames(), {
+      previous.fileName,
+      snapshot.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
+    );
+    expect(
+      await repository.readPackages(after: 0, upTo: snapshotPosition),
+      hasLength(snapshotPosition),
+    );
+    expect(
+      (await repository.readSnapshotAtOrBefore(snapshotPosition + 1))?.fileName,
+      snapshot.fileName,
+    );
+    await expectStateMatchesDatabase();
+
+    await database.customStatement('DROP TRIGGER fail_history_removal');
+    final next = compactionOver(repository)..start();
+    await confirmCommands(_threshold);
+    await next.shutdown();
+
+    const position = snapshotPosition + 1 + _threshold;
+    final latest = await repository.readSnapshotAtOrBefore(position);
+    expect(latest?.position, position);
+    expect(await repository.readSnapshotFileNames(), {latest?.fileName});
+    expect(await _fileNamesIn(snapshots), {latest?.fileName});
+    expect(await repository.readPackages(after: 0, upTo: position), isEmpty);
+    await expectStateMatchesDatabase();
+  });
+
   test('сжатие диагностируется успехом записи снимка и сжатия, а сверка, '
       'после которой сжатие не понадобилось, событий не даёт', () async {
     final compaction = compactionOver(repository)..start();
