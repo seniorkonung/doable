@@ -354,3 +354,26 @@
   - **Dependencies:** 1.28, 1.29.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 1.29.
   - **Estimated scope:** XS.
+
+- [ ] 1.31 Определить в одном месте тестовые подмены лога фактов и отказа записи временных файлов снимков
+  - **Acceptance criteria:**
+    - В `test/support/` одна общая пересылка контракта лога фактов передаёт каждую операцию `GraphFactLog` и `ObservableGraphFactLog` исходному логу. На ней построены пять обёрток: `_InterceptingLog` в `test/graph_snapshots/graph_snapshot_store_test.dart` и `test/graph_snapshots/graph_log_compaction_test.dart`, `_FirstPortionPausingLog` в `test/graph_snapshots/graph_snapshot_rebuild_test.dart`, `_RegistryReadOverride` в `test/app/bootstrap/app_runtime_graph_snapshots_test.dart` и `_StoppingLog` в `test/support/graph_snapshot_process_worker.dart`. Каждая задаёт только перехватываемые операции, поэтому новая операция контракта лога меняет в тестах только общую пересылку.
+    - Отказ записи во временный файл снимка, как при нехватке места, вместе с запуском записи в изоляте определён в `test/support/` один раз и используется тестами сжатия и пересборки. Местные копии `_FailingTemporaryFiles`, `_FailingTemporaryFile`, `_writeFailingOnTemporaryFile` и `_writeFailingOnTemporaryFiles` удалены. Остановка процесса перед переименованием в `test/support/graph_snapshot_process_worker.dart` остаётся отдельной подменой.
+    - Код приложения, проверяемые сценарии, ожидания и названия тестов не меняются. Помощники `_fileNamesIn`, `_flipByte` и `_lines` остаются в своих файлах.
+  - **Verification:**
+    - Убедиться, что `rg 'implements (Observable)?GraphFactLog' test` находит только общую пересылку, а `rg 'extends IOOverrides' test/graph_snapshots test/support` — только общий отказ временных файлов и остановку перед переименованием.
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/graph_snapshots/ test/app/bootstrap/` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph_snapshots/`.
+  - **Dependencies:** 1.24, 1.27, 1.29.
+  - **Files likely touched:** новые файлы в `test/support/` (названия рабочие: `forwarding_graph_fact_log.dart`, `failing_snapshot_temporary_files.dart`), `test/graph_snapshots/graph_snapshot_store_test.dart`, `test/graph_snapshots/graph_log_compaction_test.dart`, `test/graph_snapshots/graph_snapshot_rebuild_test.dart`, `test/app/bootstrap/app_runtime_graph_snapshots_test.dart`, `test/support/graph_snapshot_process_worker.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 1.32 Повторно подтвердить готовность этапа после объединения тестовых подмен лога фактов и файлов снимков
+  - **Acceptance criteria:**
+    - После задачи 1.31 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено. В том числе прерывание процесса при записи снимка оставляет реестр снимков согласованным с файлами, повреждённый последний снимок пересобирается из базы, а неудачное сжатие не повторяется на каждом новом пакете. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 1.30 и 1.31 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 1.30, 1.31.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 1.31.
+  - **Estimated scope:** XS.

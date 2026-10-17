@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Фаза 1 в целом выполнена: лог фактов пишется в транзакции каждой команды, состояние собирается из снимка и пакетов и совпадает с выгрузкой базы, снимки пишутся надёжно, проверяются при чтении и пересобираются из базы, полные проверки проекта проходят. Активное замечание одно, низкой важности: дублирование тестовых обёрток (F7). Принятых остаточных рисков нет.
+**Summary:** Фаза 1 в целом выполнена: лог фактов пишется в транзакции каждой команды, состояние собирается из снимка и пакетов и совпадает с выгрузкой базы, снимки пишутся надёжно, проверяются при чтении и пересобираются из базы, полные проверки проекта проходят. Активных замечаний и принятых остаточных рисков нет. Исправления по найденным при ревью замечаниям запланированы незавершёнными задачами 1.19–1.32 этапа 1.
 
 ## Review target
 
@@ -87,14 +87,7 @@
 
 ## Findings
 
-### F7 · Low — Тестовые обёртки лога фактов и внедрение отказов файловой системы скопированы по файлам
-
-- **Evidence:** В тестах пять почти одинаковых пересылающих реализаций `GraphFactLog` и `ObservableGraphFactLog`: `test/graph_snapshots/graph_snapshot_store_test.dart:350`, `test/graph_snapshots/graph_log_compaction_test.dart:370`, `test/graph_snapshots/graph_snapshot_rebuild_test.dart:392`, `test/app/bootstrap/app_runtime_graph_snapshots_test.dart:242` и `test/support/graph_snapshot_process_worker.dart:98`. Ещё две копии `_FailingTemporaryFiles` вместе с помощником записи (`graph_log_compaction_test.dart:425-470` и `graph_snapshot_rebuild_test.dart:436-481`) отличаются одной буквой в имени помощника. Кроме того, повторяются `_fileNamesIn` (в четырёх файлах), `_flipByte` (в двух) и `_lines` (в восьми).
-- **Evidence revisions:** ["491e7180c977faaaba8d6b73ad459805cfe4aae8"]
-- **Impact:** Каждый новый метод контракта лога потребует пяти одинаковых правок тестов, а фазы 2 и 3 работу с историей расширяют. Копии внедрения отказов будут незаметно расходиться.
-- **Required outcome:** Пересылка контракта лога с перехватом отдельных операций и внедрение отказов временных файлов определены в тестах в одном месте.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/graph_snapshots/graph_snapshot_store_test.dart", "test/graph_snapshots/graph_log_compaction_test.dart", "test/graph_snapshots/graph_snapshot_rebuild_test.dart", "test/app/bootstrap/app_runtime_graph_snapshots_test.dart", "test/support/graph_snapshot_process_worker.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
