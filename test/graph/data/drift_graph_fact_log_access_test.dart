@@ -193,12 +193,15 @@ void main() {
   );
 
   test('записи графа отдаются полными порциями в каноническом порядке с '
-      'границами внутри каждой секции', () async {
+      'границами внутри каждой секции и группы намерений с одним временем '
+      'создания', () async {
     // По 100 записей в порции границы приходятся на середину секции тегов,
-    // намерений, назначений, связей и дневных выборов.
+    // намерений, назначений, связей и дневных выборов. После 149 тегов
+    // граница в секции намерений проходит внутри пары с одним временем
+    // создания.
     expect(graphFactLogPortionLimit, 100);
     final tags = [
-      for (var index = 0; index < 150; index++) await createTag('Тег $index'),
+      for (var index = 0; index < 149; index++) await createTag('Тег $index'),
     ];
     final root = (await confirm<IntentionSaved>(
       CreateIntention.withInitialState(
@@ -263,8 +266,13 @@ void main() {
       100,
       100,
       100,
-      51,
+      50,
     ]);
+    final beforeBoundary =
+        (portions[1].records.last as IntentionRecord).intention;
+    final afterBoundary =
+        (portions[2].records.first as IntentionRecord).intention;
+    expect(afterBoundary.createdAt, beforeBoundary.createdAt);
     expect(
       portions.map((portion) => portion.position),
       everyElement(await repository.readCurrentPosition()),
