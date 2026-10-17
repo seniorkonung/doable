@@ -416,3 +416,16 @@
   - **Dependencies:** 1.24, 1.34.
   - **Files likely touched:** `lib/src/graph/data/stored_graph_rows.dart`.
   - **Estimated scope:** XS.
+
+- [ ] 1.36 Сообщать о строке графа вне формы хранения при чтении записей порциями отказом контракта лога фактов, чтобы модуль снимков не зависел от данных графа
+  - **Acceptance criteria:**
+    - Контракт `GraphFactLog` в `lib/src/graph_snapshots/graph_fact_log.dart` задаёт собственный отказ `GraphRecordCorruption` без прочитанных данных: строка графа в базе вне формы хранения, и запись порции из неё не собирается. Документация `readGraphRecords` называет этот отказ отдельно от остальных отказов базы, которые по-прежнему передаются исключением.
+    - `DriftPersonalGraphRepository.readGraphRecords` на границе контракта превращает `StoredGraphCorruption` общего декодера задачи 1.24 в `GraphRecordCorruption`. Остальные отказы и другие операции лога фактов не меняются, а чтения и команды репозитория по-прежнему получают `StoredGraphCorruption` и свои отказы повреждения.
+    - `graphSnapshotFailureCode` относит `GraphRecordCorruption` к категории `corruption`, а `lib/src/graph_snapshots/` больше не импортирует `lib/src/graph/`. Для целостных данных события диагностики, результаты команд и чтений, пакеты фактов и записи порций не меняются. Проверяемые сценарии, ожидания и названия тестов не меняются. Условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+  - **Verification:**
+    - Убедиться, что `rg '\.\./graph/|StoredGraphCorruption' lib/src/graph_snapshots` ничего не находит.
+    - Убедиться, что без изменений проходит тест «строка графа вне формы хранения диагностируется отказом пересборки и сжатия с категорией повреждения» в `test/graph_snapshots/graph_snapshot_rebuild_test.dart`: он проходит настоящий путь от строки в базе через `readGraphRecords` до категории `corruption`. Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/graph/data/ test/graph_snapshots/` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph/data/ test/graph_snapshots/`.
+    - Сопоставить актуальные результаты проверок задачи 1.35 с условием готовности. Выполнить `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 1.24, 1.35.
+  - **Files likely touched:** `lib/src/graph_snapshots/graph_fact_log.dart`, `lib/src/graph_snapshots/graph_snapshot_store.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`.
+  - **Estimated scope:** S.
