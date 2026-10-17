@@ -44,7 +44,7 @@
 
 ## Additional Context
 
-- [ADR-0006 — Часы устройства как наблюдения](../../../docs/adr/0006-treat-device-clock-timestamps-as-observations.md) — `accepted`, обязательное ограничение. Время записи пакетов, суточная отсечка и срок хранения копий не задают причинный порядок.
+- [ADR-0006 — Часы устройства как наблюдения](../../../docs/adr/0006-treat-device-clock-timestamps-as-observations.md) — `accepted`, обязательное ограничение. Время записи пакетов и суточная отсечка копий не задают причинный порядок.
 - [ADR-0003 — Типизированные UUID](../../../docs/adr/0003-use-typed-uuid-identifiers-for-domain-entities.md) — `accepted`. Идентификаторы переносятся файлами и снимками без изменения.
 - [ADR-0007 — Unicode без NUL](../../../docs/adr/0007-restrict-graph-user-text-to-unicode-without-nul.md) — `accepted`, обязательное ограничение. Импортируемый текст проходит ту же проверку, что и ввод.
 - [ADR-0008 — Функции схемы SQLite](../../../docs/adr/0008-treat-sqlite-schema-functions-as-durable-contract.md) — `accepted`. Импорт не открывает чужие файлы SQLite, поэтому граница доверия не расширяется.
