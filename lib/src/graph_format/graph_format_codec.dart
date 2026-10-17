@@ -101,6 +101,50 @@ abstract final class GraphFormatCodec {
     return bytes.takeBytes();
   }
 
+  /// Заголовок всегда пишется текущей версией формата.
+  static Uint8List encodeHeader(GraphFormatHeader header) {
+    final counts = header.counts;
+    return utf8.encode(
+      jsonEncode({
+        'format': _formatMarker,
+        'version': GraphFormatVersion.current.number,
+        'writtenAt': _writeTimestamp(header.writtenAt),
+        'counts': {
+          'tags': counts.tags,
+          'intentions': counts.intentions,
+          'tagAssignments': counts.tagAssignments,
+          'longTermRelations': counts.longTermRelations,
+          'dailyChoices': counts.dailyChoices,
+        },
+      }),
+    );
+  }
+
+  /// Читает заголовок файла или снимка вместе с версией его записей.
+  ///
+  /// Маркер и версия проверяются раньше остальных полей: заголовок более
+  /// новой версии может быть устроен иначе.
+  static ({GraphFormatVersion version, GraphFormatHeader header}) decodeHeader(
+    List<int> line,
+  ) {
+    final json = _readJson(line);
+    final number = json['version'];
+    if (json['format'] != _formatMarker || number is! int) {
+      throw const GraphFormatCorruption();
+    }
+    final version = GraphFormatVersion.ofCarrier(number);
+    final header = _readObject(json, (fields) {
+      fields
+        ..string('format')
+        ..integer('version');
+      return GraphFormatHeader(
+        writtenAt: _readTimestamp(fields.string('writtenAt')),
+        counts: _readCounts(fields.object('counts')),
+      );
+    });
+    return (version: version, header: header);
+  }
+
   /// Читает строку файла или снимка версии [version] в записи текущей версии.
   static List<GraphEntityRecord> decodeEntityRecord(
     List<int> line,
@@ -138,10 +182,7 @@ abstract final class GraphFormatCodec {
     return facts;
   }
 
-  static List<Map<String, Object?>> _readCurrentVersion(
-    List<int> line,
-    GraphFormatVersion version,
-  ) {
+  static Map<String, Object?> _readJson(List<int> line) {
     final Object? json;
     try {
       json = _jsonFromUtf8.convert(line);
@@ -149,7 +190,14 @@ abstract final class GraphFormatCodec {
       throw const GraphFormatCorruption();
     }
     if (json is! Map<String, Object?>) throw const GraphFormatCorruption();
-    var objects = [json];
+    return json;
+  }
+
+  static List<Map<String, Object?>> _readCurrentVersion(
+    List<int> line,
+    GraphFormatVersion version,
+  ) {
+    var objects = [_readJson(line)];
     for (
       var number = version.number;
       number < GraphFormatVersion.current.number;
@@ -190,6 +238,8 @@ abstract final class GraphFormatCodec {
 
 const _lineFeed = 0x0a;
 
+const _formatMarker = 'doable-graph';
+
 const _tagKind = 'tag';
 const _intentionKind = 'intention';
 const _tagAssignmentKind = 'tagAssignment';
@@ -216,8 +266,8 @@ Map<String, Object?> _writeFact(GraphFact fact) => switch (fact) {
       IntentionArchiveState.active => false,
       IntentionArchiveState.archived => true,
     },
-    'createdAt': _writeTimestamp(intention.createdAt),
-    'updatedAt': _writeTimestamp(intention.updatedAt),
+    'createdAt': _writeTimestamp(intention.createdAt.value),
+    'updatedAt': _writeTimestamp(intention.updatedAt.value),
   },
   TagAssignmentRecord(:final assignment) => {
     'kind': _tagAssignmentKind,
@@ -300,15 +350,13 @@ Map<String, Object?> _writeTagAssignment(TagAssignment assignment) => {
   'intentionId': assignment.intentionId.toCanonicalString(),
 };
 
-/// Момент в UTC в ISO-8601 с микросекундами. Показания часов устройства
-/// укладываются в четырёхзначный год.
-String _writeTimestamp(IntentionTimestamp timestamp) {
-  final value = timestamp.value;
-  return '${_digits(value.year, 4)}-${_digits(value.month, 2)}-'
-      '${_digits(value.day, 2)}T${_digits(value.hour, 2)}:'
-      '${_digits(value.minute, 2)}:${_digits(value.second, 2)}.'
-      '${_digits(value.millisecond * 1000 + value.microsecond, 6)}Z';
-}
+/// Момент [value] в UTC в ISO-8601 с микросекундами. Показания часов
+/// устройства укладываются в четырёхзначный год.
+String _writeTimestamp(DateTime value) =>
+    '${_digits(value.year, 4)}-${_digits(value.month, 2)}-'
+    '${_digits(value.day, 2)}T${_digits(value.hour, 2)}:'
+    '${_digits(value.minute, 2)}:${_digits(value.second, 2)}.'
+    '${_digits(value.millisecond * 1000 + value.microsecond, 6)}Z';
 
 String _digits(int value, int width) => value.toString().padLeft(width, '0');
 
@@ -364,8 +412,8 @@ Intention _readIntention(_JsonFields fields) {
     archiveState: fields.boolean('archived')
         ? IntentionArchiveState.archived
         : IntentionArchiveState.active,
-    createdAt: _readTimestamp(fields.string('createdAt')),
-    updatedAt: _readTimestamp(fields.string('updatedAt')),
+    createdAt: IntentionTimestamp(_readTimestamp(fields.string('createdAt'))),
+    updatedAt: IntentionTimestamp(_readTimestamp(fields.string('updatedAt'))),
   );
 }
 
@@ -450,23 +498,21 @@ final _timestampPattern = RegExp(
   r'^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})\.([0-9]{6})Z$',
 );
 
-IntentionTimestamp _readTimestamp(String text) {
+DateTime _readTimestamp(String text) {
   final match =
       _timestampPattern.firstMatch(text) ??
       (throw const GraphFormatCorruption());
   int part(int group) => int.parse(match.group(group)!);
   final fraction = part(7);
-  final timestamp = IntentionTimestamp(
-    DateTime.utc(
-      part(1),
-      part(2),
-      part(3),
-      part(4),
-      part(5),
-      part(6),
-      fraction ~/ 1000,
-      fraction % 1000,
-    ),
+  final timestamp = DateTime.utc(
+    part(1),
+    part(2),
+    part(3),
+    part(4),
+    part(5),
+    part(6),
+    fraction ~/ 1000,
+    fraction % 1000,
   );
   // DateTime переносит лишние единицы в старшие разряды, поэтому
   // несуществующий момент записывается иначе, чем прочитан.
@@ -485,6 +531,19 @@ DailyChoiceSchedule _readSchedule(String? text) {
     hour: int.parse(match.group(1)!),
     minute: int.parse(match.group(2)!),
   );
+}
+
+GraphRecordCounts _readCounts(Map<String, Object?> object) {
+  final fields = _JsonFields(object);
+  final counts = GraphRecordCounts(
+    tags: fields.integer('tags'),
+    intentions: fields.integer('intentions'),
+    tagAssignments: fields.integer('tagAssignments'),
+    longTermRelations: fields.integer('longTermRelations'),
+    dailyChoices: fields.integer('dailyChoices'),
+  );
+  fields.ensureAllRead();
+  return counts;
 }
 
 TagId _readTagId(String text) => switch (TagId.decode(text)) {
@@ -532,6 +591,10 @@ final class _JsonFields {
   String? nullableString(String name) => _read<String?>(name);
 
   bool boolean(String name) => _read<bool>(name);
+
+  int integer(String name) => _read<int>(name);
+
+  Map<String, Object?> object(String name) => _read<Map<String, Object?>>(name);
 
   List<Object?> list(String name) => _read<List<Object?>>(name);
 

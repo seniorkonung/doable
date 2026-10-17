@@ -9,6 +9,40 @@ import '../tag/domain/tag.dart';
 import '../tag/domain/tag_assignment.dart';
 import '../tag/domain/tag_id.dart';
 
+/// Заголовок файла или снимка: момент записи и количества записей каждого
+/// вида.
+final class GraphFormatHeader {
+  GraphFormatHeader({required DateTime writtenAt, required this.counts})
+    : writtenAt = writtenAt.toUtc();
+
+  /// Показание часов устройства в момент записи.
+  final DateTime writtenAt;
+  final GraphRecordCounts counts;
+}
+
+/// Количества записей каждого вида — размеры секций файла.
+final class GraphRecordCounts {
+  GraphRecordCounts({
+    required this.tags,
+    required this.intentions,
+    required this.tagAssignments,
+    required this.longTermRelations,
+    required this.dailyChoices,
+  }) {
+    RangeError.checkNotNegative(tags, 'tags');
+    RangeError.checkNotNegative(intentions, 'intentions');
+    RangeError.checkNotNegative(tagAssignments, 'tagAssignments');
+    RangeError.checkNotNegative(longTermRelations, 'longTermRelations');
+    RangeError.checkNotNegative(dailyChoices, 'dailyChoices');
+  }
+
+  final int tags;
+  final int intentions;
+  final int tagAssignments;
+  final int longTermRelations;
+  final int dailyChoices;
+}
+
 /// Факт пакета лога: полное состояние сущности после транзакции или её
 /// удаление.
 sealed class GraphFact {
