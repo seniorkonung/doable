@@ -8,18 +8,26 @@ lefthook = "2.1.9"
 [tasks]
 prepare = "lefthook install"
 start = "flutter run"
+# CI запускает эти же части параллельными jobs.
+check = [
+    { task = "check:static" },
+    "bash tool/test_shard.sh 0 1",
+    { task = "check:process-tests" }
+]
 # Корневой `flutter analyze` разбирает и вложенный пакет widgetbook/, поэтому
 # его зависимости разрешаются до анализа.
-check = [
+"check:static" = [
     "dart format --output=none --set-exit-if-changed .",
     "bash test/tool/check_ci_scope_test.sh",
+    "bash test/tool/test_shard_test.sh",
     "flutter pub get --enforce-lockfile --directory widgetbook",
-    "flutter analyze",
-    "flutter test --concurrency=2 --exclude-tags=flutter_process",
-    # Вложенный Flutter пересоздаёт нативные артефакты SQLite в общей сборке.
-    # Эти наборы запускаются отдельно, чтобы не мешать параллельным чтениям.
-    "flutter test --concurrency=1 --tags=flutter_process"
+    "flutter analyze"
 ]
+# Обычные тесты одной части: `mise run check:tests -- <номер от 0> <число частей>`.
+"check:tests" = "bash tool/test_shard.sh"
+# Вложенный Flutter пересоздаёт нативные артефакты SQLite в общей сборке.
+# Эти наборы запускаются отдельно, чтобы не мешать параллельным чтениям.
+"check:process-tests" = "flutter test --concurrency=1 --tags=flutter_process"
 codegen = [
     "flutter gen-l10n",
     "dart run build_runner build --delete-conflicting-outputs",
