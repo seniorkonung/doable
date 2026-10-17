@@ -335,7 +335,6 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
           choice,
           stepsByChoice[choice.id] ?? const [],
           relations,
-          foundIds,
           participants,
         ),
     ]);
@@ -347,14 +346,12 @@ DailyChoiceCatalogItem _catalogItemFor(
   List<ChoicePathStep> steps,
   Map<LongTermRelationId, ({IntentionId source, IntentionId related})>
   relations,
-  Set<IntentionId> intentionIds,
   Map<IntentionId, DailyChoiceCatalogParticipant> participants,
 ) {
   _validateStoredChoicePathLinks(
     choice: choice,
     steps: steps,
     relations: relations,
-    intentionIds: intentionIds,
   );
   return DailyChoiceCatalogItem(
     id: choice.id,

@@ -70,6 +70,7 @@ import '../application/personal_graph_repository.dart';
 import '../application/selected_relations.dart';
 import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
+import 'stored_choice_path_verification.dart';
 
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
