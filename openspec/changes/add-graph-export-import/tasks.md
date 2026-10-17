@@ -259,7 +259,7 @@
   - **Files likely touched:** `lib/src/data/local/schema/graph_log_schema.drift`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/graph_fact_capture.dart`, `test/support/graph_seed.dart`, `test/data/local/graph_log_schema_test.dart`, `test/graph/data/graph_fact_capture_test.dart`, `test/graph/data/drift_graph_fact_log_write_test.dart`; результаты генерации `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v3.json`.
   - **Estimated scope:** M.
 
-- [ ] 1.23 Повторно подтвердить готовность этапа после запрета записи графа в обход единого пути
+- [x] 1.23 Повторно подтвердить готовность этапа после запрета записи графа в обход единого пути
   - **Acceptance criteria:**
     - После задач 1.19–1.22 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено, в том числе после каждого вида команды база совпадает с состоянием, собранным из снимка и лога, а накладные расходы лога на команды укладываются в бюджеты дизайна. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
     - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
