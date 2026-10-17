@@ -66,7 +66,9 @@ Future<void> runGraphStateWriteInIsolate(GraphStateWrite write) =>
 ///
 /// Состояние графа на текущей позиции для экспорта пишет [writeCurrentState]
 /// тем же способом: в отдельном изоляте, который обращается к логу через
-/// это сжатие, под отметкой чтения истории.
+/// это сжатие, под отметкой чтения истории. Если запись обнаружила, что
+/// последний снимок не проходит проверку, снимок пересобирается из базы вне
+/// порога.
 final class GraphLogCompaction {
   GraphLogCompaction({
     required this._log,
@@ -91,6 +93,9 @@ final class GraphLogCompaction {
     clock: _clock,
     diagnosticsSink: _diagnosticsSink,
   );
+
+  /// Подписка на новые пакеты; есть, только пока сжатие ведётся — между
+  /// [start] и [shutdown].
   StreamSubscription<int>? _signals;
   Future<void>? _running;
 
@@ -126,24 +131,43 @@ final class GraphLogCompaction {
   /// отражает состояние на этой позиции, даже если во время записи
   /// подтверждаются команды и завершается сжатие, а команды записи не ждут:
   /// база получает от изолята записи только короткие операции лога.
+  ///
+  /// Если базовый снимок не прошёл проверку, запись отказывает
+  /// [GraphSnapshotCorruption]. Когда этот снимок остаётся последним, сжатие
+  /// пересобирает снимок из базы, не дожидаясь порога, если оно ведётся и
+  /// ещё не идёт, поэтому после пересборки запись повторяется успешно.
   Future<void> writeCurrentState(
     File file, {
     required DateTime writtenAt,
     required void Function(double share) onProgress,
-  }) => readHistory(
-    (history) => _inWriter(
-      (compaction) => _stateWriteRunner(
-        GraphStateWrite._(
-          history,
-          file.path,
-          _directory,
-          writtenAt,
-          compaction,
-        ),
-      ),
-      onProgress: onProgress,
-    ),
-  );
+  }) async {
+    GraphSnapshotEntry? base;
+    try {
+      await readHistory((history) {
+        base = history.base;
+        return _inWriter(
+          (compaction) => _stateWriteRunner(
+            GraphStateWrite._(
+              history,
+              file.path,
+              _directory,
+              writtenAt,
+              compaction,
+            ),
+          ),
+          onProgress: onProgress,
+        );
+      });
+    } on GraphSnapshotCorruption {
+      // Сжатие запускается после снятия отметки чтения, поэтому граница
+      // хранения уже не сохраняет повреждённый снимок ради этого чтения.
+      if (base case final corrupted?
+          when _signals != null && _running == null) {
+        _launch(corrupted: corrupted);
+      }
+      rethrow;
+    }
+  }
 
   /// Сверяет лог с порогом и следит за новыми пакетами. Вызывается один раз,
   /// не одновременно с [removeUnregisteredFiles].
@@ -154,7 +178,9 @@ final class GraphLogCompaction {
 
   /// Перестаёт следить за новыми пакетами и дожидается идущего сжатия.
   Future<void> shutdown() async {
-    await _signals?.cancel();
+    final signals = _signals;
+    _signals = null;
+    await signals?.cancel();
     await _running;
   }
 
@@ -177,11 +203,14 @@ final class GraphLogCompaction {
     return true;
   }
 
-  void _launch() {
-    _running = _compactIfDue().whenComplete(() => _running = null);
+  /// Запускает сжатие, которое не дожидается порога, если последний снимок —
+  /// [corrupted], не прошедший проверку при чтении истории.
+  void _launch({GraphSnapshotEntry? corrupted}) {
+    _running = _compactIfDue(corrupted: corrupted)
+        .whenComplete(() => _running = null);
   }
 
-  Future<void> _compactIfDue() async {
+  Future<void> _compactIfDue({GraphSnapshotEntry? corrupted}) async {
     final stopwatch = Stopwatch()..start();
     var stage = GraphLogCompactionDiagnosticsStage.check;
     try {
@@ -189,7 +218,9 @@ final class GraphLogCompaction {
       _latestPosition = max(_latestPosition, position);
       final latest = await _log.readSnapshotAtOrBefore(position);
       final snapshotPosition = _snapshotPosition = latest?.position ?? 0;
-      if (position - snapshotPosition <= _threshold) return;
+      final rebuildDue =
+          corrupted != null && latest?.fileName == corrupted.fileName;
+      if (!rebuildDue && position - snapshotPosition <= _threshold) return;
       stage = GraphLogCompactionDiagnosticsStage.snapshotWrite;
       final snapshot = await _writeSnapshot(position);
       _snapshotPosition = snapshot.position;

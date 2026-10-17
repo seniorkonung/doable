@@ -72,6 +72,7 @@ void main() {
 
   GraphLogCompaction compactionOver(
     ObservableGraphFactLog log, {
+    GraphSnapshotWriteRunner runner = runGraphSnapshotWriteInIsolate,
     GraphStateWriteRunner stateWriteRunner = runGraphStateWriteInIsolate,
   }) => GraphLogCompaction(
     log: log,
@@ -79,6 +80,7 @@ void main() {
     clock: () => now,
     diagnosticsSink: outcomes,
     threshold: _threshold,
+    runner: runner,
     stateWriteRunner: stateWriteRunner,
   );
 
@@ -329,6 +331,83 @@ void main() {
     );
 
     expect(await exported.exists(), isFalse);
+  });
+
+  test('повреждённый последний снимок, обнаруженный записью при числе пакетов '
+      'меньше порога, пересобирается, и повторная запись читается в выгрузку '
+      'базы', () async {
+    await confirmCommands(2);
+    final damaged = await store().writeSnapshot(2);
+    await confirmCommands(1);
+    final damagedFile = File.fromUri(snapshots.uri.resolve(damaged.fileName));
+    await _flipByte(damagedFile, await damagedFile.length() ~/ 2);
+    final expected = await referenceState();
+    final compaction = compactionOver(repository)..start();
+
+    await expectLater(
+      writeState(compaction),
+      throwsA(isA<GraphSnapshotCorruption>()),
+    );
+    // Выключение дожидается запущенной пересборки.
+    await compaction.shutdown();
+
+    final rebuilt = await repository.readSnapshotAtOrBefore(3);
+    expect(rebuilt?.position, 3);
+    expect(await repository.readSnapshotFileNames(), {rebuilt?.fileName});
+    await writeState(compaction);
+    expect(await exportedRecords(), expected);
+  });
+
+  test('повреждение, обнаруженное записью во время задержанного сжатия, '
+      'второго сжатия не запускает', () async {
+    await confirmCommands(1);
+    final damaged = await store().writeSnapshot(1);
+    final damagedFile = File.fromUri(snapshots.uri.resolve(damaged.fileName));
+    await _flipByte(damagedFile, await damagedFile.length() ~/ 2);
+    final writeReached = Completer<void>();
+    final releaseWrite = Completer<void>();
+    var attempts = 0;
+    final compaction = compactionOver(
+      repository,
+      runner: (write) async {
+        attempts++;
+        if (!writeReached.isCompleted) writeReached.complete();
+        await releaseWrite.future;
+        return runGraphSnapshotWriteInIsolate(write);
+      },
+    )..start();
+    final compacted = outcomes.next;
+    await confirmCommands(_threshold + 1);
+    await writeReached.future;
+
+    await expectLater(
+      writeState(compaction),
+      throwsA(isA<GraphSnapshotCorruption>()),
+    );
+    releaseWrite.complete();
+
+    expect((await compacted).status, isA<DiagnosticsSucceeded>());
+    await compaction.shutdown();
+    expect(attempts, 1);
+  });
+
+  test('после выключения сжатия повреждение, обнаруженное записью, '
+      'пересборку не запускает', () async {
+    await confirmCommands(2);
+    final damaged = await store().writeSnapshot(2);
+    final damagedFile = File.fromUri(snapshots.uri.resolve(damaged.fileName));
+    await _flipByte(damagedFile, await damagedFile.length() ~/ 2);
+    final compaction = compactionOver(repository)..start();
+    await compaction.shutdown();
+
+    await expectLater(
+      writeState(compaction),
+      throwsA(isA<GraphSnapshotCorruption>()),
+    );
+    // Повторное выключение дождалось бы запущенной пересборки.
+    await compaction.shutdown();
+
+    expect(await repository.readSnapshotFileNames(), {damaged.fileName});
   });
 }
 
