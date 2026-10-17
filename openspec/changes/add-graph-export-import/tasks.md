@@ -403,3 +403,16 @@
   - **Dependencies:** 1.24, 1.33.
   - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_tagged_intentions.dart`, `test/graph/data/drift_tagged_entities_read_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`.
   - **Estimated scope:** S.
+
+- [ ] 1.35 Проверять хранимый текст намерения в общем декодере за один проход и без обработчика недостижимого отказа
+  - **Acceptance criteria:**
+    - По решению 5 [дизайна](design.md) `decodeStoredIntention` в `lib/src/graph/data/stored_graph_rows.dart` проверяет каждый хранимый текст намерения — название и описание — одним проходом нормализации `IntentionText`, а не сначала в декодере и затем повторно в фабрике `Intention`. `decodeStoredIntentionTitle` тоже проверяет название один раз.
+    - Набор проверок не меняется: текст вне формы, к которой его приводит ввод, недопустимый Unicode, пустое или полностью пробельное описание и превышение длины по-прежнему дают `StoredGraphCorruption`. Декодер перехватывает только отказы, которые даёт эта проверка; перехвата `ArgumentError` не остаётся.
+    - Для данных, которые пишет приложение, результаты чтений и команд, `GraphChange`, пакеты фактов и записи порций не меняются. Проверяемые сценарии, ожидания и названия тестов не меняются. Условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+  - **Verification:**
+    - Убедиться по коду, что от `decodeStoredIntention` до готового `Intention` каждый хранимый текст проходит `IntentionText.normalizeTitle` или `IntentionText.normalizeDescription` ровно один раз, а `rg 'ArgumentError' lib/src/graph/data/stored_graph_rows.dart` ничего не находит.
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/graph/data/ test/intention/data/ test/graph_snapshots/` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph/data/ test/graph_snapshots/`.
+    - Сопоставить актуальные результаты проверок задачи 1.34 с условием готовности. Выполнить `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 1.24, 1.34.
+  - **Files likely touched:** `lib/src/graph/data/stored_graph_rows.dart`.
+  - **Estimated scope:** XS.
