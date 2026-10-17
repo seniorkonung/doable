@@ -101,6 +101,9 @@ final class _Fixture {
     }
     raw.execute('BEGIN');
     try {
+      // Сохранённый граф фикстуры не оставляет отметок лога фактов, иначе
+      // первая команда читала бы его целиком.
+      raw.execute('UPDATE graph_log_control SET capture = 0');
       for (var number = 1; number <= _pathLength + 1; number++) {
         _addIntention(number, ready: number == 2 || number == 151);
       }
@@ -127,6 +130,7 @@ final class _Fixture {
       raw.execute('UPDATE daily_choices SET priority = 1 WHERE id = ?', [
         _uuid(10400),
       ]);
+      raw.execute('UPDATE graph_log_control SET capture = 1');
       raw.execute('COMMIT');
     } on Object {
       raw.execute('ROLLBACK');

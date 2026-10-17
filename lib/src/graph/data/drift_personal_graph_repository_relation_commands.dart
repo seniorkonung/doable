@@ -33,35 +33,23 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     final commandType = _longTermRelationCommandDiagnosticsType(command);
 
     try {
-      final success = await _sequencer.run(() async {
-        final committed = await _database.transaction(
-          () => switch (command) {
-            CreateLongTermRelation() => _createLongTermRelation(command),
-            UpdateLongTermRelation() => _updateLongTermRelation(command),
-            ArchiveLongTermRelation() => _setLongTermRelationScope(
-              relationId: command.relationId,
-              scope: relation_domain.RelationScope.archived,
-            ),
-            RestoreLongTermRelation() => _setLongTermRelationScope(
-              relationId: command.relationId,
-              scope: relation_domain.RelationScope.active,
-            ),
-            DeleteLongTermRelation() => _deleteLongTermRelation(
-              command.relationId,
-            ),
-          },
-        );
-        if (committed.didMutate) {
-          _mutationSequence++;
-        }
-        final revision = _currentRevision;
-        final value = committed.toSuccess(revision);
-        final result = ConfirmedGraphResult(revision: revision, value: value);
-        if (committed.didMutate) {
-          _notifyGraphWatchersFor(value.changes);
-        }
-        return result;
-      });
+      final success = await _writeGraph<LongTermRelationCommandSuccess>(
+        (_) => switch (command) {
+          CreateLongTermRelation() => _createLongTermRelation(command),
+          UpdateLongTermRelation() => _updateLongTermRelation(command),
+          ArchiveLongTermRelation() => _setLongTermRelationScope(
+            relationId: command.relationId,
+            scope: relation_domain.RelationScope.archived,
+          ),
+          RestoreLongTermRelation() => _setLongTermRelationScope(
+            relationId: command.relationId,
+            scope: relation_domain.RelationScope.active,
+          ),
+          DeleteLongTermRelation() => _deleteLongTermRelation(
+            command.relationId,
+          ),
+        },
+      );
       _recordDiagnostics(
         LongTermRelationCommandDiagnosticsEvent(
           commandType: commandType,
@@ -494,12 +482,9 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
   }
 }
 
-sealed class _CommittedLongTermRelationCommand {
+sealed class _CommittedLongTermRelationCommand
+    implements _GraphWrite<LongTermRelationCommandSuccess> {
   const _CommittedLongTermRelationCommand();
-
-  bool get didMutate;
-
-  LongTermRelationCommandSuccess toSuccess(GraphRevision revision);
 }
 
 final class _CommittedLongTermRelationCreation

@@ -579,6 +579,8 @@ void main() {
       clock = _DeterministicClock([
         DateTime.utc(2026, 9, 3, 12),
         DateTime.utc(2026, 9, 3, 13),
+        // Время записи пакета удаления.
+        DateTime.utc(2026, 9, 3, 14),
       ]);
       repository = DriftPersonalGraphRepository(
         database,
@@ -1024,6 +1026,17 @@ void main() {
     test(
       'физически удаляет active и archived намерения из всех публичных чтений',
       () async {
+        // Каждое удаление читает часы для времени записи своего пакета фактов.
+        clock = _DeterministicClock([
+          DateTime.utc(2026, 9, 3, 12),
+          DateTime.utc(2026, 9, 3, 13),
+        ]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
         final fixtures = [
           (id: _id(_firstUuid), isArchived: false),
           (id: _id(_secondUuid), isArchived: true),
@@ -1770,6 +1783,14 @@ void main() {
 
       test('переименованный выбранный тег назначается по идентичности с '
           'актуальным названием без создания нового тега', () async {
+        // Переименование читает часы для времени записи своего пакета фактов.
+        clock = _DeterministicClock([createdAt, createdAt]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
         final renamed = await repository.execute(
           RenameTag(tagId: homeTagId, name: TagName.fromInput('Быт')),
         );
@@ -1805,6 +1826,14 @@ void main() {
       test('удалённый и заново созданный одноимённый выбранный тег отклоняет '
           'всё создание точным отсутствующим идентификатором без подмены '
           'новым тегом', () async {
+        // Команды тегов читают часы для времени записи своих пакетов фактов.
+        clock = _DeterministicClock([createdAt, createdAt, createdAt]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
         _tagCommandSuccess(await repository.execute(DeleteTag(homeTagId)));
         final recreated = _tagCommandSuccess(
           await repository.execute(CreateTag(TagName.fromInput('Дом'))),
@@ -2081,6 +2110,8 @@ List<IntentionSummary> _catalogItems(Result<IntentionCatalogPage> result) {
   return (result as ResultSuccess<IntentionCatalogPage>).value.items;
 }
 
+/// Сохранённое намерение фикстуры не оставляет отметок лога фактов:
+/// иначе следующая команда, даже без изменений, записала бы его пакет.
 Future<void> _insertIntention(
   AppDatabase database, {
   required String id,
@@ -2090,19 +2121,23 @@ Future<void> _insertIntention(
   bool isArchived = false,
   required DateTime createdAt,
   DateTime? updatedAt,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id,
-        title: title,
-        description: Value(description),
-        isActionReady: Value(isActionReady),
-        isArchived: Value(isArchived),
-        createdAt: createdAt.microsecondsSinceEpoch,
-        updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
-      ),
-    );
+}) async {
+  await database.customStatement('UPDATE graph_log_control SET capture = 0');
+  await database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id,
+          title: title,
+          description: Value(description),
+          isActionReady: Value(isActionReady),
+          isArchived: Value(isArchived),
+          createdAt: createdAt.microsecondsSinceEpoch,
+          updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
+        ),
+      );
+  await database.customStatement('UPDATE graph_log_control SET capture = 1');
+}
 
 final class _DeterministicIntentionIdGenerator implements IntentionIdGenerator {
   _DeterministicIntentionIdGenerator(Iterable<IntentionId> ids)

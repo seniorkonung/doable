@@ -188,9 +188,12 @@ void main() {
 
   test('некорректная календарная дата отклоняет весь период', () async {
     // Формат этой даты допускается схемой, но календарный день не существует.
+    // Повреждение возникает вне команд графа и отметок лога не оставляет.
+    await database.customStatement('UPDATE graph_log_control SET capture = 0');
     await database.customStatement('UPDATE daily_choices SET choice_date = ?', [
       '2026-02-30',
     ]);
+    await database.customStatement('UPDATE graph_log_control SET capture = 1');
     for (final month in [1, 12]) {
       expect(
         await repository.execute(

@@ -11,16 +11,12 @@ extension _BlockingRelationsDeletion on DriftPersonalGraphRepository {
       ),
     );
     try {
-      final confirmed = await _sequencer.run(() async {
-        final revision = _DriftGraphRevision(_epoch, _mutationSequence + 1);
-        final value = await _database.transaction(() async {
-          final deleted = await _deleteSelectedBlockingRelations(command);
-          return deleted.toSuccess(command, revision);
-        });
-        _mutationSequence++;
-        final result = ConfirmedGraphResult(revision: revision, value: value);
-        _notifyGraphWatchersFor(value.changes);
-        return result;
+      final confirmed = await _writeGraph<BlockingRelationsDeleted>((_) async {
+        final deleted = await _deleteSelectedBlockingRelations(command);
+        return _GraphWriteResult(
+          didMutate: true,
+          toSuccess: (revision) => deleted.toSuccess(command, revision),
+        );
       });
       _recordDiagnostics(
         BlockingRelationsDeleteDiagnosticsEvent(

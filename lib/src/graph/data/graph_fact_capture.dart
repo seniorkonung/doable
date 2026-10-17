@@ -44,17 +44,36 @@ final class GraphFactCapture {
       ...await _relationFacts(),
       ...await _dailyChoiceFacts(),
     ];
-    for (final marks in <TableInfo<Table, Object?>>[
-      _database.graphLogTagMarks,
-      _database.graphLogIntentionMarks,
-      _database.graphLogTagAssignmentMarks,
-      _database.graphLogLongTermRelationMarks,
-      _database.graphLogDailyChoiceMarks,
-    ]) {
+    for (final marks in _markTables) {
       await _database.delete(marks).go();
     }
     return facts;
   }
+
+  /// Остались ли отметки: перед подтверждением транзакции записи их быть не
+  /// должно, иначе часть её изменений не попала бы в пакет.
+  Future<bool> hasMarks() async {
+    final markTables = _markTables;
+    final exists = [
+      for (final marks in markTables)
+        'EXISTS (SELECT 1 FROM ${marks.actualTableName})',
+    ];
+    final row = await _database
+        .customSelect(
+          'SELECT ${exists.join(' OR ')} AS has_marks',
+          readsFrom: markTables.toSet(),
+        )
+        .getSingle();
+    return row.read<bool>('has_marks');
+  }
+
+  List<TableInfo<Table, Object?>> get _markTables => [
+    _database.graphLogTagMarks,
+    _database.graphLogIntentionMarks,
+    _database.graphLogTagAssignmentMarks,
+    _database.graphLogLongTermRelationMarks,
+    _database.graphLogDailyChoiceMarks,
+  ];
 
   Future<Iterable<GraphFact>> _tagFacts() async {
     final rows = await _database

@@ -22,6 +22,8 @@ import '../../daily_choice/domain/daily_choice_description.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../daily_choice/domain/daily_choice_priority.dart';
 import '../../daily_choice/domain/daily_choice_schedule.dart';
+import '../../graph_format/graph_format_codec.dart'
+    show GraphFormatCodec, GraphFormatVersion;
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -70,6 +72,7 @@ import '../application/personal_graph_repository.dart';
 import '../application/selected_relations.dart';
 import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
+import 'graph_fact_capture.dart';
 import 'stored_choice_path_verification.dart';
 
 import 'package:drift/drift.dart';
@@ -602,44 +605,37 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     try {
       _validateCommandText(command);
-      final success = await _sequencer.run(() async {
-        final committed = await _database.transaction(
-          () => switch (command) {
-            CreateIntention() => _createIntention(
-              command,
-              onStage: (stage) => creationStage = stage,
-            ),
-            UpdateIntention() => _updateIntention(command),
-            EnableIntentionReadiness() => _changeReadiness(
-              command.id,
-              domain.IntentionReadiness.ready,
-            ),
-            DisableIntentionReadiness() => _changeReadiness(
-              command.id,
-              domain.IntentionReadiness.notReady,
-            ),
-            ArchiveIntention() => _changeArchiveState(
-              command.id,
-              domain.IntentionArchiveState.archived,
-            ),
-            RestoreIntention() => _changeArchiveState(
-              command.id,
-              domain.IntentionArchiveState.active,
-            ),
-            DeleteIntention() => _deleteIntention(command.id),
-          },
-        );
-        if (committed.didMutate) {
-          _mutationSequence++;
-        }
-        final revision = _currentRevision;
-        final value = committed.toSuccess(revision);
-        final result = ConfirmedGraphResult(revision: revision, value: value);
-        if (committed.didMutate) {
-          _notifyGraphWatchersFor(value.changes);
-        }
-        return result;
-      });
+      final success = await _writeGraph<IntentionCommandSuccess>(
+        (clock) => switch (command) {
+          CreateIntention() => _createIntention(
+            command,
+            clock,
+            onStage: (stage) => creationStage = stage,
+          ),
+          UpdateIntention() => _updateIntention(command, clock),
+          EnableIntentionReadiness() => _changeReadiness(
+            command.id,
+            domain.IntentionReadiness.ready,
+            clock,
+          ),
+          DisableIntentionReadiness() => _changeReadiness(
+            command.id,
+            domain.IntentionReadiness.notReady,
+            clock,
+          ),
+          ArchiveIntention() => _changeArchiveState(
+            command.id,
+            domain.IntentionArchiveState.archived,
+            clock,
+          ),
+          RestoreIntention() => _changeArchiveState(
+            command.id,
+            domain.IntentionArchiveState.active,
+            clock,
+          ),
+          DeleteIntention() => _deleteIntention(command.id),
+        },
+      );
       _recordDiagnostics(
         _commandDiagnosticsEvent(
           command,
@@ -663,6 +659,65 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       return ResultFailure(failure);
     }
   }
+
+  /// Единый путь записи графа (ADR-0034): в последовательном исполнителе
+  /// выполняет [body] в транзакции, дописывает в неё пакет фактов о
+  /// затронутых сущностях и подтверждает её. После подтверждения ревизия
+  /// продвигается на единицу, а наблюдатели получают изменения команды.
+  ///
+  /// Команда без изменений не пишет пакет и сохраняет ревизию. Любой отказ, в
+  /// том числе запись сущности длиннее предела записи формата, откатывает и
+  /// изменения графа, и пакет. [afterRollback] выполняется в исполнителе
+  /// после отката и может заменить отказ своим.
+  Future<ConfirmedGraphResult<T>> _writeGraph<T extends GraphCommandOutcome>(
+    Future<_GraphWrite<T>> Function(_GraphWriteClock clock) body, {
+    Future<void> Function(Object error)? afterRollback,
+  }) => _sequencer.run(() async {
+    final clock = _GraphWriteClock(_now);
+    final (bool, ConfirmedGraphResult<T>) committed;
+    try {
+      committed = await _database.transaction(() async {
+        final write = await body(clock);
+        final capture = GraphFactCapture(_database);
+        final facts = await capture.takeFacts();
+        if (facts.isNotEmpty) {
+          await _database
+              .into(_database.graphLogPackages)
+              .insert(
+                local.GraphLogPackagesCompanion.insert(
+                  recordedAt: clock.read().microsecondsSinceEpoch,
+                  kind: 'change',
+                  formatVersion: Value(GraphFormatVersion.current.number),
+                  facts: Value(GraphFormatCodec.encodePackage(facts)),
+                ),
+              );
+        }
+        if (await capture.hasMarks()) {
+          throw StateError('Отметки транзакции не попали в пакет фактов.');
+        }
+        // Исполнитель не начнёт другую запись до публикации этой ревизии.
+        final revision = write.didMutate
+            ? _DriftGraphRevision(_epoch, _mutationSequence + 1)
+            : _currentRevision;
+        return (
+          write.didMutate,
+          ConfirmedGraphResult(
+            revision: revision,
+            value: write.toSuccess(revision),
+          ),
+        );
+      });
+    } on Object catch (error) {
+      await afterRollback?.call(error);
+      rethrow;
+    }
+    final (didMutate, confirmed) = committed;
+    if (didMutate) {
+      _mutationSequence++;
+      _notifyGraphWatchersFor(confirmed.changes);
+    }
+    return confirmed;
+  });
 
   void _recordDiagnostics(DiagnosticsEvent event) {
     recordDiagnosticsSafely(_diagnosticsSink, event);
@@ -719,7 +774,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   /// результата: отказ относится к последнему сообщённому этапу, до первого
   /// перехода — к проверке.
   Future<_CommittedIntentionCommand> _createIntention(
-    CreateIntention command, {
+    CreateIntention command,
+    _GraphWriteClock clock, {
     required void Function(IntentionCreationCommandDiagnosticsStage) onStage,
   }) async {
     final title = IntentionText.normalizeTitle(command.title);
@@ -730,7 +786,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     await _requireCreationTags(command.tagIds);
 
     onStage(IntentionCreationCommandDiagnosticsStage.write);
-    final createdAt = domain.IntentionTimestamp(_now());
+    final createdAt = domain.IntentionTimestamp(clock.read());
     final intention = domain.Intention(
       id: _idGenerator.generate(),
       title: title,
@@ -812,6 +868,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   Future<_CommittedIntentionCommand> _updateIntention(
     UpdateIntention command,
+    _GraphWriteClock clock,
   ) async {
     final title = IntentionText.normalizeTitle(command.title);
     final description = switch (command.description) {
@@ -835,7 +892,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       readiness: existing.readiness,
       archiveState: existing.archiveState,
       createdAt: existing.createdAt,
-      updatedAt: domain.IntentionTimestamp(_now()),
+      updatedAt: domain.IntentionTimestamp(clock.read()),
     );
     await (_database.update(
       _database.intentions,
@@ -858,6 +915,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<_CommittedIntentionCommand> _changeReadiness(
     IntentionId id,
     domain.IntentionReadiness readiness,
+    _GraphWriteClock clock,
   ) async {
     final storedBefore = await _readCommandSnapshot(id);
     if (storedBefore == null) throw const _IntentionNotFound();
@@ -876,7 +934,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       readiness: readiness,
       archiveState: existing.archiveState,
       createdAt: existing.createdAt,
-      updatedAt: domain.IntentionTimestamp(_now()),
+      updatedAt: domain.IntentionTimestamp(clock.read()),
     );
     await (_database.update(
       _database.intentions,
@@ -898,6 +956,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<_CommittedIntentionCommand> _changeArchiveState(
     IntentionId id,
     domain.IntentionArchiveState archiveState,
+    _GraphWriteClock clock,
   ) async {
     final storedBefore = await _readCommandSnapshot(id);
     if (storedBefore == null) throw const _IntentionNotFound();
@@ -924,7 +983,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       readiness: existing.readiness,
       archiveState: archiveState,
       createdAt: existing.createdAt,
-      updatedAt: domain.IntentionTimestamp(_now()),
+      updatedAt: domain.IntentionTimestamp(clock.read()),
     );
     await (_database.update(
       _database.intentions,
@@ -1807,6 +1866,43 @@ final class _StoredIntentionColumnNames {
 /// восстановлении из резервной копии без перезапуска приложения.
 final class _GraphEpoch {}
 
+/// Итог тела записи графа: изменило ли оно граф и результат команды при
+/// ревизии, которую получает подтверждение.
+abstract interface class _GraphWrite<T extends GraphCommandOutcome> {
+  bool get didMutate;
+
+  T toSuccess(GraphRevision revision);
+}
+
+/// Итог тела, которое собрало результат из проверенного состояния своей
+/// транзакции; результату недостаёт только ревизии.
+final class _GraphWriteResult<T extends GraphCommandOutcome>
+    implements _GraphWrite<T> {
+  const _GraphWriteResult({
+    required this.didMutate,
+    required T Function(GraphRevision revision) toSuccess,
+  }) : _toSuccess = toSuccess;
+
+  @override
+  final bool didMutate;
+  final T Function(GraphRevision revision) _toSuccess;
+
+  @override
+  T toSuccess(GraphRevision revision) => _toSuccess(revision);
+}
+
+/// Одно показание часов репозитория на запись графа: данные сущностей и время
+/// записи пакета фактов получают одно наблюдение момента изменения
+/// (ADR-0006). Запись без изменений часы не читает.
+final class _GraphWriteClock {
+  _GraphWriteClock(this._now);
+
+  final DateTime Function() _now;
+  DateTime? _reading;
+
+  DateTime read() => _reading ??= _now();
+}
+
 final class _AsyncSequencer {
   Future<void> _tail = Future<void>.value();
 
@@ -1875,14 +1971,11 @@ final class _DriftIntentionCatalogEntrySnapshot
   }
 }
 
-sealed class _CommittedIntentionCommand {
+sealed class _CommittedIntentionCommand
+    implements _GraphWrite<IntentionCommandSuccess> {
   const _CommittedIntentionCommand();
 
-  bool get didMutate;
-
   IntentionId get intentionId;
-
-  IntentionCommandSuccess toSuccess(GraphRevision revision);
 }
 
 final class _CommittedIntentionCreated extends _CommittedIntentionCommand {

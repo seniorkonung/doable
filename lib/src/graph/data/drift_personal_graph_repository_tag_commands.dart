@@ -21,69 +21,42 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
 
     record(const DiagnosticsStarted());
     try {
-      final confirmed = await _sequencer.run(() async {
-        late _CommittedTagCommand committed;
-        try {
-          committed = await _database.transaction(
-            () => switch (command) {
-              CreateTag() => _createTag(
-                command,
-                onStage: (value) => stage = value,
-              ),
-              RenameTag() => _renameTag(
-                command,
-                onStage: (value) => stage = value,
-              ),
-              DeleteTag() => _deleteTag(
-                command,
-                onStage: (value) => stage = value,
-              ),
-              AssignTag() => _assignTag(
-                command,
-                onStage: (value) => stage = value,
-              ),
-              RemoveTagAssignment() => _removeTagAssignment(
-                command,
-                onStage: (value) => stage = value,
-              ),
-            },
-          );
-        } on Object catch (error) {
+      final confirmed = await _writeGraph<TagCommandSuccess>(
+        (_) => switch (command) {
+          CreateTag() => _createTag(command, onStage: (value) => stage = value),
+          RenameTag() => _renameTag(command, onStage: (value) => stage = value),
+          DeleteTag() => _deleteTag(command, onStage: (value) => stage = value),
+          AssignTag() => _assignTag(command, onStage: (value) => stage = value),
+          RemoveTagAssignment() => _removeTagAssignment(
+            command,
+            onStage: (value) => stage = value,
+          ),
+        },
+        afterRollback: (error) async {
           // После отката индекс имени остаётся окончательным арбитром гонки.
           final conflictingName = switch (command) {
             CreateTag(:final name) || RenameTag(:final name) => name,
             DeleteTag() || AssignTag() || RemoveTagAssignment() => null,
           };
-          if (conflictingName != null) {
-            if (classifySqliteFailure(error) case SqliteConstraintFailure(
-              extendedResultCode: SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-            )) {
-              stage = TagCommandDiagnosticsStage.resultRead;
-              final occupied = await _findTagByNameKey(
-                conflictingName.matchingKey,
-              );
-              if (occupied != null &&
-                  switch (command) {
-                    CreateTag() => true,
-                    RenameTag(:final tagId) => occupied.id != tagId,
-                    DeleteTag() ||
-                    AssignTag() ||
-                    RemoveTagAssignment() => false,
-                  }) {
-                throw _TagNameOccupied(occupied.id);
-              }
+          if (conflictingName == null) return;
+          if (classifySqliteFailure(error) case SqliteConstraintFailure(
+            extendedResultCode: SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
+          )) {
+            stage = TagCommandDiagnosticsStage.resultRead;
+            final occupied = await _findTagByNameKey(
+              conflictingName.matchingKey,
+            );
+            if (occupied != null &&
+                switch (command) {
+                  CreateTag() => true,
+                  RenameTag(:final tagId) => occupied.id != tagId,
+                  DeleteTag() || AssignTag() || RemoveTagAssignment() => false,
+                }) {
+              throw _TagNameOccupied(occupied.id);
             }
           }
-          rethrow;
-        }
-
-        if (committed.didMutate) _mutationSequence++;
-        final revision = _currentRevision;
-        final outcome = committed.toSuccess(revision);
-        final result = ConfirmedGraphResult(revision: revision, value: outcome);
-        if (committed.didMutate) _notifyGraphWatchersFor(result.changes);
-        return result;
-      });
+        },
+      );
       record(DiagnosticsSucceeded(stopwatch.elapsed));
       return TagCommandSucceeded(confirmed);
     } on Object catch (error) {
@@ -345,11 +318,8 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   }
 }
 
-sealed class _CommittedTagCommand {
+sealed class _CommittedTagCommand implements _GraphWrite<TagCommandSuccess> {
   const _CommittedTagCommand();
-
-  bool get didMutate;
-  TagCommandSuccess toSuccess(GraphRevision revision);
 }
 
 final class _CommittedTagCreated extends _CommittedTagCommand {

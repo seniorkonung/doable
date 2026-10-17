@@ -334,6 +334,8 @@ Future<void> _createFirstObjectGraph(
       DateTime.utc(2026, 9, 3, 15),
       DateTime.utc(2026, 9, 3, 16),
       DateTime.utc(2026, 9, 3, 17),
+      // Время записи пакета удаления.
+      DateTime.utc(2026, 9, 3, 18),
     ]).call,
     InMemoryDiagnosticsSink(),
   );
