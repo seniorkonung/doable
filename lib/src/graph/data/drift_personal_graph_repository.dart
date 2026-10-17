@@ -1878,10 +1878,7 @@ abstract interface class _GraphWrite<T extends GraphCommandOutcome> {
 /// транзакции; результату недостаёт только ревизии.
 final class _GraphWriteResult<T extends GraphCommandOutcome>
     implements _GraphWrite<T> {
-  const _GraphWriteResult({
-    required this.didMutate,
-    required T Function(GraphRevision revision) toSuccess,
-  }) : _toSuccess = toSuccess;
+  const _GraphWriteResult({required this.didMutate, required this._toSuccess});
 
   @override
   final bool didMutate;
