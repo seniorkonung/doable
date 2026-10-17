@@ -60,6 +60,11 @@ mise run codegen-check-test
 ## Pull request checks
 
 `mise run --skip-tools check` runs formatting, analysis and functional tests.
+CI runs the same parts as parallel jobs: `check:static`, four `check:tests`
+shards and `check:process-tests`. To reproduce one shard locally, pass its
+zero-based index and the shard count, for example
+`mise run --skip-tools check:tests -- 1 4`.
+
 Benchmarks are separate from this command and from automatic test discovery:
 
 ```sh
@@ -94,25 +99,23 @@ mise run --skip-tools benchmark -- \
   --dart-define=BENCHMARK_CASE=longPaths/archived/year/throughRelations/computeRace
 ```
 
-The remaining eight `slow` suites were reviewed when benchmarks were separated:
+Timing measurements live only in benchmarks. Regular tests have no elapsed-time
+measurements or budgets and use the smallest fixtures their assertions need,
+such as a few portions beyond the page size instead of production-scale
+volumes.
 
-| Suite | Checks retained in regular tests |
-| --- | --- |
-| Intention catalog large fixture | Complete keyset traversal, bounded reads, tag filtering and reconciliation; repeated latency measurements moved to `benchmark/` |
-| Daily choice read cost | Path preservation, bounded page reads, startup reads and a responsive event loop during worker-isolate SQL |
-| Relation group large fixture | Ordering, archive scopes, batched selection and command/revision consistency |
-| Tag catalog read cost | Complete snapshot without omissions |
-| Tag assignment read cost | Complete assignment and selection snapshots |
-| Tagged entities read cost | Complete ordered traversal and bounded materialization |
-| Tag assignment widget read cost | Loaded contents and usable scrolling |
-| Tag navigation widget read cost | Pagination, bounded mounted rows and consistent refresh after mutations |
+Every pull request must pass the single `Full checks` status. Jobs are selected
+from the changed paths:
 
-These functional checks retain `slow` because of their fixtures or traversal
-work. They have no repeated timing measurements or elapsed-time budgets.
+- project checks — static checks, four test shards and the `flutter_process`
+  suites — run for every change except documentation-only or OpenSpec-only
+  ones;
+- the release APK and packaged Android privacy-manifest check run for
+  artifact-impacting changes;
+- unclassified paths run every job.
 
-Every pull request must pass the single `Full checks` status. Project checks
-always run, while the release APK and packaged Android privacy-manifest check
-run for artifact-impacting or unclassified changes. A documentation-only,
-OpenSpec-only, or isolated Dart/test-only update may skip that Android job only
-after the preceding pull request commit has a trusted successful `Full checks`
-run; manual and weekly runs always include the Android evidence.
+A pull request is classified by its whole diff. A later push is classified by
+its own changes only on the first run attempt, when the push extends the
+preceding pull request commit and that commit has a trusted successful
+`Full checks` run. Re-runs, rewritten history and reopened pull requests use
+the whole diff again. Manual and weekly runs always run every job.

@@ -316,13 +316,14 @@ void seedWidelyAssignedTagFixture(
   }
 }
 
-/// Смешанная выдача с редким архивом и таким же числом посторонних
-/// назначений. На каждую пару приходятся основной получатель, архивный
-/// у каждой сороковой пары, и дополнительный, архивный только у двадцатой
-/// пары из каждых сорока. Выбранный и другой теги назначены обоим.
+/// Смешанная выдача с архивом и таким же числом посторонних назначений.
+/// На каждую пару приходятся основной получатель, архивный у первой пары
+/// каждого периода [archivePeriod], и дополнительный, архивный у пары из
+/// середины периода. Выбранный и другой теги назначены обоим.
 void seedLargeTaggedEntitiesFixture(
   sqlite.Database database, {
   required int recipientPairs,
+  required int archivePeriod,
 }) {
   database.execute('BEGIN');
   try {
@@ -340,8 +341,8 @@ void seedLargeTaggedEntitiesFixture(
       ]);
     }
     for (var index = 0; index < recipientPairs; index++) {
-      final primary = _largeTaggedPrimary(index);
-      final counterpart = _largeTaggedCounterpart(index);
+      final primary = _largeTaggedPrimary(index, archivePeriod);
+      final counterpart = _largeTaggedCounterpart(index, archivePeriod);
       for (final recipient in [primary, counterpart]) {
         database.execute(
           'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
@@ -354,6 +355,7 @@ void seedLargeTaggedEntitiesFixture(
           ],
         );
       }
+      // Связь с архивированным получателем не может оставаться активной.
       database.execute(
         'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
         [
@@ -362,7 +364,7 @@ void seedLargeTaggedEntitiesFixture(
           primary.id,
           index.isEven ? 'need' : 'can',
           2,
-          index % 20 == 0 ? 1 : 0,
+          primary.archived || index % 20 == 0 ? 1 : 0,
         ],
       );
       // Назначения постороннего тега чередуются с выбранным, но не входят
@@ -387,26 +389,27 @@ void seedLargeTaggedEntitiesFixture(
 /// выбранного тега вместе с порядковым номером среди всех его назначений.
 List<(String id, int ordinal)> largeTaggedIntentions(
   int recipientPairs, {
+  required int archivePeriod,
   required bool archived,
 }) => [
   for (var index = 0; index < recipientPairs; index++)
     for (final (offset, recipient) in [
-      (0, _largeTaggedPrimary(index)),
-      (1, _largeTaggedCounterpart(index)),
+      (0, _largeTaggedPrimary(index, archivePeriod)),
+      (1, _largeTaggedCounterpart(index, archivePeriod)),
     ])
       if (recipient.archived == archived) (recipient.id, index * 2 + offset),
 ];
 
 typedef _LargeTaggedRecipient = ({String id, String title, bool archived});
 
-_LargeTaggedRecipient _largeTaggedPrimary(int index) => (
+_LargeTaggedRecipient _largeTaggedPrimary(int index, int archivePeriod) => (
   id: tagFixtureId(100000 + index),
   title: '$index',
-  archived: index % 40 == 0,
+  archived: index % archivePeriod == 0,
 );
 
-_LargeTaggedRecipient _largeTaggedCounterpart(int index) => (
+_LargeTaggedRecipient _largeTaggedCounterpart(int index, int archivePeriod) => (
   id: tagFixtureId(200000 + index),
   title: '$index/2',
-  archived: index % 40 == 20,
+  archived: index % archivePeriod == archivePeriod ~/ 2,
 );
