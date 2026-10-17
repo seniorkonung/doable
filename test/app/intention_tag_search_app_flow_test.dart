@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -208,71 +209,73 @@ final class _App {
 /// Намерения с тегами «Здоровье», «Спорт» и «Отдых», связи первого
 /// намерения и его дневной выбор с путём по одной из активных связей.
 void _seed(sqlite.Database database) {
-  for (final (number, name) in [
-    (_health, 'Здоровье'),
-    (_sport, 'Спорт'),
-    (_rest, 'Отдых'),
-  ]) {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(number),
-      name,
-    ]);
-  }
-  for (final (number, title, ready, archived, tags) in [
-    (1, 'Ходить в парк', 1, 0, [_health, _rest]),
-    (2, 'Ходить до магазина', 1, 0, [_health]),
-    (3, 'Ходить в зал', 1, 0, [_health, _sport, _rest]),
-    (4, 'Читать в тишине', 0, 0, [_health, _rest]),
-    (5, 'Ходить в парк', 1, 1, [_health, _rest]),
-    (6, 'Гулять без тегов', 0, 0, <int>[]),
-    (7, 'Ходить в парк', 0, 0, [_health, _rest]),
-  ]) {
-    database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(number), title, ready, archived, number, number],
-    );
-    for (final tag in tags) {
+  seedRawGraph(database, () {
+    for (final (number, name) in [
+      (_health, 'Здоровье'),
+      (_sport, 'Спорт'),
+      (_rest, 'Отдых'),
+    ]) {
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        name,
+      ]);
+    }
+    for (final (number, title, ready, archived, tags) in [
+      (1, 'Ходить в парк', 1, 0, [_health, _rest]),
+      (2, 'Ходить до магазина', 1, 0, [_health]),
+      (3, 'Ходить в зал', 1, 0, [_health, _sport, _rest]),
+      (4, 'Читать в тишине', 0, 0, [_health, _rest]),
+      (5, 'Ходить в парк', 1, 1, [_health, _rest]),
+      (6, 'Гулять без тегов', 0, 0, <int>[]),
+      (7, 'Ходить в парк', 0, 0, [_health, _rest]),
+    ]) {
       database.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(tag), tagFixtureId(number)],
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [tagFixtureId(number), title, ready, archived, number, number],
+      );
+      for (final tag in tags) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(tag), tagFixtureId(number)],
+        );
+      }
+    }
+    for (final (number, related, archived) in [
+      (_pathRelation, 2, 0),
+      (_archivedRelation, 5, 1),
+      (_activeRelation, 4, 0),
+    ]) {
+      database.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(number),
+          tagFixtureId(1),
+          tagFixtureId(related),
+          'need',
+          2,
+          archived,
+        ],
       );
     }
-  }
-  for (final (number, related, archived) in [
-    (_pathRelation, 2, 0),
-    (_archivedRelation, 5, 1),
-    (_activeRelation, 4, 0),
-  ]) {
     database.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
       [
-        tagFixtureId(number),
+        tagFixtureId(_dailyChoice),
         tagFixtureId(1),
-        tagFixtureId(related),
-        'need',
-        2,
-        archived,
+        tagFixtureId(2),
+        '2026-09-25',
+        0,
       ],
     );
-  }
-  database.execute(
-    'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-    [
-      tagFixtureId(_dailyChoice),
-      tagFixtureId(1),
-      tagFixtureId(2),
-      '2026-09-25',
-      0,
-    ],
-  );
-  database.execute(
-    'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-    [
-      tagFixtureId(202),
-      tagFixtureId(_dailyChoice),
-      tagFixtureId(_pathRelation),
-    ],
-  );
+    database.execute(
+      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+      [
+        tagFixtureId(202),
+        tagFixtureId(_dailyChoice),
+        tagFixtureId(_pathRelation),
+      ],
+    );
+  });
 }
 
 Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {

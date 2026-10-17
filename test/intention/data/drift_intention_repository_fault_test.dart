@@ -25,6 +25,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -77,47 +78,46 @@ void main() {
   });
 
   group('Порция каталога — отказы получения собственных тегов', () {
-    test(
-      'ошибка после получения назначений не публикует частичный успех',
-      () async {
-        for (final (error, expected, code)
-            in <(Object, Matcher, DiagnosticsFailureCode)>[
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_BUSY,
-                  message: 'CANARY-недоступность',
-                ),
-                isA<IntentionUnavailableFailure>(),
-                DiagnosticsFailureCode.unavailable,
+    test('ошибка после получения назначений не публикует частичный успех', () async {
+      for (final (error, expected, code)
+          in <(Object, Matcher, DiagnosticsFailureCode)>[
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_BUSY,
+                message: 'CANARY-недоступность',
               ),
-              (
-                SqliteException(
-                  extendedResultCode: SqlError.SQLITE_CORRUPT,
-                  message: 'CANARY-повреждение',
-                ),
-                isA<IntentionCorruptionFailure>(),
-                DiagnosticsFailureCode.corruption,
+              isA<IntentionUnavailableFailure>(),
+              DiagnosticsFailureCode.unavailable,
+            ),
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_CORRUPT,
+                message: 'CANARY-повреждение',
               ),
-              (
-                StateError('CANARY-неизвестный-отказ'),
-                isA<IntentionUnexpectedFailure>(),
-                DiagnosticsFailureCode.unexpected,
-              ),
-            ]) {
-          final interceptor = _TagAssignmentReadInterceptor(failure: error);
-          final replacement = await _replaceDatabase(
-            interceptor,
-            database,
-            diagnostics,
-          );
-          database = replacement.database;
-          repository = replacement.repository;
-          await _insertIntention(
-            database,
-            id: _id(_firstUuid),
-            title: 'CANARY-намерение',
-            createdAt: DateTime.utc(2026, 9, 2, 10),
-          );
+              isA<IntentionCorruptionFailure>(),
+              DiagnosticsFailureCode.corruption,
+            ),
+            (
+              StateError('CANARY-неизвестный-отказ'),
+              isA<IntentionUnexpectedFailure>(),
+              DiagnosticsFailureCode.unexpected,
+            ),
+          ]) {
+        final interceptor = _TagAssignmentReadInterceptor(failure: error);
+        final replacement = await _replaceDatabase(
+          interceptor,
+          database,
+          diagnostics,
+        );
+        database = replacement.database;
+        repository = replacement.repository;
+        await _insertIntention(
+          database,
+          id: _id(_firstUuid),
+          title: 'CANARY-намерение',
+          createdAt: DateTime.utc(2026, 9, 2, 10),
+        );
+        await seedGraph(database, () async {
           await database.customStatement(
             'INSERT INTO tags (id, name) VALUES (?, ?)',
             [_relationUuid, 'CANARY-тег'],
@@ -126,39 +126,39 @@ void main() {
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [_relationUuid, _firstUuid],
           );
-          final result = await repository.getCatalogPage(
-            IntentionCatalogQuery(
-              scope: IntentionScope.all,
-              titleFilter: null,
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 1,
-            ),
-          );
+        });
+        final result = await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+          ),
+        );
 
-          expect(
-            result,
-            isA<ResultFailure<IntentionCatalogPage>>().having(
-              (result) => result.failure,
-              'причина',
-              expected,
+        expect(
+          result,
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'причина',
+            expected,
+          ),
+        );
+        expect(
+          diagnostics.events.last,
+          isA<CatalogPageReadDiagnosticsEvent>().having(
+            (event) => event.status,
+            'исход',
+            isA<DiagnosticsFailed>().having(
+              (status) => status.code,
+              'категория',
+              code,
             ),
-          );
-          expect(
-            diagnostics.events.last,
-            isA<CatalogPageReadDiagnosticsEvent>().having(
-              (event) => event.status,
-              'исход',
-              isA<DiagnosticsFailed>().having(
-                (status) => status.code,
-                'категория',
-                code,
-              ),
-            ),
-          );
-          expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-        }
-      },
-    );
+          ),
+        );
+        expect(diagnostics.events.toString(), isNot(contains('CANARY')));
+      }
+    });
   });
 
   group('DriftPersonalGraphRepository.execute — откат после DML', () {
@@ -332,14 +332,16 @@ void main() {
         isArchived: true,
         createdAt: DateTime.utc(2026, 9, 2),
       );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        homeTagId.toCanonicalString(),
-        'Дом',
-      ]);
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        weekendTagId.toCanonicalString(),
-        'Выходные',
-      ]);
+      seedRawGraph(raw, () {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          homeTagId.toCanonicalString(),
+          'Дом',
+        ]);
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          weekendTagId.toCanonicalString(),
+          'Выходные',
+        ]);
+      });
       final created = await repository.execute(
         CreateTag(TagName.fromInput('Спорт')),
       );
@@ -770,19 +772,22 @@ Future<void> _insertIntention(
   bool isActionReady = false,
   bool isArchived = false,
   required DateTime createdAt,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        description: Value(description),
-        isActionReady: Value(isActionReady),
-        isArchived: Value(isArchived),
-        createdAt: createdAt.microsecondsSinceEpoch,
-        updatedAt: createdAt.microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          description: Value(description),
+          isActionReady: Value(isActionReady),
+          isArchived: Value(isArchived),
+          createdAt: createdAt.microsecondsSinceEpoch,
+          updatedAt: createdAt.microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<void> _expectStoredIntention(
   AppDatabase database, {
@@ -811,8 +816,10 @@ Future<void> _insertRelation(
   required String id,
   required IntentionId sourceId,
   required IntentionId relatedId,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO long_term_relations (
       id,
       source_intention_id,
@@ -822,7 +829,8 @@ Future<void> _insertRelation(
       is_archived
     ) VALUES (?, ?, ?, 'need', 1, 0)
   ''',
-  [id, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
+    [id, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
+  ),
 );
 
 Future<bool> _relationIsArchived(AppDatabase database, String id) async {

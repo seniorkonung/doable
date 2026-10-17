@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -97,10 +98,13 @@ void main() {
       final h = await _pumpCatalog(
         tester,
         size: const Size(360, 800),
-        seed: (raw) => raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-          name,
-          tagFixtureId(303),
-        ]),
+        seed: (raw) => seedRawGraph(
+          raw,
+          () => raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+            name,
+            tagFixtureId(303),
+          ]),
+        ),
       );
       final l10n = AppLocalizations.of(
         tester.element(find.byType(TagCatalogPage)),
@@ -131,12 +135,14 @@ void main() {
       final h = await _pumpCatalog(
         tester,
         seed: (raw) {
-          for (var number = 305; number <= 352; number++) {
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              tagFixtureId(number),
-              'Тег $number',
-            ]);
-          }
+          seedRawGraph(raw, () {
+            for (var number = 305; number <= 352; number++) {
+              raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+                tagFixtureId(number),
+                'Тег $number',
+              ]);
+            }
+          });
         },
       );
       final model = h.container.read(tagCatalogViewModelProvider().notifier);
@@ -276,16 +282,21 @@ _pumpCatalog(
   );
   await database.open();
   seedTagStorageFixture(raw);
-  for (final (number, name) in [(303, 'Свободный'), (304, 'Только в архиве')]) {
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(number),
-      name,
-    ]);
-  }
-  raw.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagFixtureId(304), tagFixtureId(2)],
-  );
+  seedRawGraph(raw, () {
+    for (final (number, name) in [
+      (303, 'Свободный'),
+      (304, 'Только в архиве'),
+    ]) {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        name,
+      ]);
+    }
+    raw.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(304), tagFixtureId(2)],
+    );
+  });
   seed?.call(raw);
   final repository = DriftPersonalGraphRepository(
     database,

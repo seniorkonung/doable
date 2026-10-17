@@ -31,6 +31,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -223,17 +224,19 @@ void _registerAssignmentScenarios() {
         final ready =
             (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
         seedTagStorageFixture(raw);
-        for (var index = 0; index < 50; index++) {
-          final id = tagFixtureId(10000 + index);
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            id,
-            'Дополнение ${index.toString().padLeft(3, '0')}',
-          ]);
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [id, tagFixtureId(number)],
-          );
-        }
+        seedRawGraph(raw, () {
+          for (var index = 0; index < 50; index++) {
+            final id = tagFixtureId(10000 + index);
+            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+              id,
+              'Дополнение ${index.toString().padLeft(3, '0')}',
+            ]);
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [id, tagFixtureId(number)],
+            );
+          }
+        });
         final l10n = await AppLocalizations.delegate.load(locale);
         final router = ready.container.read(appRouterProvider);
         await tester.pumpWidget(MainApp(runtime: runtime));
@@ -544,15 +547,17 @@ void _registerDraftSelectionScenarios() {
       () => DateTime.utc(2026, 9, 25),
       diagnostics,
     );
-    for (final (number, name) in [
-      (firstTagNumber, 'Дом'),
-      (lastTagNumber, 'Работа'),
-    ]) {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
-    }
+    seedRawGraph(raw, () {
+      for (final (number, name) in [
+        (firstTagNumber, 'Дом'),
+        (lastTagNumber, 'Работа'),
+      ]) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          name,
+        ]);
+      }
+    });
     final container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),

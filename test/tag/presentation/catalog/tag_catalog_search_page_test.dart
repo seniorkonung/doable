@@ -37,6 +37,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
@@ -1161,12 +1162,14 @@ Future<AppRouter> _pumpStoredCatalog(
   );
   await database.open();
   seedTagNavigationFixture(raw, extraPairsPerScope: 0);
-  for (final (number, name) in [
-    (303, 'Дом без назначений'),
-    (304, 'Дом в архиве'),
-  ]) {
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [name, _id(number)]);
-  }
+  seedRawGraph(raw, () {
+    for (final (number, name) in [
+      (303, 'Дом без назначений'),
+      (304, 'Дом в архиве'),
+    ]) {
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [name, _id(number)]);
+    }
+  });
   final repository = DriftPersonalGraphRepository(
     database,
     UuidV7IntentionIdGenerator(),

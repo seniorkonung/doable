@@ -425,28 +425,30 @@ Future<void> _addSearchTag(
 
 Future<void> _seedSearchGraph(AppDatabase database) async {
   await seedDurabilityGraph(database);
-  for (final (number, name) in [
-    (900, 'Первая группа'),
-    (901, 'Вторая группа'),
-  ]) {
-    await database.customStatement(
-      'INSERT INTO tags (id, name) VALUES (?, ?)',
-      [durabilityUuid(number), name],
-    );
-  }
-  for (var i = 0; i < 160; i++) {
-    final id = durabilityUuid(1000 + i);
-    await database.customStatement(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) '
-      'VALUES (?, ?, 1, 0, 1, 1)',
-      [
-        id,
-        'Поиск ${i.isEven ? 'A' : 'B'} ${(i ~/ 2).toString().padLeft(3, '0')}',
-      ],
-    );
-    await database.customStatement(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [durabilityUuid(i.isEven ? 900 : 901), id],
-    );
-  }
+  await seedGraph(database, () async {
+    for (final (number, name) in [
+      (900, 'Первая группа'),
+      (901, 'Вторая группа'),
+    ]) {
+      await database.customStatement(
+        'INSERT INTO tags (id, name) VALUES (?, ?)',
+        [durabilityUuid(number), name],
+      );
+    }
+    for (var i = 0; i < 160; i++) {
+      final id = durabilityUuid(1000 + i);
+      await database.customStatement(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) '
+        'VALUES (?, ?, 1, 0, 1, 1)',
+        [
+          id,
+          'Поиск ${i.isEven ? 'A' : 'B'} ${(i ~/ 2).toString().padLeft(3, '0')}',
+        ],
+      );
+      await database.customStatement(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [durabilityUuid(i.isEven ? 900 : 901), id],
+      );
+    }
+  });
 }

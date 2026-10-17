@@ -26,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/daily_choice_local_date.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -519,17 +520,21 @@ void main() {
     await database.open();
     addTearDown(database.close);
     await _seedGraph(database);
-    await database.customStatement(
-      "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, 'can', 1, 0)",
-      [_uuid(103), _uuid(1), _uuid(3)],
-    );
+    await seedGraph(database, () async {
+      await database.customStatement(
+        "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, 'can', 1, 0)",
+        [_uuid(103), _uuid(1), _uuid(3)],
+      );
+    });
     for (var number = 201; number <= 251; number++) {
       await _insertChoice(database, number, day);
       await _insertChoice(database, number + 100, day, completed: true);
     }
-    await database.customStatement(
-      'UPDATE daily_choices SET scheduled_minute = 1080 WHERE is_completed = 1',
-    );
+    await seedGraph(database, () async {
+      await database.customStatement(
+        'UPDATE daily_choices SET scheduled_minute = 1080 WHERE is_completed = 1',
+      );
+    });
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -658,7 +663,7 @@ void main() {
 
 /// Засевает основание 1, промежуточное намерение 2, готовое действие 3 и
 /// связи пути 1 → 2 → 3.
-Future<void> _seedGraph(AppDatabase database) async {
+Future<void> _seedGraph(AppDatabase database) => seedGraph(database, () async {
   for (final number in [1, 2, 3]) {
     await database.customStatement(
       '''INSERT INTO intentions
@@ -676,7 +681,7 @@ Future<void> _seedGraph(AppDatabase database) async {
       [_uuid(number), _uuid(source), _uuid(target)],
     );
   }
-}
+});
 
 /// Дневной выбор [number] действия 3 от основания 1 через путь 1 → 2 → 3.
 Future<void> _insertChoice(
@@ -687,7 +692,7 @@ Future<void> _insertChoice(
   int? scheduledMinute,
   int priority = 4,
   String? description,
-}) async {
+}) => seedGraph(database, () async {
   await database.customStatement(
     '''INSERT INTO daily_choices
      (id, source_intention_id, selected_intention_id, choice_date,
@@ -716,7 +721,7 @@ Future<void> _insertChoice(
      VALUES (?, ?, ?, ?)''',
     [_uuid(number + 2000), _uuid(number), _uuid(102), _uuid(number + 1000)],
   );
-}
+});
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(_uuid(number)) as IntentionIdDecodingSuccess).id;

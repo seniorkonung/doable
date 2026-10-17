@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
@@ -462,7 +463,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
-Future<void> _seed(AppDatabase database) => database.transaction(() async {
+Future<void> _seed(AppDatabase database) => seedGraph(database, () async {
   for (final id in [
     2,
     for (var i = 1; i <= 120; i++) ...[1000 + i, 2000 + i],

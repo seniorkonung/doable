@@ -14,6 +14,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -114,17 +115,20 @@ void main() {
       final legacyDatabase = sqlite.sqlite3.open(harness.databaseFile.path);
       try {
         _registerSearchKeyFunction(legacyDatabase, historicalSearchKey);
-        legacyDatabase.execute(
-          '''
+        seedRawGraph(
+          legacyDatabase,
+          () => legacyDatabase.execute(
+            '''
               INSERT INTO intentions (id, title, created_at, updated_at)
               VALUES (?, ?, ?, ?)
             ''',
-          [
-            idValue,
-            title,
-            DateTime.utc(2026, 9, 4, 10).microsecondsSinceEpoch,
-            DateTime.utc(2026, 9, 4, 10).microsecondsSinceEpoch,
-          ],
+            [
+              idValue,
+              title,
+              DateTime.utc(2026, 9, 4, 10).microsecondsSinceEpoch,
+              DateTime.utc(2026, 9, 4, 10).microsecondsSinceEpoch,
+            ],
+          ),
         );
         expect(
           legacyDatabase
@@ -265,8 +269,10 @@ void main() {
         final harness = await LocalDatabaseHarness.fileBacked();
         addTearDown(harness.dispose);
         final database = await harness.openReadyDatabase();
-        await database.customStatement(
-          '''
+        await seedGraph(
+          database,
+          () => database.customStatement(
+            '''
               INSERT INTO intentions (
                 id,
                 title,
@@ -277,15 +283,16 @@ void main() {
                 updated_at
               ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ''',
-          [
-            fixture.id,
-            'Повреждённое намерение',
-            null,
-            0,
-            0,
-            DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
-            DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
-          ],
+            [
+              fixture.id,
+              'Повреждённое намерение',
+              null,
+              0,
+              0,
+              DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
+              DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
+            ],
+          ),
         );
         await harness.closePersistenceObjectGraph();
 

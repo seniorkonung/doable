@@ -15,6 +15,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -458,19 +459,22 @@ Future<void> _insertIntention(
 }) {
   final created = createdAt ?? DateTime.utc(2026, 9, 2, 10);
   final updated = updatedAt ?? created;
-  return database
-      .into(database.intentions)
-      .insert(
-        IntentionsCompanion.insert(
-          id: id,
-          title: title,
-          description: Value(description),
-          isActionReady: Value(isActionReady),
-          isArchived: Value(isArchived),
-          createdAt: created.microsecondsSinceEpoch,
-          updatedAt: updated.microsecondsSinceEpoch,
+  return seedGraph(
+    database,
+    () => database
+        .into(database.intentions)
+        .insert(
+          IntentionsCompanion.insert(
+            id: id,
+            title: title,
+            description: Value(description),
+            isActionReady: Value(isActionReady),
+            isArchived: Value(isArchived),
+            createdAt: created.microsecondsSinceEpoch,
+            updatedAt: updated.microsecondsSinceEpoch,
+          ),
         ),
-      );
+  );
 }
 
 Future<void> _insertRawIntention(
@@ -481,8 +485,10 @@ Future<void> _insertRawIntention(
   required Object createdAt,
   required Object updatedAt,
   Object? description,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO intentions (
       id,
       title,
@@ -493,15 +499,16 @@ Future<void> _insertRawIntention(
       updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
   ''',
-  [
-    id,
-    'Корректное название',
-    description,
-    isActionReady,
-    isArchived,
-    createdAt,
-    updatedAt,
-  ],
+    [
+      id,
+      'Корректное название',
+      description,
+      isActionReady,
+      isArchived,
+      createdAt,
+      updatedAt,
+    ],
+  ),
 );
 
 IntentionId _id(String value) => switch (IntentionId.decode(value)) {

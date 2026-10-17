@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/graph_seed.dart';
 import '../support/local_database_harness.dart';
 import '../support/intention_creation_storage_observer.dart';
 import '../support/intention_creation_origin.dart';
@@ -184,20 +185,22 @@ Future<_App> _launch(
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
   storage.connection = raw;
-  for (final (id, title, archived) in [(1, 'Гулять', 0), (2, 'Читать', 1)]) {
+  seedRawGraph(raw, () {
+    for (final (id, title, archived) in [(1, 'Гулять', 0), (2, 'Читать', 1)]) {
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 1, 1)',
+        [tagFixtureId(id), title, archived],
+      );
+    }
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagFixtureId(301),
+      'Дом',
+    ]);
     raw.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 1, 1)',
-      [tagFixtureId(id), title, archived],
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(301), tagFixtureId(1)],
     );
-  }
-  raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-    tagFixtureId(301),
-    'Дом',
-  ]);
-  raw.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagFixtureId(301), tagFixtureId(1)],
-  );
+  });
   final completions = <GraphCommandCompletion>[];
   final subscription = ready.container
       .read(graphCommandCoordinatorProvider.notifier)

@@ -51,6 +51,7 @@ import '../support/daily_choice_durability_fixture.dart';
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/daily_choice_catalog_controls.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
@@ -750,7 +751,7 @@ Future<void> _scrollTo(WidgetTester tester, Finder row) async {
 }
 
 Future<void> _seedPagedBreakdowns(AppDatabase database) =>
-    database.transaction(() async {
+    seedGraph(database, () async {
       for (var i = 1; i <= 120; i++) {
         await database.customStatement(
           'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 1, 0, 1, 1)',
