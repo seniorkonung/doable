@@ -270,3 +270,29 @@
   - **Dependencies:** 1.19, 1.20, 1.21, 1.22.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах соответствующих задач этапа.
   - **Estimated scope:** XS.
+
+- [ ] 1.24 Разбирать строки каждой таблицы графа одним декодером с одним отказом повреждения для чтений репозитория, захвата фактов и чтения порциями
+  - **Acceptance criteria:**
+    - По решению 5 [дизайна](design.md) строки таблиц `tags`, `intentions`, `tag_assignments`, `long_term_relations`, `daily_choices` и `daily_choice_path_steps` и идентификаторы их сущностей разбираются в значения предметной модели одним механизмом данных графа. Его используют чтения `DriftPersonalGraphRepository`, механизм фактов задачи 1.5 и чтение записей порциями задачи 1.10. Второй копии разбора тех же столбцов не остаётся ни в `graph_record_rows.dart`, ни в файлах чтений репозитория.
+    - Строка вне формы хранения даёт один общий отказ повреждения, а не `StateError`. Классификаторы отказов команд и чтений относят его к повреждению, как прежний `_StoredIntentionCorruption`, а диагностика операций со снимками — к категории `corruption`. Команда, каскад которой затронул такую строку, откатывается целиком без пакета и возвращает отказ повреждения своей команды.
+    - Декодер выполняет те проверки строк, которые уже выполняют чтения репозитория, и не добавляет новых, как требует «Обработка обнаруженного повреждения данных» в `local-data-lifecycle`. Для целостных данных результаты команд и чтений, `GraphChange`, пакеты фактов и записи порций не меняются.
+    - Накладные расходы лога на команду укладываются в бюджеты решения 15.
+  - **Verification:**
+    - Проверить через репозиторий: помощник задачи 1.19 записывает намерение с идентификатором вне формы и назначение ему тега. Удаление этого тега возвращает отказ повреждения команды тега, а база и лог фактов остаются прежними. Проверить, что пересборка снимка из базы с такой строкой даёт событие диагностики с категорией `corruption`.
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph/data/ test/graph_snapshots/`.
+    - Выполнить серию бенчмарка лога фактов по методике решения 15: `mise run --skip-tools benchmark -- --plain-name 'бенчмарк лога фактов' --dart-define=BENCHMARK_SAMPLES=40 --dart-define=BENCHMARK_WARMUPS=3`; сообщить в сессии замеры и бюджеты.
+  - **Dependencies:** 1.19, 1.22.
+  - **Files likely touched:** `lib/src/graph/data/graph_record_rows.dart`, `lib/src/graph/data/graph_fact_capture.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart` и другие файлы данных графа с копиями декодеров идентификаторов, `lib/src/graph_snapshots/graph_snapshot_store.dart`, `test/graph/data/drift_graph_fact_log_write_test.dart`, `test/graph_snapshots/graph_snapshot_rebuild_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 1.25 Повторно подтвердить готовность этапа после объединения декодеров строк графа
+  - **Acceptance criteria:**
+    - После задачи 1.24 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено, в том числе после каждого вида команды база совпадает с состоянием, собранным из снимка и лога, а накладные расходы лога на команды укладываются в бюджеты дизайна. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 1.8 и 1.24 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+    - Собрать `mise exec --no-deps -- flutter build apk --release` для ручной проверки. Если доступно запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; иначе ограничиться CLI-проверками. Сообщить в сессии результаты и оставшуюся ручную проверку на устройстве: работу команд графа.
+  - **Dependencies:** 1.23, 1.24.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 1.24.
+  - **Estimated scope:** XS.
