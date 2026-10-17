@@ -42,12 +42,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash tool/check_ci_scope.sh
 
-  project_checks:
-    name: Project checks
+  static_checks:
+    name: Static checks
     needs: scope_detector
     if: ${{ needs.scope_detector.outputs.project_required == 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -69,8 +69,61 @@ jobs:
       - name: Verify generated-artifact detector negative paths
         run: mise run --skip-tools codegen-check-test
 
-      - name: Run full project checks
-        run: mise run --skip-tools check
+      - name: Run static checks
+        run: mise run --skip-tools check:static
+
+  tests:
+    name: Tests ${{ matrix.shard }}
+    needs: scope_detector
+    if: ${{ needs.scope_detector.outputs.project_required == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      # Все части доходят до конца, чтобы прогон показал все упавшие тесты.
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.1
+          install_args: flutter
+          cache: true
+          cache_save: true
+
+      - name: Run test shard
+        run: mise run --skip-tools check:tests -- ${{ strategy.job-index }} ${{ strategy.job-total }}
+
+  process_tests:
+    name: Process tests
+    needs: scope_detector
+    if: ${{ needs.scope_detector.outputs.project_required == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.1
+          install_args: flutter
+          cache: true
+          cache_save: true
+
+      - name: Run process tests
+        run: mise run --skip-tools check:process-tests
 
   openspec_checks:
     name: OpenSpec checks
@@ -155,7 +208,9 @@ jobs:
     name: Full checks
     needs:
       - scope_detector
-      - project_checks
+      - static_checks
+      - tests
+      - process_tests
       - openspec_checks
       - android_artifact
     if: ${{ always() }}
@@ -169,7 +224,9 @@ jobs:
           PROJECT_REQUIRED: ${{ needs.scope_detector.outputs.project_required }}
           OPENSPEC_REQUIRED: ${{ needs.scope_detector.outputs.openspec_required }}
           ANDROID_REQUIRED: ${{ needs.scope_detector.outputs.android_required }}
-          PROJECT_RESULT: ${{ needs.project_checks.result }}
+          STATIC_RESULT: ${{ needs.static_checks.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          PROCESS_RESULT: ${{ needs.process_tests.result }}
           OPENSPEC_RESULT: ${{ needs.openspec_checks.result }}
           ANDROID_RESULT: ${{ needs.android_artifact.result }}
           SCOPE_RESULT: ${{ needs.scope_detector.result }}
@@ -206,6 +263,8 @@ jobs:
             esac
           }
 
-          require_job_result "$PROJECT_REQUIRED" "$PROJECT_RESULT" "Project checks"
+          require_job_result "$PROJECT_REQUIRED" "$STATIC_RESULT" "Static checks"
+          require_job_result "$PROJECT_REQUIRED" "$TESTS_RESULT" "Tests"
+          require_job_result "$PROJECT_REQUIRED" "$PROCESS_RESULT" "Process tests"
           require_job_result "$OPENSPEC_REQUIRED" "$OPENSPEC_RESULT" "OpenSpec checks"
           require_job_result "$ANDROID_REQUIRED" "$ANDROID_RESULT" "Android artifact evidence"

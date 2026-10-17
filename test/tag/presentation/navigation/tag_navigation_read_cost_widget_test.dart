@@ -1,6 +1,3 @@
-@Tags(['slow'])
-library;
-
 import 'dart:async';
 import 'dart:io';
 
@@ -32,8 +29,12 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
+/// Архивирован каждый четвёртый получатель: из 206 назначений выбранного тега
+/// активный охват занимает четыре порции по 50, а архивный — две.
+const _archivePeriod = 4;
+
 void main() {
-  const pairs = 5003;
+  const pairs = 103;
   testWidgets(
     'прокрутка обоих охватов при ${pairs * 2} назначениях выбранного тега и ${pairs * 2} назначениях другого тега',
     (tester) async {
@@ -46,7 +47,6 @@ void main() {
       await app.selectScope(tester, TaggedIntentionsScope.active);
       expect((await app.loaded(tester)).items, hasLength(50));
     },
-    timeout: const Timeout(Duration(minutes: 5)),
   );
 
   const scope = TaggedIntentionsScope.active;
@@ -105,7 +105,7 @@ void main() {
     expect(app.reads.samples, hasLength(readCount + 1));
     await _traverse(tester, app, changed);
     expect(tester.takeException(), isNull);
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  });
 }
 
 Future<void> _traverse(
@@ -170,6 +170,7 @@ Future<void> _traverse(
 List<IntentionId> _expected(int pairs, TaggedIntentionsScope scope) => [
   for (final (id, _) in largeTaggedIntentions(
     pairs,
+    archivePeriod: _archivePeriod,
     archived: scope == TaggedIntentionsScope.archived,
   ))
     (IntentionId.decode(id) as IntentionIdDecodingSuccess).id,
@@ -271,7 +272,11 @@ final class _App {
     });
     await tester.runAsync(() async {
       await database.open();
-      seedLargeTaggedEntitiesFixture(raw, recipientPairs: pairs);
+      seedLargeTaggedEntitiesFixture(
+        raw,
+        recipientPairs: pairs,
+        archivePeriod: _archivePeriod,
+      );
     });
     final repository = DriftPersonalGraphRepository(
       database,

@@ -1,6 +1,3 @@
-@Tags(['slow'])
-library;
-
 import 'dart:math';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
@@ -21,9 +18,9 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_large_fixture.dart';
 import '../../support/local_database_harness.dart';
 
-const _fixtureSize = intentionCatalogFixtureSize;
-const _pageSize = 100;
-const _jointMatchCount = 235;
+const _fixtureSize = 5000;
+const _pageSize = 10;
+const _jointMatchCount = 23;
 const _conditionCount = 1201;
 const _extraTagCount = 137;
 const _backgroundTagCount = 64;
@@ -61,14 +58,13 @@ void main() {
         InMemoryDiagnosticsSink(),
       );
 
-      await populateIntentionCatalogFixture(database);
+      await populateIntentionCatalogFixture(database, _fixtureSize);
       trace.clear();
 
       await _expectBoundedPages(repository);
       await _expectFirstPageCounts(repository, trace);
       await _expectCompleteKeysetTraversal(repository);
     },
-    timeout: const Timeout(Duration(minutes: 3)),
   );
 
   test(
@@ -77,7 +73,7 @@ void main() {
       final (:repository, raw: _, :trace) = await _openJointFixture();
 
       // Без фильтра названия совпадение отсекают только теги среди
-      // 25 000 готовых активных кандидатов; «Другое название» проходит.
+      // 2 500 готовых активных кандидатов; «Другое название» проходит.
       final tagOnlyMatchCount = _jointMatchCount + 1;
       for (final (pageSize, titleFilter, matchCount) in [
         (1, 'редкое %_', _jointMatchCount),
@@ -109,7 +105,7 @@ void main() {
           [
             for (var index = 0; index < _jointMatchCount; index++)
               _jointIntentionIndex(index),
-            _jointIntentionIndex(241),
+            _jointIntentionIndex(_otherTitleCandidate),
           ],
         ),
       ]) {
@@ -121,22 +117,22 @@ void main() {
         );
       }
 
-      // Каждый из 25 000 активных кандидатов имеет несколько собственных
-      // назначений. Отсечение кандидата не должно перебирать набор условий:
-      // оба набора читаются из параметра один раз на запрос. Без фильтра
-      // названия из 24 997 готовых активных кандидатов, кроме исключённого
-      // намерения, все 1201 исключённых тегов отсекают трёх кандидатов, а
-      // все 1201 обязательных тегов есть у 239 совместных кандидатов.
+      // Каждый из 2 500 активных кандидатов имеет несколько собственных
+      // назначений. Оба набора условий читаются из параметра один раз на
+      // запрос. Без фильтра названия из 2 497 готовых активных кандидатов,
+      // кроме исключённого намерения, все 1201 исключённых тегов отсекают
+      // трёх кандидатов, а все 1201 обязательных тегов есть у 27 совместных
+      // кандидатов.
       for (final (label, conditions, matchCount) in [
         (
           'только исключённые',
           (popular: false, required: 0, excluded: _conditionCount),
-          24994,
+          2494,
         ),
         (
           'только обязательные',
           (popular: false, required: _conditionCount, excluded: 0),
-          239,
+          27,
         ),
         ('совместные', _allConditions, tagOnlyMatchCount),
       ]) {
@@ -151,42 +147,41 @@ void main() {
         _expectJointPage(first, trace, isFirst: true);
       }
     },
-    timeout: const Timeout(Duration(minutes: 3)),
   );
 
   test('отдаёт порцию и продолжение в порядке охвата при популярном обязательном теге', () async {
     final (:repository, raw: _, :trace) = await _openJointFixture();
 
-    // Популярный тег назначен 19 999 из 24 999 активных намерений. Среди
-    // них не готов кандидат 243 и исключён из выдачи кандидат 244, поэтому
-    // один популярный тег оставляет 19 997 совпадений. Все 1201
-    // исключённых тегов отсекают ещё трёх кандидатов.
+    // Популярный тег назначен 1 999 из 2 499 активных намерений. Среди них
+    // один кандидат не готов и один исключён из выдачи, поэтому один
+    // популярный тег оставляет 1 997 совпадений. Все 1201 исключённых тегов
+    // отсекают ещё трёх кандидатов.
     // С редкими обязательными тегами совпадения сужаются до совместных
     // кандидатов, но популярный тег остаётся в наборе условий.
-    const popularBounds = [(6, 1728), (1756, 3478)];
+    const popularBounds = [(6, 160), (174, 328)];
     for (final (label, conditions, matchCount, bounds) in [
       (
         'только обязательные',
         (popular: true, required: 0, excluded: 0),
-        19997,
+        1997,
         popularBounds,
       ),
       (
         'только обязательные',
         (popular: true, required: _conditionCount, excluded: 0),
-        239,
+        27,
         null,
       ),
       (
         'совместные',
         (popular: true, required: 0, excluded: _conditionCount),
-        19994,
+        1994,
         popularBounds,
       ),
       (
         'совместные',
         (popular: true, required: _conditionCount, excluded: _conditionCount),
-        236,
+        24,
         null,
       ),
     ]) {
@@ -232,7 +227,7 @@ void main() {
         cursor = page.nextCursor;
       }
     }
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  });
 
   test(
     'согласует массовое удаление исключённого тега ограниченными порциями',
@@ -240,7 +235,7 @@ void main() {
       final (:repository, :raw, :trace) = await _openJointFixture();
       _populateMassExcludedTag(raw);
 
-      // До удаления массовый тег оставляет в выдаче 2500 намерений с номерами
+      // До удаления массовый тег оставляет в выдаче 250 намерений с номерами
       // вида 20k + 4. Выдача загружена до конца 25 обычными порциями, поэтому
       // сохранённая область во много раз больше порции согласования.
       final before = [
@@ -268,10 +263,10 @@ void main() {
       expect(deletion, isA<TagCommandSucceeded>());
       final deletionRevision = (deletion as TagCommandSucceeded).value.revision;
 
-      // Удаление открывает почти 20 000 совпадений внутри сохранённой
+      // Удаление открывает почти 2 000 совпадений внутри сохранённой
       // области. Условие по удалённому тегу остаётся в запросе.
       final after = _expectedTagOnlyMatches(_massConditions);
-      expect(after, hasLength(19994));
+      expect(after, hasLength(1994));
       for (final (label, boundary, storedCount) in [
         (
           'ранее полностью загруженная выдача',
@@ -319,7 +314,6 @@ void main() {
         );
       }
     },
-    timeout: const Timeout(Duration(minutes: 5)),
   );
 }
 
@@ -537,7 +531,7 @@ _openJointFixture() async {
     () => DateTime.utc(2026, 9, 3),
     InMemoryDiagnosticsSink(),
   );
-  await populateIntentionCatalogFixture(database);
+  await populateIntentionCatalogFixture(database, _fixtureSize);
   _populateJointTagFixture(raw);
   trace.clear();
   trace.parameterLimit = 400;
@@ -577,7 +571,7 @@ Future<void> _expectJointTraversal(
   expect(actual.toSet(), hasLength(matches.length));
 }
 
-/// Среди 50 000 намерений 245 кандидатов далеко за первой обычной порцией.
+/// Среди 5 000 намерений 33 кандидата далеко за первой обычной порцией.
 /// Десять отсекаются разными частями запроса; остальные имеют все 1201 тега.
 /// Каждое намерение дополнительно имеет три фоновых тега вне условий.
 void _populateJointTagFixture(sqlite.Database database) {
@@ -608,9 +602,11 @@ void _populateJointTagFixture(sqlite.Database database) {
         'UPDATE intentions SET title = ?, is_action_ready = ?, '
         'is_archived = ? WHERE id = ?',
         [
-          index == 241 ? 'Другое название' : 'Редкое %_ совпадение',
-          index == 243 ? 0 : 1,
-          index == 242 ? 1 : 0,
+          index == _otherTitleCandidate
+              ? 'Другое название'
+              : 'Редкое %_ совпадение',
+          index == _notReadyCandidate ? 0 : 1,
+          index == _archivedCandidate ? 1 : 0,
           id,
         ],
       );
@@ -655,6 +651,15 @@ void _populateJointTagFixture(sqlite.Database database) {
 
 const _jointCandidateCount = _jointMatchCount + 10;
 
+/// Номера кандидатов за совпадениями: каждый отсекает одна часть запроса.
+const _otherTitleCandidate = _jointMatchCount + 6;
+const _archivedCandidate = _jointMatchCount + 7;
+const _notReadyCandidate = _jointMatchCount + 8;
+const _excludedCandidate = _jointMatchCount + 9;
+
+const _jointFirstIndex = 100;
+const _jointIndexStep = 120;
+
 /// Порция несёт полный состав собственных тегов намерений фикстуры.
 void _expectFixtureTags(List<IntentionSummary> items) {
   for (final item in items) {
@@ -698,16 +703,19 @@ void _expectBoundedReadVolume(
   expect(trace.writes, isEmpty);
 }
 
-int _jointIntentionIndex(int index) => 1000 + index * 200;
+int _jointIntentionIndex(int index) =>
+    _jointFirstIndex + index * _jointIndexStep;
 
 /// Трём совместным кандидатам не хватает последнего обязательного тега.
 int _jointRequiredTagCount(int index) =>
-    index >= 235 && index <= 237 ? _conditionCount - 1 : _conditionCount;
+    index >= _jointMatchCount && index <= _jointMatchCount + 2
+    ? _conditionCount - 1
+    : _conditionCount;
 
 /// Номер исключённого тега совместного кандидата, если он назначен.
-int? _jointExcludedTag(int index) => switch (index) {
-  238 || 239 => 0,
-  240 => _conditionCount - 1,
+int? _jointExcludedTag(int index) => switch (index - _jointMatchCount) {
+  3 || 4 => 0,
+  5 => _conditionCount - 1,
   _ => null,
 };
 
@@ -718,7 +726,9 @@ bool _hasPopularTag(int fixtureIndex) => fixtureIndex % 10 != 2;
 /// Номер совместного кандидата для намерения фикстуры, если оно им является.
 int? _jointIndexOf(int fixtureIndex) {
   final offset = fixtureIndex - _jointIntentionIndex(0);
-  final joint = offset >= 0 && offset % 200 == 0 ? offset ~/ 200 : null;
+  final joint = offset >= 0 && offset % _jointIndexStep == 0
+      ? offset ~/ _jointIndexStep
+      : null;
   return joint != null && joint < _jointCandidateCount ? joint : null;
 }
 
@@ -737,9 +747,12 @@ List<int> _expectedTagOnlyMatches(_Conditions conditions) => [
 
 bool _matchesTagOnlyQuery(int fixtureIndex, _Conditions conditions) {
   final joint = _jointIndexOf(fixtureIndex);
-  // Активны чётные намерения, кроме переведённого в архив кандидата 242;
-  // кандидат 243 не готов, кандидат 244 исключён из выдачи запросом.
-  if (fixtureIndex.isOdd || joint == 242 || joint == 243 || joint == 244) {
+  // Активны чётные намерения, кроме переведённого в архив кандидата;
+  // ещё один кандидат не готов, а другой исключён из выдачи запросом.
+  if (fixtureIndex.isOdd ||
+      joint == _archivedCandidate ||
+      joint == _notReadyCandidate ||
+      joint == _excludedCandidate) {
     return false;
   }
   if (conditions.popular && !_hasPopularTag(fixtureIndex)) return false;
@@ -808,7 +821,7 @@ IntentionCatalogQuery _jointQuery({
     ],
   ),
   excludedIntentionId: switch (IntentionId.decode(
-    _fixtureId(_jointIntentionIndex(244)),
+    _fixtureId(_jointIntentionIndex(_excludedCandidate)),
   )) {
     IntentionIdDecodingSuccess(:final id) => id,
     InvalidIntentionIdDecoding() => throw StateError('Неверный UUID фикстуры.'),

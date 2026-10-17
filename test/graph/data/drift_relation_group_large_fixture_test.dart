@@ -1,6 +1,3 @@
-@Tags(['slow'])
-library;
-
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -133,7 +130,7 @@ void main() {
       archivedAfterMutation.indexOf(unviewedArchivedCanonicalId),
       lessThan(initialArchivedPosition),
     );
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  });
 
   test('после повторного открытия обнаруживает скрытое фильтром повреждение без startup-аудита', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
@@ -234,7 +231,6 @@ void main() {
         ),
       );
     },
-    timeout: const Timeout(Duration(minutes: 3)),
   );
 
   test(
@@ -340,7 +336,6 @@ void main() {
       );
       expect(trace.rowCounts, everyElement(lessThanOrEqualTo(_pageSize + 1)));
     },
-    timeout: const Timeout(Duration(minutes: 5)),
   );
 }
 

@@ -1,6 +1,3 @@
-@Tags(['slow'])
-library;
-
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
@@ -30,12 +27,15 @@ final class _Trace extends LocalDatabaseConnectionObserver {
   void clear() => rowCounts.clear();
 }
 
+/// Архивирован один получатель из двадцати: среди 2 006 назначений
+/// выбранного тега 51 архивное, то есть больше одной порции по 50.
+const _archivePeriod = 40;
+
 void main() {
-  const pairs = 5003;
+  const pairs = 1003;
   test(
     'порции намерений и редкого архива среди назначений противоположного охвата и другого тега читаются ограниченно и полностью при ${pairs * 2} назначениях',
     () => _readAllPages(pairs),
-    timeout: const Timeout(Duration(minutes: 5)),
   );
 }
 
@@ -55,7 +55,11 @@ Future<void> _readAllPages(int pairs) async {
   );
   try {
     await database.open();
-    seedLargeTaggedEntitiesFixture(raw, recipientPairs: pairs);
+    seedLargeTaggedEntitiesFixture(
+      raw,
+      recipientPairs: pairs,
+      archivePeriod: _archivePeriod,
+    );
     final graph = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -97,6 +101,7 @@ Future<void> _traverse(
 ) async {
   final expected = largeTaggedIntentions(
     pairs,
+    archivePeriod: _archivePeriod,
     archived: scope == TaggedIntentionsScope.archived,
   );
   final ids = <String>[];

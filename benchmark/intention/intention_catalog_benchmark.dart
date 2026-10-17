@@ -13,13 +13,15 @@ import '../../test/support/intention_catalog_large_fixture.dart';
 import '../../test/support/local_database_harness.dart';
 import '../support/benchmark.dart';
 
+const _intentions = 50000;
+
 void main() {
   test('бенчмарк каталога намерений: короткие фильтры', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     final database = await harness.openReadyDatabase();
     final preparation = Stopwatch()..start();
-    await populateIntentionCatalogFixture(database);
+    await populateIntentionCatalogFixture(database, _intentions);
     preparation.stop();
     final repository = DriftPersonalGraphRepository(
       database,
@@ -30,7 +32,7 @@ void main() {
     stdout.writeln(
       jsonEncode({
         'benchmark': 'intentionCatalog',
-        'intentions': intentionCatalogFixtureSize,
+        'intentions': _intentions,
         'preparationMs': preparation.elapsedMilliseconds,
         'databaseBytes': harness.databaseFile.lengthSync(),
         'os': Platform.operatingSystem,
@@ -64,7 +66,7 @@ void main() {
         expect(page.items.length, lessThanOrEqualTo(100));
         expect(
           (page as IntentionCatalogFirstPage).totalCount,
-          filter.startsWith('я') ? 0 : intentionCatalogFixtureSize ~/ 2,
+          filter.startsWith('я') ? 0 : _intentions ~/ 2,
         );
         if (sample >= 0) samples.add(watch.elapsed);
       }

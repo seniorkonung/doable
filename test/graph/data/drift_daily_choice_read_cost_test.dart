@@ -1,6 +1,3 @@
-@Tags(['slow'])
-library;
-
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -453,7 +450,7 @@ void main() {
       longPath.steps.map((step) => step.relationId),
     );
     _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  });
 
   test(
     'повторный bootstrap большой истории не читает сохранённые пути',
@@ -483,7 +480,6 @@ void main() {
         lessThan(_pageSize),
       );
     },
-    timeout: const Timeout(Duration(minutes: 3)),
   );
 
   test(
@@ -677,7 +673,7 @@ void main() {
       pageSteps: _pageSize,
       pageSize: _pageSize,
     );
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  });
 
   test('каталог одного дня читает только этот день порциями по 50', () async {
     // Сотни записей соседних дней созданы после записей выбранного дня.
@@ -796,7 +792,7 @@ void main() {
             as DailyChoiceCatalogFirstPage;
     expect(nextDay.totalCount, 301);
     _expectBoundedPage(fixture.trace, pageSteps: pageSize, pageSize: pageSize);
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  });
 
   test(
     'длинный путь и достижимость читаются отдельно от размера порции',
@@ -854,6 +850,5 @@ void main() {
         isA<DailyChoiceReadSuccess>(),
       );
     },
-    timeout: const Timeout(Duration(minutes: 3)),
   );
 }

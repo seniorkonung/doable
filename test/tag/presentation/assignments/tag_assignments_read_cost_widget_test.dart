@@ -1,6 +1,3 @@
-@Tags(['slow'])
-library;
-
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -18,6 +15,10 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 
+/// Первое намерение получает чётные теги: 102 назначения — больше двух
+/// прежних порций по 50.
+const _tagCount = 203;
+
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
@@ -28,11 +29,11 @@ void main() {
       openInMemoryLocalDatabase(setup: (connection) => raw = connection),
     );
     await database.open();
-    seedLargeTagReadFixture(raw);
+    seedLargeTagReadFixture(raw, tagCount: _tagCount);
     expect(
       raw.select('SELECT COUNT(*) FROM tag_assignments').single.values.single,
       largeTagReadFixtureAssignmentCount(
-        tagCount: 1203,
+        tagCount: _tagCount,
         includeDenseRecipients: false,
       ),
     );
@@ -47,7 +48,7 @@ void main() {
 
   final intentionId =
       (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
-  const expectedCount = 602;
+  const expectedCount = 102;
   testWidgets(
     'полная загрузка и прокрутка $expectedCount назначений намерения остаются доступными',
     (tester) async {
@@ -98,7 +99,10 @@ void main() {
         findsNothing,
       );
       expect(loaded.items.first.id.toCanonicalString(), tagFixtureId(10000));
-      expect(loaded.items.last.id.toCanonicalString(), tagFixtureId(11202));
+      expect(
+        loaded.items.last.id.toCanonicalString(),
+        tagFixtureId(10000 + _tagCount - 1),
+      );
 
       final scrollable = tester.state<ScrollableState>(
         find.byType(Scrollable).last,
