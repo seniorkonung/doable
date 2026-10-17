@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
 const _source = '018f0b5d-6b2e-7c80-8000-000000000001';
@@ -26,16 +27,18 @@ void main() {
       setup: (connection) => raw = connection,
     );
     await database.open();
-    for (final (id, title) in [
-      (_source, 'Исходное намерение'),
-      (_selected, 'Выбранное действие'),
-      (_other, 'Другое действие'),
-    ]) {
-      raw.execute(
-        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-        [id, title],
-      );
-    }
+    seedRawGraph(raw, () {
+      for (final (id, title) in [
+        (_source, 'Исходное намерение'),
+        (_selected, 'Выбранное действие'),
+        (_other, 'Другое действие'),
+      ]) {
+        raw.execute(
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+          [id, title],
+        );
+      }
+    });
     _addRelation(raw, _relation, _source, _selected);
     _addRelation(raw, _secondRelation, _selected, _other);
   });
@@ -61,9 +64,12 @@ void main() {
       (1439, 3),
       (null, 4),
     ]) {
-      raw.execute(
-        'UPDATE daily_choices SET scheduled_minute = ?, priority = ?',
-        [minute, priority],
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE daily_choices SET scheduled_minute = ?, priority = ?',
+          [minute, priority],
+        ),
       );
       final row = raw
           .select('SELECT scheduled_minute, priority FROM daily_choices')
@@ -101,7 +107,10 @@ void main() {
     ]) {
       for (final value in invalidValues) {
         expect(
-          () => raw.execute('UPDATE daily_choices SET $column = ?', [value]),
+          () => seedRawGraph(
+            raw,
+            () => raw.execute('UPDATE daily_choices SET $column = ?', [value]),
+          ),
           throwsA(isA<sqlite.SqliteException>()),
           reason: 'Недопустимое значение $column: $value.',
         );
@@ -129,20 +138,31 @@ void main() {
       final secondSequence = rows.last['creation_sequence'] as int;
       expect(secondSequence, greaterThan(firstSequence));
       expect(
-        () => raw.execute('UPDATE daily_choices SET id = ? WHERE id = ?', [
-          _thirdStep,
-          _choice,
-        ]),
-        throwsA(isA<sqlite.SqliteException>()),
-      );
-      expect(
-        () => raw.execute(
-          'UPDATE daily_choices SET creation_sequence = ? WHERE id = ?',
-          [secondSequence + 1, _choice],
+        () => seedRawGraph(
+          raw,
+          () => raw.execute('UPDATE daily_choices SET id = ? WHERE id = ?', [
+            _thirdStep,
+            _choice,
+          ]),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
-      raw.execute('DELETE FROM daily_choices WHERE id = ?', [_secondChoice]);
+      expect(
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE daily_choices SET creation_sequence = ? WHERE id = ?',
+            [secondSequence + 1, _choice],
+          ),
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+      seedRawGraph(
+        raw,
+        () => raw.execute('DELETE FROM daily_choices WHERE id = ?', [
+          _secondChoice,
+        ]),
+      );
       _addChoice(raw, _thirdStep);
       expect(
         raw.select('SELECT creation_sequence FROM daily_choices WHERE id = ?', [
@@ -165,12 +185,15 @@ void main() {
       (_source, _selected, '2026-09-23', null, 'неизвестно'),
     ]) {
       expect(
-        () => raw.execute(
-          '''INSERT INTO daily_choices
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            '''INSERT INTO daily_choices
             (id, source_intention_id, selected_intention_id,
              choice_date, description, is_completed)
             VALUES (?, ?, ?, ?, ?, ?)''',
-          [_choice, values.$1, values.$2, values.$3, values.$4, values.$5],
+            [_choice, values.$1, values.$2, values.$3, values.$4, values.$5],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
         reason: 'Недопустимая строка $values должна быть отклонена.',
@@ -190,52 +213,76 @@ void main() {
       'UPDATE intentions SET id = ? WHERE id = ?',
     ]) {
       expect(
-        () => raw.execute(
-          sql,
-          sql.startsWith('DELETE') ? [_source] : [_thirdStep, _source],
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            sql,
+            sql.startsWith('DELETE') ? [_source] : [_thirdStep, _source],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
     }
     expect(
-      () => raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
-        _relation,
-      ]),
+      () => seedRawGraph(
+        raw,
+        () => raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
+          _relation,
+        ]),
+      ),
       throwsA(isA<sqlite.SqliteException>()),
     );
     expect(
-      () => raw.execute('UPDATE long_term_relations SET id = ? WHERE id = ?', [
-        _thirdStep,
-        _relation,
-      ]),
+      () => seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE long_term_relations SET id = ? WHERE id = ?',
+          [_thirdStep, _relation],
+        ),
+      ),
       throwsA(isA<sqlite.SqliteException>()),
     );
 
-    raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]);
+    seedRawGraph(
+      raw,
+      () => raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]),
+    );
     expect(raw.select('SELECT id FROM daily_choice_path_steps'), hasLength(1));
     expect(
-      () => raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
-        _relation,
-      ]),
+      () => seedRawGraph(
+        raw,
+        () => raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
+          _relation,
+        ]),
+      ),
       throwsA(isA<sqlite.SqliteException>()),
     );
-    raw.execute('DELETE FROM daily_choices WHERE id = ?', [_secondChoice]);
-    raw.execute('DELETE FROM long_term_relations WHERE id = ?', [_relation]);
+    seedRawGraph(raw, () {
+      raw
+        ..execute('DELETE FROM daily_choices WHERE id = ?', [_secondChoice])
+        ..execute('DELETE FROM long_term_relations WHERE id = ?', [_relation]);
+    });
     expect(raw.select('SELECT id FROM daily_choice_path_steps'), isEmpty);
   });
 
   test('защищает прямых участников без долговременных связей', () {
-    raw.execute('DELETE FROM long_term_relations');
+    seedRawGraph(raw, () => raw.execute('DELETE FROM long_term_relations'));
     _addChoice(raw, _choice);
     for (final id in [_source, _selected]) {
       expect(
-        () => raw.execute('DELETE FROM intentions WHERE id = ?', [id]),
+        () => seedRawGraph(
+          raw,
+          () => raw.execute('DELETE FROM intentions WHERE id = ?', [id]),
+        ),
         throwsA(isA<sqlite.SqliteException>()),
       );
     }
-    raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]);
-    raw.execute('DELETE FROM intentions WHERE id = ?', [_source]);
-    raw.execute('DELETE FROM intentions WHERE id = ?', [_selected]);
+    seedRawGraph(raw, () {
+      raw
+        ..execute('DELETE FROM daily_choices WHERE id = ?', [_choice])
+        ..execute('DELETE FROM intentions WHERE id = ?', [_source])
+        ..execute('DELETE FROM intentions WHERE id = ?', [_selected]);
+    });
   });
 
   test('не допускает чужого предшественника, самоссылку, второй корень и ветвление', () {
@@ -294,12 +341,17 @@ void main() {
       _addStep(raw, _secondStep, _choice, _secondRelation, _firstStep);
       _addStep(raw, _thirdStep, _choice, _relation, _secondStep);
       raw.execute('BEGIN');
-      for (final id in order) {
-        raw.execute('DELETE FROM daily_choice_path_steps WHERE id = ?', [id]);
-      }
+      seedRawGraph(raw, () {
+        for (final id in order) {
+          raw.execute('DELETE FROM daily_choice_path_steps WHERE id = ?', [id]);
+        }
+      });
       raw.execute('COMMIT');
       expect(raw.select('SELECT id FROM daily_choice_path_steps'), isEmpty);
-      raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]);
+      seedRawGraph(
+        raw,
+        () => raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]),
+      );
     }
   });
 
@@ -327,9 +379,12 @@ void main() {
       ('related_intention_id', _other),
     ]) {
       expect(
-        () => raw.execute(
-          'UPDATE long_term_relations SET $column = ?, description = ? WHERE id = ?',
-          [value, 'Изменение', _relation],
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE long_term_relations SET $column = ?, description = ? WHERE id = ?',
+            [value, 'Изменение', _relation],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
@@ -340,12 +395,15 @@ void main() {
       ]).single['description'],
       isNull,
     );
-    raw.execute(
-      '''UPDATE long_term_relations
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        '''UPDATE long_term_relations
          SET type = 'need', source_intention_id = ?, related_intention_id = ?,
              priority = 2, description = 'Допустимо', is_archived = 1
          WHERE id = ?''',
-      [_source, _selected, _relation],
+        [_source, _selected, _relation],
+      ),
     );
     final row = raw.select('SELECT * FROM long_term_relations WHERE id = ?', [
       _relation,
@@ -353,11 +411,14 @@ void main() {
     expect(row['priority'], 2);
     expect(row['description'], 'Допустимо');
     expect(row['is_archived'], 1);
-    raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]);
-    raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
-      'can',
-      _relation,
-    ]);
+    seedRawGraph(raw, () {
+      raw
+        ..execute('DELETE FROM daily_choices WHERE id = ?', [_choice])
+        ..execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
+          'can',
+          _relation,
+        ]);
+    });
     expect(
       raw.select('SELECT type FROM long_term_relations WHERE id = ?', [
         _relation,
@@ -373,21 +434,27 @@ void _addRelation(
   String source,
   String related,
 ) {
-  db.execute(
-    '''INSERT INTO long_term_relations
+  seedRawGraph(
+    db,
+    () => db.execute(
+      '''INSERT INTO long_term_relations
        (id, source_intention_id, related_intention_id, type, priority)
        VALUES (?, ?, ?, 'need', 1)''',
-    [id, source, related],
+      [id, source, related],
+    ),
   );
 }
 
 void _addChoice(sqlite.Database db, String id) {
-  db.execute(
-    '''INSERT INTO daily_choices
+  seedRawGraph(
+    db,
+    () => db.execute(
+      '''INSERT INTO daily_choices
        (id, source_intention_id, selected_intention_id,
         choice_date, is_completed)
        VALUES (?, ?, ?, '2026-09-23', 0)''',
-    [id, _source, _selected],
+      [id, _source, _selected],
+    ),
   );
 }
 
@@ -398,11 +465,14 @@ void _addStep(
   String relation, [
   String? previous,
 ]) {
-  db.execute(
-    '''INSERT INTO daily_choice_path_steps
+  seedRawGraph(
+    db,
+    () => db.execute(
+      '''INSERT INTO daily_choice_path_steps
        (id, daily_choice_id, long_term_relation_id, previous_step_id)
        VALUES (?, ?, ?, ?)''',
-    [id, owner, relation, previous],
+      [id, owner, relation, previous],
+    ),
   );
 }
 

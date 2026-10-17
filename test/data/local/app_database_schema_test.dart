@@ -6,6 +6,8 @@ import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
+
 void main() {
   late AppDatabase database;
 
@@ -78,33 +80,42 @@ void main() {
         }
 
         await expectLater(
-          database.customStatement(
-            '''
+          seedGraph(
+            database,
+            () => database.customStatement(
+              '''
               INSERT INTO intentions (
                 id, title, title_search_key, created_at, updated_at
               ) VALUES (?, ?, ?, ?, ?)
             ''',
-            [
-              '018f0b5d-6b2e-7c80-8000-000000000010',
-              'Нельзя записать ключ',
-              'подменённый ключ',
-              1000000,
-              1000000,
-            ],
+              [
+                '018f0b5d-6b2e-7c80-8000-000000000010',
+                'Нельзя записать ключ',
+                'подменённый ключ',
+                1000000,
+                1000000,
+              ],
+            ),
           ),
           throwsA(isA<Exception>()),
         );
         await expectLater(
-          database.customStatement(
-            'UPDATE intentions SET title_search_key = ? WHERE id = ?',
-            ['подменённый ключ', fixtures.first.id],
+          seedGraph(
+            database,
+            () => database.customStatement(
+              'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+              ['подменённый ключ', fixtures.first.id],
+            ),
           ),
           throwsA(isA<Exception>()),
         );
 
-        await database.customStatement(
-          'UPDATE intentions SET title = ? WHERE id = ?',
-          ['Straße', fixtures.first.id],
+        await seedGraph(
+          database,
+          () => database.customStatement(
+            'UPDATE intentions SET title = ? WHERE id = ?',
+            ['Straße', fixtures.first.id],
+          ),
         );
         final recalculated = await database
             .customSelect(
@@ -131,34 +142,40 @@ void main() {
         );
 
         await expectLater(
-          database.customStatement(
-            '''
+          seedGraph(
+            database,
+            () => database.customStatement(
+              '''
               INSERT INTO intentions (id, title, created_at, updated_at)
               VALUES (?, ?, ?, ?)
             ''',
-            [
-              '018f0b5d-6b2e-7c80-8000-000000000013',
-              'Недопустимый\u0000заголовок',
-              1000000,
-              1000000,
-            ],
+              [
+                '018f0b5d-6b2e-7c80-8000-000000000013',
+                'Недопустимый\u0000заголовок',
+                1000000,
+                1000000,
+              ],
+            ),
           ),
           throwsA(isA<sqlite.SqliteException>()),
         );
         await expectLater(
-          database.customStatement(
-            '''
+          seedGraph(
+            database,
+            () => database.customStatement(
+              '''
               INSERT INTO intentions (
                 id, title, description, created_at, updated_at
               ) VALUES (?, ?, ?, ?, ?)
             ''',
-            [
-              '018f0b5d-6b2e-7c80-8000-000000000015',
-              'Допустимый заголовок',
-              'Недопустимое\u0000описание',
-              1000000,
-              1000000,
-            ],
+              [
+                '018f0b5d-6b2e-7c80-8000-000000000015',
+                'Допустимый заголовок',
+                'Недопустимое\u0000описание',
+                1000000,
+                1000000,
+              ],
+            ),
           ),
           throwsA(isA<sqlite.SqliteException>()),
         );
@@ -174,7 +191,11 @@ void main() {
           ),
         ]) {
           await expectLater(
-            database.customStatement(statement.sql, statement.arguments),
+            seedGraph(
+              database,
+              () =>
+                  database.customStatement(statement.sql, statement.arguments),
+            ),
             throwsA(isA<sqlite.SqliteException>()),
           );
         }
@@ -226,42 +247,51 @@ void main() {
 
     test('отклоняет неполную строку и недопустимые boolean', () async {
       await expectLater(
-        database.customStatement(
-          '''
+        seedGraph(
+          database,
+          () => database.customStatement(
+            '''
           INSERT INTO intentions (
             id, title, is_action_ready, is_archived, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?)
         ''',
-          [
-            '018f0b5d-6b2e-7c80-8000-000000000004',
-            'Некорректное состояние',
-            2,
-            0,
-            1000000,
-            1000000,
-          ],
+            [
+              '018f0b5d-6b2e-7c80-8000-000000000004',
+              'Некорректное состояние',
+              2,
+              0,
+              1000000,
+              1000000,
+            ],
+          ),
         ),
         throwsA(isA<Exception>()),
       );
       await expectLater(
-        database.customStatement(
-          '''
+        seedGraph(
+          database,
+          () => database.customStatement(
+            '''
           INSERT INTO intentions (
             id, title, created_at, updated_at
           ) VALUES (?, NULL, ?, ?)
         ''',
-          ['018f0b5d-6b2e-7c80-8000-000000000005', 1000000, 1000000],
+            ['018f0b5d-6b2e-7c80-8000-000000000005', 1000000, 1000000],
+          ),
         ),
         throwsA(isA<Exception>()),
       );
       await expectLater(
-        database.customStatement(
-          '''
+        seedGraph(
+          database,
+          () => database.customStatement(
+            '''
           INSERT INTO intentions (
             id, title, created_at, updated_at
           ) VALUES (?, ?, ?, ?)
         ''',
-          ['018f0b5d-6b2e-7c80-8000-000000000006', '', 1000000, 1000000],
+            ['018f0b5d-6b2e-7c80-8000-000000000006', '', 1000000, 1000000],
+          ),
         ),
         throwsA(isA<Exception>()),
       );
@@ -449,9 +479,12 @@ void main() {
         isArchived: 1,
       );
       await expectLater(
-        database.customStatement(
-          'UPDATE long_term_relations SET is_archived = 0 WHERE id = ?',
-          ['018f0b5d-6b2e-7c80-8000-000000000152'],
+        seedGraph(
+          database,
+          () => database.customStatement(
+            'UPDATE long_term_relations SET is_archived = 0 WHERE id = ?',
+            ['018f0b5d-6b2e-7c80-8000-000000000152'],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
@@ -465,67 +498,75 @@ void main() {
         priority: 2,
       );
       await expectLater(
-        database.customStatement(
-          'UPDATE intentions SET is_archived = 1 WHERE id = ?',
-          ['018f0b5d-6b2e-7c80-8000-000000000141'],
+        seedGraph(
+          database,
+          () => database.customStatement(
+            'UPDATE intentions SET is_archived = 1 WHERE id = ?',
+            ['018f0b5d-6b2e-7c80-8000-000000000141'],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
       await expectLater(
-        database.customStatement('DELETE FROM intentions WHERE id = ?', [
-          '018f0b5d-6b2e-7c80-8000-000000000143',
-        ]),
+        seedGraph(
+          database,
+          () => database.customStatement(
+            'DELETE FROM intentions WHERE id = ?',
+            ['018f0b5d-6b2e-7c80-8000-000000000143'],
+          ),
+        ),
         throwsA(isA<sqlite.SqliteException>()),
       );
     });
 
-    test(
-      'запрещает изменять идентичность и последовательность создания',
-      () async {
-        await _insertRelationParticipants(database);
-        const relationId = '018f0b5d-6b2e-7c80-8000-000000000161';
-        await _insertLongTermRelation(
-          database,
-          id: relationId,
-          sourceId: '018f0b5d-6b2e-7c80-8000-000000000131',
-          relatedId: '018f0b5d-6b2e-7c80-8000-000000000132',
-          type: 'need',
-          priority: 1,
-        );
-        final original = await database
-            .customSelect(
-              'SELECT creation_sequence, id FROM long_term_relations WHERE id = ?',
-              variables: [Variable.withString(relationId)],
-            )
-            .getSingle();
+    test('запрещает изменять идентичность и последовательность создания', () async {
+      await _insertRelationParticipants(database);
+      const relationId = '018f0b5d-6b2e-7c80-8000-000000000161';
+      await _insertLongTermRelation(
+        database,
+        id: relationId,
+        sourceId: '018f0b5d-6b2e-7c80-8000-000000000131',
+        relatedId: '018f0b5d-6b2e-7c80-8000-000000000132',
+        type: 'need',
+        priority: 1,
+      );
+      final original = await database
+          .customSelect(
+            'SELECT creation_sequence, id FROM long_term_relations WHERE id = ?',
+            variables: [Variable.withString(relationId)],
+          )
+          .getSingle();
 
-        await expectLater(
-          database.customStatement(
+      await expectLater(
+        seedGraph(
+          database,
+          () => database.customStatement(
             'UPDATE long_term_relations SET id = ? WHERE id = ?',
             ['018f0b5d-6b2e-7c80-8000-000000000162', relationId],
           ),
-          throwsA(isA<sqlite.SqliteException>()),
-        );
-        await expectLater(
-          database.customStatement(
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+      await expectLater(
+        seedGraph(
+          database,
+          () => database.customStatement(
             'UPDATE long_term_relations SET creation_sequence = ? WHERE id = ?',
             [original.read<int>('creation_sequence') + 1, relationId],
           ),
-          throwsA(isA<sqlite.SqliteException>()),
-        );
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
 
-        final stored = await database
-            .customSelect(
-              'SELECT creation_sequence, id FROM long_term_relations',
-            )
-            .getSingle();
-        expect(stored.read<String>('id'), relationId);
-        expect(
-          stored.read<int>('creation_sequence'),
-          original.read<int>('creation_sequence'),
-        );
-      },
-    );
+      final stored = await database
+          .customSelect('SELECT creation_sequence, id FROM long_term_relations')
+          .getSingle();
+      expect(stored.read<String>('id'), relationId);
+      expect(
+        stored.read<int>('creation_sequence'),
+        original.read<int>('creation_sequence'),
+      );
+    });
 
     test(
       'не переиспользует максимальную последовательность после удаления',
@@ -554,9 +595,12 @@ void main() {
           firstRelationId,
         );
 
-        await database.customStatement(
-          'DELETE FROM long_term_relations WHERE id = ?',
-          [firstRelationId],
+        await seedGraph(
+          database,
+          () => database.customStatement(
+            'DELETE FROM long_term_relations WHERE id = ?',
+            [firstRelationId],
+          ),
         );
         await _insertLongTermRelation(
           database,
@@ -584,13 +628,16 @@ Future<void> _insertIntention(
   required int createdAt,
   required int updatedAt,
   bool isArchived = false,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
       INSERT INTO intentions (
         id, title, description, is_archived, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?)
     ''',
-  [id, title, description, isArchived ? 1 : 0, createdAt, updatedAt],
+    [id, title, description, isArchived ? 1 : 0, createdAt, updatedAt],
+  ),
 );
 
 Future<void> _insertRelationParticipants(AppDatabase database) async {
@@ -621,8 +668,10 @@ Future<void> _insertLongTermRelation(
   required int priority,
   String? description,
   int isArchived = 0,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO long_term_relations (
       id,
       source_intention_id,
@@ -633,7 +682,8 @@ Future<void> _insertLongTermRelation(
       is_archived
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
   ''',
-  [id, sourceId, relatedId, type, priority, description, isArchived],
+    [id, sourceId, relatedId, type, priority, description, isArchived],
+  ),
 );
 
 Future<int> _relationCreationSequence(

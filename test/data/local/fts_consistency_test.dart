@@ -5,6 +5,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
+
 void main() {
   late AppDatabase database;
 
@@ -25,17 +27,23 @@ void main() {
 
         expect(await _findByTitleFilter(database, 'молоко'), [id]);
 
-        await database.customStatement(
-          'UPDATE intentions SET title = ? WHERE id = ?',
-          ['Купить хлеб', id],
+        await seedGraph(
+          database,
+          () => database.customStatement(
+            'UPDATE intentions SET title = ? WHERE id = ?',
+            ['Купить хлеб', id],
+          ),
         );
 
         expect(await _findByTitleFilter(database, 'молоко'), isEmpty);
         expect(await _findByTitleFilter(database, 'хлеб'), [id]);
 
-        await database.customStatement(
-          'UPDATE intentions SET description = ? WHERE id = ?',
-          ['Изменено неиндексируемое поле', id],
+        await seedGraph(
+          database,
+          () => database.customStatement(
+            'UPDATE intentions SET description = ? WHERE id = ?',
+            ['Изменено неиндексируемое поле', id],
+          ),
         );
 
         expect(await _findByTitleFilter(database, 'хлеб'), [id]);
@@ -44,9 +52,13 @@ void main() {
           completes,
         );
 
-        await database.customStatement('DELETE FROM intentions WHERE id = ?', [
-          id,
-        ]);
+        await seedGraph(
+          database,
+          () => database.customStatement(
+            'DELETE FROM intentions WHERE id = ?',
+            [id],
+          ),
+        );
 
         expect(await _findByTitleFilter(database, 'хлеб'), isEmpty);
       },
@@ -163,13 +175,16 @@ Future<void> _insertIntention(
   AppDatabase database, {
   required String id,
   required String title,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
       INSERT INTO intentions (
         id, title, created_at, updated_at
       ) VALUES (?, ?, ?, ?)
     ''',
-  [id, title, 1000000, 1000000],
+    [id, title, 1000000, 1000000],
+  ),
 );
 
 Future<List<String>> _findByTitleFilter(
