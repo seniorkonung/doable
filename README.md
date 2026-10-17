@@ -95,21 +95,10 @@ mise run --skip-tools benchmark -- \
   --dart-define=BENCHMARK_CASE=longPaths/archived/year/throughRelations/computeRace
 ```
 
-The remaining eight `slow` suites were reviewed when benchmarks were separated:
-
-| Suite | Checks retained in regular tests |
-| --- | --- |
-| Intention catalog large fixture | Complete keyset traversal, bounded reads, tag filtering and reconciliation; repeated latency measurements moved to `benchmark/` |
-| Daily choice read cost | Path preservation, bounded page reads, startup reads and a responsive event loop during worker-isolate SQL |
-| Relation group large fixture | Ordering, archive scopes, batched selection and command/revision consistency |
-| Tag catalog read cost | Complete snapshot without omissions |
-| Tag assignment read cost | Complete assignment and selection snapshots |
-| Tagged entities read cost | Complete ordered traversal and bounded materialization |
-| Tag assignment widget read cost | Loaded contents and usable scrolling |
-| Tag navigation widget read cost | Pagination, bounded mounted rows and consistent refresh after mutations |
-
-These functional checks retain `slow` because of their fixtures or traversal
-work. They have no repeated timing measurements or elapsed-time budgets.
+Timing measurements live only in benchmarks. Regular tests have no elapsed-time
+measurements or budgets and use the smallest fixtures their assertions need,
+such as a few portions beyond the page size instead of production-scale
+volumes.
 
 Every pull request must pass the single `Full checks` status. Project checks
 always run, while the release APK and packaged Android privacy-manifest check

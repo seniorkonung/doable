@@ -1,6 +1,3 @@
-@Tags(['slow'])
-library;
-
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
