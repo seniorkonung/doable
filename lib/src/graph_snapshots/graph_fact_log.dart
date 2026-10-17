@@ -109,6 +109,14 @@ final class GraphRecordPortion {
   final GraphRecordOrderKey? next;
 }
 
+/// Строка графа в базе вне формы хранения: запись порции
+/// [GraphFactLog.readGraphRecords] из неё не собирается.
+///
+/// Отказ не несёт прочитанных данных: в них пользовательский текст.
+final class GraphRecordCorruption implements Exception {
+  const GraphRecordCorruption();
+}
+
 /// Доступ хранилища снимков к логу фактов и реестру снимков.
 ///
 /// Позиция 0 — пустой граф новой установки, каждый подтверждённый пакет
@@ -141,6 +149,9 @@ abstract interface class GraphFactLog {
   /// меняться между порциями. Строки читаются по возрастанию неизменных
   /// ключей порядка, поэтому порции не повторяют строк и не пропускают
   /// строку, которая была в базе на протяжении всего чтения.
+  ///
+  /// Строка порции вне формы хранения даёт [GraphRecordCorruption], а
+  /// остальные отказы базы передаются исключением, как у других операций.
   Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after});
 
   /// Ближайший зарегистрированный снимок не новее [position]; из снимков

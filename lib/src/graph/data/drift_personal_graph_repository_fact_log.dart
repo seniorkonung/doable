@@ -34,10 +34,22 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
     return [for (final row in rows) _storedFactPackage(row)];
   });
 
+  /// Хранилище снимков не зависит от данных графа, поэтому строку вне формы
+  /// хранения оно получает отказом контракта лога, а не общего декодера.
+  Future<GraphRecordPortion> _readGraphRecords(
+    GraphRecordOrderKey? after,
+  ) async {
+    try {
+      return await _readGraphRecordPortion(after);
+    } on StoredGraphCorruption catch (_, stackTrace) {
+      Error.throwWithStackTrace(const GraphRecordCorruption(), stackTrace);
+    }
+  }
+
   /// Порция заполняется секциями по порядку файла формата, поэтому неполная
   /// порция дошла до конца последней секции. Транзакция согласует строки
   /// порции, в том числе дневные выборы с шагами их путей, с позицией лога.
-  Future<GraphRecordPortion> _readGraphRecords(
+  Future<GraphRecordPortion> _readGraphRecordPortion(
     GraphRecordOrderKey? after,
   ) => _sequencer.run(
     () => _database.transaction(() async {

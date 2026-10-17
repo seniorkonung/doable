@@ -7,7 +7,6 @@ import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local/sqlite_failure_classifier.dart';
-import '../graph/data/stored_graph_rows.dart';
 import '../graph_format/graph_format_codec.dart';
 import '../graph_format/graph_format_file.dart';
 import '../graph_format/graph_format_records.dart';
@@ -32,7 +31,7 @@ DiagnosticsFailureCode graphSnapshotFailureCode(Object error) =>
     switch (error) {
       GraphSnapshotCorruption() => DiagnosticsFailureCode.snapshotCorruption,
       GraphFormatCorruption() ||
-      StoredGraphCorruption() => DiagnosticsFailureCode.corruption,
+      GraphRecordCorruption() => DiagnosticsFailureCode.corruption,
       FileSystemException() => DiagnosticsFailureCode.unavailable,
       _ => switch (classifySqliteFailure(error)) {
         SqliteCorruptionFailure() => DiagnosticsFailureCode.corruption,
