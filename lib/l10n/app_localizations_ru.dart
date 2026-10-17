@@ -1267,6 +1267,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTagAssignment => 'назначение тега';
 
   @override
+  String get dataExportSaved => 'Данные сохранены в файл';
+
+  @override
+  String get dataExportFailed => 'Не удалось сохранить файл';
+
+  @override
   String get tagNavigationTitle => 'Намерения с тегом';
 
   @override

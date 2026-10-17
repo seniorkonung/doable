@@ -131,15 +131,23 @@ final class _GraphOperationPresenterState
       (completion) => _messageFor(localizations, completion),
     );
     final message = plan.otherCount == 0
-        ? plan.message
+        ? plan.message.text
         : localizations.graphOperationMessageWithOthers(
-            plan.message,
+            plan.message.text,
             plan.otherCount,
           );
+    final action = plan.message.action;
     surface.plan = plan;
     final controller = messenger.showSnackBar(
       SnackBar(
         dismissDirection: DismissDirection.horizontal,
+        // Действие не продлевает показ: SnackBar с действием по умолчанию не
+        // закрывается по таймеру, а таймер ScaffoldMessenger проверяет только
+        // persist и не учитывает экранный диктор.
+        persist: false,
+        action: action == null
+            ? null
+            : SnackBarAction(label: action.label, onPressed: action.onPressed),
         content: PresentationFrameEvidence<GraphOperationMessagePlan>(
           subject: plan,
           requiresCurrentRoute: false,
@@ -213,24 +221,42 @@ final class _PresentationSurface {
   }
 }
 
-String _messageFor(
+GraphOperationMessage _messageFor(
   AppLocalizations localizations,
   GraphCommandCompletion completion,
 ) => switch (completion) {
-  IntentionCommandCompletion() => _intentionMessage(localizations, completion),
-  LongTermRelationCommandCompletion() => _relationMessage(
-    localizations,
-    completion,
+  IntentionCommandCompletion() => GraphOperationMessage(
+    _intentionMessage(localizations, completion),
   ),
-  BlockingRelationsDeleteCompletion() => _blockingRelationsDeleteMessage(
-    localizations,
-    completion,
+  LongTermRelationCommandCompletion() => GraphOperationMessage(
+    _relationMessage(localizations, completion),
   ),
-  DailyChoiceCommandCompletion() => _dailyChoiceMessage(
-    localizations,
-    completion,
+  BlockingRelationsDeleteCompletion() => GraphOperationMessage(
+    _blockingRelationsDeleteMessage(localizations, completion),
   ),
-  TagCommandCompletion() => _tagMessage(localizations, completion),
+  DailyChoiceCommandCompletion() => GraphOperationMessage(
+    _dailyChoiceMessage(localizations, completion),
+  ),
+  TagCommandCompletion() => GraphOperationMessage(
+    _tagMessage(localizations, completion),
+  ),
+  GraphExportCompletion() => _exportMessage(localizations, completion),
+};
+
+GraphOperationMessage _exportMessage(
+  AppLocalizations localizations,
+  GraphExportCompletion completion,
+) => switch (completion.outcome) {
+  GraphExportOutcome.succeeded => GraphOperationMessage(
+    localizations.dataExportSaved,
+  ),
+  GraphExportOutcome.failed => GraphOperationMessage(
+    localizations.dataExportFailed,
+    action: GraphOperationMessageAction(
+      label: localizations.commonRetry,
+      onPressed: completion.retry,
+    ),
+  ),
 };
 
 String _tagMessage(

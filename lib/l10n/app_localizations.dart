@@ -2030,6 +2030,18 @@ abstract class AppLocalizations {
   /// **'tag assignment'**
   String get graphOperationTagAssignment;
 
+  /// Сообщение общей поверхности об успешном экспорте графа в файл
+  ///
+  /// In en, this message translates to:
+  /// **'Data saved to a file'**
+  String get dataExportSaved;
+
+  /// Сообщение общей поверхности об отказе экспорта графа с действием commonRetry
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save the file'**
+  String get dataExportFailed;
+
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:

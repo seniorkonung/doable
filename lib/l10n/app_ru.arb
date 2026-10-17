@@ -348,6 +348,8 @@
   "graphOperationAssignTag": "Назначение",
   "graphOperationRemoveTagAssignment": "Снятие",
   "graphOperationTagAssignment": "назначение тега",
+  "dataExportSaved": "Данные сохранены в файл",
+  "dataExportFailed": "Не удалось сохранить файл",
   "tagNavigationTitle": "Намерения с тегом",
   "@tagNavigationTitle": {"description":"Заголовок навигации по тегу"},
   "tagNavigationTag": "Тег: {tagName}",

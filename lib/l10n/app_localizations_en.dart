@@ -1261,6 +1261,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTagAssignment => 'tag assignment';
 
   @override
+  String get dataExportSaved => 'Data saved to a file';
+
+  @override
+  String get dataExportFailed => 'Couldn’t save the file';
+
+  @override
   String get tagNavigationTitle => 'Tagged intentions';
 
   @override

@@ -144,6 +144,13 @@ final class TagOperationToken extends GraphOperationToken {
   String toString() => 'TagOperationToken';
 }
 
+final class GraphExportOperationToken extends GraphOperationToken {
+  GraphExportOperationToken._();
+
+  @override
+  String toString() => 'GraphExportOperationToken';
+}
+
 /// Завершение, право предъявления которого выдаёт coordinator.
 ///
 /// По протоколу ADR-0012 успех сразу принадлежит оболочке, а отказ — открытой
@@ -323,6 +330,37 @@ final class TagCommandCompletion extends GraphCommandCompletion {
   bool get isFailure => confirmedResult is GraphResultFailure;
 }
 
+/// Исход экспорта графа, выполненного модулем операций с данными.
+enum GraphExportOutcome { succeeded, failed }
+
+/// Завершение экспорта графа в файл.
+///
+/// Права инициатора у экспорта нет: успех и отказ сразу принадлежат общей
+/// поверхности. Граф экспорт не меняет, поэтому пакета изменений у него нет.
+final class GraphExportCompletion extends GraphCommandCompletion {
+  const GraphExportCompletion._({
+    required this.token,
+    required this.outcome,
+    required this.retry,
+  });
+
+  @override
+  final GraphExportOperationToken token;
+  final GraphExportOutcome outcome;
+
+  /// Повтор экспорта, переданный при его принятии.
+  final void Function() retry;
+
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => null;
+
+  @override
+  bool get isFailure => switch (outcome) {
+    GraphExportOutcome.succeeded => false,
+    GraphExportOutcome.failed => true,
+  };
+}
+
 sealed class IntentionOperationTarget {
   const IntentionOperationTarget();
 }
@@ -442,12 +480,27 @@ final class BlockingRelationsDeleteAlreadyRunning
   const BlockingRelationsDeleteAlreadyRunning();
 }
 
+sealed class GraphExportStart {
+  const GraphExportStart();
+}
+
+final class GraphExportAccepted extends GraphExportStart {
+  const GraphExportAccepted(this.future);
+
+  final Future<GraphExportCompletion> future;
+}
+
+final class GraphExportAlreadyRunning extends GraphExportStart {
+  const GraphExportAlreadyRunning();
+}
+
 final class GraphCommandCoordinatorDraining extends IntentionCommandStart
     implements
         LongTermRelationCommandStart,
         BlockingRelationsDeleteStart,
         DailyChoiceCommandStart,
-        TagCommandStart {
+        TagCommandStart,
+        GraphExportStart {
   const GraphCommandCoordinatorDraining();
 }
 
@@ -509,8 +562,10 @@ final class GraphAppPresentationRegistration {
 final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   final _completionController =
       StreamController<GraphCommandCompletion>.broadcast(sync: true);
-  // Публикация завершений последовательна в порядке принятия, поэтому порядок
-  // вставки совпадает с порядком публикации terminal outcome.
+  // Запись переставляется в конец при публикации завершения, поэтому порядок
+  // записей совпадает с порядком публикации terminal outcome: завершения
+  // команд публикуются последовательно в порядке принятия, а экспорта — вне
+  // этой последовательности.
   final _entries = <GraphOperationToken, _PresentationEntry>{};
   final _registrations = <GraphAppPresentationRegistration>[];
   final _gates = <GraphCommandKey, _PresentationEntry>{};
@@ -518,6 +573,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   late GraphCommandRepository _repository;
   Future<void> _publicationTail = Future<void>.value();
   var _isDraining = false;
+  var _isExportRunning = false;
   Completer<void>? _shutdownCompleter;
 
   @override
@@ -857,7 +913,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
       final completion = await operationFuture;
-      entry.completion = completion;
+      _placeAtPublication(entry, completion);
       for (final key in keys) {
         if (identical(_gates[key], entry)) {
           _gates.remove(key);
@@ -875,6 +931,72 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     _inFlight.add(tracked);
 
     return _GraphCommandAccepted(completionCompleter.future);
+  }
+
+  /// Принимает экспорт графа, который выполняет [export] модуля операций с
+  /// данными.
+  ///
+  /// Пока принятый экспорт выполняется, второй не принимается. Экспорт не
+  /// блокирует сущности графа, а его завершение публикуется сразу по
+  /// окончании, вне последовательной публикации команд: завершения команд,
+  /// принятых во время экспорта, его не ждут. Отказ предъявляется с действием,
+  /// которое запускает [retry].
+  GraphExportStart acceptExport({
+    required Future<GraphExportOutcome> Function() export,
+    required void Function() retry,
+  }) {
+    if (_isDraining) {
+      return const GraphCommandCoordinatorDraining();
+    }
+    if (_isExportRunning) {
+      return const GraphExportAlreadyRunning();
+    }
+
+    _isExportRunning = true;
+    final token = GraphExportOperationToken._();
+    // Права инициатора у экспорта нет: результат сразу принадлежит оболочке.
+    final entry = _PresentationEntry(token)..initiatorReleased = true;
+    _entries[token] = entry;
+    late final Future<void> tracked;
+    final publication = _runExport(export).then((outcome) {
+      final completion = GraphExportCompletion._(
+        token: token,
+        outcome: outcome,
+        retry: retry,
+      );
+      _placeAtPublication(entry, completion);
+      _isExportRunning = false;
+      _completionController.add(completion);
+      _dispatchAppPresentation();
+      return completion;
+    });
+    tracked = publication.whenComplete(() {
+      _inFlight.remove(tracked);
+      _completeShutdownIfDrained();
+    });
+    _inFlight.add(tracked);
+
+    return GraphExportAccepted(publication);
+  }
+
+  Future<GraphExportOutcome> _runExport(
+    Future<GraphExportOutcome> Function() export,
+  ) async {
+    try {
+      return await export();
+    } on Object {
+      return GraphExportOutcome.failed;
+    }
+  }
+
+  void _placeAtPublication(
+    _PresentationEntry entry,
+    GraphCommandCompletion completion,
+  ) {
+    entry.completion = completion;
+    _entries
+      ..remove(entry.token)
+      ..[entry.token] = entry;
   }
 
   /// Выдаёт открытой экранной сессии право предъявить её failure.

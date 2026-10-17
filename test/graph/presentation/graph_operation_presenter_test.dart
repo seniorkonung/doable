@@ -1345,9 +1345,123 @@ void main() {
       findsOneWidget,
     );
   });
+
+  for (final scenario in [
+    (
+      locale: const Locale('ru'),
+      saved: 'Данные сохранены в файл',
+      failed: 'Не удалось сохранить файл',
+      retry: 'Повторить',
+    ),
+    (
+      locale: const Locale('en'),
+      saved: 'Data saved to a file',
+      failed: _exportFailed,
+      retry: 'Try again',
+    ),
+  ]) {
+    testWidgets(
+      'успех экспорта предъявляется текстом, а отказ — текстом и кнопкой '
+      '«Повторить», которая запускает повтор один раз, '
+      '${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: scenario.locale,
+        );
+        final success = harness.startExport();
+        harness.completeExport(success, GraphExportOutcome.succeeded);
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.saved), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: scenario.saved,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        expect(find.byType(SnackBarAction), findsNothing);
+        await _closeMessage(tester);
+
+        final failure = harness.startExport();
+        harness.completeExport(failure, GraphExportOutcome.failed);
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.failed), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: scenario.failed,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        expect(
+          tester.getSemantics(find.text(scenario.retry)),
+          isSemantics(
+            label: scenario.retry,
+            isButton: true,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
+        expect(harness.exportRetries, 0);
+
+        await tester.tap(find.text(scenario.retry));
+        await tester.pump();
+        await tester.tap(find.text(scenario.retry), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(harness.exportRetries, 1);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  for (final accessibleNavigation in [false, true]) {
+    testWidgets('отказ экспорта закрывается через обычное время показа и при '
+        'accessibleNavigation $accessibleNavigation, а затем предъявляется '
+        'успех команды, ставший ожидающим во время показа', (tester) async {
+      if (accessibleNavigation) {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(accessibleNavigation: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+      }
+      final harness = await _pumpPresenterApp(tester);
+      final export = harness.startExport();
+      harness.completeExport(export, GraphExportOutcome.failed);
+      await tester.pumpAndSettle();
+      expect(find.text(_exportFailed), findsOneWidget);
+
+      final command = harness.startDelete(index: 1, title: 'Ожидающее');
+      harness.completeDeleted(command);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text(_exportFailed), findsOneWidget);
+      expect(find.text(_deleted('Ожидающее')), findsNothing);
+
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text(_exportFailed), findsNothing);
+      expect(find.text(_deleted('Ожидающее')), findsOneWidget);
+      expect(harness.exportRetries, 0);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
 }
 
 const _withoutPresenter = -1;
+
+const _exportFailed = 'Couldn’t save the file';
 
 String _deleted(String title) => 'Delete — “$title”: Intention deleted.';
 
@@ -1610,6 +1724,8 @@ final class _PresenterHarness {
   final _blockingIndexes = <BlockingRelationsDeleteAccepted, int>{};
   final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
   final _tagIndexes = <TagCommandAccepted, int>{};
+  final _exports = <GraphExportAccepted, Completer<GraphExportOutcome>>{};
+  var exportRetries = 0;
 
   GraphCommandCoordinator get _coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
@@ -2313,6 +2429,21 @@ final class _PresenterHarness {
       ResultFailure(IntentionHasBlockingRelationsFailure(intentionId)),
     );
   }
+
+  GraphExportAccepted startExport() {
+    final outcome = Completer<GraphExportOutcome>();
+    final accepted = _coordinator.acceptExport(
+      export: () => outcome.future,
+      retry: () => exportRetries += 1,
+    ) as GraphExportAccepted;
+    _exports[accepted] = outcome;
+    return accepted;
+  }
+
+  void completeExport(
+    GraphExportAccepted accepted,
+    GraphExportOutcome outcome,
+  ) => _exports[accepted]!.complete(outcome);
 }
 
 Future<_PresenterHarness> _pumpPresenterApp(
