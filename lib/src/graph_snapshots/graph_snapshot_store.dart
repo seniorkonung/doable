@@ -57,6 +57,14 @@ final class GraphSnapshotStore {
     required this._diagnosticsSink,
   });
 
+  /// Каталог снимков в каталоге данных приложения
+  /// [applicationDocumentsDirectory]. На Android это app_flutter, который
+  /// правила резервного копирования исключают из облачной копии и переноса.
+  static Directory directoryIn(Directory applicationDocumentsDirectory) =>
+      Directory.fromUri(
+        applicationDocumentsDirectory.uri.resolve('graph_snapshots/'),
+      );
+
   final GraphFactLog _log;
 
   /// Каталог принадлежит хранилищу: всё, что в нём не зарегистрировано,

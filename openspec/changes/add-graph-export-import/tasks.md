@@ -154,7 +154,7 @@
   - **Files likely touched:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `lib/src/graph_snapshots/graph_snapshot_store.dart`, `lib/src/graph_snapshots/graph_log_compaction.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.15 Запускать очистку и сжатие снимков в жизненном цикле приложения и дожидаться сжатия при выключении
+- [x] 1.15 Запускать очистку и сжатие снимков в жизненном цикле приложения и дожидаться сжатия при выключении
   - **Acceptance criteria:**
     - `AppRuntime` после подготовки хранилища выполняет очистку каталога снимков и затем запускает фоновое сжатие; при выключении он дожидается идущего сжатия так же, как координатора, и только после этого закрывает базу. Отказ очистки или сжатия не мешает готовности приложения и командам.
     - `AppRuntime.production` размещает снимки в `graph_snapshots/` внутри `app_flutter`, который правила резервного копирования уже исключают из облачной копии и переноса по [ADR-0004](../../../docs/adr/0004-keep-personal-graph-device-local.md); манифест и правила не меняются.

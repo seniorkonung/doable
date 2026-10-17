@@ -78,8 +78,13 @@ final class GraphLogCompaction {
   /// успешная.
   int? _failedAt;
 
+  /// Удаляет из каталога снимков незарегистрированные и временные файлы по
+  /// правилу [GraphSnapshotStore.removeUnregisteredFiles]. Выполняется не
+  /// одновременно со сжатием.
+  Future<void> removeUnregisteredFiles() => _store.removeUnregisteredFiles();
+
   /// Сверяет лог с порогом и следит за новыми пакетами. Вызывается один раз,
-  /// не одновременно с очисткой каталога снимков.
+  /// не одновременно с [removeUnregisteredFiles].
   void start() {
     _signals = _log.confirmedPositions.listen(_onConfirmed);
     _launch();

@@ -9,6 +9,9 @@ import '../graph/application/graph_command_coordinator.dart';
 import '../graph/application/personal_graph_repository.dart';
 import '../graph/application/personal_graph_repository_provider.dart';
 import '../graph/data/drift_personal_graph_repository.dart';
+import '../graph_snapshots/graph_fact_log.dart';
+import '../graph_snapshots/graph_log_compaction.dart';
+import '../graph_snapshots/graph_snapshot_store.dart';
 import '../intention/application/intention_id_generator.dart';
 import '../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../shared/diagnostics/developer_diagnostics_sink.dart';
@@ -22,6 +25,20 @@ import 'routing/app_router_provider.dart';
 typedef AppPersonalGraphRepositoryFactory = PersonalGraphRepository Function(
   AppDatabase database,
 );
+
+/// Создаёт сжатие лога фактов готового графа над его логом [log].
+typedef AppGraphLogCompactionFactory = Future<GraphLogCompaction> Function(
+  ObservableGraphFactLog log,
+);
+
+/// Граф над готовой базой: репозиторий и лог фактов, если его ведёт этот
+/// репозиторий.
+typedef _AppGraph = ({
+  PersonalGraphRepository repository,
+  ObservableGraphFactLog? factLog,
+});
+
+typedef _AppGraphFactory = _AppGraph Function(AppDatabase database);
 
 sealed class AppRuntimeBootstrapResult {
   const AppRuntimeBootstrapResult();
@@ -61,28 +78,46 @@ final class AppRuntime {
   /// без него используется [readDeviceLocalDay].
   /// [quickCreationModeStore] принадлежит этому runtime и обслуживает единый
   /// контроллер независимо от подготовки и команд личного графа.
+  /// [graphLogCompactionFactory] подключает снимки графа: после подготовки
+  /// хранилища runtime очищает каталог снимков и затем запускает сжатие лога
+  /// фактов, а выключение дожидается сжатия и только потом закрывает базу.
+  /// Лог фактов ведёт репозиторий по умолчанию, поэтому с
+  /// [repositoryFactory] сжатие не подключается.
   factory AppRuntime({
     required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
     required QuickCreationModeStore quickCreationModeStore,
     AppPersonalGraphRepositoryFactory? repositoryFactory,
+    AppGraphLogCompactionFactory? graphLogCompactionFactory,
     DailyChoiceLocalDateSource? dailyChoiceLocalDateSource,
   }) {
-    final resolvedRepositoryFactory =
-        repositoryFactory ??
-        (database) => DriftPersonalGraphRepository(
+    assert(
+      repositoryFactory == null || graphLogCompactionFactory == null,
+      'Сжатие ведётся над логом фактов репозитория по умолчанию.',
+    );
+    final _AppGraphFactory graphFactory = switch (repositoryFactory) {
+      final createRepository? => (database) => (
+        repository: createRepository(database),
+        factLog: null,
+      ),
+      null => (database) {
+        final repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
           () => DateTime.now().toUtc(),
           diagnosticsSink,
           relationIdGenerator: UuidV7LongTermRelationIdGenerator(),
         );
+        return (repository: repository, factLog: repository);
+      },
+    };
     return AppRuntime._(
       LocalDataBootstrap(
         connectionFactory: connectionFactory,
         diagnosticsSink: diagnosticsSink,
       ),
-      resolvedRepositoryFactory,
+      graphFactory,
+      graphLogCompactionFactory,
       dailyChoiceLocalDateSource ?? readDeviceLocalDay,
       quickCreationModeStore,
     );
@@ -99,18 +134,28 @@ final class AppRuntime {
         localDataDirectoryProvider: getApplicationDocumentsDirectory,
         diagnosticsSink: diagnosticsSink,
       ),
+      graphLogCompactionFactory: (log) async => GraphLogCompaction(
+        log: log,
+        directory: GraphSnapshotStore.directoryIn(
+          await getApplicationDocumentsDirectory(),
+        ),
+        clock: () => DateTime.now().toUtc(),
+        diagnosticsSink: diagnosticsSink,
+      ),
     );
   }
 
   AppRuntime._(
     this._localDataBootstrap,
-    this._repositoryFactory,
+    this._graphFactory,
+    this._graphLogCompactionFactory,
     this._dailyChoiceLocalDateSource,
     this._quickCreationModeStore,
   );
 
   final LocalDataBootstrap _localDataBootstrap;
-  final AppPersonalGraphRepositoryFactory _repositoryFactory;
+  final _AppGraphFactory _graphFactory;
+  final AppGraphLogCompactionFactory? _graphLogCompactionFactory;
   final DailyChoiceLocalDateSource _dailyChoiceLocalDateSource;
   final QuickCreationModeStore _quickCreationModeStore;
   // Одна загрузка и одна очередь на runtime, в том числе при повторе bootstrap.
@@ -120,6 +165,10 @@ final class AppRuntime {
   Future<AppRuntimeBootstrapResult>? _bootstrapping;
   AppRuntimeReady? _ready;
   GraphCommandCoordinator? _commandCoordinator;
+
+  /// Запуск снимков графа: завершается запущенным сжатием либо `null`, если
+  /// сжатие не запущено.
+  Future<GraphLogCompaction?>? _graphSnapshots;
   Future<void>? _shuttingDown;
 
   GraphCommandCoordinator get commandCoordinator {
@@ -186,7 +235,7 @@ final class AppRuntime {
     }
     ProviderContainer? container;
     try {
-      final repository = _repositoryFactory(database);
+      final (:repository, :factLog) = _graphFactory(database);
       container = ProviderContainer(
         overrides: [
           quickCreationModeControllerProvider.overrideWith(
@@ -207,6 +256,12 @@ final class AppRuntime {
       );
       container.read(appRouterProvider);
       _commandCoordinator = coordinator;
+      if ((factLog, _graphLogCompactionFactory) case (
+        final log?,
+        final createCompaction?,
+      )) {
+        _graphSnapshots = _startGraphSnapshots(createCompaction, log);
+      }
       return _ready = AppRuntimeReady(container);
     } on Object {
       container?.dispose();
@@ -215,21 +270,57 @@ final class AppRuntime {
     }
   }
 
+  /// Очищает каталог снимков и затем, если выключение ещё не началось,
+  /// запускает сжатие лога фактов. Готовность и команды графа этого не ждут.
+  Future<GraphLogCompaction?> _startGraphSnapshots(
+    AppGraphLogCompactionFactory createCompaction,
+    ObservableGraphFactLog log,
+  ) async {
+    final GraphLogCompaction compaction;
+    try {
+      compaction = await createCompaction(log);
+    } on Object {
+      // Без каталога снимков сжатие не запускается; следующий запуск
+      // пробует снова.
+      return null;
+    }
+    try {
+      await compaction.removeUnregisteredFiles();
+    } on Object {
+      // Отказ записан диагностикой очистки. Оставшиеся файлы сжатию не
+      // мешают, их удалит очистка следующего запуска.
+    }
+    if (_lifecycle != _AppRuntimeLifecycle.running) return null;
+    return compaction..start();
+  }
+
   Future<void> shutdown() {
     final existingShutdown = _shuttingDown;
     if (existingShutdown != null) return existingShutdown;
 
     _lifecycle = _AppRuntimeLifecycle.closing;
     final draining = _commandCoordinator?.shutdown() ?? Future<void>.value();
+    final compacting = _stopGraphSnapshots();
     _ready?.container.dispose();
-    final shuttingDown = _finishShutdown(draining);
+    final shuttingDown = _finishShutdown(draining, compacting);
     _shuttingDown = shuttingDown;
     return shuttingDown;
   }
 
-  Future<void> _finishShutdown(Future<void> draining) async {
+  /// Дожидается очистки каталога снимков и идущего сжатия; новые пакеты
+  /// сжатие больше не запускают.
+  Future<void> _stopGraphSnapshots() async {
+    final compaction = await _graphSnapshots;
+    await compaction?.shutdown();
+  }
+
+  Future<void> _finishShutdown(
+    Future<void> draining,
+    Future<void> compacting,
+  ) async {
     try {
       await draining;
+      await compacting;
       await _localDataBootstrap.close();
     } finally {
       _lifecycle = _AppRuntimeLifecycle.closed;
