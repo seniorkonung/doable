@@ -321,7 +321,7 @@
   - **Files likely touched:** `lib/src/data/local/schema/graph_log_schema.drift`, `lib/src/graph_snapshots/graph_fact_log.dart`, `lib/src/graph_snapshots/graph_snapshot_store.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `test/data/local/graph_log_schema_test.dart`, `test/graph/data/drift_graph_fact_log_access_test.dart`, `test/graph_snapshots/graph_snapshot_store_test.dart`; результаты генерации `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v3.json`.
   - **Estimated scope:** S.
 
-- [ ] 1.28 Повторно подтвердить готовность этапа после удаления версии формата из реестра снимков
+- [x] 1.28 Повторно подтвердить готовность этапа после удаления версии формата из реестра снимков
   - **Acceptance criteria:**
     - После задач 1.26 и 1.27 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено, в том числе база совпадает с состоянием, собранным из снимка и лога, реестр снимков согласован с файлами, а повреждённый снимок обнаруживается и не становится графом. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
     - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
