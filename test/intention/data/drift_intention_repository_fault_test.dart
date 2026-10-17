@@ -414,20 +414,22 @@ void main() {
       // читает окончательный результат.
       final writeIndexes = [
         for (var index = 0; index < operations.length; index++)
-          if (operations[index].operation != LocalDatabaseSqlOperation.select)
-            index,
+          if (_writesGraph(operations[index])) index,
       ];
+      final firstRead = operations.indexWhere(
+        (operation) => operation.operation == LocalDatabaseSqlOperation.select,
+      );
       final firstWrite = writeIndexes.first;
       final lastWrite = writeIndexes.last;
       expect(writeIndexes.length, greaterThan(1));
-      expect(firstWrite, greaterThan(0));
+      expect(firstRead, inInclusiveRange(0, firstWrite - 1));
       expect(operations.skip(lastWrite + 1), isNotEmpty);
 
       // Точки с разным исходом: первая проверка, первая запись (намерение),
       // первое назначение и первое чтение окончательного результата.
       // Остальные операции повторяют те же ветки.
       for (final failAfter in <int>{
-        1,
+        firstRead + 1,
         firstWrite + 1,
         writeIndexes[1] + 1,
         lastWrite + 2,
@@ -1055,8 +1057,9 @@ final class _StatementFaultInjector extends LocalDatabaseConnectionObserver {
 }
 
 /// После [arm] задерживает на [delay] каждое чтение, выполненное после первой
-/// записи, то есть чтения окончательного результата создания. При заданном
-/// [failure] первое такое чтение после задержки завершается этим отказом.
+/// записи в таблицы графа, то есть чтения окончательного результата
+/// создания. При заданном [failure] первое такое чтение после задержки
+/// завершается этим отказом.
 final class _ResultReadDelay extends LocalDatabaseConnectionObserver {
   _ResultReadDelay(this.delay, {this.failure});
 
@@ -1070,9 +1073,7 @@ final class _ResultReadDelay extends LocalDatabaseConnectionObserver {
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (_armed && statement.operation != LocalDatabaseSqlOperation.select) {
-      _wrote = true;
-    }
+    if (_armed && _writesGraph(statement)) _wrote = true;
   }
 
   @override
@@ -1146,6 +1147,12 @@ final class _SelectedTagsReadInterceptor
     return rows;
   }
 }
+
+/// Запись команды в таблицы графа, а не служебная запись лога фактов:
+/// признак записи, отметки и пакет.
+bool _writesGraph(LocalDatabaseSqlStatement statement) =>
+    statement.operation != LocalDatabaseSqlOperation.select &&
+    !statement.statements.any((sql) => sql.contains('graph_log_'));
 
 /// Таблица, в которую пишет операция, либо название операции чтения.
 String _writtenTable(LocalDatabaseSqlStatement statement) {

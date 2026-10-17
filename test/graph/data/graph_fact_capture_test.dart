@@ -19,6 +19,7 @@ import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
 const _source = '018f0b5d-6b2e-7c80-8000-000000000001';
@@ -54,19 +55,20 @@ void main() {
   Future<void> write(String sql, [List<Object?> arguments = const []]) =>
       database.customStatement(sql, arguments);
 
-  /// Выполняет [writes] одной транзакцией и превращает её отметки в факты.
+  /// Выполняет [writes] одной транзакцией с признаком записи, как единый
+  /// путь записи графа, и превращает её отметки в факты.
   Future<List<GraphFact>> capture(Future<void> Function() writes) =>
       database.transaction(() async {
+        await write('UPDATE graph_log_control SET writing = 1');
         await writes();
-        return GraphFactCapture(database).takeFacts();
+        final facts = await GraphFactCapture(database).takeFacts();
+        await write('UPDATE graph_log_control SET writing = 0');
+        return facts;
       });
 
   /// Записывает исходное состояние графа без отметок.
-  Future<void> arrange(Future<void> Function() writes) async {
-    await write('UPDATE graph_log_control SET capture = 0');
-    await writes();
-    await write('UPDATE graph_log_control SET capture = 1');
-  }
+  Future<void> arrange(Future<void> Function() writes) =>
+      seedGraph(database, writes);
 
   Future<void> addIntention(
     String id,

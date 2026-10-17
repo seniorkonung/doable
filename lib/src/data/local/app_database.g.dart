@@ -30,8 +30,20 @@ class GraphLogControl extends Table
     $customConstraints:
         'NOT NULL CHECK (typeof(capture) = \'integer\' AND capture IN (0, 1))',
   );
+  static const VerificationMeta _writingMeta = const VerificationMeta(
+    'writing',
+  );
+  late final GeneratedColumn<bool> writing = GeneratedColumn<bool>(
+    'writing',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (typeof(writing) = \'integer\' AND writing IN (0, 1))',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, capture];
+  List<GeneratedColumn> get $columns => [id, capture, writing];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -55,6 +67,14 @@ class GraphLogControl extends Table
     } else if (isInserting) {
       context.missing(_captureMeta);
     }
+    if (data.containsKey('writing')) {
+      context.handle(
+        _writingMeta,
+        writing.isAcceptableOrUnknown(data['writing']!, _writingMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_writingMeta);
+    }
     return context;
   }
 
@@ -72,6 +92,10 @@ class GraphLogControl extends Table
         DriftSqlType.bool,
         data['${effectivePrefix}capture'],
       )!,
+      writing: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}writing'],
+      )!,
     );
   }
 
@@ -88,17 +112,27 @@ class GraphLogControlData extends DataClass
     implements Insertable<GraphLogControlData> {
   final int id;
   final bool capture;
-  const GraphLogControlData({required this.id, required this.capture});
+  final bool writing;
+  const GraphLogControlData({
+    required this.id,
+    required this.capture,
+    required this.writing,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['capture'] = Variable<bool>(capture);
+    map['writing'] = Variable<bool>(writing);
     return map;
   }
 
   GraphLogControlCompanion toCompanion(bool nullToAbsent) {
-    return GraphLogControlCompanion(id: Value(id), capture: Value(capture));
+    return GraphLogControlCompanion(
+      id: Value(id),
+      capture: Value(capture),
+      writing: Value(writing),
+    );
   }
 
   factory GraphLogControlData.fromJson(
@@ -109,6 +143,7 @@ class GraphLogControlData extends DataClass
     return GraphLogControlData(
       id: serializer.fromJson<int>(json['id']),
       capture: serializer.fromJson<bool>(json['capture']),
+      writing: serializer.fromJson<bool>(json['writing']),
     );
   }
   @override
@@ -117,15 +152,21 @@ class GraphLogControlData extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'capture': serializer.toJson<bool>(capture),
+      'writing': serializer.toJson<bool>(writing),
     };
   }
 
-  GraphLogControlData copyWith({int? id, bool? capture}) =>
-      GraphLogControlData(id: id ?? this.id, capture: capture ?? this.capture);
+  GraphLogControlData copyWith({int? id, bool? capture, bool? writing}) =>
+      GraphLogControlData(
+        id: id ?? this.id,
+        capture: capture ?? this.capture,
+        writing: writing ?? this.writing,
+      );
   GraphLogControlData copyWithCompanion(GraphLogControlCompanion data) {
     return GraphLogControlData(
       id: data.id.present ? data.id.value : this.id,
       capture: data.capture.present ? data.capture.value : this.capture,
+      writing: data.writing.present ? data.writing.value : this.writing,
     );
   }
 
@@ -133,46 +174,59 @@ class GraphLogControlData extends DataClass
   String toString() {
     return (StringBuffer('GraphLogControlData(')
           ..write('id: $id, ')
-          ..write('capture: $capture')
+          ..write('capture: $capture, ')
+          ..write('writing: $writing')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, capture);
+  int get hashCode => Object.hash(id, capture, writing);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is GraphLogControlData &&
           other.id == this.id &&
-          other.capture == this.capture);
+          other.capture == this.capture &&
+          other.writing == this.writing);
 }
 
 class GraphLogControlCompanion extends UpdateCompanion<GraphLogControlData> {
   final Value<int> id;
   final Value<bool> capture;
+  final Value<bool> writing;
   const GraphLogControlCompanion({
     this.id = const Value.absent(),
     this.capture = const Value.absent(),
+    this.writing = const Value.absent(),
   });
   GraphLogControlCompanion.insert({
     this.id = const Value.absent(),
     required bool capture,
-  }) : capture = Value(capture);
+    required bool writing,
+  }) : capture = Value(capture),
+       writing = Value(writing);
   static Insertable<GraphLogControlData> custom({
     Expression<int>? id,
     Expression<bool>? capture,
+    Expression<bool>? writing,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (capture != null) 'capture': capture,
+      if (writing != null) 'writing': writing,
     });
   }
 
-  GraphLogControlCompanion copyWith({Value<int>? id, Value<bool>? capture}) {
+  GraphLogControlCompanion copyWith({
+    Value<int>? id,
+    Value<bool>? capture,
+    Value<bool>? writing,
+  }) {
     return GraphLogControlCompanion(
       id: id ?? this.id,
       capture: capture ?? this.capture,
+      writing: writing ?? this.writing,
     );
   }
 
@@ -185,6 +239,9 @@ class GraphLogControlCompanion extends UpdateCompanion<GraphLogControlData> {
     if (capture.present) {
       map['capture'] = Variable<bool>(capture.value);
     }
+    if (writing.present) {
+      map['writing'] = Variable<bool>(writing.value);
+    }
     return map;
   }
 
@@ -192,7 +249,8 @@ class GraphLogControlCompanion extends UpdateCompanion<GraphLogControlData> {
   String toString() {
     return (StringBuffer('GraphLogControlCompanion(')
           ..write('id: $id, ')
-          ..write('capture: $capture')
+          ..write('capture: $capture, ')
+          ..write('writing: $writing')
           ..write(')'))
         .toString();
   }
@@ -5605,82 +5663,82 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final GraphBackups graphBackups = GraphBackups(this);
   late final Tags tags = Tags(this);
   late final Trigger graphLogMarkTagInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_tag_insert AFTER INSERT ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (new.id, \'insert\');END',
+    'CREATE TRIGGER graph_log_mark_tag_insert AFTER INSERT ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (new.id, \'insert\');END',
     'graph_log_mark_tag_insert',
   );
   late final Trigger graphLogMarkTagUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_tag_update AFTER UPDATE ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (new.id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_tag_update AFTER UPDATE ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (new.id, \'update\');END',
     'graph_log_mark_tag_update',
   );
   late final Trigger graphLogMarkTagDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_tag_delete AFTER DELETE ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (old.id, \'delete\');END',
+    'CREATE TRIGGER graph_log_mark_tag_delete AFTER DELETE ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (old.id, \'delete\');END',
     'graph_log_mark_tag_delete',
   );
   late final Intentions intentions = Intentions(this);
   late final Trigger graphLogMarkIntentionInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_intention_insert AFTER INSERT ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (new.id, \'insert\');END',
+    'CREATE TRIGGER graph_log_mark_intention_insert AFTER INSERT ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (new.id, \'insert\');END',
     'graph_log_mark_intention_insert',
   );
   late final Trigger graphLogMarkIntentionUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_intention_update AFTER UPDATE ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (new.id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_intention_update AFTER UPDATE ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (new.id, \'update\');END',
     'graph_log_mark_intention_update',
   );
   late final Trigger graphLogMarkIntentionDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_intention_delete AFTER DELETE ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (old.id, \'delete\');END',
+    'CREATE TRIGGER graph_log_mark_intention_delete AFTER DELETE ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (old.id, \'delete\');END',
     'graph_log_mark_intention_delete',
   );
   late final TagAssignments tagAssignments = TagAssignments(this);
   late final Trigger graphLogMarkTagAssignmentInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_tag_assignment_insert AFTER INSERT ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'insert\');END',
+    'CREATE TRIGGER graph_log_mark_tag_assignment_insert AFTER INSERT ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'insert\');END',
     'graph_log_mark_tag_assignment_insert',
   );
   late final Trigger graphLogMarkTagAssignmentUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_tag_assignment_update AFTER UPDATE ON tag_assignments WHEN old.tag_creation_sequence <> 0 AND (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_tag_assignment_update AFTER UPDATE ON tag_assignments WHEN old.tag_creation_sequence <> 0 AND (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'update\');END',
     'graph_log_mark_tag_assignment_update',
   );
   late final Trigger graphLogMarkTagAssignmentDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_tag_assignment_delete AFTER DELETE ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (old.tag_id, old.intention_id, \'delete\');END',
+    'CREATE TRIGGER graph_log_mark_tag_assignment_delete AFTER DELETE ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (old.tag_id, old.intention_id, \'delete\');END',
     'graph_log_mark_tag_assignment_delete',
   );
   late final LongTermRelations longTermRelations = LongTermRelations(this);
   late final Trigger graphLogMarkLongTermRelationInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_long_term_relation_insert AFTER INSERT ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (new.id, \'insert\');END',
+    'CREATE TRIGGER graph_log_mark_long_term_relation_insert AFTER INSERT ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (new.id, \'insert\');END',
     'graph_log_mark_long_term_relation_insert',
   );
   late final Trigger graphLogMarkLongTermRelationUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_long_term_relation_update AFTER UPDATE ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (new.id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_long_term_relation_update AFTER UPDATE ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (new.id, \'update\');END',
     'graph_log_mark_long_term_relation_update',
   );
   late final Trigger graphLogMarkLongTermRelationDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_long_term_relation_delete AFTER DELETE ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (old.id, \'delete\');END',
+    'CREATE TRIGGER graph_log_mark_long_term_relation_delete AFTER DELETE ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (old.id, \'delete\');END',
     'graph_log_mark_long_term_relation_delete',
   );
   late final DailyChoices dailyChoices = DailyChoices(this);
   late final Trigger graphLogMarkDailyChoiceInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_insert AFTER INSERT ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'insert\');END',
+    'CREATE TRIGGER graph_log_mark_daily_choice_insert AFTER INSERT ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'insert\');END',
     'graph_log_mark_daily_choice_insert',
   );
   late final Trigger graphLogMarkDailyChoiceUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_update AFTER UPDATE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_daily_choice_update AFTER UPDATE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'update\');END',
     'graph_log_mark_daily_choice_update',
   );
   late final Trigger graphLogMarkDailyChoiceDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_delete AFTER DELETE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.id, \'delete\');END',
+    'CREATE TRIGGER graph_log_mark_daily_choice_delete AFTER DELETE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.id, \'delete\');END',
     'graph_log_mark_daily_choice_delete',
   );
   late final DailyChoicePathSteps dailyChoicePathSteps = DailyChoicePathSteps(
     this,
   );
   late final Trigger graphLogMarkDailyChoicePathStepInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_insert AFTER INSERT ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.daily_choice_id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_insert AFTER INSERT ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.daily_choice_id, \'update\');END',
     'graph_log_mark_daily_choice_path_step_insert',
   );
   late final Trigger graphLogMarkDailyChoicePathStepUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_update AFTER UPDATE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\'), (new.daily_choice_id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_update AFTER UPDATE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\'), (new.daily_choice_id, \'update\');END',
     'graph_log_mark_daily_choice_path_step_update',
   );
   late final Trigger graphLogMarkDailyChoicePathStepDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_delete AFTER DELETE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_delete AFTER DELETE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\');END',
     'graph_log_mark_daily_choice_path_step_delete',
   );
   late final Trigger tagsImmutableIdentity = Trigger(
@@ -5842,7 +5900,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     graphLogControl,
-    OnCreateQuery('INSERT INTO graph_log_control (id, capture) VALUES (1, 1)'),
+    OnCreateQuery(
+      'INSERT INTO graph_log_control (id, capture, writing) VALUES (1, 1, 0)',
+    ),
     graphLogTagMarks,
     graphLogIntentionMarks,
     graphLogTagAssignmentMarks,
@@ -6205,9 +6265,17 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 }
 
 typedef $GraphLogControlCreateCompanionBuilder =
-    GraphLogControlCompanion Function({Value<int> id, required bool capture});
+    GraphLogControlCompanion Function({
+      Value<int> id,
+      required bool capture,
+      required bool writing,
+    });
 typedef $GraphLogControlUpdateCompanionBuilder =
-    GraphLogControlCompanion Function({Value<int> id, Value<bool> capture});
+    GraphLogControlCompanion Function({
+      Value<int> id,
+      Value<bool> capture,
+      Value<bool> writing,
+    });
 
 class $GraphLogControlFilterComposer
     extends Composer<_$AppDatabase, GraphLogControl> {
@@ -6225,6 +6293,11 @@ class $GraphLogControlFilterComposer
 
   ColumnFilters<bool> get capture => $composableBuilder(
     column: $table.capture,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get writing => $composableBuilder(
+    column: $table.writing,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6247,6 +6320,11 @@ class $GraphLogControlOrderingComposer
     column: $table.capture,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get writing => $composableBuilder(
+    column: $table.writing,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $GraphLogControlAnnotationComposer
@@ -6263,6 +6341,9 @@ class $GraphLogControlAnnotationComposer
 
   GeneratedColumn<bool> get capture =>
       $composableBuilder(column: $table.capture, builder: (column) => column);
+
+  GeneratedColumn<bool> get writing =>
+      $composableBuilder(column: $table.writing, builder: (column) => column);
 }
 
 class $GraphLogControlTableManager
@@ -6294,14 +6375,26 @@ class $GraphLogControlTableManager
               $GraphLogControlOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $GraphLogControlAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<bool> capture = const Value.absent(),
-          }) => GraphLogControlCompanion(id: id, capture: capture),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required bool capture,
-          }) => GraphLogControlCompanion.insert(id: id, capture: capture),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<bool> capture = const Value.absent(),
+                Value<bool> writing = const Value.absent(),
+              }) => GraphLogControlCompanion(
+                id: id,
+                capture: capture,
+                writing: writing,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required bool capture,
+                required bool writing,
+              }) => GraphLogControlCompanion.insert(
+                id: id,
+                capture: capture,
+                writing: writing,
+              ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),

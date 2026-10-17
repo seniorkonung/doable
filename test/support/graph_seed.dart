@@ -4,7 +4,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 /// Заполняет граф записями [write] в одной транзакции или точке сохранения
 /// с выключенным захватом фактов: заполненные так строки в лог фактов не
 /// попадают. Отказ записи откатывает и записи, и выключение захвата и
-/// доходит до вызывающего кода без замены.
+/// доходит до вызывающего кода без замены. Без помощника база отклоняет
+/// прямую запись в таблицы графа, пока захват включён.
 Future<void> seedGraph(AppDatabase database, Future<void> Function() write) =>
     database.transaction(() async {
       await database.customStatement(_disableCapture);

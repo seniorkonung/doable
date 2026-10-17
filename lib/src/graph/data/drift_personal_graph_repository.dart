@@ -705,6 +705,9 @@ final class DriftPersonalGraphRepository
   /// продвигается на единицу, наблюдатели получают изменения команды, а
   /// [confirmedPositions] — позицию пакета.
   ///
+  /// Признак записи стоит только внутри транзакции: без него база
+  /// отклоняет запись в таблицы графа, пока включён захват фактов.
+  ///
   /// Команда без изменений не пишет пакет и сохраняет ревизию. Любой отказ, в
   /// том числе запись сущности длиннее предела записи формата, откатывает и
   /// изменения графа, и пакет. [afterRollback] выполняется в исполнителе
@@ -717,9 +720,9 @@ final class DriftPersonalGraphRepository
     final (bool, int?, ConfirmedGraphResult<T>) committed;
     try {
       committed = await _database.transaction(() async {
+        await _setGraphWriting(true);
         final write = await body(clock);
-        final capture = GraphFactCapture(_database);
-        final facts = await capture.takeFacts();
+        final facts = await GraphFactCapture(_database).takeFacts();
         int? packagePosition;
         if (facts.isNotEmpty) {
           // Позиция — rowid пакета: INTEGER PRIMARY KEY AUTOINCREMENT.
@@ -734,9 +737,7 @@ final class DriftPersonalGraphRepository
                 ),
               );
         }
-        if (await capture.hasMarks()) {
-          throw StateError('Отметки транзакции не попали в пакет фактов.');
-        }
+        await _setGraphWriting(false);
         // Исполнитель не начнёт другую запись до публикации этой ревизии.
         final revision = write.didMutate
             ? _DriftGraphRevision(_epoch, _mutationSequence + 1)
@@ -762,6 +763,10 @@ final class DriftPersonalGraphRepository
     if (packagePosition != null) _confirmedPositions.add(packagePosition);
     return confirmed;
   });
+
+  Future<void> _setGraphWriting(bool writing) => _database
+      .update(_database.graphLogControl)
+      .write(local.GraphLogControlCompanion(writing: Value(writing)));
 
   void _recordDiagnostics(DiagnosticsEvent event) {
     recordDiagnosticsSafely(_diagnosticsSink, event);

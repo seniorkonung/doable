@@ -1,16 +1,22 @@
 import 'tag_schema.drift';
 
 -- Захват выключает только замена графа; новая установка начинает с
--- включённым захватом.
+-- включённым захватом. Признак записи ставит единый путь записи графа
+-- только внутри своей транзакции и снимает перед COMMIT: пока захват
+-- включён, триггеры отметок прерывают запись в таблицы графа без признака.
 CREATE TABLE graph_log_control (
   id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
   capture BOOLEAN NOT NULL CHECK (
     typeof(capture) = 'integer' AND
     capture IN (0, 1)
+  ),
+  writing BOOLEAN NOT NULL CHECK (
+    typeof(writing) = 'integer' AND
+    writing IN (0, 1)
   )
 );
 
-@create: INSERT INTO graph_log_control (id, capture) VALUES (1, 1);
+@create: INSERT INTO graph_log_control (id, capture, writing) VALUES (1, 1, 0);
 
 -- Отметки сущностей, затронутых текущей транзакцией. INSERT OR IGNORE
 -- сохраняет первую операцию: по ней и текущему существованию сущность
@@ -165,6 +171,9 @@ CREATE TRIGGER graph_log_mark_tag_insert
 AFTER INSERT ON tags
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation)
   VALUES (new.id, 'insert');
 END;
@@ -173,6 +182,9 @@ CREATE TRIGGER graph_log_mark_tag_update
 AFTER UPDATE ON tags
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation)
   VALUES (new.id, 'update');
 END;
@@ -181,6 +193,9 @@ CREATE TRIGGER graph_log_mark_tag_delete
 AFTER DELETE ON tags
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation)
   VALUES (old.id, 'delete');
 END;
@@ -189,6 +204,9 @@ CREATE TRIGGER graph_log_mark_intention_insert
 AFTER INSERT ON intentions
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_intention_marks (
     intention_id, first_operation
   ) VALUES (new.id, 'insert');
@@ -198,6 +216,9 @@ CREATE TRIGGER graph_log_mark_intention_update
 AFTER UPDATE ON intentions
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_intention_marks (
     intention_id, first_operation
   ) VALUES (new.id, 'update');
@@ -207,6 +228,9 @@ CREATE TRIGGER graph_log_mark_intention_delete
 AFTER DELETE ON intentions
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_intention_marks (
     intention_id, first_operation
   ) VALUES (old.id, 'delete');
@@ -216,6 +240,9 @@ CREATE TRIGGER graph_log_mark_tag_assignment_insert
 AFTER INSERT ON tag_assignments
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_tag_assignment_marks (
     tag_id, intention_id, first_operation
   ) VALUES (new.tag_id, new.intention_id, 'insert');
@@ -223,13 +250,17 @@ END;
 
 -- Заполнение порядка тега — часть вставки назначения, а не его изменение.
 -- Его UPDATE срабатывает раньше отметки вставки, и без этого условия
--- первой операцией нового назначения оказалось бы изменение.
+-- первой операцией нового назначения оказалось бы изменение. Вставку без
+-- признака записи прерывает отметка вставки.
 CREATE TRIGGER graph_log_mark_tag_assignment_update
 AFTER UPDATE ON tag_assignments
 WHEN
   old.tag_creation_sequence <> 0 AND
   (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_tag_assignment_marks (
     tag_id, intention_id, first_operation
   ) VALUES (new.tag_id, new.intention_id, 'update');
@@ -239,6 +270,9 @@ CREATE TRIGGER graph_log_mark_tag_assignment_delete
 AFTER DELETE ON tag_assignments
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_tag_assignment_marks (
     tag_id, intention_id, first_operation
   ) VALUES (old.tag_id, old.intention_id, 'delete');
@@ -248,6 +282,9 @@ CREATE TRIGGER graph_log_mark_long_term_relation_insert
 AFTER INSERT ON long_term_relations
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_long_term_relation_marks (
     long_term_relation_id, first_operation
   ) VALUES (new.id, 'insert');
@@ -257,6 +294,9 @@ CREATE TRIGGER graph_log_mark_long_term_relation_update
 AFTER UPDATE ON long_term_relations
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_long_term_relation_marks (
     long_term_relation_id, first_operation
   ) VALUES (new.id, 'update');
@@ -266,6 +306,9 @@ CREATE TRIGGER graph_log_mark_long_term_relation_delete
 AFTER DELETE ON long_term_relations
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_long_term_relation_marks (
     long_term_relation_id, first_operation
   ) VALUES (old.id, 'delete');
@@ -275,6 +318,9 @@ CREATE TRIGGER graph_log_mark_daily_choice_insert
 AFTER INSERT ON daily_choices
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_daily_choice_marks (
     daily_choice_id, first_operation
   ) VALUES (new.id, 'insert');
@@ -284,6 +330,9 @@ CREATE TRIGGER graph_log_mark_daily_choice_update
 AFTER UPDATE ON daily_choices
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_daily_choice_marks (
     daily_choice_id, first_operation
   ) VALUES (new.id, 'update');
@@ -293,6 +342,9 @@ CREATE TRIGGER graph_log_mark_daily_choice_delete
 AFTER DELETE ON daily_choices
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_daily_choice_marks (
     daily_choice_id, first_operation
   ) VALUES (old.id, 'delete');
@@ -304,6 +356,9 @@ CREATE TRIGGER graph_log_mark_daily_choice_path_step_insert
 AFTER INSERT ON daily_choice_path_steps
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_daily_choice_marks (
     daily_choice_id, first_operation
   ) VALUES (new.daily_choice_id, 'update');
@@ -313,6 +368,9 @@ CREATE TRIGGER graph_log_mark_daily_choice_path_step_update
 AFTER UPDATE ON daily_choice_path_steps
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_daily_choice_marks (
     daily_choice_id, first_operation
   ) VALUES (old.daily_choice_id, 'update'), (new.daily_choice_id, 'update');
@@ -322,6 +380,9 @@ CREATE TRIGGER graph_log_mark_daily_choice_path_step_delete
 AFTER DELETE ON daily_choice_path_steps
 WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
+  SELECT RAISE(ABORT, 'graph write outside the graph write path')
+  FROM graph_log_control
+  WHERE writing = 0;
   INSERT OR IGNORE INTO graph_log_daily_choice_marks (
     daily_choice_id, first_operation
   ) VALUES (old.daily_choice_id, 'update');

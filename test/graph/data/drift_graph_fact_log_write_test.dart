@@ -24,6 +24,7 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -215,6 +216,39 @@ void main() {
     );
 
     expect(await packages(), hasLength(before.length));
+  });
+
+  test('прямая запись в таблицу графа отклоняется и после подтверждённой '
+      'команды, и после отказа команды', () async {
+    Future<void> insertTag() => database.customStatement(
+      'INSERT INTO tags (id, name) VALUES (?, ?)',
+      ['018f0b5d-6b2e-7c80-8000-000000000021', 'Дом'],
+    );
+    final bypassRejection = throwsA(
+      isA<sqlite.SqliteException>().having(
+        (error) => error.message,
+        'message',
+        'graph write outside the graph write path',
+      ),
+    );
+
+    final intention = await createIntention('Изучать язык');
+    await expectLater(insertTag(), bypassRejection);
+
+    final failed = await repository.execute(
+      UpdateIntention(
+        id: intention.id,
+        title: intention.title,
+        description: _descriptionForRecordLength(
+          intention,
+          graphFormatRecordByteLimit + 1,
+        ),
+      ),
+    );
+    expect(failed, isA<ResultFailure<Object?>>());
+    await expectLater(insertTag(), bypassRejection);
+
+    expect(await database.select(database.tags).get(), isEmpty);
   });
 
   group('предел записи', () {

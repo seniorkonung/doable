@@ -35,23 +35,6 @@ final class GraphFactCapture {
     return facts;
   }
 
-  /// Остались ли отметки: перед подтверждением транзакции записи их быть не
-  /// должно, иначе часть её изменений не попала бы в пакет.
-  Future<bool> hasMarks() async {
-    final markTables = _markTables;
-    final exists = [
-      for (final marks in markTables)
-        'EXISTS (SELECT 1 FROM ${marks.actualTableName})',
-    ];
-    final row = await _database
-        .customSelect(
-          'SELECT ${exists.join(' OR ')} AS has_marks',
-          readsFrom: markTables.toSet(),
-        )
-        .getSingle();
-    return row.read<bool>('has_marks');
-  }
-
   List<TableInfo<Table, Object?>> get _markTables => [
     _database.graphLogTagMarks,
     _database.graphLogIntentionMarks,
