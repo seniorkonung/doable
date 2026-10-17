@@ -14,13 +14,10 @@ check = [
     "bash tool/test_shard.sh 0 1",
     { task = "check:process-tests" }
 ]
-# Корневой `flutter analyze` разбирает и вложенный пакет widgetbook/, поэтому
-# его зависимости разрешаются до анализа.
 "check:static" = [
     "dart format --output=none --set-exit-if-changed .",
     "bash test/tool/check_ci_scope_test.sh",
     "bash test/tool/test_shard_test.sh",
-    "flutter pub get --enforce-lockfile --directory widgetbook",
     "flutter analyze"
 ]
 # Обычные тесты одной части: `mise run check:tests -- <номер от 0> <число частей>`.
@@ -37,14 +34,8 @@ codegen-check = "bash tool/check_generated.sh"
 codegen-check-test = "bash tool/check_generated_test.sh"
 setup = [
     "apm install --frozen",
-    "flutter pub get",
-    "flutter pub get --directory widgetbook"
+    "flutter pub get"
 ]
-
-[tasks.widgetbook]
-description = "Запустить Widgetbook на Linux-десктопе"
-dir = "{{config_root}}/widgetbook"
-run = "flutter run -d linux"
 
 [tasks.benchmark]
 description = "Бенчмарки: время, очередь и сравнение с бюджетами"
