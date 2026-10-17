@@ -104,9 +104,18 @@ measurements or budgets and use the smallest fixtures their assertions need,
 such as a few portions beyond the page size instead of production-scale
 volumes.
 
-Every pull request must pass the single `Full checks` status. Project checks
-always run, while the release APK and packaged Android privacy-manifest check
-run for artifact-impacting or unclassified changes. A documentation-only,
-OpenSpec-only, or isolated Dart/test-only update may skip that Android job only
-after the preceding pull request commit has a trusted successful `Full checks`
-run; manual and weekly runs always include the Android evidence.
+Every pull request must pass the single `Full checks` status. Jobs are selected
+from the changed paths:
+
+- project checks — static checks, four test shards and the `flutter_process`
+  suites — run for every change except documentation-only or OpenSpec-only
+  ones;
+- the release APK and packaged Android privacy-manifest check run for
+  artifact-impacting changes;
+- unclassified paths run every job.
+
+A pull request is classified by its whole diff. A later push is classified by
+its own changes only on the first run attempt, when the push extends the
+preceding pull request commit and that commit has a trusted successful
+`Full checks` run. Re-runs, rewritten history and reopened pull requests use
+the whole diff again. Manual and weekly runs always run every job.
