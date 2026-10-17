@@ -92,48 +92,49 @@ Tag decodeStoredTag(Map<String, Object?> data) => Tag(
 );
 
 /// Намерение из столбцов таблицы `intentions`, имена которых в строке
-/// начинаются с [prefix].
+/// начинаются с [prefix]. Название и описание хранятся в той форме, к
+/// которой их приводит ввод. Фабрика [Intention] нормализует текст так же,
+/// как ввод, поэтому текст в другой форме отличается от прочитанного.
 Intention decodeStoredIntention(
   Map<String, Object?> data, [
   String prefix = '',
 ]) {
+  final title = requiredStoredString(data, '${prefix}title');
   final description = _nullableStoredString(data, '${prefix}description');
-  return Intention(
-    id: decodeStoredIntentionId(requiredStoredString(data, '${prefix}id')),
-    title: decodeStoredIntentionTitle(data, '${prefix}title'),
-    description: description == null
-        ? null
-        : _storedIntentionText(description, IntentionText.normalizeDescription),
-    readiness: decodeStoredIntentionReadiness(data, '${prefix}is_action_ready'),
-    archiveState: decodeStoredIntentionArchiveState(
-      data,
-      '${prefix}is_archived',
-    ),
-    createdAt: _decodeStoredIntentionTimestamp(data, '${prefix}created_at'),
-    updatedAt: _decodeStoredIntentionTimestamp(data, '${prefix}updated_at'),
-  );
+  final Intention intention;
+  try {
+    intention = Intention(
+      id: decodeStoredIntentionId(requiredStoredString(data, '${prefix}id')),
+      title: title,
+      description: description,
+      readiness: decodeStoredIntentionReadiness(
+        data,
+        '${prefix}is_action_ready',
+      ),
+      archiveState: decodeStoredIntentionArchiveState(
+        data,
+        '${prefix}is_archived',
+      ),
+      createdAt: _decodeStoredIntentionTimestamp(data, '${prefix}created_at'),
+      updatedAt: _decodeStoredIntentionTimestamp(data, '${prefix}updated_at'),
+    );
+  } on IntentionTextValidationException {
+    throw const StoredGraphCorruption();
+  }
+  if (intention.title != title || intention.description != description) {
+    throw const StoredGraphCorruption();
+  }
+  return intention;
 }
 
 /// Название намерения из столбца [column]. Оно хранится в той форме, к
 /// которой его приводит ввод.
-String decodeStoredIntentionTitle(Map<String, Object?> data, String column) =>
-    _storedIntentionText(
-      requiredStoredString(data, column),
-      IntentionText.normalizeTitle,
-    );
-
-/// Текст намерения [stored], который нормализация [normalize] ввода
-/// оставляет без изменений.
-String _storedIntentionText(
-  String stored,
-  String? Function(String value) normalize,
-) {
-  final String? normalized;
+String decodeStoredIntentionTitle(Map<String, Object?> data, String column) {
+  final stored = requiredStoredString(data, column);
+  final String normalized;
   try {
-    normalized = normalize(stored);
+    normalized = IntentionText.normalizeTitle(stored);
   } on IntentionTextValidationException {
-    throw const StoredGraphCorruption();
-  } on ArgumentError {
     throw const StoredGraphCorruption();
   }
   if (normalized != stored) throw const StoredGraphCorruption();

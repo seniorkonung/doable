@@ -404,7 +404,7 @@
   - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_tagged_intentions.dart`, `test/graph/data/drift_tagged_entities_read_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`.
   - **Estimated scope:** S.
 
-- [ ] 1.35 Проверять хранимый текст намерения в общем декодере за один проход и без обработчика недостижимого отказа
+- [x] 1.35 Проверять хранимый текст намерения в общем декодере за один проход и без обработчика недостижимого отказа
   - **Acceptance criteria:**
     - По решению 5 [дизайна](design.md) `decodeStoredIntention` в `lib/src/graph/data/stored_graph_rows.dart` проверяет каждый хранимый текст намерения — название и описание — одним проходом нормализации `IntentionText`, а не сначала в декодере и затем повторно в фабрике `Intention`. `decodeStoredIntentionTitle` тоже проверяет название один раз.
     - Набор проверок не меняется: текст вне формы, к которой его приводит ввод, недопустимый Unicode, пустое или полностью пробельное описание и превышение длины по-прежнему дают `StoredGraphCorruption`. Декодер перехватывает только отказы, которые даёт эта проверка; перехвата `ArgumentError` не остаётся.
