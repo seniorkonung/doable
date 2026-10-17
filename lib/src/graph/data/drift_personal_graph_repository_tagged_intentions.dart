@@ -46,10 +46,7 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
                 '''SELECT a.creation_sequence AS assignment_sequence,
                  a.intention_id AS assigned_intention_id,
                  i.id AS intention_id, i.title AS intention_title,
-                 i.is_archived AS intention_archived,
-                 CASE WHEN substr(a.intention_id, 1, 1) = char(65279)
-                   OR substr(i.title, 1, 1) = char(65279)
-                   THEN 1 ELSE 0 END AS has_leading_bom
+                 i.is_archived AS intention_archived
                FROM tag_assignments a
                JOIN intentions i ON i.id = a.intention_id
                WHERE a.tag_id = ?
@@ -113,7 +110,6 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
 }
 
 TaggedIntention _decodeTaggedIntention(Map<String, Object?> data) {
-  _checkTaggedTextEncoding(data);
   final assignedIntention = requiredStoredString(data, 'assigned_intention_id');
   final id = decodeStoredIntentionId(assignedIntention);
   if (requiredStoredString(data, 'intention_id') != assignedIntention) {
@@ -124,13 +120,6 @@ TaggedIntention _decodeTaggedIntention(Map<String, Object?> data) {
     title: decodeStoredIntentionTitle(data, 'intention_title'),
     archiveState: decodeStoredIntentionArchiveState(data, 'intention_archived'),
   );
-}
-
-void _checkTaggedTextEncoding(Map<String, Object?> data) {
-  // Декодер SQLite удаляет начальный BOM; проверяем исходный TEXT до этого.
-  if (requiredStoredInteger(data, 'has_leading_bom') != 0) {
-    throw const StoredGraphCorruption();
-  }
 }
 
 final class _DriftTaggedIntentionsCursor implements TaggedIntentionsCursor {

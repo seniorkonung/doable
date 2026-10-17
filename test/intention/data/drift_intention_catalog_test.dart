@@ -1068,80 +1068,55 @@ void main() {
       },
     );
 
-    // По одному случаю на проверку чтения: начальный BOM и разбор
-    // идентификатора. Прочие варианты проходят те же проверки.
-    for (final (label, corrupt) in <(String, void Function(Database))>[
-      (
-        'начальный BOM в идентификаторе тега',
-        (connection) {
-          final tagId = '\ufeff${_uuid(440)}';
-          seedRawGraph(connection, () {
-            connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              tagId,
-              'Тег с повреждённым идентификатором',
-            ]);
-            connection.execute(
-              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-              [tagId, _uuid(1)],
-            );
-          });
-        },
-      ),
-      (
-        'неверный идентификатор тега после сотого назначения',
-        (connection) {
-          seedRawGraph(connection, () {
-            for (var number = 303; number <= 439; number++) {
-              connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-                _uuid(number),
-                'Тег $number',
-              ]);
-              connection.execute(
-                'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-                [_uuid(number), _uuid(1)],
-              );
-            }
-            connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              'некорректный идентификатор',
-              'Последний тег',
-            ]);
-            connection.execute(
-              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-              ['некорректный идентификатор', _uuid(1)],
-            );
-          });
-        },
-      ),
-    ]) {
-      test('отклоняет всю порцию: $label', () async {
-        seedTagStorageFixture(raw);
-        corrupt(raw);
-
-        expect(
-          await repository.getCatalogPage(
-            IntentionCatalogQuery(
-              scope: IntentionScope.all,
-              titleFilter: null,
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 3,
-            ),
-          ),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          await repository.getTagAssignments(_id(_uuid(1))),
-          isA<TagAssignmentsError>().having(
-            (result) => result.failure,
-            'причина',
-            isA<TagAssignmentsCorruptionFailure>(),
-          ),
+    // Один случай на разбор идентификатора: прочие варианты проходят ту же
+    // проверку.
+    test('отклоняет всю порцию: неверный идентификатор тега после сотого назначения', () async {
+      seedTagStorageFixture(raw);
+      seedRawGraph(raw, () {
+        for (var number = 303; number <= 439; number++) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _uuid(number),
+            'Тег $number',
+          ]);
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_uuid(number), _uuid(1)],
+          );
+        }
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          'некорректный идентификатор',
+          'Последний тег',
+        ]);
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          ['некорректный идентификатор', _uuid(1)],
         );
       });
-    }
+
+      expect(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 3,
+          ),
+        ),
+        isA<ResultFailure<IntentionCatalogPage>>().having(
+          (result) => result.failure,
+          'причина',
+          isA<IntentionCorruptionFailure>(),
+        ),
+      );
+      expect(
+        await repository.getTagAssignments(_id(_uuid(1))),
+        isA<TagAssignmentsError>().having(
+          (result) => result.failure,
+          'причина',
+          isA<TagAssignmentsCorruptionFailure>(),
+        ),
+      );
+    });
   });
 
   test('отбирает действия до порции и считает только совпадения', () async {

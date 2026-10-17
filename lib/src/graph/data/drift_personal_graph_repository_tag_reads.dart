@@ -12,9 +12,7 @@ extension _TagReading on DriftPersonalGraphRepository {
     };
     final rows = await _database
         .customSelect(
-          '''SELECT a.intention_id, a.tag_id AS assigned_tag_id, t.id, t.name,
-         CASE WHEN substr(t.id, 1, 1) = char(65279)
-           THEN 1 ELSE 0 END AS has_leading_bom
+          '''SELECT a.intention_id, a.tag_id AS assigned_tag_id, t.id, t.name
        FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
        WHERE a.intention_id IN (${List.filled(requested.length, '?').join(', ')})
        ORDER BY a.intention_id ASC, a.tag_creation_sequence ASC''',
@@ -192,9 +190,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           await _validateTagReadIntention(intentionId);
           final rows = await _database
               .customSelect(
-                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name,
-                 CASE WHEN substr(t.id, 1, 1) = char(65279)
-                   THEN 1 ELSE 0 END AS has_leading_bom
+                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.intention_id = ?
                ORDER BY a.tag_creation_sequence ASC''',
@@ -301,10 +297,6 @@ extension _TagReading on DriftPersonalGraphRepository {
 /// назначения совпадает с порядком создания тега (триггеры), а внешний ключ не
 /// допускает назначения без тега.
 tag_domain.Tag _decodeAssignedTag(Map<String, Object?> data) {
-  // SQLite удаляет начальный BOM при декодировании; проверяем исходный TEXT.
-  if (requiredStoredInteger(data, 'has_leading_bom') != 0) {
-    throw const StoredGraphCorruption();
-  }
   final tag = decodeStoredTag(data);
   if (requiredStoredString(data, 'assigned_tag_id') !=
       tag.id.toCanonicalString()) {

@@ -155,16 +155,6 @@ void main() {
     expect(events.join(' '), isNot(contains('CANARY')));
   });
 
-  test('начальный BOM сохранённого названия не удаляется при чтении', () async {
-    seedRawGraph(raw, () {
-      raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-        '\uFEFFНамерение',
-        tagFixtureId(1),
-      ]);
-    });
-    await expectCorruption(TaggedIntentionsScope.active);
-  });
-
   test('недопустимый UTF-8 идентичности даёт повреждение', () async {
     seedRawGraph(raw, () {
       raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
