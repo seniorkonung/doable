@@ -11,19 +11,39 @@ import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 Future<GraphSnapshotEntry> writeGraphSnapshotFailingOnTemporaryFiles(
   GraphSnapshotWrite write,
 ) => Isolate.run(
-  () => IOOverrides.runWithIOOverrides(write.run, _FailingTemporaryFiles()),
+  () => IOOverrides.runWithIOOverrides(
+    write.run,
+    _FailingFiles((path) => path.endsWith('.tmp')),
+  ),
 );
 
-final class _FailingTemporaryFiles extends IOOverrides {
+/// Запись состояния графа в отдельном изоляте, как
+/// [runGraphStateWriteInIsolate], при которой файл [file] появляется, а
+/// запись в него отказывает, как при нехватке места.
+GraphStateWriteRunner writeGraphStateFailingOn(File file) {
+  final failingPath = file.path;
+  return (write) => Isolate.run(
+    () => IOOverrides.runWithIOOverrides(
+      write.run,
+      _FailingFiles((path) => path == failingPath),
+    ),
+  );
+}
+
+final class _FailingFiles extends IOOverrides {
+  _FailingFiles(this._fails);
+
+  final bool Function(String path) _fails;
+
   @override
   File createFile(String path) {
     final file = super.createFile(path);
-    return path.endsWith('.tmp') ? _FailingTemporaryFile(file) : file;
+    return _fails(path) ? _FailingFile(file) : file;
   }
 }
 
-final class _FailingTemporaryFile implements File {
-  _FailingTemporaryFile(this._file);
+final class _FailingFile implements File {
+  _FailingFile(this._file);
 
   final File _file;
 

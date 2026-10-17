@@ -31,6 +31,15 @@ Future<GraphSnapshotEntry> runGraphSnapshotWriteInIsolate(
   GraphSnapshotWrite write,
 ) => Isolate.run(write.run);
 
+/// Выполняет запись состояния графа [write] в отдельном изоляте. Подмена
+/// позволяет проверкам внедрять отказы файловой системы в изоляте записи.
+typedef GraphStateWriteRunner = Future<void> Function(GraphStateWrite write);
+
+/// Отдельная функция не захватывает лог и базу замыканием изолята, как
+/// [runGraphSnapshotWriteInIsolate].
+Future<void> runGraphStateWriteInIsolate(GraphStateWrite write) =>
+    Isolate.run(write.run);
+
 /// Фоновое сжатие лога фактов в снимки.
 ///
 /// Когда пакетов после последнего снимка становится больше порога, снимок
@@ -54,6 +63,10 @@ Future<GraphSnapshotEntry> runGraphSnapshotWriteInIsolate(
 ///
 /// Исход сжатия и записи или пересборки снимка в изоляте записи сообщается в
 /// [DiagnosticsSink]; отказ диагностики исход сжатия не меняет.
+///
+/// Состояние графа на текущей позиции для экспорта пишет [writeCurrentState]
+/// тем же способом: в отдельном изоляте, который обращается к логу через
+/// это сжатие, под отметкой чтения истории.
 final class GraphLogCompaction {
   GraphLogCompaction({
     required this._log,
@@ -62,6 +75,7 @@ final class GraphLogCompaction {
     required this._diagnosticsSink,
     this._threshold = graphLogCompactionThreshold,
     this._runner = runGraphSnapshotWriteInIsolate,
+    this._stateWriteRunner = runGraphStateWriteInIsolate,
   });
 
   final ObservableGraphFactLog _log;
@@ -70,6 +84,7 @@ final class GraphLogCompaction {
   final DiagnosticsSink _diagnosticsSink;
   final int _threshold;
   final GraphSnapshotWriteRunner _runner;
+  final GraphStateWriteRunner _stateWriteRunner;
   late final _store = GraphSnapshotStore(
     log: _log,
     directory: _directory,
@@ -100,6 +115,35 @@ final class GraphLogCompaction {
   /// завершилось.
   Future<T> readHistory<T>(Future<T> Function(GraphHistoryRead history) read) =>
       _store.readHistory(read);
+
+  /// Пишет состояние графа на текущей позиции в новый файл формата [file]
+  /// существующего каталога с моментом [writtenAt] в заголовке по правилу
+  /// [GraphSnapshotStore.writeStateFile] в отдельном изоляте; [onProgress]
+  /// получает ход записи.
+  ///
+  /// Чтение истории [readHistory] фиксирует текущую позицию и сохраняет её
+  /// базовый снимок и пакеты после него до конца записи. Поэтому файл
+  /// отражает состояние на этой позиции, даже если во время записи
+  /// подтверждаются команды и завершается сжатие, а команды записи не ждут:
+  /// база получает от изолята записи только короткие операции лога.
+  Future<void> writeCurrentState(
+    File file, {
+    required DateTime writtenAt,
+    required void Function(double share) onProgress,
+  }) => readHistory(
+    (history) => _inWriter(
+      (compaction) => _stateWriteRunner(
+        GraphStateWrite._(
+          history,
+          file.path,
+          _directory,
+          writtenAt,
+          compaction,
+        ),
+      ),
+      onProgress: onProgress,
+    ),
+  );
 
   /// Сверяет лог с порогом и следит за новыми пакетами. Вызывается один раз,
   /// не одновременно с [removeUnregisteredFiles].
@@ -173,14 +217,24 @@ final class GraphLogCompaction {
     }
   }
 
-  /// Изолят записи обращается к логу и диагностике через порт: операции
-  /// выполняет [_log] этого изолята, поэтому база и её исполнитель остаются
-  /// здесь, а события записывает [_diagnosticsSink].
+  Future<GraphSnapshotEntry> _writeSnapshot(int position) => _inWriter(
+    (compaction) => _runner(
+      GraphSnapshotWrite._(position, _directory, _clock(), compaction),
+    ),
+  );
+
+  /// Выполняет [write] изолята записи, который обращается к логу и
+  /// диагностике через порт: операции выполняет [_log] этого изолята,
+  /// поэтому база и её исполнитель остаются здесь, события записывает
+  /// [_diagnosticsSink], а ход записи получает [onProgress].
   ///
   /// Сообщения изолята записи обрабатываются в порядке отправки, а его
   /// результат приходит последним, поэтому к завершению записи все её
-  /// события уже записаны.
-  Future<GraphSnapshotEntry> _writeSnapshot(int position) async {
+  /// события и ход уже переданы.
+  Future<T> _inWriter<T>(
+    Future<T> Function(SendPort compaction) write, {
+    void Function(double share)? onProgress,
+  }) async {
     final messages = ReceivePort();
     messages.listen((message) {
       switch (message as _WriterMessage) {
@@ -188,12 +242,12 @@ final class GraphLogCompaction {
           call.answer(_log);
         case _WriterDiagnostics(:final event):
           _recordDiagnostics(event);
+        case _WriterProgress(:final share):
+          onProgress?.call(share);
       }
     });
     try {
-      return await _runner(
-        GraphSnapshotWrite._(position, _directory, _clock(), messages.sendPort),
-      );
+      return await write(messages.sendPort);
     } finally {
       messages.close();
     }
@@ -234,6 +288,39 @@ final class GraphSnapshotWrite {
       return store.rebuildSnapshot();
     }
   }
+}
+
+/// Запись состояния графа для отдельного изолята: чтение истории, путь файла,
+/// каталог снимков, момент записи и порт, через который изолят обращается к
+/// логу фактов и передаёт ход записи.
+final class GraphStateWrite {
+  const GraphStateWrite._(
+    this._history,
+    this._path,
+    this._directory,
+    this._writtenAt,
+    this._compaction,
+  );
+
+  final GraphHistoryRead _history;
+  final String _path;
+  final Directory _directory;
+  final DateTime _writtenAt;
+  final SendPort _compaction;
+
+  /// Пишет состояние на позиции чтения истории в файл; выполняется в
+  /// изоляте записи.
+  Future<void> run() =>
+      GraphSnapshotStore(
+        log: _PortGraphFactLog(_compaction),
+        directory: _directory,
+        clock: () => _writtenAt,
+        diagnosticsSink: _PortDiagnosticsSink(_compaction),
+      ).writeStateFile(
+        _history,
+        File(_path),
+        onProgress: (share) => _compaction.send(_WriterProgress(share)),
+      );
 }
 
 /// Лог фактов изолята записи: каждую операцию выполняет лог изолята сжатия,
@@ -307,6 +394,13 @@ final class _WriterDiagnostics extends _WriterMessage {
   const _WriterDiagnostics(this.event);
 
   final DiagnosticsEvent event;
+}
+
+/// Доля записанных записей состояния графа.
+final class _WriterProgress extends _WriterMessage {
+  const _WriterProgress(this.share);
+
+  final double share;
 }
 
 final class _GraphFactLogCall<T> extends _WriterMessage {

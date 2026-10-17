@@ -62,8 +62,8 @@ final class GraphHistoryRead {
 /// реестре только после надёжной записи, а при каждом чтении сверяется с
 /// реестром, потому что вне базы файл журналом не защищён.
 ///
-/// Запись, пересборка и очистка сообщают исход в [DiagnosticsSink]; отказ
-/// диагностики их исход не меняет.
+/// Запись снимка, пересборка и очистка сообщают исход в [DiagnosticsSink];
+/// отказ диагностики их исход не меняет.
 final class GraphSnapshotStore {
   GraphSnapshotStore({
     required this._log,
@@ -129,6 +129,36 @@ final class GraphSnapshotStore {
   /// снимка и пакетов после него по правилу [readStateAt].
   Future<AssembledGraphState> readState(GraphHistoryRead history) =>
       _assemble(history.position, history.base);
+
+  /// Пишет состояние графа на позиции чтения истории [history] по правилу
+  /// [readState] в новый файл формата [file] существующего каталога.
+  /// Заголовок несёт момент записи по часам хранилища и количества записей.
+  ///
+  /// [onProgress] получает долю записанных записей от количеств заголовка,
+  /// когда она достигает следующей сотой доли, и последней — полную. Файл
+  /// не регистрируется и не сбрасывается на диск: он не снимок. Снимок, не
+  /// прошедший проверку, даёт [GraphSnapshotCorruption], а при любом отказе
+  /// файл удаляется.
+  Future<void> writeStateFile(
+    GraphHistoryRead history,
+    File file, {
+    required void Function(double share) onProgress,
+  }) async {
+    try {
+      final state = await readState(history);
+      final counts = state.counts;
+      await _writeTemporary(
+        file,
+        GraphFormatFile.write(
+          GraphFormatHeader(writtenAt: _clock(), counts: counts),
+          _reportingProgress(state.records, _total(counts), onProgress),
+        ),
+      );
+    } catch (_) {
+      await _deleteLeftover(file);
+      rethrow;
+    }
+  }
 
   Future<AssembledGraphState> _assemble(
     int position,
@@ -479,8 +509,41 @@ Future<({int byteSize, Uint8List checksum})> _writeDurably(
   return (byteSize: byteSize, checksum: Uint8List.fromList(digest.value.bytes));
 }
 
-/// Пишет [bytes] в [file] без сброса на диск: файл порций пересборки
-/// читается только самой пересборкой.
+/// Записи [records], по мере выдачи которых [onProgress] получает долю
+/// выданных записей от [total], когда она достигает следующей сотой доли.
+///
+/// Ход записи пересекает границу изолятов сообщениями, поэтому их число не
+/// растёт с размером графа.
+Stream<GraphEntityRecord> _reportingProgress(
+  Stream<GraphEntityRecord> records,
+  int total,
+  void Function(double share) onProgress,
+) {
+  var written = 0;
+  var reportedSteps = 0;
+  return records.map((record) {
+    written++;
+    final steps = written * _progressSteps ~/ total;
+    if (steps > reportedSteps) {
+      reportedSteps = steps;
+      onProgress(written / total);
+    }
+    return record;
+  });
+}
+
+/// Число долей, которыми сообщается ход записи состояния.
+const _progressSteps = 100;
+
+int _total(GraphRecordCounts counts) =>
+    counts.tags +
+    counts.intentions +
+    counts.tagAssignments +
+    counts.longTermRelations +
+    counts.dailyChoices;
+
+/// Пишет [bytes] в [file] без сброса на диск: файлы порций пересборки и
+/// состояния — не снимки, и после сбоя процесса они не нужны.
 Future<void> _writeTemporary(File file, Stream<List<int>> bytes) async {
   final output = await file.open(mode: FileMode.writeOnly);
   try {
