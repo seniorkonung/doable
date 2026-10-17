@@ -27,7 +27,9 @@ abstract final class GraphFormatFile {
   /// здесь или в [GraphFormatFileReading.records], файл более новой версии —
   /// [GraphFormatVersionTooNew]. Ошибки самого [file] передаются как есть.
   static Future<GraphFormatFileReading> read(Stream<List<int>> file) async {
-    final lines = StreamIterator(_readLines(_decompress(file)));
+    final lines = StreamIterator(
+      _readLines(_decompress(file), firstLineLimit: _headerByteLimit),
+    );
     try {
       if (!await lines.moveNext()) throw const GraphFormatCorruption();
       final (:version, :header) = GraphFormatCodec.decodeHeader(lines.current);
@@ -38,6 +40,35 @@ abstract final class GraphFormatFile {
     } catch (_) {
       await lines.cancel();
       rethrow;
+    }
+  }
+
+  /// Сжатые байты записей [records] без заголовка и секций — промежуточного
+  /// файла, количества записей которого неизвестны до конца записи.
+  ///
+  /// Записи кодируются по мере прослушивания результата; запись длиннее
+  /// предела завершает поток отказом [GraphRecordTooLong].
+  static Stream<List<int>> writeRecords(Stream<GraphEntityRecord> records) =>
+      gzip.encoder.bind(
+        records.map((record) => _terminated(GraphFormatCodec.encode(record))),
+      );
+
+  /// Записи текущей версии из сжатых байтов [file], записанных
+  /// [writeRecords], по мере прослушивания.
+  ///
+  /// Повреждённый или обрезанный файл даёт [GraphFormatCorruption]. Ошибки
+  /// самого [file] передаются как есть.
+  static Stream<GraphEntityRecord> readRecords(Stream<List<int>> file) async* {
+    await for (final line in _readLines(
+      _decompress(file),
+      firstLineLimit: graphFormatRecordByteLimit,
+    )) {
+      for (final record in GraphFormatCodec.decodeEntityRecord(
+        line,
+        GraphFormatVersion.current,
+      )) {
+        yield record;
+      }
     }
   }
 }
@@ -161,13 +192,17 @@ Stream<List<int>> _decompress(Stream<List<int>> file) async* {
 }
 
 /// Делит распакованный текст на строки, каждая из которых завершена
-/// переводом строки.
+/// переводом строки. Первая строка не длиннее [firstLineLimit], остальные —
+/// предела записи.
 ///
 /// Чтение строки длиннее предела прекращается, как только она его превысила,
 /// поэтому память чтения ограничена и на чужом файле без переводов строк.
-Stream<List<int>> _readLines(Stream<List<int>> content) async* {
+Stream<List<int>> _readLines(
+  Stream<List<int>> content, {
+  required int firstLineLimit,
+}) async* {
   final pending = BytesBuilder(copy: false);
-  var limit = _headerByteLimit;
+  var limit = firstLineLimit;
   await for (final chunk in content) {
     var start = 0;
     while (start < chunk.length) {

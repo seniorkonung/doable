@@ -1,21 +1,39 @@
 import '../graph_format/graph_format_records.dart';
 import '../intention/domain/intention.dart';
 
-/// Базовое состояние сборки: пустой граф позиции 0 или записи состояния на
-/// позиции, например снимка.
+/// Запись базового состояния и позиция лога, состояние графа на которой она
+/// отражает.
+typedef GraphStateBaseRecord = ({GraphEntityRecord record, int position});
+
+/// Базовое состояние сборки: пустой граф позиции 0, записи состояния на
+/// позиции, например снимка, или записи, прочитанные порциями из базы.
 final class GraphStateBase {
-  const GraphStateBase({required this.position, required this.readRecords});
+  /// Состояние на позиции [position]: его отражает каждая запись.
+  GraphStateBase({
+    required this.position,
+    required Stream<GraphEntityRecord> Function() readRecords,
+  }) : readRecords = (() =>
+           readRecords().map((record) => (record: record, position: position)));
+
+  /// Записи, прочитанные порциями из базы, которая менялась между ними.
+  ///
+  /// Записи идут по возрастанию неизменных ключей порядка строк, а каждая
+  /// отражает состояние графа на позиции своей порции не раньше [position].
+  const GraphStateBase.portions({
+    required this.position,
+    required this.readRecords,
+  });
 
   const GraphStateBase.empty() : position = 0, readRecords = _noRecords;
 
   final int position;
 
-  /// Каждый вызов заново открывает записи состояния в каноническом порядке
-  /// файла формата: сборка читает их дважды.
-  final Stream<GraphEntityRecord> Function() readRecords;
+  /// Каждый вызов заново открывает записи в каноническом порядке файла
+  /// формата: сборка читает их дважды.
+  final Stream<GraphStateBaseRecord> Function() readRecords;
 }
 
-Stream<GraphEntityRecord> _noRecords() => const Stream.empty();
+Stream<GraphStateBaseRecord> _noRecords() => const Stream.empty();
 
 /// Пакет фактов лога с его позицией; факты прочитаны в текущей версии
 /// формата.
@@ -57,7 +75,9 @@ abstract final class GraphStateAssembly {
   /// после сущностей базы своей секции по месту последнего создания в
   /// пакетах. Сущность, удалённая и снова созданная с тем же ключом,
   /// покидает прежнее место, как строка базы с новой последовательностью
-  /// создания.
+  /// создания. Запись базы, после позиции которой сущность удалялась,
+  /// освобождает своё место, а запись, прочитанная после удаления, — уже
+  /// новая строка и остаётся на своём месте.
   static Future<AssembledGraphState> assemble(
     GraphStateBase base,
     Stream<GraphFactPackage> packages,
@@ -65,12 +85,12 @@ abstract final class GraphStateAssembly {
     final outcomes = await _summarize(base.position, packages);
 
     final counts = List.filled(_Section.values.length, 0);
-    await for (final record in base.readRecords()) {
+    await for (final (:record, :position) in base.readRecords()) {
       final outcome = outcomes[_keyOf(record)];
       if (outcome == null) {
         counts[_Section.of(record).index]++;
-      } else {
-        outcome.isInBase = true;
+      } else if (outcome.isCurrentAt(position)) {
+        outcome.keepsBasePlace = true;
       }
     }
     final created = [for (final _ in _Section.values) <_Life>[]];
@@ -117,7 +137,7 @@ Future<Map<GraphEntityKey, _Outcome>> _summarize(
               .putIfAbsent(_keyOf(fact), _Outcome.new)
               .change(fact, factNumber);
         case GraphEntityDeletion(:final entity):
-          outcomes.putIfAbsent(entity, _Outcome.new).delete();
+          outcomes.putIfAbsent(entity, _Outcome.new).delete(position);
       }
       factNumber++;
     }
@@ -130,15 +150,16 @@ Stream<GraphEntityRecord> _assembledRecords(
   Map<GraphEntityKey, _Outcome> outcomes,
   _Creations created,
 ) async* {
-  await for (final record in base.readRecords()) {
+  await for (final (:record, :position) in base.readRecords()) {
     for (final creation in created.takeBefore(record)) {
       yield creation;
     }
     final outcome = outcomes[_keyOf(record)];
     if (outcome == null) {
       yield record;
-    } else if (outcome.replacement case final replacement?) {
-      yield replacement;
+    } else if (outcome.life case final life?
+        when outcome.isCurrentAt(position)) {
+      yield life.record;
     }
   }
   for (final creation in created.takeRest()) {
@@ -151,25 +172,30 @@ final class _Outcome {
   /// Состояние после пакетов; `null` — сущность удалена.
   _Life? life;
 
-  /// Сущность удалялась в пакетах, поэтому её последнее состояние создано в
-  /// них заново.
-  var wasDeleted = false;
+  /// Позиция пакета, в котором сущность удалена последний раз; `null` — в
+  /// пакетах сущность не удалялась.
+  int? deletedAt;
 
-  /// Сущность есть в базовом состоянии.
-  var isInBase = false;
+  /// Сущность остаётся на месте своей записи в базовом состоянии.
+  var keepsBasePlace = false;
 
   /// Сущность встаёт на место созданной, а не на своё место в базе.
-  bool get isCreated => life != null && (wasDeleted || !isInBase);
+  bool get isCreated => life != null && !keepsBasePlace;
 
-  /// Запись на месте сущности базы; `null` — место освобождается.
-  GraphEntityRecord? get replacement => wasDeleted ? null : life?.record;
+  /// Запись базы, отражающая состояние на позиции [position], — та же строка,
+  /// что и сущность после пакетов, если сущность не удалялась после этой
+  /// позиции. Иначе место записи освобождается.
+  bool isCurrentAt(int position) => switch (deletedAt) {
+    final deleted? => deleted <= position,
+    null => true,
+  };
 
   void change(GraphEntityRecord record, int factNumber) =>
       life = (record: record, creation: life?.creation ?? factNumber);
 
-  void delete() {
+  void delete(int position) {
     life = null;
-    wasDeleted = true;
+    deletedAt = position;
   }
 }
 

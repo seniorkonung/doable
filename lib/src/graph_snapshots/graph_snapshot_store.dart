@@ -66,8 +66,43 @@ final class GraphSnapshotStore {
   /// атомарно переименовывается в файл снимка, а после fsync каталога
   /// снимок регистрируется. При отказе файл удаляется, а реестр не меняется.
   /// Запись не выполняется одновременно с [removeUnregisteredFiles].
-  Future<GraphSnapshotEntry> writeSnapshot(int position) async {
-    final state = await readStateAt(position);
+  Future<GraphSnapshotEntry> writeSnapshot(int position) async =>
+      _writeState(position, await readStateAt(position));
+
+  /// Пересобирает из базы снимок текущего состояния и регистрирует его, когда
+  /// последний снимок не проходит проверку.
+  ///
+  /// Записи графа читаются короткими порциями во временный файл каталога, а
+  /// команды графа выполняются между порциями, поэтому порции отражают разные
+  /// позиции лога. Состояние на позиции последней порции собирается из этого
+  /// файла и пакетов после позиции первой порции и пишется, как в
+  /// [writeSnapshot]. Временный файл удаляется, а при отказе реестр не
+  /// меняется. Пересборка не выполняется одновременно с
+  /// [removeUnregisteredFiles].
+  Future<GraphSnapshotEntry> rebuildSnapshot() async {
+    await _createDirectory();
+    final portions = _file(_temporaryFileName());
+    try {
+      final (:start, :end, :portionStarts) = await _writePortions(portions);
+      final state = await GraphStateAssembly.assemble(
+        GraphStateBase.portions(
+          position: start,
+          readRecords: () => _readPortions(portions, portionStarts),
+        ),
+        _readPackages(after: start, upTo: end),
+      );
+      return await _writeState(end, state);
+    } finally {
+      await _deleteLeftover(portions);
+    }
+  }
+
+  /// Пишет снимок состояния [state] на позиции [position] и регистрирует
+  /// его по правилу [writeSnapshot].
+  Future<GraphSnapshotEntry> _writeState(
+    int position,
+    AssembledGraphState state,
+  ) async {
     await _createDirectory();
     final fileName = '${const Uuid().v4()}$_snapshotExtension';
     var file = _file('$fileName$_temporaryExtension');
@@ -139,6 +174,52 @@ final class GraphSnapshotStore {
     }
   }
 
+  /// Пишет в [file] записи графа, прочитанные порциями до конца. Возвращает
+  /// позиции первой и последней порции и начала порций с новой позицией.
+  Future<({int start, int end, List<_PortionStart> portionStarts})>
+  _writePortions(File file) async {
+    final first = await _log.readGraphRecords();
+    var end = first.position;
+    final portionStarts = <_PortionStart>[];
+    var written = 0;
+    Stream<GraphEntityRecord> records() async* {
+      for (var portion = first; ;) {
+        end = portion.position;
+        if (portionStarts.lastOrNull?.position != portion.position) {
+          portionStarts.add((firstRecord: written, position: portion.position));
+        }
+        written += portion.records.length;
+        for (final record in portion.records) {
+          yield record;
+        }
+        final next = portion.next;
+        if (next == null) return;
+        portion = await _log.readGraphRecords(after: next);
+      }
+    }
+
+    await _writeTemporary(file, GraphFormatFile.writeRecords(records()));
+    return (start: first.position, end: end, portionStarts: portionStarts);
+  }
+
+  /// Записи файла порций [file] с позициями их порций.
+  Stream<GraphStateBaseRecord> _readPortions(
+    File file,
+    List<_PortionStart> portionStarts,
+  ) async* {
+    var index = 0;
+    var nextStart = 0;
+    late int position;
+    await for (final record in GraphFormatFile.readRecords(file.openRead())) {
+      while (nextStart < portionStarts.length &&
+          portionStarts[nextStart].firstRecord <= index) {
+        position = portionStarts[nextStart++].position;
+      }
+      yield (record: record, position: position);
+      index++;
+    }
+  }
+
   /// Записи снимка, сверенного с реестром: размер — до чтения, SHA-256 —
   /// по прочтении всего файла, до завершения записей.
   Stream<GraphEntityRecord> _readSnapshot(GraphSnapshotEntry snapshot) async* {
@@ -173,6 +254,14 @@ const _snapshotExtension = '.jsonl.gz';
 
 const _temporaryExtension = '.tmp';
 
+String _temporaryFileName() =>
+    '${const Uuid().v4()}$_snapshotExtension$_temporaryExtension';
+
+/// Порция файла пересборки, позиция которой отличается от предыдущей: её
+/// записи, начиная с записи номер [firstRecord], отражают состояние на
+/// [position]. Позиция меняется не чаще пакетов после первой порции.
+typedef _PortionStart = ({int firstRecord, int position});
+
 /// Пишет [bytes] в [file] и выполняет fsync: writeFrom передаёт байты
 /// системе без буфера процесса, а flush сбрасывает файл на диск.
 /// https://api.dart.dev/dart-io/RandomAccessFile/flush.html
@@ -196,6 +285,19 @@ Future<({int byteSize, Uint8List checksum})> _writeDurably(
   }
   hashing.close();
   return (byteSize: byteSize, checksum: Uint8List.fromList(digest.value.bytes));
+}
+
+/// Пишет [bytes] в [file] без сброса на диск: файл порций пересборки
+/// читается только самой пересборкой.
+Future<void> _writeTemporary(File file, Stream<List<int>> bytes) async {
+  final output = await file.open(mode: FileMode.writeOnly);
+  try {
+    await for (final chunk in bytes) {
+      await output.writeFrom(chunk);
+    }
+  } finally {
+    await output.close();
+  }
 }
 
 /// Передаёт байты [file] как есть и по их окончании сверяет SHA-256 с
