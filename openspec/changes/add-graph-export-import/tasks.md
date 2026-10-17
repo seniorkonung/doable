@@ -390,3 +390,16 @@
   - **Dependencies:** 1.22, 1.32.
   - **Files likely touched:** `test/intention/data/drift_intention_repository_fault_test.dart`.
   - **Estimated scope:** S.
+
+- [ ] 1.34 Не проверять начальный U+FEFF исходного TEXT в чтениях назначенных тегов и намерений с тегом
+  - **Acceptance criteria:**
+    - По решению 5 [дизайна](design.md) форму хранения значений графа проверяет только общий декодер. Запросы `_readIntentionTags` и `_readTagAssignments` в `drift_personal_graph_repository_tag_reads.dart` и запрос страницы намерений с тегом в `drift_personal_graph_repository_tagged_intentions.dart` не выбирают `has_leading_bom`. `_decodeAssignedTag` и `_decodeTaggedIntention` не отклоняют строку по начальному U+FEFF, `_checkTaggedTextEncoding` удалён. Остальные проверки этих чтений сохраняются: разбор общим декодером и совпадение идентификатора назначения с идентификатором сущности.
+    - Удалены тесты, которые пишут начальный U+FEFF в базу в обход приложения: «начальный BOM сохранённого названия не удаляется при чтении» в `test/graph/data/drift_tagged_entities_read_test.dart` и случай «начальный BOM в идентификаторе тега» в `test/intention/data/drift_intention_catalog_test.dart` вместе с упоминанием BOM в комментарии к этим случаям. Ограничение схемы на начальный U+FEFF в названии тега и его тесты не меняются.
+    - Для данных, которые пишет приложение, результаты чтений и команд, пакеты фактов и записи порций не меняются. Условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+  - **Verification:**
+    - Убедиться, что `rg 'has_leading_bom|char\(65279\)' lib test` находит только ограничение названия тега в `lib/src/data/local/schema/tag_schema.drift`, его копию в `lib/src/data/local/app_database.g.dart` и тест этого ограничения в `test/data/local/sqlite_tag_functions_test.dart`.
+    - Выполнить `mise exec --no-deps -- flutter test test/graph/data/drift_tagged_entities_read_test.dart test/graph/data/drift_tag_assignment_read_test.dart test/intention/data/drift_intention_catalog_test.dart`.
+    - Сопоставить актуальные результаты проверок задачи 1.33 с условием готовности. Выполнить `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 1.24, 1.33.
+  - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_tagged_intentions.dart`, `test/graph/data/drift_tagged_entities_read_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`.
+  - **Estimated scope:** S.
