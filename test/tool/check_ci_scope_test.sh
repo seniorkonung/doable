@@ -60,16 +60,9 @@ workflow_disables_mise_auto_install() {
   [[ "$count" == 1 ]]
 }
 
-project_mise_tasks_skip_tool_installation() {
+workflow_mise_tasks_skip_tool_installation() {
   awk '
-    /^  project_checks:/ {
-      in_project_checks = 1
-      next
-    }
-    in_project_checks && /^  [[:alnum:]_]+:/ {
-      exit
-    }
-    in_project_checks && /run: mise run / {
+    /run: mise run / {
       found_task = 1
       if ($0 !~ /run: mise run --skip-tools /) {
         invalid_task = 1
@@ -144,9 +137,9 @@ check_boolean \
   true \
   workflow_disables_mise_auto_install
 check_boolean \
-  "проектные mise-задачи не устанавливают полный toolchain" \
+  "mise-задачи workflow не устанавливают полный toolchain" \
   true \
-  project_mise_tasks_skip_tool_installation
+  workflow_mise_tasks_skip_tool_installation
 check_boolean \
   "OpenSpec-валидация не запускает mise exec" \
   true \

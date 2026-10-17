@@ -60,8 +60,12 @@ mise run codegen-check-test
 ## Pull request checks
 
 `mise run --skip-tools check` runs formatting, analysis, functional tests and
-Widgetbook checks. Benchmarks are separate from this command and
-from automatic test discovery:
+Widgetbook checks. CI runs the same parts as parallel jobs: `check:static`,
+four `check:tests` shards and `check:process-tests`. To reproduce one shard
+locally, pass its zero-based index and the shard count, for example
+`mise run --skip-tools check:tests -- 1 4`.
+
+Benchmarks are separate from this command and from automatic test discovery:
 
 ```sh
 mise run --skip-tools benchmark
