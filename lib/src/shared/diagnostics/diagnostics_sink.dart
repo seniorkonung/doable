@@ -577,3 +577,37 @@ final class GraphSnapshotCleanupDiagnosticsEvent extends DiagnosticsEvent {
 
   final GraphSnapshotCleanupDiagnosticsStage? stage;
 }
+
+/// Этап экспорта графа в документ.
+enum GraphExportDiagnosticsStage {
+  /// Создание документа системным диалогом сохранения.
+  documentCreation,
+
+  /// Запись состояния графа в файл во временном каталоге приложения.
+  temporaryFileWrite,
+
+  /// Копирование временного файла в документ.
+  documentWrite,
+}
+
+/// Экспорт графа в документ: исход, длительность записи после выбора
+/// документа, а у отказа — этап и безопасная категория, в том числе
+/// повреждение снимка. Отмена системного диалога отказом не считается и
+/// события не даёт.
+///
+/// Записи графа, имена, пути и адреса файлов и документов и исходное
+/// исключение не входят в контракт события. Конструкторы допускают этап
+/// только у отказа. Передача получателю — через [recordDiagnosticsSafely].
+final class GraphExportDiagnosticsEvent extends DiagnosticsEvent {
+  GraphExportDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphExportDiagnosticsEvent.failed({
+    required GraphExportDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphExportDiagnosticsStage? stage;
+}

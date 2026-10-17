@@ -217,6 +217,11 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': ?stage?.name,
     ..._encodeStatus(event.status),
   },
+  GraphExportDiagnosticsEvent(:final stage) => {
+    'operation': 'graphExport',
+    'stage': ?stage?.name,
+    ..._encodeStatus(event.status),
+  },
 };
 
 Map<String, Object> _encodeStatus(DiagnosticsStatus status) => switch (status) {

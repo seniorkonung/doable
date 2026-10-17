@@ -243,6 +243,32 @@ void main() {
               'failureCode': 'unavailable',
             },
           ),
+          (
+            'успех экспорта графа',
+            GraphExportDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 51),
+            ),
+            {
+              'operation': 'graphExport',
+              'outcome': 'succeeded',
+              'durationMicros': 51,
+            },
+          ),
+          (
+            'отказ экспорта графа из-за повреждённого снимка',
+            GraphExportDiagnosticsEvent.failed(
+              stage: GraphExportDiagnosticsStage.temporaryFileWrite,
+              duration: const Duration(microseconds: 52),
+              code: DiagnosticsFailureCode.snapshotCorruption,
+            ),
+            {
+              'operation': 'graphExport',
+              'stage': 'temporaryFileWrite',
+              'outcome': 'failed',
+              'durationMicros': 52,
+              'failureCode': 'snapshotCorruption',
+            },
+          ),
         ]) {
       test('$description кодируется только операцией, этапом отказа, исходом, '
           'длительностью и категорией отказа', () {

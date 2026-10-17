@@ -15,6 +15,7 @@ import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_file.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
+import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -29,6 +30,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/file_document_access.dart';
 import '../support/graph_log_completeness_reference.dart';
@@ -39,8 +41,10 @@ void main() {
   late LocalDatabaseHarness harness;
   late AppDatabase database;
   late DriftPersonalGraphRepository repository;
+  late Directory snapshots;
   late Directory temporary;
   late FileDocumentAccess documents;
+  late EncodedDiagnosticsLog diagnostics;
   var now = DateTime.utc(2026, 10, 7, 9);
   // Местное время, поэтому дата в имени документа не зависит от часового
   // пояса проверки.
@@ -56,6 +60,9 @@ void main() {
       () => now = now.add(const Duration(seconds: 1)),
       InMemoryDiagnosticsSink(),
     );
+    snapshots = Directory.fromUri(
+      harness.temporaryDirectory.uri.resolve('graph_snapshots/'),
+    );
     temporary = Directory.fromUri(
       harness.temporaryDirectory.uri.resolve('tmp/'),
     );
@@ -64,6 +71,7 @@ void main() {
         harness.temporaryDirectory.uri.resolve('documents/'),
       ).create(),
     );
+    diagnostics = EncodedDiagnosticsLog();
   });
 
   /// Контейнер приложения с экспортом, который пишет состояние графа
@@ -75,15 +83,14 @@ void main() {
       documents: documents,
       compaction: GraphLogCompaction(
         log: repository,
-        directory: Directory.fromUri(
-          harness.temporaryDirectory.uri.resolve('graph_snapshots/'),
-        ),
+        directory: snapshots,
         clock: () => now,
         diagnosticsSink: InMemoryDiagnosticsSink(),
         stateWriteRunner: stateWriteRunner,
       ),
       temporaryDirectory: temporary,
       clock: () => exportMoment,
+      diagnosticsSink: diagnostics,
     );
     final container = ProviderContainer(
       overrides: [
@@ -138,8 +145,9 @@ void main() {
   )).intention;
 
   test('документ, выбранный в системном диалоге, читается модулем формата в '
-      'выгрузку базы с моментом экспорта в заголовке, а временный файл '
-      'удаляется', () async {
+      'выгрузку базы с моментом экспорта в заголовке, временный файл '
+      'удаляется, а успех диагностируется без пользовательских '
+      'данных', () async {
     final home = await createTag('Дом');
     final health = await createIntention('Здоровье', tagIds: {home.id});
     final running = await createIntention('Бегать');
@@ -166,11 +174,14 @@ void main() {
     expect(reading.header.writtenAt, exportMoment.toUtc());
     expect(_lines(await reading.records.toList()), expected);
     expect(await _filesIn(temporary), isEmpty);
+    expect(diagnostics.events, [
+      {'operation': 'graphExport', 'outcome': 'succeeded'},
+    ]);
   });
 
   test('отмена диалога с именем по умолчанию «Doable <местная дата>.jsonl.gz» '
-      'не принимает экспорт и не оставляет файлов, а следующий запуск снова '
-      'открывает диалог', () async {
+      'не принимает экспорт, не диагностируется и не оставляет файлов, а '
+      'следующий запуск снова открывает диалог', () async {
     await createTag('Дом');
     documents.dialog = () async => const DocumentCreationCancelled();
     final container = app();
@@ -192,13 +203,15 @@ void main() {
     expect(documents.suggestedNames, ['Doable 2026-10-07.jsonl.gz']);
     expect(published, isEmpty);
     expect(states, isEmpty);
+    expect(diagnostics.events, isEmpty);
     expect(await _filesIn(temporary), isEmpty);
     await startExport(container);
     expect(documents.suggestedNames, hasLength(2));
   });
 
-  test('отказ записи временного файла даёт отказ экспорта и не оставляет '
-      'временных файлов', () async {
+  test('отказ записи временного файла даёт отказ экспорта, диагностируемый '
+      'этапом записи временного файла, и не оставляет временных '
+      'файлов', () async {
     await createTag('Дом');
     final container = app(
       stateWriteRunner: writeGraphStateFailingIn(temporary),
@@ -213,10 +226,49 @@ void main() {
       container.read(graphExportControllerProvider),
       isA<GraphExportIdle>(),
     );
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphExport',
+        'stage': 'temporaryFileWrite',
+        'outcome': 'failed',
+        'failureCode': 'unavailable',
+      },
+    ]);
   });
 
-  test('отказ записи документа даёт отказ экспорта без временных файлов, а '
-      'повтор из сообщения снова открывает диалог и сохраняет граф', () async {
+  test('повреждённый последний снимок даёт отказ экспорта, диагностируемый '
+      'этапом записи временного файла и категорией повреждения '
+      'снимка', () async {
+    await createTag('Дом');
+    final damaged = await GraphSnapshotStore(
+      log: repository,
+      directory: snapshots,
+      clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    ).writeSnapshot(1);
+    final damagedFile = File.fromUri(snapshots.uri.resolve(damaged.fileName));
+    final bytes = await damagedFile.readAsBytes();
+    bytes[bytes.length ~/ 2] ^= 0xff;
+    await damagedFile.writeAsBytes(bytes);
+    final container = app();
+    final exported = nextExport(container);
+
+    await startExport(container);
+
+    expect((await exported).outcome, GraphExportOutcome.failed);
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphExport',
+        'stage': 'temporaryFileWrite',
+        'outcome': 'failed',
+        'failureCode': 'snapshotCorruption',
+      },
+    ]);
+  });
+
+  test('отказ записи документа даёт отказ экспорта без временных файлов, '
+      'диагностируемый этапом записи документа, а повтор из сообщения снова '
+      'открывает диалог и сохраняет граф', () async {
     await createTag('Дом');
     documents.failsWrites = true;
     final container = app();
@@ -225,6 +277,14 @@ void main() {
     final failure = await failed;
     expect(failure.outcome, GraphExportOutcome.failed);
     expect(await _filesIn(temporary), isEmpty);
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphExport',
+        'stage': 'documentWrite',
+        'outcome': 'failed',
+        'failureCode': 'unavailable',
+      },
+    ]);
 
     documents.failsWrites = false;
     final retried = nextExport(container);
@@ -241,7 +301,8 @@ void main() {
     );
   });
 
-  test('системный диалог, который не открылся, даёт отказ экспорта', () async {
+  test('системный диалог, который не открылся, даёт отказ экспорта, '
+      'диагностируемый этапом создания документа', () async {
     await createTag('Дом');
     documents.dialog = () async => const DocumentCreationFailed();
     final container = app();
@@ -250,6 +311,14 @@ void main() {
     await startExport(container);
 
     expect((await exported).outcome, GraphExportOutcome.failed);
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphExport',
+        'stage': 'documentCreation',
+        'outcome': 'failed',
+        'failureCode': 'unavailable',
+      },
+    ]);
   });
 
   test('повторный запуск во время ожидания диалога и во время экспорта не '
