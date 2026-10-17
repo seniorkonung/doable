@@ -24,6 +24,7 @@ import '../../daily_choice/domain/daily_choice_priority.dart';
 import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
+import '../../graph_snapshots/graph_fact_log.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -92,6 +93,7 @@ part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
+part 'drift_personal_graph_repository_fact_log.dart';
 part 'drift_personal_graph_repository_statistics.dart';
 part 'drift_statistics_relation_snapshot.dart';
 part 'drift_statistics_seed_groups.dart';
@@ -99,7 +101,8 @@ part 'drift_intention_statistics_source.dart';
 part 'drift_intention_statistics_reader.dart';
 part 'drift_through_relations_statistics_reader.dart';
 
-final class DriftPersonalGraphRepository implements PersonalGraphRepository {
+final class DriftPersonalGraphRepository
+    implements PersonalGraphRepository, GraphFactLog {
   DriftPersonalGraphRepository(
     this._database,
     this._idGenerator,
@@ -221,6 +224,30 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);
+
+  @override
+  Future<int> readCurrentPosition() => _readCurrentLogPosition();
+
+  @override
+  Future<List<StoredGraphFactPackage>> readPackages({
+    required int after,
+    required int upTo,
+  }) => _readStoredFactPackages(after: after, upTo: upTo);
+
+  @override
+  Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
+      _readSnapshotAtOrBefore(position);
+
+  @override
+  Future<Set<String>> readSnapshotFileNames() => _readSnapshotFileNames();
+
+  @override
+  Future<void> registerSnapshot(GraphSnapshotEntry snapshot) =>
+      _registerSnapshot(snapshot);
+
+  @override
+  Future<List<String>> removeHistoryBefore(int boundary) =>
+      _removeHistoryBefore(boundary);
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);
