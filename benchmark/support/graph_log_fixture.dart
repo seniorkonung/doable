@@ -5,6 +5,8 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/graph_seed.dart';
+
 /// Число сущностей графа профиля решения 15 дизайна: пример владельца
 /// продукта.
 const graphLogProfileEntities = 1000000;
@@ -102,78 +104,76 @@ final class GraphLogFixture {
       insertChoice,
       insertStep,
     ] = statements;
-    database.execute('BEGIN');
     try {
-      database.execute('UPDATE graph_log_control SET capture = 0');
-      for (var tag = 0; tag < tags; tag++) {
-        insertTag.execute([_id(1, tag), 'Тег $tag']);
-      }
-      final createdAt = DateTime.utc(2024).microsecondsSinceEpoch;
-      for (var intention = 0; intention < intentions; intention++) {
-        final timestamp =
-            createdAt + intention * Duration.microsecondsPerSecond;
-        insertIntention.execute([
-          _id(2, intention),
-          intentionTitle(intention),
-          intentionDescription(intention),
-          intention % 2,
-          timestamp,
-          timestamp,
-        ]);
-      }
-      for (var intention = 0; intention < intentions; intention++) {
-        insertAssignment.execute([_id(1, intention % tags), _id(2, intention)]);
-      }
-      for (var relation = 0; relation < longTermRelations; relation++) {
-        final (source, related, lane) = _relationEnds(relation);
-        insertRelation.execute([
-          _id(3, relation),
-          _id(2, source),
-          _id(2, related),
-          relation.isEven ? 'need' : 'can',
-          relation % 4 + 1,
-          relation % 5 == 0 ? 'Связь $relation: почему это важно' : null,
-          lane == 2 && relation % 20 == 19 ? 1 : 0,
-        ]);
-      }
-      final firstDay = DateTime.utc(2021);
-      var step = 0;
-      for (var choice = 0; choice < dailyChoices; choice++) {
-        final source = choice * 13 % _laneIntentions;
-        final length = choice % 5 + 1;
-        final day = firstDay.add(Duration(days: choice ~/ 150));
-        insertChoice.execute([
-          _id(4, choice),
-          _id(2, source),
-          _id(2, (source + length) % _laneIntentions),
-          CalendarDate.fromParts(
-            day.year,
-            day.month,
-            day.day,
-          ).toCanonicalString(),
-          choice % 10 == 0 ? 'Выбор $choice: что сделать сегодня' : null,
-          choice % 2,
-          choice % 3 == 0 ? null : choice * 37 % 1440,
-          choice % 4 + 1,
-        ]);
-        String? previous;
-        for (var offset = 0; offset < length; offset++) {
-          final stepId = _id(5, step++);
-          // Связь первой полосы с номером n ведёт от намерения n к n + 1.
-          insertStep.execute([
-            stepId,
-            _id(4, choice),
-            _id(3, (source + offset) % _laneIntentions),
-            previous,
-          ]);
-          previous = stepId;
+      seedRawGraph(database, () {
+        for (var tag = 0; tag < tags; tag++) {
+          insertTag.execute([_id(1, tag), 'Тег $tag']);
         }
-      }
-      database.execute('UPDATE graph_log_control SET capture = 1');
-      database.execute('COMMIT');
-    } on Object {
-      database.execute('ROLLBACK');
-      rethrow;
+        final createdAt = DateTime.utc(2024).microsecondsSinceEpoch;
+        for (var intention = 0; intention < intentions; intention++) {
+          final timestamp =
+              createdAt + intention * Duration.microsecondsPerSecond;
+          insertIntention.execute([
+            _id(2, intention),
+            intentionTitle(intention),
+            intentionDescription(intention),
+            intention % 2,
+            timestamp,
+            timestamp,
+          ]);
+        }
+        for (var intention = 0; intention < intentions; intention++) {
+          insertAssignment.execute([
+            _id(1, intention % tags),
+            _id(2, intention),
+          ]);
+        }
+        for (var relation = 0; relation < longTermRelations; relation++) {
+          final (source, related, lane) = _relationEnds(relation);
+          insertRelation.execute([
+            _id(3, relation),
+            _id(2, source),
+            _id(2, related),
+            relation.isEven ? 'need' : 'can',
+            relation % 4 + 1,
+            relation % 5 == 0 ? 'Связь $relation: почему это важно' : null,
+            lane == 2 && relation % 20 == 19 ? 1 : 0,
+          ]);
+        }
+        final firstDay = DateTime.utc(2021);
+        var step = 0;
+        for (var choice = 0; choice < dailyChoices; choice++) {
+          final source = choice * 13 % _laneIntentions;
+          final length = choice % 5 + 1;
+          final day = firstDay.add(Duration(days: choice ~/ 150));
+          insertChoice.execute([
+            _id(4, choice),
+            _id(2, source),
+            _id(2, (source + length) % _laneIntentions),
+            CalendarDate.fromParts(
+              day.year,
+              day.month,
+              day.day,
+            ).toCanonicalString(),
+            choice % 10 == 0 ? 'Выбор $choice: что сделать сегодня' : null,
+            choice % 2,
+            choice % 3 == 0 ? null : choice * 37 % 1440,
+            choice % 4 + 1,
+          ]);
+          String? previous;
+          for (var offset = 0; offset < length; offset++) {
+            final stepId = _id(5, step++);
+            // Связь первой полосы с номером n ведёт от намерения n к n + 1.
+            insertStep.execute([
+              stepId,
+              _id(4, choice),
+              _id(3, (source + offset) % _laneIntentions),
+              previous,
+            ]);
+            previous = stepId;
+          }
+        }
+      });
     } finally {
       for (final statement in statements) {
         statement.close();

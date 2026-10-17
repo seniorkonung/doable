@@ -24,6 +24,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/graph_seed.dart';
 import '../../test/support/in_memory_diagnostics_sink.dart';
 import '../../test/support/local_database_harness.dart';
 import '../support/benchmark.dart';
@@ -539,14 +540,15 @@ final class _Graph {
   /// подготовка замера, а не изменение графа.
   void _restoreHub() {
     final hub = fixture.hubIntentionId.toCanonicalString();
-    raw
-      ..execute('UPDATE graph_log_control SET capture = 0')
-      ..execute('UPDATE intentions SET is_archived = 0 WHERE id = ?', [hub])
-      ..execute(
-        'UPDATE long_term_relations SET is_archived = 0 '
-        'WHERE source_intention_id = ?',
-        [hub],
-      );
+    seedRawGraph(raw, () {
+      raw
+        ..execute('UPDATE intentions SET is_archived = 0 WHERE id = ?', [hub])
+        ..execute(
+          'UPDATE long_term_relations SET is_archived = 0 '
+          'WHERE source_intention_id = ?',
+          [hub],
+        );
+    });
   }
 
   Future<void> dispose() => harness.dispose();

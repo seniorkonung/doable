@@ -22,6 +22,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/contribution_statistics_fixture.dart';
 import '../support/benchmark.dart';
+import '../../test/support/graph_seed.dart';
 import '../../test/support/local_database_harness.dart';
 
 const _readZone = #statisticsCostRead;
@@ -121,16 +122,20 @@ void main() {
               1;
           final expected = <bool, List<FixtureContribution>>{};
           for (final closed in [false, true]) {
-            raw.execute(
-              'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
-              [closed ? 1 : 0, cycleId.toCanonicalString()],
-            );
+            seedRawGraph(raw, () {
+              raw.execute(
+                'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
+                [closed ? 1 : 0, cycleId.toCanonicalString()],
+              );
+            });
             expected[closed] = fixture.expectedThroughRelations(period, raw);
           }
-          raw.execute(
-            'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
-            [originalCycleArchived ? 1 : 0, cycleId.toCanonicalString()],
-          );
+          seedRawGraph(raw, () {
+            raw.execute(
+              'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
+              [originalCycleArchived ? 1 : 0, cycleId.toCanonicalString()],
+            );
+          });
           referenceWatch.stop();
           expect(
             expected[false],
