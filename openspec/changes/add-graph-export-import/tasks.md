@@ -355,7 +355,7 @@
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 1.29.
   - **Estimated scope:** XS.
 
-- [ ] 1.31 Определить в одном месте тестовые подмены лога фактов и отказа записи временных файлов снимков
+- [x] 1.31 Определить в одном месте тестовые подмены лога фактов и отказа записи временных файлов снимков
   - **Acceptance criteria:**
     - В `test/support/` одна общая пересылка контракта лога фактов передаёт каждую операцию `GraphFactLog` и `ObservableGraphFactLog` исходному логу. На ней построены пять обёрток: `_InterceptingLog` в `test/graph_snapshots/graph_snapshot_store_test.dart` и `test/graph_snapshots/graph_log_compaction_test.dart`, `_FirstPortionPausingLog` в `test/graph_snapshots/graph_snapshot_rebuild_test.dart`, `_RegistryReadOverride` в `test/app/bootstrap/app_runtime_graph_snapshots_test.dart` и `_StoppingLog` в `test/support/graph_snapshot_process_worker.dart`. Каждая задаёт только перехватываемые операции, поэтому новая операция контракта лога меняет в тестах только общую пересылку.
     - Отказ записи во временный файл снимка, как при нехватке места, вместе с запуском записи в изоляте определён в `test/support/` один раз и используется тестами сжатия и пересборки. Местные копии `_FailingTemporaryFiles`, `_FailingTemporaryFile`, `_writeFailingOnTemporaryFile` и `_writeFailingOnTemporaryFiles` удалены. Остановка процесса перед переименованием в `test/support/graph_snapshot_process_worker.dart` остаётся отдельной подменой.
