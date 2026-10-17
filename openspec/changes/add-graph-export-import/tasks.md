@@ -285,7 +285,7 @@
   - **Files likely touched:** `lib/src/graph/data/graph_record_rows.dart`, `lib/src/graph/data/graph_fact_capture.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart` и другие файлы данных графа с копиями декодеров идентификаторов, `lib/src/graph_snapshots/graph_snapshot_store.dart`, `test/graph/data/drift_graph_fact_log_write_test.dart`, `test/graph_snapshots/graph_snapshot_rebuild_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.25 Повторно подтвердить готовность этапа после объединения декодеров строк графа
+- [x] 1.25 Повторно подтвердить готовность этапа после объединения декодеров строк графа
   - **Acceptance criteria:**
     - После задачи 1.24 условие Ready to advance этапа 1 из [плана](plan.md) по-прежнему выполнено, в том числе после каждого вида команды база совпадает с состоянием, собранным из снимка и лога, а накладные расходы лога на команды укладываются в бюджеты дизайна. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
     - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
