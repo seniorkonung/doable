@@ -31,6 +31,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
 import '../support/encoded_diagnostics_log.dart';
+import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -343,14 +344,13 @@ void main() {
 
 /// Лог фактов, который перед операцией вызывает действие теста: осмотр
 /// каталога снимков или отказ вместо операции.
-final class _InterceptingLog implements GraphFactLog {
+final class _InterceptingLog extends ForwardingGraphFactLog {
   _InterceptingLog(
-    this._log, {
+    super.source, {
     this.beforeRegistration = _proceedWith,
     this.beforeFileNames = _proceed,
   });
 
-  final GraphFactLog _log;
   final Future<void> Function(GraphSnapshotEntry snapshot) beforeRegistration;
   final Future<void> Function() beforeFileNames;
 
@@ -359,37 +359,16 @@ final class _InterceptingLog implements GraphFactLog {
   static Future<void> _proceed() async {}
 
   @override
-  Future<int> readCurrentPosition() => _log.readCurrentPosition();
-
-  @override
-  Future<List<StoredGraphFactPackage>> readPackages({
-    required int after,
-    required int upTo,
-  }) => _log.readPackages(after: after, upTo: upTo);
-
-  @override
-  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
-      _log.readGraphRecords(after: after);
-
-  @override
-  Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
-      _log.readSnapshotAtOrBefore(position);
-
-  @override
   Future<Set<String>> readSnapshotFileNames() async {
     await beforeFileNames();
-    return _log.readSnapshotFileNames();
+    return super.readSnapshotFileNames();
   }
 
   @override
   Future<void> registerSnapshot(GraphSnapshotEntry snapshot) async {
     await beforeRegistration(snapshot);
-    await _log.registerSnapshot(snapshot);
+    await super.registerSnapshot(snapshot);
   }
-
-  @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      _log.removeHistoryBefore(boundary);
 }
 
 Future<Set<String>> _fileNamesIn(Directory directory) async => {

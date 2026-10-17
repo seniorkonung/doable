@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -18,6 +17,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/encoded_diagnostics_log.dart';
+import '../support/failing_snapshot_temporary_files.dart';
+import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -170,7 +171,7 @@ void main() {
       'порог пакетов, и повторяется по его достижении', () async {
     final compaction = compactionOver(
       repository,
-      runners: [_writeFailingOnTemporaryFile],
+      runners: [writeGraphSnapshotFailingOnTemporaryFiles],
     )..start();
     await confirmCommands(_threshold + 1);
     await expectLater(attempts.single, throwsA(isA<FileSystemException>()));
@@ -347,7 +348,7 @@ void main() {
         (
           'записи временного файла снимка',
           (log) => log,
-          [_writeFailingOnTemporaryFile],
+          [writeGraphSnapshotFailingOnTemporaryFiles],
           [
             {
               'operation': 'graphSnapshotWrite',
@@ -426,15 +427,14 @@ final _diskFull = sqlite.SqliteException(
 
 /// Лог фактов, который перед операцией вызывает действие теста: задержку или
 /// отказ вместо операции.
-final class _InterceptingLog implements ObservableGraphFactLog {
+final class _InterceptingLog extends ForwardingGraphFactLog {
   _InterceptingLog(
-    this._log, {
+    super.source, {
     this.beforeCurrentPosition = _proceed,
     this.beforeRegistration = _proceed,
     this.beforeHistoryRemoval = _proceed,
   });
 
-  final ObservableGraphFactLog _log;
   final Future<void> Function() beforeCurrentPosition;
   final Future<void> Function() beforeRegistration;
   final Future<void> Function() beforeHistoryRemoval;
@@ -442,85 +442,22 @@ final class _InterceptingLog implements ObservableGraphFactLog {
   static Future<void> _proceed() async {}
 
   @override
-  Stream<int> get confirmedPositions => _log.confirmedPositions;
-
-  @override
   Future<int> readCurrentPosition() async {
     await beforeCurrentPosition();
-    return _log.readCurrentPosition();
+    return super.readCurrentPosition();
   }
-
-  @override
-  Future<List<StoredGraphFactPackage>> readPackages({
-    required int after,
-    required int upTo,
-  }) => _log.readPackages(after: after, upTo: upTo);
-
-  @override
-  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
-      _log.readGraphRecords(after: after);
-
-  @override
-  Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
-      _log.readSnapshotAtOrBefore(position);
-
-  @override
-  Future<Set<String>> readSnapshotFileNames() => _log.readSnapshotFileNames();
 
   @override
   Future<void> registerSnapshot(GraphSnapshotEntry snapshot) async {
     await beforeRegistration();
-    await _log.registerSnapshot(snapshot);
+    await super.registerSnapshot(snapshot);
   }
 
   @override
   Future<List<String>> removeHistoryBefore(int boundary) async {
     await beforeHistoryRemoval();
-    return _log.removeHistoryBefore(boundary);
+    return super.removeHistoryBefore(boundary);
   }
-}
-
-/// Запись снимка в изоляте, у которой временный файл появляется, но запись в
-/// него отказывает, как при нехватке места.
-/// https://api.dart.dev/dart-io/IOOverrides-class.html
-Future<GraphSnapshotEntry> _writeFailingOnTemporaryFile(
-  GraphSnapshotWrite write,
-) => Isolate.run(
-  () => IOOverrides.runWithIOOverrides(write.run, _FailingTemporaryFiles()),
-);
-
-final class _FailingTemporaryFiles extends IOOverrides {
-  @override
-  File createFile(String path) {
-    final file = super.createFile(path);
-    return path.endsWith('.tmp') ? _FailingTemporaryFile(file) : file;
-  }
-}
-
-final class _FailingTemporaryFile implements File {
-  _FailingTemporaryFile(this._file);
-
-  final File _file;
-
-  @override
-  String get path => _file.path;
-
-  @override
-  Future<RandomAccessFile> open({FileMode mode = FileMode.read}) async {
-    await _file.writeAsBytes(const [0x1f, 0x8b]);
-    throw FileSystemException(
-      'Запись не выполнена.',
-      path,
-      const OSError('No space left on device', 28),
-    );
-  }
-
-  @override
-  Future<FileSystemEntity> delete({bool recursive = false}) =>
-      _file.delete(recursive: recursive);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 Future<Set<String>> _fileNamesIn(Directory directory) async => {

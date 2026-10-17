@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/forwarding_graph_fact_log.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -239,40 +240,11 @@ final class _CloseTrackingObserver extends LocalDatabaseConnectionObserver {
 
 /// Лог фактов, в котором чтение реестра снимков выполняет
 /// [_readSnapshotFileNames], а остальные операции — исходный лог.
-final class _RegistryReadOverride implements ObservableGraphFactLog {
-  const _RegistryReadOverride(this._log, this._readSnapshotFileNames);
+final class _RegistryReadOverride extends ForwardingGraphFactLog {
+  const _RegistryReadOverride(super.source, this._readSnapshotFileNames);
 
-  final ObservableGraphFactLog _log;
   final Future<Set<String>> Function(GraphFactLog log) _readSnapshotFileNames;
 
   @override
-  Stream<int> get confirmedPositions => _log.confirmedPositions;
-
-  @override
-  Future<int> readCurrentPosition() => _log.readCurrentPosition();
-
-  @override
-  Future<List<StoredGraphFactPackage>> readPackages({
-    required int after,
-    required int upTo,
-  }) => _log.readPackages(after: after, upTo: upTo);
-
-  @override
-  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
-      _log.readGraphRecords(after: after);
-
-  @override
-  Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
-      _log.readSnapshotAtOrBefore(position);
-
-  @override
-  Future<Set<String>> readSnapshotFileNames() => _readSnapshotFileNames(_log);
-
-  @override
-  Future<void> registerSnapshot(GraphSnapshotEntry snapshot) =>
-      _log.registerSnapshot(snapshot);
-
-  @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      _log.removeHistoryBefore(boundary);
+  Future<Set<String>> readSnapshotFileNames() => _readSnapshotFileNames(source);
 }

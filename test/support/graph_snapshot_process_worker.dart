@@ -10,6 +10,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'encoded_diagnostics_log.dart';
+import 'forwarding_graph_fact_log.dart';
 import 'in_memory_diagnostics_sink.dart';
 
 const graphSnapshotWorkerDatabasePath = 'DOABLE_SNAPSHOT_DATABASE_PATH';
@@ -95,49 +96,21 @@ void main() {
 
 /// Лог фактов, который останавливает процесс до или после регистрации
 /// снимка.
-final class _StoppingLog implements ObservableGraphFactLog {
-  _StoppingLog(this._log, this._stopPoint);
+final class _StoppingLog extends ForwardingGraphFactLog {
+  _StoppingLog(super.source, this._stopPoint);
 
-  final ObservableGraphFactLog _log;
   final GraphSnapshotStopPoint _stopPoint;
-
-  @override
-  Stream<int> get confirmedPositions => _log.confirmedPositions;
-
-  @override
-  Future<int> readCurrentPosition() => _log.readCurrentPosition();
-
-  @override
-  Future<List<StoredGraphFactPackage>> readPackages({
-    required int after,
-    required int upTo,
-  }) => _log.readPackages(after: after, upTo: upTo);
-
-  @override
-  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
-      _log.readGraphRecords(after: after);
-
-  @override
-  Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
-      _log.readSnapshotAtOrBefore(position);
-
-  @override
-  Future<Set<String>> readSnapshotFileNames() => _log.readSnapshotFileNames();
 
   @override
   Future<void> registerSnapshot(GraphSnapshotEntry snapshot) async {
     if (_stopPoint == GraphSnapshotStopPoint.beforeRegistration) {
       await _reportReadyAndWait();
     }
-    await _log.registerSnapshot(snapshot);
+    await super.registerSnapshot(snapshot);
     if (_stopPoint == GraphSnapshotStopPoint.afterRegistration) {
       await _reportReadyAndWait();
     }
   }
-
-  @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      _log.removeHistoryBefore(boundary);
 }
 
 /// Пишет снимок в отдельном изоляте, как [runGraphSnapshotWriteInIsolate],

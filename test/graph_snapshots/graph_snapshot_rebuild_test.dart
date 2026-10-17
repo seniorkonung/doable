@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -31,6 +30,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
 import '../support/encoded_diagnostics_log.dart';
+import '../support/failing_snapshot_temporary_files.dart';
+import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
@@ -274,7 +275,7 @@ void main() {
     );
     final compaction = compactionOver(
       repository,
-      runner: _writeFailingOnTemporaryFiles,
+      runner: writeGraphSnapshotFailingOnTemporaryFiles,
     )..start();
 
     await confirmCommands(_threshold + 1);
@@ -324,7 +325,7 @@ void main() {
     await snapshotFile(damaged).delete();
     final compaction = compactionOver(
       repository,
-      runner: _writeFailingOnTemporaryFiles,
+      runner: writeGraphSnapshotFailingOnTemporaryFiles,
     )..start();
 
     await confirmCommands(_threshold + 1);
@@ -430,90 +431,19 @@ final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
 
 /// Лог фактов, который после чтения первой порции записей графа ждёт
 /// действия теста.
-final class _FirstPortionPausingLog implements ObservableGraphFactLog {
-  _FirstPortionPausingLog(this._log, this._afterFirstPortion);
+final class _FirstPortionPausingLog extends ForwardingGraphFactLog {
+  _FirstPortionPausingLog(super.source, this._afterFirstPortion);
 
-  final ObservableGraphFactLog _log;
   final Future<void> Function() _afterFirstPortion;
-
-  @override
-  Stream<int> get confirmedPositions => _log.confirmedPositions;
-
-  @override
-  Future<int> readCurrentPosition() => _log.readCurrentPosition();
-
-  @override
-  Future<List<StoredGraphFactPackage>> readPackages({
-    required int after,
-    required int upTo,
-  }) => _log.readPackages(after: after, upTo: upTo);
 
   @override
   Future<GraphRecordPortion> readGraphRecords({
     GraphRecordOrderKey? after,
   }) async {
-    final portion = await _log.readGraphRecords(after: after);
+    final portion = await super.readGraphRecords(after: after);
     if (after == null) await _afterFirstPortion();
     return portion;
   }
-
-  @override
-  Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
-      _log.readSnapshotAtOrBefore(position);
-
-  @override
-  Future<Set<String>> readSnapshotFileNames() => _log.readSnapshotFileNames();
-
-  @override
-  Future<void> registerSnapshot(GraphSnapshotEntry snapshot) =>
-      _log.registerSnapshot(snapshot);
-
-  @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      _log.removeHistoryBefore(boundary);
-}
-
-/// Запись снимка в изоляте, у которой временные файлы появляются, но запись
-/// в них отказывает, как при нехватке места.
-/// https://api.dart.dev/dart-io/IOOverrides-class.html
-Future<GraphSnapshotEntry> _writeFailingOnTemporaryFiles(
-  GraphSnapshotWrite write,
-) => Isolate.run(
-  () => IOOverrides.runWithIOOverrides(write.run, _FailingTemporaryFiles()),
-);
-
-final class _FailingTemporaryFiles extends IOOverrides {
-  @override
-  File createFile(String path) {
-    final file = super.createFile(path);
-    return path.endsWith('.tmp') ? _FailingTemporaryFile(file) : file;
-  }
-}
-
-final class _FailingTemporaryFile implements File {
-  _FailingTemporaryFile(this._file);
-
-  final File _file;
-
-  @override
-  String get path => _file.path;
-
-  @override
-  Future<RandomAccessFile> open({FileMode mode = FileMode.read}) async {
-    await _file.writeAsBytes(const [0x1f, 0x8b]);
-    throw FileSystemException(
-      'Запись не выполнена.',
-      path,
-      const OSError('No space left on device', 28),
-    );
-  }
-
-  @override
-  Future<FileSystemEntity> delete({bool recursive = false}) =>
-      _file.delete(recursive: recursive);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 Future<Set<String>> _fileNamesIn(Directory directory) async => {
