@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
 
+import '../shared/diagnostics/diagnostics_sink.dart';
 import 'graph_fact_log.dart';
 import 'graph_snapshot_store.dart';
 
@@ -38,11 +39,15 @@ Future<GraphSnapshotEntry> runGraphSnapshotWriteInIsolate(
 /// повторяется на каждом новом пакете: следующая попытка — когда после неё
 /// записано ещё не меньше порога пакетов либо при [start] в следующем
 /// запуске приложения.
+///
+/// Исход сжатия и записи или пересборки снимка в изоляте записи сообщается в
+/// [DiagnosticsSink]; отказ диагностики исход сжатия не меняет.
 final class GraphLogCompaction {
   GraphLogCompaction({
     required this._log,
     required this._directory,
     required this._clock,
+    required this._diagnosticsSink,
     this._threshold = graphLogCompactionThreshold,
     this._runner = runGraphSnapshotWriteInIsolate,
   });
@@ -50,12 +55,14 @@ final class GraphLogCompaction {
   final ObservableGraphFactLog _log;
   final Directory _directory;
   final DateTime Function() _clock;
+  final DiagnosticsSink _diagnosticsSink;
   final int _threshold;
   final GraphSnapshotWriteRunner _runner;
   late final _store = GraphSnapshotStore(
     log: _log,
     directory: _directory,
     clock: _clock,
+    diagnosticsSink: _diagnosticsSink,
   );
   StreamSubscription<int>? _signals;
   Future<void>? _running;
@@ -108,60 +115,93 @@ final class GraphLogCompaction {
   }
 
   Future<void> _compactIfDue() async {
+    final stopwatch = Stopwatch()..start();
+    var stage = GraphLogCompactionDiagnosticsStage.check;
     try {
       final position = await _log.readCurrentPosition();
       _latestPosition = max(_latestPosition, position);
       final latest = await _log.readSnapshotAtOrBefore(position);
       final snapshotPosition = _snapshotPosition = latest?.position ?? 0;
       if (position - snapshotPosition <= _threshold) return;
+      stage = GraphLogCompactionDiagnosticsStage.snapshotWrite;
       final snapshot = await _writeSnapshot(position);
       _snapshotPosition = snapshot.position;
       _failedAt = null;
+      stage = GraphLogCompactionDiagnosticsStage.historyRemoval;
       await _store.removeHistoryBefore(snapshot.position);
-    } on Object {
+      _recordDiagnostics(
+        GraphLogCompactionDiagnosticsEvent.succeeded(
+          duration: stopwatch.elapsed,
+        ),
+      );
+    } on Object catch (error) {
       // Запись снимка при отказе удаляет свой файл и не регистрирует его, а
       // удаление истории откатывается своей транзакцией.
       _failedAt = _latestPosition;
+      _recordDiagnostics(
+        GraphLogCompactionDiagnosticsEvent.failed(
+          stage: stage,
+          duration: stopwatch.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
     }
   }
 
-  /// Изолят записи обращается к логу через порт: операции выполняет [_log]
-  /// этого изолята, поэтому база и её исполнитель остаются здесь.
+  /// Изолят записи обращается к логу и диагностике через порт: операции
+  /// выполняет [_log] этого изолята, поэтому база и её исполнитель остаются
+  /// здесь, а события записывает [_diagnosticsSink].
+  ///
+  /// Сообщения изолята записи обрабатываются в порядке отправки, а его
+  /// результат приходит последним, поэтому к завершению записи все её
+  /// события уже записаны.
   Future<GraphSnapshotEntry> _writeSnapshot(int position) async {
-    final calls = ReceivePort();
-    calls.listen((call) => (call as _GraphFactLogCall).answer(_log));
+    final messages = ReceivePort();
+    messages.listen((message) {
+      switch (message as _WriterMessage) {
+        case final _GraphFactLogCall<Object?> call:
+          call.answer(_log);
+        case _WriterDiagnostics(:final event):
+          _recordDiagnostics(event);
+      }
+    });
     try {
       return await _runner(
-        GraphSnapshotWrite._(position, _directory, _clock(), calls.sendPort),
+        GraphSnapshotWrite._(position, _directory, _clock(), messages.sendPort),
       );
     } finally {
-      calls.close();
+      messages.close();
     }
   }
+
+  void _recordDiagnostics(DiagnosticsEvent event) =>
+      recordDiagnosticsSafely(_diagnosticsSink, event);
 }
 
 /// Запись снимка для отдельного изолята: позиция, каталог снимков, момент
-/// записи и порт, через который изолят обращается к логу фактов.
+/// записи и порт, через который изолят обращается к логу фактов и
+/// передаёт события диагностики.
 final class GraphSnapshotWrite {
   const GraphSnapshotWrite._(
     this._position,
     this._directory,
     this._writtenAt,
-    this._log,
+    this._compaction,
   );
 
   final int _position;
   final Directory _directory;
   final DateTime _writtenAt;
-  final SendPort _log;
+  final SendPort _compaction;
 
   /// Пишет и регистрирует снимок, а если последний снимок не проходит
   /// проверку, пересобирает снимок из базы; выполняется в изоляте записи.
   Future<GraphSnapshotEntry> run() async {
     final store = GraphSnapshotStore(
-      log: _PortGraphFactLog(_log),
+      log: _PortGraphFactLog(_compaction),
       directory: _directory,
       clock: () => _writtenAt,
+      diagnosticsSink: _PortDiagnosticsSink(_compaction),
     );
     try {
       return await store.writeSnapshot(_position);
@@ -221,7 +261,30 @@ final class _PortGraphFactLog implements GraphFactLog {
   }
 }
 
-final class _GraphFactLogCall<T> {
+/// Получатель диагностики изолята записи: события записывает получатель
+/// изолята сжатия.
+final class _PortDiagnosticsSink implements DiagnosticsSink {
+  const _PortDiagnosticsSink(this._compaction);
+
+  final SendPort _compaction;
+
+  @override
+  void record(DiagnosticsEvent event) =>
+      _compaction.send(_WriterDiagnostics(event));
+}
+
+/// Сообщение изолята записи изоляту сжатия.
+sealed class _WriterMessage {
+  const _WriterMessage();
+}
+
+final class _WriterDiagnostics extends _WriterMessage {
+  const _WriterDiagnostics(this.event);
+
+  final DiagnosticsEvent event;
+}
+
+final class _GraphFactLogCall<T> extends _WriterMessage {
   const _GraphFactLogCall(this._operation, this._reply);
 
   final Future<T> Function(GraphFactLog log) _operation;

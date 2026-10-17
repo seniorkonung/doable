@@ -21,13 +21,16 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uuid/uuid.dart';
 
+import '../support/encoded_diagnostics_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -41,6 +44,7 @@ void main() {
   late DriftPersonalGraphRepository repository;
   late Directory snapshots;
   late List<Future<GraphSnapshotEntry>> attempts;
+  late EncodedDiagnosticsLog diagnostics;
   var now = DateTime.utc(2026, 10, 17, 9);
   var tagNumber = 0;
 
@@ -57,22 +61,30 @@ void main() {
       harness.temporaryDirectory.uri.resolve('graph_snapshots/'),
     );
     attempts = [];
+    diagnostics = EncodedDiagnosticsLog();
   });
 
   tearDown(() => harness.dispose());
 
-  GraphSnapshotStore storeOver(GraphFactLog log) =>
-      GraphSnapshotStore(log: log, directory: snapshots, clock: () => now);
+  GraphSnapshotStore storeOver(GraphFactLog log) => GraphSnapshotStore(
+    log: log,
+    directory: snapshots,
+    clock: () => now,
+    diagnosticsSink: InMemoryDiagnosticsSink(),
+  );
 
   /// Сжатие с порогом проверок, которое запоминает каждую попытку записи
-  /// снимка; [runner] выполняет запись в изоляте.
+  /// снимка; [runner] выполняет запись в изоляте, а события диагностики
+  /// получает [diagnosticsSink].
   GraphLogCompaction compactionOver(
     ObservableGraphFactLog log, {
     GraphSnapshotWriteRunner runner = runGraphSnapshotWriteInIsolate,
+    DiagnosticsSink? diagnosticsSink,
   }) => GraphLogCompaction(
     log: log,
     directory: snapshots,
     clock: () => now,
+    diagnosticsSink: diagnosticsSink ?? diagnostics,
     threshold: _threshold,
     runner: (write) {
       final attempt = runner(write);
@@ -275,6 +287,104 @@ void main() {
       hasLength(_threshold + 1),
     );
   });
+
+  test(
+    'повреждённый последний снимок диагностируется отказом записи с '
+    'категорией повреждения снимка, а пересборка и сжатие — успехом',
+    () async {
+      await createTag('Дом');
+      final damaged = await storeOver(repository).writeSnapshot(1);
+      await _flipByte(
+        snapshotFile(damaged),
+        await snapshotFile(damaged).length() ~/ 2,
+      );
+      final compaction = compactionOver(repository)..start();
+
+      await confirmCommands(_threshold + 1);
+      await compaction.shutdown();
+
+      expect(diagnostics.events, [
+        {
+          'operation': 'graphSnapshotWrite',
+          'stage': 'stateAssembly',
+          'outcome': 'failed',
+          'failureCode': 'snapshotCorruption',
+        },
+        {'operation': 'graphSnapshotRebuild', 'outcome': 'succeeded'},
+        {'operation': 'graphLogCompaction', 'outcome': 'succeeded'},
+      ]);
+    },
+  );
+
+  test('отказ записи при пересборке диагностируется этапом чтения базы, а '
+      'сжатие — этапом записи снимка', () async {
+    await createTag('Дом');
+    final damaged = await storeOver(repository).writeSnapshot(1);
+    await snapshotFile(damaged).delete();
+    final compaction = compactionOver(
+      repository,
+      runner: _writeFailingOnTemporaryFiles,
+    )..start();
+
+    await confirmCommands(_threshold + 1);
+    await compaction.shutdown();
+
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphSnapshotWrite',
+        'stage': 'stateAssembly',
+        'outcome': 'failed',
+        'failureCode': 'snapshotCorruption',
+      },
+      {
+        'operation': 'graphSnapshotRebuild',
+        'stage': 'databaseRead',
+        'outcome': 'failed',
+        'failureCode': 'unavailable',
+      },
+      {
+        'operation': 'graphLogCompaction',
+        'stage': 'snapshotWrite',
+        'outcome': 'failed',
+        'failureCode': 'unavailable',
+      },
+    ]);
+  });
+
+  test('отказ получателя диагностики не меняет исход сжатия с пересборкой и '
+      'очистки', () async {
+    await createTag('Дом');
+    final damaged = await storeOver(repository).writeSnapshot(1);
+    await snapshotFile(damaged).delete();
+    final compaction = compactionOver(
+      repository,
+      diagnosticsSink: _ThrowingDiagnosticsSink(),
+    )..start();
+    await confirmCommands(_threshold + 1);
+    await compaction.shutdown();
+    await File.fromUri(
+      snapshots.uri.resolve('${const Uuid().v4()}.jsonl.gz.tmp'),
+    ).writeAsBytes([1, 2, 3]);
+
+    await GraphSnapshotStore(
+      log: repository,
+      directory: snapshots,
+      clock: () => now,
+      diagnosticsSink: _ThrowingDiagnosticsSink(),
+    ).removeUnregisteredFiles();
+
+    final position = await repository.readCurrentPosition();
+    final rebuilt = await repository.readSnapshotAtOrBefore(position);
+    expect(rebuilt?.position, position);
+    expect(await _fileNamesIn(snapshots), {rebuilt?.fileName});
+    await expectStateMatchesDatabase();
+  });
+}
+
+final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
+  @override
+  void record(DiagnosticsEvent event) =>
+      throw StateError('Получатель диагностики недоступен.');
 }
 
 /// Лог фактов, который после чтения первой порции записей графа ждёт

@@ -6,9 +6,11 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 
+import '../data/local/sqlite_failure_classifier.dart';
 import '../graph_format/graph_format_codec.dart';
 import '../graph_format/graph_format_file.dart';
 import '../graph_format/graph_format_records.dart';
+import '../shared/diagnostics/diagnostics_sink.dart';
 import 'graph_fact_log.dart';
 import 'graph_state_assembly.dart';
 
@@ -20,17 +22,39 @@ final class GraphSnapshotCorruption implements Exception {
   const GraphSnapshotCorruption();
 }
 
+/// Безопасная категория отказа операции со снимками для диагностики.
+///
+/// Снимок, не прошедший проверку, отличается от повреждения данных лога и
+/// базы; отказы файлов снимков относятся к недоступности хранилища, как у
+/// файла настройки установки.
+DiagnosticsFailureCode graphSnapshotFailureCode(Object error) =>
+    switch (error) {
+      GraphSnapshotCorruption() => DiagnosticsFailureCode.snapshotCorruption,
+      GraphFormatCorruption() => DiagnosticsFailureCode.corruption,
+      FileSystemException() => DiagnosticsFailureCode.unavailable,
+      _ => switch (classifySqliteFailure(error)) {
+        SqliteCorruptionFailure() => DiagnosticsFailureCode.corruption,
+        SqliteUnavailableFailure() => DiagnosticsFailureCode.unavailable,
+        SqliteConstraintFailure() ||
+        SqliteUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
+      },
+    };
+
 /// Файлы снимков в собственном каталоге и сборка состояния графа на позиции
 /// из снимка и лога фактов.
 ///
 /// Снимок — неизменяемый файл формата данных графа. Он регистрируется в
 /// реестре только после надёжной записи, а при каждом чтении сверяется с
 /// реестром, потому что вне базы файл журналом не защищён.
+///
+/// Запись, пересборка и очистка сообщают исход в [DiagnosticsSink]; отказ
+/// диагностики их исход не меняет.
 final class GraphSnapshotStore {
   GraphSnapshotStore({
     required this._log,
     required this._directory,
     required this._clock,
+    required this._diagnosticsSink,
   });
 
   final GraphFactLog _log;
@@ -39,6 +63,7 @@ final class GraphSnapshotStore {
   /// удаляет очистка.
   final Directory _directory;
   final DateTime Function() _clock;
+  final DiagnosticsSink _diagnosticsSink;
 
   /// Состояние графа на позиции [position], не новее текущей, из ближайшего
   /// зарегистрированного снимка не новее неё и пакетов после него.
@@ -66,8 +91,35 @@ final class GraphSnapshotStore {
   /// атомарно переименовывается в файл снимка, а после fsync каталога
   /// снимок регистрируется. При отказе файл удаляется, а реестр не меняется.
   /// Запись не выполняется одновременно с [removeUnregisteredFiles].
-  Future<GraphSnapshotEntry> writeSnapshot(int position) async =>
-      _writeState(position, await readStateAt(position));
+  Future<GraphSnapshotEntry> writeSnapshot(int position) async {
+    final stopwatch = Stopwatch()..start();
+    var stage = GraphSnapshotWriteDiagnosticsStage.stateAssembly;
+    try {
+      final state = await readStateAt(position);
+      stage = GraphSnapshotWriteDiagnosticsStage.fileWrite;
+      final snapshot = await _writeState(
+        position,
+        state,
+        beforeRegistration: () =>
+            stage = GraphSnapshotWriteDiagnosticsStage.registration,
+      );
+      _recordDiagnostics(
+        GraphSnapshotWriteDiagnosticsEvent.succeeded(
+          duration: stopwatch.elapsed,
+        ),
+      );
+      return snapshot;
+    } on Object catch (error) {
+      _recordDiagnostics(
+        GraphSnapshotWriteDiagnosticsEvent.failed(
+          stage: stage,
+          duration: stopwatch.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
+      rethrow;
+    }
+  }
 
   /// Пересобирает из базы снимок текущего состояния и регистрирует его, когда
   /// последний снимок не проходит проверку.
@@ -80,10 +132,38 @@ final class GraphSnapshotStore {
   /// меняется. Пересборка не выполняется одновременно с
   /// [removeUnregisteredFiles].
   Future<GraphSnapshotEntry> rebuildSnapshot() async {
+    final stopwatch = Stopwatch()..start();
+    var stage = GraphSnapshotRebuildDiagnosticsStage.databaseRead;
+    try {
+      final snapshot = await _rebuildSnapshot((next) => stage = next);
+      _recordDiagnostics(
+        GraphSnapshotRebuildDiagnosticsEvent.succeeded(
+          duration: stopwatch.elapsed,
+        ),
+      );
+      return snapshot;
+    } on Object catch (error) {
+      _recordDiagnostics(
+        GraphSnapshotRebuildDiagnosticsEvent.failed(
+          stage: stage,
+          duration: stopwatch.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
+      rethrow;
+    }
+  }
+
+  /// Пересборка по правилу [rebuildSnapshot], которая сообщает [enter] о
+  /// начале каждого этапа после чтения базы.
+  Future<GraphSnapshotEntry> _rebuildSnapshot(
+    void Function(GraphSnapshotRebuildDiagnosticsStage stage) enter,
+  ) async {
     await _createDirectory();
     final portions = _file(_temporaryFileName());
     try {
       final (:start, :end, :portionStarts) = await _writePortions(portions);
+      enter(GraphSnapshotRebuildDiagnosticsStage.stateAssembly);
       final state = await GraphStateAssembly.assemble(
         GraphStateBase.portions(
           position: start,
@@ -91,18 +171,26 @@ final class GraphSnapshotStore {
         ),
         _readPackages(after: start, upTo: end),
       );
-      return await _writeState(end, state);
+      enter(GraphSnapshotRebuildDiagnosticsStage.fileWrite);
+      return await _writeState(
+        end,
+        state,
+        beforeRegistration: () =>
+            enter(GraphSnapshotRebuildDiagnosticsStage.registration),
+      );
     } finally {
       await _deleteLeftover(portions);
     }
   }
 
   /// Пишет снимок состояния [state] на позиции [position] и регистрирует
-  /// его по правилу [writeSnapshot].
+  /// его по правилу [writeSnapshot]; [beforeRegistration] вызывается, когда
+  /// файл снимка уже надёжно записан.
   Future<GraphSnapshotEntry> _writeState(
     int position,
-    AssembledGraphState state,
-  ) async {
+    AssembledGraphState state, {
+    required void Function() beforeRegistration,
+  }) async {
     await _createDirectory();
     final fileName = '${const Uuid().v4()}$_snapshotExtension';
     var file = _file('$fileName$_temporaryExtension');
@@ -123,6 +211,7 @@ final class GraphSnapshotStore {
         byteSize: byteSize,
         checksum: checksum,
       );
+      beforeRegistration();
       await _log.registerSnapshot(snapshot);
       return snapshot;
     } catch (_) {
@@ -144,12 +233,33 @@ final class GraphSnapshotStore {
   /// Удаляет из каталога снимков незарегистрированные и временные файлы,
   /// которые оставили прерванные и неудачные записи и удаление истории.
   Future<void> removeUnregisteredFiles() async {
-    if (!await _directory.exists()) return;
-    final registered = await _log.readSnapshotFileNames();
-    await for (final entity in _directory.list()) {
-      if (!registered.contains(entity.uri.pathSegments.last)) {
-        await entity.delete();
+    final stopwatch = Stopwatch()..start();
+    var stage = GraphSnapshotCleanupDiagnosticsStage.fileRemoval;
+    try {
+      if (await _directory.exists()) {
+        stage = GraphSnapshotCleanupDiagnosticsStage.registryRead;
+        final registered = await _log.readSnapshotFileNames();
+        stage = GraphSnapshotCleanupDiagnosticsStage.fileRemoval;
+        await for (final entity in _directory.list()) {
+          if (!registered.contains(entity.uri.pathSegments.last)) {
+            await entity.delete();
+          }
+        }
       }
+      _recordDiagnostics(
+        GraphSnapshotCleanupDiagnosticsEvent.succeeded(
+          duration: stopwatch.elapsed,
+        ),
+      );
+    } on Object catch (error) {
+      _recordDiagnostics(
+        GraphSnapshotCleanupDiagnosticsEvent.failed(
+          stage: stage,
+          duration: stopwatch.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
+      rethrow;
     }
   }
 
@@ -248,6 +358,9 @@ final class GraphSnapshotStore {
   }
 
   File _file(String name) => File.fromUri(_directory.uri.resolve(name));
+
+  void _recordDiagnostics(DiagnosticsEvent event) =>
+      recordDiagnosticsSafely(_diagnosticsSink, event);
 }
 
 const _snapshotExtension = '.jsonl.gz';

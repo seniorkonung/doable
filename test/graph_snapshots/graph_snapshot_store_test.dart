@@ -27,8 +27,10 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
+import '../support/encoded_diagnostics_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -39,6 +41,7 @@ void main() {
   late DriftPersonalGraphRepository repository;
   late Directory snapshots;
   late DateTime now;
+  late EncodedDiagnosticsLog diagnostics;
 
   setUp(() async {
     harness = await LocalDatabaseHarness.fileBacked();
@@ -53,12 +56,17 @@ void main() {
     snapshots = Directory.fromUri(
       harness.temporaryDirectory.uri.resolve('graph_snapshots/'),
     );
+    diagnostics = EncodedDiagnosticsLog();
   });
 
   tearDown(() => harness.dispose());
 
-  GraphSnapshotStore storeOver(GraphFactLog log) =>
-      GraphSnapshotStore(log: log, directory: snapshots, clock: () => now);
+  GraphSnapshotStore storeOver(GraphFactLog log) => GraphSnapshotStore(
+    log: log,
+    directory: snapshots,
+    clock: () => now,
+    diagnosticsSink: diagnostics,
+  );
 
   Future<T> confirm<T extends GraphCommandOutcome>(
     GraphCommand<GraphCommandOutcome, GraphCommandFailure> command,
@@ -170,10 +178,13 @@ void main() {
       late Set<String> namesAtRegistration;
       late Uint8List bytesAtRegistration;
       final store = storeOver(
-        _RegistrationObservingLog(repository, (snapshot) async {
-          namesAtRegistration = await _fileNamesIn(snapshots);
-          bytesAtRegistration = await snapshotFile(snapshot).readAsBytes();
-        }),
+        _InterceptingLog(
+          repository,
+          beforeRegistration: (snapshot) async {
+            namesAtRegistration = await _fileNamesIn(snapshots);
+            bytesAtRegistration = await snapshotFile(snapshot).readAsBytes();
+          },
+        ),
       );
 
       final snapshot = await store.writeSnapshot(1);
@@ -190,9 +201,10 @@ void main() {
   test('отказ регистрации удаляет записанный файл снимка', () async {
     await createTag('Дом');
     final store = storeOver(
-      _RegistrationObservingLog(
+      _InterceptingLog(
         repository,
-        (_) async => throw const FileSystemException('Нет места.'),
+        beforeRegistration: (_) async =>
+            throw const FileSystemException('Нет места.'),
       ),
     );
 
@@ -271,15 +283,84 @@ void main() {
 
     expect(await snapshots.exists(), isFalse);
   });
+
+  test('очистка диагностируется успехом без имён и числа удалённых '
+      'файлов', () async {
+    await File.fromUri(
+      snapshots.uri.resolve('${const Uuid().v4()}.jsonl.gz.tmp'),
+    ).create(recursive: true);
+
+    await storeOver(repository).removeUnregisteredFiles();
+
+    expect(diagnostics.events, [
+      {'operation': 'graphSnapshotCleanup', 'outcome': 'succeeded'},
+    ]);
+  });
+
+  test('отказ чтения реестра при очистке диагностируется этапом чтения '
+      'реестра и категорией повреждения базы', () async {
+    await snapshots.create(recursive: true);
+    final store = storeOver(
+      _InterceptingLog(
+        repository,
+        beforeFileNames: () async => throw sqlite.SqliteException(
+          extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
+          message: 'database disk image is malformed',
+        ),
+      ),
+    );
+
+    await expectLater(
+      store.removeUnregisteredFiles(),
+      throwsA(isA<sqlite.SqliteException>()),
+    );
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphSnapshotCleanup',
+        'stage': 'registryRead',
+        'outcome': 'failed',
+        'failureCode': 'corruption',
+      },
+    ]);
+  });
+
+  test('отказ удаления файла при очистке диагностируется этапом удаления '
+      'файлов и категорией недоступности хранилища', () async {
+    // Непустой каталог не удаляется без рекурсии, как файл при отказе ОС.
+    await File.fromUri(snapshots.uri.resolve('${const Uuid().v4()}/вложенный'))
+        .create(recursive: true);
+
+    await expectLater(
+      storeOver(repository).removeUnregisteredFiles(),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphSnapshotCleanup',
+        'stage': 'fileRemoval',
+        'outcome': 'failed',
+        'failureCode': 'unavailable',
+      },
+    ]);
+  });
 }
 
-/// Лог фактов, который перед регистрацией снимка вызывает действие теста:
-/// осмотр каталога снимков или отказ вместо регистрации.
-final class _RegistrationObservingLog implements GraphFactLog {
-  _RegistrationObservingLog(this._log, this._beforeRegistration);
+/// Лог фактов, который перед операцией вызывает действие теста: осмотр
+/// каталога снимков или отказ вместо операции.
+final class _InterceptingLog implements GraphFactLog {
+  _InterceptingLog(
+    this._log, {
+    this.beforeRegistration = _proceedWith,
+    this.beforeFileNames = _proceed,
+  });
 
   final GraphFactLog _log;
-  final Future<void> Function(GraphSnapshotEntry snapshot) _beforeRegistration;
+  final Future<void> Function(GraphSnapshotEntry snapshot) beforeRegistration;
+  final Future<void> Function() beforeFileNames;
+
+  static Future<void> _proceedWith(GraphSnapshotEntry _) async {}
+
+  static Future<void> _proceed() async {}
 
   @override
   Future<int> readCurrentPosition() => _log.readCurrentPosition();
@@ -299,11 +380,14 @@ final class _RegistrationObservingLog implements GraphFactLog {
       _log.readSnapshotAtOrBefore(position);
 
   @override
-  Future<Set<String>> readSnapshotFileNames() => _log.readSnapshotFileNames();
+  Future<Set<String>> readSnapshotFileNames() async {
+    await beforeFileNames();
+    return _log.readSnapshotFileNames();
+  }
 
   @override
   Future<void> registerSnapshot(GraphSnapshotEntry snapshot) async {
-    await _beforeRegistration(snapshot);
+    await beforeRegistration(snapshot);
     await _log.registerSnapshot(snapshot);
   }
 

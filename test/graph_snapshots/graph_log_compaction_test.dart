@@ -17,6 +17,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/encoded_diagnostics_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -30,6 +31,7 @@ void main() {
   late DriftPersonalGraphRepository repository;
   late Directory snapshots;
   late List<Future<GraphSnapshotEntry>> attempts;
+  late EncodedDiagnosticsLog diagnostics;
   var now = DateTime.utc(2026, 10, 17, 9);
   var tagNumber = 0;
 
@@ -46,6 +48,7 @@ void main() {
       harness.temporaryDirectory.uri.resolve('graph_snapshots/'),
     );
     attempts = [];
+    diagnostics = EncodedDiagnosticsLog();
   });
 
   tearDown(() => harness.dispose());
@@ -60,6 +63,7 @@ void main() {
     log: log,
     directory: snapshots,
     clock: () => now,
+    diagnosticsSink: diagnostics,
     threshold: _threshold,
     runner: (write) {
       final runner = attempts.length < runners.length
@@ -91,6 +95,7 @@ void main() {
       log: repository,
       directory: snapshots,
       clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
     ).readStateAt(position);
     expect(
       _lines(await state.records.toList()),
@@ -105,6 +110,7 @@ void main() {
       log: repository,
       directory: snapshots,
       clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
     ).writeSnapshot(2);
     final compaction = compactionOver(repository)..start();
 
@@ -129,10 +135,13 @@ void main() {
     final registrationReached = Completer<void>();
     final releaseRegistration = Completer<void>();
     final compaction = compactionOver(
-      _RegistrationInterceptingLog(repository, (_) async {
-        registrationReached.complete();
-        await releaseRegistration.future;
-      }),
+      _InterceptingLog(
+        repository,
+        beforeRegistration: () async {
+          registrationReached.complete();
+          await releaseRegistration.future;
+        },
+      ),
     )..start();
     await confirmCommands(_threshold + 1);
     await registrationReached.future;
@@ -194,14 +203,12 @@ void main() {
       log: repository,
       directory: snapshots,
       clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
     ).writeSnapshot(1);
     final failing = compactionOver(
-      _RegistrationInterceptingLog(
+      _InterceptingLog(
         repository,
-        (_) async => throw sqlite.SqliteException(
-          extendedResultCode: 13,
-          message: 'database or disk is full',
-        ),
+        beforeRegistration: () async => throw _diskFull,
       ),
     )..start();
     await confirmCommands(_threshold + 1);
@@ -231,21 +238,158 @@ void main() {
     );
     await expectStateMatchesDatabase();
   });
+
+  test('сжатие диагностируется успехом записи снимка и сжатия, а сверка, '
+      'после которой сжатие не понадобилось, событий не даёт', () async {
+    final compaction = compactionOver(repository)..start();
+
+    await confirmCommands(_threshold + 1);
+    await compaction.shutdown();
+
+    expect(diagnostics.events, [
+      {'operation': 'graphSnapshotWrite', 'outcome': 'succeeded'},
+      {'operation': 'graphLogCompaction', 'outcome': 'succeeded'},
+    ]);
+  });
+
+  test('отказ сверки с порогом диагностируется этапом сверки и категорией '
+      'повреждения базы', () async {
+    final compaction = compactionOver(
+      _InterceptingLog(
+        repository,
+        beforeCurrentPosition: () async => throw sqlite.SqliteException(
+          extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
+          message: 'database disk image is malformed',
+        ),
+      ),
+    )..start();
+
+    await compaction.shutdown();
+
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphLogCompaction',
+        'stage': 'check',
+        'outcome': 'failed',
+        'failureCode': 'corruption',
+      },
+    ]);
+  });
+
+  for (final (failure, intercepted, runners, events)
+      in <
+        (
+          String,
+          ObservableGraphFactLog Function(ObservableGraphFactLog log),
+          List<GraphSnapshotWriteRunner>,
+          List<Map<String, Object?>>,
+        )
+      >[
+        (
+          'записи временного файла снимка',
+          (log) => log,
+          [_writeFailingOnTemporaryFile],
+          [
+            {
+              'operation': 'graphSnapshotWrite',
+              'stage': 'fileWrite',
+              'outcome': 'failed',
+              'failureCode': 'unavailable',
+            },
+            {
+              'operation': 'graphLogCompaction',
+              'stage': 'snapshotWrite',
+              'outcome': 'failed',
+              'failureCode': 'unavailable',
+            },
+          ],
+        ),
+        (
+          'регистрации снимка',
+          (log) => _InterceptingLog(
+            log,
+            beforeRegistration: () async => throw _diskFull,
+          ),
+          const [],
+          [
+            {
+              'operation': 'graphSnapshotWrite',
+              'stage': 'registration',
+              'outcome': 'failed',
+              'failureCode': 'unexpected',
+            },
+            {
+              'operation': 'graphLogCompaction',
+              'stage': 'snapshotWrite',
+              'outcome': 'failed',
+              'failureCode': 'unexpected',
+            },
+          ],
+        ),
+        (
+          'удаления истории',
+          (log) => _InterceptingLog(
+            log,
+            beforeHistoryRemoval: () async => throw _diskFull,
+          ),
+          const [],
+          [
+            {'operation': 'graphSnapshotWrite', 'outcome': 'succeeded'},
+            {
+              'operation': 'graphLogCompaction',
+              'stage': 'historyRemoval',
+              'outcome': 'failed',
+              'failureCode': 'unexpected',
+            },
+          ],
+        ),
+      ]) {
+    test('отказ $failure диагностируется этапом и категорией отказа без '
+        'позиций, имён файлов и исходного исключения', () async {
+      final compaction = compactionOver(
+        intercepted(repository),
+        runners: runners,
+      )..start();
+
+      await confirmCommands(_threshold + 1);
+      await compaction.shutdown();
+
+      expect(diagnostics.events, events);
+    });
+  }
 }
 
-/// Лог фактов, который перед регистрацией снимка вызывает действие теста:
-/// задержку или отказ вместо регистрации.
-final class _RegistrationInterceptingLog implements ObservableGraphFactLog {
-  _RegistrationInterceptingLog(this._log, this._beforeRegistration);
+/// Отказ базы из-за нехватки места.
+final _diskFull = sqlite.SqliteException(
+  extendedResultCode: sqlite.SqlError.SQLITE_FULL,
+  message: 'database or disk is full',
+);
+
+/// Лог фактов, который перед операцией вызывает действие теста: задержку или
+/// отказ вместо операции.
+final class _InterceptingLog implements ObservableGraphFactLog {
+  _InterceptingLog(
+    this._log, {
+    this.beforeCurrentPosition = _proceed,
+    this.beforeRegistration = _proceed,
+    this.beforeHistoryRemoval = _proceed,
+  });
 
   final ObservableGraphFactLog _log;
-  final Future<void> Function(GraphSnapshotEntry snapshot) _beforeRegistration;
+  final Future<void> Function() beforeCurrentPosition;
+  final Future<void> Function() beforeRegistration;
+  final Future<void> Function() beforeHistoryRemoval;
+
+  static Future<void> _proceed() async {}
 
   @override
   Stream<int> get confirmedPositions => _log.confirmedPositions;
 
   @override
-  Future<int> readCurrentPosition() => _log.readCurrentPosition();
+  Future<int> readCurrentPosition() async {
+    await beforeCurrentPosition();
+    return _log.readCurrentPosition();
+  }
 
   @override
   Future<List<StoredGraphFactPackage>> readPackages({
@@ -266,13 +410,15 @@ final class _RegistrationInterceptingLog implements ObservableGraphFactLog {
 
   @override
   Future<void> registerSnapshot(GraphSnapshotEntry snapshot) async {
-    await _beforeRegistration(snapshot);
+    await beforeRegistration();
     await _log.registerSnapshot(snapshot);
   }
 
   @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      _log.removeHistoryBefore(boundary);
+  Future<List<String>> removeHistoryBefore(int boundary) async {
+    await beforeHistoryRemoval();
+    return _log.removeHistoryBefore(boundary);
+  }
 }
 
 /// Запись снимка в изоляте, у которой временный файл появляется, но запись в

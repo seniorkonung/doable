@@ -144,7 +144,7 @@
   - **Files likely touched:** `lib/src/graph_snapshots/graph_fact_log.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `lib/src/graph_snapshots/graph_log_compaction.dart`, `test/graph/data/drift_graph_fact_log_access_test.dart`, `test/graph_snapshots/graph_snapshot_rebuild_test.dart` (новый).
   - **Estimated scope:** M.
 
-- [ ] 1.14 Диагностировать запись, сжатие, пересборку и очистку снимков без пользовательского содержимого
+- [x] 1.14 Диагностировать запись, сжатие, пересборку и очистку снимков без пользовательского содержимого
   - **Acceptance criteria:**
     - По решению 14 [дизайна](design.md) новые события существующей границы диагностики различают операцию со снимками — запись, сжатие, пересборку из базы или очистку, — этап, результат, безопасную категорию отказа, включая повреждение снимка, и длительность и не содержат текста, идентификаторов, путей и содержимого.
     - `DeveloperDiagnosticsSink` кодирует новые события ветками исчерпывающего переключателя; отказ диагностики не меняет результат сжатия, пересборки или очистки.
