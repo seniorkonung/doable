@@ -241,6 +241,18 @@ GraphOperationMessage _messageFor(
     _tagMessage(localizations, completion),
   ),
   GraphExportCompletion() => _exportMessage(localizations, completion),
+  GraphBackupRestoreCompletion() => GraphOperationMessage(
+    _backupRestoreMessage(localizations, completion),
+  ),
+};
+
+String _backupRestoreMessage(
+  AppLocalizations localizations,
+  GraphBackupRestoreCompletion completion,
+) => switch (completion.result) {
+  GraphBackupRestored() => localizations.dataBackupRestored,
+  GraphBackupRestoreFailed() => localizations.dataBackupRestoreFailed,
+  GraphBackupRestoreStorageFull() => localizations.dataReplacementStorageFull,
 };
 
 GraphOperationMessage _exportMessage(

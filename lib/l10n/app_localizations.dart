@@ -2048,6 +2048,24 @@ abstract class AppLocalizations {
   /// **'That file already exists. Save the copy under a new name'**
   String get dataExportExistingFile;
 
+  /// Сообщение общей поверхности об успешном восстановлении резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Copy restored'**
+  String get dataBackupRestored;
+
+  /// Сообщение об отказе восстановления резервной копии: под строкой «Резервные копии» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t restore the copy. Nothing was changed'**
+  String get dataBackupRestoreFailed;
+
+  /// Сообщение об отказе замены графа из-за нехватки места на устройстве
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough space on the device. Free up space and try again. Nothing was changed'**
+  String get dataReplacementStorageFull;
+
   /// Заголовок страницы «Настройки» и доступное название перехода к ней с Главной
   ///
   /// In en, this message translates to:

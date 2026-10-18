@@ -1479,6 +1479,80 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     });
   }
+
+  for (final scenario in [
+    (
+      locale: const Locale('ru'),
+      restored: 'Копия восстановлена',
+      failed: 'Не удалось восстановить копию. Ничего не изменено',
+      storageFull:
+          'Недостаточно места на устройстве. Освободите место и повторите. '
+          'Ничего не изменено',
+    ),
+    (
+      locale: const Locale('en'),
+      restored: 'Copy restored',
+      failed: 'Couldn’t restore the copy. Nothing was changed',
+      storageFull:
+          'Not enough space on the device. Free up space and try again. '
+          'Nothing was changed',
+    ),
+  ]) {
+    testWidgets(
+      'успех восстановления копии сразу предъявляется общей поверхностью, а '
+      'отказ сначала принадлежит инициатору и без его права предъявляется '
+      'общей поверхностью, ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: scenario.locale,
+        );
+        final success = harness.startBackupRestore();
+        harness.completeBackupRestored(success);
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.restored), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: scenario.restored,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        await _closeMessage(tester);
+
+        for (final (outcome, message) in [
+          (const GraphBackupRestoreFailed(), scenario.failed),
+          (const GraphBackupRestoreStorageFull(), scenario.storageFull),
+        ]) {
+          final failure = harness.startBackupRestore();
+          harness.completeBackupRestore(failure, outcome);
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing);
+          final claim = harness.claimInitiatorFailure(failure.token);
+          expect(claim, isNotNull);
+
+          harness.releaseInitiatorClaim(claim!);
+          await tester.pumpAndSettle();
+          expect(find.text(message), findsOneWidget);
+          expect(
+            tester.getSemantics(
+              find.byKey(const ValueKey('graph-operation-message')),
+            ),
+            matchesSemantics(
+              label: message,
+              isLiveRegion: true,
+              textDirection: TextDirection.ltr,
+            ),
+          );
+          await _closeMessage(tester);
+        }
+      },
+    );
+  }
 }
 
 const _withoutPresenter = -1;
@@ -1747,6 +1821,13 @@ final class _PresenterHarness {
   final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
   final _tagIndexes = <TagCommandAccepted, int>{};
   final _exports = <GraphExportAccepted, Completer<GraphExportOutcome>>{};
+  final _restores =
+      <
+        GraphBackupRestoreAccepted,
+        Completer<
+          Future<GraphBackupRestoreOutcome> Function(GraphExclusiveReplacement)
+        >
+      >{};
   var exportRetries = 0;
 
   GraphCommandCoordinator get _coordinator =>
@@ -2466,6 +2547,31 @@ final class _PresenterHarness {
     GraphExportAccepted accepted,
     GraphExportOutcome outcome,
   ) => _exports[accepted]!.complete(outcome);
+
+  GraphBackupRestoreAccepted startBackupRestore() {
+    final finish =
+        Completer<
+          Future<GraphBackupRestoreOutcome> Function(GraphExclusiveReplacement)
+        >();
+    final accepted = _coordinator.acceptBackupRestore(
+      (exclusive) async => (await finish.future)(exclusive),
+    ) as GraphBackupRestoreAccepted;
+    _restores[accepted] = finish;
+    return accepted;
+  }
+
+  void completeBackupRestored(GraphBackupRestoreAccepted accepted) =>
+      _restores[accepted]!.complete(
+        (GraphExclusiveReplacement exclusive) => exclusive.replace(
+          () async =>
+              ConfirmedGraphReplacement(const TestDetailsRevision(0, epoch: 1)),
+        ),
+      );
+
+  void completeBackupRestore(
+    GraphBackupRestoreAccepted accepted,
+    GraphBackupRestoreOutcome outcome,
+  ) => _restores[accepted]!.complete((_) async => outcome);
 }
 
 Future<_PresenterHarness> _pumpPresenterApp(

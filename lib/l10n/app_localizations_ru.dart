@@ -1277,6 +1277,17 @@ class AppLocalizationsRu extends AppLocalizations {
       'Такой файл уже есть. Сохраните копию под новым именем';
 
   @override
+  String get dataBackupRestored => 'Копия восстановлена';
+
+  @override
+  String get dataBackupRestoreFailed =>
+      'Не удалось восстановить копию. Ничего не изменено';
+
+  @override
+  String get dataReplacementStorageFull =>
+      'Недостаточно места на устройстве. Освободите место и повторите. Ничего не изменено';
+
+  @override
   String get settingsTitle => 'Настройки';
 
   @override

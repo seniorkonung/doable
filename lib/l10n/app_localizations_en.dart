@@ -1271,6 +1271,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'That file already exists. Save the copy under a new name';
 
   @override
+  String get dataBackupRestored => 'Copy restored';
+
+  @override
+  String get dataBackupRestoreFailed =>
+      'Couldn’t restore the copy. Nothing was changed';
+
+  @override
+  String get dataReplacementStorageFull =>
+      'Not enough space on the device. Free up space and try again. Nothing was changed';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override
