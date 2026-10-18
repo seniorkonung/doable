@@ -351,6 +351,7 @@ final class AppRuntime {
           compaction: files.compaction,
           replacement: replacement,
           snapshotFiles: snapshotFilesCleaned.future,
+          diagnosticsSink: _diagnosticsSink,
         ),
         _ => null,
       };

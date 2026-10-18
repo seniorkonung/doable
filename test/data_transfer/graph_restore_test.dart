@@ -31,6 +31,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
@@ -50,6 +51,7 @@ void main() {
   late _CompactionOutcomes compactionOutcomes;
   late GraphLogCompaction compaction;
   late GraphBackups backups;
+  late EncodedDiagnosticsLog diagnostics;
   late ProviderContainer container;
   late DateTime now;
   var replacementSnapshotRunner = runGraphReplacementSnapshotWriteInIsolate;
@@ -87,11 +89,13 @@ void main() {
       clock: () => now,
       diagnosticsSink: InMemoryDiagnosticsSink(),
     );
+    diagnostics = EncodedDiagnosticsLog();
     final restore = GraphRestore(
       backups: repository,
       compaction: compaction,
       replacement: repository,
       snapshotFiles: Future.value(),
+      diagnosticsSink: diagnostics,
     );
     container = ProviderContainer(
       overrides: [
@@ -308,6 +312,20 @@ void main() {
     expect(await graphState(), beforeRestore);
   });
 
+  test('восстановление диагностируется успехом без пользовательских '
+      'данных', () async {
+    final home = await createTag('Дом');
+    await createIntention('Здоровье', tagIds: {home.id});
+    final backup = await makeManualBackup();
+    await createIntention('Бегать');
+
+    expect(await restore(backup), isA<GraphBackupRestored>());
+
+    expect(diagnostics.events, [
+      {'operation': 'graphBackupRestore', 'outcome': 'succeeded'},
+    ]);
+  });
+
   test('ход восстановления сообщается долями обеих фаз по порядку, а после '
       'восстановления его нет', () async {
     final home = await createTag('Дом');
@@ -403,19 +421,29 @@ void main() {
     });
   });
 
-  test('восстановление копии, которую удалило окно хранения, отказывает и '
-      'ничего не меняет, хотя её позиция хранится другой копией', () async {
+  test('восстановление копии, которую удалило окно хранения, отказывает, '
+      'диагностируется этапом записи снимка замены и категорией «не найдено» '
+      'и ничего не меняет, хотя её позиция хранится другой копией', () async {
     final evicted = await evictedManualBackupWithRetainedPosition();
     final before = await storedState();
 
     expect(await restore(evicted), isA<GraphBackupRestoreFailed>());
 
     expect(await storedState(), before);
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphBackupRestore',
+        'stage': 'snapshotWrite',
+        'outcome': 'failed',
+        'failureCode': 'notFound',
+      },
+    ]);
   });
 
   group('отмена', () {
     test('во время записи снимка замены прекращает эту запись и '
-        'восстановление без изменений и без файла снимка замены', () async {
+        'восстановление без изменений, без файла снимка замены и без события '
+        'диагностики', () async {
       await createTag('Дом');
       final backup = await makeManualBackup();
       await createTag('Сад');
@@ -454,10 +482,11 @@ void main() {
         isA<GraphRestoreIdle>(),
       );
       expect(await storedState(), before);
+      expect(diagnostics.events, isEmpty);
     });
 
-    test('во время замены откатывает её без изменений и без файла снимка '
-        'замены', () async {
+    test('во время замены откатывает её без изменений, без файла снимка '
+        'замены и без события диагностики', () async {
       final home = await createTag('Дом');
       await createIntention('Здоровье', tagIds: {home.id});
       final backup = await makeManualBackup();
@@ -477,11 +506,13 @@ void main() {
       expect(await restore(backup), isA<GraphBackupRestoreCancelled>());
 
       expect(await storedState(), before);
+      expect(diagnostics.events, isEmpty);
     });
   });
 
   group('нехватка места', () {
-    test('при записи снимка замены даёт свой исход и ничего не '
+    test('при записи снимка замены даёт свой исход, диагностируемый этапом '
+        'записи снимка замены и категорией нехватки места, и ничего не '
         'меняет', () async {
       await createTag('Дом');
       final backup = await makeManualBackup();
@@ -493,10 +524,20 @@ void main() {
       expect(await restore(backup), isA<GraphBackupRestoreStorageFull>());
 
       expect(await storedState(), before);
+      expect(diagnostics.events, [
+        {
+          'operation': 'graphBackupRestore',
+          'stage': 'snapshotWrite',
+          'outcome': 'failed',
+          'failureCode': 'storageFull',
+        },
+      ]);
     });
 
-    test('при замене графа даёт свой исход, ничего не меняет и удаляет '
-        'снимок замены', () async {
+    test('сценарий «Отказ восстановления диагностируется без содержимого»: '
+        'при замене графа даёт свой исход, диагностируемый этапом замены и '
+        'категорией нехватки места без пользовательских данных, ничего не '
+        'меняет и удаляет снимок замены', () async {
       // Копия с длинными описаниями занимает страницы переполнения, которых
       // после их удаления и VACUUM в базе нет.
       final long = [
@@ -520,6 +561,14 @@ void main() {
       expect(await restore(backup), isA<GraphBackupRestoreStorageFull>());
 
       expect(await storedState(), before);
+      expect(diagnostics.events, [
+        {
+          'operation': 'graphBackupRestore',
+          'stage': 'replacement',
+          'outcome': 'failed',
+          'failureCode': 'storageFull',
+        },
+      ]);
     });
   });
 }

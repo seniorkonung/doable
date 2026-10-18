@@ -39,6 +39,7 @@ final class BenchmarkGraphRestore {
               compaction: _compaction,
               replacement: _repository,
               snapshotFiles: Future.value(),
+              diagnosticsSink: InMemoryDiagnosticsSink(),
             ),
           ),
         ),

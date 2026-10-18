@@ -6,6 +6,7 @@ import '../../graph_backups/graph_backup_registry.dart';
 import '../../graph_backups/graph_change_summary.dart';
 import '../../graph_snapshots/graph_log_compaction.dart';
 import '../../graph_snapshots/graph_snapshot_store.dart';
+import '../../shared/diagnostics/diagnostics_sink.dart';
 import 'graph_replacement.dart';
 
 /// Что изменилось в графе с резервной копии до текущего состояния.
@@ -53,12 +54,16 @@ final class GraphRestoreProgress {
 /// время подтверждаются как обычно. Фаза 2 заменяет граф этим снимком в
 /// монопольном режиме координатора, а прежнее состояние транзакция замены
 /// сохраняет копией перед заменой.
+///
+/// Исход восстановления сообщается в [DiagnosticsSink]; отмена события не
+/// даёт, а отказ диагностики исход восстановления не меняет.
 final class GraphRestore {
   GraphRestore({
     required this._backups,
     required this._compaction,
     required this._replacement,
     required this._snapshotFiles,
+    required this._diagnosticsSink,
   });
 
   final GraphBackupRegistry _backups;
@@ -72,6 +77,7 @@ final class GraphRestore {
   /// файлы прежних запусков. Снимок замены пишется только после этого, иначе
   /// очистка удалила бы его до регистрации.
   final Future<void> _snapshotFiles;
+  final DiagnosticsSink _diagnosticsSink;
 
   /// Считает изменения графа с копии [backup] до текущего состояния по тем же
   /// правилам, что и сводки копий, — только по фактам пакетов лога.
@@ -116,6 +122,7 @@ final class GraphRestore {
     required void Function(GraphRestoreProgress progress) onProgress,
     required Future<void> cancelled,
   }) async {
+    final stopwatch = Stopwatch()..start();
     var isCancelled = false;
     unawaited(cancelled.then((_) => isCancelled = true));
     UnregisteredGraphSnapshot? snapshot;
@@ -129,7 +136,7 @@ final class GraphRestore {
         cancelled: cancelled,
       );
       snapshot = written;
-      return await exclusive.replace(() {
+      final restored = await exclusive.replace(() {
         onProgress(
           const GraphRestoreProgress(GraphRestorePhase.replacement, 0),
         );
@@ -141,6 +148,13 @@ final class GraphRestore {
           isCancelled: () => isCancelled,
         );
       });
+      recordDiagnosticsSafely(
+        _diagnosticsSink,
+        GraphBackupRestoreDiagnosticsEvent.succeeded(
+          duration: stopwatch.elapsed,
+        ),
+      );
+      return restored;
     } on GraphReplacementSnapshotCancelled {
       // Запись снимка замены при отмене удаляет свой файл.
       return const GraphBackupRestoreCancelled();
@@ -149,6 +163,20 @@ final class GraphRestore {
       return const GraphBackupRestoreCancelled();
     } on Object catch (error) {
       await snapshot?.delete();
+      recordDiagnosticsSafely(
+        _diagnosticsSink,
+        GraphBackupRestoreDiagnosticsEvent.failed(
+          // Снимок замены есть, только когда его запись завершилась.
+          stage: snapshot == null
+              ? GraphBackupRestoreDiagnosticsStage.snapshotWrite
+              : GraphBackupRestoreDiagnosticsStage.replacement,
+          duration: stopwatch.elapsed,
+          code: switch (error) {
+            _GraphBackupNotStored() => DiagnosticsFailureCode.notFound,
+            _ => graphSnapshotFailureCode(error),
+          },
+        ),
+      );
       return switch (classifySqliteFailure(error)) {
         SqliteStorageFullFailure() => const GraphBackupRestoreStorageFull(),
         _ => const GraphBackupRestoreFailed(),
