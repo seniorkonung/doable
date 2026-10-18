@@ -543,7 +543,7 @@
   - **Files likely touched:** `lib/src/data_transfer/application/graph_composition.dart` (новый контракт, название рабочее), `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_composition.dart` (новая часть), `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `lib/src/app/app_runtime.dart`, `test/graph/data/drift_graph_composition_read_test.dart` (новый).
   - **Estimated scope:** M.
 
-- [ ] 2.11 Добавить в иконки дизайн-системы шестерёнку, значок экспорта и открытый замок из макетов
+- [x] 2.11 Добавить в иконки дизайн-системы шестерёнку, значок экспорта и открытый замок из макетов
   - **Acceptance criteria:**
     - По требованию «Иконки из дизайна» `app-appearance` шестерёнка перехода к настройкам из `context/doable-design/design/Home.dc.html`, значок строки «Export data» и открытый замок предупреждения панели экспорта из `context/doable-design/design/Settings.dc.html` сохраняют исходную графику, размеры и толщину линий. Они добавлены в `DoableIconData` с записями в таблице `lib/src/design_system/icons/README.md`.
   - **Verification:**

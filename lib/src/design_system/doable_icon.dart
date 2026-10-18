@@ -19,7 +19,10 @@ enum DoableIconData {
   fromIntention('from_intention'),
   fromAction('from_action'),
   check('check'),
-  chevronRight('chevron_right');
+  chevronRight('chevron_right'),
+  settings('settings'),
+  export('export'),
+  lockOpen('lock_open');
 
   const DoableIconData(this._assetName);
 
