@@ -619,7 +619,7 @@
   - **Files likely touched:** тестовые обвязки, которые находит команда проверки: 32 файла в `test/intention/presentation/`, `test/daily_choice/presentation/`, `test/tag/presentation/`, `test/long_term_relation/presentation/` и `test/app/tag_assignment_app_lifecycle_test.dart`; в каждом добавляются тема и импорт `doable_theme.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.18 Повторно подтвердить готовность этапа после перевода тестовых обвязок корневой оболочки на тему Doable
+- [x] 2.18 Повторно подтвердить готовность этапа после перевода тестовых обвязок корневой оболочки на тему Doable
   - **Acceptance criteria:**
     - После задачи 2.17 условие Ready to advance этапа 2 из [плана](plan.md) по-прежнему выполнено. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
     - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
