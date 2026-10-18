@@ -75,6 +75,15 @@ final class GraphEntityDeleted extends GraphFact {
 /// сущности в факте пакета.
 sealed class GraphEntityRecord {
   const GraphEntityRecord();
+
+  /// Ключ сущности, состояние которой несёт запись.
+  GraphEntityKey get key => switch (this) {
+    TagRecord(:final tag) => TagKey(tag.id),
+    IntentionRecord(:final intention) => IntentionKey(intention.id),
+    TagAssignmentRecord(:final assignment) => TagAssignmentKey(assignment),
+    LongTermRelationRecord(:final id) => LongTermRelationKey(id),
+    DailyChoiceRecord(:final choice) => DailyChoiceKey(choice.id),
+  };
 }
 
 final class TagRecord extends GraphEntityRecord {

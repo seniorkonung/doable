@@ -86,7 +86,7 @@ abstract final class GraphStateAssembly {
 
     final counts = List.filled(_Section.values.length, 0);
     await for (final (:record, :position) in base.readRecords()) {
-      final outcome = outcomes[_keyOf(record)];
+      final outcome = outcomes[record.key];
       if (outcome == null) {
         counts[_Section.of(record).index]++;
       } else if (outcome.isCurrentAt(position)) {
@@ -135,7 +135,7 @@ Future<Map<GraphEntityKey, _Outcome>> _summarize(
         case GraphEntityCreated(:final record) ||
             GraphEntityChanged(:final record):
           outcomes
-              .putIfAbsent(_keyOf(record), _Outcome.new)
+              .putIfAbsent(record.key, _Outcome.new)
               .change(record, factNumber);
         case GraphEntityDeleted(:final entity):
           outcomes.putIfAbsent(entity, _Outcome.new).delete(position);
@@ -155,7 +155,7 @@ Stream<GraphEntityRecord> _assembledRecords(
     for (final creation in created.takeBefore(record)) {
       yield creation;
     }
-    final outcome = outcomes[_keyOf(record)];
+    final outcome = outcomes[record.key];
     if (outcome == null) {
       yield record;
     } else if (outcome.life case final life?
@@ -279,14 +279,6 @@ int _compareIntentions(Intention first, Intention second) {
   final byCreation = first.createdAt.value.compareTo(second.createdAt.value);
   return byCreation != 0 ? byCreation : first.id.compareTo(second.id);
 }
-
-GraphEntityKey _keyOf(GraphEntityRecord record) => switch (record) {
-  TagRecord(:final tag) => TagKey(tag.id),
-  IntentionRecord(:final intention) => IntentionKey(intention.id),
-  TagAssignmentRecord(:final assignment) => TagAssignmentKey(assignment),
-  LongTermRelationRecord(:final id) => LongTermRelationKey(id),
-  DailyChoiceRecord(:final choice) => DailyChoiceKey(choice.id),
-};
 
 /// Секции в порядке файла формата.
 enum _Section {
