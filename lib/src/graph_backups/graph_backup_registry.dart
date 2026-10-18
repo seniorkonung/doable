@@ -15,15 +15,33 @@ enum GraphBackupKind {
   beforeReplacement,
 }
 
+/// Номер резервной копии в реестре. Номера не переиспользуются, поэтому
+/// номер удалённой копии не совпадает с номером ни одной хранимой, даже если
+/// у хранимой копии та же позиция.
+final class GraphBackupId {
+  const GraphBackupId(this._value);
+
+  final int _value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is GraphBackupId && other._value == _value;
+
+  @override
+  int get hashCode => _value.hashCode;
+}
+
 /// Резервная копия: позиция лога, состояние графа на которой она хранит.
 final class GraphBackupEntry {
   const GraphBackupEntry({
+    required this.id,
     required this.kind,
     required this.position,
     required this.madeAt,
     required this.summary,
   });
 
+  final GraphBackupId id;
   final GraphBackupKind kind;
   final int position;
 

@@ -75,11 +75,14 @@ final class UnregisteredGraphSnapshot {
   /// базы журналом не защищён, поэтому повреждённый снимок не становится
   /// графом: несовпадение, отсутствие файла и нечитаемые записи дают
   /// [GraphSnapshotCorruption]. Поток однократный.
-  Stream<GraphEntityRecord> readRecords() => _readVerifiedSnapshot(
-    File.fromUri(directory.uri.resolve(fileName)),
-    byteSize: byteSize,
-    checksum: checksum,
-  );
+  Stream<GraphEntityRecord> readRecords() =>
+      _readVerifiedSnapshot(_file, byteSize: byteSize, checksum: checksum);
+
+  /// Удаляет файл снимка, который не стал зарегистрированным. Файл, который
+  /// не удалось удалить, удаляет очистка каталога снимков при запуске.
+  Future<void> delete() => _deleteLeftover(_file);
+
+  File get _file => File.fromUri(directory.uri.resolve(fileName));
 }
 
 /// Безопасная категория отказа операции со снимками для диагностики.

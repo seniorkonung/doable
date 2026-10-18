@@ -217,6 +217,7 @@ DateTime _backupMoment(int madeAt) =>
 /// Схема гарантирует копии известный вид и либо полную сводку, либо признак
 /// замены.
 GraphBackupEntry _backupEntry(local.GraphBackup row) => GraphBackupEntry(
+  id: GraphBackupId(row.id),
   kind: switch (row.kind) {
     _dailyBackupKind => GraphBackupKind.daily,
     'manual' => GraphBackupKind.manual,

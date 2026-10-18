@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
@@ -14,6 +15,9 @@ import '../data_transfer/application/graph_composition.dart';
 import '../data_transfer/application/graph_composition_provider.dart';
 import '../data_transfer/application/graph_export.dart';
 import '../data_transfer/application/graph_export_provider.dart';
+import '../data_transfer/application/graph_replacement.dart';
+import '../data_transfer/application/graph_restore.dart';
+import '../data_transfer/application/graph_restore_provider.dart';
 import '../data_transfer/data/method_channel_document_access.dart';
 import '../graph/application/graph_command_coordinator.dart';
 import '../graph/application/personal_graph_repository.dart';
@@ -53,13 +57,14 @@ typedef AppGraphFilesFactory = Future<AppGraphFiles> Function(
   ObservableGraphFactLog log,
 );
 
-/// Граф над готовой базой: репозиторий, а также лог фактов, состав графа и
-/// реестр копий, если их ведёт этот репозиторий.
+/// Граф над готовой базой: репозиторий, а также лог фактов, состав графа,
+/// реестр копий и замена графа, если их ведёт этот репозиторий.
 typedef _AppGraph = ({
   PersonalGraphRepository repository,
   ObservableGraphFactLog? factLog,
   GraphCompositionSource? composition,
   GraphBackupRegistry? backupRegistry,
+  GraphReplacement? replacement,
 });
 
 typedef _AppGraphFactory = _AppGraph Function(AppDatabase database);
@@ -109,11 +114,14 @@ final class AppRuntime {
   /// только после удаления временных файлов прежних запусков. Резервные
   /// копии ведутся над тем же сжатием: после подготовки хранилища и при
   /// каждом возвращении приложения на передний план runtime проверяет фоном,
-  /// нужна ли ежедневная копия. Выключение дожидается идущего экспорта,
-  /// сжатия и создания копии и только потом закрывает базу.
-  /// Лог фактов, состав графа и реестр копий ведёт репозиторий по умолчанию,
-  /// поэтому с [repositoryFactory] файлы графа, состав графа и копии не
-  /// подключаются.
+  /// нужна ли ежедневная копия. Восстановление копии пишет снимок замены
+  /// через то же сжатие только после очистки каталога снимков и заменяет граф
+  /// репозиторием в монопольном режиме координатора. Выключение дожидается
+  /// идущего экспорта, восстановления, сжатия и создания копии и только потом
+  /// закрывает базу.
+  /// Лог фактов, состав графа, реестр копий и замену графа ведёт репозиторий
+  /// по умолчанию, поэтому с [repositoryFactory] файлы графа, состав графа и
+  /// копии не подключаются.
   /// [clock] заменяет системные часы как часы устройства для репозитория по
   /// умолчанию, экспорта и резервных копий.
   factory AppRuntime({
@@ -136,6 +144,7 @@ final class AppRuntime {
         factLog: null,
         composition: null,
         backupRegistry: null,
+        replacement: null,
       ),
       null => (database) {
         final repository = DriftPersonalGraphRepository(
@@ -150,6 +159,7 @@ final class AppRuntime {
           factLog: repository,
           composition: repository,
           backupRegistry: repository,
+          replacement: repository,
         );
       },
     };
@@ -299,8 +309,15 @@ final class AppRuntime {
     }
     ProviderContainer? container;
     try {
-      final (:repository, :factLog, :composition, :backupRegistry) =
-          _graphFactory(database);
+      final (
+        :repository,
+        :factLog,
+        :composition,
+        :backupRegistry,
+        :replacement,
+      ) = _graphFactory(
+        database,
+      );
       final files = switch ((factLog, _graphFilesFactory)) {
         (final log?, final createFiles?) => await createFiles(log),
         _ => null,
@@ -326,6 +343,16 @@ final class AppRuntime {
         ),
         _ => null,
       };
+      final snapshotFilesCleaned = Completer<void>();
+      final restore = switch ((files, backupRegistry, replacement)) {
+        (final files?, final registry?, final replacement?) => GraphRestore(
+          backups: registry,
+          compaction: files.compaction,
+          replacement: replacement,
+          snapshotFiles: snapshotFilesCleaned.future,
+        ),
+        _ => null,
+      };
       container = ProviderContainer(
         overrides: [
           quickCreationModeControllerProvider.overrideWith(
@@ -345,6 +372,10 @@ final class AppRuntime {
               () => GraphExportController(export),
             ),
           if (backups != null) graphBackupsProvider.overrideWithValue(backups),
+          if (restore != null)
+            graphRestoreControllerProvider.overrideWith(
+              () => GraphRestoreController(restore),
+            ),
         ],
         retry: (retryCount, error) => null,
       );
@@ -354,7 +385,10 @@ final class AppRuntime {
       container.read(appRouterProvider);
       _commandCoordinator = coordinator;
       if (files != null) {
-        _graphSnapshots = _startGraphSnapshots(files.compaction);
+        _graphSnapshots = _startGraphSnapshots(
+          files.compaction,
+          cleaned: snapshotFilesCleaned,
+        );
       }
       if (backups != null) _startDailyGraphBackups(backups);
       return _ready = AppRuntimeReady(container);
@@ -380,18 +414,20 @@ final class AppRuntime {
     return directory;
   }
 
-  /// Очищает каталог снимков и затем, если выключение ещё не началось,
-  /// запускает сжатие лога фактов [compaction]. Готовность и команды графа
-  /// этого не ждут.
+  /// Очищает каталог снимков, завершает [cleaned] и затем, если выключение
+  /// ещё не началось, запускает сжатие лога фактов [compaction]. Готовность
+  /// и команды графа этого не ждут.
   Future<GraphLogCompaction?> _startGraphSnapshots(
-    GraphLogCompaction compaction,
-  ) async {
+    GraphLogCompaction compaction, {
+    required Completer<void> cleaned,
+  }) async {
     try {
       await compaction.removeUnregisteredFiles();
     } on Object {
-      // Отказ записан диагностикой очистки. Оставшиеся файлы сжатию не
-      // мешают, их удалит очистка следующего запуска.
+      // Отказ записан диагностикой очистки. Оставшиеся файлы сжатию и
+      // снимку замены не мешают, их удалит очистка следующего запуска.
     }
+    cleaned.complete();
     if (_lifecycle != _AppRuntimeLifecycle.running) return null;
     return compaction..start();
   }
