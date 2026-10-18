@@ -19,7 +19,13 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
   Future<List<StoredGraphLogPackage>> _readStoredLogPackages({
     required int after,
     required int upTo,
-  }) => _sequencer.run(() async {
+  }) =>
+      _sequencer.run(() => _selectStoredLogPackages(after: after, upTo: upTo));
+
+  Future<List<StoredGraphLogPackage>> _selectStoredLogPackages({
+    required int after,
+    required int upTo,
+  }) async {
     final packages = _database.graphLogPackages;
     final snapshots = _database.graphSnapshots;
     final rows =
@@ -43,7 +49,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
           row.readTableOrNull(snapshots),
         ),
     ];
-  });
+  }
 
   /// Хранилище снимков не зависит от данных графа, поэтому строку вне формы
   /// хранения оно получает отказом контракта лога, а не общего декодера.

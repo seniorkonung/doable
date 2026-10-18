@@ -111,6 +111,27 @@ final class GraphStateSource {
 sealed class GraphHistoryPackage {
   const GraphHistoryPackage({required this.position});
 
+  /// Пакет истории из хранимого пакета [package]: факты пакета «изменение»
+  /// прочитаны в текущей версии формата.
+  factory GraphHistoryPackage.decode(StoredGraphLogPackage package) =>
+      switch (package) {
+        StoredGraphChangePackage(
+          :final position,
+          :final formatVersion,
+          :final facts,
+        ) =>
+          GraphHistoryChange(
+            position: position,
+            facts: GraphFormatCodec.decodePackage(
+              facts,
+              GraphFormatVersion.ofCarrier(formatVersion),
+            ),
+          ),
+        StoredGraphResetPackage(:final position) => GraphHistoryReset(
+          position: position,
+        ),
+      };
+
   final int position;
 }
 
@@ -581,23 +602,7 @@ Stream<GraphHistoryPackage> _readHistoryPackages(
     final portion = await log.readPackages(after: next, upTo: upTo);
     if (portion.isEmpty) return;
     for (final package in portion) {
-      yield switch (package) {
-        StoredGraphChangePackage(
-          :final position,
-          :final formatVersion,
-          :final facts,
-        ) =>
-          GraphHistoryChange(
-            position: position,
-            facts: GraphFormatCodec.decodePackage(
-              facts,
-              GraphFormatVersion.ofCarrier(formatVersion),
-            ),
-          ),
-        StoredGraphResetPackage(:final position) => GraphHistoryReset(
-          position: position,
-        ),
-      };
+      yield GraphHistoryPackage.decode(package);
     }
     next = portion.last.position;
   }

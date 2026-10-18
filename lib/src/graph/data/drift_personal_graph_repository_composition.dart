@@ -56,41 +56,16 @@ extension _GraphCompositionReading on DriftPersonalGraphRepository {
     return controller.stream;
   }
 
-  /// Одно агрегатное чтение без строк сущностей: один оператор SQLite
-  /// читает все числа на одном подтверждённом состоянии.
   Future<GraphCompositionRead> _readComposition() async {
     final stopwatch = Stopwatch()..start();
     try {
-      final row = await _sequencer.run(
-        () => _database
-            .customSelect(
-              '''SELECT
-                (SELECT count(*) FROM intentions) AS intention_count,
-                (SELECT count(*) FROM long_term_relations) AS relation_count,
-                (SELECT count(*) FROM daily_choices) AS daily_choice_count,
-                (SELECT count(*) FROM tags) AS tag_count''',
-              readsFrom: {
-                _database.intentions,
-                _database.longTermRelations,
-                _database.dailyChoices,
-                _database.tags,
-              },
-            )
-            .getSingle(),
-      );
+      final composition = await _sequencer.run(_selectComposition);
       _recordDiagnostics(
         GraphCompositionReadDiagnosticsEvent.succeeded(
           duration: stopwatch.elapsed,
         ),
       );
-      return GraphCompositionReadSucceeded(
-        GraphComposition(
-          intentionCount: row.read<int>('intention_count'),
-          relationCount: row.read<int>('relation_count'),
-          dailyChoiceCount: row.read<int>('daily_choice_count'),
-          tagCount: row.read<int>('tag_count'),
-        ),
-      );
+      return GraphCompositionReadSucceeded(composition);
     } on Object catch (error) {
       _recordDiagnostics(
         GraphCompositionReadDiagnosticsEvent.failed(
@@ -105,5 +80,31 @@ extension _GraphCompositionReading on DriftPersonalGraphRepository {
       );
       return const GraphCompositionReadFailed();
     }
+  }
+
+  /// Одно агрегатное чтение без строк сущностей: один оператор SQLite
+  /// читает все числа на одном подтверждённом состоянии.
+  Future<GraphComposition> _selectComposition() async {
+    final row = await _database
+        .customSelect(
+          '''SELECT
+            (SELECT count(*) FROM intentions) AS intention_count,
+            (SELECT count(*) FROM long_term_relations) AS relation_count,
+            (SELECT count(*) FROM daily_choices) AS daily_choice_count,
+            (SELECT count(*) FROM tags) AS tag_count''',
+          readsFrom: {
+            _database.intentions,
+            _database.longTermRelations,
+            _database.dailyChoices,
+            _database.tags,
+          },
+        )
+        .getSingle();
+    return GraphComposition(
+      intentionCount: row.read<int>('intention_count'),
+      relationCount: row.read<int>('relation_count'),
+      dailyChoiceCount: row.read<int>('daily_choice_count'),
+      tagCount: row.read<int>('tag_count'),
+    );
   }
 }
