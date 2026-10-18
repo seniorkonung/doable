@@ -722,7 +722,7 @@
   - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt`, `android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt`, `lib/src/data_transfer/application/document_access.dart`, `lib/src/data_transfer/data/method_channel_document_access.dart`, `lib/src/data_transfer/application/graph_export_provider.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/data_transfer/method_channel_document_access_test.dart`, `test/app/graph_export_app_flow_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.26 Повторно подтвердить готовность этапа после запрета экспорта в файл с данными
+- [x] 2.26 Повторно подтвердить готовность этапа после запрета экспорта в файл с данными
   - **Acceptance criteria:**
     - После задачи 2.25 условие Ready to advance этапа 2 из [плана](plan.md) по-прежнему выполнено, в том числе файл экспорта читается модулем формата как то же состояние графа, что и в базе, набор разрешений Android не изменился, а сценарии «В диалоге выбран прежний файл» и «Отказ экспорта не оставляет файла» подтверждены проверками. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
     - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
