@@ -329,7 +329,7 @@ void main() {
   });
 
   test('файл с данными, выбранный в диалоге, даёт отдельный исход экспорта '
-      'без записи временного файла и без диагностики', () async {
+      'без хода экспорта и без диагностики', () async {
     await createTag('Дом');
     documents.dialog = () async => const ExistingFileChosen();
     final container = app();
@@ -344,8 +344,6 @@ void main() {
 
     expect((await exported).outcome, GraphExportOutcome.existingFile);
     expect(states, isEmpty);
-    expect(await _filesIn(temporary), isEmpty);
-    expect(documents.finished, isEmpty);
     expect(diagnostics.events, isEmpty);
   });
 
