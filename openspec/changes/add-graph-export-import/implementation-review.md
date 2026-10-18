@@ -3,17 +3,17 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Задачи 2.17–2.24 выполнены, и полные проверки проекта на проверяемой голове проходят. Обвязки корневой оболочки строят её с темой Doable. Право на выбранный документ удерживается до исхода экспорта. После отказа документ удаляется. Экспорт, наткнувшийся на повреждённый последний снимок, дожидается пересборки. На проверяемой голове экспорт по-прежнему считает выбранный в диалоге существующий файл новым документом. По решению человека экспорт в такой файл с данными не должен начинаться. Это записано в требовании «Экспорт в файл» и решении 13 дизайна, а доработку кода ведут невыполненные задачи 2.25–2.26. Тест отказа удаления, который не ловил регрессию, по решению человека удаляет невыполненная задача 2.27. Решение 13 дизайна перечисляет методы канала документов вместе с шагом завершения работы с документом. Незакрытых находок нет. Принятых остаточных рисков нет.
+**Summary:** Задачи 2.25–2.27 выполнены, и полные проверки проекта на проверяемой голове проходят. Плагин запрашивает размер выбранного документа до ответа в Dart. В файл, о котором поставщик сообщил, что он не пуст, экспорт не пишет и не удаляет его, а общая поверхность предлагает «Повторить». После отказа удаляется только документ, пустой при выборе. Копирование заменяет прежнее содержимое целиком. Тест отказа удаления, который проверял только подмену, удалён. Осталось одно замечание низкой важности, F1: новый тест уровня приложения для выбора файла с данными не ловит регрессий, которых не ловят другие тесты, а его название обещает проверку, которой в нём нет. Его предписывает проверка задачи 2.25. Принятых остаточных рисков нет.
 
 ## Review target
 
-- **Baseline ref:** 4f1380513622b1731d6b76c53e17fcbcab416f80
-- **Base commit:** 4f1380513622b1731d6b76c53e17fcbcab416f80
-- **Reviewed head:** 794a9f818889c20858e28894794a4c2fe810aacd
-- **Target commits:** ["cc9fa3d0ba02cfdcd3db06cb4dd8ea851d37831e", "d7f3670365ad2edb7b30b2ed254229ec9198fc94", "ac60244eb3b25baf44881db05f95a51425d3c5c9", "3ea4c4cd4db555957e0fe2fe5a0aec3a0d11f786", "077a05b2335d74a7301d2a465c8dccc1b7f64edd", "3034a313dc99e1fd009845b36c24eb60edc28bd9", "75f4e491ef173d5392b5279f5d451465c5b884a7", "a1969b63862d8e77421d9c2060d1ba14eb7d6237", "d8c6dc941a30a6d09b0cf064666a1ec9967cd880", "794a9f818889c20858e28894794a4c2fe810aacd"]
-- **Reviewable paths:** ["android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt", "android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt", "lib/src/data_transfer/application/document_access.dart", "lib/src/data_transfer/application/graph_export.dart", "lib/src/data_transfer/data/method_channel_document_access.dart", "lib/src/graph_snapshots/graph_log_compaction.dart", "openspec/changes/add-graph-export-import/tasks.md", "test/app/tag_assignment_app_lifecycle_test.dart", "test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart", "test/daily_choice/presentation/daily_choice_creation_completion_test.dart", "test/daily_choice/presentation/daily_choice_creation_exit_test.dart", "test/daily_choice/presentation/daily_choice_picker_context_test_support.dart", "test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart", "test/daily_choice/presentation/details/daily_choice_details_page_test.dart", "test/daily_choice/presentation/path/choice_path_page_test.dart", "test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart", "test/data_transfer/graph_export_test.dart", "test/data_transfer/method_channel_document_access_test.dart", "test/graph_snapshots/graph_state_export_test.dart", "test/intention/presentation/catalog/intention_catalog_page_test.dart", "test/intention/presentation/catalog/intention_picker_session_test_support.dart", "test/intention/presentation/details/intention_details_delete_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/details/intention_details_statistics_test.dart", "test/intention/presentation/details/intention_details_tags_test.dart", "test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart", "test/intention/presentation/editor/intention_creation_sheet_layout_test.dart", "test/intention/presentation/editor/intention_creation_tags_test.dart", "test/intention/presentation/editor/intention_editor_page_test.dart", "test/intention/presentation/intention_tag_search_accessibility_test.dart", "test/long_term_relation/presentation/details/relation_details_tags_test.dart", "test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart", "test/long_term_relation/presentation/editor/relation_editor_page_test.dart", "test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart", "test/support/file_document_access.dart", "test/tag/presentation/catalog/tag_catalog_delete_test.dart", "test/tag/presentation/catalog/tag_catalog_navigation_test.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_search_page_test.dart", "test/tag/presentation/navigation/tag_navigation_page_test.dart", "test/tag/presentation/navigation/tag_navigation_read_cost_widget_test.dart", "test/tag/presentation/tag_accessibility_test.dart", "test/tag/presentation/tag_catalog_search_accessibility_scenarios.dart"]
+- **Baseline ref:** a891602bdf651fb17696d3754b107fd913e4c952
+- **Base commit:** a891602bdf651fb17696d3754b107fd913e4c952
+- **Reviewed head:** 99a31dbed697ebee1ef2701b3c7a9ca10ab5a389
+- **Target commits:** ["2a8d84f73a6677011cdb530bfb2250ea9acd3805", "554e31f94b8914305e9ae56f3a04d6a98ff7043f", "99a31dbed697ebee1ef2701b3c7a9ca10ab5a389"]
+- **Reviewable paths:** ["android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt", "android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt", "lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/data_transfer/application/document_access.dart", "lib/src/data_transfer/application/graph_export.dart", "lib/src/data_transfer/application/graph_export_provider.dart", "lib/src/data_transfer/data/method_channel_document_access.dart", "lib/src/graph/application/graph_command_coordinator.dart", "lib/src/graph/presentation/graph_operation_presenter.dart", "openspec/changes/add-graph-export-import/tasks.md", "test/app/graph_export_app_flow_test.dart", "test/data_transfer/graph_export_test.dart", "test/data_transfer/method_channel_document_access_test.dart", "test/graph/presentation/graph_operation_presenter_test.dart", "test/support/file_document_access.dart"]
 - **OpenSpec change:** add-graph-export-import
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,88 +22,88 @@
 
 ## Reviewed increment
 
-### U1 · Тестовые обвязки строят корневую оболочку с темой Doable, как приложение
+### U1 · Экспорт не начинается в выбранный файл с данными, а после отказа удаляется только документ, пустой при выборе
 
-- **Work items:** ["2.17", "2.18"]
-- **Requirements and scenarios:** ["tasks: 2.17 — каждая обвязка `MaterialApp.router` с `AppRouter` задаёт `doableTheme(Brightness.light)`", "plan: Direction — поведение, которого спецификации изменения не касаются, сохраняется", "ADR-0029"]
-- **Affected boundary:** Виджетные тесты представлений намерений, дневных выборов, тегов, долговременных связей и тест жизненного цикла приложения при назначении тегов.
-- **Implementation target:** ["test/app/tag_assignment_app_lifecycle_test.dart", "test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart", "test/daily_choice/presentation/daily_choice_creation_completion_test.dart", "test/daily_choice/presentation/daily_choice_creation_exit_test.dart", "test/daily_choice/presentation/daily_choice_picker_context_test_support.dart", "test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart", "test/daily_choice/presentation/details/daily_choice_details_page_test.dart", "test/daily_choice/presentation/path/choice_path_page_test.dart", "test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart", "test/intention/presentation/catalog/intention_catalog_page_test.dart", "test/intention/presentation/catalog/intention_picker_session_test_support.dart", "test/intention/presentation/details/intention_details_delete_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/details/intention_details_statistics_test.dart", "test/intention/presentation/details/intention_details_tags_test.dart", "test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart", "test/intention/presentation/editor/intention_creation_sheet_layout_test.dart", "test/intention/presentation/editor/intention_creation_tags_test.dart", "test/intention/presentation/editor/intention_editor_page_test.dart", "test/intention/presentation/intention_tag_search_accessibility_test.dart", "test/long_term_relation/presentation/details/relation_details_tags_test.dart", "test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart", "test/long_term_relation/presentation/editor/relation_editor_page_test.dart", "test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart", "test/tag/presentation/catalog/tag_catalog_delete_test.dart", "test/tag/presentation/catalog/tag_catalog_navigation_test.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_search_page_test.dart", "test/tag/presentation/navigation/tag_navigation_page_test.dart", "test/tag/presentation/navigation/tag_navigation_read_cost_widget_test.dart", "test/tag/presentation/tag_accessibility_test.dart", "test/tag/presentation/tag_catalog_search_accessibility_scenarios.dart"]
-- **Applicable constraints and non-goals:** Код приложения не меняется.
-  Проверяемые сценарии и названия тестов прежние; ожидание меняется только там, где оно зависело от темы Material по умолчанию.
-  Обычные тесты остаются быстрыми и без замеров времени.
+- **Work items:** ["2.25", "2.26"]
+- **Requirements and scenarios:** ["graph-export-import: Экспорт в файл — сценарий «В диалоге выбран прежний файл»", "graph-export-import: Отказы экспорта и импорта — сценарий «Отказ экспорта не оставляет файла»", "graph-export-import: Локализация и доступность экспорта и импорта", "graph-export-import: Диагностика экспорта и импорта без пользовательского содержимого", "design: решение 12 — выбор файла с данными предъявляется как отказ", "design: решение 13 — выбор существующего файла, документ после отказа экспорта, режим \"wt\"", "plan: Phase 2 Ready to advance"]
+- **Affected boundary:** Человек в сценарии экспорта; поставщики документов Storage Access Framework за системным диалогом сохранения; встроенный плагин `DocumentAccessPlugin` и его канал; контракт `DocumentAccess`, `GraphExport`, `GraphExportController`, координатор и `GraphOperationPresenter`.
+- **Implementation target:** ["android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt", "android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt", "lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/data_transfer/application/document_access.dart", "lib/src/data_transfer/application/graph_export.dart", "lib/src/data_transfer/application/graph_export_provider.dart", "lib/src/data_transfer/data/method_channel_document_access.dart", "lib/src/graph/application/graph_command_coordinator.dart", "lib/src/graph/presentation/graph_operation_presenter.dart", "test/app/graph_export_app_flow_test.dart", "test/data_transfer/graph_export_test.dart", "test/data_transfer/method_channel_document_access_test.dart", "test/graph/presentation/graph_operation_presenter_test.dart"]
+- **Applicable constraints and non-goals:** Нет новых разрешений, записей манифеста и `FileProvider` (ADR-0004, ADR-0037).
+  Память операций с данными не растёт с размером графа и файла.
+  Диагностика не содержит имён, адресов и содержимого файлов.
+  Команды графа не ждут экспорта.
+  Отмена диалога ничего не меняет и сообщения не показывает.
+  Перезапись выбранного файла с данными не делается безопасной, а запрещается.
+- **Excluded change scope:** Открытие документов и импорт относятся к этапу 4. Документ, оставшийся после завершения процесса посреди экспорта, при запуске не удаляется.
 
-### U2 · Право на выбранный документ удерживается до исхода экспорта, а документ неудавшегося экспорта удаляется
+### U2 · Устойчивость экспорта к отказу удаления проверяется только там, где этот отказ возникает
 
-- **Work items:** ["2.19", "2.20", "2.23", "2.24"]
-- **Requirements and scenarios:** ["graph-export-import: Экспорт в файл — принятый экспорт продолжается до результата", "graph-export-import: Отказы экспорта и импорта — сценарий «Отказ экспорта не оставляет файла»", "design: решение 13 — право на документ, документ после отказа экспорта", "ADR-0031", "ADR-0037", "plan: Phase 2 Ready — набор разрешений Android не изменился"]
-- **Affected boundary:** Поставщики документов Storage Access Framework, встроенный плагин `DocumentAccessPlugin` и его канал, контракт `DocumentAccess` и операция `GraphExport`.
-- **Implementation target:** ["android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt", "android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt", "lib/src/data_transfer/application/document_access.dart", "lib/src/data_transfer/application/graph_export.dart", "lib/src/data_transfer/data/method_channel_document_access.dart", "test/data_transfer/graph_export_test.dart", "test/data_transfer/method_channel_document_access_test.dart", "test/support/file_document_access.dart"]
-- **Applicable constraints and non-goals:** Нет новых разрешений, записей манифеста, правил резервного копирования и `FileProvider` (ADR-0004, ADR-0037).
-  Байты через канал не передаются.
-  Диагностика не содержит адресов документов.
-  Документ, оставшийся после завершения процесса посреди экспорта, при запуске не удаляется.
-- **Excluded change scope:** Открытие документов и их копирование для импорта относятся к этапу 4.
-
-### U3 · Экспорт, наткнувшийся на повреждённый последний снимок, дожидается пересборки и пишет файл из нового снимка
-
-- **Work items:** ["2.21", "2.22"]
-- **Requirements and scenarios:** ["design: решение 7 — пересборка из базы и исключение для записи состояния экспорта", "plan: Phase 2 Ready — успешный повтор экспорта после пересборки повреждённого последнего снимка", "graph-export-import: Экспорт в файл — изменения графа не ждут окончания экспорта"]
-- **Affected boundary:** Сжатие лога фактов `GraphLogCompaction` и запись состояния графа для экспорта.
-- **Implementation target:** ["lib/src/graph_snapshots/graph_log_compaction.dart", "test/graph_snapshots/graph_state_export_test.dart", "test/data_transfer/graph_export_test.dart"]
-- **Applicable constraints and non-goals:** Команды графа не ждут экспорта, сжатия и пересборки.
-  Одновременно идёт не больше одного сжатия, а неудачное сжатие не повторяется на каждом новом пакете.
-  Алгоритм пересборки, правило автоматического повтора и события диагностики не меняются.
+- **Work items:** ["2.27"]
+- **Requirements and scenarios:** ["graph-export-import: Отказы экспорта и импорта — неудача удаления не меняет исход и сообщение экспорта"]
+- **Affected boundary:** Набор автоматических проверок экспорта.
+- **Implementation target:** ["test/data_transfer/graph_export_test.dart", "test/support/file_document_access.dart"]
+- **Applicable constraints and non-goals:** Код приложения и другие проверки не меняются.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Работали два свежих изолированных рецензента `implementation-decision-review`. Рецензент U1 получил 32 пути U1. U2 и U3 делят `test/data_transfer/graph_export_test.dart`, поэтому их проверял один рецензент по общей записке с двумя разделами намерения и объединённым списком из 10 путей. Оба получили только нейтральную записку и точный диапазон `4f1380513622b1731d6b76c53e17fcbcab416f80..794a9f818889c20858e28894794a4c2fe810aacd`. Планирующие артефакты, история Git, прежний отчёт и обсуждение реализации им не передавались. Оба сообщили полное покрытие своих путей. |
-| OpenSpec conformance | Complete | Проверено в чистом рабочем дереве worktree, `HEAD` которого совпадает с `794a9f818889c20858e28894794a4c2fe810aacd`. `mise run check`: формат (723 файла без изменений), проверки CI-скриптов и `flutter analyze` без замечаний; обычные тесты — 3034 прошли; процессные тесты — 14 прошли. `mise run codegen-check` — успешно. `JAVA_HOME=<temurin-25> android/gradlew -p android :app:testDebugUnitTest --console=plain --rerun`: `DocumentAccessPluginTest` 12 из 12, `DisplayWindowPolicyTest` 44 из 44. `mise exec --no-deps -- openspec validate add-graph-export-import --strict` — успешно. Команда проверки задачи 2.17 по `MaterialApp` и `AppRouter` без `doableTheme(` ничего не находит. Release APK собран, `tool/check_android_privacy_manifest.dart` проходит. Манифест, `res/xml` и сборочные файлы в диапазоне не менялись. |
-| Code quality | Complete | Все пути поставки диапазона пройдены по линзам `code-review-and-quality`: корректность, читаемость, архитектура, безопасность и производительность. Учтены неизменённые вызывающие и зависимые места: `GraphExportController`, `DisplayHostActivity.configureFlutterEngine`, `AppRuntime.shutdown`, `GraphSnapshotStore`, модуль формата `graph_format_file.dart`. Сверены исходники Android SDK 36.1: `ContentResolver`, `DocumentsProvider`, `FileSystemProvider`, `FileUtils`. |
+| Independent decision review | Complete | U1 и U2 делят `test/data_transfer/graph_export_test.dart`, поэтому их проверял один свежий изолированный рецензент `implementation-decision-review` по общей записке с двумя разделами намерения и объединённым списком из 18 путей поставки и тестов диапазона `a891602bdf651fb17696d3754b107fd913e4c952..99a31dbed697ebee1ef2701b3c7a9ca10ab5a389`. Планирующие артефакты, история Git, прежний отчёт и обсуждение реализации ему не передавались. Рецензент сообщил полное покрытие всех 18 путей. |
+| OpenSpec conformance | Complete | Проверено в чистом рабочем дереве worktree, `HEAD` которого совпадает с `99a31dbed697ebee1ef2701b3c7a9ca10ab5a389`. `mise run check`: формат (723 файла без изменений), проверки CI-скриптов и `flutter analyze` без замечаний; обычные тесты — 3038 прошли; процессные тесты — 14 прошли. `mise run codegen-check` — успешно. `JAVA_HOME=<temurin-25> android/gradlew -p android :app:testDebugUnitTest --console=plain --rerun`: `DocumentAccessPluginTest` 16 из 16, `DisplayWindowPolicyTest` 44 из 44. `mise exec --no-deps -- openspec validate add-graph-export-import --strict` — успешно. `mise exec --no-deps -- flutter build apk --release` собран, `tool/check_android_privacy_manifest.dart` с `build-tools/36.0.0/aapt2` проходит. `git grep failsDeletes` по `lib` и `test` ничего не находит. Манифест, `res/`, `build.gradle.kts` и `pubspec` в диапазоне не менялись. |
+| Code quality | Complete | Все пути поставки диапазона пройдены по линзам `code-review-and-quality`: корректность, читаемость, архитектура, безопасность и производительность. Учтены неизменённые вызывающие и зависимые места: `DisplayHostActivity`, `GraphCommandCoordinator.acceptExport`, `claimInitiatorFailure`, `planGraphOperationMessage`, общая поверхность `GraphOperationPresenter` с `persist: false`, обвязки `FileDocumentAccess` и presenter-теста. Сверены байткод Robolectric 4.16 (`ShadowContentResolver.openOutputStream`, `ShadowParcelFileDescriptor.open`) и поведение `ParcelFileDescriptor.parseMode` для режимов `"w"` и `"wt"`. |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F1 · Low — Тест уровня приложения для выбора файла с данными не ловит новых регрессий, а название обещает непроверяемое
+
+- **Evidence:** Тест «выбранный в диалоге прежний файл не записывается, а общая поверхность показывает…» в `test/app/graph_export_app_flow_test.dart:129-150` подменяет диалог ответом `ExistingFileChosen`, ждёт текст сообщения, проверяет пустые `documents.created` и `documents.finished`, нажимает «Повторить» и ждёт второго открытия диалога.
+  Каждое звено этой цепочки уже проверено. Превращение `ExistingFileChosen` в `GraphExportOutcome.existingFile` настоящими контроллером и координатором без диагностики проверяет `test/data_transfer/graph_export_test.dart:331-350`. Текст на русском и английском и действие, вызывающее `completion.retry` настоящего `GraphCommandCoordinator.acceptExport`, проверяет `test/graph/presentation/graph_operation_presenter_test.dart:1427-1445` (обвязка `startExport`, строки 2455-2463).
+  Повтор одинаков для всех исходов: `retry: () => unawaited(start())` в `lib/src/data_transfer/application/graph_export_provider.dart:80`. То, что повтор снова открывает диалог, проверяют `graph_export_test.dart:296-301` и тест отказа уровня приложения `graph_export_app_flow_test.dart:104-127`; последний подтверждает и подключение presenter в настоящем приложении.
+  Пустые `created` и `finished` верны по построению: подменённый диалог не вызывает `newDocument()`, а `ExistingFileChosen` не несёт `CreatedDocument`, без которого ни запись, ни завершение работы с документом не вызываются. По той же причине верны по построению проверки пустого временного каталога и `documents.finished` в `graph_export_test.dart:347-348`.
+  Название обещает, что «прежний файл не записывается», но прежнего файла в тесте нет. Неизменность файла проверяет только нативный тест `DocumentAccessPluginTest.kt:172-186`.
+  Тест предписан третьим пунктом проверки задачи 2.25 в `tasks.md`.
+- **Evidence revisions:** ["99a31dbed697ebee1ef2701b3c7a9ca10ab5a389"]
+- **Impact:** Обычный набор получает медленный тест уровня приложения с файловой базой, запуском `AppRuntime` и изолятом, который не может упасть ни от одной правдоподобной регрессии, не замеченной другими тестами. Название вводит в заблуждение о том, где проверена сохранность выбранного файла.
+- **Required outcome:** Каждый тест и каждая проверка, добавленные для выбора файла с данными, ловят правдоподобную регрессию, которую не ловит другой тест, а названия тестов описывают то, что они действительно проверяют. Сценарий «В диалоге выбран прежний файл» по-прежнему подтверждён проверками.
+- **Earliest source of truth:** task/verification
+- **Affected artifacts:** ["openspec/changes/add-graph-export-import/tasks.md: 2.25 Verification", "test/app/graph_export_app_flow_test.dart", "test/data_transfer/graph_export_test.dart"]
 
 ## Review coverage
 
 **Цель и сопоставление.**
 
-Цель — 10 коммитов `4f1380513622b1731d6b76c53e17fcbcab416f80..794a9f818889c20858e28894794a4c2fe810aacd` и 43 пути. Рабочее дерево чистое, `HEAD` совпадает с проверяемой головой.
+Цель — 3 коммита `a891602bdf651fb17696d3754b107fd913e4c952..99a31dbed697ebee1ef2701b3c7a9ca10ab5a389` и 19 путей. Рабочее дерево чистое, `HEAD` совпадает с проверяемой головой.
 
-Файл `tasks.md` — свидетельство планирования. Диапазон меняет в нём только отметки 2.17–2.24.
+Файл `tasks.md` — свидетельство планирования. Диапазон меняет в нём только отметки 2.25–2.27.
 
-Остальные 42 пути распределены по U1–U3. Путь `test/data_transfer/graph_export_test.dart` общий для U2 и U3: коммит `75f4e491ef173d5392b5279f5d451465c5b884a7` уточняет в нём название проверки при выключенном сжатии.
+Остальные 18 путей распределены по U1 и U2. Путь `test/data_transfer/graph_export_test.dart` общий: коммит `2a8d84f73a6677011cdb530bfb2250ea9acd3805` добавляет в него проверку выбора файла с данными, а `99a31dbed697ebee1ef2701b3c7a9ca10ab5a389` удаляет тест отказа удаления.
 
-Задачи сопоставлены с коммитами так. Задаче 2.17 соответствует `cc9fa3d0ba02cfdcd3db06cb4dd8ea851d37831e`, задаче 2.18 — `d7f3670365ad2edb7b30b2ed254229ec9198fc94`. Задаче 2.19 соответствуют `ac60244eb3b25baf44881db05f95a51425d3c5c9` и `3ea4c4cd4db555957e0fe2fe5a0aec3a0d11f786`, задаче 2.20 — `077a05b2335d74a7301d2a465c8dccc1b7f64edd`. Задаче 2.21 соответствует `3034a313dc99e1fd009845b36c24eb60edc28bd9`, задаче 2.22 — `75f4e491ef173d5392b5279f5d451465c5b884a7` и `a1969b63862d8e77421d9c2060d1ba14eb7d6237`. Задаче 2.23 соответствует `d8c6dc941a30a6d09b0cf064666a1ec9967cd880`, задаче 2.24 — `794a9f818889c20858e28894794a4c2fe810aacd`.
+Задаче 2.25 соответствует `2a8d84f73a6677011cdb530bfb2250ea9acd3805`, задаче 2.26 — `554e31f94b8914305e9ae56f3a04d6a98ff7043f`, задаче 2.27 — `99a31dbed697ebee1ef2701b3c7a9ca10ab5a389`. Задача 2.26 — только проверка: её утверждения подтверждены повторным запуском проверок из таблицы покрытия. Посторонней работы и путей без задачи нет.
 
-Посторонней работы и путей без задачи нет.
-
-Прежний отчёт относился к диапазону `86b632af83727b04b963e83d6d818ae0346e26bf..5d7bf4b03c157a348f9d1f6530248d635fd7f1df`. Активных замечаний и принятых рисков в нём не было, поэтому переносить нечего. Его вывод о падении 260 тестов закрыт задачами 2.17 и 2.18: `mise run check` теперь проходит.
+Прежний отчёт относился к диапазону `4f1380513622b1731d6b76c53e17fcbcab416f80..794a9f818889c20858e28894794a4c2fe810aacd`. Активных замечаний и принятых рисков в нём не было, поэтому переносить нечего. Доработку выбора существующего файла, которую он отдал задачам 2.25–2.26, этот диапазон выполняет.
 
 **Проверенные свойства.**
 
-Обвязки U1 задают ту же светлую тему, что `lib/main.dart`. Тёмная тема тестам не нужна, потому что яркость платформы в них светлая. Добавленный `pumpAndSettle()` после `scrollUntilVisible` в двух тестах выбора с 250 элементами не меняет проверяемых ожиданий.
+После ответа диалога плагин закрепляет право записи и в фоновом потоке запрашивает `COLUMN_SIZE`; ответ в Dart приходит только после запроса. Размер больше нуля даёт код канала `existing_file`, право отпускается, документ не пишется и не удаляется. Нулевой размер вносит документ в `emptyDocuments` до ответа в Dart, поэтому шаг завершения на главном потоке видит эту отметку. Отсутствующий столбец, `NULL`, отрицательный размер и исключение поставщика дают неизвестный размер: экспорт идёт, а после отказа документ остаётся. Шаг завершения отпускает право при любом исходе.
 
-Право записи закрепляется в `onActivityResult`, пока жива Activity, получившая ответ, и до ответа в Dart. Если поставщик не дал закрепляемого права, адрес всё равно передаётся. Повторное добавление плагина при переносе движка реестр пропускает, поэтому очистка прав при подключении к движку срабатывает один раз за жизнь движка и не отпускает право идущего экспорта.
+Копирование открывает документ в режиме `"wt"`. Тест «Копирование заменяет прежнее содержимое документа целиком» различает регрессию к `"w"`: Robolectric передаёт режим настоящему `ContentResolver` и поставщику, `ParcelFileDescriptor.parseMode("w")` не даёт `MODE_TRUNCATE`, а теневой `ParcelFileDescriptor.open` усекает файл только с этим флагом.
 
-После удаления `DocumentsProvider` сам отзывает права на документ, поэтому следующее отпускание бросает `SecurityException`, и плагин его перехватывает. Шаг завершения выполняется ровно один раз при успехе, при отказе записи документа и при отказе записи состояния. Исключение `writeCurrentState` проходит дальше после завершения работы с документом. Повтор из сообщения об отказе открывает диалог, только когда удаление уже завершено, поэтому имя по умолчанию свободно.
+Исход `ExistingFileChosen` — отдельный вариант запечатанного `DocumentCreation` без `CreatedDocument`, поэтому ни запись, ни шаг завершения для него вызвать нельзя. `_write` теперь возвращает `CreatedDocumentOutcome`, и запись не может породить исход `existingFile`. Исход предъявляется как отказ: `isFailure` даёт те же правила показа и объединения, что у «Не удалось сохранить файл», а общая поверхность выключает `persist` для всех сообщений с действием. Строки есть на русском и английском. Диагностических событий этот исход не даёт, как и отмена диалога.
 
-Запись состояния при повреждённом базовом снимке снимает отметку чтения до ожидания. Проверка `_running` и запуск сжатия выполняются без промежуточного `await`, поэтому второго сжатия нет. Повтор выполняется один раз, и ход отсчитывается с нуля. Повреждение во второй записи сразу даёт отказ. При выключенном сжатии отказ наступает без ожидания. База закрывается только после экспорта и сжатия (`AppRuntime._finishShutdown`), поэтому повтор после выключения сжатия её ещё застаёт.
+Удаление `failsDeletes` и его теста обосновано: экспорт не получает результата шага завершения. Требование о неудаче удаления по-прежнему подтверждают `DocumentAccessPluginTest.kt:159-170` и `method_channel_document_access_test.dart:142-152`.
 
-Сценарий «Отказ экспорта не оставляет файла» для документа, созданного диалогом, подтверждают `graph_export_test.dart` и нативная проверка удаления до отпускания права. Выбор в диалоге существующего файла на проверяемой голове экспорт считает новым документом: после отказа такой файл удаляется, а режим `"w"` у поставщика локальных папок не усекает его при успехе. По решению человека экспорт в файл с данными не начинается; требование «Экспорт в файл», решение 13 дизайна и задачи 2.25–2.26 владеют этой доработкой.
+Файл экспорта читается модулем формата как выгрузка базы: эти тесты в `graph_export_test.dart` не менялись и прошли. Запись состояния и `GraphLogCompaction` в диапазоне не менялись, поэтому бюджет экспорта из задачи 2.9 в силе.
 
 **Рассмотрено, но в замечания не записано.**
 
-Ответ канала из фонового потока плагина допустим: так же устроена запись документа задачи 2.4, а прежний отчёт сверил это с `FlutterJNI` Flutter 3.47.1.
+Ответ канала из фонового потока плагина допустим: так же устроены запись документа задачи 2.4 и шаг завершения задачи 2.23, а прежний отчёт сверил это с `FlutterJNI` Flutter 3.47.1.
 
-Комментарий в `releaseGrant` называет отсутствие права только случаем поставщика без закрепляемого права. Права нет и после удаления документа. Поведение верное, это лишь неполнота комментария.
+Запрос размера опирается на временное право чтения из ответа диалога; плагин закрепляет только право записи. Если смена дисплея при открытом диалоге заменит хост в `onResume`, а прежняя Activity будет уничтожена раньше, чем поставщик ответит на запрос, запрос откажет. Тогда файл с данными будет считаться файлом неизвестного размера, и экспорт пойдёт в него, как решение 13 предписывает для отказавшего запроса. Уничтожение прежней Activity идёт после показа новой, а запрос метаданных у поставщика короче. Свидетельств, что это окно достижимо, не найдено.
 
-Экспорт, не принятый координатором при выключении, оставляет пустой документ и закреплённое право до следующего запуска. Так предписывает задача 2.19, а импорт отклоняет такой файл.
+Кодирование выбора файла с данными ошибкой канала задокументировано в плагине и адаптере канала: успешный ответ канала несёт только адрес документа.
 
 **Ограничения.**
 
-Поведение DocumentsUI при перезаписи установлено по исходникам AOSP, на устройстве не проверялось. Диалоги сохранения других производителей могут отличаться.
+Поведение DocumentsUI при выборе существующего файла и значение `COLUMN_SIZE` у поставщиков установлены по исходникам Android и описаниям поставщиков, на устройстве не проверялись.
 
-На устройстве ничего не проверялось, и эти проверки остаются ручными проверками пользователя. Нужно проверить экспорт в локальную папку и в облачный документ со сменой дисплея при открытом диалоге и во время записи временного файла. Нужно убедиться, что после отказа экспорта файла не остаётся, а повтор сохраняет файл под именем по умолчанию. Выбор существующего файла в диалоге проверяется после задачи 2.25.
+На устройстве ничего не проверялось, и эти проверки остаются ручными проверками пользователя. Нужно убедиться, что выбор прежнего файла в диалоге сохранения оставляет его без изменений и показывает «Такой файл уже есть. Сохраните копию под новым именем». Нужно убедиться, что экспорт в новый файл локальной папки и облачного хранилища по-прежнему проходит, а после отказа файла не остаётся.
