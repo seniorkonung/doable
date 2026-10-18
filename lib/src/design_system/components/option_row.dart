@@ -8,6 +8,17 @@ import '../doable_type.dart';
 /// Взаимоисключающие состояния конца строки варианта.
 enum OptionRowTrailing { none, selected, forward }
 
+/// Ход операции, которую выполняет строка.
+final class OptionRowProgress {
+  const OptionRowProgress({required this.share, required this.label});
+
+  /// Выполненная доля от 0 до 1.
+  final double share;
+
+  /// Ход для экранного диктора, например «42 %».
+  final String label;
+}
+
 /// Вариант со значком, названием и пояснением; выбор обрабатывает потребитель.
 /// Текст переносится, а высота строки растёт от минимальных 60 dp.
 final class OptionRow extends StatelessWidget {
@@ -17,6 +28,7 @@ final class OptionRow extends StatelessWidget {
     required this.hint,
     required this.onPressed,
     this.trailing = OptionRowTrailing.none,
+    this.progress,
     this.autofocus = false,
     super.key,
   });
@@ -24,8 +36,15 @@ final class OptionRow extends StatelessWidget {
   final DoableIconData icon;
   final String name;
   final String hint;
-  final VoidCallback onPressed;
+
+  /// Без обработчика строка недоступна: значок и название приглушены, а
+  /// экранный диктор объявляет недоступность состоянием строки.
+  final VoidCallback? onPressed;
   final OptionRowTrailing trailing;
+
+  /// Ход операции строки: кольцо вокруг значка, которое экранный диктор
+  /// читает значением строки.
+  final OptionRowProgress? progress;
   final bool autofocus;
 
   @override
@@ -38,6 +57,7 @@ final class OptionRow extends StatelessWidget {
           Brightness.dark => DoableColors.dark,
         };
     final selected = trailing == OptionRowTrailing.selected;
+    final ink = onPressed == null ? colors.grip : colors.ink;
     final trailingIcon = switch (trailing) {
       OptionRowTrailing.none => null,
       OptionRowTrailing.selected => DoableIcon(
@@ -56,11 +76,13 @@ final class OptionRow extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         button: true,
+        enabled: onPressed != null,
         selected: switch (trailing) {
           OptionRowTrailing.none => false,
           OptionRowTrailing.selected => true,
           OptionRowTrailing.forward => null,
         },
+        value: progress?.label,
         child: Material(
           color: selected ? colors.fill : Colors.transparent,
           borderRadius: borderRadius,
@@ -82,12 +104,24 @@ final class OptionRow extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: selected ? colors.accent : colors.fill,
                       ),
-                      child: Center(
-                        child: DoableIcon(
-                          icon,
-                          size: 22,
-                          color: selected ? colors.onAccent : colors.ink,
-                        ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          DoableIcon(
+                            icon,
+                            size: 22,
+                            color: selected ? colors.onAccent : ink,
+                          ),
+                          if (progress case final progress?)
+                            Positioned.fill(
+                              // Ход читается значением строки.
+                              child: ExcludeSemantics(
+                                child: CircularProgressIndicator(
+                                  value: progress.share,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: DoableMetrics.space3),
@@ -98,9 +132,7 @@ final class OptionRow extends StatelessWidget {
                         children: [
                           Text(
                             name,
-                            style: DoableType.action.copyWith(
-                              color: colors.ink,
-                            ),
+                            style: DoableType.action.copyWith(color: ink),
                           ),
                           Text(
                             hint,

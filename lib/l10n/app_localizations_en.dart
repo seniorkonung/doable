@@ -1267,7 +1267,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataExportFailed => 'Couldn’t save the file';
 
   @override
+  String get dataSectionTitle => 'Data';
+
+  @override
+  String get dataSectionLocalOnly =>
+      'Everything you write is stored only on this device.';
+
+  @override
   String get dataExportTitle => 'Export data';
+
+  @override
+  String get dataExportHint => 'Save a copy of everything to a file';
+
+  @override
+  String get dataExportNothing => 'Nothing to export yet';
+
+  @override
+  String get dataExportRunning => 'Saving to a file…';
+
+  @override
+  String dataExportProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
 
   @override
   String dataExportComposition(

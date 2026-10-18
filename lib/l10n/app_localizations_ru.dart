@@ -1273,7 +1273,32 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataExportFailed => 'Не удалось сохранить файл';
 
   @override
+  String get dataSectionTitle => 'Данные';
+
+  @override
+  String get dataSectionLocalOnly =>
+      'Всё, что вы пишете, хранится только на этом устройстве.';
+
+  @override
   String get dataExportTitle => 'Экспорт данных';
+
+  @override
+  String get dataExportHint => 'Сохранить копию всего в файл';
+
+  @override
+  String get dataExportNothing => 'Пока нечего экспортировать';
+
+  @override
+  String get dataExportRunning => 'Сохраняется в файл…';
+
+  @override
+  String dataExportProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
 
   @override
   String dataExportComposition(

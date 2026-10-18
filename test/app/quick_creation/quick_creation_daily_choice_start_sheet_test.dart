@@ -77,6 +77,8 @@ void main() {
           matchesSemantics(
             label: '$name\n$hint',
             isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
             hasTapAction: true,
             isFocusable: true,
             hasFocusAction: true,

@@ -2042,11 +2042,47 @@ abstract class AppLocalizations {
   /// **'Couldn’t save the file'**
   String get dataExportFailed;
 
-  /// Заголовок панели экспорта графа в файл
+  /// Заголовок раздела «Данные» страницы настроек
+  ///
+  /// In en, this message translates to:
+  /// **'Data'**
+  String get dataSectionTitle;
+
+  /// Пояснение раздела «Данные» о том, что граф хранится только на устройстве
+  ///
+  /// In en, this message translates to:
+  /// **'Everything you write is stored only on this device.'**
+  String get dataSectionLocalOnly;
+
+  /// Название строки экспорта в разделе «Данные» и заголовок панели экспорта графа в файл
   ///
   /// In en, this message translates to:
   /// **'Export data'**
   String get dataExportTitle;
+
+  /// Подпись строки экспорта, когда экспорт можно начать или состав графа неизвестен
+  ///
+  /// In en, this message translates to:
+  /// **'Save a copy of everything to a file'**
+  String get dataExportHint;
+
+  /// Подпись недоступной строки экспорта при пустом графе
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to export yet'**
+  String get dataExportNothing;
+
+  /// Подпись строки экспорта, пока идёт экспорт
+  ///
+  /// In en, this message translates to:
+  /// **'Saving to a file…'**
+  String get dataExportRunning;
+
+  /// Ход идущего экспорта для экранного диктора: доля записанных записей в процентах
+  ///
+  /// In en, this message translates to:
+  /// **'{share}'**
+  String dataExportProgress(double share);
 
   /// Состав будущего файла экспорта: числа всех намерений, долговременных связей, дневных выборов и тегов вместе с архивированными
   ///
