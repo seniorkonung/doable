@@ -1273,6 +1273,74 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataExportFailed => 'Не удалось сохранить файл';
 
   @override
+  String get dataExportTitle => 'Экспорт данных';
+
+  @override
+  String dataExportComposition(
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  ) {
+    final intl.NumberFormat intentionsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String intentionsString = intentionsNumberFormat.format(intentions);
+    final intl.NumberFormat relationsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String relationsString = relationsNumberFormat.format(relations);
+    final intl.NumberFormat dailyChoicesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String dailyChoicesString = dailyChoicesNumberFormat.format(
+      dailyChoices,
+    );
+    final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tagsString = tagsNumberFormat.format(tags);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: '$intentionsString намерения',
+      many: '$intentionsString намерений',
+      few: '$intentionsString намерения',
+      one: '$intentionsString намерение',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: '$relationsString связи',
+      many: '$relationsString связей',
+      few: '$relationsString связи',
+      one: '$relationsString связь',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      dailyChoices,
+      locale: localeName,
+      other: '$dailyChoicesString дневного выбора',
+      many: '$dailyChoicesString дневных выборов',
+      few: '$dailyChoicesString дневных выбора',
+      one: '$dailyChoicesString дневной выбор',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      tags,
+      locale: localeName,
+      other: '$tagsString тега',
+      many: '$tagsString тегов',
+      few: '$tagsString тега',
+      one: '$tagsString тег',
+    );
+    return '$_temp0, $_temp1, $_temp2 и $_temp3 в одном файле';
+  }
+
+  @override
+  String get dataExportUnprotected =>
+      'Файл не защищён. Любой, у кого он есть, сможет прочитать написанное.';
+
+  @override
+  String get dataExportSave => 'Сохранить в файл';
+
+  @override
   String get tagNavigationTitle => 'Намерения с тегом';
 
   @override

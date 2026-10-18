@@ -53,15 +53,12 @@ Future<T?> showDoableSheet<T>({
 /// При нехватке высоты тело прокручивается; шапка остаётся доступной для свайпа.
 /// Компонент только оформляет содержимое, показом управляет [showDoableSheet].
 final class Sheet extends StatelessWidget {
-  const Sheet({
-    required this.title,
-    required this.text,
-    required this.child,
-    super.key,
-  });
+  const Sheet({required this.title, required this.child, this.text, super.key});
 
   final String title;
-  final String text;
+
+  /// Пояснение под заголовком; без него тело следует сразу за заголовком.
+  final String? text;
   final Widget child;
 
   @override
@@ -130,17 +127,19 @@ final class Sheet extends StatelessWidget {
                     style: DoableType.title.copyWith(color: colors.ink),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DoableMetrics.space4,
+                if (text case final text?) ...[
+                  const SizedBox(height: 2),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DoableMetrics.space4,
+                    ),
+                    child: Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      style: DoableType.hint.copyWith(color: colors.muted),
+                    ),
                   ),
-                  child: Text(
-                    text,
-                    textAlign: TextAlign.center,
-                    style: DoableType.hint.copyWith(color: colors.muted),
-                  ),
-                ),
+                ],
                 const SizedBox(height: DoableMetrics.space3),
                 Flexible(child: SingleChildScrollView(child: child)),
               ],

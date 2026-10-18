@@ -10,3 +10,10 @@ final graphCompositionSourceProvider = Provider<GraphCompositionSource>(
     'Источник состава графа должен быть предоставлен композицией приложения.',
   ),
 );
+
+/// Состав графа, пока его показывает хотя бы один экран: экраны делят одно
+/// наблюдение, а без них состав не перечитывается после каждой команды.
+final graphCompositionProvider =
+    StreamProvider.autoDispose<GraphCompositionRead>(
+      (ref) => ref.watch(graphCompositionSourceProvider).watchComposition(),
+    );

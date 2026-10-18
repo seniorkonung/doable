@@ -2042,6 +2042,35 @@ abstract class AppLocalizations {
   /// **'Couldn’t save the file'**
   String get dataExportFailed;
 
+  /// Заголовок панели экспорта графа в файл
+  ///
+  /// In en, this message translates to:
+  /// **'Export data'**
+  String get dataExportTitle;
+
+  /// Состав будущего файла экспорта: числа всех намерений, долговременных связей, дневных выборов и тегов вместе с архивированными
+  ///
+  /// In en, this message translates to:
+  /// **'{intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}} in one file'**
+  String dataExportComposition(
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  );
+
+  /// Предупреждение панели экспорта о том, что файл не зашифрован
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not protected. Anyone who has it can read what you wrote.'**
+  String get dataExportUnprotected;
+
+  /// Кнопка панели экспорта, открывающая системный диалог сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Save to a file'**
+  String get dataExportSave;
+
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:
