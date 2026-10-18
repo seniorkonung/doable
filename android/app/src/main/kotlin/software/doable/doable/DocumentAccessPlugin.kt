@@ -22,6 +22,11 @@ import java.util.concurrent.Executor
  * временный файл приложения потоками `ContentResolver` в [copyExecutor]; байты
  * через канал не передаются. Контракт канала задаёт
  * `lib/src/data_transfer/data/method_channel_document_access.dart`.
+ *
+ * Временное право на документ Android снимает вместе с Activity, получившей
+ * ответ диалога, а движок при смене дисплея переносится в другую Activity
+ * (ADR-0031). Поэтому право записи закрепляется при ответе диалога и
+ * отпускается на шаге завершения работы с документом.
  */
 class DocumentAccessPlugin internal constructor(
     private val copyExecutor: Executor,
@@ -37,6 +42,9 @@ class DocumentAccessPlugin internal constructor(
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         contentResolver = binding.applicationContext.contentResolver
+        // Постоянных прав на документы приложение не хранит: закреплённые права
+        // остались от процесса, завершённого посреди операции с документом.
+        contentResolver.persistedUriPermissions.map { it.uri }.forEach(::releaseGrant)
         channel = MethodChannel(binding.binaryMessenger, CHANNEL)
         channel.setMethodCallHandler(::onMethodCall)
     }
@@ -70,7 +78,10 @@ class DocumentAccessPlugin internal constructor(
         if (requestCode != CREATE_DOCUMENT_REQUEST) return false
         val result = pendingCreation ?: return false
         pendingCreation = null
-        result.success(data?.data?.takeIf { resultCode == Activity.RESULT_OK }?.toString())
+        val document = data?.data?.takeIf { resultCode == Activity.RESULT_OK }
+        // Право закрепляется, пока жива Activity, получившая ответ.
+        document?.let(::takeWriteGrant)
+        result.success(document?.toString())
         return true
     }
 
@@ -87,6 +98,10 @@ class DocumentAccessPlugin internal constructor(
                 document = Uri.parse(requireNotNull(call.argument<String>("document"))),
                 result = result,
             )
+            "finishDocument" -> {
+                releaseGrant(Uri.parse(requireNotNull(call.argument<String>("document"))))
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
@@ -127,6 +142,26 @@ class DocumentAccessPlugin internal constructor(
                 false
             }
             if (written) result.success(null) else result.error(DOCUMENT_NOT_WRITTEN, null, null)
+        }
+    }
+
+    private fun takeWriteGrant(document: Uri) {
+        try {
+            contentResolver.takePersistableUriPermission(document, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        } catch (error: SecurityException) {
+            // Поставщик не дал закрепляемого права: копирование идёт с временным.
+        }
+    }
+
+    /** Отпускает закреплённое право на [document] в любых режимах, если оно есть. */
+    private fun releaseGrant(document: Uri) {
+        try {
+            contentResolver.releasePersistableUriPermission(
+                document,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        } catch (error: SecurityException) {
+            // Права нет: поставщик не дал закрепляемого права.
         }
     }
 

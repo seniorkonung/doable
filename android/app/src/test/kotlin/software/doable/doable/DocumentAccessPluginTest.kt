@@ -1,6 +1,7 @@
 package software.doable.doable
 
 import android.app.Activity
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -32,6 +33,10 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowContentResolver
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
 
@@ -66,6 +71,71 @@ class DocumentAccessPluginTest {
 
         activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
         assertEquals(document.toString(), reply.value())
+    }
+
+    @Test
+    fun `Выбор места закрепляет право записи в документ до ответа в Dart`() {
+        var grantsAtReply: List<Uri>? = null
+        val reply = messenger.invoke(
+            "createDocument",
+            mapOf("name" to "Doable 2026-10-18.jsonl.gz"),
+            onReply = { grantsAtReply = writeGrants() },
+        )
+        val dialog = shadowOf(activity).nextStartedActivityForResult
+
+        activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+
+        assertEquals(document.toString(), reply.value())
+        assertEquals(listOf(document), grantsAtReply)
+    }
+
+    @Test
+    @Config(shadows = [ContentResolverWithoutPersistableGrants::class])
+    fun `Без закрепляемого права адрес документа передаётся, а завершение работы отвечает без ошибки`() {
+        val reply = messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+        val dialog = shadowOf(activity).nextStartedActivityForResult
+
+        activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        val finish = messenger.invoke("finishDocument", mapOf("document" to document.toString()))
+
+        assertEquals(document.toString(), reply.value())
+        assertNull(finish.value())
+    }
+
+    @Test
+    fun `Завершение работы после записи документа отпускает закреплённое право`() {
+        chooseDocument()
+        val source = File.createTempFile("export", ".jsonl.gz").apply {
+            deleteOnExit()
+            writeBytes(ByteArray(10))
+        }
+        shadowOf(context.contentResolver).registerOutputStream(document, ByteArrayOutputStream())
+        messenger.invoke("writeDocument", mapOf("source" to source.path, "document" to document.toString()))
+        copies.single().run()
+
+        val finish = messenger.invoke("finishDocument", mapOf("document" to document.toString()))
+
+        assertNull(finish.value())
+        assertEquals(emptyList<Uri>(), writeGrants())
+    }
+
+    @Test
+    fun `Завершение работы без записи документа отпускает закреплённое право`() {
+        chooseDocument()
+
+        val finish = messenger.invoke("finishDocument", mapOf("document" to document.toString()))
+
+        assertNull(finish.value())
+        assertEquals(emptyList<Uri>(), writeGrants())
+    }
+
+    @Test
+    fun `Подключение к движку отпускает право, оставшееся после завершения процесса посреди экспорта`() {
+        context.contentResolver.takePersistableUriPermission(document, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+
+        DocumentAccessPlugin().onAttachedToEngine(pluginBinding(context, ChannelMessenger()))
+
+        assertEquals(emptyList<Uri>(), writeGrants())
     }
 
     @Test
@@ -146,6 +216,17 @@ class DocumentAccessPluginTest {
         assertEquals("document_not_written", reply.errorCode())
     }
 
+    /** Документ, место которого человек выбрал в системном диалоге. */
+    private fun chooseDocument() {
+        messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+        val dialog = shadowOf(activity).nextStartedActivityForResult
+        activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+    }
+
+    /** Документы с закреплённым правом записи. */
+    private fun writeGrants(): List<Uri> =
+        context.contentResolver.persistedUriPermissions.filter { it.isWritePermission }.map { it.uri }
+
     private inner class ClosingOutputStream : ByteArrayOutputStream() {
         var closedBeforeReply = false
 
@@ -179,8 +260,8 @@ private class ChannelMessenger : BinaryMessenger {
     private val replies = mutableListOf<ChannelReply>()
     val anyReplyReceived get() = replies.any { it.received }
 
-    fun invoke(method: String, arguments: Map<String, String>): ChannelReply {
-        val reply = ChannelReply().also { replies += it }
+    fun invoke(method: String, arguments: Map<String, String>, onReply: () -> Unit = {}): ChannelReply {
+        val reply = ChannelReply(onReply).also { replies += it }
         val message = StandardMethodCodec.INSTANCE.encodeMethodCall(MethodCall(method, arguments))
         message.rewind()
         requireNotNull(handlers[CHANNEL]).onMessage(message, reply)
@@ -197,11 +278,13 @@ private class ChannelMessenger : BinaryMessenger {
     }
 }
 
-private class ChannelReply : BinaryMessenger.BinaryReply {
+/** Ответ плагина; [onReply] наблюдает состояние в момент ответа. */
+private class ChannelReply(private val onReply: () -> Unit) : BinaryMessenger.BinaryReply {
     private var envelope: ByteBuffer? = null
     val received get() = envelope != null
 
     override fun reply(reply: ByteBuffer?) {
+        onReply()
         envelope = requireNotNull(reply)
     }
 
@@ -216,6 +299,23 @@ private class ChannelReply : BinaryMessenger.BinaryReply {
         return (error as? FlutterException)?.code
             ?: throw AssertionError("Ожидался отказ канала, получено $error")
     }
+}
+
+/**
+ * Поставщик документа без закрепляемого права: как Android, отказывает и
+ * закрепить право, и отпустить его.
+ *
+ * Класс открыт: Robolectric создаёт тень отражением.
+ */
+@Implements(ContentResolver::class)
+class ContentResolverWithoutPersistableGrants : ShadowContentResolver() {
+    @Implementation
+    override fun takePersistableUriPermission(uri: Uri, modeFlags: Int): Unit =
+        throw SecurityException("No persistable permission grants found")
+
+    @Implementation
+    override fun releasePersistableUriPermission(uri: Uri, modeFlags: Int): Unit =
+        throw SecurityException("No permission grants found")
 }
 
 /** Привязка к Activity, которая, как Flutter, передаёт ответы Activity слушателям. */
