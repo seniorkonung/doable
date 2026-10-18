@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/file_document_access.dart';
 import '../../support/forwarding_graph_fact_log.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -40,7 +41,9 @@ void main() {
 
   tearDown(() => root.delete(recursive: true));
 
-  AppRuntime runtimeWith(AppGraphLogCompactionFactory compactionFactory) {
+  AppRuntime runtimeWith(
+    GraphLogCompaction Function(ObservableGraphFactLog log) createCompaction,
+  ) {
     final runtime = AppRuntime(
       connectionFactory: () => observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(),
@@ -48,7 +51,11 @@ void main() {
       ),
       diagnosticsSink: diagnostics,
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
-      graphLogCompactionFactory: compactionFactory,
+      graphFilesFactory: (log) async => (
+        compaction: createCompaction(log),
+        temporaryDirectory: Directory.fromUri(root.uri.resolve('tmp/')),
+        documents: FileDocumentAccess(root),
+      ),
     );
     addTearDown(runtime.shutdown);
     return runtime;
@@ -89,7 +96,7 @@ void main() {
     final leftoverAtWrite = <bool>[];
     final writeStarted = Completer<void>();
     final runtime = runtimeWith(
-      (log) async => compactionOver(
+      (log) => compactionOver(
         log,
         readRegistry: (log) async {
           cleanupStarted.complete();
@@ -125,7 +132,7 @@ void main() {
     final writeStarted = Completer<void>();
     final releaseWrite = Completer<void>();
     final runtime = runtimeWith(
-      (log) async => compactionOver(
+      (log) => compactionOver(
         log,
         // Сжатие сверяет порог уже после пакета команды.
         readRegistry: (log) async {
@@ -167,7 +174,7 @@ void main() {
     final commandConfirmed = Completer<void>();
     final writeStarted = Completer<void>();
     final runtime = runtimeWith(
-      (log) async => compactionOver(
+      (log) => compactionOver(
         log,
         readRegistry: (_) async {
           await commandConfirmed.future;

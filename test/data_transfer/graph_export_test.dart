@@ -88,7 +88,7 @@ void main() {
         diagnosticsSink: InMemoryDiagnosticsSink(),
         stateWriteRunner: stateWriteRunner,
       ),
-      temporaryDirectory: temporary,
+      temporaryDirectory: Future.value(temporary),
       clock: () => exportMoment,
       diagnosticsSink: diagnostics,
     );

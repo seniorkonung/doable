@@ -512,7 +512,7 @@
   - **Files likely touched:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `lib/src/data_transfer/application/graph_export.dart`, `test/data_transfer/graph_export_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Estimated scope:** S.
 
-- [ ] 2.8 Подключить экспорт к жизненному циклу приложения и очищать временный каталог при запуске
+- [x] 2.8 Подключить экспорт к жизненному циклу приложения и очищать временный каталог при запуске
   - **Acceptance criteria:**
     - `AppRuntime` собирает операцию экспорта из лога фактов репозитория, того же сжатия лога, которое ведёт отметки чтения и пересборку снимка, доступа к документам, часов и диагностики. Доступ к документам передаётся параметром, а `AppRuntime.production` подключает плагин задачи 2.4.
     - Временный каталог — `app_flutter/tmp/`, который правила резервного копирования уже исключают по [ADR-0004](../../../docs/adr/0004-keep-personal-graph-device-local.md). После подготовки хранилища `AppRuntime` удаляет оставшиеся в нём файлы прежних запусков раньше, чем экспорт этого запуска пишет временный файл; отказ очистки не мешает готовности и командам, а оставшиеся файлы удалит следующий запуск. Выключение дожидается идущего экспорта до закрытия базы.

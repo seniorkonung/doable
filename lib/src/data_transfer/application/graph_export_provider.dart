@@ -81,14 +81,21 @@ final class GraphExportController extends Notifier<GraphExportState> {
   }
 
   Future<GraphExportOutcome> _write(CreatedDocument document) async {
-    state = const GraphExportRunning(0);
+    _publish(const GraphExportRunning(0));
     try {
       return await _export.write(
         document,
-        onProgress: (share) => state = GraphExportRunning(share),
+        onProgress: (share) => _publish(GraphExportRunning(share)),
       );
     } finally {
-      state = const GraphExportIdle();
+      _publish(const GraphExportIdle());
     }
+  }
+
+  /// Выключение приложения освобождает контейнер, не дожидаясь экспорта, а
+  /// экспорт продолжается до результата, которого выключение дожидается.
+  /// Состояние освобождённого контейнера никто не наблюдает.
+  void _publish(GraphExportState next) {
+    if (ref.mounted) state = next;
   }
 }

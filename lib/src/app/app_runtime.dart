@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -5,6 +7,10 @@ import '../data/local/app_database.dart';
 import '../data/local/bootstrap/local_data_bootstrap.dart';
 import '../data/local/bootstrap/local_data_bootstrap_result.dart';
 import '../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../data_transfer/application/document_access.dart';
+import '../data_transfer/application/graph_export.dart';
+import '../data_transfer/application/graph_export_provider.dart';
+import '../data_transfer/data/method_channel_document_access.dart';
 import '../graph/application/graph_command_coordinator.dart';
 import '../graph/application/personal_graph_repository.dart';
 import '../graph/application/personal_graph_repository_provider.dart';
@@ -26,8 +32,17 @@ typedef AppPersonalGraphRepositoryFactory = PersonalGraphRepository Function(
   AppDatabase database,
 );
 
-/// Создаёт сжатие лога фактов готового графа над его логом [log].
-typedef AppGraphLogCompactionFactory = Future<GraphLogCompaction> Function(
+/// Файлы графа вне базы: сжатие лога фактов в снимки, каталог временных
+/// файлов операций с данными и документы, которые человек выбирает
+/// системными диалогами.
+typedef AppGraphFiles = ({
+  GraphLogCompaction compaction,
+  Directory temporaryDirectory,
+  DocumentAccess documents,
+});
+
+/// Создаёт файлы готового графа над его логом фактов [log].
+typedef AppGraphFilesFactory = Future<AppGraphFiles> Function(
   ObservableGraphFactLog log,
 );
 
@@ -78,22 +93,25 @@ final class AppRuntime {
   /// без него используется [readDeviceLocalDay].
   /// [quickCreationModeStore] принадлежит этому runtime и обслуживает единый
   /// контроллер независимо от подготовки и команд личного графа.
-  /// [graphLogCompactionFactory] подключает снимки графа: после подготовки
-  /// хранилища runtime очищает каталог снимков и затем запускает сжатие лога
-  /// фактов, а выключение дожидается сжатия и только потом закрывает базу.
+  /// [graphFilesFactory] подключает файлы графа вне базы. После подготовки
+  /// хранилища runtime удаляет временные файлы прежних запусков, очищает
+  /// каталог снимков и затем запускает сжатие лога фактов. Экспорт графа
+  /// пишет состояние через то же сжатие и начинает запись временного файла
+  /// только после удаления временных файлов прежних запусков. Выключение
+  /// дожидается идущего экспорта и сжатия и только потом закрывает базу.
   /// Лог фактов ведёт репозиторий по умолчанию, поэтому с
-  /// [repositoryFactory] сжатие не подключается.
+  /// [repositoryFactory] файлы графа не подключаются.
   factory AppRuntime({
     required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
     required QuickCreationModeStore quickCreationModeStore,
     AppPersonalGraphRepositoryFactory? repositoryFactory,
-    AppGraphLogCompactionFactory? graphLogCompactionFactory,
+    AppGraphFilesFactory? graphFilesFactory,
     DailyChoiceLocalDateSource? dailyChoiceLocalDateSource,
   }) {
     assert(
-      repositoryFactory == null || graphLogCompactionFactory == null,
-      'Сжатие ведётся над логом фактов репозитория по умолчанию.',
+      repositoryFactory == null || graphFilesFactory == null,
+      'Файлы графа ведутся над логом фактов репозитория по умолчанию.',
     );
     final _AppGraphFactory graphFactory = switch (repositoryFactory) {
       final createRepository? => (database) => (
@@ -117,9 +135,10 @@ final class AppRuntime {
         diagnosticsSink: diagnosticsSink,
       ),
       graphFactory,
-      graphLogCompactionFactory,
+      graphFilesFactory,
       dailyChoiceLocalDateSource ?? readDeviceLocalDay,
       quickCreationModeStore,
+      diagnosticsSink,
     );
   }
 
@@ -134,30 +153,40 @@ final class AppRuntime {
         localDataDirectoryProvider: getApplicationDocumentsDirectory,
         diagnosticsSink: diagnosticsSink,
       ),
-      graphLogCompactionFactory: (log) async => GraphLogCompaction(
-        log: log,
-        directory: GraphSnapshotStore.directoryIn(
-          await getApplicationDocumentsDirectory(),
-        ),
-        clock: () => DateTime.now().toUtc(),
-        diagnosticsSink: diagnosticsSink,
-      ),
+      graphFilesFactory: (log) async {
+        final applicationDocuments = await getApplicationDocumentsDirectory();
+        return (
+          compaction: GraphLogCompaction(
+            log: log,
+            directory: GraphSnapshotStore.directoryIn(applicationDocuments),
+            clock: () => DateTime.now().toUtc(),
+            diagnosticsSink: diagnosticsSink,
+          ),
+          // Внутри app_flutter, поэтому исключён из backup и transfer.
+          temporaryDirectory: Directory.fromUri(
+            applicationDocuments.uri.resolve('tmp/'),
+          ),
+          documents: const MethodChannelDocumentAccess(),
+        );
+      },
     );
   }
 
   AppRuntime._(
     this._localDataBootstrap,
     this._graphFactory,
-    this._graphLogCompactionFactory,
+    this._graphFilesFactory,
     this._dailyChoiceLocalDateSource,
     this._quickCreationModeStore,
+    this._diagnosticsSink,
   );
 
   final LocalDataBootstrap _localDataBootstrap;
   final _AppGraphFactory _graphFactory;
-  final AppGraphLogCompactionFactory? _graphLogCompactionFactory;
+  final AppGraphFilesFactory? _graphFilesFactory;
   final DailyChoiceLocalDateSource _dailyChoiceLocalDateSource;
   final QuickCreationModeStore _quickCreationModeStore;
+  final DiagnosticsSink _diagnosticsSink;
   // Одна загрузка и одна очередь на runtime, в том числе при повторе bootstrap.
   late final Future<QuickCreationMode> _initialQuickCreationMode =
       _quickCreationModeStore.read();
@@ -236,6 +265,23 @@ final class AppRuntime {
     ProviderContainer? container;
     try {
       final (:repository, :factLog) = _graphFactory(database);
+      final files = switch ((factLog, _graphFilesFactory)) {
+        (final log?, final createFiles?) => await createFiles(log),
+        _ => null,
+      };
+      if (_lifecycle != _AppRuntimeLifecycle.running) {
+        throw StateError('Файлы графа созданы после начала shutdown.');
+      }
+      final export = switch (files) {
+        final files? => GraphExport(
+          documents: files.documents,
+          compaction: files.compaction,
+          temporaryDirectory: _removeTemporaryFiles(files.temporaryDirectory),
+          clock: () => DateTime.now().toUtc(),
+          diagnosticsSink: _diagnosticsSink,
+        ),
+        null => null,
+      };
       container = ProviderContainer(
         overrides: [
           quickCreationModeControllerProvider.overrideWith(
@@ -248,6 +294,10 @@ final class AppRuntime {
           dailyChoiceLocalDateSourceProvider.overrideWithValue(
             _dailyChoiceLocalDateSource,
           ),
+          if (export != null)
+            graphExportControllerProvider.overrideWith(
+              () => GraphExportController(export),
+            ),
         ],
         retry: (retryCount, error) => null,
       );
@@ -256,11 +306,8 @@ final class AppRuntime {
       );
       container.read(appRouterProvider);
       _commandCoordinator = coordinator;
-      if ((factLog, _graphLogCompactionFactory) case (
-        final log?,
-        final createCompaction?,
-      )) {
-        _graphSnapshots = _startGraphSnapshots(createCompaction, log);
+      if (files != null) {
+        _graphSnapshots = _startGraphSnapshots(files.compaction);
       }
       return _ready = AppRuntimeReady(container);
     } on Object {
@@ -270,20 +317,27 @@ final class AppRuntime {
     }
   }
 
-  /// Очищает каталог снимков и затем, если выключение ещё не началось,
-  /// запускает сжатие лога фактов. Готовность и команды графа этого не ждут.
-  Future<GraphLogCompaction?> _startGraphSnapshots(
-    AppGraphLogCompactionFactory createCompaction,
-    ObservableGraphFactLog log,
-  ) async {
-    final GraphLogCompaction compaction;
+  /// Удаляет каталог временных файлов [directory] вместе с файлами,
+  /// которые оставили прерванные операции прежних запусков; операция этого
+  /// запуска создаёт каталог заново. Завершается каталогом, в который можно
+  /// писать временные файлы этого запуска. Готовность и команды графа этого
+  /// не ждут.
+  Future<Directory> _removeTemporaryFiles(Directory directory) async {
     try {
-      compaction = await createCompaction(log);
-    } on Object {
-      // Без каталога снимков сжатие не запускается; следующий запуск
-      // пробует снова.
-      return null;
+      await directory.delete(recursive: true);
+    } on FileSystemException {
+      // Каталога нет, или часть файлов не удалена. Оставшиеся файлы
+      // операциям не мешают, их удалит очистка следующего запуска.
     }
+    return directory;
+  }
+
+  /// Очищает каталог снимков и затем, если выключение ещё не началось,
+  /// запускает сжатие лога фактов [compaction]. Готовность и команды графа
+  /// этого не ждут.
+  Future<GraphLogCompaction?> _startGraphSnapshots(
+    GraphLogCompaction compaction,
+  ) async {
     try {
       await compaction.removeUnregisteredFiles();
     } on Object {
@@ -299,6 +353,7 @@ final class AppRuntime {
     if (existingShutdown != null) return existingShutdown;
 
     _lifecycle = _AppRuntimeLifecycle.closing;
+    // Координатор дожидается принятых команд и идущего экспорта.
     final draining = _commandCoordinator?.shutdown() ?? Future<void>.value();
     final compacting = _stopGraphSnapshots();
     _ready?.container.dispose();

@@ -36,8 +36,10 @@ final class GraphExport {
   /// повреждённого снимка.
   final GraphLogCompaction _compaction;
 
-  /// Каталог временных файлов приложения.
-  final Directory _temporaryDirectory;
+  /// Каталог временных файлов приложения. Он становится доступен, когда из
+  /// него удалены файлы прежних запусков, поэтому их очистка не затрагивает
+  /// временный файл этого экспорта.
+  final Future<Directory> _temporaryDirectory;
   final DateTime Function() _clock;
   final DiagnosticsSink _diagnosticsSink;
 
@@ -74,7 +76,7 @@ final class GraphExport {
   }) async {
     final stopwatch = Stopwatch()..start();
     final file = File.fromUri(
-      _temporaryDirectory.uri.resolve(_temporaryFileName),
+      (await _temporaryDirectory).uri.resolve(_temporaryFileName),
     );
     try {
       await _writeTemporaryFile(file, stopwatch, onProgress: onProgress);
@@ -112,7 +114,7 @@ final class GraphExport {
     required void Function(double share) onProgress,
   }) async {
     try {
-      await _temporaryDirectory.create(recursive: true);
+      await file.parent.create(recursive: true);
       await _compaction.writeCurrentState(
         file,
         writtenAt: _clock(),
