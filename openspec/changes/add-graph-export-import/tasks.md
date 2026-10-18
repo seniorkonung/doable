@@ -680,3 +680,28 @@
   - **Dependencies:** 2.20, 2.21.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 2.21.
   - **Estimated scope:** XS.
+
+- [ ] 2.23 Удалять после отказа экспорта документ, созданный в выбранном месте, если его поставщик это позволяет
+  - **Acceptance criteria:**
+    - По требованию «Отказы экспорта и импорта» и решению 13 [дизайна](design.md) шаг завершения работы с созданным документом из задачи 2.19 получает исход экспорта. После отказа записи документа и после отказа записи состояния до копирования плагин в фоновом потоке удаляет документ через `DocumentsContract.deleteDocument` и только затем отпускает закреплённое право. После успеха документ остаётся.
+    - Отказ удаления не меняет исход экспорта и его сообщение «Не удалось сохранить файл» с действием «Повторить», не мешает отпустить право и не завершает процесс. Это относится и к поставщику без поддержки удаления, и к отозванному доступу, и к исключению поставщика.
+    - Шаг запуска из задачи 2.19 по-прежнему только отпускает оставшиеся права и документы не удаляет. Байты через канал не передаются. Манифест, набор разрешений и правила резервного копирования не меняются, `FileProvider` не появляется.
+  - **Verification:**
+    - Нативными проверками Robolectric проверить три случая. Шаг завершения после отказа удаляет документ, а затем отпускает право. После успеха документ не удаляется. Исключение поставщика при удалении не мешает отпустить право и даёт ответ в Dart без ошибки.
+    - С подменой доступа к документам `FileDocumentAccess` проверить, что после внедрённых отказов записи временного файла и записи документа созданного документа нет. После успеха документ остаётся и читается модулем формата. При отказе удаления исход экспорта остаётся прежним отказом. С подменой канала проверить, что Dart-сторона передаёт исход экспорта на шаге завершения.
+    - Выполнить `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`, `mise exec --no-deps -- flutter test test/data_transfer/` и `mise exec --no-deps -- flutter build apk --debug`. Убедиться, что `git diff --stat` не содержит `android/app/src/main/AndroidManifest.xml` и `android/app/src/main/res/xml/`.
+  - **Dependencies:** 2.19.
+  - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt`, `android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt`, `lib/src/data_transfer/application/document_access.dart`, `lib/src/data_transfer/data/method_channel_document_access.dart`, `lib/src/data_transfer/application/graph_export.dart`, `test/data_transfer/method_channel_document_access_test.dart`, `test/data_transfer/graph_export_test.dart`, `test/support/file_document_access.dart`.
+  - **Estimated scope:** S.
+
+- [ ] 2.24 Повторно подтвердить готовность этапа после удаления документа неудавшегося экспорта
+  - **Acceptance criteria:**
+    - После задачи 2.23 условие Ready to advance этапа 2 из [плана](plan.md) по-прежнему выполнено, в том числе набор разрешений Android не изменился, а сценарий «Отказ экспорта не оставляет файла» подтверждён проверкой. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 2.22 и 2.23 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`, `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+    - Собрать `mise exec --no-deps -- flutter build apk --release` и проверить набор разрешений собранного APK командой `mise exec --no-deps -- dart run tool/check_android_privacy_manifest.dart <Android SDK>/build-tools/36.0.0/aapt2 build/app/outputs/flutter-apk/app-release.apk`. Сообщить в сессии результаты и оставшиеся ручные проверки на устройстве: после отказа экспорта в локальную папку и в облачный документ файла не остаётся, а повтор сохраняет файл под именем по умолчанию.
+  - **Dependencies:** 2.22, 2.23.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 2.23.
+  - **Estimated scope:** XS.
