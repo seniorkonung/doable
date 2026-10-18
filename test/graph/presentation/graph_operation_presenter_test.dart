@@ -15,6 +15,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/graph_backups/graph_backups.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -1553,6 +1554,38 @@ void main() {
       },
     );
   }
+
+  for (final scenario in [
+    (locale: const Locale('ru'), failed: 'Не удалось сделать копию'),
+    (locale: const Locale('en'), failed: 'Couldn’t back up'),
+  ]) {
+    testWidgets(
+      'отказ ручной копии сразу предъявляется общей поверхностью текстом без '
+      'действия, ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: scenario.locale,
+        );
+        harness.startManualBackup(ManualGraphBackupOutcome.failed);
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.failed), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: scenario.failed,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        expect(find.byType(SnackBarAction), findsNothing);
+        await _closeMessage(tester);
+      },
+    );
+  }
 }
 
 const _withoutPresenter = -1;
@@ -2572,6 +2605,9 @@ final class _PresenterHarness {
     GraphBackupRestoreAccepted accepted,
     GraphBackupRestoreOutcome outcome,
   ) => _restores[accepted]!.complete((_) async => outcome);
+
+  void startManualBackup(ManualGraphBackupOutcome outcome) =>
+      _coordinator.acceptManualBackup(() async => outcome);
 }
 
 Future<_PresenterHarness> _pumpPresenterApp(

@@ -896,7 +896,7 @@
   - **Files likely touched:** `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/graph/presentation/graph_operation_message_plan.dart`, `lib/l10n/app_ru.arb` и `lib/l10n/app_en.arb` с результатами генерации, `test/graph/application/graph_command_coordinator_replacement_test.dart` (новый), `test/graph/presentation/graph_operation_presenter_test.dart`; если для непринятых команд вводится отдельный вариант результата, то и переключатели результатов принятия в `lib/src/*/presentation/`.
   - **Estimated scope:** M.
 
-- [ ] 3.14 Принимать ручную копию операцией координатора с политикой «только отказ»
+- [x] 3.14 Принимать ручную копию операцией координатора с политикой «только отказ»
   - **Acceptance criteria:**
     - По решению 12 [дизайна](design.md), [ADR-0016](../../../docs/adr/0016-present-only-failure-for-self-evident-success.md) и требованию «Список резервных копий» [спецификации](specs/graph-backups/spec.md) координатор принимает ручную копию задачи 3.6 типизированной операцией. Успех публикуется для согласования и права предъявления не образует, поэтому сообщения не даёт. Отказ сразу принадлежит общей поверхности и показывается сообщением «Не удалось сделать копию» («Couldn’t back up») без действия. Пока ручная копия выполняется, вторая не принимается; во время выключения копия не принимается, а принятую дожидаются.
   - **Verification:**

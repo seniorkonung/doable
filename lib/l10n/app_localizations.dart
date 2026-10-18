@@ -2066,6 +2066,12 @@ abstract class AppLocalizations {
   /// **'Not enough space on the device. Free up space and try again. Nothing was changed'**
   String get dataReplacementStorageFull;
 
+  /// Сообщение общей поверхности без действия об отказе ручной резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t back up'**
+  String get dataManualBackupFailed;
+
   /// Заголовок страницы «Настройки» и доступное название перехода к ней с Главной
   ///
   /// In en, this message translates to:

@@ -1190,6 +1190,8 @@
   "@dataBackupRestoreFailed": {"description": "Сообщение об отказе восстановления резервной копии: под строкой «Резервные копии» или на общей поверхности"},
   "dataReplacementStorageFull": "Not enough space on the device. Free up space and try again. Nothing was changed",
   "@dataReplacementStorageFull": {"description": "Сообщение об отказе замены графа из-за нехватки места на устройстве"},
+  "dataManualBackupFailed": "Couldn’t back up",
+  "@dataManualBackupFailed": {"description": "Сообщение общей поверхности без действия об отказе ручной резервной копии"},
   "settingsTitle": "Settings",
   "@settingsTitle": {"description": "Заголовок страницы «Настройки» и доступное название перехода к ней с Главной"},
   "dataSectionTitle": "Data",

@@ -43,8 +43,8 @@ final class GraphOperationMessagePlan {
 /// текстом. При отсутствии отказов объединяются все успехи с сообщением
 /// последнего.
 GraphOperationMessagePlan planGraphOperationMessage(
-  List<GraphCommandCompletion> completions,
-  GraphOperationMessage Function(GraphCommandCompletion) messageFor,
+  List<GraphPresentableCompletion> completions,
+  GraphOperationMessage Function(GraphPresentableCompletion) messageFor,
 ) {
   final failureTokens = <GraphOperationToken>[];
   GraphOperationMessage? firstFailureMessage;

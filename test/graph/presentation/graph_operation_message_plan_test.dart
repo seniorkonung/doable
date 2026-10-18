@@ -9,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../intention/presentation/details/details_test_support.dart';
 
 void main() {
-  late List<GraphCommandCompletion> successes;
-  late List<GraphCommandCompletion> failures;
+  late List<GraphPresentableCompletion> successes;
+  late List<GraphPresentableCompletion> failures;
 
   setUpAll(() async {
     final repository = ControlledDetailsRepository();

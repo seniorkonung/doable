@@ -1288,6 +1288,9 @@ class AppLocalizationsRu extends AppLocalizations {
       'Недостаточно места на устройстве. Освободите место и повторите. Ничего не изменено';
 
   @override
+  String get dataManualBackupFailed => 'Не удалось сделать копию';
+
+  @override
   String get settingsTitle => 'Настройки';
 
   @override

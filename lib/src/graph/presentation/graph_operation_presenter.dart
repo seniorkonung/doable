@@ -24,6 +24,9 @@ import 'graph_operation_message_plan.dart';
 /// Показывает в [ScaffoldMessenger] не больше одного сообщения, ждёт его
 /// закрытия и только затем запрашивает у coordinator следующий результат.
 /// Новый результат не снимает текущее сообщение.
+///
+/// Что предъявлять, решает coordinator: ручная копия приходит сюда только
+/// отказом (ADR-0016).
 final class GraphOperationPresenter extends ConsumerStatefulWidget {
   const GraphOperationPresenter({required this.child, super.key});
 
@@ -223,7 +226,7 @@ final class _PresentationSurface {
 
 GraphOperationMessage _messageFor(
   AppLocalizations localizations,
-  GraphCommandCompletion completion,
+  GraphPresentableCompletion completion,
 ) => switch (completion) {
   IntentionCommandCompletion() => GraphOperationMessage(
     _intentionMessage(localizations, completion),
@@ -243,6 +246,9 @@ GraphOperationMessage _messageFor(
   GraphExportCompletion() => _exportMessage(localizations, completion),
   GraphBackupRestoreCompletion() => GraphOperationMessage(
     _backupRestoreMessage(localizations, completion),
+  ),
+  GraphManualBackupFailedCompletion() => GraphOperationMessage(
+    localizations.dataManualBackupFailed,
   ),
 };
 

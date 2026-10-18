@@ -354,6 +354,7 @@
   "dataBackupRestored": "Копия восстановлена",
   "dataBackupRestoreFailed": "Не удалось восстановить копию. Ничего не изменено",
   "dataReplacementStorageFull": "Недостаточно места на устройстве. Освободите место и повторите. Ничего не изменено",
+  "dataManualBackupFailed": "Не удалось сделать копию",
   "settingsTitle": "Настройки",
   "dataSectionTitle": "Данные",
   "dataSectionLocalOnly": "Всё, что вы пишете, хранится только на этом устройстве.",

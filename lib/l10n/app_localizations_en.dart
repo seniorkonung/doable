@@ -1282,6 +1282,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Not enough space on the device. Free up space and try again. Nothing was changed';
 
   @override
+  String get dataManualBackupFailed => 'Couldn’t back up';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

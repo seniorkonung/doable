@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
 import '../../daily_choice/application/daily_choice_result.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
+import '../../graph_backups/graph_backups.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -159,10 +160,15 @@ final class GraphBackupRestoreOperationToken extends GraphOperationToken {
   String toString() => 'GraphBackupRestoreOperationToken';
 }
 
-/// Завершение, право предъявления которого выдаёт coordinator.
-///
-/// По протоколу ADR-0012 успех сразу принадлежит оболочке, а отказ — открытой
-/// экранной сессии инициатора.
+final class GraphManualBackupOperationToken extends GraphOperationToken {
+  GraphManualBackupOperationToken._();
+
+  @override
+  String toString() => 'GraphManualBackupOperationToken';
+}
+
+/// Завершение принятой операции, которое coordinator публикует для
+/// согласования данных.
 sealed class GraphCommandCompletion {
   const GraphCommandCompletion();
 
@@ -175,7 +181,17 @@ sealed class GraphCommandCompletion {
   bool get isFailure;
 }
 
-final class IntentionCommandCompletion extends GraphCommandCompletion {
+/// Завершение, право предъявления которого выдаёт coordinator.
+///
+/// Политику предъявления задаёт вид завершения. По умолчанию действует
+/// протокол ADR-0012: успех сразу принадлежит оболочке, а отказ — открытой
+/// экранной сессии инициатора. У операции с политикой «только отказ» по
+/// ADR-0016 предъявляемо только завершение отказа.
+sealed class GraphPresentableCompletion extends GraphCommandCompletion {
+  const GraphPresentableCompletion();
+}
+
+final class IntentionCommandCompletion extends GraphPresentableCompletion {
   const IntentionCommandCompletion._({
     required this.token,
     required this.kind,
@@ -218,7 +234,8 @@ final class IntentionCommandCompletion extends GraphCommandCompletion {
 
 enum LongTermRelationCommandKind { create, update, archive, restore, delete }
 
-final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
+final class LongTermRelationCommandCompletion
+    extends GraphPresentableCompletion {
   const LongTermRelationCommandCompletion._({
     required this.token,
     required this.kind,
@@ -251,7 +268,8 @@ final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   };
 }
 
-final class BlockingRelationsDeleteCompletion extends GraphCommandCompletion {
+final class BlockingRelationsDeleteCompletion
+    extends GraphPresentableCompletion {
   const BlockingRelationsDeleteCompletion._({
     required this.token,
     required this.intentionId,
@@ -280,7 +298,7 @@ final class BlockingRelationsDeleteCompletion extends GraphCommandCompletion {
 
 enum DailyChoiceCommandKind { create, update, replace, delete }
 
-final class DailyChoiceCommandCompletion extends GraphCommandCompletion {
+final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
   const DailyChoiceCommandCompletion._({
     required this.token,
     required this.kind,
@@ -310,7 +328,7 @@ final class DailyChoiceCommandCompletion extends GraphCommandCompletion {
 
 enum TagCommandKind { create, rename, delete, assign, removeAssignment }
 
-final class TagCommandCompletion extends GraphCommandCompletion {
+final class TagCommandCompletion extends GraphPresentableCompletion {
   const TagCommandCompletion._({
     required this.token,
     required this.kind,
@@ -353,7 +371,7 @@ enum GraphExportOutcome {
 /// Права инициатора у экспорта нет: успех и отказ сразу принадлежат общей
 /// поверхности. Выбор файла с данными предъявляется так же, как отказ. Граф
 /// экспорт не меняет, поэтому пакета изменений у него нет.
-final class GraphExportCompletion extends GraphCommandCompletion {
+final class GraphExportCompletion extends GraphPresentableCompletion {
   const GraphExportCompletion._({
     required this.token,
     required this.outcome,
@@ -418,7 +436,7 @@ final class GraphBackupRestoreStorageFull extends GraphBackupRestoreResult {
 ///
 /// Успех сразу принадлежит общей поверхности, а отказ — сначала строке
 /// «Резервные копии» через право инициатора. Отмена завершения не даёт.
-final class GraphBackupRestoreCompletion extends GraphCommandCompletion {
+final class GraphBackupRestoreCompletion extends GraphPresentableCompletion {
   const GraphBackupRestoreCompletion._({
     required this.token,
     required this.result,
@@ -440,6 +458,39 @@ final class GraphBackupRestoreCompletion extends GraphCommandCompletion {
     GraphBackupRestored() => false,
     GraphBackupRestoreFailed() || GraphBackupRestoreStorageFull() => true,
   };
+}
+
+/// Завершение ручной копии с политикой «только отказ» по ADR-0016.
+///
+/// Новая копия видна в списке копий и в строке «Резервные копии», поэтому
+/// успех публикуется для согласования и права предъявления не образует, а
+/// отказ сразу принадлежит общей поверхности. Граф копия не меняет, поэтому
+/// пакета изменений у неё нет.
+sealed class GraphManualBackupCompletion extends GraphCommandCompletion {
+  const GraphManualBackupCompletion._(this.token);
+
+  @override
+  final GraphManualBackupOperationToken token;
+
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => null;
+}
+
+final class GraphManualBackupMadeCompletion
+    extends GraphManualBackupCompletion {
+  const GraphManualBackupMadeCompletion._(super.token) : super._();
+
+  @override
+  bool get isFailure => false;
+}
+
+final class GraphManualBackupFailedCompletion
+    extends GraphManualBackupCompletion
+    implements GraphPresentableCompletion {
+  const GraphManualBackupFailedCompletion._(super.token) : super._();
+
+  @override
+  bool get isFailure => true;
 }
 
 /// Право принятого восстановления копии заменить граф в монопольном режиме
@@ -613,6 +664,20 @@ final class GraphBackupRestoreAlreadyRunning extends GraphBackupRestoreStart {
   const GraphBackupRestoreAlreadyRunning();
 }
 
+sealed class GraphManualBackupStart {
+  const GraphManualBackupStart();
+}
+
+final class GraphManualBackupAccepted extends GraphManualBackupStart {
+  const GraphManualBackupAccepted(this.future);
+
+  final Future<GraphManualBackupCompletion> future;
+}
+
+final class GraphManualBackupAlreadyRunning extends GraphManualBackupStart {
+  const GraphManualBackupAlreadyRunning();
+}
+
 /// Координатор не принимает операцию: идёт завершение работы приложения, а
 /// для команд графа — и замена графа в монопольном режиме. Экраны
 /// предъявляют оба случая одинаково.
@@ -623,7 +688,8 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart
         DailyChoiceCommandStart,
         TagCommandStart,
         GraphExportStart,
-        GraphBackupRestoreStart {
+        GraphBackupRestoreStart,
+        GraphManualBackupStart {
   const GraphCommandCoordinatorDraining();
 }
 
@@ -636,7 +702,7 @@ final class GraphInitiatorPresentationClaim {
   );
 
   final GraphOperationToken token;
-  final GraphCommandCompletion completion;
+  final GraphPresentableCompletion completion;
   final _PresentationEntry _entry;
 }
 
@@ -653,7 +719,7 @@ final class GraphAppPresentationClaim {
         entries.map((entry) => entry.completion!),
       );
 
-  final List<GraphCommandCompletion> completions;
+  final List<GraphPresentableCompletion> completions;
   final List<_PresentationEntry> _entries;
   final GraphAppPresentationRegistration _registration;
 }
@@ -687,8 +753,9 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       StreamController<GraphCommandCompletion>.broadcast(sync: true);
   // Запись переставляется в конец при публикации завершения, поэтому порядок
   // записей совпадает с порядком публикации terminal outcome: завершения
-  // команд публикуются последовательно в порядке принятия, а экспорта и
-  // восстановления копии — вне этой последовательности.
+  // команд публикуются последовательно в порядке принятия, а экспорта,
+  // восстановления копии и отказа ручной копии — вне этой
+  // последовательности.
   final _entries = <GraphOperationToken, _PresentationEntry>{};
   final _registrations = <GraphAppPresentationRegistration>[];
   final _gates = <GraphCommandKey, _PresentationEntry>{};
@@ -698,6 +765,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   var _isDraining = false;
   var _isExportRunning = false;
   var _isBackupRestoreRunning = false;
+  var _isManualBackupRunning = false;
 
   /// Монопольный режим замены графа: новые команды графа не принимаются.
   var _isReplacing = false;
@@ -1020,7 +1088,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   _GraphCommandAcceptance _acceptOperation({
     required Set<GraphCommandKey> keys,
     required _PresentationEntry entry,
-    required Future<GraphCommandCompletion> Function() execute,
+    required Future<GraphPresentableCompletion> Function() execute,
   }) {
     if (_isDraining || _isReplacing) {
       return const _GraphCommandDraining();
@@ -1034,9 +1102,9 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       _gates[key] = entry;
     }
     _entries[entry.token] = entry;
-    final operationFuture = Future<GraphCommandCompletion>.sync(execute);
+    final operationFuture = Future<GraphPresentableCompletion>.sync(execute);
 
-    final completionCompleter = Completer<GraphCommandCompletion>();
+    final completionCompleter = Completer<GraphPresentableCompletion>();
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
       final completion = await operationFuture;
@@ -1192,9 +1260,61 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     return GraphBackupRestored._(await replace());
   }
 
+  /// Принимает ручную копию, которую делает [backup] модуля резервных копий;
+  /// [backup] сообщает отказ исходом, а не исключением.
+  ///
+  /// Пока принятая ручная копия выполняется, вторая не принимается. Копия не
+  /// блокирует сущности графа, а её завершение публикуется сразу по
+  /// окончании, вне последовательной публикации команд. По ADR-0016 успех
+  /// права предъявления не образует, а отказ сразу принадлежит общей
+  /// поверхности.
+  GraphManualBackupStart acceptManualBackup(
+    Future<ManualGraphBackupOutcome> Function() backup,
+  ) {
+    if (_isDraining) {
+      return const GraphCommandCoordinatorDraining();
+    }
+    if (_isManualBackupRunning) {
+      return const GraphManualBackupAlreadyRunning();
+    }
+
+    _isManualBackupRunning = true;
+    final token = GraphManualBackupOperationToken._();
+    late final Future<void> tracked;
+    final publication = backup().then((outcome) {
+      _isManualBackupRunning = false;
+      final GraphManualBackupCompletion completion = switch (outcome) {
+        ManualGraphBackupOutcome.made => GraphManualBackupMadeCompletion._(
+          token,
+        ),
+        ManualGraphBackupOutcome.failed => GraphManualBackupFailedCompletion._(
+          token,
+        ),
+      };
+      if (completion case GraphManualBackupFailedCompletion failure) {
+        // Права инициатора у ручной копии нет: отказ сразу принадлежит
+        // оболочке.
+        _placeAtPublication(
+          _PresentationEntry(token)..initiatorReleased = true,
+          failure,
+        );
+      }
+      _completionController.add(completion);
+      _dispatchAppPresentation();
+      return completion;
+    });
+    tracked = publication.whenComplete(() {
+      _inFlight.remove(tracked);
+      _completeShutdownIfDrained();
+    });
+    _inFlight.add(tracked);
+
+    return GraphManualBackupAccepted(publication);
+  }
+
   void _placeAtPublication(
     _PresentationEntry entry,
-    GraphCommandCompletion completion,
+    GraphPresentableCompletion completion,
   ) {
     entry.completion = completion;
     _entries
@@ -1497,7 +1617,7 @@ final class _PresentationEntry {
   _PresentationEntry(this.token);
 
   final GraphOperationToken token;
-  GraphCommandCompletion? completion;
+  GraphPresentableCompletion? completion;
   bool initiatorReleased = false;
   GraphInitiatorPresentationClaim? initiatorClaim;
   GraphAppPresentationClaim? appClaim;
@@ -1510,7 +1630,7 @@ sealed class _GraphCommandAcceptance {
 final class _GraphCommandAccepted extends _GraphCommandAcceptance {
   const _GraphCommandAccepted(this.future);
 
-  final Future<GraphCommandCompletion> future;
+  final Future<GraphPresentableCompletion> future;
 }
 
 final class _GraphCommandAlreadyRunning extends _GraphCommandAcceptance {
