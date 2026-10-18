@@ -23,11 +23,15 @@ import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../daily_choice/domain/daily_choice_priority.dart';
 import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../data_transfer/application/graph_composition.dart';
+import '../../graph_backups/graph_backup_registry.dart';
+import '../../graph_backups/graph_change_summary.dart';
 import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
 import '../../graph_format/graph_format_records.dart'
     show GraphEntityRecord, IntentionRecord, TagAssignmentRecord, TagRecord;
 import '../../graph_snapshots/graph_fact_log.dart';
+import '../../graph_snapshots/graph_snapshot_store.dart'
+    show GraphHistoryPackage;
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -99,6 +103,7 @@ part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_fact_log.dart';
 part 'drift_personal_graph_repository_composition.dart';
+part 'drift_personal_graph_repository_backups.dart';
 part 'drift_personal_graph_repository_statistics.dart';
 part 'drift_statistics_relation_snapshot.dart';
 part 'drift_statistics_seed_groups.dart';
@@ -110,7 +115,8 @@ final class DriftPersonalGraphRepository
     implements
         PersonalGraphRepository,
         ObservableGraphFactLog,
-        GraphCompositionSource {
+        GraphCompositionSource,
+        GraphBackupRegistry {
   DriftPersonalGraphRepository(
     this._database,
     this._idGenerator,
@@ -142,6 +148,9 @@ final class DriftPersonalGraphRepository
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final StreamController<int> _confirmedPositions =
       StreamController.broadcast();
+
+  /// Сигнал подтверждённой записи реестра копий.
+  final StreamController<void> _backupsChanged = StreamController.broadcast();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
   final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
   _dailyChoiceWatchers = {};
@@ -270,6 +279,19 @@ final class DriftPersonalGraphRepository
 
   @override
   Stream<GraphCompositionRead> watchComposition() => _watchComposition();
+
+  @override
+  Stream<GraphBackupsRead> watchBackups() => _watchBackups();
+
+  @override
+  Future<bool> insertDailyBackup({
+    required DateTime dayStart,
+    required GraphChangeTally? since,
+  }) => _insertDailyBackup(dayStart, since);
+
+  @override
+  Future<void> insertManualBackup({required GraphChangeTally? since}) =>
+      _insertManualBackup(since);
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);
