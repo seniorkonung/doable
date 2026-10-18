@@ -629,3 +629,29 @@
   - **Dependencies:** 2.16, 2.17.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 2.17.
   - **Estimated scope:** XS.
+
+- [ ] 2.19 Удерживать право на документ, выбранный в диалоге сохранения, до исхода экспорта, даже если движок перенесён в другую Activity
+  - **Acceptance criteria:**
+    - По решению 13 [дизайна](design.md) и [ADR-0037](../../../docs/adr/0037-export-unencrypted-file-through-system-dialogs.md) плагин закрепляет право записи на адрес из ответа `RESULT_OK` диалога сохранения ещё при обработке ответа, до передачи адреса в Dart. Временное право Android снимает вместе с Activity, получившей ответ, а при смене дисплея `DisplayHostActivity` переносит движок в новую Activity и закрывает прежнюю ([ADR-0031](../../../docs/adr/0031-restrict-phones-to-portrait-full-screen.md)). Поэтому копирование в документ, начавшееся после переноса, проходит так же, как без него. Если поставщик не дал закрепляемого права, адрес передаётся в Dart, а копирование идёт с временным правом, как раньше.
+    - Контракт `DocumentAccess` получает явный шаг завершения работы с созданным документом. Плагин на этом шаге отпускает закреплённое право. `GraphExport.write` выполняет этот шаг один раз при любом исходе: успехе, отказе записи документа и отказе записи состояния до копирования. Отказ отпустить право не меняет исход экспорта и не завершает процесс.
+    - При запуске приложения плагин отпускает все закреплённые права приложения, оставшиеся после завершения процесса посреди экспорта. Экспорт, не принятый координатором при выключении приложения, право не отпускает: его отпускает этот шаг при следующем запуске.
+    - Запрос, ожидающий ответа диалога при отсоединении Activity, по-прежнему завершается отменой. Байты через канал не передаются. Манифест, набор разрешений и правила резервного копирования не меняются, `FileProvider` не появляется.
+  - **Verification:**
+    - Нативными проверками Robolectric проверить следующее. Ответ `RESULT_OK` закрепляет право на адрес документа до ответа в Dart, а отказ закрепления не мешает передать адрес. Шаг завершения отпускает право и после записи документа, и без неё. При подключении плагина к движку оставшиеся закреплённые права отпускаются.
+    - С подменой доступа к документам проверить, что `GraphExport.write` выполняет шаг завершения ровно один раз при успехе, при отказе записи документа и при отказе записи временного файла. С подменой канала проверить, что Dart-сторона передаёт адрес документа на шаге завершения и превращает ошибку канала в исход без исключения.
+    - Выполнить `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`, `mise exec --no-deps -- flutter test test/data_transfer/` и `mise exec --no-deps -- flutter build apk --debug`. Убедиться, что `git diff --stat` не содержит `android/app/src/main/AndroidManifest.xml` и `android/app/src/main/res/xml/`.
+  - **Dependencies:** 2.4, 2.6.
+  - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt`, `android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt`, `lib/src/data_transfer/application/document_access.dart`, `lib/src/data_transfer/data/method_channel_document_access.dart`, `lib/src/data_transfer/application/graph_export.dart`, `test/data_transfer/method_channel_document_access_test.dart`, `test/data_transfer/graph_export_test.dart`, `test/support/file_document_access.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.20 Повторно подтвердить готовность этапа после удержания права на выбранный документ до исхода экспорта
+  - **Acceptance criteria:**
+    - После задачи 2.19 условие Ready to advance этапа 2 из [плана](plan.md) по-прежнему выполнено, в том числе набор разрешений Android не изменился. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 2.18 и 2.19 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`, `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+    - Собрать `mise exec --no-deps -- flutter build apk --release` и проверить набор разрешений собранного APK командой `mise exec --no-deps -- dart run tool/check_android_privacy_manifest.dart <Android SDK>/build-tools/36.0.0/aapt2 build/app/outputs/flutter-apk/app-release.apk`. Сообщить в сессии результаты и оставшиеся ручные проверки на устройстве: экспорт в локальную папку и в облачный документ со сменой дисплея при открытом диалоге и во время записи временного файла.
+  - **Dependencies:** 2.18, 2.19.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 2.19.
+  - **Estimated scope:** XS.
