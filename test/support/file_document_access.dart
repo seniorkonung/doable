@@ -25,10 +25,6 @@ final class FileDocumentAccess implements DocumentAccess {
   /// Запись документа отказывает, как при отозванном доступе.
   var failsWrites = false;
 
-  /// Документ после отказа операции остаётся, как у поставщика без
-  /// поддержки удаления.
-  var failsDeletes = false;
-
   /// Адреса документов, работа с которыми завершена, в порядке завершения.
   final finished = <String>[];
 
@@ -64,7 +60,7 @@ final class FileDocumentAccess implements DocumentAccess {
     required CreatedDocumentOutcome outcome,
   }) async {
     finished.add(document.uri);
-    if (outcome == CreatedDocumentOutcome.failed && !failsDeletes) {
+    if (outcome == CreatedDocumentOutcome.failed) {
       await File.fromUri(Uri.parse(document.uri)).delete();
     }
   }

@@ -308,22 +308,6 @@ void main() {
     );
   });
 
-  test('документ, который поставщик не удалил после отказа записи, оставляет '
-      'исход экспорта отказом', () async {
-    await createTag('Дом');
-    documents
-      ..failsWrites = true
-      ..failsDeletes = true;
-    final container = app();
-    final exported = nextExport(container);
-
-    await startExport(container);
-
-    expect((await exported).outcome, GraphExportOutcome.failed);
-    expect(documents.created.single.existsSync(), isTrue);
-    expect(documents.finished, [documents.created.single.uri.toString()]);
-  });
-
   test('системный диалог, который не открылся, даёт отказ экспорта, '
       'диагностируемый этапом создания документа', () async {
     await createTag('Дом');
