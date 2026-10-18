@@ -8,6 +8,8 @@ import '../data/local/bootstrap/local_data_bootstrap.dart';
 import '../data/local/bootstrap/local_data_bootstrap_result.dart';
 import '../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../data_transfer/application/document_access.dart';
+import '../data_transfer/application/graph_composition.dart';
+import '../data_transfer/application/graph_composition_provider.dart';
 import '../data_transfer/application/graph_export.dart';
 import '../data_transfer/application/graph_export_provider.dart';
 import '../data_transfer/data/method_channel_document_access.dart';
@@ -46,11 +48,12 @@ typedef AppGraphFilesFactory = Future<AppGraphFiles> Function(
   ObservableGraphFactLog log,
 );
 
-/// Граф над готовой базой: репозиторий и лог фактов, если его ведёт этот
-/// репозиторий.
+/// Граф над готовой базой: репозиторий, а также лог фактов и состав графа,
+/// если их ведёт этот репозиторий.
 typedef _AppGraph = ({
   PersonalGraphRepository repository,
   ObservableGraphFactLog? factLog,
+  GraphCompositionSource? composition,
 });
 
 typedef _AppGraphFactory = _AppGraph Function(AppDatabase database);
@@ -99,8 +102,8 @@ final class AppRuntime {
   /// пишет состояние через то же сжатие и начинает запись временного файла
   /// только после удаления временных файлов прежних запусков. Выключение
   /// дожидается идущего экспорта и сжатия и только потом закрывает базу.
-  /// Лог фактов ведёт репозиторий по умолчанию, поэтому с
-  /// [repositoryFactory] файлы графа не подключаются.
+  /// Лог фактов и состав графа ведёт репозиторий по умолчанию, поэтому с
+  /// [repositoryFactory] файлы графа и состав графа не подключаются.
   factory AppRuntime({
     required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
@@ -117,6 +120,7 @@ final class AppRuntime {
       final createRepository? => (database) => (
         repository: createRepository(database),
         factLog: null,
+        composition: null,
       ),
       null => (database) {
         final repository = DriftPersonalGraphRepository(
@@ -126,7 +130,11 @@ final class AppRuntime {
           diagnosticsSink,
           relationIdGenerator: UuidV7LongTermRelationIdGenerator(),
         );
-        return (repository: repository, factLog: repository);
+        return (
+          repository: repository,
+          factLog: repository,
+          composition: repository,
+        );
       },
     };
     return AppRuntime._(
@@ -264,7 +272,7 @@ final class AppRuntime {
     }
     ProviderContainer? container;
     try {
-      final (:repository, :factLog) = _graphFactory(database);
+      final (:repository, :factLog, :composition) = _graphFactory(database);
       final files = switch ((factLog, _graphFilesFactory)) {
         (final log?, final createFiles?) => await createFiles(log),
         _ => null,
@@ -291,6 +299,8 @@ final class AppRuntime {
             ),
           ),
           personalGraphRepositoryProvider.overrideWithValue(repository),
+          if (composition != null)
+            graphCompositionSourceProvider.overrideWithValue(composition),
           dailyChoiceLocalDateSourceProvider.overrideWithValue(
             _dailyChoiceLocalDateSource,
           ),

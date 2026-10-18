@@ -21,6 +21,7 @@ import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../daily_choice/domain/daily_choice_priority.dart';
 import '../../daily_choice/domain/daily_choice_schedule.dart';
+import '../../data_transfer/application/graph_composition.dart';
 import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
 import '../../graph_format/graph_format_records.dart'
@@ -96,6 +97,7 @@ part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_fact_log.dart';
+part 'drift_personal_graph_repository_composition.dart';
 part 'drift_personal_graph_repository_statistics.dart';
 part 'drift_statistics_relation_snapshot.dart';
 part 'drift_statistics_seed_groups.dart';
@@ -104,7 +106,10 @@ part 'drift_intention_statistics_reader.dart';
 part 'drift_through_relations_statistics_reader.dart';
 
 final class DriftPersonalGraphRepository
-    implements PersonalGraphRepository, ObservableGraphFactLog {
+    implements
+        PersonalGraphRepository,
+        ObservableGraphFactLog,
+        GraphCompositionSource {
   DriftPersonalGraphRepository(
     this._database,
     this._idGenerator,
@@ -259,6 +264,9 @@ final class DriftPersonalGraphRepository
   @override
   Future<List<String>> removeHistoryBefore(int boundary) =>
       _removeHistoryBefore(boundary);
+
+  @override
+  Stream<GraphCompositionRead> watchComposition() => _watchComposition();
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);

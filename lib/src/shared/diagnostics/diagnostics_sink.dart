@@ -578,6 +578,22 @@ final class GraphSnapshotCleanupDiagnosticsEvent extends DiagnosticsEvent {
   final GraphSnapshotCleanupDiagnosticsStage? stage;
 }
 
+/// Чтение состава графа: исход, длительность, а у отказа — безопасная
+/// категория, в том числе повреждение хранилища.
+///
+/// Числа сущностей и исходное исключение не входят в контракт события.
+/// Конструкторы допускают только завершённое чтение. Передача получателю —
+/// через [recordDiagnosticsSafely].
+final class GraphCompositionReadDiagnosticsEvent extends DiagnosticsEvent {
+  GraphCompositionReadDiagnosticsEvent.succeeded({required Duration duration})
+    : super(DiagnosticsSucceeded(duration));
+
+  GraphCompositionReadDiagnosticsEvent.failed({
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+}
+
 /// Этап экспорта графа в документ.
 enum GraphExportDiagnosticsStage {
   /// Создание документа системным диалогом сохранения.

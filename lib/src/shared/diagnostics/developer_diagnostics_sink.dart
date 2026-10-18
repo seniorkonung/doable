@@ -217,6 +217,10 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': ?stage?.name,
     ..._encodeStatus(event.status),
   },
+  GraphCompositionReadDiagnosticsEvent() => {
+    'operation': 'graphCompositionRead',
+    ..._encodeStatus(event.status),
+  },
   GraphExportDiagnosticsEvent(:final stage) => {
     'operation': 'graphExport',
     'stage': ?stage?.name,

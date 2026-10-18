@@ -244,6 +244,19 @@ void main() {
             },
           ),
           (
+            'отказ чтения состава графа из-за повреждения хранилища',
+            GraphCompositionReadDiagnosticsEvent.failed(
+              duration: const Duration(microseconds: 61),
+              code: DiagnosticsFailureCode.corruption,
+            ),
+            {
+              'operation': 'graphCompositionRead',
+              'outcome': 'failed',
+              'durationMicros': 61,
+              'failureCode': 'corruption',
+            },
+          ),
+          (
             'успех экспорта графа',
             GraphExportDiagnosticsEvent.succeeded(
               duration: const Duration(microseconds: 51),

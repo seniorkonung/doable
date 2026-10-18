@@ -532,7 +532,7 @@
   - **Files likely touched:** `benchmark/graph_export/graph_export_benchmark.dart` (новый), `benchmark/support/graph_log_memory_worker.dart`, `benchmark/support/graph_log_fixture.dart`, `openspec/changes/add-graph-export-import/design.md`.
   - **Estimated scope:** M.
 
-- [ ] 2.10 Читать состав графа коротким агрегатным чтением и сообщать о его изменениях
+- [x] 2.10 Читать состав графа коротким агрегатным чтением и сообщать о его изменениях
   - **Acceptance criteria:**
     - По решению 9 [дизайна](design.md) узкий контракт, заданный потребностями раздела «Данные», возвращает на одном подтверждённом состоянии число всех намерений и долговременных связей вместе с архивированными, дневных выборов и тегов и признак пустого графа — нет ни одного намерения и ни одного тега. `DriftPersonalGraphRepository` реализует его агрегатным чтением через последовательный исполнитель без материализации сущностей, а `AppRuntime` предоставляет его тем же репозиторием; `PersonalGraphRepository` и его тестовые подмены не меняются ([ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md)).
     - Наблюдение состава выдаёт новое значение после каждого подтверждённого изменения, которое меняет состав.

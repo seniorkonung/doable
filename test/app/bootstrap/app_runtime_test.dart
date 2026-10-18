@@ -18,6 +18,8 @@ import 'package:doable/src/data/local/app_database.dart'
         LocalDatabaseConnectionObserver,
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
+import 'package:doable/src/data_transfer/application/graph_composition.dart';
+import 'package:doable/src/data_transfer/application/graph_composition_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -32,6 +34,8 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -117,6 +121,44 @@ void main() {
       expect(await runtime.bootstrap(), isA<AppRuntimeRetryableFailure>());
       expect(await runtime.bootstrap(), isA<AppRuntimeReady>());
       expect(connectionAttempts, 2);
+    });
+
+    test('предоставляет состав графа тем же репозиторием, который выполняет '
+        'команды графа', () async {
+      final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
+        connectionFactory: openInMemoryLocalDatabase,
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(runtime.shutdown);
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final compositions = StreamIterator(
+        ready.container.read(graphCompositionSourceProvider).watchComposition(),
+      );
+      addTearDown(compositions.cancel);
+      Future<GraphComposition> next() async {
+        expect(await compositions.moveNext(), isTrue);
+        return (compositions.current as GraphCompositionReadSucceeded)
+            .composition;
+      }
+
+      expect((await next()).isEmpty, isTrue);
+      expect(
+        await ready.container
+            .read(personalGraphRepositoryProvider)
+            .execute(CreateTag(TagName.fromInput('Дом'))),
+        isA<GraphCommandSucceeded>(),
+      );
+
+      expect(
+        await next(),
+        const GraphComposition(
+          intentionCount: 0,
+          relationCount: 0,
+          dailyChoiceCount: 0,
+          tagCount: 1,
+        ),
+      );
     });
 
     test('типизированно отображает non-ready outcomes', () async {
