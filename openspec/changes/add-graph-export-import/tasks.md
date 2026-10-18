@@ -705,3 +705,31 @@
   - **Dependencies:** 2.22, 2.23.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 2.23.
   - **Estimated scope:** XS.
+
+- [ ] 2.25 Не начинать экспорт в файл с данными, выбранный в диалоге сохранения для замены, и не удалять после отказа документ, который при выборе не был пуст
+  - **Acceptance criteria:**
+    - По требованию «Экспорт в файл» и решению 13 [дизайна](design.md) плагин, закрепив право при ответе диалога, в фоновом потоке читает размер выбранного документа (`DocumentsContract.Document.COLUMN_SIZE`) и только затем отвечает в Dart. Если размер больше нуля, плагин отпускает право, документ не пишет и не удаляет, а `DocumentAccess.createDocument` возвращает отдельный вариант `DocumentCreation` для существующего файла.
+    - Для этого исхода `GraphExportController.start` передаёт координатору экспорт с отдельным исходом `GraphExportOutcome`, как для диалога, который не открылся: временный файл не пишется, граф не меняется. По решению 12 `GraphOperationPresenter` показывает на общей поверхности «Такой файл уже есть. Сохраните копию под новым именем» с действием «Повторить», которое снова открывает системный диалог. Строка есть на русском и английском. Как и отмена диалога, этот исход события диагностики не даёт.
+    - После отказа экспорта плагин удаляет только документ, о котором поставщик при выборе сообщил нулевой размер. Если размер неизвестен, потому что поставщик его не сообщил или запрос отказал, экспорт идёт, а после отказа документ остаётся. Шаг завершения по-прежнему отпускает право при любом исходе.
+    - Копирование открывает документ в режиме `"wt"`, поэтому после успеха в документе ровно файл экспорта, даже если в нём были данные.
+    - Байты через канал не передаются, адресов документов в диагностике нет. Манифест, набор разрешений и правила резервного копирования не меняются, `FileProvider` не появляется.
+  - **Verification:**
+    - Нативными проверками Robolectric проверить три случая. Документ с ненулевым размером даёт в Dart исход существующего файла, право отпущено, а документ не записан и не удалён. Документ неизвестного размера после отказа не удаляется, а право отпущено. Копирование открывает документ в режиме `"wt"`. Существующая проверка удаления после отказа идёт на документе нулевого размера.
+    - С подменой канала проверить, что Dart-сторона превращает ответ плагина о существующем файле в его вариант `DocumentCreation`.
+    - В `test/app/graph_export_app_flow_test.dart` с подменой `FileDocumentAccess`, диалог которой возвращает исход существующего файла, подтвердить сценарий «В диалоге выбран прежний файл» [спецификации](specs/graph-export-import/spec.md): документ не пишется, общая поверхность показывает «Такой файл уже есть. Сохраните копию под новым именем» с «Повторить», а «Повторить» снова открывает системный диалог.
+    - Выполнить `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`, `mise exec --no-deps -- flutter test test/data_transfer/ test/app/graph_export_app_flow_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/graph/application/graph_command_coordinator_export_test.dart` и `mise exec --no-deps -- flutter build apk --debug`. Убедиться, что `git diff --stat` не содержит `android/app/src/main/AndroidManifest.xml` и `android/app/src/main/res/xml/`.
+  - **Dependencies:** 2.23.
+  - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt`, `android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt`, `lib/src/data_transfer/application/document_access.dart`, `lib/src/data_transfer/data/method_channel_document_access.dart`, `lib/src/data_transfer/application/graph_export_provider.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/data_transfer/method_channel_document_access_test.dart`, `test/app/graph_export_app_flow_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.26 Повторно подтвердить готовность этапа после запрета экспорта в файл с данными
+  - **Acceptance criteria:**
+    - После задачи 2.25 условие Ready to advance этапа 2 из [плана](plan.md) по-прежнему выполнено, в том числе файл экспорта читается модулем формата как то же состояние графа, что и в базе, набор разрешений Android не изменился, а сценарии «В диалоге выбран прежний файл» и «Отказ экспорта не оставляет файла» подтверждены проверками. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 2.24 и 2.25 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `JAVA_HOME=<JDK 21 или новее> android/gradlew -p android :app:testDebugUnitTest --console=plain`, `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+    - Собрать `mise exec --no-deps -- flutter build apk --release` и проверить набор разрешений собранного APK командой `mise exec --no-deps -- dart run tool/check_android_privacy_manifest.dart <Android SDK>/build-tools/36.0.0/aapt2 build/app/outputs/flutter-apk/app-release.apk`. Сообщить в сессии результаты и оставшиеся ручные проверки на устройстве: выбор прежнего файла в диалоге сохранения оставляет его без изменений и показывает «Такой файл уже есть. Сохраните копию под новым именем», а экспорт в новый файл локальной папки и облачного хранилища по-прежнему проходит.
+  - **Dependencies:** 2.24, 2.25.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 2.25.
+  - **Estimated scope:** XS.
