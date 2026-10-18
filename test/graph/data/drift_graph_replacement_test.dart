@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         AppDatabase,
@@ -10,9 +12,13 @@ import 'package:doable/src/data/local/app_database.dart'
         LocalDatabaseSqlOperation,
         LocalDatabaseSqlStatement;
 import 'package:doable/src/data/local/sqlite_failure_classifier.dart';
+import 'package:doable/src/data_transfer/application/graph_composition.dart';
 import 'package:doable/src/data_transfer/application/graph_replacement.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/selected_relations.dart';
+import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_backups/graph_change_summary.dart';
@@ -25,6 +31,8 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -40,6 +48,14 @@ import '../../support/local_database_harness.dart';
 /// намерение и связь и путь через архивированную связь к намерению без
 /// готовности к действию.
 const _goldenPath = 'test/graph_format/golden/graph_format_v1.jsonl';
+
+/// Идентификаторы сущностей эталонного файла.
+const _goldenHealthId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f11';
+const _goldenRunningId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12';
+const _goldenFiveKilometersId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13';
+const _goldenSportTagId = '7b0e2f4c-1d3a-4c5e-8f60-0a1b2c3d4e12';
+const _goldenHealthRunningRelationId = '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b11';
+const _goldenDailyChoiceId = '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d12';
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -133,7 +149,7 @@ void main() {
     );
   }
 
-  Future<void> replace(
+  Future<ConfirmedGraphReplacement> replace(
     UnregisteredGraphSnapshot snapshot, {
     void Function(double share)? onProgress,
     bool Function()? isCancelled,
@@ -150,6 +166,9 @@ void main() {
     final read = await repository.watchBackups().first;
     return (read as GraphBackupsReadSucceeded).backups;
   }
+
+  Future<GraphRevision> intentionRevision(IntentionId id) async =>
+      _revisionOf(await repository.watchIntention(id).first);
 
   Future<List<List<Object?>>> rows(String query) async => [
     for (final row in await database.customSelect(query).get())
@@ -268,6 +287,215 @@ void main() {
       expect(progress[index], greaterThan(progress[index - 1]));
     }
     expect(progress.last, 1);
+  });
+
+  group('новая эпоха ревизий', () {
+    test('результат замены несёт изменение «граф заменён» с ревизией новой '
+        'эпохи: ревизии прежней эпохи с ней несравнимы, чтения после замены '
+        'получают её, а следующая команда — более новую', () async {
+      final running = await createIntention('Бег трусцой');
+      final before = await intentionRevision(running.id);
+
+      final replacement = await replace(await goldenSnapshot());
+
+      expect(replacement.changes, [
+        isA<GraphReplaced>().having(
+          (change) => change.revision.compareTo(replacement.revision),
+          'ревизия',
+          GraphRevisionOrder.same,
+        ),
+      ]);
+      expect(
+        before.compareTo(replacement.revision),
+        GraphRevisionOrder.differentEpoch,
+      );
+      expect(
+        replacement.revision.compareTo(before),
+        GraphRevisionOrder.differentEpoch,
+      );
+      expect(
+        (await intentionRevision(running.id)).compareTo(replacement.revision),
+        GraphRevisionOrder.same,
+      );
+      await createTag('Спорт и отдых');
+      expect(
+        (await intentionRevision(running.id)).compareTo(replacement.revision),
+        GraphRevisionOrder.newer,
+      );
+    });
+
+    test('после замены наблюдатели намерения, дневного выбора, '
+        'долговременной связи, выбранных связей и тега перечитывают их на '
+        'ревизии новой эпохи', () async {
+      await createPreviousGraph();
+      final health = _intentionId(_goldenHealthId);
+      final relation = _relationId(_goldenHealthRunningRelationId);
+      final reads = <String, StreamIterator<_SnapshotRead>>{
+        'намерение': StreamIterator(
+          repository.watchIntention(_intentionId(_goldenRunningId)),
+        ),
+        'дневной выбор': StreamIterator(
+          repository.watchDailyChoice(_dailyChoiceId(_goldenDailyChoiceId)),
+        ),
+        'долговременная связь': StreamIterator(
+          repository.watchRelation(relation),
+        ),
+        'выбранные связи': StreamIterator(
+          repository.watchSelectedRelations(
+            SelectedRelationsQuery(
+              intentionId: health,
+              relationIds: [relation],
+            ),
+          ),
+        ),
+        'тег': StreamIterator(repository.watchTag(_tagId(_goldenSportTagId))),
+      };
+      for (final read in reads.values) {
+        // Наблюдение, которое ждёт уведомления, завершает отмену только
+        // после него, поэтому сбой теста не должен ждать отмены.
+        addTearDown(() => unawaited(read.cancel()));
+        expect(await read.moveNext(), isTrue);
+      }
+
+      final replacement = await replace(await goldenSnapshot());
+
+      for (final MapEntry(key: watched, value: read) in reads.entries) {
+        expect(await read.moveNext(), isTrue, reason: watched);
+        expect(
+          _revisionOf(read.current).compareTo(replacement.revision),
+          GraphRevisionOrder.same,
+          reason: watched,
+        );
+      }
+    });
+
+    test('после замены наблюдение состава выдаёт состав нового '
+        'графа', () async {
+      await createPreviousGraph();
+      final reads = StreamIterator(repository.watchComposition());
+      addTearDown(reads.cancel);
+      expect(await reads.moveNext(), isTrue);
+
+      await replace(await goldenSnapshot());
+
+      expect(await reads.moveNext(), isTrue);
+      expect(
+        (reads.current as GraphCompositionReadSucceeded).composition,
+        const GraphComposition(
+          intentionCount: 4,
+          relationCount: 3,
+          dailyChoiceCount: 2,
+          tagCount: 2,
+        ),
+      );
+    });
+
+    test('после замены наблюдение списка копий выдаёт список, в котором '
+        'первой стоит копия перед заменой', () async {
+      await createPreviousGraph();
+      await repository.insertManualBackup(since: null);
+      final reads = StreamIterator(repository.watchBackups());
+      addTearDown(reads.cancel);
+      expect(await reads.moveNext(), isTrue);
+
+      await replace(await goldenSnapshot());
+
+      expect(await reads.moveNext(), isTrue);
+      expect(
+        [
+          for (final backup
+              in (reads.current as GraphBackupsReadSucceeded).backups)
+            backup.kind,
+        ],
+        [GraphBackupKind.beforeReplacement, GraphBackupKind.manual],
+      );
+    });
+
+    test('после замены наблюдатели лога получают позицию пакета '
+        '«сброс»', () async {
+      await createPreviousGraph();
+      final position = await repository.readCurrentPosition();
+      final confirmed = <int>[];
+      final subscription = repository.confirmedPositions.listen(confirmed.add);
+      addTearDown(subscription.cancel);
+
+      await replace(await goldenSnapshot());
+      await pumpEventQueue();
+
+      expect(confirmed, [position + 1]);
+    });
+
+    test('снимок связей статистики, загруженный до замены, после неё '
+        'собирается заново по новому графу', () async {
+      await createPreviousGraph();
+      await repository.loadStatisticsRelationSnapshot();
+
+      await replace(await goldenSnapshot());
+
+      expect(
+        _relationEdges(await repository.loadStatisticsRelationSnapshot()),
+        {
+          (_goldenHealthId, _goldenRunningId),
+          (_goldenHealthId, _goldenFiveKilometersId),
+        },
+      );
+    });
+
+    /// Проверяет, что прерванная [interruptedReplacement] замена непустого
+    /// графа сохраняет эпоху ревизий и не сообщает о себе наблюдателям лога
+    /// и списка копий.
+    Future<void> expectEpochAndObserversUntouched(
+      Future<void> Function(UnregisteredGraphSnapshot snapshot)
+      interruptedReplacement,
+    ) async {
+      final running = await createIntention('Бег трусцой');
+      final before = await intentionRevision(running.id);
+      final backupReads = <GraphBackupsRead>[];
+      final backupSubscription = repository.watchBackups().listen(
+        backupReads.add,
+      );
+      addTearDown(backupSubscription.cancel);
+      final confirmed = <int>[];
+      final positionSubscription = repository.confirmedPositions.listen(
+        confirmed.add,
+      );
+      addTearDown(positionSubscription.cancel);
+      await repository.readCurrentPosition();
+      await pumpEventQueue();
+      expect(backupReads, hasLength(1));
+
+      await interruptedReplacement(await goldenSnapshot());
+      await pumpEventQueue();
+      await repository.readCurrentPosition();
+      await pumpEventQueue();
+
+      expect(
+        (await intentionRevision(running.id)).compareTo(before),
+        GraphRevisionOrder.same,
+      );
+      expect(backupReads, hasLength(1));
+      expect(confirmed, isEmpty);
+    }
+
+    test('отказ замены сохраняет эпоху ревизий и не сообщает о замене '
+        'наблюдателям лога и списка копий', () async {
+      await expectEpochAndObserversUntouched((snapshot) async {
+        probe.failsBefore = (statement) =>
+            _insertsInto(statement, 'graph_log_packages');
+        await expectLater(replace(snapshot), throwsA(isA<StateError>()));
+        probe.failsBefore = null;
+      });
+    });
+
+    test('отмена замены сохраняет эпоху ревизий и не сообщает о замене '
+        'наблюдателям лога и списка копий', () async {
+      await expectEpochAndObserversUntouched(
+        (snapshot) => expectLater(
+          replace(snapshot, isCancelled: () => true),
+          throwsA(isA<GraphReplacementCancelled>()),
+        ),
+      );
+    });
   });
 
   group('отказ откатывает всю замену', () {
@@ -441,6 +669,42 @@ void main() {
 }
 
 String _unchanged(String jsonl) => jsonl;
+
+/// Значение наблюдения сущности: снимок на ревизии или отказ чтения.
+typedef _SnapshotRead =
+    GraphResult<GraphSnapshot<Object?>, GraphCommandFailure>;
+
+GraphRevision _revisionOf(_SnapshotRead read) => switch (read) {
+  GraphResultSuccess(:final value) => value.revision,
+  GraphResultFailure(:final failure) => throw TestFailure(
+    'Отказ чтения: $failure',
+  ),
+};
+
+IntentionId _intentionId(String id) =>
+    (IntentionId.decode(id) as IntentionIdDecodingSuccess).id;
+
+LongTermRelationId _relationId(String id) =>
+    (LongTermRelationId.decode(id) as LongTermRelationIdDecodingSuccess).id;
+
+DailyChoiceId _dailyChoiceId(String id) =>
+    (DailyChoiceId.decode(id) as DailyChoiceIdDecodingSuccess).id;
+
+TagId _tagId(String id) => (TagId.decode(id) as TagIdDecodingSuccess).id;
+
+/// Пары «исходное намерение, связанное намерение» активных связей снимка.
+Set<(String, String)> _relationEdges(ContributionRelationGraph graph) => {
+  for (var node = 0; node < graph.intentionIds.length; node++)
+    for (
+      var edge = graph.childOffsets[node];
+      edge < graph.childOffsets[node + 1];
+      edge++
+    )
+      (
+        graph.intentionIds[node].toCanonicalString(),
+        graph.intentionIds[graph.children[edge]].toCanonicalString(),
+      ),
+};
 
 /// Строки записей файла формата без строки заголовка.
 List<String> _recordLines(String jsonl) =>

@@ -154,7 +154,7 @@ final class DriftPersonalGraphRepository
   final DailyChoiceIdGenerator _dailyChoiceIdGenerator;
   final ChoicePathStepIdGenerator _choicePathStepIdGenerator;
   final TagIdGenerator _tagIdGenerator;
-  final _GraphEpoch _epoch = _GraphEpoch();
+  var _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final StreamController<int> _confirmedPositions =
       StreamController.broadcast();
@@ -304,7 +304,7 @@ final class DriftPersonalGraphRepository
       _insertManualBackup(since);
 
   @override
-  Future<void> replaceGraph(
+  Future<ConfirmedGraphReplacement> replaceGraph(
     UnregisteredGraphSnapshot snapshot, {
     required void Function(double share) onProgress,
     required bool Function() isCancelled,
@@ -1704,8 +1704,8 @@ final class _StoredIntentionCommandSnapshot {
   final String titleSearchKey;
 }
 
-/// Различает ревизии разных экземпляров репозитория: понадобится при
-/// восстановлении из резервной копии без перезапуска приложения.
+/// Различает ревизии разных поколений графа: каждый экземпляр репозитория
+/// начинает свою эпоху и новую — после каждой замены графа (ADR-0036).
 final class _GraphEpoch {}
 
 /// Итог тела записи графа: изменило ли оно граф и результат команды при

@@ -866,7 +866,7 @@
   - **Files likely touched:** `lib/src/data_transfer/application/graph_replacement.dart` (новый контракт, название рабочее), `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_replacement.dart` (новая часть), `test/graph/data/drift_graph_replacement_test.dart` (новый), `test/data/local/database_connection_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 3.11 Начинать после замены графа новую эпоху ревизий и публиковать изменение «граф заменён»
+- [x] 3.11 Начинать после замены графа новую эпоху ревизий и публиковать изменение «граф заменён»
   - **Acceptance criteria:**
     - По решению 11 [дизайна](design.md) и [ADR-0036](../../../docs/adr/0036-replace-graph-atomically-with-new-epoch-and-generation.md) после подтверждения замены тот же экземпляр репозитория начинает новую эпоху ревизий и сбрасывает кэши, в том числе снимок связей статистики по [ADR-0026](../../../docs/adr/0026-compute-contribution-through-relations-off-queue.md). Он уведомляет всех наблюдателей сущностей и состава графа и сообщает позицию пакета «сброс» наблюдателям лога. Если замена добавила копию перед заменой, наблюдатели списка копий задачи 3.5 получают новый список, где эта копия стоит первой. Результат замены несёт изменение «граф заменён» с ревизией новой эпохи, а ревизии прежней эпохи сравниваются с ней как `differentEpoch`.
     - Отказ и отмена замены эпоху, кэши и наблюдателей не трогают.

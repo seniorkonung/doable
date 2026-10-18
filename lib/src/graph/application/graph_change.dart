@@ -139,6 +139,29 @@ final class IntentionRelationCountsChanged implements GraphChange {
   final RelationCounts counts;
 }
 
+/// Изменение «граф заменён»: весь граф заменён одной транзакцией (ADR-0036).
+///
+/// Его ревизия — первая ревизия новой эпохи: ревизии прежней эпохи
+/// сравниваются с ней как [GraphRevisionOrder.differentEpoch].
+final class GraphReplaced implements GraphChange {
+  const GraphReplaced({required this.revision});
+
+  @override
+  final GraphRevision revision;
+}
+
+/// Результат подтверждённой замены графа: пакет ревизии новой эпохи из
+/// единственного изменения [GraphReplaced].
+final class ConfirmedGraphReplacement implements ConfirmedGraphChangePackage {
+  ConfirmedGraphReplacement(this.revision)
+    : changes = List.unmodifiable([GraphReplaced(revision: revision)]);
+
+  @override
+  final GraphRevision revision;
+  @override
+  final List<GraphChange> changes;
+}
+
 sealed class LongTermRelationChange implements GraphChange {
   const LongTermRelationChange();
 

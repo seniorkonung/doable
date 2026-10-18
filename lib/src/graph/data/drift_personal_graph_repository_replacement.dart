@@ -12,8 +12,9 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   ///
   /// Захват фактов выключен на время транзакции, а признак записи единого
   /// пути не ставится: замену отражает в логе пакет «сброс», а не факты.
-  /// Любой отказ откатывает транзакцию, в том числе выключение захвата.
-  Future<void> _replaceGraph(
+  /// Любой отказ откатывает транзакцию, в том числе выключение захвата, и
+  /// новой эпохи не начинает.
+  Future<ConfirmedGraphReplacement> _replaceGraph(
     UnregisteredGraphSnapshot snapshot,
     void Function(double share) onProgress,
     bool Function() isCancelled,
@@ -25,7 +26,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
     // Момент копии перед заменой и время записи пакета «сброс» — одно
     // показание часов (ADR-0006).
     final replacedAt = _now();
-    await _database.transaction(() async {
+    final (resetPosition, addedBackup) = await _database.transaction(() async {
       await _setGraphCapture(false);
       final position = await _selectCurrentLogPosition();
       // Первая копия сравнивается с составом прежнего графа, поэтому сводка
@@ -71,8 +72,53 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
             ),
           );
       await _setGraphCapture(true);
+      return (resetPosition, summary != null);
     });
+    return _startReplacedGraphEpoch(resetPosition, addedBackup: addedBackup);
   });
+
+  /// Начинает после подтверждённой замены графа новую эпоху ревизий
+  /// (ADR-0036) и возвращает результат замены с первой ревизией этой эпохи.
+  ///
+  /// Номер изменения продолжает расти: курсоры и загрузка снимка связей
+  /// статистики, которые сверяют только его, тоже устаревают. Кэши
+  /// статистики сбрасываются, а наблюдатели сущностей перечитывают их:
+  /// ревизии прежней эпохи с новой несравнимы. Наблюдатели тегов узнают о
+  /// замене от обновлений таблиц Drift, наблюдатели состава и лога — по
+  /// позиции пакета «сброс» [resetPosition], а наблюдатели списка копий —
+  /// если замена добавила копию перед заменой.
+  ConfirmedGraphReplacement _startReplacedGraphEpoch(
+    int resetPosition, {
+    required bool addedBackup,
+  }) {
+    _epoch = _GraphEpoch();
+    _mutationSequence++;
+    _lastRelationChangeSequence = _mutationSequence;
+    _statisticsRelationSnapshot = null;
+    _throughRelationsResults.clear();
+    _intentionStatisticsResults.clear();
+    for (final watchers in List.of(_intentionWatchers.values)) {
+      for (final watcher in List.of(watchers)) {
+        watcher.add(null);
+      }
+    }
+    for (final registrations in List.of(_dailyChoiceWatchers.values)) {
+      for (final registration in List.of(registrations)) {
+        registration.invalidations.add(null);
+      }
+    }
+    for (final registrations in List.of(_relationWatchers.values)) {
+      for (final registration in List.of(registrations)) {
+        registration.invalidations.add(null);
+      }
+    }
+    for (final registration in List.of(_selectedRelationsWatchers)) {
+      registration.invalidations.add(null);
+    }
+    _confirmedPositions.add(resetPosition);
+    if (addedBackup) _backupsChanged.add(null);
+    return ConfirmedGraphReplacement(_currentRevision);
+  }
 
   Future<void> _setGraphCapture(bool capture) => _database
       .update(_database.graphLogControl)
