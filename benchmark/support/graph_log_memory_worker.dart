@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -18,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../test/support/file_document_access.dart';
 import '../../test/support/in_memory_diagnostics_sink.dart';
+import 'graph_backup_restore.dart';
 
 const _operationVariable = 'DOABLE_GRAPH_LOG_OPERATION';
 const _pathVariable = 'DOABLE_GRAPH_LOG_PATH';
@@ -51,6 +53,13 @@ enum GraphLogMemoryOperation {
   /// файл экспорта: наибольший объём живых данных за время экспорта.
   export,
 
+  /// Восстановление ручной копии, которую сделала подготовка графа, от
+  /// подтверждения до замены графа: наибольший объём живых данных кучи
+  /// вместе с памятью malloc процесса. В ней SQLite держит кэш страниц и
+  /// журналы операторов транзакции замены: в этой сборке они живут в памяти
+  /// (`SQLITE_TEMP_STORE=2`).
+  restore,
+
   /// Итог фактов пакетов после последнего снимка: живые данные, которые
   /// собранное состояние удерживает до выдачи записей.
   rangeSummary,
@@ -61,8 +70,8 @@ enum GraphLogMemoryOperation {
 }
 
 /// Прирост памяти операции над её значением перед операцией и число
-/// выданных операцией записей; у сжатия записей нет, а у экспорта это
-/// записи записанного документа.
+/// выданных операцией записей; у сжатия записей нет, у экспорта это записи
+/// записанного документа, а у восстановления — записи графа после замены.
 typedef GraphLogMemory = ({int growthBytes, int records});
 
 /// Выполняет [operation] в новом процессе Flutter: операции лога — над
@@ -123,6 +132,10 @@ void main() {
     );
     final run = switch (operation) {
       GraphLogMemoryOperation.fileRead => () => _readFile(path),
+      GraphLogMemoryOperation.restore => _restoreInIsolate(
+        path,
+        Directory(environment[_snapshotsVariable]!),
+      ),
       _ => await _openGraphOperation(
         operation,
         path,
@@ -133,6 +146,7 @@ void main() {
       GraphLogMemoryOperation.assembly ||
       GraphLogMemoryOperation.compaction ||
       GraphLogMemoryOperation.export => await _LiveHeapPeak.start(),
+      GraphLogMemoryOperation.restore => await _LiveHeapPeak.startWithMalloc(),
       GraphLogMemoryOperation.rangeSummary => await _RetainedLiveHeap.start(),
       GraphLogMemoryOperation.fileRead => _ResidentSetPeak.start(),
     };
@@ -159,7 +173,9 @@ Future<_Operation> _openGraphOperation(
   File databaseFile,
   Directory snapshots,
 ) async {
-  final repository = await _openRepository(databaseFile);
+  final database = AppDatabase(openFileBackedLocalDatabase(databaseFile));
+  addTearDown(database.close);
+  final repository = await _openRepository(database);
   final position = await repository.readCurrentPosition();
   final diagnostics = InMemoryDiagnosticsSink();
   final store = GraphSnapshotStore(
@@ -200,6 +216,7 @@ Future<_Operation> _openGraphOperation(
       snapshots,
       diagnostics,
     ),
+    GraphLogMemoryOperation.restore ||
     GraphLogMemoryOperation.fileRead => throw ArgumentError.value(operation),
   };
 }
@@ -245,11 +262,48 @@ Future<_Operation> _openExport(
   };
 }
 
+/// Восстановление ручной копии, которую сделала подготовка графа, как после
+/// подтверждения восстановления, в отдельном изоляте той же группы.
+///
+/// Замена графа занимает свой изолят без пауз: драйвер SQLite синхронный, а
+/// каждый шаг замены продолжает предыдущий в той же очереди микрозадач. В
+/// изоляте замены ответ на сборку мусора доходил бы до замера лишь между
+/// шагами, и память читалась бы вместе с мусором, накопленным за эти шаги.
+/// Куча у изолятов одной группы общая, поэтому замер охватывает и изолят
+/// замены.
+_Operation _restoreInIsolate(File databaseFile, Directory snapshots) =>
+    () async {
+      final records = await Isolate.run(() async {
+        final database = AppDatabase(openFileBackedLocalDatabase(databaseFile));
+        try {
+          final restore = BenchmarkGraphRestore(
+            await _openRepository(database),
+            snapshots: snapshots,
+            clock: () => _now,
+          );
+          try {
+            await restore.restore(await restore.readManualBackup());
+          } finally {
+            await restore.dispose();
+          }
+          final row = await database.customSelect('''SELECT
+            (SELECT count(*) FROM tags) + (SELECT count(*) FROM intentions) +
+            (SELECT count(*) FROM tag_assignments) +
+            (SELECT count(*) FROM long_term_relations) +
+            (SELECT count(*) FROM daily_choices) AS records''').getSingle();
+          return row.read<int>('records');
+        } finally {
+          await database.close();
+        }
+      });
+      return () async => records;
+    };
+
 final _now = DateTime.utc(2026, 10, 17, 12);
 
-Future<DriftPersonalGraphRepository> _openRepository(File databaseFile) async {
-  final database = AppDatabase(openFileBackedLocalDatabase(databaseFile));
-  addTearDown(database.close);
+Future<DriftPersonalGraphRepository> _openRepository(
+  AppDatabase database,
+) async {
   final repository = DriftPersonalGraphRepository(
     database,
     UuidV7IntentionIdGenerator(),
@@ -280,13 +334,26 @@ sealed class _Measurement {
 /// У изолятов одной группы общая куча, поэтому замер охватывает и изолят
 /// записи снимка.
 final class _LiveHeapPeak implements _Measurement {
-  _LiveHeapPeak._(this._service, this._baseline) : _peak = _baseline {
+  _LiveHeapPeak._(this._service, this._read, this._baseline)
+    : _peak = _baseline {
     _sampling = _sample();
   }
 
-  static Future<_LiveHeapPeak> start() async {
+  static Future<_LiveHeapPeak> start() =>
+      _start((service) => service.readLiveBytes());
+
+  /// Замер, который прибавляет к живым данным кучи память malloc процесса,
+  /// занятую в момент замера. Кучу Dart VM размещает не в malloc, а в
+  /// отображённых страницах, поэтому она не учитывается дважды.
+  static Future<_LiveHeapPeak> startWithMalloc() => _start(
+    (service) async => await service.readLiveBytes() + _mallocInUseBytes(),
+  );
+
+  static Future<_LiveHeapPeak> _start(
+    Future<int> Function(_VmService service) read,
+  ) async {
     final service = await _VmService.connect();
-    return _LiveHeapPeak._(service, await service.readLiveBytes());
+    return _LiveHeapPeak._(service, read, await read(service));
   }
 
   /// Пауза между сборками: непрерывная сборка мусора замедлила бы сжатие
@@ -297,6 +364,7 @@ final class _LiveHeapPeak implements _Measurement {
   static const _minimumSamples = 3;
 
   final _VmService _service;
+  final Future<int> Function(_VmService service) _read;
   final int _baseline;
   int _peak;
   var _samples = 0;
@@ -305,7 +373,7 @@ final class _LiveHeapPeak implements _Measurement {
 
   Future<void> _sample() async {
     while (!_finished) {
-      final live = await _service.readLiveBytes();
+      final live = await _read(_service);
       if (_finished) break;
       if (live > _peak) _peak = live;
       _samples++;
@@ -375,6 +443,47 @@ final class _ResidentSetPeak implements _Measurement {
         .firstWhere((line) => line.startsWith('$field:'));
     return int.parse(line.split(RegExp(r'\s+'))[1]) * 1024;
   }
+}
+
+/// Память, занятая в malloc процесса во всех его аренах, по mallinfo2
+/// glibc: https://man7.org/linux/man-pages/man3/mallinfo.3.html
+int _mallocInUseBytes() {
+  if (!Platform.isLinux) {
+    throw UnsupportedError('Память malloc читается из glibc Linux.');
+  }
+  final info = _mallinfo2();
+  return info.uordblks + info.hblkhd;
+}
+
+final _mallinfo2 = DynamicLibrary.process()
+    .lookupFunction<_MallInfo2 Function(), _MallInfo2 Function()>('mallinfo2');
+
+/// `struct mallinfo2` glibc.
+final class _MallInfo2 extends Struct {
+  @Size()
+  external int arena;
+  @Size()
+  external int ordblks;
+  @Size()
+  external int smblks;
+  @Size()
+  external int hblks;
+
+  /// Байты блоков, выделенных отдельными отображениями.
+  @Size()
+  external int hblkhd;
+  @Size()
+  external int usmblks;
+  @Size()
+  external int fsmblks;
+
+  /// Байты занятых блоков арен.
+  @Size()
+  external int uordblks;
+  @Size()
+  external int fordblks;
+  @Size()
+  external int keepcost;
 }
 
 /// Клиент JSON-RPC протокола VM service текущего процесса.
