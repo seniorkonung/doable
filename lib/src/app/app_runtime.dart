@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../data/local/app_database.dart';
+import '../data/local/app_database.dart'
+    show AppDatabase, openAndroidProductionDatabaseConnection;
 import '../data/local/bootstrap/local_data_bootstrap.dart';
 import '../data/local/bootstrap/local_data_bootstrap_result.dart';
 import '../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
@@ -17,6 +19,9 @@ import '../graph/application/graph_command_coordinator.dart';
 import '../graph/application/personal_graph_repository.dart';
 import '../graph/application/personal_graph_repository_provider.dart';
 import '../graph/data/drift_personal_graph_repository.dart';
+import '../graph_backups/graph_backup_registry.dart';
+import '../graph_backups/graph_backups.dart';
+import '../graph_backups/graph_backups_provider.dart';
 import '../graph_snapshots/graph_fact_log.dart';
 import '../graph_snapshots/graph_log_compaction.dart';
 import '../graph_snapshots/graph_snapshot_store.dart';
@@ -48,12 +53,13 @@ typedef AppGraphFilesFactory = Future<AppGraphFiles> Function(
   ObservableGraphFactLog log,
 );
 
-/// Граф над готовой базой: репозиторий, а также лог фактов и состав графа,
-/// если их ведёт этот репозиторий.
+/// Граф над готовой базой: репозиторий, а также лог фактов, состав графа и
+/// реестр копий, если их ведёт этот репозиторий.
 typedef _AppGraph = ({
   PersonalGraphRepository repository,
   ObservableGraphFactLog? factLog,
   GraphCompositionSource? composition,
+  GraphBackupRegistry? backupRegistry,
 });
 
 typedef _AppGraphFactory = _AppGraph Function(AppDatabase database);
@@ -100,10 +106,16 @@ final class AppRuntime {
   /// хранилища runtime удаляет временные файлы прежних запусков, очищает
   /// каталог снимков и затем запускает сжатие лога фактов. Экспорт графа
   /// пишет состояние через то же сжатие и начинает запись временного файла
-  /// только после удаления временных файлов прежних запусков. Выключение
-  /// дожидается идущего экспорта и сжатия и только потом закрывает базу.
-  /// Лог фактов и состав графа ведёт репозиторий по умолчанию, поэтому с
-  /// [repositoryFactory] файлы графа и состав графа не подключаются.
+  /// только после удаления временных файлов прежних запусков. Резервные
+  /// копии ведутся над тем же сжатием: после подготовки хранилища и при
+  /// каждом возвращении приложения на передний план runtime проверяет фоном,
+  /// нужна ли ежедневная копия. Выключение дожидается идущего экспорта,
+  /// сжатия и создания копии и только потом закрывает базу.
+  /// Лог фактов, состав графа и реестр копий ведёт репозиторий по умолчанию,
+  /// поэтому с [repositoryFactory] файлы графа, состав графа и копии не
+  /// подключаются.
+  /// [clock] заменяет системные часы как часы устройства для репозитория по
+  /// умолчанию, экспорта и резервных копий.
   factory AppRuntime({
     required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
@@ -111,22 +123,25 @@ final class AppRuntime {
     AppPersonalGraphRepositoryFactory? repositoryFactory,
     AppGraphFilesFactory? graphFilesFactory,
     DailyChoiceLocalDateSource? dailyChoiceLocalDateSource,
+    DateTime Function()? clock,
   }) {
     assert(
       repositoryFactory == null || graphFilesFactory == null,
       'Файлы графа ведутся над логом фактов репозитория по умолчанию.',
     );
+    final readClock = clock ?? () => DateTime.now().toUtc();
     final _AppGraphFactory graphFactory = switch (repositoryFactory) {
       final createRepository? => (database) => (
         repository: createRepository(database),
         factLog: null,
         composition: null,
+        backupRegistry: null,
       ),
       null => (database) {
         final repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
-          () => DateTime.now().toUtc(),
+          readClock,
           diagnosticsSink,
           relationIdGenerator: UuidV7LongTermRelationIdGenerator(),
         );
@@ -134,6 +149,7 @@ final class AppRuntime {
           repository: repository,
           factLog: repository,
           composition: repository,
+          backupRegistry: repository,
         );
       },
     };
@@ -147,6 +163,7 @@ final class AppRuntime {
       dailyChoiceLocalDateSource ?? readDeviceLocalDay,
       quickCreationModeStore,
       diagnosticsSink,
+      readClock,
     );
   }
 
@@ -187,6 +204,7 @@ final class AppRuntime {
     this._dailyChoiceLocalDateSource,
     this._quickCreationModeStore,
     this._diagnosticsSink,
+    this._clock,
   );
 
   final LocalDataBootstrap _localDataBootstrap;
@@ -195,6 +213,7 @@ final class AppRuntime {
   final DailyChoiceLocalDateSource _dailyChoiceLocalDateSource;
   final QuickCreationModeStore _quickCreationModeStore;
   final DiagnosticsSink _diagnosticsSink;
+  final DateTime Function() _clock;
   // Одна загрузка и одна очередь на runtime, в том числе при повторе bootstrap.
   late final Future<QuickCreationMode> _initialQuickCreationMode =
       _quickCreationModeStore.read();
@@ -206,6 +225,14 @@ final class AppRuntime {
   /// Запуск снимков графа: завершается запущенным сжатием либо `null`, если
   /// сжатие не запущено.
   Future<GraphLogCompaction?>? _graphSnapshots;
+
+  /// Сообщает о возвращениях приложения на передний план, пока выключение не
+  /// началось.
+  AppLifecycleListener? _foregroundReturns;
+
+  /// Последняя запущенная проверка ежедневной копии. Копии делаются по
+  /// одной, поэтому она завершается после всех предыдущих.
+  Future<void>? _dailyGraphBackup;
   Future<void>? _shuttingDown;
 
   GraphCommandCoordinator get commandCoordinator {
@@ -272,7 +299,8 @@ final class AppRuntime {
     }
     ProviderContainer? container;
     try {
-      final (:repository, :factLog, :composition) = _graphFactory(database);
+      final (:repository, :factLog, :composition, :backupRegistry) =
+          _graphFactory(database);
       final files = switch ((factLog, _graphFilesFactory)) {
         (final log?, final createFiles?) => await createFiles(log),
         _ => null,
@@ -285,10 +313,18 @@ final class AppRuntime {
           documents: files.documents,
           compaction: files.compaction,
           temporaryDirectory: _removeTemporaryFiles(files.temporaryDirectory),
-          clock: () => DateTime.now().toUtc(),
+          clock: _clock,
           diagnosticsSink: _diagnosticsSink,
         ),
         null => null,
+      };
+      final backups = switch ((files, backupRegistry)) {
+        (final files?, final registry?) => GraphBackups(
+          registry: registry,
+          compaction: files.compaction,
+          clock: _clock,
+        ),
+        _ => null,
       };
       container = ProviderContainer(
         overrides: [
@@ -308,6 +344,7 @@ final class AppRuntime {
             graphExportControllerProvider.overrideWith(
               () => GraphExportController(export),
             ),
+          if (backups != null) graphBackupsProvider.overrideWithValue(backups),
         ],
         retry: (retryCount, error) => null,
       );
@@ -319,6 +356,7 @@ final class AppRuntime {
       if (files != null) {
         _graphSnapshots = _startGraphSnapshots(files.compaction);
       }
+      if (backups != null) _startDailyGraphBackups(backups);
       return _ready = AppRuntimeReady(container);
     } on Object {
       container?.dispose();
@@ -358,16 +396,29 @@ final class AppRuntime {
     return compaction..start();
   }
 
+  /// Проверяет, нужна ли ежедневная копия [backups], сейчас и при каждом
+  /// возвращении приложения на передний план, пока выключение не началось.
+  /// Готовность и команды графа проверки не ждут, а её отказ сообщается
+  /// исходом и не мешает работе.
+  void _startDailyGraphBackups(GraphBackups backups) {
+    void makeDailyBackupIfDue() =>
+        _dailyGraphBackup = backups.makeDailyBackupIfDue();
+    _foregroundReturns = AppLifecycleListener(onResume: makeDailyBackupIfDue);
+    makeDailyBackupIfDue();
+  }
+
   Future<void> shutdown() {
     final existingShutdown = _shuttingDown;
     if (existingShutdown != null) return existingShutdown;
 
     _lifecycle = _AppRuntimeLifecycle.closing;
+    _foregroundReturns?.dispose();
     // Координатор дожидается принятых команд и идущего экспорта.
     final draining = _commandCoordinator?.shutdown() ?? Future<void>.value();
     final compacting = _stopGraphSnapshots();
+    final backingUp = _dailyGraphBackup ?? Future<void>.value();
     _ready?.container.dispose();
-    final shuttingDown = _finishShutdown(draining, compacting);
+    final shuttingDown = _finishShutdown(draining, compacting, backingUp);
     _shuttingDown = shuttingDown;
     return shuttingDown;
   }
@@ -382,10 +433,12 @@ final class AppRuntime {
   Future<void> _finishShutdown(
     Future<void> draining,
     Future<void> compacting,
+    Future<void> backingUp,
   ) async {
     try {
       await draining;
       await compacting;
+      await backingUp;
       await _localDataBootstrap.close();
     } finally {
       _lifecycle = _AppRuntimeLifecycle.closed;
