@@ -340,6 +340,7 @@ final class AppRuntime {
           registry: registry,
           compaction: files.compaction,
           clock: _clock,
+          diagnosticsSink: _diagnosticsSink,
         ),
         _ => null,
       };

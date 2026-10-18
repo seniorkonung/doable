@@ -85,6 +85,7 @@ void main() {
       registry: repository,
       compaction: compaction,
       clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
     );
     final restore = GraphRestore(
       backups: repository,

@@ -631,3 +631,90 @@ final class GraphExportDiagnosticsEvent extends DiagnosticsEvent {
 
   final GraphExportDiagnosticsStage? stage;
 }
+
+/// Вид создаваемой резервной копии графа.
+enum GraphBackupCreationDiagnosticsKind { daily, manual, beforeReplacement }
+
+/// Этап создания резервной копии графа.
+enum GraphBackupCreationDiagnosticsStage {
+  /// Чтение списка копий и подсчёт сводки изменений по пакетам лога после
+  /// позиции предыдущей копии.
+  changeSummary,
+
+  /// Запись копии в реестр копий, у ежедневной копии — вместе с удалением
+  /// копий окном хранения.
+  registration,
+}
+
+/// Создание резервной копии графа: вид копии, исход, длительность, а у
+/// отказа — этап и безопасная категория, в том числе нехватка места.
+/// Ежедневная копия, которая не понадобилась, события не даёт.
+///
+/// Позиции лога, моменты копий, сводки, записи графа и исходное исключение
+/// не входят в контракт события. Конструкторы допускают этап только у
+/// отказа. Передача получателю — через [recordDiagnosticsSafely].
+final class GraphBackupCreationDiagnosticsEvent extends DiagnosticsEvent {
+  GraphBackupCreationDiagnosticsEvent.succeeded({
+    required this.kind,
+    required Duration duration,
+  }) : stage = null,
+       super(DiagnosticsSucceeded(duration));
+
+  GraphBackupCreationDiagnosticsEvent.failed({
+    required this.kind,
+    required GraphBackupCreationDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphBackupCreationDiagnosticsKind kind;
+  final GraphBackupCreationDiagnosticsStage? stage;
+}
+
+/// Автоматическое удаление резервных копий окном хранения при записи
+/// ежедневной копии: исход, длительность, а у отказа — безопасная категория.
+/// Ежедневная копия, которая не вытеснила ни одной копии, события удаления
+/// не даёт.
+///
+/// Число, виды, позиции и моменты удалённых копий и исходное исключение не
+/// входят в контракт события. Передача получателю — через
+/// [recordDiagnosticsSafely].
+final class GraphBackupRemovalDiagnosticsEvent extends DiagnosticsEvent {
+  GraphBackupRemovalDiagnosticsEvent.succeeded({required Duration duration})
+    : super(DiagnosticsSucceeded(duration));
+
+  GraphBackupRemovalDiagnosticsEvent.failed({
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+}
+
+/// Этап восстановления резервной копии графа.
+enum GraphBackupRestoreDiagnosticsStage {
+  /// Проверка, что копия хранится, и запись её состояния в снимок замены.
+  snapshotWrite,
+
+  /// Замена графа снимком замены в монопольном режиме координатора.
+  replacement,
+}
+
+/// Восстановление резервной копии графа: исход, длительность, а у отказа —
+/// этап и безопасная категория, в том числе повреждение снимка и нехватка
+/// места. Отмена восстановления отказом не считается и события не даёт.
+///
+/// Позиция и момент копии, записи графа, имена и пути файлов и исходное
+/// исключение не входят в контракт события. Конструкторы допускают этап
+/// только у отказа. Передача получателю — через [recordDiagnosticsSafely].
+final class GraphBackupRestoreDiagnosticsEvent extends DiagnosticsEvent {
+  GraphBackupRestoreDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphBackupRestoreDiagnosticsEvent.failed({
+    required GraphBackupRestoreDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphBackupRestoreDiagnosticsStage? stage;
+}

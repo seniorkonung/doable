@@ -66,18 +66,32 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
     return [for (final row in rows) _backupEntry(row)];
   }
 
-  Future<bool> _insertDailyBackup(DateTime dayStart, GraphChangeTally? since) =>
-      _writeBackup((madeAt, position) async {
-        if (!await _isDailyBackupDue(dayStart, madeAt, position)) return false;
-        await _insertBackupRow(
-          GraphBackupKind.daily,
-          madeAt,
-          position,
-          await _summaryUpTo(position, since),
-        );
-        await _removeBackupsBeforeWindow();
-        return true;
-      });
+  /// Удаление копий окном хранения диагностируется после подтверждения
+  /// транзакции, если оно удалило хотя бы одну копию, а его отказ — сразу.
+  Future<bool> _insertDailyBackup(
+    DateTime dayStart,
+    GraphChangeTally? since,
+  ) async {
+    final removal = Stopwatch();
+    var removed = 0;
+    final written = await _writeBackup((madeAt, position) async {
+      if (!await _isDailyBackupDue(dayStart, madeAt, position)) return false;
+      await _insertBackupRow(
+        GraphBackupKind.daily,
+        madeAt,
+        position,
+        await _summaryUpTo(position, since),
+      );
+      removed = await _removeBackupsBeforeWindow(removal);
+      return true;
+    });
+    if (removed > 0) {
+      _recordDiagnostics(
+        GraphBackupRemovalDiagnosticsEvent.succeeded(duration: removal.elapsed),
+      );
+    }
+    return written;
+  }
 
   Future<void> _insertManualBackup(GraphChangeTally? since) =>
       _writeBackup((madeAt, position) async {
@@ -189,21 +203,38 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
   }
 
   /// Удаляет копии любого вида, созданные раньше самой старой из
-  /// [retainedDailyGraphBackups] последних ежедневных копий.
-  Future<void> _removeBackupsBeforeWindow() async {
+  /// [retainedDailyGraphBackups] последних ежедневных копий, и возвращает
+  /// число удалённых копий.
+  ///
+  /// Длительность удаления отсчитывает [duration]; отказ диагностируется и
+  /// передаётся вызывающему.
+  Future<int> _removeBackupsBeforeWindow(Stopwatch duration) async {
     final backups = _database.graphBackups;
-    final oldestRetained =
-        await (_database.selectOnly(backups)
-              ..addColumns([backups.id])
-              ..where(backups.kind.equals(_dailyBackupKind))
-              ..orderBy([OrderingTerm.desc(backups.id)])
-              ..limit(1, offset: retainedDailyGraphBackups - 1))
-            .map((row) => row.read(backups.id)!)
-            .getSingleOrNull();
-    if (oldestRetained == null) return;
-    await (_database.delete(
-      backups,
-    )..where((backup) => backup.id.isSmallerThanValue(oldestRetained))).go();
+    duration.start();
+    try {
+      final oldestRetained =
+          await (_database.selectOnly(backups)
+                ..addColumns([backups.id])
+                ..where(backups.kind.equals(_dailyBackupKind))
+                ..orderBy([OrderingTerm.desc(backups.id)])
+                ..limit(1, offset: retainedDailyGraphBackups - 1))
+              .map((row) => row.read(backups.id)!)
+              .getSingleOrNull();
+      if (oldestRetained == null) return 0;
+      return await (_database.delete(
+        backups,
+      )..where((backup) => backup.id.isSmallerThanValue(oldestRetained))).go();
+    } on Object catch (error) {
+      _recordDiagnostics(
+        GraphBackupRemovalDiagnosticsEvent.failed(
+          duration: duration.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
+      rethrow;
+    } finally {
+      duration.stop();
+    }
   }
 }
 

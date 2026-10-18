@@ -282,9 +282,92 @@ void main() {
               'failureCode': 'snapshotCorruption',
             },
           ),
+          (
+            'отказ удаления копий окном хранения',
+            GraphBackupRemovalDiagnosticsEvent.failed(
+              duration: const Duration(microseconds: 81),
+              code: DiagnosticsFailureCode.corruption,
+            ),
+            {
+              'operation': 'graphBackupRemoval',
+              'outcome': 'failed',
+              'durationMicros': 81,
+              'failureCode': 'corruption',
+            },
+          ),
+          (
+            'успех восстановления копии',
+            GraphBackupRestoreDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 91),
+            ),
+            {
+              'operation': 'graphBackupRestore',
+              'outcome': 'succeeded',
+              'durationMicros': 91,
+            },
+          ),
+          (
+            'отказ восстановления копии из-за повреждённого снимка',
+            GraphBackupRestoreDiagnosticsEvent.failed(
+              stage: GraphBackupRestoreDiagnosticsStage.snapshotWrite,
+              duration: const Duration(microseconds: 92),
+              code: DiagnosticsFailureCode.snapshotCorruption,
+            ),
+            {
+              'operation': 'graphBackupRestore',
+              'stage': 'snapshotWrite',
+              'outcome': 'failed',
+              'durationMicros': 92,
+              'failureCode': 'snapshotCorruption',
+            },
+          ),
         ]) {
       test('$description кодируется только операцией, этапом отказа, исходом, '
           'длительностью и категорией отказа', () {
+        final messages = <String>[];
+        final sink = DeveloperDiagnosticsSink(messages.add);
+
+        sink.record(event);
+
+        expect(jsonDecode(messages.single), expected);
+      });
+    }
+
+    for (final (description, event, expected)
+        in <(String, DiagnosticsEvent, Map<String, Object>)>[
+          (
+            'успех ежедневной копии',
+            GraphBackupCreationDiagnosticsEvent.succeeded(
+              kind: GraphBackupCreationDiagnosticsKind.daily,
+              duration: const Duration(microseconds: 71),
+            ),
+            {
+              'operation': 'graphBackupCreation',
+              'backupKind': 'daily',
+              'outcome': 'succeeded',
+              'durationMicros': 71,
+            },
+          ),
+          (
+            'отказ копии перед заменой из-за нехватки места',
+            GraphBackupCreationDiagnosticsEvent.failed(
+              kind: GraphBackupCreationDiagnosticsKind.beforeReplacement,
+              stage: GraphBackupCreationDiagnosticsStage.registration,
+              duration: const Duration(microseconds: 72),
+              code: DiagnosticsFailureCode.storageFull,
+            ),
+            {
+              'operation': 'graphBackupCreation',
+              'backupKind': 'beforeReplacement',
+              'stage': 'registration',
+              'outcome': 'failed',
+              'durationMicros': 72,
+              'failureCode': 'storageFull',
+            },
+          ),
+        ]) {
+      test('$description кодируется только операцией, видом копии, этапом '
+          'отказа, исходом, длительностью и категорией отказа', () {
         final messages = <String>[];
         final sink = DeveloperDiagnosticsSink(messages.add);
 

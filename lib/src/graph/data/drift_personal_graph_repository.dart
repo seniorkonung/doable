@@ -39,7 +39,10 @@ import '../../graph_format/graph_format_records.dart'
         TagRecord;
 import '../../graph_snapshots/graph_fact_log.dart';
 import '../../graph_snapshots/graph_snapshot_store.dart'
-    show GraphHistoryPackage, UnregisteredGraphSnapshot;
+    show
+        GraphHistoryPackage,
+        UnregisteredGraphSnapshot,
+        graphSnapshotFailureCode;
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';

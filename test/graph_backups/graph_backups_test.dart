@@ -19,7 +19,9 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/encoded_diagnostics_log.dart';
 import '../support/forwarding_graph_fact_log.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -35,6 +37,7 @@ void main() {
   late _HeldPackageReads log;
   late _CompactionOutcomes compactionOutcomes;
   late GraphLogCompaction compaction;
+  late EncodedDiagnosticsLog diagnostics;
   late GraphBackups backups;
   late DateTime now;
 
@@ -60,10 +63,12 @@ void main() {
       diagnosticsSink: compactionOutcomes,
       threshold: _threshold,
     );
+    diagnostics = EncodedDiagnosticsLog();
     backups = GraphBackups(
       registry: repository,
       compaction: compaction,
       clock: () => now,
+      diagnosticsSink: diagnostics,
     );
   });
 
@@ -266,8 +271,10 @@ void main() {
       ));
     });
 
-    test('отказ записи ежедневной и ручной копий даёт исход отказа и не '
-        'меняет копии, а следующая попытка делает копию', () async {
+    test('отказ записи ежедневной и ручной копий из-за нехватки места даёт '
+        'исход отказа, диагностируемый этапом записи и категорией нехватки '
+        'места, и не меняет копии, а следующая попытка делает '
+        'копию', () async {
       await createTag('Дом');
       expect(
         await backups.makeDailyBackupIfDue(),
@@ -283,6 +290,17 @@ void main() {
       );
       expect(await backups.makeManualBackup(), ManualGraphBackupOutcome.failed);
 
+      expect(diagnostics.events, [
+        _made('daily'),
+        for (final kind in ['daily', 'manual'])
+          {
+            'operation': 'graphBackupCreation',
+            'backupKind': kind,
+            'stage': 'registration',
+            'outcome': 'failed',
+            'failureCode': 'storageFull',
+          },
+      ]);
       failures.failsBackupInsert = false;
       expect(_moments(await list()), [DateTime(2026, 10, 5, 9)]);
       expect(
@@ -291,7 +309,53 @@ void main() {
       );
     });
   });
+
+  group('диагностика', () {
+    test('сделанные ежедневная и ручная копии диагностируются видом копии и '
+        'успехом без пользовательских данных, а ежедневная копия, которая не '
+        'понадобилась, события не даёт', () async {
+      await createTag('Дом');
+      expect(
+        await backups.makeDailyBackupIfDue(),
+        DailyGraphBackupOutcome.made,
+      );
+      now = DateTime(2026, 10, 6, 9);
+      expect(
+        await backups.makeDailyBackupIfDue(),
+        DailyGraphBackupOutcome.notDue,
+      );
+
+      expect(await backups.makeManualBackup(), ManualGraphBackupOutcome.made);
+
+      expect(diagnostics.events, [_made('daily'), _made('manual')]);
+    });
+
+    test('отказ чтения пакетов лога для сводки даёт исход отказа, '
+        'диагностируемый этапом подсчёта сводки', () async {
+      await createTag('Дом');
+      expect(await backups.makeManualBackup(), ManualGraphBackupOutcome.made);
+      await createTag('Дача');
+      log.failsReads = true;
+
+      expect(await backups.makeManualBackup(), ManualGraphBackupOutcome.failed);
+
+      expect(diagnostics.events.last, {
+        'operation': 'graphBackupCreation',
+        'backupKind': 'manual',
+        'stage': 'changeSummary',
+        'outcome': 'failed',
+        'failureCode': 'unexpected',
+      });
+    });
+  });
 }
+
+/// Событие сделанной копии вида [kind] без длительности.
+Map<String, Object?> _made(String kind) => {
+  'operation': 'graphBackupCreation',
+  'backupKind': kind,
+  'outcome': 'succeeded',
+};
 
 /// Сводка так, как её показывает список копий: числа или признак замены.
 Object _shown(GraphChangeSummary summary) => switch (summary) {
@@ -308,7 +372,8 @@ List<DateTime> _moments(List<GraphBackupEntry> backups) => [
   for (final backup in backups) backup.madeAt.toLocal(),
 ];
 
-/// Отказывает каждую вставку строки копии, пока задан [failsBackupInsert].
+/// Отказывает каждую вставку строки копии нехваткой места, пока задан
+/// [failsBackupInsert].
 final class _BackupInsertFailures extends LocalDatabaseConnectionObserver {
   var failsBackupInsert = false;
 
@@ -317,16 +382,21 @@ final class _BackupInsertFailures extends LocalDatabaseConnectionObserver {
     if (failsBackupInsert &&
         statement.operation == LocalDatabaseSqlOperation.insert &&
         statement.statements.single.contains('"graph_backups"')) {
-      throw StateError('Внедрённый отказ вставки копии');
+      throw sqlite.SqliteException(
+        extendedResultCode: sqlite.SqlError.SQLITE_FULL,
+        message: 'database or disk is full',
+      );
     }
   }
 }
 
-/// Лог фактов, который задерживает одно чтение пакетов по запросу теста.
+/// Лог фактов, который задерживает одно чтение пакетов по запросу теста, а
+/// пока задан [failsReads], отказывает каждое чтение пакетов.
 final class _HeldPackageReads extends ForwardingGraphFactLog {
   _HeldPackageReads(super.source);
 
   ({Completer<void> reached, Completer<void> released})? _held;
+  var failsReads = false;
 
   /// Задерживает следующее чтение пакетов: `reached` завершается, когда оно
   /// начато, а продолжается оно после `release`. Следующие чтения не
@@ -342,6 +412,7 @@ final class _HeldPackageReads extends ForwardingGraphFactLog {
     required int after,
     required int upTo,
   }) async {
+    if (failsReads) throw StateError('Внедрённый отказ чтения пакетов');
     if (_held case final held?) {
       _held = null;
       held.reached.complete();

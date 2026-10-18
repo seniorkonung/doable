@@ -29,6 +29,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/encoded_diagnostics_log.dart';
 import '../../support/graph_history_rows.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -37,6 +38,7 @@ void main() {
   late LocalDatabaseHarness harness;
   late _DeleteFailureProbe probe;
   late AppDatabase database;
+  late EncodedDiagnosticsLog diagnostics;
   late DriftPersonalGraphRepository repository;
   late Directory snapshots;
   late GraphSnapshotStore store;
@@ -47,11 +49,12 @@ void main() {
     probe = _DeleteFailureProbe();
     database = await harness.openReadyDatabase(observer: probe);
     now = DateTime.utc(2026, 10, 18, 9);
+    diagnostics = EncodedDiagnosticsLog();
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
       () => now,
-      InMemoryDiagnosticsSink(),
+      diagnostics,
     );
     snapshots = Directory.fromUri(
       harness.temporaryDirectory.uri.resolve('graph_snapshots/'),
@@ -88,6 +91,12 @@ void main() {
     final read = await repository.watchBackups().first;
     return (read as GraphBackupsReadSucceeded).backups;
   }
+
+  /// События удаления копий окном хранения без длительности.
+  List<Map<String, Object?>> removals() => [
+    for (final event in diagnostics.events)
+      if (event['operation'] == 'graphBackupRemoval') event,
+  ];
 
   /// Сводка с позиции последней копии, как её посчитает модуль копий.
   Future<GraphChangeTally?> tallySinceLastBackup() async {
@@ -234,13 +243,14 @@ void main() {
 
   test('восьмая ежедневная копия удаляет самую старую ежедневную копию и '
       'ручную копию после неё, а наблюдение выдаёт список после вставки и '
-      'удаления', () async {
+      'удаления; диагностируется успехом только это удаление', () async {
     await dailyBackupOnOctober(1);
     now = DateTime.utc(2026, 10, 1, 12);
     await repository.insertManualBackup(since: await tallySinceLastBackup());
     for (var day = 2; day <= 7; day++) {
       await dailyBackupOnOctober(day);
     }
+    expect(removals(), isEmpty);
     final lists = StreamIterator(repository.watchBackups());
     addTearDown(lists.cancel);
     expect(await lists.moveNext(), isTrue);
@@ -255,10 +265,13 @@ void main() {
     expect(_moments((lists.current as GraphBackupsReadSucceeded).backups), [
       for (var day = 8; day >= 2; day--) DateTime.utc(2026, 10, day, 9),
     ]);
+    expect(removals(), [
+      {'operation': 'graphBackupRemoval', 'outcome': 'succeeded'},
+    ]);
   });
 
   test('отказ удаления копий окном хранения откатывает и вставку новой '
-      'ежедневной копии', () async {
+      'ежедневной копии и диагностируется категорией отказа', () async {
     for (var day = 1; day <= 7; day++) {
       await dailyBackupOnOctober(day);
     }
@@ -278,6 +291,13 @@ void main() {
 
     probe.failsDelete = false;
     expect(_moments(await backups()), before);
+    expect(removals(), [
+      {
+        'operation': 'graphBackupRemoval',
+        'outcome': 'failed',
+        'failureCode': 'unexpected',
+      },
+    ]);
   });
 }
 

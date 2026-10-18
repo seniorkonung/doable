@@ -1,4 +1,7 @@
 import '../graph_snapshots/graph_log_compaction.dart';
+import '../graph_snapshots/graph_snapshot_store.dart'
+    show graphSnapshotFailureCode;
+import '../shared/diagnostics/diagnostics_sink.dart';
 import 'graph_backup_registry.dart';
 import 'graph_change_summary.dart';
 
@@ -39,11 +42,15 @@ enum ManualGraphBackupOutcome {
 /// сменить только копия перед заменой графа, а за ней в логе следует пакет
 /// «сброс», и продолжение сводки даёт признак замены. Отказ копии не меняет
 /// копии и не мешает следующей.
+///
+/// Сделанная копия и отказ сообщаются в [DiagnosticsSink]; отказ диагностики
+/// исход копии не меняет.
 final class GraphBackups {
   GraphBackups({
     required this._registry,
     required this._compaction,
     required this._clock,
+    required this._diagnosticsSink,
   });
 
   final GraphBackupRegistry _registry;
@@ -51,6 +58,7 @@ final class GraphBackups {
   /// Сжатие лога фактов, которое ведёт отметки чтения истории.
   final GraphLogCompaction _compaction;
   final DateTime Function() _clock;
+  final DiagnosticsSink _diagnosticsSink;
 
   /// Завершение последней запрошенной копии.
   Future<void> _previous = Future.value();
@@ -64,29 +72,44 @@ final class GraphBackups {
   /// исключением.
   Future<DailyGraphBackupOutcome> makeDailyBackupIfDue() =>
       _oneAtATime(() async {
+        final creation = _BackupCreationDiagnostics(
+          GraphBackupCreationDiagnosticsKind.daily,
+          _diagnosticsSink,
+        );
         try {
-          return await _makeDailyBackupIfDue()
-              ? DailyGraphBackupOutcome.made
-              : DailyGraphBackupOutcome.notDue;
-        } on Object {
+          if (!await _makeDailyBackupIfDue(creation)) {
+            return DailyGraphBackupOutcome.notDue;
+          }
+          creation.recordMade();
+          return DailyGraphBackupOutcome.made;
+        } on Object catch (error) {
+          creation.recordFailure(error);
           return DailyGraphBackupOutcome.failed;
         }
       });
 
   /// Делает копию текущего состояния графа по запросу человека.
   Future<ManualGraphBackupOutcome> makeManualBackup() => _oneAtATime(() async {
+    final creation = _BackupCreationDiagnostics(
+      GraphBackupCreationDiagnosticsKind.manual,
+      _diagnosticsSink,
+    );
     try {
       final backups = await _registry.readBackups();
-      await _registry.insertManualBackup(
-        since: await _tallySince(backups.firstOrNull),
-      );
+      final since = await _tallySince(backups.firstOrNull);
+      creation.stage = GraphBackupCreationDiagnosticsStage.registration;
+      await _registry.insertManualBackup(since: since);
+      creation.recordMade();
       return ManualGraphBackupOutcome.made;
-    } on Object {
+    } on Object catch (error) {
+      creation.recordFailure(error);
       return ManualGraphBackupOutcome.failed;
     }
   });
 
-  Future<bool> _makeDailyBackupIfDue() async {
+  Future<bool> _makeDailyBackupIfDue(
+    _BackupCreationDiagnostics creation,
+  ) async {
     final now = _clock();
     final dayStart = _dayStartOf(now);
     final backups = await _registry.readBackups();
@@ -104,10 +127,9 @@ final class GraphBackups {
         )) {
       return false;
     }
-    return _registry.insertDailyBackup(
-      dayStart: dayStart,
-      since: await _tallySince(backups.firstOrNull),
-    );
+    final since = await _tallySince(backups.firstOrNull);
+    creation.stage = GraphBackupCreationDiagnosticsStage.registration;
+    return _registry.insertDailyBackup(dayStart: dayStart, since: since);
   }
 
   /// Сводка пакетов от позиции копии [last] до текущей; `null` — копий нет,
@@ -139,4 +161,38 @@ DateTime _dayStartOf(DateTime moment) {
   return local.isBefore(start)
       ? DateTime(local.year, local.month, local.day - 1, _dayStartHour)
       : start;
+}
+
+/// Диагностика одного создания копии: длительность отсчитывается от начала
+/// создания, а отказ относится к этапу [stage].
+final class _BackupCreationDiagnostics {
+  _BackupCreationDiagnostics(this._kind, this._sink);
+
+  final GraphBackupCreationDiagnosticsKind _kind;
+  final DiagnosticsSink _sink;
+  final _stopwatch = Stopwatch()..start();
+
+  /// Этап, который выполняется сейчас.
+  var stage = GraphBackupCreationDiagnosticsStage.changeSummary;
+
+  void recordMade() => recordDiagnosticsSafely(
+    _sink,
+    GraphBackupCreationDiagnosticsEvent.succeeded(
+      kind: _kind,
+      duration: _stopwatch.elapsed,
+    ),
+  );
+
+  /// Копия читает реестр и пакеты лога через модуль снимков и пишет реестр
+  /// в хранилище графа, поэтому её отказ классифицируется так же, как
+  /// отказы снимков.
+  void recordFailure(Object error) => recordDiagnosticsSafely(
+    _sink,
+    GraphBackupCreationDiagnosticsEvent.failed(
+      kind: _kind,
+      stage: stage,
+      duration: _stopwatch.elapsed,
+      code: graphSnapshotFailureCode(error),
+    ),
+  );
 }

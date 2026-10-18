@@ -57,6 +57,7 @@ final class BenchmarkGraphRestore {
       registry: _repository,
       compaction: _compaction,
       clock: _clock,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
     ).makeManualBackup();
     if (outcome != ManualGraphBackupOutcome.made) {
       throw StateError('Ручная копия не сделана.');

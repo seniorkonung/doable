@@ -226,6 +226,21 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': ?stage?.name,
     ..._encodeStatus(event.status),
   },
+  GraphBackupCreationDiagnosticsEvent(:final kind, :final stage) => {
+    'operation': 'graphBackupCreation',
+    'backupKind': kind.name,
+    'stage': ?stage?.name,
+    ..._encodeStatus(event.status),
+  },
+  GraphBackupRemovalDiagnosticsEvent() => {
+    'operation': 'graphBackupRemoval',
+    ..._encodeStatus(event.status),
+  },
+  GraphBackupRestoreDiagnosticsEvent(:final stage) => {
+    'operation': 'graphBackupRestore',
+    'stage': ?stage?.name,
+    ..._encodeStatus(event.status),
+  },
 };
 
 Map<String, Object> _encodeStatus(DiagnosticsStatus status) => switch (status) {

@@ -26,6 +26,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
     // Момент копии перед заменой и время записи пакета «сброс» — одно
     // показание часов (ADR-0006).
     final replacedAt = _now();
+    final backupCreation = Stopwatch();
     final (resetPosition, addedBackup) = await _database.transaction(() async {
       await _setGraphCapture(false);
       final position = await _selectCurrentLogPosition();
@@ -33,7 +34,11 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
       // считается до его удаления.
       final summary = (await _selectComposition()).isEmpty
           ? null
-          : await _summaryUpTo(position, null);
+          : await _createBackupBeforeReplacement(
+              GraphBackupCreationDiagnosticsStage.changeSummary,
+              backupCreation,
+              () => _summaryUpTo(position, null),
+            );
       final progress = _ReplacementProgress(
         _recordTotal(await _selectRecordCounts()) +
             _recordTotal(snapshot.counts),
@@ -50,11 +55,15 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         throw const GraphReplacementRecordsRejected();
       }
       if (summary != null) {
-        await _insertBackupRow(
-          GraphBackupKind.beforeReplacement,
-          replacedAt,
-          position,
-          summary,
+        await _createBackupBeforeReplacement(
+          GraphBackupCreationDiagnosticsStage.registration,
+          backupCreation,
+          () => _insertBackupRow(
+            GraphBackupKind.beforeReplacement,
+            replacedAt,
+            position,
+            summary,
+          ),
         );
       }
       final resetPosition = position + 1;
@@ -74,8 +83,43 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
       await _setGraphCapture(true);
       return (resetPosition, summary != null);
     });
+    if (addedBackup) {
+      _recordDiagnostics(
+        GraphBackupCreationDiagnosticsEvent.succeeded(
+          kind: GraphBackupCreationDiagnosticsKind.beforeReplacement,
+          duration: backupCreation.elapsed,
+        ),
+      );
+    }
     return _startReplacedGraphEpoch(resetPosition, addedBackup: addedBackup);
   });
+
+  /// Выполняет [run] — этап [stage] создания копии перед заменой; его
+  /// длительность добавляется к [duration]. Отказ этапа диагностируется и
+  /// передаётся вызывающему, а успех диагностирует подтверждённая замена:
+  /// копия появляется только вместе с ней.
+  Future<T> _createBackupBeforeReplacement<T>(
+    GraphBackupCreationDiagnosticsStage stage,
+    Stopwatch duration,
+    Future<T> Function() run,
+  ) async {
+    duration.start();
+    try {
+      return await run();
+    } on Object catch (error) {
+      _recordDiagnostics(
+        GraphBackupCreationDiagnosticsEvent.failed(
+          kind: GraphBackupCreationDiagnosticsKind.beforeReplacement,
+          stage: stage,
+          duration: duration.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
+      rethrow;
+    } finally {
+      duration.stop();
+    }
+  }
 
   /// Начинает после подтверждённой замены графа новую эпоху ревизий
   /// (ADR-0036) и возвращает результат замены с первой ревизией этой эпохи.

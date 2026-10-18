@@ -40,6 +40,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/encoded_diagnostics_log.dart';
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -61,6 +62,7 @@ void main() {
   late LocalDatabaseHarness harness;
   late _StatementProbe probe;
   late AppDatabase database;
+  late EncodedDiagnosticsLog diagnostics;
   late DriftPersonalGraphRepository repository;
   late Directory snapshots;
   late GraphSnapshotStore store;
@@ -73,11 +75,12 @@ void main() {
     probe = _StatementProbe();
     database = await harness.openReadyDatabase(observer: probe);
     now = DateTime.utc(2026, 10, 18, 9);
+    diagnostics = EncodedDiagnosticsLog();
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
       () => now,
-      InMemoryDiagnosticsSink(),
+      diagnostics,
     );
     snapshots = await Directory.fromUri(
       harness.temporaryDirectory.uri.resolve('graph_snapshots/'),
@@ -167,6 +170,12 @@ void main() {
     return (read as GraphBackupsReadSucceeded).backups;
   }
 
+  /// События создания копий без длительности.
+  List<Map<String, Object?>> backupCreations() => [
+    for (final event in diagnostics.events)
+      if (event['operation'] == 'graphBackupCreation') event,
+  ];
+
   Future<GraphRevision> intentionRevision(IntentionId id) async =>
       _revisionOf(await repository.watchIntention(id).first);
 
@@ -218,7 +227,8 @@ void main() {
   });
 
   test('копия перед заменой получает позицию до сброса и сводку с '
-      'предыдущей копии, а её состояние собирается в прежний граф', () async {
+      'предыдущей копии, а её состояние собирается в прежний граф; создание '
+      'копии диагностируется её видом и успехом', () async {
     final home = await createTag('Дача');
     final running = await createIntention('Бег трусцой', tagIds: {home.id});
     await repository.insertManualBackup(since: null);
@@ -243,13 +253,22 @@ void main() {
     expect(_shown(backup.summary), (added: 1, changed: 1, deleted: 0));
     final state = await store.readStateAt(backup.position);
     expect(_lines(await state.records.toList()), previous);
+    expect(backupCreations(), [
+      {
+        'operation': 'graphBackupCreation',
+        'backupKind': 'beforeReplacement',
+        'outcome': 'succeeded',
+      },
+    ]);
   });
 
-  test('замена пустого графа не добавляет копию перед заменой', () async {
+  test('замена пустого графа не добавляет копию перед заменой и не '
+      'диагностирует её создание', () async {
     await replace(await goldenSnapshot());
 
     expect(await backups(), isEmpty);
     expect(await graphLines(), _recordLines(golden));
+    expect(backupCreations(), isEmpty);
   });
 
   test('поиск по названию находит намерения нового графа, а не '
@@ -521,6 +540,44 @@ void main() {
 
         probe.failsBefore = null;
         expect(await storedState(), before);
+      });
+    }
+
+    final backupStages =
+        <String, (String, bool Function(LocalDatabaseSqlStatement))>{
+          // Сводка копии начинается с поиска предыдущей копии.
+          'подсчёт сводки': (
+            'changeSummary',
+            (statement) =>
+                statement.operation == LocalDatabaseSqlOperation.select &&
+                statement.statements.single.contains('FROM "graph_backups"'),
+          ),
+          'запись в реестр копий': (
+            'registration',
+            (statement) => _insertsInto(statement, 'graph_backups'),
+          ),
+        };
+    for (final MapEntry(key: point, value: (stage, fails))
+        in backupStages.entries) {
+      test('отказ этапа «$point» копии перед заменой диагностируется видом '
+          'копии, этим этапом и категорией отказа', () async {
+        await createPreviousGraph();
+        await repository.insertManualBackup(since: null);
+        final snapshot = await goldenSnapshot();
+        probe.failsBefore = fails;
+
+        await expectLater(replace(snapshot), throwsA(isA<StateError>()));
+
+        probe.failsBefore = null;
+        expect(backupCreations(), [
+          {
+            'operation': 'graphBackupCreation',
+            'backupKind': 'beforeReplacement',
+            'stage': stage,
+            'outcome': 'failed',
+            'failureCode': 'unexpected',
+          },
+        ]);
       });
     }
 
