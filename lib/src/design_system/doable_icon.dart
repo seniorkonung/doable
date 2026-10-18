@@ -22,7 +22,8 @@ enum DoableIconData {
   chevronRight('chevron_right'),
   settings('settings'),
   export('export'),
-  lockOpen('lock_open');
+  lockOpen('lock_open'),
+  backups('backups');
 
   const DoableIconData(this._assetName);
 

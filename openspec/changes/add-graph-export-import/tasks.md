@@ -947,7 +947,7 @@
   - **Files likely touched:** `lib/src/app/navigation/app_shell_page.dart`, `lib/src/app/navigation/graph_generation.dart` (новый, название рабочее), `lib/src/statistics/presentation/home_statistics_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `test/app/navigation/app_shell_graph_generation_test.dart` (новый).
   - **Estimated scope:** M; модели меняются однотипно.
 
-- [ ] 3.19 Добавить в иконки дизайн-системы значок резервных копий из макета
+- [x] 3.19 Добавить в иконки дизайн-системы значок резервных копий из макета
   - **Acceptance criteria:**
     - По требованию «Иконки из дизайна» `app-appearance` значок строки «Backups» из `context/doable-design/design/Settings.dc.html` — часы со стрелкой возврата — сохраняет исходную графику, размеры и толщину линий и добавлен в `DoableIconData` с записью в таблице `lib/src/design_system/icons/README.md`.
   - **Verification:**
