@@ -36,6 +36,18 @@ final class GraphBackupEntry {
   final GraphChangeSummary summary;
 }
 
+/// Сделана ли копия с моментом [madeAt] в текущий день, который начался в
+/// [dayStart], если сейчас [now].
+///
+/// Копия с моментом позже [now] сделана до перевода часов назад, то есть не в
+/// текущий день: иначе после такого перевода ежедневных копий не было бы до
+/// наступления её дня.
+bool isGraphBackupMadeInCurrentDay(
+  DateTime madeAt, {
+  required DateTime dayStart,
+  required DateTime now,
+}) => !madeAt.isBefore(dayStart) && !madeAt.isAfter(now);
+
 /// Исход чтения списка копий.
 sealed class GraphBackupsRead {
   const GraphBackupsRead();
@@ -73,9 +85,9 @@ abstract interface class GraphBackupRegistry {
   /// транзакции записи; возвращает, записана ли копия.
   ///
   /// Условие: ежедневных копий нет, а граф не пуст, либо последняя ежедневная
-  /// копия сделана не в текущий день, начавшийся в [dayStart], и после её
-  /// позиции в логе есть пакеты. Копия, момент которой позже момента новой
-  /// копии, сделана не в текущий день: часы переведены назад.
+  /// копия сделана не в текущий день, начавшийся в [dayStart], по правилу
+  /// [isGraphBackupMadeInCurrentDay] с моментом новой копии, и после её
+  /// позиции в логе есть пакеты.
   ///
   /// Новая ежедневная копия сдвигает окно хранения
   /// [retainedDailyGraphBackups]: копии любого вида, созданные раньше самой

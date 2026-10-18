@@ -89,10 +89,7 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
     return written;
   });
 
-  /// Последняя ежедневная копия сделана в текущий день, если её момент не
-  /// раньше [dayStart] и не позже [madeAt]. Копию с моментом позже [madeAt]
-  /// сделали до перевода часов назад: иначе после такого перевода ежедневных
-  /// копий не было бы до наступления её дня.
+  /// Условие записи ежедневной копии [GraphBackupRegistry.insertDailyBackup].
   Future<bool> _isDailyBackupDue(
     DateTime dayStart,
     DateTime madeAt,
@@ -105,9 +102,11 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
               ..limit(1))
             .getSingleOrNull();
     if (last == null) return !(await _selectComposition()).isEmpty;
-    final lastMadeAt = _backupMoment(last.madeAt);
-    final isToday =
-        !lastMadeAt.isBefore(dayStart) && !lastMadeAt.isAfter(madeAt);
+    final isToday = isGraphBackupMadeInCurrentDay(
+      _backupMoment(last.madeAt),
+      dayStart: dayStart,
+      now: madeAt,
+    );
     return !isToday && position > last.position;
   }
 
