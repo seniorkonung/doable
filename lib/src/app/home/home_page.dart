@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../design_system/doable_colors.dart';
+import '../../design_system/doable_icon.dart';
 import '../../statistics/application/intention_statistics_target.dart';
 import '../../statistics/presentation/home_statistics_content.dart';
 import '../../statistics/presentation/home_statistics_period_selector.dart';
@@ -68,8 +70,22 @@ final class _HomePageState extends ConsumerState<HomePage> {
     final localizations = AppLocalizations.of(context);
     final state = ref.watch(homeStatisticsViewModelProvider);
     final model = ref.read(homeStatisticsViewModelProvider.notifier);
+    final colors = Theme.of(context).extension<DoableColors>()!;
     return Scaffold(
-      appBar: AppBar(title: Text(AppDestination.home.title(localizations))),
+      appBar: AppBar(
+        title: Text(AppDestination.home.title(localizations)),
+        actions: [
+          IconButton(
+            tooltip: localizations.settingsTitle,
+            onPressed: () => context.router.push(const SettingsRoute()),
+            icon: DoableIcon(
+              DoableIconData.settings,
+              size: 22,
+              color: colors.ink,
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: HomeStatisticsContent(
           state: state,

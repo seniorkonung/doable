@@ -11,6 +11,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
@@ -55,6 +56,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
+import '../../support/temporary_graph_files.dart';
 
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
@@ -401,8 +403,12 @@ void _expectCreationSheetAboveCatalog(WidgetTester tester) {
   );
 }
 
-/// Запускает приложение на засеянном хранилище и ждёт Главную.
-Future<AppRouter> _start(WidgetTester tester) async {
+/// Запускает приложение на засеянном хранилище и ждёт Главную. Страницам
+/// операций с данными нужны файлы графа [graphFiles].
+Future<AppRouter> _start(
+  WidgetTester tester, {
+  TemporaryGraphFiles? graphFiles,
+}) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
@@ -419,6 +425,7 @@ Future<AppRouter> _start(WidgetTester tester) async {
     diagnosticsSink: InMemoryDiagnosticsSink(),
     dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_choiceDate)
         .read,
+    graphFilesFactory: graphFiles?.create,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());

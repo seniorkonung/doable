@@ -1273,6 +1273,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataExportFailed => 'Не удалось сохранить файл';
 
   @override
+  String get settingsTitle => 'Настройки';
+
+  @override
   String get dataSectionTitle => 'Данные';
 
   @override

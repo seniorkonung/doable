@@ -1182,6 +1182,8 @@
   "@dataExportSaved": {"description": "Сообщение общей поверхности об успешном экспорте графа в файл"},
   "dataExportFailed": "Couldn’t save the file",
   "@dataExportFailed": {"description": "Сообщение общей поверхности об отказе экспорта графа с действием commonRetry"},
+  "settingsTitle": "Settings",
+  "@settingsTitle": {"description": "Заголовок страницы «Настройки» и доступное название перехода к ней с Главной"},
   "dataSectionTitle": "Data",
   "@dataSectionTitle": {"description": "Заголовок раздела «Данные» страницы настроек"},
   "dataSectionLocalOnly": "Everything you write is stored only on this device.",

@@ -135,6 +135,23 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('матрица: настройки — обычная страница поверх Главной', (
+    tester,
+  ) async {
+    final router = await _start(tester, graphFiles: TemporaryGraphFiles());
+    await _open(tester, find.byTooltip('Settings'), SettingsPage);
+    _expectAboveShell(
+      tester,
+      SettingsPage,
+      AppDestination.home,
+      expectedPanel: true,
+    );
+    expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
+    await _close(tester, SettingsPage);
+    _expectRootPage(tester, router, AppDestination.home);
+    expect(tester.takeException(), isNull);
+  });
+
   const read = _MatrixEntry.intention;
   const daily = _MatrixEntry.dailyChoice;
   const tags = _MatrixEntry.tags;

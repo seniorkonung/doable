@@ -2042,6 +2042,12 @@ abstract class AppLocalizations {
   /// **'Couldn’t save the file'**
   String get dataExportFailed;
 
+  /// Заголовок страницы «Настройки» и доступное название перехода к ней с Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
   /// Заголовок раздела «Данные» страницы настроек
   ///
   /// In en, this message translates to:

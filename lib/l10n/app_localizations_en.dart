@@ -1267,6 +1267,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataExportFailed => 'Couldn’t save the file';
 
   @override
+  String get settingsTitle => 'Settings';
+
+  @override
   String get dataSectionTitle => 'Data';
 
   @override
