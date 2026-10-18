@@ -212,7 +212,8 @@ void main() {
 
   test('отказ записи временного файла даёт отказ экспорта, диагностируемый '
       'этапом записи временного файла, не оставляет временных файлов и '
-      'завершает работу с документом один раз', () async {
+      'созданного документа и завершает работу с документом '
+      'один раз', () async {
     await createTag('Дом');
     final container = app(
       stateWriteRunner: writeGraphStateFailingIn(temporary),
@@ -223,6 +224,7 @@ void main() {
 
     expect((await exported).outcome, GraphExportOutcome.failed);
     expect(await _filesIn(temporary), isEmpty);
+    expect(documents.created.single.existsSync(), isFalse);
     expect(documents.finished, [documents.created.single.uri.toString()]);
     expect(
       container.read(graphExportControllerProvider),
@@ -268,10 +270,10 @@ void main() {
     ]);
   });
 
-  test('отказ записи документа даёт отказ экспорта без временных файлов, '
-      'диагностируемый этапом записи документа, и завершает работу с '
-      'документом один раз, а повтор из сообщения снова открывает диалог и '
-      'сохраняет граф', () async {
+  test('отказ записи документа даёт отказ экспорта без временных файлов и '
+      'созданного документа, диагностируемый этапом записи документа, и '
+      'завершает работу с документом один раз, а повтор из сообщения снова '
+      'открывает диалог и сохраняет граф', () async {
     await createTag('Дом');
     documents.failsWrites = true;
     final container = app();
@@ -280,6 +282,7 @@ void main() {
     final failure = await failed;
     expect(failure.outcome, GraphExportOutcome.failed);
     expect(await _filesIn(temporary), isEmpty);
+    expect(documents.created.single.existsSync(), isFalse);
     expect(documents.finished, [documents.created.single.uri.toString()]);
     expect(diagnostics.events, [
       {
@@ -303,6 +306,22 @@ void main() {
       _lines(await reading.records.toList()),
       _lines(await referenceGraphRecords(database)),
     );
+  });
+
+  test('документ, который поставщик не удалил после отказа записи, оставляет '
+      'исход экспорта отказом', () async {
+    await createTag('Дом');
+    documents
+      ..failsWrites = true
+      ..failsDeletes = true;
+    final container = app();
+    final exported = nextExport(container);
+
+    await startExport(container);
+
+    expect((await exported).outcome, GraphExportOutcome.failed);
+    expect(documents.created.single.existsSync(), isTrue);
+    expect(documents.finished, [documents.created.single.uri.toString()]);
   });
 
   test('системный диалог, который не открылся, даёт отказ экспорта, '

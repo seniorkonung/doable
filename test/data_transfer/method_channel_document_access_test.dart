@@ -105,7 +105,7 @@ void main() {
       expect(write, isA<DocumentWriteFailed>());
     },
   );
-  test('шаг завершения передаёт адрес документа', () async {
+  test('шаг завершения передаёт адрес документа и исход операции', () async {
     final calls = <MethodCall>[];
     answer((call) async {
       calls.add(call);
@@ -114,10 +114,18 @@ void main() {
 
     await const MethodChannelDocumentAccess().finishDocument(
       const CreatedDocument(documentUri),
+      outcome: CreatedDocumentOutcome.succeeded,
+    );
+    await const MethodChannelDocumentAccess().finishDocument(
+      const CreatedDocument(documentUri),
+      outcome: CreatedDocumentOutcome.failed,
     );
 
-    expect(calls.single.method, 'finishDocument');
-    expect(calls.single.arguments, {'document': documentUri});
+    expect(calls.map((call) => call.method), everyElement('finishDocument'));
+    expect(calls.map((call) => call.arguments), [
+      {'document': documentUri, 'succeeded': true},
+      {'document': documentUri, 'succeeded': false},
+    ]);
   });
 
   test('ошибка канала на шаге завершения не становится исключением', () async {
@@ -126,6 +134,7 @@ void main() {
     await expectLater(
       const MethodChannelDocumentAccess().finishDocument(
         const CreatedDocument(documentUri),
+        outcome: CreatedDocumentOutcome.failed,
       ),
       completes,
     );

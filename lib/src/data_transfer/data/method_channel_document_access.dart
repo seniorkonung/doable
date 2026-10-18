@@ -51,10 +51,14 @@ final class MethodChannelDocumentAccess implements DocumentAccess {
   }
 
   @override
-  Future<void> finishDocument(CreatedDocument document) async {
+  Future<void> finishDocument(
+    CreatedDocument document, {
+    required CreatedDocumentOutcome outcome,
+  }) async {
     try {
       await _channel.invokeMethod<void>('finishDocument', {
         'document': document.uri,
+        'succeeded': outcome == CreatedDocumentOutcome.succeeded,
       });
     } on PlatformException {
       // Право, которое не удалось отпустить, плагин отпустит при следующем

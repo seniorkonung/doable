@@ -70,15 +70,21 @@ final class GraphExport {
   /// Отказ записи документа — [GraphExportOutcome.failed], отказ записи
   /// состояния — исключение [GraphLogCompaction.writeCurrentState].
   /// Временный файл удаляется, а работа с документом завершается при любом
-  /// исходе.
+  /// исходе; после отказа документ удаляется, если поставщик это позволяет.
   Future<GraphExportOutcome> write(
     CreatedDocument document, {
     required void Function(double share) onProgress,
   }) async {
+    var documentOutcome = CreatedDocumentOutcome.failed;
     try {
-      return await _write(document, onProgress: onProgress);
+      final outcome = await _write(document, onProgress: onProgress);
+      documentOutcome = switch (outcome) {
+        GraphExportOutcome.succeeded => CreatedDocumentOutcome.succeeded,
+        GraphExportOutcome.failed => CreatedDocumentOutcome.failed,
+      };
+      return outcome;
     } finally {
-      await _documents.finishDocument(document);
+      await _documents.finishDocument(document, outcome: documentOutcome);
     }
   }
 

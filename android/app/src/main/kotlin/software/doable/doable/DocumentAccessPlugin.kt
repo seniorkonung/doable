@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -19,19 +20,20 @@ import java.util.concurrent.Executor
  * Framework без разрешений и без `FileProvider` (ADR-0037).
  *
  * Канал создаёт документ диалогом `ACTION_CREATE_DOCUMENT` и копирует в него
- * временный файл приложения потоками `ContentResolver` в [copyExecutor]; байты
- * через канал не передаются. Контракт канала задаёт
+ * временный файл приложения потоками `ContentResolver` в [backgroundExecutor];
+ * байты через канал не передаются. Контракт канала задаёт
  * `lib/src/data_transfer/data/method_channel_document_access.dart`.
  *
  * Временное право на документ Android снимает вместе с Activity, получившей
  * ответ диалога, а движок при смене дисплея переносится в другую Activity
  * (ADR-0031). Поэтому право записи закрепляется при ответе диалога и
- * отпускается на шаге завершения работы с документом.
+ * отпускается на шаге завершения работы с документом. После отказа операции
+ * этот шаг сначала удаляет документ: удалению нужно это право.
  */
 class DocumentAccessPlugin internal constructor(
-    private val copyExecutor: Executor,
+    private val backgroundExecutor: Executor,
 ) : FlutterPlugin, ActivityAware, PluginRegistry.ActivityResultListener {
-    constructor() : this(Executor { Thread(it, "DocumentAccessCopy").start() })
+    constructor() : this(Executor { Thread(it, "DocumentAccess").start() })
 
     private lateinit var channel: MethodChannel
     private lateinit var contentResolver: ContentResolver
@@ -98,10 +100,11 @@ class DocumentAccessPlugin internal constructor(
                 document = Uri.parse(requireNotNull(call.argument<String>("document"))),
                 result = result,
             )
-            "finishDocument" -> {
-                releaseGrant(Uri.parse(requireNotNull(call.argument<String>("document"))))
-                result.success(null)
-            }
+            "finishDocument" -> finishDocument(
+                document = Uri.parse(requireNotNull(call.argument<String>("document"))),
+                succeeded = requireNotNull(call.argument<Boolean>("succeeded")),
+                result = result,
+            )
             else -> result.notImplemented()
         }
     }
@@ -127,7 +130,7 @@ class DocumentAccessPlugin internal constructor(
     }
 
     private fun writeDocument(source: String, document: Uri, result: MethodChannel.Result) {
-        copyExecutor.execute {
+        backgroundExecutor.execute {
             // Исключение в собственном потоке завершило бы процесс, поэтому любой
             // отказ поставщика документа становится отказом записи. Текст
             // исключения не передаётся: он может содержать адрес документа.
@@ -142,6 +145,31 @@ class DocumentAccessPlugin internal constructor(
                 false
             }
             if (written) result.success(null) else result.error(DOCUMENT_NOT_WRITTEN, null, null)
+        }
+    }
+
+    private fun finishDocument(document: Uri, succeeded: Boolean, result: MethodChannel.Result) {
+        if (succeeded) {
+            releaseGrant(document)
+            result.success(null)
+            return
+        }
+        backgroundExecutor.execute {
+            // Диалог создал документ пустым, а прерванное копирование оставляет в нём
+            // часть байтов.
+            deleteDocument(document)
+            releaseGrant(document)
+            result.success(null)
+        }
+    }
+
+    private fun deleteDocument(document: Uri) {
+        try {
+            DocumentsContract.deleteDocument(contentResolver, document)
+        } catch (error: Exception) {
+            // Поставщик не поддерживает удаление, доступ отозван или поставщик
+            // отказал: документ остаётся, а исход операции не меняется. Исключение
+            // в собственном потоке завершило бы процесс.
         }
     }
 

@@ -1,10 +1,14 @@
 package software.doable.doable
 
 import android.app.Activity
+import android.content.ContentProvider
 import android.content.ContentResolver
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.database.Cursor
 import android.net.Uri
+import android.os.Bundle
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineGroup
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -44,8 +48,8 @@ import org.robolectric.util.ReflectionHelpers.ClassParameter
 class DocumentAccessPluginTest {
     private val context = RuntimeEnvironment.getApplication()
     private val messenger = ChannelMessenger()
-    private val copies = mutableListOf<Runnable>()
-    private val plugin = DocumentAccessPlugin(Executor { copies += it })
+    private val backgroundTasks = mutableListOf<Runnable>()
+    private val plugin = DocumentAccessPlugin(Executor { backgroundTasks += it })
     private val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
     private val activityBinding = ResultActivityBinding(activity)
     private val document = Uri.parse(
@@ -96,14 +100,16 @@ class DocumentAccessPluginTest {
         val dialog = shadowOf(activity).nextStartedActivityForResult
 
         activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
-        val finish = messenger.invoke("finishDocument", mapOf("document" to document.toString()))
+        val finish = messenger.invoke(
+            "finishDocument", mapOf("document" to document.toString(), "succeeded" to true),
+        )
 
         assertEquals(document.toString(), reply.value())
         assertNull(finish.value())
     }
 
     @Test
-    fun `Завершение работы после записи документа отпускает закреплённое право`() {
+    fun `Завершение работы после записи документа отпускает закреплённое право и оставляет документ`() {
         chooseDocument()
         val source = File.createTempFile("export", ".jsonl.gz").apply {
             deleteOnExit()
@@ -111,19 +117,51 @@ class DocumentAccessPluginTest {
         }
         shadowOf(context.contentResolver).registerOutputStream(document, ByteArrayOutputStream())
         messenger.invoke("writeDocument", mapOf("source" to source.path, "document" to document.toString()))
-        copies.single().run()
+        backgroundTasks.single().run()
+        backgroundTasks.clear()
+        val provider = registerDocumentsProvider()
 
-        val finish = messenger.invoke("finishDocument", mapOf("document" to document.toString()))
+        val finish = messenger.invoke(
+            "finishDocument", mapOf("document" to document.toString(), "succeeded" to true),
+        )
+        backgroundTasks.forEach(Runnable::run)
 
         assertNull(finish.value())
+        assertEquals(emptyList<Uri>(), writeGrants())
+        assertEquals(emptyList<Uri>(), provider.deleted)
+    }
+
+    @Test
+    fun `Завершение работы после отказа удаляет документ в фоне, а затем отпускает закреплённое право`() {
+        chooseDocument()
+        val provider = registerDocumentsProvider()
+        var grantsAtDeletion: List<Uri>? = null
+        provider.onDelete = { grantsAtDeletion = writeGrants() }
+
+        val finish = messenger.invoke(
+            "finishDocument", mapOf("document" to document.toString(), "succeeded" to false),
+        )
+        assertFalse(finish.received)
+        assertEquals(emptyList<Uri>(), provider.deleted)
+
+        backgroundTasks.single().run()
+
+        assertNull(finish.value())
+        assertEquals(listOf(document), provider.deleted)
+        assertEquals(listOf(document), grantsAtDeletion)
         assertEquals(emptyList<Uri>(), writeGrants())
     }
 
     @Test
-    fun `Завершение работы без записи документа отпускает закреплённое право`() {
+    fun `Исключение поставщика при удалении документа не мешает отпустить право и ответить без ошибки`() {
         chooseDocument()
+        registerDocumentsProvider().deletionFailure =
+            UnsupportedOperationException("Delete not supported")
 
-        val finish = messenger.invoke("finishDocument", mapOf("document" to document.toString()))
+        val finish = messenger.invoke(
+            "finishDocument", mapOf("document" to document.toString(), "succeeded" to false),
+        )
+        backgroundTasks.single().run()
 
         assertNull(finish.value())
         assertEquals(emptyList<Uri>(), writeGrants())
@@ -188,7 +226,7 @@ class DocumentAccessPluginTest {
         assertEquals(0, written.size())
         assertFalse(reply.received)
 
-        copies.single().run()
+        backgroundTasks.single().run()
 
         assertNull(reply.value())
         assertArrayEquals(bytes, written.toByteArray())
@@ -211,7 +249,7 @@ class DocumentAccessPluginTest {
         val reply = messenger.invoke(
             "writeDocument", mapOf("source" to source.path, "document" to document.toString()),
         )
-        copies.single().run()
+        backgroundTasks.single().run()
 
         assertEquals("document_not_written", reply.errorCode())
     }
@@ -222,6 +260,10 @@ class DocumentAccessPluginTest {
         val dialog = shadowOf(activity).nextStartedActivityForResult
         activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
     }
+
+    /** Поставщик документа, место которого выбрано в диалоге сохранения. */
+    private fun registerDocumentsProvider(): DocumentsProviderStub =
+        Robolectric.setupContentProvider(DocumentsProviderStub::class.java, document.authority)
 
     /** Документы с закреплённым правом записи. */
     private fun writeGrants(): List<Uri> =
@@ -260,7 +302,7 @@ private class ChannelMessenger : BinaryMessenger {
     private val replies = mutableListOf<ChannelReply>()
     val anyReplyReceived get() = replies.any { it.received }
 
-    fun invoke(method: String, arguments: Map<String, String>, onReply: () -> Unit = {}): ChannelReply {
+    fun invoke(method: String, arguments: Map<String, Any>, onReply: () -> Unit = {}): ChannelReply {
         val reply = ChannelReply(onReply).also { replies += it }
         val message = StandardMethodCodec.INSTANCE.encodeMethodCall(MethodCall(method, arguments))
         message.rewind()
@@ -316,6 +358,52 @@ class ContentResolverWithoutPersistableGrants : ShadowContentResolver() {
     @Implementation
     override fun releasePersistableUriPermission(uri: Uri, modeFlags: Int): Unit =
         throw SecurityException("No permission grants found")
+}
+
+/**
+ * Поставщик документов, который запоминает удалённые документы, а при
+ * [deletionFailure] отказывает удалению исключением.
+ *
+ * Класс открыт: Robolectric создаёт поставщика отражением.
+ */
+class DocumentsProviderStub : ContentProvider() {
+    val deleted = mutableListOf<Uri>()
+
+    /** Наблюдает состояние в момент удаления. */
+    var onDelete: () -> Unit = {}
+    var deletionFailure: RuntimeException? = null
+
+    override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
+        // Метод поставщика, которым DocumentsContract.deleteDocument удаляет документ.
+        check(method == "android:deleteDocument") { "Неожиданный метод поставщика $method" }
+        deletionFailure?.let { throw it }
+        onDelete()
+        deleted += requireNotNull(extras?.getParcelable("uri", Uri::class.java))
+        return null
+    }
+
+    override fun onCreate() = true
+
+    override fun query(
+        uri: Uri,
+        projection: Array<String>?,
+        selection: String?,
+        selectionArgs: Array<String>?,
+        sortOrder: String?,
+    ): Cursor? = null
+
+    override fun getType(uri: Uri): String? = null
+
+    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?) = 0
+
+    override fun update(
+        uri: Uri,
+        values: ContentValues?,
+        selection: String?,
+        selectionArgs: Array<String>?,
+    ) = 0
 }
 
 /** Привязка к Activity, которая, как Flutter, передаёт ответы Activity слушателям. */
