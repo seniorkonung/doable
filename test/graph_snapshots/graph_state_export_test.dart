@@ -333,8 +333,8 @@ void main() {
     expect(await exported.exists(), isFalse);
   });
 
-  test('повреждённый последний снимок, обнаруженный записью при числе пакетов '
-      'меньше порога, пересобирается, и повторная запись читается в выгрузку '
+  test('первая запись, обнаружившая повреждённый последний снимок при числе '
+      'пакетов меньше порога, дожидается его пересборки и читается в выгрузку '
       'базы', () async {
     await confirmCommands(2);
     final damaged = await store().writeSnapshot(2);
@@ -344,28 +344,25 @@ void main() {
     final expected = await referenceState();
     final compaction = compactionOver(repository)..start();
 
-    await expectLater(
-      writeState(compaction),
-      throwsA(isA<GraphSnapshotCorruption>()),
-    );
-    // Выключение дожидается запущенной пересборки.
-    await compaction.shutdown();
+    await writeState(compaction);
 
     final rebuilt = await repository.readSnapshotAtOrBefore(3);
     expect(rebuilt?.position, 3);
     expect(await repository.readSnapshotFileNames(), {rebuilt?.fileName});
-    await writeState(compaction);
     expect(await exportedRecords(), expected);
+    await compaction.shutdown();
   });
 
-  test('повреждение, обнаруженное записью во время задержанного сжатия, '
-      'второго сжатия не запускает', () async {
+  test('запись, обнаружившая повреждение во время задержанного сжатия, '
+      'дожидается его и завершается успешно, а снимок записывается один '
+      'раз', () async {
     await confirmCommands(1);
     final damaged = await store().writeSnapshot(1);
     final damagedFile = File.fromUri(snapshots.uri.resolve(damaged.fileName));
     await _flipByte(damagedFile, await damagedFile.length() ~/ 2);
     final writeReached = Completer<void>();
     final releaseWrite = Completer<void>();
+    final corruptionFound = Completer<void>();
     var attempts = 0;
     final compaction = compactionOver(
       repository,
@@ -375,20 +372,51 @@ void main() {
         await releaseWrite.future;
         return runGraphSnapshotWriteInIsolate(write);
       },
+      stateWriteRunner: (write) async {
+        try {
+          await runGraphStateWriteInIsolate(write);
+        } on GraphSnapshotCorruption {
+          if (!corruptionFound.isCompleted) corruptionFound.complete();
+          rethrow;
+        }
+      },
     )..start();
     final compacted = outcomes.next;
     await confirmCommands(_threshold + 1);
     await writeReached.future;
+    final expected = await referenceState();
+    final write = writeState(compaction);
+    await corruptionFound.future;
+
+    releaseWrite.complete();
+
+    await write;
+    expect((await compacted).status, isA<DiagnosticsSucceeded>());
+    await compaction.shutdown();
+    expect(attempts, 1);
+    expect(await exportedRecords(), expected);
+  });
+
+  test('запись, дождавшаяся неудачной пересборки повреждённого последнего '
+      'снимка, отказывает повреждением снимка и не оставляет файла', () async {
+    await confirmCommands(2);
+    final damaged = await store().writeSnapshot(2);
+    await confirmCommands(1);
+    final damagedFile = File.fromUri(snapshots.uri.resolve(damaged.fileName));
+    await _flipByte(damagedFile, await damagedFile.length() ~/ 2);
+    final compaction = compactionOver(
+      repository,
+      runner: writeGraphSnapshotFailingOnTemporaryFiles,
+    )..start();
 
     await expectLater(
       writeState(compaction),
       throwsA(isA<GraphSnapshotCorruption>()),
     );
-    releaseWrite.complete();
 
-    expect((await compacted).status, isA<DiagnosticsSucceeded>());
+    expect(outcomes.recorded.single.status, isA<DiagnosticsFailed>());
+    expect(await exported.exists(), isFalse);
     await compaction.shutdown();
-    expect(attempts, 1);
   });
 
   test('после выключения сжатия повреждение, обнаруженное записью, '
@@ -417,12 +445,17 @@ final class _CompactionOutcomes implements DiagnosticsSink {
   final _outcomes =
       StreamController<GraphLogCompactionDiagnosticsEvent>.broadcast();
 
+  /// Исходы сжатий в порядке их окончания.
+  final recorded = <GraphLogCompactionDiagnosticsEvent>[];
+
   /// Исход следующего сжатия.
   Future<GraphLogCompactionDiagnosticsEvent> get next => _outcomes.stream.first;
 
   @override
   void record(DiagnosticsEvent event) {
-    if (event is GraphLogCompactionDiagnosticsEvent) _outcomes.add(event);
+    if (event is! GraphLogCompactionDiagnosticsEvent) return;
+    recorded.add(event);
+    _outcomes.add(event);
   }
 }
 

@@ -68,7 +68,8 @@ Future<void> runGraphStateWriteInIsolate(GraphStateWrite write) =>
 /// тем же способом: в отдельном изоляте, который обращается к логу через
 /// это сжатие, под отметкой чтения истории. Если запись обнаружила, что
 /// последний снимок не проходит проверку, снимок пересобирается из базы вне
-/// порога.
+/// порога, а запись дожидается пересборки и выполняется заново из нового
+/// снимка.
 final class GraphLogCompaction {
   GraphLogCompaction({
     required this._log,
@@ -132,10 +133,14 @@ final class GraphLogCompaction {
   /// подтверждаются команды и завершается сжатие, а команды записи не ждут:
   /// база получает от изолята записи только короткие операции лога.
   ///
-  /// Если базовый снимок не прошёл проверку, запись отказывает
-  /// [GraphSnapshotCorruption]. Когда этот снимок остаётся последним, сжатие
-  /// пересобирает снимок из базы, не дожидаясь порога, если оно ведётся и
-  /// ещё не идёт, поэтому после пересборки запись повторяется успешно.
+  /// Если базовый снимок не прошёл проверку, а сжатие ведётся, запись
+  /// дожидается идущего сжатия, а затем пересборки снимка из базы вне
+  /// порога, если этот снимок остаётся последним. Когда последним
+  /// зарегистрирован другой снимок, запись один раз выполняется заново по
+  /// новому чтению истории, и ход отсчитывается с нуля. Иначе — сжатие не
+  /// ведётся или пересборка не удалась — запись отказывает
+  /// [GraphSnapshotCorruption]; повреждение, обнаруженное новой записью,
+  /// тоже сразу даёт этот отказ.
   Future<void> writeCurrentState(
     File file, {
     required DateTime writtenAt,
@@ -143,30 +148,65 @@ final class GraphLogCompaction {
   }) async {
     GraphSnapshotEntry? base;
     try {
-      await readHistory((history) {
-        base = history.base;
-        return _inWriter(
-          (compaction) => _stateWriteRunner(
-            GraphStateWrite._(
-              history,
-              file.path,
-              _directory,
-              writtenAt,
-              compaction,
-            ),
-          ),
-          onProgress: onProgress,
-        );
-      });
+      await _writeState(
+        file,
+        writtenAt: writtenAt,
+        onProgress: onProgress,
+        onBase: (selected) => base = selected,
+      );
     } on GraphSnapshotCorruption {
-      // Сжатие запускается после снятия отметки чтения, поэтому граница
-      // хранения уже не сохраняет повреждённый снимок ради этого чтения.
-      if (base case final corrupted?
-          when _signals != null && _running == null) {
-        _launch(corrupted: corrupted);
+      // Отметка чтения уже снята, поэтому граница хранения не сохраняет
+      // повреждённый снимок ради этой записи.
+      if (base case final corrupted? when _signals != null) {
+        await _rebuildIfLatest(corrupted);
+        onProgress(0);
+        await _writeState(
+          file,
+          writtenAt: writtenAt,
+          onProgress: onProgress,
+          onBase: (selected) {
+            if (selected?.fileName == corrupted.fileName) {
+              throw const GraphSnapshotCorruption();
+            }
+          },
+        );
+        return;
       }
       rethrow;
     }
+  }
+
+  /// Пишет состояние графа на текущей позиции в [file] под отметкой чтения
+  /// истории; [onBase] получает базовый снимок чтения до записи.
+  Future<void> _writeState(
+    File file, {
+    required DateTime writtenAt,
+    required void Function(double share) onProgress,
+    required void Function(GraphSnapshotEntry? base) onBase,
+  }) => readHistory((history) {
+    onBase(history.base);
+    return _inWriter(
+      (compaction) => _stateWriteRunner(
+        GraphStateWrite._(
+          history,
+          file.path,
+          _directory,
+          writtenAt,
+          compaction,
+        ),
+      ),
+      onProgress: onProgress,
+    );
+  });
+
+  /// Дожидается идущего сжатия, а затем, если сжатие ещё ведётся, запускает
+  /// и дожидается сжатия, которое пересобирает снимок вне порога, если
+  /// последним остаётся [corrupted].
+  Future<void> _rebuildIfLatest(GraphSnapshotEntry corrupted) async {
+    while (_running != null) {
+      await _running;
+    }
+    if (_signals != null) await _launch(corrupted: corrupted);
   }
 
   /// Сверяет лог с порогом и следит за новыми пакетами. Вызывается один раз,
@@ -205,10 +245,9 @@ final class GraphLogCompaction {
 
   /// Запускает сжатие, которое не дожидается порога, если последний снимок —
   /// [corrupted], не прошедший проверку при чтении истории.
-  void _launch({GraphSnapshotEntry? corrupted}) {
-    _running = _compactIfDue(corrupted: corrupted)
-        .whenComplete(() => _running = null);
-  }
+  Future<void> _launch({GraphSnapshotEntry? corrupted}) =>
+      _running = _compactIfDue(corrupted: corrupted)
+          .whenComplete(() => _running = null);
 
   Future<void> _compactIfDue({GraphSnapshotEntry? corrupted}) async {
     final stopwatch = Stopwatch()..start();
