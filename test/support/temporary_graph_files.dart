@@ -14,8 +14,13 @@ import 'in_memory_diagnostics_sink.dart';
 ///
 /// Удаление каталога зарегистрировано раньше выключения runtime, созданного
 /// после этого объекта, поэтому выполняется после него.
+///
+/// [stateWriteRunner] запускает запись состояния графа для экспорта: так
+/// проверка задерживает экспорт.
 final class TemporaryGraphFiles {
-  factory TemporaryGraphFiles() {
+  factory TemporaryGraphFiles({
+    GraphStateWriteRunner stateWriteRunner = runGraphStateWriteInIsolate,
+  }) {
     final root = Directory.systemTemp.createTempSync('doable_graph_files_');
     addTearDown(() => root.deleteSync(recursive: true));
     return TemporaryGraphFiles._(
@@ -23,13 +28,15 @@ final class TemporaryGraphFiles {
       FileDocumentAccess(
         Directory.fromUri(root.uri.resolve('documents/'))..createSync(),
       ),
+      stateWriteRunner,
     );
   }
 
-  TemporaryGraphFiles._(this._root, this.documents);
+  TemporaryGraphFiles._(this._root, this.documents, this._stateWriteRunner);
 
   final Directory _root;
   final FileDocumentAccess documents;
+  final GraphStateWriteRunner _stateWriteRunner;
 
   /// Фабрика файлов графа для `AppRuntime.graphFilesFactory`.
   Future<AppGraphFiles> create(ObservableGraphFactLog log) async => (
@@ -38,6 +45,7 @@ final class TemporaryGraphFiles {
       directory: Directory.fromUri(_root.uri.resolve('graph_snapshots/')),
       clock: () => DateTime.now().toUtc(),
       diagnosticsSink: InMemoryDiagnosticsSink(),
+      stateWriteRunner: _stateWriteRunner,
     ),
     temporaryDirectory: Directory.fromUri(_root.uri.resolve('tmp/')),
     documents: documents,
