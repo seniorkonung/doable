@@ -30,6 +30,42 @@ final class GraphReplacedInRange implements Exception {
   const GraphReplacedInRange();
 }
 
+/// Запись снимка замены графа [GraphSnapshotStore.writeReplacementSnapshot]
+/// отменена, а её файл удалён.
+final class GraphReplacementSnapshotCancelled implements Exception {
+  const GraphReplacementSnapshotCancelled();
+}
+
+/// Файл снимка, надёжно записанный в каталог снимков, но не
+/// зарегистрированный: позицию ему даёт регистрация.
+final class UnregisteredGraphSnapshot {
+  const UnregisteredGraphSnapshot({
+    required this.fileName,
+    required this.byteSize,
+    required this.checksum,
+    required this.counts,
+  });
+
+  /// Имя файла в каталоге снимков.
+  final String fileName;
+
+  final int byteSize;
+
+  /// SHA-256 файла, 32 байта.
+  final Uint8List checksum;
+
+  /// Количества записей из заголовка файла.
+  final GraphRecordCounts counts;
+
+  /// Запись реестра снимков для этого файла на позиции [position].
+  GraphSnapshotEntry entryAt(int position) => GraphSnapshotEntry(
+    position: position,
+    fileName: fileName,
+    byteSize: byteSize,
+    checksum: checksum,
+  );
+}
+
 /// Безопасная категория отказа операции со снимками для диагностики.
 ///
 /// Снимок, не прошедший проверку, отличается от повреждения данных лога и
@@ -256,15 +292,55 @@ final class GraphSnapshotStore {
     }
   }
 
+  /// Пишет состояние графа на позиции источника [state] по правилу
+  /// [readState] в новый файл каталога снимков так же надёжно, как
+  /// [writeSnapshot], но не регистрирует его: снимок замены графа
+  /// регистрирует транзакция замены. Заголовок несёт момент записи по часам
+  /// хранилища и количества записей.
+  ///
+  /// [onProgress] получает ход записи по правилу [writeStateFile]. Когда
+  /// [isCancelled] истинно, запись прекращается перед следующей прочитанной
+  /// или записанной записью отказом [GraphReplacementSnapshotCancelled].
+  /// Снимок, не прошедший проверку, даёт [GraphSnapshotCorruption]. При
+  /// отказе и отмене файл удаляется, а файл, оставшийся после завершения
+  /// процесса, удаляет [removeUnregisteredFiles]. Запись не выполняется
+  /// одновременно с [removeUnregisteredFiles].
+  Future<UnregisteredGraphSnapshot> writeReplacementSnapshot(
+    GraphStateSource state, {
+    required void Function(double share) onProgress,
+    required bool Function() isCancelled,
+  }) async {
+    final assembled = await _assemble(
+      state.position,
+      state.base,
+      isCancelled: isCancelled,
+    );
+    final counts = assembled.counts;
+    return _writeSnapshotFile(
+      counts,
+      _reportingProgress(
+        _untilCancelled(assembled.records, isCancelled),
+        _total(counts),
+        onProgress,
+      ),
+    );
+  }
+
+  /// Сборка состояния на позиции [position] из снимка [snapshot] и пакетов
+  /// после него. Перед каждой записью, прочитанной из снимка, проверяется
+  /// отмена [isCancelled]: сборка читает снимок дважды, и первое чтение ради
+  /// количеств ещё ничего не пишет.
   Future<AssembledGraphState> _assemble(
     int position,
-    GraphSnapshotEntry? snapshot,
-  ) {
+    GraphSnapshotEntry? snapshot, {
+    bool Function() isCancelled = _notCancelled,
+  }) {
     final base = snapshot == null
         ? const GraphStateBase.empty()
         : GraphStateBase(
             position: snapshot.position,
-            readRecords: () => _readSnapshot(snapshot),
+            readRecords: () =>
+                _untilCancelled(_readSnapshot(snapshot), isCancelled),
           );
     return GraphStateAssembly.assemble(
       base,
@@ -380,6 +456,26 @@ final class GraphSnapshotStore {
     AssembledGraphState state, {
     required void Function() beforeRegistration,
   }) async {
+    final written = await _writeSnapshotFile(state.counts, state.records);
+    final snapshot = written.entryAt(position);
+    try {
+      beforeRegistration();
+      await _log.registerSnapshot(snapshot);
+      return snapshot;
+    } catch (_) {
+      await _deleteLeftover(_file(written.fileName));
+      rethrow;
+    }
+  }
+
+  /// Пишет файл снимка с количествами [counts] и моментом записи по часам
+  /// хранилища в заголовке и записями [records] во временный файл каталога,
+  /// который после fsync атомарно переименовывается в файл снимка, а затем
+  /// выполняет fsync каталога. При отказе файл удаляется.
+  Future<UnregisteredGraphSnapshot> _writeSnapshotFile(
+    GraphRecordCounts counts,
+    Stream<GraphEntityRecord> records,
+  ) async {
     await _createDirectory();
     final fileName = '${const Uuid().v4()}$_snapshotExtension';
     var file = _file('$fileName$_temporaryExtension');
@@ -387,21 +483,18 @@ final class GraphSnapshotStore {
       final (:byteSize, :checksum) = await _writeDurably(
         file,
         GraphFormatFile.write(
-          GraphFormatHeader(writtenAt: _clock(), counts: state.counts),
-          state.records,
+          GraphFormatHeader(writtenAt: _clock(), counts: counts),
+          records,
         ),
       );
       file = await file.rename(_file(fileName).path);
       _syncDirectory(_directory);
-      final snapshot = GraphSnapshotEntry(
-        position: position,
+      return UnregisteredGraphSnapshot(
         fileName: fileName,
         byteSize: byteSize,
         checksum: checksum,
+        counts: counts,
       );
-      beforeRegistration();
-      await _log.registerSnapshot(snapshot);
-      return snapshot;
     } catch (_) {
       await _deleteLeftover(file);
       rethrow;
@@ -666,6 +759,19 @@ Stream<GraphEntityRecord> _reportingProgress(
 
 /// Число долей, которыми сообщается ход записи состояния.
 const _progressSteps = 100;
+
+/// Записи [records], перед выдачей каждой из которых проверяется отмена
+/// [isCancelled]: отменённая запись завершается отказом
+/// [GraphReplacementSnapshotCancelled].
+Stream<GraphEntityRecord> _untilCancelled(
+  Stream<GraphEntityRecord> records,
+  bool Function() isCancelled,
+) => records.map((record) {
+  if (isCancelled()) throw const GraphReplacementSnapshotCancelled();
+  return record;
+});
+
+bool _notCancelled() => false;
 
 int _total(GraphRecordCounts counts) =>
     counts.tags +

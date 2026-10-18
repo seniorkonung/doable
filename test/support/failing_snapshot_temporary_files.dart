@@ -3,6 +3,7 @@ import 'dart:isolate';
 
 import 'package:doable/src/graph_snapshots/graph_fact_log.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
+import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 
 /// Пишет снимок в отдельном изоляте, как [runGraphSnapshotWriteInIsolate],
 /// но временные файлы снимка появляются, а запись в них отказывает, как при
@@ -10,6 +11,19 @@ import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 /// https://api.dart.dev/dart-io/IOOverrides-class.html
 Future<GraphSnapshotEntry> writeGraphSnapshotFailingOnTemporaryFiles(
   GraphSnapshotWrite write,
+) => Isolate.run(
+  () => IOOverrides.runWithIOOverrides(
+    write.run,
+    _FailingFiles((path) => path.endsWith('.tmp')),
+  ),
+);
+
+/// Пишет снимок замены графа в отдельном изоляте, как
+/// [runGraphReplacementSnapshotWriteInIsolate], но временные файлы снимка
+/// появляются, а запись в них отказывает, как при нехватке места.
+Future<UnregisteredGraphSnapshot>
+writeGraphReplacementSnapshotFailingOnTemporaryFiles(
+  GraphReplacementSnapshotWrite write,
 ) => Isolate.run(
   () => IOOverrides.runWithIOOverrides(
     write.run,
