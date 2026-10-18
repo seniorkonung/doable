@@ -84,8 +84,8 @@ abstract final class GraphFormatCodec {
   static final _jsonFromUtf8 = const Utf8Decoder().fuse(const JsonDecoder());
 
   /// Отклоняет запись длиннее предела отказом [GraphRecordTooLong].
-  static Uint8List encode(GraphFact fact) {
-    final bytes = utf8.encode(jsonEncode(_writeFact(fact)));
+  static Uint8List encode(GraphEntityRecord record) {
+    final bytes = utf8.encode(jsonEncode(_writeRecord(record)));
     if (bytes.length > graphFormatRecordByteLimit) {
       throw const GraphRecordTooLong();
     }
@@ -94,14 +94,41 @@ abstract final class GraphFormatCodec {
 
   /// Пакет фактов — их упорядоченная последовательность, каждый факт на
   /// своей строке.
+  ///
+  /// Факт «создана» или «изменена» — объект записи сущности с видом факта
+  /// первым полем. Предел проверяется у самой записи, поэтому сущность с
+  /// записью на пределе сохраняется, а её запись читается из файла формата.
   static Uint8List encodePackage(Iterable<GraphFact> facts) {
     final bytes = BytesBuilder(copy: false);
     for (final fact in facts) {
-      bytes
-        ..add(encode(fact))
-        ..addByte(_lineFeed);
+      switch (fact) {
+        case GraphEntityCreated(:final record):
+          _addRecordFact(bytes, _createdFactStart, record);
+        case GraphEntityChanged(:final record):
+          _addRecordFact(bytes, _changedFactStart, record);
+        case GraphEntityDeleted(:final entity):
+          bytes.add(
+            utf8.encode(
+              jsonEncode({'fact': _deletedFact, ..._writeEntityKey(entity)}),
+            ),
+          );
+      }
+      bytes.addByte(_lineFeed);
     }
     return bytes.takeBytes();
+  }
+
+  /// Дописывает к [bytes] начало объекта факта [factStart] и поля записи
+  /// [record] без открывающей скобки её объекта.
+  static void _addRecordFact(
+    BytesBuilder bytes,
+    Uint8List factStart,
+    GraphEntityRecord record,
+  ) {
+    final encoded = encode(record);
+    bytes
+      ..add(factStart)
+      ..add(Uint8List.sublistView(encoded, 1));
   }
 
   /// Заголовок всегда пишется текущей версией формата.
@@ -248,9 +275,17 @@ const _intentionKind = 'intention';
 const _tagAssignmentKind = 'tagAssignment';
 const _relationKind = 'longTermRelation';
 const _dailyChoiceKind = 'dailyChoice';
-const _deletionKind = 'deletion';
 
-Map<String, Object?> _writeFact(GraphFact fact) => switch (fact) {
+const _createdFact = 'created';
+const _changedFact = 'changed';
+const _deletedFact = 'deleted';
+
+/// Начала объектов фактов с записью: поле вида факта и разделитель перед
+/// полями записи.
+final _createdFactStart = utf8.encode('{"fact":"$_createdFact",');
+final _changedFactStart = utf8.encode('{"fact":"$_changedFact",');
+
+Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
   TagRecord(:final tag) => {
     'kind': _tagKind,
     'id': tag.id.toCanonicalString(),
@@ -324,27 +359,25 @@ Map<String, Object?> _writeFact(GraphFact fact) => switch (fact) {
         },
     ],
   },
-  GraphEntityDeletion(:final entity) => {
-    'kind': _deletionKind,
-    ...switch (entity) {
-      TagKey(:final id) => {'entity': _tagKind, 'id': id.toCanonicalString()},
-      IntentionKey(:final id) => {
-        'entity': _intentionKind,
-        'id': id.toCanonicalString(),
-      },
-      TagAssignmentKey(:final assignment) => {
-        'entity': _tagAssignmentKind,
-        ..._writeTagAssignment(assignment),
-      },
-      LongTermRelationKey(:final id) => {
-        'entity': _relationKind,
-        'id': id.toCanonicalString(),
-      },
-      DailyChoiceKey(:final id) => {
-        'entity': _dailyChoiceKind,
-        'id': id.toCanonicalString(),
-      },
-    },
+};
+
+Map<String, Object?> _writeEntityKey(GraphEntityKey entity) => switch (entity) {
+  TagKey(:final id) => {'entity': _tagKind, 'id': id.toCanonicalString()},
+  IntentionKey(:final id) => {
+    'entity': _intentionKind,
+    'id': id.toCanonicalString(),
+  },
+  TagAssignmentKey(:final assignment) => {
+    'entity': _tagAssignmentKind,
+    ..._writeTagAssignment(assignment),
+  },
+  LongTermRelationKey(:final id) => {
+    'entity': _relationKind,
+    'id': id.toCanonicalString(),
+  },
+  DailyChoiceKey(:final id) => {
+    'entity': _dailyChoiceKind,
+    'id': id.toCanonicalString(),
   },
 };
 
@@ -363,12 +396,16 @@ String _writeTimestamp(DateTime value) =>
 
 String _digits(int value, int width) => value.toString().padLeft(width, '0');
 
-GraphFact _readFact(_JsonFields fields) {
-  final kind = fields.string('kind');
-  return kind == _deletionKind
-      ? GraphEntityDeletion(_readEntityKey(fields))
-      : _readEntity(kind, fields);
-}
+GraphFact _readFact(_JsonFields fields) => switch (fields.string('fact')) {
+  _createdFact => GraphEntityCreated(
+    _readEntity(fields.string('kind'), fields),
+  ),
+  _changedFact => GraphEntityChanged(
+    _readEntity(fields.string('kind'), fields),
+  ),
+  _deletedFact => GraphEntityDeleted(_readEntityKey(fields)),
+  _ => throw const GraphFormatCorruption(),
+};
 
 GraphEntityRecord _readEntity(String kind, _JsonFields fields) =>
     switch (kind) {

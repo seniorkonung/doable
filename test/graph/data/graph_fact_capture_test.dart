@@ -15,8 +15,10 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
@@ -152,8 +154,8 @@ void main() {
     expect(await capture(() async {}), isEmpty);
   });
 
-  test('создание намерения с тегами даёт его полную запись и назначения '
-      'в порядке их создания', () async {
+  test('создание намерения с тегами даёт факты «создана» с его полной '
+      'записью и назначениями в порядке их создания', () async {
     await addGraph();
 
     final facts = await capture(() async {
@@ -170,14 +172,16 @@ void main() {
     expect(
       _lines(facts),
       _lines([
-        _intention(
-          _created,
-          'Новое намерение',
-          description: '  Первая строка\nвторая строка  ',
-          ready: true,
+        GraphEntityCreated(
+          _intention(
+            _created,
+            'Новое намерение',
+            description: '  Первая строка\nвторая строка  ',
+            ready: true,
+          ),
         ),
-        _assignment(_tagB, _created),
-        _assignment(_tagA, _created),
+        GraphEntityCreated(_assignment(_tagB, _created)),
+        GraphEntityCreated(_assignment(_tagA, _created)),
       ]),
     );
   });
@@ -195,14 +199,18 @@ void main() {
     expect(
       _lines(facts),
       _lines([
-        _intention(_source, 'В тот же момент', createdAt: earlier),
-        _intention(_created, 'После перевода часов', createdAt: earlier),
-        _intention(_later, 'Создано первым'),
+        GraphEntityCreated(
+          _intention(_source, 'В тот же момент', createdAt: earlier),
+        ),
+        GraphEntityCreated(
+          _intention(_created, 'После перевода часов', createdAt: earlier),
+        ),
+        GraphEntityCreated(_intention(_later, 'Создано первым')),
       ]),
     );
   });
 
-  test('изменение намерения даёт одну запись с состоянием после '
+  test('изменение намерения даёт один факт «изменена» с состоянием после '
       'транзакции', () async {
     await addGraph();
 
@@ -221,19 +229,21 @@ void main() {
     expect(
       _lines(facts),
       _lines([
-        _intention(
-          _source,
-          'Новое название',
-          description: 'Описание',
-          ready: true,
-          updatedAt: _updatedAt,
+        GraphEntityChanged(
+          _intention(
+            _source,
+            'Новое название',
+            description: 'Описание',
+            ready: true,
+            updatedAt: _updatedAt,
+          ),
         ),
       ]),
     );
   });
 
-  test('архивирование намерения вместе со связями даёт записи в порядке '
-      'секций и создания связей', () async {
+  test('архивирование намерения вместе со связями даёт факты «изменена» в '
+      'порядке секций и создания связей', () async {
     await addGraph();
 
     final facts = await capture(() async {
@@ -251,14 +261,38 @@ void main() {
     expect(
       _lines(facts),
       _lines([
-        _intention(_selected, 'Выбранное действие', archived: true),
-        _relationRecord(_relation, _source, _selected, archived: true),
-        _relationRecord(_secondRelation, _selected, _other, archived: true),
+        GraphEntityChanged(
+          _intention(_selected, 'Выбранное действие', archived: true),
+        ),
+        GraphEntityChanged(
+          _relationRecord(_relation, _source, _selected, archived: true),
+        ),
+        GraphEntityChanged(
+          _relationRecord(_secondRelation, _selected, _other, archived: true),
+        ),
       ]),
     );
   });
 
-  test('удаление тега даёт удаление тега и каждого его назначения', () async {
+  test('переименование тега даёт факт «изменена» с новым названием', () async {
+    await addGraph();
+
+    final facts = await capture(
+      () => write("UPDATE tags SET name = 'Дача' WHERE id = ?", [_tagA]),
+    );
+
+    expect(
+      _lines(facts),
+      _lines([
+        GraphEntityChanged(
+          TagRecord(Tag(id: _tagId(_tagA), name: TagName.fromStored('Дача'))),
+        ),
+      ]),
+    );
+  });
+
+  test('удаление тега даёт факты «удалена» для тега и каждого его '
+      'назначения', () async {
     await addGraph();
     await arrange(() async {
       await assign(_tagA, _selected);
@@ -273,16 +307,16 @@ void main() {
     expect(
       _lines(facts),
       _lines([
-        GraphEntityDeletion(TagKey(_tagId(_tagA))),
-        GraphEntityDeletion(TagAssignmentKey(_tagAssignment(_tagA, _source))),
-        GraphEntityDeletion(TagAssignmentKey(_tagAssignment(_tagA, _selected))),
+        GraphEntityDeleted(TagKey(_tagId(_tagA))),
+        GraphEntityDeleted(TagAssignmentKey(_tagAssignment(_tagA, _source))),
+        GraphEntityDeleted(TagAssignmentKey(_tagAssignment(_tagA, _selected))),
       ]),
     );
   });
 
   group('дневной выбор', () {
-    test('создание даёт запись со всем путём от исходного намерения к '
-        'выбранному', () async {
+    test('создание даёт факт «создана» со всем путём от исходного намерения '
+        'к выбранному', () async {
       await addGraph();
 
       final facts = await capture(() async {
@@ -294,15 +328,17 @@ void main() {
       expect(
         _lines(facts),
         _lines([
-          _choiceRecord([
-            _step(_firstStep, _relation),
-            _step(_secondStep, _secondRelation, _firstStep),
-          ]),
+          GraphEntityCreated(
+            _choiceRecord([
+              _step(_firstStep, _relation),
+              _step(_secondStep, _secondRelation, _firstStep),
+            ]),
+          ),
         ]),
       );
     });
 
-    test('замена пути даёт запись с новым путём', () async {
+    test('замена пути даёт факт «изменена» с новым путём', () async {
       await addGraph();
       await arrange(() async {
         await addRelation(_directRelation, _source, _other);
@@ -319,28 +355,33 @@ void main() {
       expect(
         _lines(facts),
         _lines([
-          _choiceRecord([_step(_directStep, _directRelation)]),
+          GraphEntityChanged(
+            _choiceRecord([_step(_directStep, _directRelation)]),
+          ),
         ]),
       );
     });
 
-    test('удаление вместе с шагами пути даёт удаление выбора', () async {
-      await addGraph();
-      await arrange(() async {
-        await addChoice();
-        await addStep(_firstStep, _relation);
-        await addStep(_secondStep, _secondRelation, _firstStep);
-      });
+    test(
+      'удаление вместе с шагами пути даёт факт «удалена» для выбора',
+      () async {
+        await addGraph();
+        await arrange(() async {
+          await addChoice();
+          await addStep(_firstStep, _relation);
+          await addStep(_secondStep, _secondRelation, _firstStep);
+        });
 
-      final facts = await capture(
-        () => write('DELETE FROM daily_choices WHERE id = ?', [_choice]),
-      );
+        final facts = await capture(
+          () => write('DELETE FROM daily_choices WHERE id = ?', [_choice]),
+        );
 
-      expect(
-        _lines(facts),
-        _lines([GraphEntityDeletion(DailyChoiceKey(_dailyChoiceId(_choice)))]),
-      );
-    });
+        expect(
+          _lines(facts),
+          _lines([GraphEntityDeleted(DailyChoiceKey(_dailyChoiceId(_choice)))]),
+        );
+      },
+    );
   });
 
   test('сущности, созданные и удалённые в одной транзакции, фактов не '

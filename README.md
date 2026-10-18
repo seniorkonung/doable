@@ -22,6 +22,12 @@ and manually clear its local app data. On Android, clear Doable's storage
 through the system app settings. This permanently deletes the installation's
 local data; the next launch creates a fresh database with schema version 3.
 
+Earlier pre-release builds with schema version 3, which introduced the graph
+fact log and graph export, recorded graph changes without their kind: created,
+changed, or deleted. No migration from them is provided either: this build reads
+their recorded changes as damaged local data. Before first launching this build
+over such an installation, clear Doable's local app data the same way.
+
 Before rolling back to a build without schema version 3, stop Doable and
 manually clear local app data again if this build has created a database: the
 earlier builds do not open schema version 3. Rolling back the build cannot

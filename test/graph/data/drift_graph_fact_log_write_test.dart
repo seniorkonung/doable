@@ -93,7 +93,7 @@ void main() {
 
     final tag = (await expectOnePackage<TagCreated>(
       repository.execute(CreateTag(TagName.fromInput('Дом'))),
-      ['тег'],
+      ['создание тега'],
     )).tag;
     final source = (await expectOnePackage<IntentionSaved>(
       repository.execute(
@@ -104,7 +104,7 @@ void main() {
           tagIds: {tag.id},
         ),
       ),
-      ['намерение', 'назначение'],
+      ['создание намерения', 'создание назначения'],
     )).intention;
     final selected = (await expectOnePackage<IntentionSaved>(
       repository.execute(
@@ -115,7 +115,7 @@ void main() {
           tagIds: const {},
         ),
       ),
-      ['намерение'],
+      ['создание намерения'],
     )).intention;
     final relation = (await expectOnePackage<LongTermRelationCreated>(
       repository.execute(
@@ -127,7 +127,7 @@ void main() {
           description: null,
         ),
       ),
-      ['связь'],
+      ['создание связи'],
     )).relation;
     final choice = (await expectOnePackage<DailyChoiceCreated>(
       repository.execute(
@@ -140,7 +140,7 @@ void main() {
           isCompleted: false,
         ),
       ),
-      ['дневной выбор'],
+      ['создание дневного выбора'],
     )).choice;
     await expectOnePackage<DailyChoiceFieldsUpdated>(
       repository.execute(
@@ -151,7 +151,7 @@ void main() {
           ),
         ),
       ),
-      ['дневной выбор'],
+      ['изменение дневного выбора'],
     );
     final other = (await expectOnePackage<IntentionSaved>(
       repository.execute(
@@ -162,7 +162,7 @@ void main() {
           tagIds: const {},
         ),
       ),
-      ['намерение'],
+      ['создание намерения'],
     )).intention;
     final otherRelation = (await expectOnePackage<LongTermRelationCreated>(
       repository.execute(
@@ -174,7 +174,7 @@ void main() {
           description: null,
         ),
       ),
-      ['связь'],
+      ['создание связи'],
     )).relation;
     await expectOnePackage<DailyChoicePathReplaced>(
       repository.execute(
@@ -185,7 +185,7 @@ void main() {
           path: _path(otherRelation.id, source.id, other.id),
         ),
       ),
-      ['дневной выбор'],
+      ['изменение дневного выбора'],
     );
     await expectOnePackage<DailyChoiceDeleted>(
       repository.execute(DeleteDailyChoice(choice.id)),
@@ -316,10 +316,11 @@ void main() {
         final package = (await packages()).last;
         final facts = _decodeFacts(package);
         expect(facts, hasLength(1));
-        final fact = facts.single as IntentionRecord;
-        expect(fact.intention.description, description);
+        final record =
+            (facts.single as GraphEntityChanged).record as IntentionRecord;
+        expect(record.intention.description, description);
         expect(
-          GraphFormatCodec.encode(fact).length,
+          GraphFormatCodec.encode(record).length,
           graphFormatRecordByteLimit,
         );
       },
@@ -383,12 +384,9 @@ List<GraphFact> _decodeFacts(GraphLogPackage package) =>
 List<String> _factKinds(GraphLogPackage package) => [
   for (final fact in _decodeFacts(package))
     switch (fact) {
-      TagRecord() => 'тег',
-      IntentionRecord() => 'намерение',
-      TagAssignmentRecord() => 'назначение',
-      LongTermRelationRecord() => 'связь',
-      DailyChoiceRecord() => 'дневной выбор',
-      GraphEntityDeletion(:final entity) => switch (entity) {
+      GraphEntityCreated(:final record) => 'создание ${_entityOf(record)}',
+      GraphEntityChanged(:final record) => 'изменение ${_entityOf(record)}',
+      GraphEntityDeleted(:final entity) => switch (entity) {
         TagKey() => 'удаление тега',
         IntentionKey() => 'удаление намерения',
         TagAssignmentKey() => 'удаление назначения',
@@ -397,6 +395,14 @@ List<String> _factKinds(GraphLogPackage package) => [
       },
     },
 ];
+
+String _entityOf(GraphEntityRecord record) => switch (record) {
+  TagRecord() => 'тега',
+  IntentionRecord() => 'намерения',
+  TagAssignmentRecord() => 'назначения',
+  LongTermRelationRecord() => 'связи',
+  DailyChoiceRecord() => 'дневного выбора',
+};
 
 /// Описание одного-двух графемных кластеров, с которым запись [intention],
 /// изменённая в момент [_now], занимает [byteLength] байт UTF-8: каждый

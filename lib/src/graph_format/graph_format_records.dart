@@ -43,14 +43,37 @@ final class GraphRecordCounts {
   final int dailyChoices;
 }
 
-/// Факт пакета лога: полное состояние сущности после транзакции или её
-/// удаление.
+/// Факт пакета лога: вид изменения сущности транзакцией.
 sealed class GraphFact {
   const GraphFact();
 }
 
-/// Запись сущности графа: строка файла экспорта или снимка либо факт пакета.
-sealed class GraphEntityRecord extends GraphFact {
+/// Сущность создана транзакцией; [record] — её состояние после транзакции.
+final class GraphEntityCreated extends GraphFact {
+  const GraphEntityCreated(this.record);
+
+  final GraphEntityRecord record;
+}
+
+/// Сущность была до транзакции и есть после неё; [record] — её состояние
+/// после транзакции.
+final class GraphEntityChanged extends GraphFact {
+  const GraphEntityChanged(this.record);
+
+  final GraphEntityRecord record;
+}
+
+/// Сущность была до транзакции и удалена ею. Удаление бывает только в пакете
+/// фактов: файл и снимок содержат одно состояние графа.
+final class GraphEntityDeleted extends GraphFact {
+  const GraphEntityDeleted(this.entity);
+
+  final GraphEntityKey entity;
+}
+
+/// Запись сущности графа: строка файла экспорта или снимка либо состояние
+/// сущности в факте пакета.
+sealed class GraphEntityRecord {
   const GraphEntityRecord();
 }
 
@@ -109,14 +132,6 @@ final class DailyChoiceRecord extends GraphEntityRecord {
 
   final DailyChoice choice;
   final StoredChoicePath path;
-}
-
-/// Удаление сущности бывает только в пакете фактов: файл и снимок содержат
-/// одно состояние графа.
-final class GraphEntityDeletion extends GraphFact {
-  const GraphEntityDeletion(this.entity);
-
-  final GraphEntityKey entity;
 }
 
 /// Ключ сущности графа. Ключи равны, когда указывают на одну сущность.

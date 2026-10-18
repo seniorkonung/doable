@@ -56,11 +56,11 @@ void main() {
           GraphFactPackage(
             position: 2,
             facts: [
-              sport,
-              swimming,
-              _assignment(tag: 2, intention: 3),
-              _assignment(tag: 1, intention: 3),
-              canSwim,
+              GraphEntityCreated(sport),
+              GraphEntityCreated(swimming),
+              GraphEntityCreated(_assignment(tag: 2, intention: 3)),
+              GraphEntityCreated(_assignment(tag: 1, intention: 3)),
+              GraphEntityCreated(canSwim),
             ],
           ),
         ]),
@@ -126,28 +126,38 @@ void main() {
           GraphFactPackage(
             position: 5,
             facts: [
-              _intention(1, 'Здоровье и сон', createdAt: _morning),
-              _relation(1, from: 1, to: 2, priority: RelationPriority.p1),
-              _relation(3, from: 2, to: 3),
+              GraphEntityChanged(
+                _intention(1, 'Здоровье и сон', createdAt: _morning),
+              ),
+              GraphEntityChanged(
+                _relation(1, from: 1, to: 2, priority: RelationPriority.p1),
+              ),
+              GraphEntityCreated(_relation(3, from: 2, to: 3)),
             ],
           ),
           GraphFactPackage(
             position: 6,
             facts: [
-              _intention(
-                1,
-                'Здоровье, сон и отдых',
-                createdAt: _morning,
-                archived: true,
+              GraphEntityChanged(
+                _intention(
+                  1,
+                  'Здоровье, сон и отдых',
+                  createdAt: _morning,
+                  archived: true,
+                ),
               ),
-              _relation(
-                1,
-                from: 1,
-                to: 2,
-                priority: RelationPriority.p1,
-                scope: RelationScope.archived,
+              GraphEntityChanged(
+                _relation(
+                  1,
+                  from: 1,
+                  to: 2,
+                  priority: RelationPriority.p1,
+                  scope: RelationScope.archived,
+                ),
               ),
-              _relation(3, from: 2, to: 3, priority: RelationPriority.p3),
+              GraphEntityChanged(
+                _relation(3, from: 2, to: 3, priority: RelationPriority.p3),
+              ),
             ],
           ),
         ]),
@@ -189,12 +199,21 @@ void main() {
       final state = await GraphStateAssembly.assemble(
         const GraphStateBase.empty(),
         Stream.fromIterable([
-          GraphFactPackage(position: 1, facts: [_tag(1, 'Дом')]),
-          GraphFactPackage(position: 2, facts: [_tag(2, 'Спорт')]),
-          GraphFactPackage(position: 3, facts: [_tag(3, 'Чтение')]),
+          GraphFactPackage(
+            position: 1,
+            facts: [GraphEntityCreated(_tag(1, 'Дом'))],
+          ),
+          GraphFactPackage(
+            position: 2,
+            facts: [GraphEntityCreated(_tag(2, 'Спорт'))],
+          ),
+          GraphFactPackage(
+            position: 3,
+            facts: [GraphEntityCreated(_tag(3, 'Чтение'))],
+          ),
           GraphFactPackage(
             position: 4,
-            facts: [GraphEntityDeletion(TagKey(_tagId(2)))],
+            facts: [GraphEntityDeleted(TagKey(_tagId(2)))],
           ),
         ]),
       );
@@ -229,8 +248,8 @@ void main() {
           GraphFactPackage(
             position: 4,
             facts: [
-              GraphEntityDeletion(TagKey(_tagId(1))),
-              GraphEntityDeletion(
+              GraphEntityDeleted(TagKey(_tagId(1))),
+              GraphEntityDeleted(
                 TagAssignmentKey(
                   TagAssignment(tagId: _tagId(1), intentionId: _intentionId(1)),
                 ),
@@ -277,7 +296,7 @@ void main() {
           ),
           GraphFactPackage(
             position: 12,
-            facts: [_assignment(tag: 1, intention: 1)],
+            facts: [GraphEntityCreated(_assignment(tag: 1, intention: 1))],
           ),
         ]),
       );
@@ -316,13 +335,13 @@ void main() {
         Stream.fromIterable([
           GraphFactPackage(
             position: 21,
-            facts: [_assignment(tag: 1, intention: 1)],
+            facts: [GraphEntityCreated(_assignment(tag: 1, intention: 1))],
           ),
           GraphFactPackage(
             position: 22,
             facts: [
-              _assignment(tag: 1, intention: 2),
-              _assignment(tag: 1, intention: 3),
+              GraphEntityCreated(_assignment(tag: 1, intention: 2)),
+              GraphEntityCreated(_assignment(tag: 1, intention: 3)),
             ],
           ),
           GraphFactPackage(
@@ -331,7 +350,7 @@ void main() {
           ),
           GraphFactPackage(
             position: 24,
-            facts: [_assignment(tag: 1, intention: 1)],
+            facts: [GraphEntityCreated(_assignment(tag: 1, intention: 1))],
           ),
         ]),
       );
@@ -373,15 +392,23 @@ void main() {
         Stream.fromIterable([
           GraphFactPackage(
             position: 6,
-            facts: [_intention(3, 'Тоже утро', createdAt: _morning)],
+            facts: [
+              GraphEntityCreated(
+                _intention(3, 'Тоже утро', createdAt: _morning),
+              ),
+            ],
           ),
           GraphFactPackage(
             position: 7,
-            facts: [_intention(1, 'Ночь', createdAt: _night)],
+            facts: [
+              GraphEntityCreated(_intention(1, 'Ночь', createdAt: _night)),
+            ],
           ),
           GraphFactPackage(
             position: 8,
-            facts: [_intention(5, 'Тоже ночь', createdAt: _night)],
+            facts: [
+              GraphEntityCreated(_intention(5, 'Тоже ночь', createdAt: _night)),
+            ],
           ),
         ]),
       );
@@ -483,8 +510,8 @@ TagAssignmentRecord _assignment({required int tag, required int intention}) =>
       TagAssignment(tagId: _tagId(tag), intentionId: _intentionId(intention)),
     );
 
-GraphEntityDeletion _unassigned({required int tag, required int intention}) =>
-    GraphEntityDeletion(
+GraphEntityDeleted _unassigned({required int tag, required int intention}) =>
+    GraphEntityDeleted(
       TagAssignmentKey(
         TagAssignment(tagId: _tagId(tag), intentionId: _intentionId(intention)),
       ),

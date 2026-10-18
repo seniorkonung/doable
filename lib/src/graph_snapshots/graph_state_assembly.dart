@@ -132,11 +132,12 @@ Future<Map<GraphEntityKey, _Outcome>> _summarize(
     position = package.position;
     for (final fact in package.facts) {
       switch (fact) {
-        case GraphEntityRecord():
+        case GraphEntityCreated(:final record) ||
+            GraphEntityChanged(:final record):
           outcomes
-              .putIfAbsent(_keyOf(fact), _Outcome.new)
-              .change(fact, factNumber);
-        case GraphEntityDeletion(:final entity):
+              .putIfAbsent(_keyOf(record), _Outcome.new)
+              .change(record, factNumber);
+        case GraphEntityDeleted(:final entity):
           outcomes.putIfAbsent(entity, _Outcome.new).delete(position);
       }
       factNumber++;

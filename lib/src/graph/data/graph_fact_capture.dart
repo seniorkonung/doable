@@ -15,11 +15,12 @@ final class GraphFactCapture {
   /// Читает отметки и строки отмеченных сущностей, удаляет отметки и
   /// возвращает факты; пустой список — транзакция пакета не даёт.
   ///
-  /// Факт — запись с полным состоянием сущности после транзакции или её
-  /// удаление; созданная и удалённая в этой же транзакции сущность факта не
-  /// даёт. Факты идут в порядке секций формата, внутри секции — в порядке
-  /// создания сущностей, как их перечисляет база, а затем удаления. Строка
-  /// отмеченной сущности вне формы хранения даёт [StoredGraphCorruption].
+  /// Факт несёт вид изменения сущности: «создана» и «изменена» — с полным
+  /// состоянием сущности после транзакции, «удалена» — с её ключом;
+  /// созданная и удалённая в этой же транзакции сущность факта не даёт.
+  /// Факты идут в порядке секций формата, внутри секции — в порядке создания
+  /// сущностей, как их перечисляет база, а затем удаления. Строка отмеченной
+  /// сущности вне формы хранения даёт [StoredGraphCorruption].
   ///
   /// Вызывать внутри транзакции записи после изменений графа.
   Future<List<GraphFact>> takeFacts() async {
@@ -197,16 +198,19 @@ final class GraphFactCapture {
   }
 }
 
-/// Факт сущности с отметкой [row]: её запись [record], если сущность есть
-/// после транзакции, иначе удаление сущности с ключом [key], если она не
-/// создана в этой же транзакции.
+/// Факт сущности с отметкой [row] по первой операции транзакции над ней и
+/// её существованию после транзакции: с записью [record] сущности или с её
+/// ключом [key].
 GraphFact? _factOf(
   QueryRow row, {
   required GraphEntityRecord Function() record,
   required GraphEntityKey Function() key,
-}) {
-  if (row.read<bool>('present')) return record();
-  return row.read<String>('first_operation') == 'insert'
-      ? null
-      : GraphEntityDeletion(key());
-}
+}) => switch ((
+  inserted: row.read<String>('first_operation') == 'insert',
+  present: row.read<bool>('present'),
+)) {
+  (inserted: true, present: true) => GraphEntityCreated(record()),
+  (inserted: true, present: false) => null,
+  (inserted: false, present: true) => GraphEntityChanged(record()),
+  (inserted: false, present: false) => GraphEntityDeleted(key()),
+};
