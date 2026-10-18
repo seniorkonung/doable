@@ -17,6 +17,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -151,6 +152,7 @@ void main() {
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -220,6 +222,7 @@ void main() {
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
         ],
         child: MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -326,6 +329,7 @@ void main() {
           ],
           retry: (count, error) => null,
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -582,6 +586,7 @@ void main() {
             personalGraphRepositoryProvider.overrideWith((ref) => repository),
           ],
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -630,6 +635,7 @@ void main() {
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
         ],
         child: MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

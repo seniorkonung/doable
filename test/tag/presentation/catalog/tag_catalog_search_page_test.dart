@@ -7,6 +7,7 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Tag, TagAssignment;
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -1189,6 +1190,7 @@ Future<AppRouter> _pumpStoredCatalog(
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -1240,6 +1242,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
                     ),
             )
           : MaterialApp.router(
+              theme: doableTheme(Brightness.light),
               locale: Locale(language),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,

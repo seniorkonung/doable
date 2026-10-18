@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -421,6 +422,7 @@ Future<_App> _launch(
       ],
       retry: (retryCount, error) => null,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

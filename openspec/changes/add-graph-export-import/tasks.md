@@ -607,7 +607,7 @@
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах соответствующих задач этапа.
   - **Estimated scope:** XS.
 
-- [ ] 2.17 Строить корневую оболочку приложения в тестовых обвязках с темой Doable, как в `lib/main.dart`
+- [x] 2.17 Строить корневую оболочку приложения в тестовых обвязках с темой Doable, как в `lib/main.dart`
   - **Acceptance criteria:**
     - Каждая тестовая обвязка, которая передаёт в `MaterialApp.router` конфигурацию `AppRouter`, задаёт `theme: doableTheme(Brightness.light)`, как `lib/main.dart` и уже существующие обвязки, например `test/app/creation_flows_test_support.dart`. Главная по [ADR-0029](../../../docs/adr/0029-represent-design-system-as-foundation-module.md) читает цвета `DoableColors` из темы приложения, поэтому в этих тестах она строится так же, как в приложении. Код приложения, в том числе `lib/src/app/home/home_page.dart`, не меняется.
     - Тесты представлений намерений, дневных выборов, тегов и долговременных связей снова проходят и проверяют своё поведение. На коммите `5d7bf4b03c157a348f9d1f6530248d635fd7f1df` 260 таких тестов в 28 файлах падали при построении `HomePage` с `Null check operator used on a null value`.

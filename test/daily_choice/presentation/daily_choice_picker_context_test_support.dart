@@ -7,6 +7,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -675,6 +676,7 @@ Future<(ControlledCatalogRepository, AppRouter)> _openApp(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: Locale(language),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

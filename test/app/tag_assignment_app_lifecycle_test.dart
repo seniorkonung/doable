@@ -7,6 +7,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -92,6 +93,7 @@ void main() {
         UncontrolledProviderScope(
           container: ready.container,
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,

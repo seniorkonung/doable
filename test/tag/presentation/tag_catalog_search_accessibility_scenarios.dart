@@ -380,6 +380,7 @@ Future<void> _showAccessibleSearch(
       child: ValueListenableBuilder<Locale>(
         valueListenable: language,
         builder: (context, locale, child) => MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
