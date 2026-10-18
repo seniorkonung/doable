@@ -40,11 +40,15 @@ final class GraphReplacementSnapshotCancelled implements Exception {
 /// зарегистрированный: позицию ему даёт регистрация.
 final class UnregisteredGraphSnapshot {
   const UnregisteredGraphSnapshot({
+    required this.directory,
     required this.fileName,
     required this.byteSize,
     required this.checksum,
     required this.counts,
   });
+
+  /// Каталог снимков, в котором записан файл.
+  final Directory directory;
 
   /// Имя файла в каталоге снимков.
   final String fileName;
@@ -61,6 +65,18 @@ final class UnregisteredGraphSnapshot {
   GraphSnapshotEntry entryAt(int position) => GraphSnapshotEntry(
     position: position,
     fileName: fileName,
+    byteSize: byteSize,
+    checksum: checksum,
+  );
+
+  /// Записи файла текущей версии по мере прослушивания, сверенные, как
+  /// записи зарегистрированного снимка: с [byteSize] — до чтения, с
+  /// [checksum] — по прочтении всего файла, до завершения записей. Файл вне
+  /// базы журналом не защищён, поэтому повреждённый снимок не становится
+  /// графом: несовпадение, отсутствие файла и нечитаемые записи дают
+  /// [GraphSnapshotCorruption]. Поток однократный.
+  Stream<GraphEntityRecord> readRecords() => _readVerifiedSnapshot(
+    File.fromUri(directory.uri.resolve(fileName)),
     byteSize: byteSize,
     checksum: checksum,
   );
@@ -490,6 +506,7 @@ final class GraphSnapshotStore {
       file = await file.rename(_file(fileName).path);
       _syncDirectory(_directory);
       return UnregisteredGraphSnapshot(
+        directory: _directory,
         fileName: fileName,
         byteSize: byteSize,
         checksum: checksum,
@@ -630,26 +647,14 @@ final class GraphSnapshotStore {
     }
   }
 
-  /// Записи снимка, сверенного с реестром: размер — до чтения, SHA-256 —
-  /// по прочтении всего файла, до завершения записей.
-  Stream<GraphEntityRecord> _readSnapshot(GraphSnapshotEntry snapshot) async* {
-    final file = _file(snapshot.fileName);
-    try {
-      if (await file.length() != snapshot.byteSize) {
-        throw const GraphSnapshotCorruption();
-      }
-      final reading = await GraphFormatFile.read(
-        _checked(file.openRead(), snapshot.checksum),
+  /// Записи снимка, сверенного с реестром по правилу
+  /// [UnregisteredGraphSnapshot.readRecords].
+  Stream<GraphEntityRecord> _readSnapshot(GraphSnapshotEntry snapshot) =>
+      _readVerifiedSnapshot(
+        _file(snapshot.fileName),
+        byteSize: snapshot.byteSize,
+        checksum: snapshot.checksum,
       );
-      await for (final record in reading.records) {
-        yield record;
-      }
-    } on PathNotFoundException {
-      throw const GraphSnapshotCorruption();
-    } on GraphFormatCorruption {
-      throw const GraphSnapshotCorruption();
-    }
-  }
 
   Future<void> _createDirectory() async {
     if (await _directory.exists()) return;
@@ -790,6 +795,30 @@ Future<void> _writeTemporary(File file, Stream<List<int>> bytes) async {
     }
   } finally {
     await output.close();
+  }
+}
+
+/// Записи файла снимка [file], сверенного с размером [byteSize] до чтения и
+/// с SHA-256 [checksum] по прочтении всего файла, до завершения записей.
+Stream<GraphEntityRecord> _readVerifiedSnapshot(
+  File file, {
+  required int byteSize,
+  required Uint8List checksum,
+}) async* {
+  try {
+    if (await file.length() != byteSize) {
+      throw const GraphSnapshotCorruption();
+    }
+    final reading = await GraphFormatFile.read(
+      _checked(file.openRead(), checksum),
+    );
+    await for (final record in reading.records) {
+      yield record;
+    }
+  } on PathNotFoundException {
+    throw const GraphSnapshotCorruption();
+  } on GraphFormatCorruption {
+    throw const GraphSnapshotCorruption();
   }
 }
 

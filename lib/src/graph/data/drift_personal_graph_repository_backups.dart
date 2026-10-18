@@ -65,14 +65,24 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
   Future<bool> _insertDailyBackup(DateTime dayStart, GraphChangeTally? since) =>
       _writeBackup((madeAt, position) async {
         if (!await _isDailyBackupDue(dayStart, madeAt, position)) return false;
-        await _insertBackupRow(GraphBackupKind.daily, madeAt, position, since);
+        await _insertBackupRow(
+          GraphBackupKind.daily,
+          madeAt,
+          position,
+          await _summaryUpTo(position, since),
+        );
         await _removeBackupsBeforeWindow();
         return true;
       });
 
   Future<void> _insertManualBackup(GraphChangeTally? since) =>
       _writeBackup((madeAt, position) async {
-        await _insertBackupRow(GraphBackupKind.manual, madeAt, position, since);
+        await _insertBackupRow(
+          GraphBackupKind.manual,
+          madeAt,
+          position,
+          await _summaryUpTo(position, since),
+        );
         return true;
       });
 
@@ -110,13 +120,14 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
     return !isToday && position > last.position;
   }
 
+  /// Вставляет строку копии с позицией [position] и сводкой [summary].
   Future<void> _insertBackupRow(
     GraphBackupKind kind,
     DateTime madeAt,
     int position,
-    GraphChangeTally? since,
+    GraphChangeSummary summary,
   ) async {
-    final counts = switch (await _summaryUpTo(position, since)) {
+    final counts = switch (summary) {
       final GraphChangeCounts counts => counts,
       GraphDataReplaced() => null,
     };

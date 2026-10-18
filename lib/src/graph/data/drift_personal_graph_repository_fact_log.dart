@@ -285,17 +285,20 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
 
   Future<void> _registerSnapshot(GraphSnapshotEntry snapshot) =>
       _sequencer.run(() async {
-        await _database
-            .into(_database.graphSnapshots)
-            .insert(
-              local.GraphSnapshotsCompanion.insert(
-                position: snapshot.position,
-                fileName: snapshot.fileName,
-                byteSize: snapshot.byteSize,
-                checksum: snapshot.checksum,
-              ),
-            );
+        await _insertSnapshotRow(snapshot);
       });
+
+  /// Вставляет строку реестра снимков и возвращает её номер.
+  Future<int> _insertSnapshotRow(GraphSnapshotEntry snapshot) => _database
+      .into(_database.graphSnapshots)
+      .insert(
+        local.GraphSnapshotsCompanion.insert(
+          position: snapshot.position,
+          fileName: snapshot.fileName,
+          byteSize: snapshot.byteSize,
+          checksum: snapshot.checksum,
+        ),
+      );
 
   /// Позиции копий читает та же транзакция, поэтому копия, записанная до
   /// неё, сохраняет свою историю. После удаления пакетов до базового снимка
