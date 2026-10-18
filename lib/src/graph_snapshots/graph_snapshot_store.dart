@@ -52,17 +52,79 @@ DiagnosticsFailureCode graphSnapshotFailureCode(Object error) =>
       },
     };
 
-/// Чтение истории, отмеченное [GraphSnapshotStore.readHistory]: позиция, на
-/// которой собирается состояние, и её базовый снимок.
+/// Идущее чтение истории [GraphSnapshotStore.readHistory].
+///
+/// Чтение выбирает историю один раз: состояние на позиции [selectStateAt]
+/// или пакеты диапазона [readPackages]. Пока история не выбрана, удаление
+/// истории хранилищем не выполняется, поэтому позицию можно найти внутри
+/// чтения до выбора: копия, найденная в реестре внутри чтения, сохраняет
+/// свою историю до его конца, а копию, удалённую раньше, поиск не находит.
+/// Чтение действует, пока не завершилось обращение, которое его получило.
 final class GraphHistoryRead {
-  const GraphHistoryRead._(this.position, this.base);
+  GraphHistoryRead._(this._log, this._mark);
 
-  /// Позиция, текущая в начале чтения.
+  final GraphFactLog _log;
+  final _HistoryReadMark _mark;
+
+  /// Позиция последнего подтверждённого пакета.
+  Future<int> readCurrentPosition() => _log.readCurrentPosition();
+
+  /// Выбирает источник состояния графа на позиции [position], не новее
+  /// текущей: ближайший зарегистрированный снимок не новее неё. До конца
+  /// чтения удаление истории сохраняет этот снимок и пакеты после него.
+  Future<GraphStateSource> selectStateAt(int position) async {
+    _mark.beginSelection();
+    final base = await _log.readSnapshotAtOrBefore(position);
+    _mark.history = (from: base?.position ?? 0, base: base);
+    return GraphStateSource._(position, base);
+  }
+
+  /// Пакеты с позициями после [after] не дальше [upTo], не новее текущей,
+  /// по возрастанию позиций; факты пакетов «изменение» прочитаны в текущей
+  /// версии формата.
+  ///
+  /// Пакеты читаются короткими порциями, а до конца чтения удаление истории
+  /// сохраняет все пакеты после [after]. Поток однократный.
+  Stream<GraphHistoryPackage> readPackages({
+    required int after,
+    required int upTo,
+  }) {
+    _mark.beginSelection();
+    _mark.history = (from: after, base: null);
+    return _readHistoryPackages(_log, after: after, upTo: upTo);
+  }
+}
+
+/// Источник состояния графа на позиции, выбранный чтением истории
+/// [GraphHistoryRead.selectStateAt]: позиция и её базовый снимок.
+final class GraphStateSource {
+  const GraphStateSource._(this.position, this.base);
+
   final int position;
 
   /// Ближайший зарегистрированный снимок не новее [position]; `null` — такого
   /// снимка нет, и базой служит пустой граф позиции 0.
   final GraphSnapshotEntry? base;
+}
+
+/// Пакет лога, прочитанный чтением истории [GraphHistoryRead.readPackages].
+sealed class GraphHistoryPackage {
+  const GraphHistoryPackage({required this.position});
+
+  final int position;
+}
+
+/// Пакет «изменение»: факты одной подтверждённой транзакции графа.
+final class GraphHistoryChange extends GraphHistoryPackage {
+  const GraphHistoryChange({required super.position, required this.facts});
+
+  final List<GraphFact> facts;
+}
+
+/// Пакет «сброс»: граф заменён, и состояние после замены записано только в
+/// снимке, а не фактами.
+final class GraphHistoryReset extends GraphHistoryPackage {
+  const GraphHistoryReset({required super.position});
 }
 
 /// Файлы снимков в собственном каталоге и сборка состояния графа на позиции
@@ -111,40 +173,36 @@ final class GraphSnapshotStore {
       _assemble(position, await _log.readSnapshotAtOrBefore(position));
 
   /// Отмечает чтение истории на время [read]: пока оно идёт,
-  /// [removeHistoryBefore] этого хранилища сохраняет его базовый снимок и
-  /// пакеты после него, даже когда границу задаёт более старая копия или
-  /// другое чтение, а отложенное ради чтения удаление выполняет вызов после
-  /// его окончания.
+  /// [removeHistoryBefore] этого хранилища сохраняет выбранную им историю —
+  /// базовый снимок состояния и пакеты после него или пакеты после начала
+  /// диапазона, — даже когда границу задаёт более старая копия или другое
+  /// чтение, а отложенное ради чтения удаление выполняет вызов после его
+  /// окончания. Чтение из-за удаления истории не прерывается и не
+  /// повторяется.
   ///
-  /// Отметка ставится до чтения текущей позиции и выбора базового снимка,
-  /// поэтому удаление истории не затрагивает ни снимок, который чтение
-  /// выберет базой, ни пакеты после него. Состояние на позиции чтения
-  /// собирает [readState] этого или другого хранилища того же каталога, пока
-  /// [read] не завершилось.
+  /// Отметка ставится до выбора истории, поэтому удаление истории не
+  /// затрагивает ни снимок, который чтение выберет базой, ни пакеты, которые
+  /// оно прочитает. Состояние на позиции выбранного источника собирает
+  /// [readState] этого или другого хранилища того же каталога, пока [read] не
+  /// завершилось.
   Future<T> readHistory<T>(
     Future<T> Function(GraphHistoryRead history) read,
   ) async {
     final mark = _HistoryReadMark();
     _historyReads.add(mark);
     try {
-      final position = await _log.readCurrentPosition();
-      final history = GraphHistoryRead._(
-        position,
-        await _log.readSnapshotAtOrBefore(position),
-      );
-      mark.history = history;
-      return await read(history);
+      return await read(GraphHistoryRead._(_log, mark));
     } finally {
       _historyReads.remove(mark);
     }
   }
 
-  /// Состояние графа на позиции чтения истории [history] из его базового
-  /// снимка и пакетов после него по правилу [readStateAt].
-  Future<AssembledGraphState> readState(GraphHistoryRead history) =>
-      _assemble(history.position, history.base);
+  /// Состояние графа на позиции источника [state] из его базового снимка и
+  /// пакетов после него по правилу [readStateAt].
+  Future<AssembledGraphState> readState(GraphStateSource state) =>
+      _assemble(state.position, state.base);
 
-  /// Пишет состояние графа на позиции чтения истории [history] по правилу
+  /// Пишет состояние графа на позиции источника [state] по правилу
   /// [readState] в новый файл формата [file] существующего каталога.
   /// Заголовок несёт момент записи по часам хранилища и количества записей.
   ///
@@ -154,18 +212,18 @@ final class GraphSnapshotStore {
   /// прошедший проверку, даёт [GraphSnapshotCorruption], а при любом отказе
   /// файл удаляется.
   Future<void> writeStateFile(
-    GraphHistoryRead history,
+    GraphStateSource state,
     File file, {
     required void Function(double share) onProgress,
   }) async {
     try {
-      final state = await readState(history);
-      final counts = state.counts;
+      final assembled = await readState(state);
+      final counts = assembled.counts;
       await _writeTemporary(
         file,
         GraphFormatFile.write(
           GraphFormatHeader(writtenAt: _clock(), counts: counts),
-          _reportingProgress(state.records, _total(counts), onProgress),
+          _reportingProgress(assembled.records, _total(counts), onProgress),
         ),
       );
     } catch (_) {
@@ -331,20 +389,19 @@ final class GraphSnapshotStore {
   /// удалённых из него снимков. Файл, который не удалось удалить, удаляет
   /// очистка.
   ///
-  /// Граница не позже базовых снимков идущих чтений истории [readHistory],
-  /// и сами эти снимки сохраняются, даже когда ближайший снимок не новее
-  /// границы старше них. Пока базовый снимок какого-либо из чтений не выбран,
-  /// история не удаляется: позиция такого чтения может предшествовать
-  /// [boundary], и тогда ему нужна история до неё.
+  /// Граница не позже базовых снимков и начал диапазонов идущих чтений
+  /// истории [readHistory], а базовые снимки сохраняются, даже когда
+  /// ближайший снимок не новее границы старше них. Пока какое-либо из чтений
+  /// не выбрало историю, она не удаляется: позиция такого чтения может
+  /// предшествовать [boundary], и тогда ему нужна история до неё.
   Future<void> removeHistoryBefore(int boundary) async {
     var retainedBoundary = boundary;
     final readBases = <GraphSnapshotEntry>[];
     for (final read in _historyReads) {
       final history = read.history;
       if (history == null) return;
-      final base = history.base;
-      retainedBoundary = min(retainedBoundary, base?.position ?? 0);
-      if (base != null) readBases.add(base);
+      retainedBoundary = min(retainedBoundary, history.from);
+      if (history.base case final base?) readBases.add(base);
     }
     final removed = await _log.removeHistoryBefore(
       retainedBoundary,
@@ -395,28 +452,18 @@ final class GraphSnapshotStore {
     required int after,
     required int upTo,
   }) async* {
-    var next = after;
-    while (true) {
-      final portion = await _log.readPackages(after: next, upTo: upTo);
-      if (portion.isEmpty) return;
-      for (final package in portion) {
-        yield switch (package) {
-          StoredGraphChangePackage(
-            :final position,
-            :final formatVersion,
-            :final facts,
-          ) =>
-            GraphFactPackage(
-              position: position,
-              facts: GraphFormatCodec.decodePackage(
-                facts,
-                GraphFormatVersion.ofCarrier(formatVersion),
-              ),
-            ),
-          StoredGraphResetPackage() => throw const GraphReplacedInRange(),
-        };
-      }
-      next = portion.last.position;
+    await for (final package in _readHistoryPackages(
+      _log,
+      after: after,
+      upTo: upTo,
+    )) {
+      yield switch (package) {
+        GraphHistoryChange(:final position, :final facts) => GraphFactPackage(
+          position: position,
+          facts: facts,
+        ),
+        GraphHistoryReset() => throw const GraphReplacedInRange(),
+      };
     }
   }
 
@@ -508,8 +555,52 @@ String _temporaryFileName() =>
 
 /// Отметка идущего чтения истории.
 final class _HistoryReadMark {
-  /// Позиция и базовый снимок чтения; `null` — снимок ещё не выбран.
-  GraphHistoryRead? history;
+  var _selecting = false;
+
+  /// История, которую читает чтение: позиция, с которой нужны пакеты, и
+  /// базовый снимок состояния; `null` — история ещё не выбрана.
+  ({int from, GraphSnapshotEntry? base})? history;
+
+  /// Чтение выбирает историю один раз: история, выбранная повторно, могла
+  /// быть удалена после первого выбора.
+  void beginSelection() {
+    if (_selecting) throw StateError('Чтение истории уже выбрало историю.');
+    _selecting = true;
+  }
+}
+
+/// Пакеты лога [log] после позиции [after] не дальше [upTo], прочитанные
+/// порциями, с фактами в текущей версии формата.
+Stream<GraphHistoryPackage> _readHistoryPackages(
+  GraphFactLog log, {
+  required int after,
+  required int upTo,
+}) async* {
+  var next = after;
+  while (true) {
+    final portion = await log.readPackages(after: next, upTo: upTo);
+    if (portion.isEmpty) return;
+    for (final package in portion) {
+      yield switch (package) {
+        StoredGraphChangePackage(
+          :final position,
+          :final formatVersion,
+          :final facts,
+        ) =>
+          GraphHistoryChange(
+            position: position,
+            facts: GraphFormatCodec.decodePackage(
+              facts,
+              GraphFormatVersion.ofCarrier(formatVersion),
+            ),
+          ),
+        StoredGraphResetPackage(:final position) => GraphHistoryReset(
+          position: position,
+        ),
+      };
+    }
+    next = portion.last.position;
+  }
 }
 
 /// Порция файла пересборки, позиция которой отличается от предыдущей: её

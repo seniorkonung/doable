@@ -785,7 +785,7 @@
   - **Files likely touched:** `lib/src/graph_snapshots/graph_fact_log.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `lib/src/graph_snapshots/graph_snapshot_store.dart`, `test/support/forwarding_graph_fact_log.dart`, `test/graph/data/drift_graph_fact_log_access_test.dart`, `test/graph_snapshots/graph_log_compaction_test.dart`, `test/graph_snapshots/graph_snapshot_rebuild_test.dart`, `test/graph_snapshots/graph_history_read_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 3.3 Читать историю с хранимой позиции под отметкой чтения: состояние на позиции и пакеты диапазона
+- [x] 3.3 Читать историю с хранимой позиции под отметкой чтения: состояние на позиции и пакеты диапазона
   - **Acceptance criteria:**
     - По решению 7 [дизайна](design.md) модуль снимков собирает состояние на заданной позиции не новее текущей и отдаёт пакеты диапазона между двумя позициями под отметкой чтения истории. Отметка ставится до выбора базового снимка или до первой порции пакетов. Пока она стоит, граница хранения не позже базового снимка сборки или начала диапазона, а сам базовый снимок сохраняется по правилу задачи 3.2, даже когда границу задаёт более старая копия или другое чтение. Отложенное удаление выполняет следующее сжатие. Чтение не прерывается и не повторяется из-за сжатия.
     - Поэтому копия, которую вызывающий нашёл в реестре внутри чтения, сохраняет свою историю до его конца, а копию, удалённую раньше, эта проверка обнаруживает.

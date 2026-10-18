@@ -118,8 +118,7 @@ final class GraphLogCompaction {
   Future<void> removeUnregisteredFiles() => _store.removeUnregisteredFiles();
 
   /// Чтение истории по правилу [GraphSnapshotStore.readHistory]: сжатие не
-  /// удаляет его базовый снимок и пакеты после него, пока [read] не
-  /// завершилось.
+  /// удаляет выбранную им историю, пока [read] не завершилось.
   Future<T> readHistory<T>(Future<T> Function(GraphHistoryRead history) read) =>
       _store.readHistory(read);
 
@@ -184,17 +183,14 @@ final class GraphLogCompaction {
     required DateTime writtenAt,
     required void Function(double share) onProgress,
     required void Function(GraphSnapshotEntry? base) onBase,
-  }) => readHistory((history) {
-    onBase(history.base);
+  }) => readHistory((history) async {
+    final state = await history.selectStateAt(
+      await history.readCurrentPosition(),
+    );
+    onBase(state.base);
     return _inWriter(
       (compaction) => _stateWriteRunner(
-        GraphStateWrite._(
-          history,
-          file.path,
-          _directory,
-          writtenAt,
-          compaction,
-        ),
+        GraphStateWrite._(state, file.path, _directory, writtenAt, compaction),
       ),
       onProgress: onProgress,
     );
@@ -361,26 +357,27 @@ final class GraphSnapshotWrite {
   }
 }
 
-/// Запись состояния графа для отдельного изолята: чтение истории, путь файла,
-/// каталог снимков, момент записи и порт, через который изолят обращается к
-/// логу фактов и передаёт ход записи.
+/// Запись состояния графа для отдельного изолята: источник состояния,
+/// выбранный чтением истории, путь файла, каталог снимков, момент записи и
+/// порт, через который изолят обращается к логу фактов и передаёт ход
+/// записи.
 final class GraphStateWrite {
   const GraphStateWrite._(
-    this._history,
+    this._state,
     this._path,
     this._directory,
     this._writtenAt,
     this._compaction,
   );
 
-  final GraphHistoryRead _history;
+  final GraphStateSource _state;
   final String _path;
   final Directory _directory;
   final DateTime _writtenAt;
   final SendPort _compaction;
 
-  /// Пишет состояние на позиции чтения истории в файл; выполняется в
-  /// изоляте записи.
+  /// Пишет состояние на позиции источника в файл; выполняется в изоляте
+  /// записи.
   Future<void> run() =>
       GraphSnapshotStore(
         log: _PortGraphFactLog(_compaction),
@@ -388,7 +385,7 @@ final class GraphStateWrite {
         clock: () => _writtenAt,
         diagnosticsSink: _PortDiagnosticsSink(_compaction),
       ).writeStateFile(
-        _history,
+        _state,
         File(_path),
         onProgress: (share) => _compaction.send(_WriterProgress(share)),
       );

@@ -81,10 +81,10 @@ void main() {
     await pumpEventQueue();
   }
 
-  /// Записи состояния, собранного на позиции чтения [history] из его
+  /// Записи состояния, собранного на позиции источника [state] из его
   /// базового снимка и пакетов после него, в кодировке формата.
-  Future<List<String>> readState(GraphHistoryRead history) async =>
-      _lines(await (await store().readState(history)).records.toList());
+  Future<List<String>> readState(GraphStateSource state) async =>
+      _lines(await (await store().readState(state)).records.toList());
 
   Future<List<String>> referenceState() async =>
       _lines(await referenceGraphRecords(database));
@@ -99,9 +99,10 @@ void main() {
     final baseSelected = Completer<void>();
     final releaseRead = Completer<void>();
     final read = compaction.readHistory((history) async {
+      final state = await _selectCurrentState(history);
       baseSelected.complete();
       await releaseRead.future;
-      return readState(history);
+      return readState(state);
     });
     await baseSelected.future;
 
@@ -154,9 +155,10 @@ void main() {
       Completer<void> baseSelected,
       Future<void> release,
     ) => compaction.readHistory((history) async {
+      final state = await _selectCurrentState(history);
       baseSelected.complete();
       await release;
-      return readState(history);
+      return readState(state);
     });
 
     await confirmCommands(1);
@@ -215,6 +217,151 @@ void main() {
     );
   });
 
+  test(
+    'сжатие, завершившееся во время чтения состояния на прежней позиции, '
+    'базовый снимок которого новее снимка более старой хранимой копии, '
+    'сохраняет этот снимок, а после чтения следующее сжатие удаляет его',
+    () async {
+      await confirmCommands(1);
+      final kept = await store().writeSnapshot(1);
+      await insertDailyBackupRow(database, position: 1);
+      await confirmCommands(1);
+      // Снимок, который не нужен ни копии, ни чтению: сжатие во время чтения
+      // удаляет его.
+      await store().writeSnapshot(2);
+      await confirmCommands(1);
+      final base = await store().writeSnapshot(3);
+      await confirmCommands(1);
+      final expected = await referenceState();
+      await confirmCommands(1);
+      final compaction = compactionOver(repository)..start();
+      final baseSelected = Completer<void>();
+      final releaseRead = Completer<void>();
+      final read = compaction.readHistory((history) async {
+        final state = await history.selectStateAt(4);
+        baseSelected.complete();
+        await releaseRead.future;
+        return readState(state);
+      });
+      await baseSelected.future;
+
+      final compacted = outcomes.next;
+      await confirmCommands(2);
+      expect((await compacted).status, isA<DiagnosticsSucceeded>());
+
+      const position = 7;
+      final latest = await repository.readSnapshotAtOrBefore(position);
+      expect(latest?.position, position);
+      expect(await repository.readSnapshotFileNames(), {
+        kept.fileName,
+        base.fileName,
+        latest?.fileName,
+      });
+      expect(
+        await _fileNamesIn(snapshots),
+        await repository.readSnapshotFileNames(),
+      );
+      releaseRead.complete();
+      expect(await read, expected);
+
+      final next = outcomes.next;
+      await confirmCommands(_threshold + 1);
+      expect((await next).status, isA<DiagnosticsSucceeded>());
+      await compaction.shutdown();
+
+      const nextPosition = position + _threshold + 1;
+      final nextLatest = await repository.readSnapshotAtOrBefore(nextPosition);
+      expect(nextLatest?.position, nextPosition);
+      expect(await repository.readSnapshotFileNames(), {
+        kept.fileName,
+        nextLatest?.fileName,
+      });
+      expect(
+        await _fileNamesIn(snapshots),
+        await repository.readSnapshotFileNames(),
+      );
+    },
+  );
+
+  test('чтение пакетов с позиции копии, строка которой удалена во время '
+      'чтения, получает все пакеты диапазона по порядку, хотя между их '
+      'порциями завершилось сжатие, а после чтения следующее сжатие удаляет '
+      'их', () async {
+    await confirmCommands(1);
+    await insertDailyBackupRow(database, position: 1);
+    // Пакеты диапазона не умещаются в одну порцию, поэтому сжатие
+    // завершается между порциями чтения.
+    await confirmCommands(graphFactLogPortionLimit);
+    // Снимок, который не нужен ни копиям, ни чтению: сжатие во время чтения
+    // удаляет его.
+    await store().writeSnapshot(graphFactLogPortionLimit + 1);
+    final replaced = await insertSameGraphReplacement(
+      database,
+      snapshots: snapshots,
+      position: graphFactLogPortionLimit + 1,
+    );
+    await confirmCommands(1);
+    final upTo = await repository.readCurrentPosition();
+    final compaction = compactionOver(repository)..start();
+    final firstReceived = Completer<void>();
+    final releaseRead = Completer<void>();
+    final read = compaction.readHistory((history) async {
+      final received = <GraphHistoryPackage>[];
+      await for (final package in history.readPackages(after: 1, upTo: upTo)) {
+        received.add(package);
+        if (received.length == 1) {
+          firstReceived.complete();
+          await releaseRead.future;
+        }
+      }
+      return received;
+    });
+    await firstReceived.future;
+    await database.delete(database.graphBackups).go();
+
+    final compacted = outcomes.next;
+    await confirmCommands(_threshold + replaced.position - upTo + 1);
+    expect((await compacted).status, isA<DiagnosticsSucceeded>());
+
+    final position = replaced.position + _threshold + 1;
+    final latest = await repository.readSnapshotAtOrBefore(position);
+    expect(latest?.position, position);
+    expect(await repository.readSnapshotFileNames(), {
+      replaced.fileName,
+      latest?.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
+    );
+    releaseRead.complete();
+    final received = await read;
+    expect(received.map((package) => package.position), [
+      for (var next = 2; next <= upTo; next++) next,
+    ]);
+    expect(
+      received.whereType<GraphHistoryReset>().map(
+        (package) => package.position,
+      ),
+      [replaced.position],
+    );
+
+    final next = outcomes.next;
+    await confirmCommands(_threshold + 1);
+    expect((await next).status, isA<DiagnosticsSucceeded>());
+    await compaction.shutdown();
+
+    final nextPosition = position + _threshold + 1;
+    final nextLatest = await repository.readSnapshotAtOrBefore(nextPosition);
+    expect(nextLatest?.position, nextPosition);
+    expect(await repository.readSnapshotFileNames(), {nextLatest?.fileName});
+    expect(await _fileNamesIn(snapshots), {nextLatest?.fileName});
+    expect(
+      await repository.readPackages(after: 0, upTo: nextPosition),
+      isEmpty,
+    );
+  });
+
   test('чтение истории, начатое, когда сжатие уже прочитало текущую позицию, '
       'но ещё не зарегистрировало новый снимок, выбирает базой прежний '
       'снимок, а сжатие оставляет его и пакеты после него', () async {
@@ -236,12 +383,13 @@ void main() {
     await registrationReached.future;
     final expected = await referenceState();
 
-    final baseSelected = Completer<GraphHistoryRead>();
+    final baseSelected = Completer<GraphStateSource>();
     final releaseRead = Completer<void>();
     final read = compaction.readHistory((history) async {
-      baseSelected.complete(history);
+      final state = await _selectCurrentState(history);
+      baseSelected.complete(state);
       await releaseRead.future;
-      return readState(history);
+      return readState(state);
     });
     expect((await baseSelected.future).base?.fileName, previous.fileName);
     releaseRegistration.complete();
@@ -285,7 +433,9 @@ void main() {
         },
       ),
     );
-    final read = compaction.readHistory(readState);
+    final read = compaction.readHistory(
+      (history) async => readState(await _selectCurrentState(history)),
+    );
     await selectionReached.future;
 
     compaction.start();
@@ -352,6 +502,11 @@ final class _InterceptingLog extends ForwardingGraphFactLog {
     await super.registerSnapshot(snapshot);
   }
 }
+
+/// Источник состояния на текущей позиции, выбранный чтением истории
+/// [history].
+Future<GraphStateSource> _selectCurrentState(GraphHistoryRead history) async =>
+    history.selectStateAt(await history.readCurrentPosition());
 
 Future<Set<String>> _fileNamesIn(Directory directory) async => {
   if (await directory.exists())
