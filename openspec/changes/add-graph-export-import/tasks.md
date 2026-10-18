@@ -606,3 +606,26 @@
   - **Dependencies:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах соответствующих задач этапа.
   - **Estimated scope:** XS.
+
+- [ ] 2.17 Строить корневую оболочку приложения в тестовых обвязках с темой Doable, как в `lib/main.dart`
+  - **Acceptance criteria:**
+    - Каждая тестовая обвязка, которая передаёт в `MaterialApp.router` конфигурацию `AppRouter`, задаёт `theme: doableTheme(Brightness.light)`, как `lib/main.dart` и уже существующие обвязки, например `test/app/creation_flows_test_support.dart`. Главная по [ADR-0029](../../../docs/adr/0029-represent-design-system-as-foundation-module.md) читает цвета `DoableColors` из темы приложения, поэтому в этих тестах она строится так же, как в приложении. Код приложения, в том числе `lib/src/app/home/home_page.dart`, не меняется.
+    - Тесты представлений намерений, дневных выборов, тегов и долговременных связей снова проходят и проверяют своё поведение. На коммите `5d7bf4b03c157a348f9d1f6530248d635fd7f1df` 260 таких тестов в 28 файлах падали при построении `HomePage` с `Null check operator used on a null value`.
+    - Проверяемые сценарии и названия тестов не меняются. Ожидание меняется только там, где оно зависело от оформления темы Material по умолчанию; каждое такое изменение названо в сессии.
+  - **Verification:**
+    - Убедиться, что `rg -l 'MaterialApp' test | xargs rg -l 'AppRouter\(' | xargs rg --files-without-match 'doableTheme\('` ничего не находит.
+    - Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/intention/presentation/ test/daily_choice/presentation/ test/tag/presentation/ test/long_term_relation/presentation/ test/app/`.
+  - **Dependencies:** 2.14.
+  - **Files likely touched:** тестовые обвязки, которые находит команда проверки: 32 файла в `test/intention/presentation/`, `test/daily_choice/presentation/`, `test/tag/presentation/`, `test/long_term_relation/presentation/` и `test/app/tag_assignment_app_lifecycle_test.dart`; в каждом добавляются тема и импорт `doable_theme.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.18 Повторно подтвердить готовность этапа после перевода тестовых обвязок корневой оболочки на тему Doable
+  - **Acceptance criteria:**
+    - После задачи 2.17 условие Ready to advance этапа 2 из [плана](plan.md) по-прежнему выполнено. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
+    - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
+  - **Verification:**
+    - Сопоставить актуальные результаты проверок задач 2.16 и 2.17 с условием готовности; при пробеле дополнить соответствующую проверку и запустить только её.
+    - Выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 2.16, 2.17.
+  - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задачи 2.17.
+  - **Estimated scope:** XS.
