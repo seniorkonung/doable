@@ -14,6 +14,9 @@ abstract interface class DocumentAccess {
   /// приложения отсоединилась, пока диалог ожидал ответа, исход —
   /// [DocumentCreationCancelled]. Пока ожидается ответ одного диалога, второй
   /// не открывается и исход второго запроса — [DocumentCreationFailed].
+  ///
+  /// Право записи в созданный документ удерживается до [finishDocument],
+  /// даже если движок приложения перенесён в другую Activity.
   Future<DocumentCreation> createDocument({required String suggestedName});
 
   /// Копирует все байты файла [source] в документ [document].
@@ -23,6 +26,14 @@ abstract interface class DocumentAccess {
     CreatedDocument document, {
     required File source,
   });
+
+  /// Завершает работу с документом [document] и отпускает удерживаемое
+  /// право на него.
+  ///
+  /// Вызывающая сторона завершает работу с каждым созданным документом один
+  /// раз при любом исходе. Отказ отпустить право исключением не становится:
+  /// право, оставшееся у приложения, отпускается при следующем запуске.
+  Future<void> finishDocument(CreatedDocument document);
 }
 
 /// Документ, созданный системным диалогом сохранения.

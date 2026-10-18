@@ -25,6 +25,9 @@ final class FileDocumentAccess implements DocumentAccess {
   /// Запись документа отказывает, как при отозванном доступе.
   var failsWrites = false;
 
+  /// Адреса документов, работа с которыми завершена, в порядке завершения.
+  final finished = <String>[];
+
   /// Создаёт пустой документ, как поставщик документов после выбора места.
   DocumentCreated newDocument() {
     final file = File.fromUri(
@@ -49,5 +52,10 @@ final class FileDocumentAccess implements DocumentAccess {
     if (failsWrites) return const DocumentWriteFailed();
     await source.copy(File.fromUri(Uri.parse(document.uri)).path);
     return const DocumentWritten();
+  }
+
+  @override
+  Future<void> finishDocument(CreatedDocument document) async {
+    finished.add(document.uri);
   }
 }

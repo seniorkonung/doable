@@ -8,9 +8,9 @@ import '../application/document_access.dart';
 /// `DocumentAccessPlugin.kt`.
 ///
 /// Плагин отвечает на создание документа его адресом или `null` при отмене,
-/// а на копирование — пустым ответом. Отказ открыть диалог или записать
-/// документ плагин передаёт ошибкой канала, которая здесь становится
-/// типизированным отказом.
+/// а на копирование и завершение работы с документом — пустым ответом. Отказ
+/// открыть диалог или записать документ плагин передаёт ошибкой канала,
+/// которая здесь становится типизированным отказом.
 final class MethodChannelDocumentAccess implements DocumentAccess {
   const MethodChannelDocumentAccess();
 
@@ -47,6 +47,18 @@ final class MethodChannelDocumentAccess implements DocumentAccess {
       return const DocumentWritten();
     } on PlatformException {
       return const DocumentWriteFailed();
+    }
+  }
+
+  @override
+  Future<void> finishDocument(CreatedDocument document) async {
+    try {
+      await _channel.invokeMethod<void>('finishDocument', {
+        'document': document.uri,
+      });
+    } on PlatformException {
+      // Право, которое не удалось отпустить, плагин отпустит при следующем
+      // запуске приложения.
     }
   }
 }

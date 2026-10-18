@@ -105,4 +105,29 @@ void main() {
       expect(write, isA<DocumentWriteFailed>());
     },
   );
+  test('шаг завершения передаёт адрес документа', () async {
+    final calls = <MethodCall>[];
+    answer((call) async {
+      calls.add(call);
+      return null;
+    });
+
+    await const MethodChannelDocumentAccess().finishDocument(
+      const CreatedDocument(documentUri),
+    );
+
+    expect(calls.single.method, 'finishDocument');
+    expect(calls.single.arguments, {'document': documentUri});
+  });
+
+  test('ошибка канала на шаге завершения не становится исключением', () async {
+    answer((_) async => throw PlatformException(code: 'error'));
+
+    await expectLater(
+      const MethodChannelDocumentAccess().finishDocument(
+        const CreatedDocument(documentUri),
+      ),
+      completes,
+    );
+  });
 }

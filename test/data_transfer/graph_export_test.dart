@@ -146,8 +146,8 @@ void main() {
 
   test('документ, выбранный в системном диалоге, читается модулем формата в '
       'выгрузку базы с моментом экспорта в заголовке, временный файл '
-      'удаляется, а успех диагностируется без пользовательских '
-      'данных', () async {
+      'удаляется, работа с документом завершается один раз, а успех '
+      'диагностируется без пользовательских данных', () async {
     final home = await createTag('Дом');
     final health = await createIntention('Здоровье', tagIds: {home.id});
     final running = await createIntention('Бегать');
@@ -174,6 +174,7 @@ void main() {
     expect(reading.header.writtenAt, exportMoment.toUtc());
     expect(_lines(await reading.records.toList()), expected);
     expect(await _filesIn(temporary), isEmpty);
+    expect(documents.finished, [documents.created.single.uri.toString()]);
     expect(diagnostics.events, [
       {'operation': 'graphExport', 'outcome': 'succeeded'},
     ]);
@@ -210,8 +211,8 @@ void main() {
   });
 
   test('отказ записи временного файла даёт отказ экспорта, диагностируемый '
-      'этапом записи временного файла, и не оставляет временных '
-      'файлов', () async {
+      'этапом записи временного файла, не оставляет временных файлов и '
+      'завершает работу с документом один раз', () async {
     await createTag('Дом');
     final container = app(
       stateWriteRunner: writeGraphStateFailingIn(temporary),
@@ -222,6 +223,7 @@ void main() {
 
     expect((await exported).outcome, GraphExportOutcome.failed);
     expect(await _filesIn(temporary), isEmpty);
+    expect(documents.finished, [documents.created.single.uri.toString()]);
     expect(
       container.read(graphExportControllerProvider),
       isA<GraphExportIdle>(),
@@ -267,8 +269,9 @@ void main() {
   });
 
   test('отказ записи документа даёт отказ экспорта без временных файлов, '
-      'диагностируемый этапом записи документа, а повтор из сообщения снова '
-      'открывает диалог и сохраняет граф', () async {
+      'диагностируемый этапом записи документа, и завершает работу с '
+      'документом один раз, а повтор из сообщения снова открывает диалог и '
+      'сохраняет граф', () async {
     await createTag('Дом');
     documents.failsWrites = true;
     final container = app();
@@ -277,6 +280,7 @@ void main() {
     final failure = await failed;
     expect(failure.outcome, GraphExportOutcome.failed);
     expect(await _filesIn(temporary), isEmpty);
+    expect(documents.finished, [documents.created.single.uri.toString()]);
     expect(diagnostics.events, [
       {
         'operation': 'graphExport',
