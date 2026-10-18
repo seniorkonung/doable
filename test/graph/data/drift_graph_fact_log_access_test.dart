@@ -5,7 +5,7 @@ import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    show AppDatabase, GraphLogPackagesCompanion;
+    show AppDatabase, GraphLogPackagesCompanion, GraphSnapshotsCompanion;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -121,7 +121,8 @@ void main() {
 
       expect(result, isA<GraphResultSuccess<Object?, GraphCommandFailure>>());
       expect(await repository.readCurrentPosition(), 1);
-      final [package] = await repository.readPackages(after: 0, upTo: 1);
+      final [package as StoredGraphChangePackage] = await repository
+          .readPackages(after: 0, upTo: 1);
       expect(package.position, 1);
       expect(package.formatVersion, GraphFormatVersion.current.number);
     },
@@ -151,8 +152,14 @@ void main() {
           position,
       ]);
       expect(rest, isEmpty);
-      expect(first.first.facts, _facts('пакет 0'));
-      expect(second.last.facts, _facts('пакет ${2 * limit - 1}'));
+      expect(
+        (first.first as StoredGraphChangePackage).facts,
+        _facts('пакет 0'),
+      );
+      expect(
+        (second.last as StoredGraphChangePackage).facts,
+        _facts('пакет ${2 * limit - 1}'),
+      );
     },
   );
 
@@ -162,10 +169,68 @@ void main() {
       final storedVersion = GraphFormatVersion.current.number + 1;
       await appendPackages(1, formatVersion: storedVersion);
 
-      final [package] = await repository.readPackages(after: 0, upTo: 1);
+      final [package as StoredGraphChangePackage] = await repository
+          .readPackages(after: 0, upTo: 1);
 
       expect(package.formatVersion, storedVersion);
       expect(package.facts, _facts('пакет 0'));
+    },
+  );
+
+  test(
+    'пакет «сброс» отдаётся между пакетами «изменение» отдельным вариантом со '
+    'своим снимком',
+    () async {
+      await appendPackages(1);
+      final snapshot = GraphSnapshotEntry(
+        position: 2,
+        fileName: 'снимок-сброса',
+        byteSize: 4096,
+        checksum: Uint8List.fromList(List.generate(32, (index) => index)),
+      );
+      final snapshotId = await database
+          .into(database.graphSnapshots)
+          .insert(
+            GraphSnapshotsCompanion.insert(
+              position: snapshot.position,
+              fileName: snapshot.fileName,
+              byteSize: snapshot.byteSize,
+              checksum: snapshot.checksum,
+            ),
+          );
+      await database
+          .into(database.graphLogPackages)
+          .insert(
+            GraphLogPackagesCompanion.insert(
+              recordedAt: 0,
+              kind: 'reset',
+              snapshotId: Value(snapshotId),
+            ),
+          );
+      await appendPackages(1);
+
+      final [before, reset as StoredGraphResetPackage, after] = await repository
+          .readPackages(after: 0, upTo: 3);
+
+      expect(
+        before,
+        isA<StoredGraphChangePackage>()
+            .having((package) => package.position, 'position', 1)
+            .having((package) => package.facts, 'facts', _facts('пакет 0')),
+      );
+      expect(reset.position, 2);
+      expect(reset.snapshot.position, snapshot.position);
+      expect(reset.snapshot.fileName, snapshot.fileName);
+      expect(reset.snapshot.byteSize, snapshot.byteSize);
+      expect(reset.snapshot.checksum, snapshot.checksum);
+      expect(
+        after,
+        isA<StoredGraphChangePackage>().having(
+          (package) => package.position,
+          'position',
+          3,
+        ),
+      );
     },
   );
 
@@ -348,7 +413,7 @@ void main() {
     await appendPackages(10);
     await registerSnapshotsAt([2, 5, 8]);
 
-    final removed = await repository.removeHistoryBefore(6);
+    final removed = await repository.removeHistoryBefore(6, retained: const []);
 
     expect(removed, ['снимок-2']);
     expect(await repository.readSnapshotFileNames(), {'снимок-5', 'снимок-8'});
@@ -359,7 +424,7 @@ void main() {
     await appendPackages(10);
     await registerSnapshotsAt([4, 7, 9]);
 
-    final removed = await repository.removeHistoryBefore(3);
+    final removed = await repository.removeHistoryBefore(3, retained: const []);
 
     expect(removed, unorderedEquals(['снимок-4', 'снимок-7']));
     expect(await repository.readSnapshotFileNames(), {'снимок-9'});
@@ -372,7 +437,10 @@ void main() {
       await appendPackages(10);
       await registerSnapshotsAt([2, 4, 6, 8, 10]);
 
-      final removed = await repository.removeHistoryBefore(4);
+      final removed = await repository.removeHistoryBefore(
+        4,
+        retained: const [],
+      );
 
       expect(removed, unorderedEquals(['снимок-2', 'снимок-6', 'снимок-8']));
       expect(await repository.readSnapshotFileNames(), {
@@ -387,7 +455,10 @@ void main() {
     await appendPackages(10);
     await registerSnapshotsAt([3, 10]);
 
-    final removed = await repository.removeHistoryBefore(10);
+    final removed = await repository.removeHistoryBefore(
+      10,
+      retained: const [],
+    );
 
     expect(removed, ['снимок-3']);
     expect(await repository.readSnapshotFileNames(), {'снимок-10'});

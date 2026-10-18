@@ -17,6 +17,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/forwarding_graph_fact_log.dart';
+import '../support/graph_history_rows.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -139,6 +140,78 @@ void main() {
     expect(
       await repository.readPackages(after: 0, upTo: nextPosition),
       isEmpty,
+    );
+  });
+
+  test('сжатие, завершившееся во время двух чтений истории, базовые снимки '
+      'которых новее снимка хранимой копии, сохраняет оба базовых снимка, а '
+      'после чтений следующее сжатие удаляет их', () async {
+    await confirmCommands(1);
+    final kept = await store().writeSnapshot(1);
+    await insertDailyBackupRow(database, position: 1);
+    final compaction = compactionOver(repository);
+    Future<List<String>> delayedRead(
+      Completer<void> baseSelected,
+      Future<void> release,
+    ) => compaction.readHistory((history) async {
+      baseSelected.complete();
+      await release;
+      return readState(history);
+    });
+
+    await confirmCommands(1);
+    final firstBase = await store().writeSnapshot(2);
+    final firstExpected = await referenceState();
+    final firstSelected = Completer<void>();
+    final releaseFirst = Completer<void>();
+    final firstRead = delayedRead(firstSelected, releaseFirst.future);
+    await firstSelected.future;
+    await confirmCommands(1);
+    final secondBase = await store().writeSnapshot(3);
+    final secondExpected = await referenceState();
+    final secondSelected = Completer<void>();
+    final releaseSecond = Completer<void>();
+    final secondRead = delayedRead(secondSelected, releaseSecond.future);
+    await secondSelected.future;
+
+    compaction.start();
+    final compacted = outcomes.next;
+    await confirmCommands(_threshold + 1);
+    expect((await compacted).status, isA<DiagnosticsSucceeded>());
+
+    const position = 3 + _threshold + 1;
+    final latest = await repository.readSnapshotAtOrBefore(position);
+    expect(latest?.position, position);
+    expect(await repository.readSnapshotFileNames(), {
+      kept.fileName,
+      firstBase.fileName,
+      secondBase.fileName,
+      latest?.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
+    );
+    releaseFirst.complete();
+    releaseSecond.complete();
+    expect(await firstRead, firstExpected);
+    expect(await secondRead, secondExpected);
+
+    final next = outcomes.next;
+    await confirmCommands(_threshold + 1);
+    expect((await next).status, isA<DiagnosticsSucceeded>());
+    await compaction.shutdown();
+
+    const nextPosition = position + _threshold + 1;
+    final nextLatest = await repository.readSnapshotAtOrBefore(nextPosition);
+    expect(nextLatest?.position, nextPosition);
+    expect(await repository.readSnapshotFileNames(), {
+      kept.fileName,
+      nextLatest?.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
     );
   });
 

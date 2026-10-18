@@ -157,7 +157,7 @@ void main() {
     await createIntention('Читать');
     final position = await repository.readCurrentPosition();
     await store.writeSnapshot(position);
-    await repository.removeHistoryBefore(position);
+    await repository.removeHistoryBefore(position, retained: const []);
 
     final state = await store.readStateAt(position);
 
@@ -263,7 +263,7 @@ void main() {
     await store.writeSnapshot(1);
     await createTag('Спорт');
     final registered = await store.writeSnapshot(2);
-    await repository.removeHistoryBefore(2);
+    await repository.removeHistoryBefore(2, retained: const []);
     await File.fromUri(
       snapshots.uri.resolve('${const Uuid().v4()}.jsonl.gz.tmp'),
     ).writeAsBytes([1, 2, 3]);

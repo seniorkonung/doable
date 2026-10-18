@@ -466,7 +466,7 @@ final class _InterceptingLog extends ForwardingGraphFactLog {
   final Future<void> Function() beforePackages;
 
   @override
-  Future<List<StoredGraphFactPackage>> readPackages({
+  Future<List<StoredGraphLogPackage>> readPackages({
     required int after,
     required int upTo,
   }) async {

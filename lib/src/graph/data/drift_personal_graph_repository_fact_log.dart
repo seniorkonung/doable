@@ -16,22 +16,33 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
     return row?.read<int>('seq') ?? 0;
   }
 
-  Future<List<StoredGraphFactPackage>> _readStoredFactPackages({
+  Future<List<StoredGraphLogPackage>> _readStoredLogPackages({
     required int after,
     required int upTo,
   }) => _sequencer.run(() async {
     final packages = _database.graphLogPackages;
+    final snapshots = _database.graphSnapshots;
     final rows =
-        await (_database.select(packages)
+        await (_database.select(packages).join([
+                leftOuterJoin(
+                  snapshots,
+                  snapshots.id.equalsExp(packages.snapshotId),
+                ),
+              ])
               ..where(
-                (package) =>
-                    package.position.isBiggerThanValue(after) &
-                    package.position.isSmallerOrEqualValue(upTo),
+                packages.position.isBiggerThanValue(after) &
+                    packages.position.isSmallerOrEqualValue(upTo),
               )
-              ..orderBy([(package) => OrderingTerm.asc(package.position)])
+              ..orderBy([OrderingTerm.asc(packages.position)])
               ..limit(graphFactLogPortionLimit))
             .get();
-    return [for (final row in rows) _storedFactPackage(row)];
+    return [
+      for (final row in rows)
+        _storedLogPackage(
+          row.readTable(packages),
+          row.readTableOrNull(snapshots),
+        ),
+    ];
   });
 
   /// Хранилище снимков не зависит от данных графа, поэтому строку вне формы
@@ -280,22 +291,44 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
             );
       });
 
-  Future<List<String>> _removeHistoryBefore(int boundary) => _sequencer.run(
+  /// Позиции копий читает та же транзакция, поэтому копия, записанная до
+  /// неё, сохраняет свою историю. После удаления пакетов до базового снимка
+  /// границы в логе остаются только сохраняемые пакеты «сброс», а схема не
+  /// даёт удалить снимок, на который они ссылаются.
+  Future<List<String>> _removeHistoryBefore(
+    int boundary,
+    Iterable<GraphSnapshotEntry> retained,
+  ) => _sequencer.run(
     () => _database.transaction(() async {
       final latest = await _newestSnapshotQuery().getSingleOrNull();
       if (latest == null) return const [];
-      final base = await _newestSnapshotQuery(atOrBefore: boundary)
-          .getSingleOrNull();
+      final backups = _database.graphBackups;
+      final oldestBackup = backups.position.min();
+      final oldestBackupPosition =
+          await (_database.selectOnly(backups)..addColumns([oldestBackup]))
+              .map((row) => row.read(oldestBackup))
+              .getSingle();
+      final base = await _newestSnapshotQuery(
+        atOrBefore: min(boundary, oldestBackupPosition ?? boundary),
+      ).getSingleOrNull();
+      final packages = _database.graphLogPackages;
       if (base != null) {
-        await (_database.delete(_database.graphLogPackages)..where(
+        await (_database.delete(packages)..where(
               (package) =>
                   package.position.isSmallerOrEqualValue(base.position),
             ))
             .go();
       }
+      final resetSnapshots = _database.selectOnly(packages)
+        ..addColumns([packages.snapshotId])
+        ..where(packages.snapshotId.isNotNull());
+      final retainedFileNames = [for (final entry in retained) entry.fileName];
       final removed =
           await (_database.delete(_database.graphSnapshots)..where(
-                (snapshot) => snapshot.id.isNotIn([latest.id, ?base?.id]),
+                (snapshot) =>
+                    snapshot.id.isNotIn([latest.id, ?base?.id]) &
+                    snapshot.fileName.isNotIn(retainedFileNames) &
+                    snapshot.id.isNotInQuery(resetSnapshots),
               ))
               .goAndReturn();
       return [for (final snapshot in removed) snapshot.fileName];
@@ -325,23 +358,33 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
 /// Запись графа с ключом порядка её строки.
 typedef _OrderedRecord = (GraphRecordOrderKey, GraphEntityRecord);
 
-/// Пакеты «сброс» пишет только замена графа, а хранилище снимков их пока не
-/// читает. Схема гарантирует пакету «изменение» версию формата и факты.
-StoredGraphFactPackage _storedFactPackage(local.GraphLogPackage row) =>
-    switch (row) {
-      local.GraphLogPackage(
-        kind: 'change',
-        :final position,
-        :final formatVersion?,
-        :final facts?,
-      ) =>
-        StoredGraphFactPackage(
-          position: position,
-          formatVersion: formatVersion,
-          facts: facts,
-        ),
-      _ => throw StateError('Пакет лога не является пакетом «изменение».'),
-    };
+/// Схема гарантирует пакету «изменение» версию формата и факты, а пакету
+/// «сброс» — зарегистрированный снимок.
+StoredGraphLogPackage _storedLogPackage(
+  local.GraphLogPackage row,
+  local.RegisteredGraphSnapshot? snapshot,
+) => switch ((row, snapshot)) {
+  (
+    local.GraphLogPackage(
+      kind: 'change',
+      :final position,
+      :final formatVersion?,
+      :final facts?,
+    ),
+    null,
+  ) =>
+    StoredGraphChangePackage(
+      position: position,
+      formatVersion: formatVersion,
+      facts: facts,
+    ),
+  (local.GraphLogPackage(kind: 'reset', :final position), final snapshot?) =>
+    StoredGraphResetPackage(
+      position: position,
+      snapshot: _snapshotEntry(snapshot),
+    ),
+  _ => throw StateError('Пакет лога вне схемы.'),
+};
 
 GraphSnapshotEntry _snapshotEntry(local.RegisteredGraphSnapshot row) =>
     GraphSnapshotEntry(

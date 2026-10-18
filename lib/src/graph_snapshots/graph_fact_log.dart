@@ -8,15 +8,20 @@ import '../intention/domain/intention_id.dart';
 /// записей в одной порции [GraphFactLog.readGraphRecords].
 const int graphFactLogPortionLimit = 100;
 
-/// Пакет фактов в том виде, в каком его хранит лог.
-final class StoredGraphFactPackage {
-  const StoredGraphFactPackage({
-    required this.position,
+/// Пакет лога в том виде, в каком его хранит лог.
+sealed class StoredGraphLogPackage {
+  const StoredGraphLogPackage({required this.position});
+
+  final int position;
+}
+
+/// Пакет «изменение»: факты одной подтверждённой транзакции графа.
+final class StoredGraphChangePackage extends StoredGraphLogPackage {
+  const StoredGraphChangePackage({
+    required super.position,
     required this.formatVersion,
     required this.facts,
   });
-
-  final int position;
 
   /// Номер версии формата, которой записаны факты пакета. Он может быть
   /// старше текущей версии, поэтому проверяется и повышается при чтении
@@ -25,6 +30,17 @@ final class StoredGraphFactPackage {
 
   /// Факты в кодировке пакета формата данных графа.
   final Uint8List facts;
+}
+
+/// Пакет «сброс»: граф заменён, и состояние на позиции пакета записано
+/// только в снимке [snapshot], а не фактами.
+final class StoredGraphResetPackage extends StoredGraphLogPackage {
+  const StoredGraphResetPackage({
+    required super.position,
+    required this.snapshot,
+  });
+
+  final GraphSnapshotEntry snapshot;
 }
 
 /// Снимок в реестре снимков: файл состояния графа на позиции лога.
@@ -137,7 +153,7 @@ abstract interface class GraphFactLog {
   /// подтверждённые между порциями, получают позиции после прежних, поэтому
   /// диапазон до уже достигнутой позиции [upTo] они не меняют. Вызывающий не
   /// удаляет историю, которую читает.
-  Future<List<StoredGraphFactPackage>> readPackages({
+  Future<List<StoredGraphLogPackage>> readPackages({
     required int after,
     required int upTo,
   });
@@ -165,13 +181,19 @@ abstract interface class GraphFactLog {
   /// Регистрирует снимок, файл которого уже надёжно записан.
   Future<void> registerSnapshot(GraphSnapshotEntry snapshot);
 
-  /// Удаляет историю за границей хранения [boundary] одной транзакцией.
+  /// Удаляет историю за границей хранения одной транзакцией.
   ///
-  /// Сохраняются последний снимок, ближайший снимок не новее границы и все
-  /// пакеты после него, а без такого снимка — все пакеты. Остальные снимки и
-  /// более ранние пакеты удаляются из реестра. Возвращает имена файлов
-  /// удалённых снимков: их удаляет вызывающий.
-  Future<List<String>> removeHistoryBefore(int boundary);
+  /// Граница хранения — наименьшая из [boundary] и позиций хранимых копий,
+  /// которые читает та же транзакция. Сохраняются последний снимок, снимки
+  /// [retained] — базовые снимки идущих чтений истории, ближайший снимок не
+  /// новее границы и все пакеты после него, а без такого снимка — все пакеты,
+  /// а также снимки, на которые ссылаются сохраняемые пакеты «сброс».
+  /// Остальные снимки и более ранние пакеты удаляются из реестра. Возвращает
+  /// имена файлов удалённых снимков: их удаляет вызывающий.
+  Future<List<String>> removeHistoryBefore(
+    int boundary, {
+    required Iterable<GraphSnapshotEntry> retained,
+  });
 }
 
 /// Лог фактов, который сообщает о подтверждённых пакетах: по сигналу сжатие

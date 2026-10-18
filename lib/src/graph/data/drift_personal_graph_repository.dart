@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
+import 'dart:math' show min;
 import 'dart:typed_data';
 
 import '../../data/local/app_database.dart' as local;
@@ -241,10 +242,10 @@ final class DriftPersonalGraphRepository
   Future<int> readCurrentPosition() => _readCurrentLogPosition();
 
   @override
-  Future<List<StoredGraphFactPackage>> readPackages({
+  Future<List<StoredGraphLogPackage>> readPackages({
     required int after,
     required int upTo,
-  }) => _readStoredFactPackages(after: after, upTo: upTo);
+  }) => _readStoredLogPackages(after: after, upTo: upTo);
 
   @override
   Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
@@ -262,8 +263,10 @@ final class DriftPersonalGraphRepository
       _registerSnapshot(snapshot);
 
   @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      _removeHistoryBefore(boundary);
+  Future<List<String>> removeHistoryBefore(
+    int boundary, {
+    required Iterable<GraphSnapshotEntry> retained,
+  }) => _removeHistoryBefore(boundary, retained);
 
   @override
   Stream<GraphCompositionRead> watchComposition() => _watchComposition();

@@ -16,7 +16,7 @@ abstract base class ForwardingGraphFactLog implements ObservableGraphFactLog {
   Future<int> readCurrentPosition() => source.readCurrentPosition();
 
   @override
-  Future<List<StoredGraphFactPackage>> readPackages({
+  Future<List<StoredGraphLogPackage>> readPackages({
     required int after,
     required int upTo,
   }) => source.readPackages(after: after, upTo: upTo);
@@ -37,6 +37,8 @@ abstract base class ForwardingGraphFactLog implements ObservableGraphFactLog {
       source.registerSnapshot(snapshot);
 
   @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      source.removeHistoryBefore(boundary);
+  Future<List<String>> removeHistoryBefore(
+    int boundary, {
+    required Iterable<GraphSnapshotEntry> retained,
+  }) => source.removeHistoryBefore(boundary, retained: retained);
 }

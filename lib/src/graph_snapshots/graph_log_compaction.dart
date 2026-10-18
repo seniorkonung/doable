@@ -44,11 +44,12 @@ Future<void> runGraphStateWriteInIsolate(GraphStateWrite write) =>
 ///
 /// Когда пакетов после последнего снимка становится больше порога, снимок
 /// текущей позиции собирается, пишется и регистрируется в отдельном изоляте,
-/// а затем удаляется история до него, кроме нужной идущим чтениям истории
-/// [readHistory]: её удаляет следующее сжатие. Если последний снимок не
-/// проходит проверку, снимок текущего состояния пересобирается из базы, а
-/// повреждённый снимок удаляет та же граница хранения. База получает только
-/// короткие операции лога и порции графа, поэтому команды графа
+/// а затем удаляется история до него, кроме нужной хранимым копиям и идущим
+/// чтениям истории [readHistory] и снимков сохраняемых пакетов «сброс»:
+/// историю, отложенную ради чтений, удаляет следующее сжатие. Если последний
+/// снимок не проходит проверку, снимок текущего состояния пересобирается из
+/// базы, а повреждённый снимок удаляет та же граница хранения. База получает
+/// только короткие операции лога и порции графа, поэтому команды графа
 /// подтверждаются и во время сжатия. Одновременно идёт не больше одного
 /// сжатия.
 ///
@@ -405,7 +406,7 @@ final class _PortGraphFactLog implements GraphFactLog {
       _call((log) => log.readCurrentPosition());
 
   @override
-  Future<List<StoredGraphFactPackage>> readPackages({
+  Future<List<StoredGraphLogPackage>> readPackages({
     required int after,
     required int upTo,
   }) => _call((log) => log.readPackages(after: after, upTo: upTo));
@@ -427,8 +428,10 @@ final class _PortGraphFactLog implements GraphFactLog {
       _call((log) => log.registerSnapshot(snapshot));
 
   @override
-  Future<List<String>> removeHistoryBefore(int boundary) =>
-      _call((log) => log.removeHistoryBefore(boundary));
+  Future<List<String>> removeHistoryBefore(
+    int boundary, {
+    required Iterable<GraphSnapshotEntry> retained,
+  }) => _call((log) => log.removeHistoryBefore(boundary, retained: retained));
 
   /// Изоляты одной группы передают замыкания:
   /// https://api.dart.dev/dart-isolate/SendPort/send.html

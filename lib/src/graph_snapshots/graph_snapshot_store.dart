@@ -23,14 +23,24 @@ final class GraphSnapshotCorruption implements Exception {
   const GraphSnapshotCorruption();
 }
 
+/// Граф заменён после базового состояния сборки: в диапазоне её пакетов есть
+/// пакет «сброс», поэтому состояние на позиции из этого базового состояния
+/// не собирается.
+final class GraphReplacedInRange implements Exception {
+  const GraphReplacedInRange();
+}
+
 /// Безопасная категория отказа операции со снимками для диагностики.
 ///
 /// Снимок, не прошедший проверку, отличается от повреждения данных лога и
 /// базы, в том числе строк графа вне формы хранения; отказы файлов снимков
 /// относятся к недоступности хранилища, как у файла настройки установки.
+/// Замена графа во время чтения истории — конфликт с одновременным
+/// изменением.
 DiagnosticsFailureCode graphSnapshotFailureCode(Object error) =>
     switch (error) {
       GraphSnapshotCorruption() => DiagnosticsFailureCode.snapshotCorruption,
+      GraphReplacedInRange() => DiagnosticsFailureCode.conflict,
       GraphFormatCorruption() ||
       GraphRecordCorruption() => DiagnosticsFailureCode.corruption,
       FileSystemException() => DiagnosticsFailureCode.unavailable,
@@ -102,8 +112,9 @@ final class GraphSnapshotStore {
 
   /// Отмечает чтение истории на время [read]: пока оно идёт,
   /// [removeHistoryBefore] этого хранилища сохраняет его базовый снимок и
-  /// пакеты после него, а отложенное ради чтения удаление выполняет вызов
-  /// после его окончания.
+  /// пакеты после него, даже когда границу задаёт более старая копия или
+  /// другое чтение, а отложенное ради чтения удаление выполняет вызов после
+  /// его окончания.
   ///
   /// Отметка ставится до чтения текущей позиции и выбора базового снимка,
   /// поэтому удаление истории не затрагивает ни снимок, который чтение
@@ -117,9 +128,12 @@ final class GraphSnapshotStore {
     _historyReads.add(mark);
     try {
       final position = await _log.readCurrentPosition();
-      final base = await _log.readSnapshotAtOrBefore(position);
-      mark.basePosition = base?.position ?? 0;
-      return await read(GraphHistoryRead._(position, base));
+      final history = GraphHistoryRead._(
+        position,
+        await _log.readSnapshotAtOrBefore(position),
+      );
+      mark.history = history;
+      return await read(history);
     } finally {
       _historyReads.remove(mark);
     }
@@ -221,7 +235,8 @@ final class GraphSnapshotStore {
   /// позиции лога. Состояние на позиции последней порции собирается из этого
   /// файла и пакетов после позиции первой порции и пишется, как в
   /// [writeSnapshot]. Временный файл удаляется, а при отказе реестр не
-  /// меняется. Пересборка не выполняется одновременно с
+  /// меняется. Если между порциями граф заменён, пересборка отказывает
+  /// [GraphReplacedInRange]. Пересборка не выполняется одновременно с
   /// [removeUnregisteredFiles].
   Future<GraphSnapshotEntry> rebuildSnapshot() async {
     final stopwatch = Stopwatch()..start();
@@ -317,17 +332,25 @@ final class GraphSnapshotStore {
   /// очистка.
   ///
   /// Граница не позже базовых снимков идущих чтений истории [readHistory],
-  /// а пока базовый снимок какого-либо из них не выбран, история не
-  /// удаляется: позиция такого чтения может предшествовать [boundary], и
-  /// тогда ему нужна история до неё.
+  /// и сами эти снимки сохраняются, даже когда ближайший снимок не новее
+  /// границы старше них. Пока базовый снимок какого-либо из чтений не выбран,
+  /// история не удаляется: позиция такого чтения может предшествовать
+  /// [boundary], и тогда ему нужна история до неё.
   Future<void> removeHistoryBefore(int boundary) async {
-    var retained = boundary;
+    var retainedBoundary = boundary;
+    final readBases = <GraphSnapshotEntry>[];
     for (final read in _historyReads) {
-      final basePosition = read.basePosition;
-      if (basePosition == null) return;
-      retained = min(retained, basePosition);
+      final history = read.history;
+      if (history == null) return;
+      final base = history.base;
+      retainedBoundary = min(retainedBoundary, base?.position ?? 0);
+      if (base != null) readBases.add(base);
     }
-    for (final fileName in await _log.removeHistoryBefore(retained)) {
+    final removed = await _log.removeHistoryBefore(
+      retainedBoundary,
+      retained: readBases,
+    );
+    for (final fileName in removed) {
       await _deleteLeftover(_file(fileName));
     }
   }
@@ -365,6 +388,9 @@ final class GraphSnapshotStore {
     }
   }
 
+  /// Пакеты «изменение» после базового состояния сборки. Пакет «сброс» даёт
+  /// [GraphReplacedInRange]: граф после него записан только в снимке, и
+  /// состояние поверх прежнего графа не собирается.
   Stream<GraphFactPackage> _readPackages({
     required int after,
     required int upTo,
@@ -374,13 +400,21 @@ final class GraphSnapshotStore {
       final portion = await _log.readPackages(after: next, upTo: upTo);
       if (portion.isEmpty) return;
       for (final package in portion) {
-        yield GraphFactPackage(
-          position: package.position,
-          facts: GraphFormatCodec.decodePackage(
-            package.facts,
-            GraphFormatVersion.ofCarrier(package.formatVersion),
-          ),
-        );
+        yield switch (package) {
+          StoredGraphChangePackage(
+            :final position,
+            :final formatVersion,
+            :final facts,
+          ) =>
+            GraphFactPackage(
+              position: position,
+              facts: GraphFormatCodec.decodePackage(
+                facts,
+                GraphFormatVersion.ofCarrier(formatVersion),
+              ),
+            ),
+          StoredGraphResetPackage() => throw const GraphReplacedInRange(),
+        };
       }
       next = portion.last.position;
     }
@@ -474,9 +508,8 @@ String _temporaryFileName() =>
 
 /// Отметка идущего чтения истории.
 final class _HistoryReadMark {
-  /// Позиция базового снимка чтения, 0 — пустой граф; `null` — снимок ещё
-  /// не выбран.
-  int? basePosition;
+  /// Позиция и базовый снимок чтения; `null` — снимок ещё не выбран.
+  GraphHistoryRead? history;
 }
 
 /// Порция файла пересборки, позиция которой отличается от предыдущей: её

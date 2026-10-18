@@ -32,6 +32,7 @@ import 'package:uuid/uuid.dart';
 import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
+import '../support/graph_history_rows.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
@@ -262,6 +263,73 @@ void main() {
     final snapshot = await repository.readSnapshotAtOrBefore(position);
     expect(snapshot?.position, position);
     expect(await repository.readPackages(after: 0, upTo: position), isEmpty);
+    await expectStateMatchesDatabase();
+  });
+
+  test('пересборка, в диапазон которой попал пакет «сброс», не регистрирует '
+      'снимок, а следующее по правилу повтора сжатие проходит', () async {
+    // Сто один тег не умещается в одну порцию записей, поэтому замена графа
+    // между порциями попадает в диапазон пакетов пересборки.
+    for (var index = 0; index <= graphFactLogPortionLimit; index++) {
+      await createTag('Метка $index');
+    }
+    final damaged = await storeOver(repository)
+        .writeSnapshot(await repository.readCurrentPosition());
+    await snapshotFile(damaged).delete();
+    final firstPortionRead = Completer<void>();
+    final releasePortions = Completer<void>();
+    final compaction = compactionOver(
+      _FirstPortionPausingLog(repository, () async {
+        firstPortionRead.complete();
+        await releasePortions.future;
+      }),
+    )..start();
+    await confirmCommands(_threshold + 1);
+    await firstPortionRead.future;
+    final replaced = await insertSameGraphReplacement(
+      database,
+      snapshots: snapshots,
+      position: await repository.readCurrentPosition(),
+    );
+
+    releasePortions.complete();
+    await expectLater(attempts.single, throwsA(isA<GraphReplacedInRange>()));
+    await compaction.shutdown();
+
+    expect(await repository.readSnapshotFileNames(), {
+      damaged.fileName,
+      replaced.fileName,
+    });
+    expect(await _fileNamesIn(snapshots), {replaced.fileName});
+    await confirmCommands(_threshold + 1);
+    final next = compactionOver(repository)..start();
+    await next.shutdown();
+
+    final position = await repository.readCurrentPosition();
+    expect(attempts, hasLength(2));
+    expect((await attempts.last).position, position);
+    expect(diagnostics.events, [
+      {
+        'operation': 'graphSnapshotWrite',
+        'stage': 'stateAssembly',
+        'outcome': 'failed',
+        'failureCode': 'snapshotCorruption',
+      },
+      {
+        'operation': 'graphSnapshotRebuild',
+        'stage': 'stateAssembly',
+        'outcome': 'failed',
+        'failureCode': 'conflict',
+      },
+      {
+        'operation': 'graphLogCompaction',
+        'stage': 'snapshotWrite',
+        'outcome': 'failed',
+        'failureCode': 'conflict',
+      },
+      {'operation': 'graphSnapshotWrite', 'outcome': 'succeeded'},
+      {'operation': 'graphLogCompaction', 'outcome': 'succeeded'},
+    ]);
     await expectStateMatchesDatabase();
   });
 

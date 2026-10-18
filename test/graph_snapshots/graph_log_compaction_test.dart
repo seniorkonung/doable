@@ -19,6 +19,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
+import '../support/graph_history_rows.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -128,6 +129,91 @@ void main() {
     expect(await repository.readSnapshotFileNames(), {latest?.fileName});
     expect(await _fileNamesIn(snapshots), {latest?.fileName});
     expect(await repository.readPackages(after: 0, upTo: position), isEmpty);
+    await expectStateMatchesDatabase();
+  });
+
+  test('сжатие сохраняет снимок не новее самой старой копии и пакеты после '
+      'него, снимок пакета «сброс» и последний снимок, а после удаления этой '
+      'копии следующее сжатие удаляет её историю', () async {
+    final store = GraphSnapshotStore(
+      log: repository,
+      directory: snapshots,
+      clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
+    await confirmCommands(1);
+    await store.writeSnapshot(1);
+    await confirmCommands(1);
+    final kept = await store.writeSnapshot(2);
+    await confirmCommands(1);
+    final replaced = await insertSameGraphReplacement(
+      database,
+      snapshots: snapshots,
+      position: 3,
+    );
+    await confirmCommands(2);
+    await insertDailyBackupRow(database, position: 6);
+    await confirmCommands(2);
+
+    final compaction = compactionOver(repository)..start();
+    await compaction.shutdown();
+
+    const position = 8;
+    final latest = await repository.readSnapshotAtOrBefore(position);
+    expect(latest?.position, position);
+    expect(await repository.readSnapshotFileNames(), {
+      kept.fileName,
+      replaced.fileName,
+      latest?.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
+    );
+    expect(
+      [
+        for (final package in await repository.readPackages(
+          after: 0,
+          upTo: position,
+        ))
+          package.position,
+      ],
+      [for (var p = kept.position + 1; p <= position; p++) p],
+    );
+    expect(diagnostics.events, [
+      {'operation': 'graphSnapshotWrite', 'outcome': 'succeeded'},
+      {'operation': 'graphLogCompaction', 'outcome': 'succeeded'},
+    ]);
+    await expectStateMatchesDatabase();
+
+    await database.customStatement(
+      "DELETE FROM graph_backups WHERE kind = 'before_replacement'",
+    );
+    await confirmCommands(_threshold + 1);
+    final next = compactionOver(repository)..start();
+    await next.shutdown();
+
+    const nextPosition = position + _threshold + 1;
+    final nextLatest = await repository.readSnapshotAtOrBefore(nextPosition);
+    expect(nextLatest?.position, nextPosition);
+    expect(await repository.readSnapshotFileNames(), {
+      replaced.fileName,
+      nextLatest?.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
+    );
+    expect(
+      [
+        for (final package in await repository.readPackages(
+          after: 0,
+          upTo: nextPosition,
+        ))
+          package.position,
+      ],
+      [for (var p = replaced.position + 1; p <= nextPosition; p++) p],
+    );
     await expectStateMatchesDatabase();
   });
 
@@ -454,9 +540,12 @@ final class _InterceptingLog extends ForwardingGraphFactLog {
   }
 
   @override
-  Future<List<String>> removeHistoryBefore(int boundary) async {
+  Future<List<String>> removeHistoryBefore(
+    int boundary, {
+    required Iterable<GraphSnapshotEntry> retained,
+  }) async {
     await beforeHistoryRemoval();
-    return super.removeHistoryBefore(boundary);
+    return super.removeHistoryBefore(boundary, retained: retained);
   }
 }
 
