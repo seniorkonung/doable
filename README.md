@@ -100,8 +100,11 @@ mise run --skip-tools benchmark -- \
 The fact log benchmark (`--plain-name 'бенчмарк лога фактов'`) builds graphs of
 up to 1,000,000 entities and measures memory in separate Flutter processes; its
 resident set size measurement reads Linux `/proc`. Its timed series are
-`profile/compaction` and `profile/<command>`. The measurement method, results
-and budgets are recorded in decision 15 of the `add-graph-export-import` design.
+`profile/compaction` and `profile/<command>`. The export benchmark
+(`--plain-name 'бенчмарк экспорта'`) builds the same graphs and measures memory
+the same way; its timed series is `profile/export`. The measurement methods,
+results and budgets of both are recorded in decision 15 of the
+`add-graph-export-import` design.
 
 Timing measurements live only in benchmarks. Regular tests have no elapsed-time
 measurements or budgets and use the smallest fixtures their assertions need,

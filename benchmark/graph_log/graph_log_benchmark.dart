@@ -4,40 +4,30 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show LocalDatabaseConnectionObserver, LocalDatabaseSqlStatement;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_file.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../test/support/graph_seed.dart';
 import '../../test/support/in_memory_diagnostics_sink.dart';
-import '../../test/support/local_database_harness.dart';
 import '../support/benchmark.dart';
+import '../support/graph_log_database.dart';
 import '../support/graph_log_fixture.dart';
 import '../support/graph_log_memory_worker.dart';
 
 /// Длина диапазона пакетов после снимка, на которой начинается сжатие.
 const _rangePackages = graphLogCompactionThreshold + 1;
-
-/// Насколько пик живых данных на профиле может превышать пик на графе в
-/// десять раз меньше: замеры одной операции колеблются на несколько
-/// мебибайт, а данные, растущие с графом, заняли бы на профиле десятки.
-const _memoryNoiseBytes = 8 << 20;
 
 /// Замеров сжатия профиля в серии. Сжатие длится десятки секунд, а его
 /// замеры расходятся на проценты, поэтому сорок замеров заняли бы полчаса
@@ -57,6 +47,7 @@ void main() {
   // строится больше минуты. Набор команд выключает захват фактов, после
   // чего лог профиля расходится с базой, поэтому он идёт последним.
   final trace = _CommandTrace();
+  final commands = _Commands(trace);
   final smaller = _GraphOnce(graphLogProfileEntities ~/ 10);
   final profile = _GraphOnce(
     graphLogProfileEntities,
@@ -137,8 +128,10 @@ void main() {
         'case': 'profile/$operation',
         'metric': 'рост пика живых данных с размером графа',
         'growthMiB': _mebibytes(growth),
-        'noiseMiB': _mebibytes(_memoryNoiseBytes),
-        'status': growth < _memoryNoiseBytes ? 'withinNoise' : 'exceeded',
+        'noiseMiB': _mebibytes(graphLogMemoryNoiseBytes),
+        'status': growth < graphLogMemoryNoiseBytes
+            ? 'withinNoise'
+            : 'exceeded',
       });
     }
   }, timeout: const Timeout(Duration(minutes: 10)));
@@ -232,7 +225,7 @@ void main() {
         final order = sample.isEven ? [true, false] : [false, true];
         final pair = <bool, _CommandSample>{};
         for (final capture in order) {
-          pair[capture] = await graph.runCommand(kind, trace, capture);
+          pair[capture] = await commands.run(graph, kind, capture);
         }
         if (sample >= 0) {
           captured.add(pair[true]!);
@@ -276,9 +269,9 @@ final class _GraphOnce {
   final int _entities;
   final int _hubRelations;
   final LocalDatabaseConnectionObserver? _observer;
-  Future<_Graph>? _graph;
+  Future<GraphLogDatabase>? _graph;
 
-  Future<_Graph> get graph => _graph ??= _Graph.prepare(
+  Future<GraphLogDatabase> get graph => _graph ??= GraphLogDatabase.prepare(
     _entities,
     hubRelations: _hubRelations,
     observer: _observer,
@@ -289,137 +282,14 @@ final class _GraphOnce {
   }
 }
 
-/// Граф в пропорциях профиля решения 15 дизайна в файловой базе с базовым
-/// снимком позиции 0.
-final class _Graph {
-  _Graph._(this.harness, this.raw, this.repository, this.fixture)
-    : snapshots = GraphSnapshotStore.directoryIn(harness.temporaryDirectory);
-
-  static Future<_Graph> prepare(
-    int entities, {
-    int hubRelations = 0,
-    LocalDatabaseConnectionObserver? observer,
-  }) async {
-    final harness = await LocalDatabaseHarness.fileBacked();
-    late sqlite.Database raw;
-    final database = await harness.openReadyDatabase(
-      setup: (connection) => raw = connection,
-      observer: observer,
-    );
-    final fixture = GraphLogFixture(entities, hubRelations: hubRelations);
-    final graph = _Graph._(
-      harness,
-      raw,
-      DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => _now,
-        InMemoryDiagnosticsSink(),
-      ),
-      fixture,
-    );
-    final preparation = Stopwatch()..start();
-    fixture.populate(raw);
-    // Снимок базы — состояние на позиции 0, с которого начинается лог.
-    final snapshot = await Zone.root.run(graph._store.rebuildSnapshot);
-    preparation.stop();
-    _report({
-      'benchmark': 'graphLogFixture',
-      'entities': entities,
-      'tags': fixture.tags,
-      'intentions': fixture.intentions,
-      'tagAssignments': fixture.tagAssignments,
-      'longTermRelations': fixture.longTermRelations,
-      'dailyChoices': fixture.dailyChoices,
-      'hubRelations': hubRelations,
-      'preparationMs': preparation.elapsedMilliseconds,
-      'databaseBytes': harness.databaseFile.lengthSync(),
-      'snapshotBytes': snapshot.byteSize,
-      'environment': Platform.operatingSystem,
-      'dart': Platform.version,
-      'sqlite': sqlite.sqlite3.version.libVersion,
-      'warmups': benchmarkWarmups,
-      'repetitions': benchmarkSamples,
-    });
-    return graph;
-  }
-
-  static final _now = DateTime.utc(2026, 10, 17, 12);
-
-  final LocalDatabaseHarness harness;
-  final sqlite.Database raw;
-  final DriftPersonalGraphRepository repository;
-  final GraphLogFixture fixture;
-  final Directory snapshots;
-  late final _store = GraphSnapshotStore(
-    log: repository,
-    directory: snapshots,
-    clock: () => _now,
-    diagnosticsSink: InMemoryDiagnosticsSink(),
-  );
-
-  /// Номер следующей правки: каждая правка затрагивает новую сущность.
-  var _edits = 0;
-
-  /// Номер следующей пары команд каждого вида.
-  final _pairs = <_CommandKind, int>{};
-
-  /// Подтверждает [count] команд, каждая из которых пишет один пакет:
-  /// правки названий намерений и описаний дневных выборов поочерёдно, а с
-  /// [longDescriptions] — описания намерений на пределе графем.
-  Future<void> confirmEdits(int count, {bool longDescriptions = false}) async {
-    final before = await repository.readCurrentPosition();
-    final results = await Zone.root.run(() async {
-      final results = <Object>[];
-      for (var index = 0; index < count; index++) {
-        final edit = _edits++;
-        results.add(
-          await repository.execute(
-            _edit(edit, longDescription: longDescriptions),
-          ),
-        );
-      }
-      return results;
-    });
-    expect(results, everyElement(isA<GraphCommandSucceeded>()));
-    expect(await repository.readCurrentPosition(), before + count);
-  }
-
-  _GraphCommand _edit(int edit, {required bool longDescription}) {
-    if (longDescription) {
-      final intention = edit % fixture.intentions;
-      return UpdateIntention(
-        id: fixture.intentionId(intention),
-        title: fixture.intentionTitle(intention),
-        description: _longDescription(edit),
-      );
-    }
-    final entity = edit ~/ 2;
-    if (edit.isEven) {
-      final intention = entity % fixture.intentions;
-      return UpdateIntention(
-        id: fixture.intentionId(intention),
-        title: '${fixture.intentionTitle(intention)} · правка $edit',
-        description: fixture.intentionDescription(intention),
-      );
-    }
-    return UpdateDailyChoiceFields(
-      choiceId: fixture.dailyChoiceId(entity % fixture.dailyChoices),
-      patch: DailyChoiceFieldsPatch(
-        description: DailyChoiceDescriptionSet(
-          DailyChoiceDescription.fromInput('Правка $edit')!,
-        ),
-      ),
-    );
-  }
-
+extension on GraphLogDatabase {
   /// Сжимает лог в снимок текущей позиции, как фоновое сжатие приложения.
   Future<Duration> compact() async {
     final diagnostics = InMemoryDiagnosticsSink();
     final compaction = GraphLogCompaction(
       log: repository,
       directory: snapshots,
-      clock: () => _now,
+      clock: () => GraphLogDatabase.now,
       diagnosticsSink: diagnostics,
     );
     final stopwatch = Stopwatch()..start();
@@ -452,6 +322,12 @@ final class _Graph {
     final position = await repository.readCurrentPosition();
     final snapshot = (await repository.readSnapshotAtOrBefore(position))!;
     final file = File.fromUri(snapshots.uri.resolve(snapshot.fileName));
+    final store = GraphSnapshotStore(
+      log: repository,
+      directory: snapshots,
+      clock: () => GraphLogDatabase.now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
     Future<Duration> measure(Future<void> Function() operation) async {
       final stopwatch = Stopwatch()..start();
       await Zone.root.run(operation);
@@ -463,37 +339,44 @@ final class _Graph {
         await (await GraphFormatFile.read(file.openRead())).records.length;
       }),
       stateAssembly: await measure(() async {
-        await (await _store.readStateAt(position)).records.length;
+        await (await store.readStateAt(position)).records.length;
       }),
       stateAssemblyAndEncoding: await measure(() async {
-        final state = await _store.readStateAt(position);
+        final state = await store.readStateAt(position);
         await GraphFormatFile.write(
-          GraphFormatHeader(writtenAt: _now, counts: state.counts),
+          GraphFormatHeader(
+            writtenAt: GraphLogDatabase.now,
+            counts: state.counts,
+          ),
           state.records,
         ).length;
       }),
       snapshotBytes: snapshot.byteSize,
     );
   }
+}
 
-  /// Память операции [operation] в отдельном процессе над этой базой.
-  Future<GraphLogMemory> measureMemory(GraphLogMemoryOperation operation) =>
-      measureGraphLogMemory(
-        operation,
-        harness.databaseFile,
-        snapshots: snapshots,
-      );
+/// Команды замера накладных расходов лога над графом профиля, части которых
+/// измеряет [_trace].
+final class _Commands {
+  _Commands(this._trace);
 
-  /// Выполняет очередную команду вида [kind] с включённым или выключенным
-  /// захватом фактов и измеряет её части по [trace].
-  Future<_CommandSample> runCommand(
+  final _CommandTrace _trace;
+
+  /// Номер следующей пары команд каждого вида.
+  final _pairs = <_CommandKind, int>{};
+
+  /// Выполняет над [graph] очередную команду вида [kind] с включённым или
+  /// выключенным захватом фактов.
+  Future<_CommandSample> run(
+    GraphLogDatabase graph,
     _CommandKind kind,
-    _CommandTrace trace,
     bool capture,
   ) async {
+    final GraphLogDatabase(:fixture, :raw, :repository) = graph;
     final pair = _pairs[kind] = (_pairs[kind] ?? -1) + 1;
     final entity = 2 * pair + (capture ? 0 : 1);
-    if (kind == _CommandKind.cascadeArchive) _restoreHub();
+    if (kind == _CommandKind.cascadeArchive) _restoreHub(graph);
     raw.execute('UPDATE graph_log_control SET capture = ?', [
       if (capture) 1 else 0,
     ]);
@@ -520,28 +403,28 @@ final class _Graph {
     };
     final stopwatch = Stopwatch();
     final result = await Zone.root.run(() async {
-      trace.start();
+      _trace.start();
       stopwatch.start();
       final result = await repository.execute(command);
       stopwatch.stop();
-      trace.stop();
+      _trace.stop();
       return result;
     });
     raw.execute('UPDATE graph_log_control SET capture = 1');
     expect(result, isA<GraphCommandSucceeded>());
     return _CommandSample(
       total: stopwatch.elapsed,
-      logStatements: trace.logStatements,
-      graphStatements: trace.graphStatements,
+      logStatements: _trace.logStatements,
+      graphStatements: _trace.graphStatements,
     );
   }
 
   /// Возвращает узел каскада и его связи в активное состояние без фактов:
   /// подготовка замера, а не изменение графа.
-  void _restoreHub() {
-    final hub = fixture.hubIntentionId.toCanonicalString();
-    seedRawGraph(raw, () {
-      raw
+  void _restoreHub(GraphLogDatabase graph) {
+    final hub = graph.fixture.hubIntentionId.toCanonicalString();
+    seedRawGraph(graph.raw, () {
+      graph.raw
         ..execute('UPDATE intentions SET is_archived = 0 WHERE id = ?', [hub])
         ..execute(
           'UPDATE long_term_relations SET is_archived = 0 '
@@ -550,8 +433,6 @@ final class _Graph {
         );
     });
   }
-
-  Future<void> dispose() => harness.dispose();
 }
 
 typedef _GraphCommand = GraphCommand<GraphCommandOutcome, GraphCommandFailure>;
@@ -684,15 +565,6 @@ Future<void> _writeRecordsOfLength(
     ),
     generate(),
   ).pipe(file.openWrite());
-}
-
-/// Описание намерения на пределе графем из русского текста.
-String _longDescription(int edit) {
-  final text = StringBuffer();
-  while (text.length < IntentionText.maxDescriptionLength) {
-    text.write('Шаг $edit: подробно описать, зачем он нужен и как понять, ');
-  }
-  return '${text.toString().substring(0, IntentionText.maxDescriptionLength - 1)}.';
 }
 
 Duration _median(List<Duration> samples) {

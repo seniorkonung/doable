@@ -5,6 +5,9 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data_transfer/application/document_access.dart';
+import 'package:doable/src/data_transfer/application/graph_export.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_format/graph_format_file.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
@@ -13,12 +16,18 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../test/support/file_document_access.dart';
 import '../../test/support/in_memory_diagnostics_sink.dart';
 
 const _operationVariable = 'DOABLE_GRAPH_LOG_OPERATION';
 const _pathVariable = 'DOABLE_GRAPH_LOG_PATH';
 const _snapshotsVariable = 'DOABLE_GRAPH_LOG_SNAPSHOTS';
 const _resultMarker = 'DOABLE_GRAPH_LOG_MEMORY:';
+
+/// Насколько пик живых данных операции на профиле может превышать её пик на
+/// графе в десять раз меньше: замеры одной операции колеблются на несколько
+/// мебибайт, а данные, растущие с графом, заняли бы на профиле десятки.
+const graphLogMemoryNoiseBytes = 8 << 20;
 
 /// Операция, память которой измеряет отдельный процесс.
 ///
@@ -37,6 +46,11 @@ enum GraphLogMemoryOperation {
   /// наибольший объём живых данных за время сжатия.
   compaction,
 
+  /// Экспорт состояния на текущей позиции от выбранного документа до
+  /// записанного; документ — локальный файл, в который копируется временный
+  /// файл экспорта: наибольший объём живых данных за время экспорта.
+  export,
+
   /// Итог фактов пакетов после последнего снимка: живые данные, которые
   /// собранное состояние удерживает до выдачи записей.
   rangeSummary,
@@ -47,7 +61,8 @@ enum GraphLogMemoryOperation {
 }
 
 /// Прирост памяти операции над её значением перед операцией и число
-/// выданных операцией записей; у сжатия записей нет.
+/// выданных операцией записей; у сжатия записей нет, а у экспорта это
+/// записи записанного документа.
 typedef GraphLogMemory = ({int growthBytes, int records});
 
 /// Выполняет [operation] в новом процессе Flutter: операции лога — над
@@ -116,7 +131,8 @@ void main() {
     };
     final measurement = switch (operation) {
       GraphLogMemoryOperation.assembly ||
-      GraphLogMemoryOperation.compaction => await _LiveHeapPeak.start(),
+      GraphLogMemoryOperation.compaction ||
+      GraphLogMemoryOperation.export => await _LiveHeapPeak.start(),
       GraphLogMemoryOperation.rangeSummary => await _RetainedLiveHeap.start(),
       GraphLogMemoryOperation.fileRead => _ResidentSetPeak.start(),
     };
@@ -179,7 +195,53 @@ Future<_Operation> _openGraphOperation(
       }
       return () async => 0;
     },
+    GraphLogMemoryOperation.export => await _openExport(
+      repository,
+      snapshots,
+      diagnostics,
+    ),
     GraphLogMemoryOperation.fileRead => throw ArgumentError.value(operation),
+  };
+}
+
+/// Экспорт в документ, уже выбранный до замера, как после системного
+/// диалога сохранения.
+Future<_Operation> _openExport(
+  DriftPersonalGraphRepository repository,
+  Directory snapshots,
+  InMemoryDiagnosticsSink diagnostics,
+) async {
+  final directory = await Directory.systemTemp.createTemp(
+    'doable_graph_export_',
+  );
+  addTearDown(() => directory.delete(recursive: true));
+  final documents = FileDocumentAccess(
+    await Directory.fromUri(directory.uri.resolve('documents/')).create(),
+  );
+  final export = GraphExport(
+    documents: documents,
+    compaction: GraphLogCompaction(
+      log: repository,
+      directory: snapshots,
+      clock: () => _now,
+      diagnosticsSink: diagnostics,
+    ),
+    temporaryDirectory: Future.value(
+      Directory.fromUri(directory.uri.resolve('tmp/')),
+    ),
+    clock: () => _now,
+    diagnosticsSink: diagnostics,
+  );
+  final DocumentCreated(:document) = documents.newDocument();
+  return () async {
+    final outcome = await export.write(document, onProgress: (_) {});
+    if (outcome != GraphExportOutcome.succeeded) {
+      throw StateError('Экспорт не записал документ.');
+    }
+    return () async =>
+        (await GraphFormatFile.read(documents.created.single.openRead()))
+            .records
+            .length;
   };
 }
 
