@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../app/navigation/graph_generation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
@@ -125,8 +126,19 @@ final class IntentionTagConditionsViewModel
   /// Новейшая ревизия графа, о подтверждении которой знает модель.
   GraphRevision? _knownRevision;
 
+  /// Поколение графа, для которого выбраны условия.
+  GraphGeneration? _graphGeneration;
+
   @override
   IntentionTagConditionsState build(IntentionCatalogPurpose purpose) {
+    // Новое поколение графа начинает поиск без условий, а другое
+    // перестроение их сохраняет.
+    final graphGeneration = ref.watch(currentGraphGenerationProvider);
+    if (graphGeneration != _graphGeneration) {
+      _graphGeneration = graphGeneration;
+      _entries.clear();
+      _knownRevision = null;
+    }
     unawaited(_changes?.cancel());
     _purpose = purpose;
     _reads = ref.watch(intentionTagConditionsReaderProvider);

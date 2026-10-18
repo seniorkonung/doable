@@ -38,11 +38,15 @@ final class TemporaryGraphFiles {
   final FileDocumentAccess documents;
   final GraphStateWriteRunner _stateWriteRunner;
 
+  /// Каталог снимков сжатия лога фактов.
+  Directory get snapshots =>
+      Directory.fromUri(_root.uri.resolve('graph_snapshots/'));
+
   /// Фабрика файлов графа для `AppRuntime.graphFilesFactory`.
   Future<AppGraphFiles> create(ObservableGraphFactLog log) async => (
     compaction: GraphLogCompaction(
       log: log,
-      directory: Directory.fromUri(_root.uri.resolve('graph_snapshots/')),
+      directory: snapshots,
       clock: () => DateTime.now().toUtc(),
       diagnosticsSink: InMemoryDiagnosticsSink(),
       stateWriteRunner: _stateWriteRunner,

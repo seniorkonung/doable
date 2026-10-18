@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../app/navigation/graph_generation.dart';
 import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
@@ -28,7 +29,10 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   late GraphCommandCoordinator _coordinator;
   final _completionTokens = <DailyChoiceId, DailyChoiceOperationToken>{};
   StreamSubscription<GraphCommandCompletion>? _completions;
-  late var _selection = DailyChoiceCatalogSelection(date: instance.initialDate);
+
+  /// Поколение графа, для которого задан выбор каталога.
+  GraphGeneration? _graphGeneration;
+  late DailyChoiceCatalogSelection _selection;
   var _generation = 0;
   GraphRevision? _requiredRevision;
   Object? _assembly;
@@ -36,6 +40,13 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
 
   @override
   DailyChoiceCatalogState build(DailyChoiceCatalogInstance instance) {
+    // Новое поколение графа открывает каталог на начальной дате экземпляра,
+    // а другое перестроение сохраняет выбор.
+    final graphGeneration = ref.watch(currentGraphGenerationProvider);
+    if (graphGeneration != _graphGeneration) {
+      _graphGeneration = graphGeneration;
+      _selection = DailyChoiceCatalogSelection(date: instance.initialDate);
+    }
     unawaited(_completions?.cancel());
     _repository = ref.watch(personalGraphRepositoryProvider);
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);

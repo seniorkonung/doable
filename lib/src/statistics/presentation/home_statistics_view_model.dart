@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../app/navigation/graph_generation.dart';
 import '../../daily_choice/domain/calendar_date.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../graph/application/graph_command_coordinator.dart';
@@ -17,9 +18,10 @@ part 'home_statistics_view_model.g.dart';
 @riverpod
 final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
   late StatisticsReadContract _reader;
-  late var _selection = HomeStatisticsSelection.initial(
-    ref.read(dailyChoiceLocalDateSourceProvider)().date,
-  );
+
+  /// Поколение графа, для которого задан выбор Главной.
+  GraphGeneration? _graphGeneration;
+  late HomeStatisticsSelection _selection;
   var _generation = 0;
   var _isVisible = false;
   var _needsRead = true;
@@ -29,6 +31,15 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
 
   @override
   HomeStatisticsState build() {
+    // Новое поколение графа открывает Главную как при запуске приложения, а
+    // другое перестроение сохраняет выбор.
+    final graphGeneration = ref.watch(currentGraphGenerationProvider);
+    if (graphGeneration != _graphGeneration) {
+      _graphGeneration = graphGeneration;
+      _selection = HomeStatisticsSelection.initial(
+        ref.read(dailyChoiceLocalDateSourceProvider)().date,
+      );
+    }
     _reader = ref.watch(personalGraphRepositoryProvider);
     _requiredRevision = null;
     _needsRead = true;
