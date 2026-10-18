@@ -876,7 +876,7 @@
   - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_replacement.dart`, `lib/src/graph/data/drift_personal_graph_repository_backups.dart`, `lib/src/graph/application/graph_change.dart`, `test/graph/data/drift_graph_replacement_test.dart`.
   - **Estimated scope:** S.
 
-- [ ] 3.12 Доказать, что прерывание процесса в любой точке замены оставляет целиком прежний или целиком новый граф с согласованными копиями
+- [x] 3.12 Доказать, что прерывание процесса в любой точке замены оставляет целиком прежний или целиком новый граф с согласованными копиями
   - **Acceptance criteria:**
     - Процесс, остановленный после удаления прежнего графа, посреди вставок, до и после COMMIT, при следующем запуске даёт либо прежний граф с прежними копиями и без копии перед этой заменой, либо новый граф с копией перед заменой и пакетом «сброс». Очистка каталога снимков удаляет незарегистрированный снимок замены, а выгрузка базы совпадает с состоянием, собранным из снимка и лога.
   - **Verification:**
