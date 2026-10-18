@@ -644,7 +644,7 @@
   - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt`, `android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt`, `lib/src/data_transfer/application/document_access.dart`, `lib/src/data_transfer/data/method_channel_document_access.dart`, `lib/src/data_transfer/application/graph_export.dart`, `test/data_transfer/method_channel_document_access_test.dart`, `test/data_transfer/graph_export_test.dart`, `test/support/file_document_access.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.20 Повторно подтвердить готовность этапа после удержания права на выбранный документ до исхода экспорта
+- [x] 2.20 Повторно подтвердить готовность этапа после удержания права на выбранный документ до исхода экспорта
   - **Acceptance criteria:**
     - После задачи 2.19 условие Ready to advance этапа 2 из [плана](plan.md) по-прежнему выполнено, в том числе набор разрешений Android не изменился. Завершённые ранее задачи сохраняют свои отметки, но не подменяют новую проверку.
     - Сгенерированные файлы согласованы, а полные проверки проекта проходят.
