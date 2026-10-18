@@ -1387,6 +1387,82 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataExportSave => 'Сохранить в файл';
 
   @override
+  String get dataBackupsTitle => 'Резервные копии';
+
+  @override
+  String get dataBackupsExplanation =>
+      'Копия делается каждый день, если данные менялись, и хранится на этом устройстве. Остаются 7 последних ежедневных копий. Выберите копию, чтобы восстановить её.';
+
+  @override
+  String get dataBackupsMakeNow => 'Сделать копию сейчас';
+
+  @override
+  String get dataBackupsReadFailed => 'Не удалось загрузить копии';
+
+  @override
+  String dataBackupMadeToday(String time) {
+    return 'Сегодня, $time';
+  }
+
+  @override
+  String dataBackupMadeYesterday(String time) {
+    return 'Вчера, $time';
+  }
+
+  @override
+  String dataBackupMadeOn(String date, String time) {
+    return '$date, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeToday(String time) {
+    return 'Восстановить копию от сегодня, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeYesterday(String time) {
+    return 'Восстановить копию от вчера, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeOn(String date, String time) {
+    return 'Восстановить копию от $date, $time';
+  }
+
+  @override
+  String dataBackupAdded(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString добавлено';
+  }
+
+  @override
+  String dataBackupChanged(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString изменено';
+  }
+
+  @override
+  String dataBackupDeleted(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString удалено';
+  }
+
+  @override
+  String get dataBackupNoChanges => 'Нет изменений';
+
+  @override
+  String get dataBackupDataReplaced => 'Данные заменены';
+
+  @override
   String get tagNavigationTitle => 'Намерения с тегом';
 
   @override

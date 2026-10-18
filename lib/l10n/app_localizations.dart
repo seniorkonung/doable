@@ -2143,6 +2143,96 @@ abstract class AppLocalizations {
   /// **'Save to a file'**
   String get dataExportSave;
 
+  /// Заголовок панели «Резервные копии»
+  ///
+  /// In en, this message translates to:
+  /// **'Backups'**
+  String get dataBackupsTitle;
+
+  /// Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения ежедневных копий
+  ///
+  /// In en, this message translates to:
+  /// **'A copy is made each day your data changes and stays on this device. The 7 most recent daily copies are kept. Choose a copy to restore it.'**
+  String get dataBackupsExplanation;
+
+  /// Кнопка панели «Резервные копии», делающая ручную копию
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get dataBackupsMakeNow;
+
+  /// Сообщение панели «Резервные копии» вместо списка, когда копии прочитать не удалось
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load backups'**
+  String get dataBackupsReadFailed;
+
+  /// Момент копии, сделанной сегодня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Today, {time}'**
+  String dataBackupMadeToday(String time);
+
+  /// Момент копии, сделанной вчера, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday, {time}'**
+  String dataBackupMadeYesterday(String time);
+
+  /// Момент копии, сделанной раньше вчерашнего дня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'{date}, {time}'**
+  String dataBackupMadeOn(String date, String time);
+
+  /// Доступное название копии, сделанной сегодня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the copy from today, {time}'**
+  String dataBackupRestoreMadeToday(String time);
+
+  /// Доступное название копии, сделанной вчера, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the copy from yesterday, {time}'**
+  String dataBackupRestoreMadeYesterday(String time);
+
+  /// Доступное название копии, сделанной раньше вчерашнего дня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the copy from {date}, {time}'**
+  String dataBackupRestoreMadeOn(String date, String time);
+
+  /// Часть сводки изменений: число добавленных намерений, тегов, долговременных связей и дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'{count} added'**
+  String dataBackupAdded(int count);
+
+  /// Часть сводки изменений: число изменённых намерений, тегов, долговременных связей и дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'{count} changed'**
+  String dataBackupChanged(int count);
+
+  /// Часть сводки изменений: число удалённых намерений, тегов, долговременных связей и дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'{count} removed'**
+  String dataBackupDeleted(int count);
+
+  /// Сводка копии, с предыдущей копии которой граф не изменился
+  ///
+  /// In en, this message translates to:
+  /// **'No changes'**
+  String get dataBackupNoChanges;
+
+  /// Сводка копии, между которой и предыдущей копией граф заменялся импортом или восстановлением
+  ///
+  /// In en, this message translates to:
+  /// **'Data replaced'**
+  String get dataBackupDataReplaced;
+
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:

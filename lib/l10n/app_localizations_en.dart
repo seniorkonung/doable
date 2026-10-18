@@ -1373,6 +1373,82 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataExportSave => 'Save to a file';
 
   @override
+  String get dataBackupsTitle => 'Backups';
+
+  @override
+  String get dataBackupsExplanation =>
+      'A copy is made each day your data changes and stays on this device. The 7 most recent daily copies are kept. Choose a copy to restore it.';
+
+  @override
+  String get dataBackupsMakeNow => 'Back up now';
+
+  @override
+  String get dataBackupsReadFailed => 'Couldn’t load backups';
+
+  @override
+  String dataBackupMadeToday(String time) {
+    return 'Today, $time';
+  }
+
+  @override
+  String dataBackupMadeYesterday(String time) {
+    return 'Yesterday, $time';
+  }
+
+  @override
+  String dataBackupMadeOn(String date, String time) {
+    return '$date, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeToday(String time) {
+    return 'Restore the copy from today, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeYesterday(String time) {
+    return 'Restore the copy from yesterday, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeOn(String date, String time) {
+    return 'Restore the copy from $date, $time';
+  }
+
+  @override
+  String dataBackupAdded(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString added';
+  }
+
+  @override
+  String dataBackupChanged(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString changed';
+  }
+
+  @override
+  String dataBackupDeleted(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString removed';
+  }
+
+  @override
+  String get dataBackupNoChanges => 'No changes';
+
+  @override
+  String get dataBackupDataReplaced => 'Data replaced';
+
+  @override
   String get tagNavigationTitle => 'Tagged intentions';
 
   @override

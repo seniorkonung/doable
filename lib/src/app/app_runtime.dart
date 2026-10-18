@@ -374,6 +374,7 @@ final class AppRuntime {
               () => GraphExportController(export),
             ),
           if (backups != null) graphBackupsProvider.overrideWithValue(backups),
+          graphBackupsClockProvider.overrideWithValue(_clock),
           if (restore != null)
             graphRestoreControllerProvider.overrideWith(
               () => GraphRestoreController(restore),
