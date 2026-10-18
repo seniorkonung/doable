@@ -638,6 +638,7 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
     SqliteCorruptionFailure() => const LongTermRelationCorruptionFailure(),
     SqliteUnavailableFailure() => const LongTermRelationUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const LongTermRelationUnexpectedFailure(),
   };
 }

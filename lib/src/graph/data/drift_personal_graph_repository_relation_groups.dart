@@ -512,6 +512,7 @@ RelationGroupReadFailure _classifyRelationGroupReadFailure(
     SqliteCorruptionFailure() => const RelationGroupCorruptionFailure(),
     SqliteUnavailableFailure() => const RelationGroupUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const RelationGroupUnexpectedFailure(),
   };
 }

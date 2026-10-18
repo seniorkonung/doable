@@ -193,6 +193,7 @@ LongTermRelationReadFailure _classifyLongTermRelationReadFailure(Object error) {
     SqliteUnavailableFailure() =>
       const LongTermRelationReadUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const LongTermRelationReadUnexpectedFailure(),
   };
 }

@@ -33,18 +33,21 @@ final class GraphReplacedInRange implements Exception {
 /// Безопасная категория отказа операции со снимками для диагностики.
 ///
 /// Снимок, не прошедший проверку, отличается от повреждения данных лога и
-/// базы, в том числе строк графа вне формы хранения; отказы файлов снимков
-/// относятся к недоступности хранилища, как у файла настройки установки.
-/// Замена графа во время чтения истории — конфликт с одновременным
-/// изменением.
+/// базы, в том числе строк графа вне формы хранения. Нехватка места на
+/// устройстве — в базе или в файлах — отдельная категория; остальные отказы
+/// файлов снимков относятся к недоступности хранилища, как у файла настройки
+/// установки. Замена графа во время чтения истории — конфликт с
+/// одновременным изменением.
 DiagnosticsFailureCode graphSnapshotFailureCode(Object error) =>
     switch (error) {
       GraphSnapshotCorruption() => DiagnosticsFailureCode.snapshotCorruption,
       GraphReplacedInRange() => DiagnosticsFailureCode.conflict,
       GraphFormatCorruption() ||
       GraphRecordCorruption() => DiagnosticsFailureCode.corruption,
-      FileSystemException() => DiagnosticsFailureCode.unavailable,
       _ => switch (classifySqliteFailure(error)) {
+        SqliteStorageFullFailure() => DiagnosticsFailureCode.storageFull,
+        _ when error is FileSystemException =>
+          DiagnosticsFailureCode.unavailable,
         SqliteCorruptionFailure() => DiagnosticsFailureCode.corruption,
         SqliteUnavailableFailure() => DiagnosticsFailureCode.unavailable,
         SqliteConstraintFailure() ||

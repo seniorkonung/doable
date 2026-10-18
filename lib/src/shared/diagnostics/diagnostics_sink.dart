@@ -50,6 +50,10 @@ enum DiagnosticsFailureCode {
   /// Файл снимка графа не прошёл проверку при чтении: размер или SHA-256 не
   /// совпали с реестром снимков, файла нет или его записи не читаются.
   snapshotCorruption,
+
+  /// На устройстве не хватило места: база сообщила `SQLITE_FULL` или запись
+  /// файла отказала с `ENOSPC`.
+  storageFull,
   incompatibleSchema,
   unexpected,
 }

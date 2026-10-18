@@ -2051,6 +2051,7 @@ IntentionFailure _classifyDetailReadFailure(Object error) {
     SqliteCorruptionFailure() => const IntentionCorruptionFailure(),
     SqliteUnavailableFailure() => const IntentionUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const IntentionUnexpectedFailure(),
   };
 }
@@ -2094,6 +2095,7 @@ IntentionFailure _classifyCommandFailure(
     SqliteCorruptionFailure() => const IntentionCorruptionFailure(),
     SqliteUnavailableFailure() => const IntentionUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const IntentionUnexpectedFailure(),
   };
 }

@@ -323,6 +323,7 @@ SelectedRelationsReadFailure _classifySelectedRelationsReadFailure(
     SqliteUnavailableFailure() =>
       const SelectedRelationsReadUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const SelectedRelationsReadUnexpectedFailure(),
   };
 }

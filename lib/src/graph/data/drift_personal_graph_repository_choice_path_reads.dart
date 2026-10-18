@@ -290,7 +290,9 @@ ChoicePathContinuationFailure _classifyChoicePathReadFailure(Object error) {
       const ChoicePathContinuationCorruptionFailure(),
     SqliteUnavailableFailure() =>
       const ChoicePathContinuationUnavailableFailure(),
-    SqliteConstraintFailure() || SqliteUnexpectedFailure() =>
+    SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
+    SqliteUnexpectedFailure() =>
       const ChoicePathContinuationUnexpectedFailure(),
   };
 }

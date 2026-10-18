@@ -29,6 +29,7 @@ extension _DailyChoiceDayStatusesReading on DriftPersonalGraphRepository {
               SqliteCorruptionFailure() => DiagnosticsFailureCode.corruption,
               SqliteUnavailableFailure() => DiagnosticsFailureCode.unavailable,
               SqliteConstraintFailure() ||
+              SqliteStorageFullFailure() ||
               SqliteUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
             };
       _recordDiagnostics(

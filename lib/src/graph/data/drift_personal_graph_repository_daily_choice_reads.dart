@@ -105,7 +105,9 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
                 const DailyChoiceReadCorruptionFailure(),
               SqliteUnavailableFailure() =>
                 const DailyChoiceReadUnavailableFailure(),
-              SqliteConstraintFailure() || SqliteUnexpectedFailure() =>
+              SqliteConstraintFailure() ||
+              SqliteStorageFullFailure() ||
+              SqliteUnexpectedFailure() =>
                 const DailyChoiceReadUnexpectedFailure(),
             };
       _recordDiagnostics(

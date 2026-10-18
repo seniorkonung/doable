@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:doable/src/data/local/sqlite_failure_classifier.dart';
 import 'package:drift/isolate.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -59,6 +61,49 @@ void main() {
           ),
         ),
         isA<SqliteCorruptionFailure>(),
+      );
+    });
+
+    test('относит к нехватке места SQLITE_FULL настоящего SQLite, которому '
+        'не хватило страниц базы', () {
+      final database = sqlite3.openInMemory();
+      addTearDown(database.close);
+      database.execute('CREATE TABLE payload (bytes BLOB)');
+      final pageCount = database.select('PRAGMA page_count').single.columnAt(0);
+      database.execute('PRAGMA max_page_count = $pageCount');
+
+      expect(
+        () => database.execute('INSERT INTO payload VALUES (zeroblob(65536))'),
+        throwsA(
+          isA<SqliteException>().having(
+            classifySqliteFailure,
+            'классификация',
+            isA<SqliteStorageFullFailure>(),
+          ),
+        ),
+      );
+    });
+
+    test('относит к нехватке места только отказ файловой системы ENOSPC', () {
+      expect(
+        classifySqliteFailure(
+          const FileSystemException(
+            'CANARY-личные-данные',
+            'CANARY-путь',
+            OSError('No space left on device', 28),
+          ),
+        ),
+        isA<SqliteStorageFullFailure>(),
+      );
+      expect(
+        classifySqliteFailure(
+          const FileSystemException(
+            'CANARY-личные-данные',
+            'CANARY-путь',
+            OSError('Permission denied', 13),
+          ),
+        ),
+        isA<SqliteUnexpectedFailure>(),
       );
     });
 

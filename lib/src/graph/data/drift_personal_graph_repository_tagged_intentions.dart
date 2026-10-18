@@ -156,6 +156,7 @@ TaggedIntentionsReadFailure _classifyTaggedIntentionsReadFailure(Object error) {
     SqliteCorruptionFailure() => const TaggedIntentionsCorruptionFailure(),
     SqliteUnavailableFailure() => const TaggedIntentionsUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const TaggedIntentionsUnexpectedFailure(),
   };
 }

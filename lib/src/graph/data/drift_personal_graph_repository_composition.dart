@@ -74,6 +74,7 @@ extension _GraphCompositionReading on DriftPersonalGraphRepository {
             SqliteCorruptionFailure() => DiagnosticsFailureCode.corruption,
             SqliteUnavailableFailure() => DiagnosticsFailureCode.unavailable,
             SqliteConstraintFailure() ||
+            SqliteStorageFullFailure() ||
             SqliteUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
           },
         ),

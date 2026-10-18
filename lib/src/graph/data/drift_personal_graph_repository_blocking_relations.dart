@@ -251,7 +251,9 @@ DeleteBlockingRelationsFailure _classifyBlockingRelationsDeleteFailure(
       const DeleteBlockingRelationsCorruptionFailure(),
     SqliteUnavailableFailure() =>
       const DeleteBlockingRelationsUnavailableFailure(),
-    SqliteConstraintFailure() || SqliteUnexpectedFailure() =>
+    SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
+    SqliteUnexpectedFailure() =>
       const DeleteBlockingRelationsUnexpectedFailure(),
   };
 }

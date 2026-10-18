@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/isolate.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -19,6 +21,13 @@ final class SqliteConstraintFailure extends SqliteFailure {
   final int extendedResultCode;
 }
 
+/// Нехватка места на устройстве: SQLite сообщил `SQLITE_FULL`, в том числе
+/// при достижении `PRAGMA max_page_count`, или запись файла отказала с
+/// `ENOSPC`.
+final class SqliteStorageFullFailure extends SqliteFailure {
+  const SqliteStorageFullFailure();
+}
+
 final class SqliteUnexpectedFailure extends SqliteFailure {
   const SqliteUnexpectedFailure();
 }
@@ -28,6 +37,7 @@ SqliteFailure classifySqliteFailure(Object error) {
   return switch (cause) {
     SqliteException(:final extendedResultCode) => switch (extendedResultCode) {
       SqlExtendedError.SQLITE_IOERR_DATA => const SqliteCorruptionFailure(),
+      SqlError.SQLITE_FULL => const SqliteStorageFullFailure(),
       _ when _isCorruptionFamily(extendedResultCode) =>
         const SqliteCorruptionFailure(),
       _ when _unavailableExtendedResultCodes.contains(extendedResultCode) =>
@@ -36,9 +46,14 @@ SqliteFailure classifySqliteFailure(Object error) {
         SqliteConstraintFailure(extendedResultCode),
       _ => const SqliteUnexpectedFailure(),
     },
+    FileSystemException(osError: OSError(errorCode: _enospc)) =>
+      const SqliteStorageFullFailure(),
     _ => const SqliteUnexpectedFailure(),
   };
 }
+
+/// Код `ENOSPC` в Linux и Android.
+const _enospc = 28;
 
 const _unavailableExtendedResultCodes = <int>{
   SqlError.SQLITE_BUSY,

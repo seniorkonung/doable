@@ -327,6 +327,7 @@ TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
     SqliteCorruptionFailure() => const TagAssignmentStatusCorruption(),
     SqliteUnavailableFailure() => const TagAssignmentStatusUnavailable(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const TagAssignmentStatusUnexpected(),
   };
 }
@@ -342,6 +343,7 @@ TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {
     SqliteCorruptionFailure() => const TagCatalogCorruptionFailure(),
     SqliteUnavailableFailure() => const TagCatalogUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const TagCatalogUnexpectedFailure(),
   };
 }
@@ -357,6 +359,7 @@ TagAssignmentsReadFailure _classifyTagAssignmentsReadFailure(Object error) {
     SqliteCorruptionFailure() => const TagAssignmentsCorruptionFailure(),
     SqliteUnavailableFailure() => const TagAssignmentsUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const TagAssignmentsUnexpectedFailure(),
   };
 }
@@ -369,6 +372,7 @@ TagReadFailure _classifyTagReadFailure(Object error) {
     SqliteCorruptionFailure() => const TagReadCorruptionFailure(),
     SqliteUnavailableFailure() => const TagReadUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const TagReadUnexpectedFailure(),
   };
 }

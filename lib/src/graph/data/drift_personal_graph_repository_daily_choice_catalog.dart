@@ -360,6 +360,7 @@ DailyChoiceCatalogReadFailure _classifyDailyChoiceCatalogFailure(Object error) {
     SqliteCorruptionFailure() => const DailyChoiceCatalogCorruptionFailure(),
     SqliteUnavailableFailure() => const DailyChoiceCatalogUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const DailyChoiceCatalogUnexpectedFailure(),
   };
 }

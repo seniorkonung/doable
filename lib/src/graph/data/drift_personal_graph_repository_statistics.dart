@@ -341,6 +341,7 @@ StatisticsReadFailure _classifyStatisticsReadFailure(Object error) {
     SqliteCorruptionFailure() => const StatisticsReadCorruptionFailure(),
     SqliteUnavailableFailure() => const StatisticsReadUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const StatisticsReadUnexpectedFailure(),
   };
 }

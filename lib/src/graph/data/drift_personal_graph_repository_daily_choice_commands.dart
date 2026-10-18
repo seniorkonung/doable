@@ -748,6 +748,7 @@ DailyChoiceCommandFailure _classifyDailyChoiceCommandFailure(Object error) {
     SqliteCorruptionFailure() => const DailyChoiceCorruptionFailure(),
     SqliteUnavailableFailure() => const DailyChoiceUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const DailyChoiceUnexpectedFailure(),
   };
 }

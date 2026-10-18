@@ -454,6 +454,7 @@ TagCommandFailure _classifyTagCommandFailure(Object error) {
     SqliteCorruptionFailure() => const TagCorruptionFailure(),
     SqliteUnavailableFailure() => const TagUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const TagUnexpectedFailure(),
   };
 }

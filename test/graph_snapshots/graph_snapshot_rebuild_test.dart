@@ -386,8 +386,9 @@ void main() {
     },
   );
 
-  test('отказ записи при пересборке диагностируется этапом чтения базы, а '
-      'сжатие — этапом записи снимка', () async {
+  test('отказ записи при пересборке из-за нехватки места диагностируется '
+      'категорией нехватки места: пересборка — этапом чтения базы, а сжатие '
+      '— этапом записи снимка', () async {
     await createTag('Дом');
     final damaged = await storeOver(repository).writeSnapshot(1);
     await snapshotFile(damaged).delete();
@@ -410,13 +411,13 @@ void main() {
         'operation': 'graphSnapshotRebuild',
         'stage': 'databaseRead',
         'outcome': 'failed',
-        'failureCode': 'unavailable',
+        'failureCode': 'storageFull',
       },
       {
         'operation': 'graphLogCompaction',
         'stage': 'snapshotWrite',
         'outcome': 'failed',
-        'failureCode': 'unavailable',
+        'failureCode': 'storageFull',
       },
     ]);
   });
