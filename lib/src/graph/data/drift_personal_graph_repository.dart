@@ -294,6 +294,9 @@ final class DriftPersonalGraphRepository
   Stream<GraphBackupsRead> watchBackups() => _watchBackups();
 
   @override
+  Future<List<GraphBackupEntry>> readBackups() => _selectBackups();
+
+  @override
   Future<bool> insertDailyBackup({
     required DateTime dayStart,
     required GraphChangeTally? since,

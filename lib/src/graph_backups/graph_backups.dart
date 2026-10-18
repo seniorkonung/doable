@@ -76,7 +76,7 @@ final class GraphBackups {
   /// Делает копию текущего состояния графа по запросу человека.
   Future<ManualGraphBackupOutcome> makeManualBackup() => _oneAtATime(() async {
     try {
-      final backups = await _readBackups();
+      final backups = await _registry.readBackups();
       await _registry.insertManualBackup(
         since: await _tallySince(backups.firstOrNull),
       );
@@ -89,7 +89,7 @@ final class GraphBackups {
   Future<bool> _makeDailyBackupIfDue() async {
     final now = _clock();
     final dayStart = _dayStartOf(now);
-    final backups = await _readBackups();
+    final backups = await _registry.readBackups();
     // Транзакция записи проверит условие заново, а копия текущего дня, уже
     // найденная здесь, избавляет каждое возвращение в приложение от подсчёта
     // сводки.
@@ -109,13 +109,6 @@ final class GraphBackups {
       since: await _tallySince(backups.firstOrNull),
     );
   }
-
-  /// Копии от новых к старым по созданию.
-  Future<List<GraphBackupEntry>> _readBackups() async =>
-      switch (await _registry.watchBackups().first) {
-        GraphBackupsReadSucceeded(:final backups) => backups,
-        GraphBackupsReadFailed() => throw const _GraphBackupsUnread(),
-      };
 
   /// Сводка пакетов от позиции копии [last] до текущей; `null` — копий нет,
   /// и реестр сравнит новую копию с пустым графом.
@@ -146,9 +139,4 @@ DateTime _dayStartOf(DateTime moment) {
   return local.isBefore(start)
       ? DateTime(local.year, local.month, local.day - 1, _dayStartHour)
       : start;
-}
-
-/// Список копий не прочитан.
-final class _GraphBackupsUnread implements Exception {
-  const _GraphBackupsUnread();
 }

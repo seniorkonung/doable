@@ -49,17 +49,21 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
 
   Future<GraphBackupsRead> _readBackups() async {
     try {
-      final rows = await _sequencer.run(
-        () => (_database.select(
-          _database.graphBackups,
-        )..orderBy([(backup) => OrderingTerm.desc(backup.id)])).get(),
-      );
-      return GraphBackupsReadSucceeded([
-        for (final row in rows) _backupEntry(row),
-      ]);
+      return GraphBackupsReadSucceeded(await _selectBackups());
     } on Object {
       return const GraphBackupsReadFailed();
     }
+  }
+
+  /// Копии от новых к старым по созданию; отказ хранилища передаётся
+  /// исключением.
+  Future<List<GraphBackupEntry>> _selectBackups() async {
+    final rows = await _sequencer.run(
+      () => (_database.select(
+        _database.graphBackups,
+      )..orderBy([(backup) => OrderingTerm.desc(backup.id)])).get(),
+    );
+    return [for (final row in rows) _backupEntry(row)];
   }
 
   Future<bool> _insertDailyBackup(DateTime dayStart, GraphChangeTally? since) =>

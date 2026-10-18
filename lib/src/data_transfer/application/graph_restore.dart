@@ -175,20 +175,10 @@ final class GraphRestore {
   /// Хранится ли копия [backup] в реестре. Отказ чтения реестра передаётся
   /// исключением.
   Future<bool> _isStored(GraphBackupEntry backup) async =>
-      switch (await _backups.watchBackups().first) {
-        GraphBackupsReadSucceeded(:final backups) => backups.any(
-          (stored) => stored.id == backup.id,
-        ),
-        GraphBackupsReadFailed() => throw const _GraphBackupsUnread(),
-      };
+      (await _backups.readBackups()).any((stored) => stored.id == backup.id);
 }
 
 /// Копию уже удалило окно хранения.
 final class _GraphBackupNotStored implements Exception {
   const _GraphBackupNotStored();
-}
-
-/// Список копий не прочитан.
-final class _GraphBackupsUnread implements Exception {
-  const _GraphBackupsUnread();
 }
