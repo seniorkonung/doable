@@ -350,6 +350,7 @@
   "graphOperationTagAssignment": "назначение тега",
   "dataExportSaved": "Данные сохранены в файл",
   "dataExportFailed": "Не удалось сохранить файл",
+  "dataExportExistingFile": "Такой файл уже есть. Сохраните копию под новым именем",
   "settingsTitle": "Настройки",
   "dataSectionTitle": "Данные",
   "dataSectionLocalOnly": "Всё, что вы пишете, хранится только на этом устройстве.",

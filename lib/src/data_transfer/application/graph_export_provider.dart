@@ -56,7 +56,9 @@ final class GraphExportController extends Notifier<GraphExportState> {
   /// отказе снова вызывает [start].
   ///
   /// Отмена диалога ничего не меняет. Диалог, который не открылся, даёт
-  /// отказ экспорта, чтобы человек мог повторить. Пока ожидается ответ
+  /// отказ экспорта, чтобы человек мог повторить. Файл с данными, выбранный в
+  /// диалоге, экспорт не перезаписывает: исход предлагает повторить и
+  /// сохранить копию под новым именем. Пока ожидается ответ
   /// диалога или идёт экспорт, вызов ничего не делает. Завершается, когда
   /// ответ диалога обработан.
   Future<void> start() async {
@@ -67,6 +69,7 @@ final class GraphExportController extends Notifier<GraphExportState> {
           switch (await _export.chooseDocument()) {
             DocumentCreated(:final document) => () => _write(document),
             DocumentCreationFailed() => () async => GraphExportOutcome.failed,
+            ExistingFileChosen() => () async => GraphExportOutcome.existingFile,
             DocumentCreationCancelled() => null,
           };
       if (export == null) return;

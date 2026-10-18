@@ -246,18 +246,24 @@ GraphOperationMessage _messageFor(
 GraphOperationMessage _exportMessage(
   AppLocalizations localizations,
   GraphExportCompletion completion,
-) => switch (completion.outcome) {
-  GraphExportOutcome.succeeded => GraphOperationMessage(
-    localizations.dataExportSaved,
-  ),
-  GraphExportOutcome.failed => GraphOperationMessage(
-    localizations.dataExportFailed,
+) {
+  GraphOperationMessage withRetry(String text) => GraphOperationMessage(
+    text,
     action: GraphOperationMessageAction(
       label: localizations.commonRetry,
       onPressed: completion.retry,
     ),
-  ),
-};
+  );
+  return switch (completion.outcome) {
+    GraphExportOutcome.succeeded => GraphOperationMessage(
+      localizations.dataExportSaved,
+    ),
+    GraphExportOutcome.failed => withRetry(localizations.dataExportFailed),
+    GraphExportOutcome.existingFile => withRetry(
+      localizations.dataExportExistingFile,
+    ),
+  };
+}
 
 String _tagMessage(
   AppLocalizations localizations,

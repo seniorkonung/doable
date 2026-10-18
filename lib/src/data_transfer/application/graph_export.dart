@@ -47,7 +47,7 @@ final class GraphExport {
   /// `Doable <местная дата>.jsonl.gz`.
   ///
   /// Диалог, который не открылся, диагностируется отказом экспорта; отмена
-  /// диалога события не даёт.
+  /// диалога и выбор файла с данными события не дают: их выбрал человек.
   Future<DocumentCreation> chooseDocument() async {
     final stopwatch = Stopwatch()..start();
     final creation = await _documents.createDocument(
@@ -70,25 +70,25 @@ final class GraphExport {
   /// Отказ записи документа — [GraphExportOutcome.failed], отказ записи
   /// состояния — исключение [GraphLogCompaction.writeCurrentState].
   /// Временный файл удаляется, а работа с документом завершается при любом
-  /// исходе; после отказа документ удаляется, если поставщик это позволяет.
+  /// исходе; после отказа документ, пустой при выборе, удаляется, если
+  /// поставщик это позволяет.
   Future<GraphExportOutcome> write(
     CreatedDocument document, {
     required void Function(double share) onProgress,
   }) async {
     var documentOutcome = CreatedDocumentOutcome.failed;
     try {
-      final outcome = await _write(document, onProgress: onProgress);
-      documentOutcome = switch (outcome) {
-        GraphExportOutcome.succeeded => CreatedDocumentOutcome.succeeded,
-        GraphExportOutcome.failed => CreatedDocumentOutcome.failed,
+      documentOutcome = await _write(document, onProgress: onProgress);
+      return switch (documentOutcome) {
+        CreatedDocumentOutcome.succeeded => GraphExportOutcome.succeeded,
+        CreatedDocumentOutcome.failed => GraphExportOutcome.failed,
       };
-      return outcome;
     } finally {
       await _documents.finishDocument(document, outcome: documentOutcome);
     }
   }
 
-  Future<GraphExportOutcome> _write(
+  Future<CreatedDocumentOutcome> _write(
     CreatedDocument document, {
     required void Function(double share) onProgress,
   }) async {
@@ -104,14 +104,14 @@ final class GraphExport {
             _diagnosticsSink,
             GraphExportDiagnosticsEvent.succeeded(duration: stopwatch.elapsed),
           );
-          return GraphExportOutcome.succeeded;
+          return CreatedDocumentOutcome.succeeded;
         case DocumentWriteFailed():
           _recordFailure(
             GraphExportDiagnosticsStage.documentWrite,
             stopwatch,
             DiagnosticsFailureCode.unavailable,
           );
-          return GraphExportOutcome.failed;
+          return CreatedDocumentOutcome.failed;
       }
     } finally {
       try {

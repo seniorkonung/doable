@@ -10,13 +10,16 @@ import '../application/document_access.dart';
 /// Плагин отвечает на создание документа его адресом или `null` при отмене,
 /// а на копирование и завершение работы с документом — пустым ответом. Отказ
 /// открыть диалог или записать документ плагин передаёт ошибкой канала,
-/// которая здесь становится типизированным отказом.
+/// которая здесь становится типизированным отказом. Выбор файла с данными
+/// документа не даёт, поэтому плагин тоже передаёт его ошибкой канала со
+/// своим кодом.
 final class MethodChannelDocumentAccess implements DocumentAccess {
   const MethodChannelDocumentAccess();
 
   static const _channel = MethodChannel(
     'software.doable.doable/document_access',
   );
+  static const _existingFile = 'existing_file';
 
   @override
   Future<DocumentCreation> createDocument({
@@ -29,8 +32,10 @@ final class MethodChannelDocumentAccess implements DocumentAccess {
       return uri == null
           ? const DocumentCreationCancelled()
           : DocumentCreated(CreatedDocument(uri));
-    } on PlatformException {
-      return const DocumentCreationFailed();
+    } on PlatformException catch (error) {
+      return error.code == _existingFile
+          ? const ExistingFileChosen()
+          : const DocumentCreationFailed();
     }
   }
 

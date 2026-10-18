@@ -1267,6 +1267,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataExportFailed => 'Couldn’t save the file';
 
   @override
+  String get dataExportExistingFile =>
+      'That file already exists. Save the copy under a new name';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

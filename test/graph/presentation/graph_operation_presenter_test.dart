@@ -1351,12 +1351,14 @@ void main() {
       locale: const Locale('ru'),
       saved: 'Данные сохранены в файл',
       failed: 'Не удалось сохранить файл',
+      existingFile: 'Такой файл уже есть. Сохраните копию под новым именем',
       retry: 'Повторить',
     ),
     (
       locale: const Locale('en'),
       saved: 'Data saved to a file',
       failed: _exportFailed,
+      existingFile: 'That file already exists. Save the copy under a new name',
       retry: 'Try again',
     ),
   ]) {
@@ -1419,6 +1421,26 @@ void main() {
         await tester.pumpAndSettle();
         expect(harness.exportRetries, 1);
         expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'выбор файла с данными предъявляется текстом и кнопкой «Повторить», '
+      'которая запускает повтор экспорта, ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: scenario.locale,
+        );
+        final export = harness.startExport();
+        harness.completeExport(export, GraphExportOutcome.existingFile);
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.existingFile), findsOneWidget);
+
+        await tester.tap(find.text(scenario.retry));
+        await tester.pumpAndSettle();
+        expect(harness.exportRetries, 1);
       },
     );
   }

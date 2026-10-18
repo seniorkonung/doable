@@ -1182,6 +1182,8 @@
   "@dataExportSaved": {"description": "Сообщение общей поверхности об успешном экспорте графа в файл"},
   "dataExportFailed": "Couldn’t save the file",
   "@dataExportFailed": {"description": "Сообщение общей поверхности об отказе экспорта графа с действием commonRetry"},
+  "dataExportExistingFile": "That file already exists. Save the copy under a new name",
+  "@dataExportExistingFile": {"description": "Сообщение общей поверхности с действием commonRetry, когда в диалоге сохранения выбран файл с данными и экспорт не начат"},
   "settingsTitle": "Settings",
   "@settingsTitle": {"description": "Заголовок страницы «Настройки» и доступное название перехода к ней с Главной"},
   "dataSectionTitle": "Data",

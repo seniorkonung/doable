@@ -2042,6 +2042,12 @@ abstract class AppLocalizations {
   /// **'Couldn’t save the file'**
   String get dataExportFailed;
 
+  /// Сообщение общей поверхности с действием commonRetry, когда в диалоге сохранения выбран файл с данными и экспорт не начат
+  ///
+  /// In en, this message translates to:
+  /// **'That file already exists. Save the copy under a new name'**
+  String get dataExportExistingFile;
+
   /// Заголовок страницы «Настройки» и доступное название перехода к ней с Главной
   ///
   /// In en, this message translates to:

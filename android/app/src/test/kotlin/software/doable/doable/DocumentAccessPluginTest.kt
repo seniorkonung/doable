@@ -7,8 +7,11 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
+import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
+import android.provider.DocumentsContract
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineGroup
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -74,6 +77,7 @@ class DocumentAccessPluginTest {
         assertFalse(reply.received)
 
         activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        backgroundTasks.single().run()
         assertEquals(document.toString(), reply.value())
     }
 
@@ -88,6 +92,7 @@ class DocumentAccessPluginTest {
         val dialog = shadowOf(activity).nextStartedActivityForResult
 
         activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        backgroundTasks.single().run()
 
         assertEquals(document.toString(), reply.value())
         assertEquals(listOf(document), grantsAtReply)
@@ -100,6 +105,7 @@ class DocumentAccessPluginTest {
         val dialog = shadowOf(activity).nextStartedActivityForResult
 
         activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        backgroundTasks.single().run()
         val finish = messenger.invoke(
             "finishDocument", mapOf("document" to document.toString(), "succeeded" to true),
         )
@@ -110,7 +116,7 @@ class DocumentAccessPluginTest {
 
     @Test
     fun `Завершение работы после записи документа отпускает закреплённое право и оставляет документ`() {
-        chooseDocument()
+        val provider = chooseDocument()
         val source = File.createTempFile("export", ".jsonl.gz").apply {
             deleteOnExit()
             writeBytes(ByteArray(10))
@@ -119,7 +125,6 @@ class DocumentAccessPluginTest {
         messenger.invoke("writeDocument", mapOf("source" to source.path, "document" to document.toString()))
         backgroundTasks.single().run()
         backgroundTasks.clear()
-        val provider = registerDocumentsProvider()
 
         val finish = messenger.invoke(
             "finishDocument", mapOf("document" to document.toString(), "succeeded" to true),
@@ -132,9 +137,8 @@ class DocumentAccessPluginTest {
     }
 
     @Test
-    fun `Завершение работы после отказа удаляет документ в фоне, а затем отпускает закреплённое право`() {
-        chooseDocument()
-        val provider = registerDocumentsProvider()
+    fun `Завершение работы после отказа удаляет пустой при выборе документ в фоне, а затем отпускает право`() {
+        val provider = chooseDocument()
         var grantsAtDeletion: List<Uri>? = null
         provider.onDelete = { grantsAtDeletion = writeGrants() }
 
@@ -154,9 +158,7 @@ class DocumentAccessPluginTest {
 
     @Test
     fun `Исключение поставщика при удалении документа не мешает отпустить право и ответить без ошибки`() {
-        chooseDocument()
-        registerDocumentsProvider().deletionFailure =
-            UnsupportedOperationException("Delete not supported")
+        chooseDocument().deletionFailure = UnsupportedOperationException("Delete not supported")
 
         val finish = messenger.invoke(
             "finishDocument", mapOf("document" to document.toString(), "succeeded" to false),
@@ -166,6 +168,30 @@ class DocumentAccessPluginTest {
         assertNull(finish.value())
         assertEquals(emptyList<Uri>(), writeGrants())
     }
+
+    @Test
+    fun `Выбранный для замены файл с данными даёт в Dart исход существующего файла, а файл остаётся прежним и без права`() {
+        val provider = registerDocumentsProvider().apply { content.writeBytes(ByteArray(10) { 7 }) }
+        val reply = messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+        val dialog = shadowOf(activity).nextStartedActivityForResult
+
+        activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        assertFalse(reply.received)
+        backgroundTasks.forEach(Runnable::run)
+
+        assertEquals("existing_file", reply.errorCode())
+        assertEquals(emptyList<Uri>(), writeGrants())
+        assertEquals(emptyList<Uri>(), provider.deleted)
+        assertArrayEquals(ByteArray(10) { 7 }, provider.content.readBytes())
+    }
+
+    @Test
+    fun `Документ, размер которого поставщик не сообщил, после отказа не удаляется, а право отпускается`() =
+        assertKeptAfterFailure(chooseDocument { reportsSize = false })
+
+    @Test
+    fun `Документ, запрос размера которого отказал, после отказа не удаляется, а право отпускается`() =
+        assertKeptAfterFailure(chooseDocument { sizeQueryFailure = IllegalStateException("Provider died") })
 
     @Test
     fun `Подключение к движку отпускает право, оставшееся после завершения процесса посреди экспорта`() {
@@ -205,6 +231,7 @@ class DocumentAccessPluginTest {
         plugin.onReattachedToActivityForConfigChanges(recreated)
         assertFalse(reply.received)
         recreated.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        backgroundTasks.single().run()
 
         assertEquals(document.toString(), reply.value())
     }
@@ -234,6 +261,24 @@ class DocumentAccessPluginTest {
     }
 
     @Test
+    fun `Копирование заменяет прежнее содержимое документа целиком, даже если оно длиннее файла`() {
+        val provider = registerDocumentsProvider().apply { content.writeBytes(ByteArray(300) { 7 }) }
+        val bytes = ByteArray(100) { it.toByte() }
+        val source = File.createTempFile("export", ".jsonl.gz").apply {
+            deleteOnExit()
+            writeBytes(bytes)
+        }
+
+        val reply = messenger.invoke(
+            "writeDocument", mapOf("source" to source.path, "document" to document.toString()),
+        )
+        backgroundTasks.single().run()
+
+        assertNull(reply.value())
+        assertArrayEquals(bytes, provider.content.readBytes())
+    }
+
+    @Test
     fun `Ошибка потока документа завершает копирование отказом записи`() {
         val source = File.createTempFile("export", ".jsonl.gz").apply {
             deleteOnExit()
@@ -254,11 +299,32 @@ class DocumentAccessPluginTest {
         assertEquals("document_not_written", reply.errorCode())
     }
 
-    /** Документ, место которого человек выбрал в системном диалоге. */
-    private fun chooseDocument() {
-        messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
+    /**
+     * Документ, место которого человек выбрал в системном диалоге, и его
+     * поставщик, настроенный [configure]. По умолчанию поставщик сообщает, что
+     * документ пуст, как после создания диалогом.
+     */
+    private fun chooseDocument(configure: DocumentsProviderStub.() -> Unit = {}): DocumentsProviderStub {
+        val provider = registerDocumentsProvider().apply(configure)
+        val reply = messenger.invoke("createDocument", mapOf("name" to "Doable 2026-10-18.jsonl.gz"))
         val dialog = shadowOf(activity).nextStartedActivityForResult
         activityBinding.deliverResult(dialog.requestCode, Activity.RESULT_OK, Intent().setData(document))
+        backgroundTasks.forEach(Runnable::run)
+        backgroundTasks.clear()
+        assertEquals(document.toString(), reply.value())
+        return provider
+    }
+
+    /** Завершение работы после отказа оставляет документ и отпускает право. */
+    private fun assertKeptAfterFailure(provider: DocumentsProviderStub) {
+        val finish = messenger.invoke(
+            "finishDocument", mapOf("document" to document.toString(), "succeeded" to false),
+        )
+        backgroundTasks.forEach(Runnable::run)
+
+        assertNull(finish.value())
+        assertEquals(emptyList<Uri>(), provider.deleted)
+        assertEquals(emptyList<Uri>(), writeGrants())
     }
 
     /** Поставщик документа, место которого выбрано в диалоге сохранения. */
@@ -361,8 +427,8 @@ class ContentResolverWithoutPersistableGrants : ShadowContentResolver() {
 }
 
 /**
- * Поставщик документов, который запоминает удалённые документы, а при
- * [deletionFailure] отказывает удалению исключением.
+ * Поставщик документа с содержимым [content], который запоминает удалённые
+ * документы, а при [deletionFailure] отказывает удалению исключением.
  *
  * Класс открыт: Robolectric создаёт поставщика отражением.
  */
@@ -372,6 +438,12 @@ class DocumentsProviderStub : ContentProvider() {
     /** Наблюдает состояние в момент удаления. */
     var onDelete: () -> Unit = {}
     var deletionFailure: RuntimeException? = null
+
+    val content: File = File.createTempFile("document", ".jsonl.gz").apply { deleteOnExit() }
+
+    /** Сообщает ли поставщик размер документа: сообщать его он не обязан. */
+    var reportsSize = true
+    var sizeQueryFailure: RuntimeException? = null
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
         // Метод поставщика, которым DocumentsContract.deleteDocument удаляет документ.
@@ -390,7 +462,16 @@ class DocumentsProviderStub : ContentProvider() {
         selection: String?,
         selectionArgs: Array<String>?,
         sortOrder: String?,
-    ): Cursor? = null
+    ): Cursor {
+        sizeQueryFailure?.let { throw it }
+        val size = content.length().takeIf { reportsSize }
+        return MatrixCursor(arrayOf(DocumentsContract.Document.COLUMN_SIZE)).apply { addRow(arrayOf(size)) }
+    }
+
+    // Как поставщик локальных папок FileSystemProvider: режим "w" переводится во
+    // флаги файла без усечения.
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor =
+        ParcelFileDescriptor.open(content, ParcelFileDescriptor.parseMode(mode))
 
     override fun getType(uri: Uri): String? = null
 

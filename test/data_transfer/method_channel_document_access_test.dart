@@ -67,6 +67,17 @@ void main() {
     },
   );
 
+  test('файл с данными, выбранный в диалоге, даёт исход существующего файла '
+      'вместо отказа', () async {
+    answer((_) async => throw PlatformException(code: 'existing_file'));
+
+    final creation = await const MethodChannelDocumentAccess().createDocument(
+      suggestedName: 'Doable 2026-10-18.jsonl.gz',
+    );
+
+    expect(creation, isA<ExistingFileChosen>());
+  });
+
   test(
     'копирование передаёт путь файла и адрес документа и завершается записью',
     () async {

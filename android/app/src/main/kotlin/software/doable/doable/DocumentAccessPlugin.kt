@@ -13,6 +13,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 import java.io.FileInputStream
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 
 /**
@@ -29,6 +30,11 @@ import java.util.concurrent.Executor
  * (ADR-0031). Поэтому право записи закрепляется при ответе диалога и
  * отпускается на шаге завершения работы с документом. После отказа операции
  * этот шаг сначала удаляет документ: удалению нужно это право.
+ *
+ * Диалог позволяет выбрать и существующий файл, подтвердив его замену, и
+ * возвращает его так же, как созданный документ. Поэтому перед ответом в Dart
+ * плагин запрашивает размер документа у поставщика: файл с данными экспорт не
+ * перезаписывает, а после отказа удаляется только документ, пустой при выборе.
  */
 class DocumentAccessPlugin internal constructor(
     private val backgroundExecutor: Executor,
@@ -41,6 +47,12 @@ class DocumentAccessPlugin internal constructor(
 
     /** Ответ на создание документа, пока диалог ожидает выбора места. */
     private var pendingCreation: MethodChannel.Result? = null
+
+    /**
+     * Документы, о которых поставщик при выборе сообщил нулевой размер, до шага
+     * завершения работы с ними. Пополняется в фоновом потоке.
+     */
+    private val emptyDocuments: MutableSet<Uri> = ConcurrentHashMap.newKeySet()
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         contentResolver = binding.applicationContext.contentResolver
@@ -81,10 +93,48 @@ class DocumentAccessPlugin internal constructor(
         val result = pendingCreation ?: return false
         pendingCreation = null
         val document = data?.data?.takeIf { resultCode == Activity.RESULT_OK }
+        if (document == null) {
+            result.success(null)
+            return true
+        }
         // Право закрепляется, пока жива Activity, получившая ответ.
-        document?.let(::takeWriteGrant)
-        result.success(document?.toString())
+        takeWriteGrant(document)
+        // Запрос размера — межпроцессный вызов поставщика.
+        backgroundExecutor.execute { answerChosenDocument(document, result) }
         return true
+    }
+
+    private fun answerChosenDocument(document: Uri, result: MethodChannel.Result) {
+        when (documentSize(document)) {
+            // В документе неизвестного размера могли быть данные, поэтому после
+            // отказа он не удаляется.
+            null -> result.success(document.toString())
+            0L -> {
+                emptyDocuments += document
+                result.success(document.toString())
+            }
+            else -> {
+                releaseGrant(document)
+                result.error(EXISTING_FILE, null, null)
+            }
+        }
+    }
+
+    /** Размер [document] по сведениям поставщика или `null`, если он неизвестен. */
+    private fun documentSize(document: Uri): Long? = try {
+        contentResolver.query(document, arrayOf(DocumentsContract.Document.COLUMN_SIZE), null, null, null)
+            ?.use { cursor ->
+                val column = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                if (column >= 0 && cursor.moveToFirst() && !cursor.isNull(column)) {
+                    cursor.getLong(column).takeIf { it >= 0 }
+                } else {
+                    null
+                }
+            }
+    } catch (error: Exception) {
+        // Поставщик отказал запросу. Исключение в собственном потоке завершило
+        // бы процесс.
+        null
     }
 
     private fun detachActivity() {
@@ -137,7 +187,9 @@ class DocumentAccessPlugin internal constructor(
             val written = try {
                 FileInputStream(source).use { input ->
                     // Поставщик, который недавно аварийно завершился, не возвращает поток.
-                    val output = checkNotNull(contentResolver.openOutputStream(document))
+                    // Режим "w" поставщик может не усекать, и в документе остался бы
+                    // хвост прежнего содержимого.
+                    val output = checkNotNull(contentResolver.openOutputStream(document, "wt"))
                     output.use { input.copyTo(it) }
                 }
                 true
@@ -149,14 +201,14 @@ class DocumentAccessPlugin internal constructor(
     }
 
     private fun finishDocument(document: Uri, succeeded: Boolean, result: MethodChannel.Result) {
-        if (succeeded) {
+        val wasEmpty = emptyDocuments.remove(document)
+        if (succeeded || !wasEmpty) {
             releaseGrant(document)
             result.success(null)
             return
         }
         backgroundExecutor.execute {
-            // Диалог создал документ пустым, а прерванное копирование оставляет в нём
-            // часть байтов.
+            // Прерванное копирование оставляет в документе часть байтов.
             deleteDocument(document)
             releaseGrant(document)
             result.success(null)
@@ -199,5 +251,6 @@ class DocumentAccessPlugin internal constructor(
         const val CREATE_DOCUMENT_REQUEST = 0x0d0c
         const val DIALOG_UNAVAILABLE = "dialog_unavailable"
         const val DOCUMENT_NOT_WRITTEN = "document_not_written"
+        const val EXISTING_FILE = "existing_file"
     }
 }

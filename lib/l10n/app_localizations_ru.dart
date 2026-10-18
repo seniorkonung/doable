@@ -1273,6 +1273,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataExportFailed => 'Не удалось сохранить файл';
 
   @override
+  String get dataExportExistingFile =>
+      'Такой файл уже есть. Сохраните копию под новым именем';
+
+  @override
   String get settingsTitle => 'Настройки';
 
   @override

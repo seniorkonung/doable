@@ -331,12 +331,20 @@ final class TagCommandCompletion extends GraphCommandCompletion {
 }
 
 /// Исход экспорта графа, выполненного модулем операций с данными.
-enum GraphExportOutcome { succeeded, failed }
+enum GraphExportOutcome {
+  succeeded,
+  failed,
+
+  /// Человек выбрал в системном диалоге файл с данными, и экспорт не начат,
+  /// чтобы не перезаписать его.
+  existingFile,
+}
 
 /// Завершение экспорта графа в файл.
 ///
 /// Права инициатора у экспорта нет: успех и отказ сразу принадлежат общей
-/// поверхности. Граф экспорт не меняет, поэтому пакета изменений у него нет.
+/// поверхности. Выбор файла с данными предъявляется так же, как отказ. Граф
+/// экспорт не меняет, поэтому пакета изменений у него нет.
 final class GraphExportCompletion extends GraphCommandCompletion {
   const GraphExportCompletion._({
     required this.token,
@@ -357,7 +365,7 @@ final class GraphExportCompletion extends GraphCommandCompletion {
   @override
   bool get isFailure => switch (outcome) {
     GraphExportOutcome.succeeded => false,
-    GraphExportOutcome.failed => true,
+    GraphExportOutcome.failed || GraphExportOutcome.existingFile => true,
   };
 }
 

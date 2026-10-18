@@ -344,6 +344,27 @@ void main() {
     ]);
   });
 
+  test('файл с данными, выбранный в диалоге, даёт отдельный исход экспорта '
+      'без записи временного файла и без диагностики', () async {
+    await createTag('Дом');
+    documents.dialog = () async => const ExistingFileChosen();
+    final container = app();
+    final states = <GraphExportState>[];
+    container.listen(
+      graphExportControllerProvider,
+      (_, state) => states.add(state),
+    );
+    final exported = nextExport(container);
+
+    await startExport(container);
+
+    expect((await exported).outcome, GraphExportOutcome.existingFile);
+    expect(states, isEmpty);
+    expect(await _filesIn(temporary), isEmpty);
+    expect(documents.finished, isEmpty);
+    expect(diagnostics.events, isEmpty);
+  });
+
   test('повторный запуск во время ожидания диалога и во время экспорта не '
       'открывает второй диалог', () async {
     await createTag('Дом');

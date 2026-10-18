@@ -125,6 +125,29 @@ void main() {
     expect(app.documents.created, hasLength(1));
     expect(app.storedState(), graphBefore);
   });
+
+  testWidgets('выбранный в диалоге прежний файл не записывается, а общая '
+      'поверхность показывает «Такой файл уже есть. Сохраните копию под новым '
+      'именем» с «Повторить», которое снова открывает системный диалог', (
+    tester,
+  ) async {
+    final app = await _ExportApp.start(tester);
+    app.documents.dialog = () async => const ExistingFileChosen();
+    await app.openSettings();
+    await app.startExport();
+    await _until(
+      tester,
+      find.text('Такой файл уже есть. Сохраните копию под новым именем'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(app.documents.created, isEmpty);
+    expect(app.documents.finished, isEmpty);
+
+    app.documents.dialog = () async => const DocumentCreationCancelled();
+    await tester.tap(find.text('Повторить'));
+    await _waitFor(tester, () => app.documents.suggestedNames.length == 2);
+  });
 }
 
 /// Приложение над файловым хранилищем с графом из двух намерений, связи
