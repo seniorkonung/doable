@@ -25,6 +25,11 @@ import 'graph_operation_message_plan.dart';
 /// закрытия и только затем запрашивает у coordinator следующий результат.
 /// Новый результат не снимает текущее сообщение.
 ///
+/// У листа и диалога своего `Scaffold` нет, поэтому сообщение остаётся на
+/// странице под ними. Предъявленным оно считается только на верхнем маршруте:
+/// до закрытия перекрывшего маршрута результат ждёт, а обычное время показа
+/// отсчитывается с первого кадра, в котором сообщение видно.
+///
 /// Что предъявлять, решает coordinator: ручная копия приходит сюда только
 /// отказом (ADR-0016).
 final class GraphOperationPresenter extends ConsumerStatefulWidget {
@@ -61,6 +66,7 @@ final class _GraphOperationPresenterState
     WidgetsBinding.instance.removeObserver(this);
     final surface = _surface;
     _surface = null;
+    surface?.cancelDisplayTimer();
     final registration = _registration;
     // Снятие сообщения меняет состояние ScaffoldMessenger, что запрещено при
     // финализации дерева. Поэтому поверхность снимается после кадра, и только
@@ -144,16 +150,17 @@ final class _GraphOperationPresenterState
     final controller = messenger.showSnackBar(
       SnackBar(
         dismissDirection: DismissDirection.horizontal,
-        // Действие не продлевает показ: SnackBar с действием по умолчанию не
-        // закрывается по таймеру, а таймер ScaffoldMessenger проверяет только
-        // persist и не учитывает экранный диктор.
-        persist: false,
+        // Время показа отсчитывает presenter: таймер ScaffoldMessenger над
+        // навигатором идёт и тогда, когда сообщение перекрыто листом или
+        // диалогом. Действие показ не продлевает, в том числе при экранном
+        // дикторе.
+        persist: true,
+        onVisible: () => _handleEntered(surface, plan),
         action: action == null
             ? null
             : SnackBarAction(label: action.label, onPressed: action.onPressed),
         content: PresentationFrameEvidence<GraphOperationMessagePlan>(
           subject: plan,
-          requiresCurrentRoute: false,
           onPresented: (shownPlan) => _confirm(surface, shownPlan),
           child: Semantics(
             key: const ValueKey('graph-operation-message'),
@@ -171,6 +178,56 @@ final class _GraphOperationPresenterState
     unawaited(controller.closed.then((_) => _handleClosed(surface)));
   }
 
+  /// Появление сообщения завершилось; `onVisible` приходит от каждого
+  /// `Scaffold`, показывающего сообщение.
+  void _handleEntered(
+    _PresentationSurface surface,
+    GraphOperationMessagePlan plan,
+  ) {
+    if (_isDisposed ||
+        !identical(_surface, surface) ||
+        !identical(surface.plan, plan) ||
+        surface.isEntered) {
+      return;
+    }
+    surface.isEntered = true;
+    // Видимое приложение с фокусом подтверждает сообщение ещё во время
+    // появления. Неподтверждённое к его концу сообщение не видно на верхнем
+    // маршруте, например под листом или диалогом, и время показа начнётся
+    // с его предъявления.
+    if (surface.isConfirmed || !_isResumed) {
+      _startDisplayTimer(surface);
+    }
+  }
+
+  void _startDisplayTimer(_PresentationSurface surface) {
+    surface.displayTimer = Timer(
+      _displayDuration,
+      () => _handleDisplayTimeout(surface),
+    );
+  }
+
+  void _handleDisplayTimeout(_PresentationSurface surface) {
+    if (_isDisposed || !identical(_surface, surface)) {
+      return;
+    }
+    surface.displayTimer = null;
+    if (!surface.isConfirmed && _isResumed) {
+      // Сообщение не видно на верхнем маршруте и ждёт закрытия маршрута,
+      // который его перекрыл.
+      return;
+    }
+    // Сообщение, не подтверждённое в приложении без фокуса, закрывается и
+    // показывается снова по возвращении фокуса.
+    final messenger = surface.messenger;
+    if (messenger != null && messenger.mounted) {
+      messenger.hideCurrentSnackBar(reason: SnackBarClosedReason.timeout);
+    }
+  }
+
+  bool get _isResumed =>
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
   void _confirm(_PresentationSurface surface, GraphOperationMessagePlan plan) {
     if (_isDisposed ||
         !identical(_surface, surface) ||
@@ -180,6 +237,11 @@ final class _GraphOperationPresenterState
     }
     surface.isConfirmed = true;
     _coordinator.confirmAppPresentation(surface.claim, plan.coveredTokens);
+    if (surface.isEntered && surface.displayTimer == null) {
+      // Перекрывший маршрут закрыт: сообщение видно обычное время с этого
+      // кадра.
+      _startDisplayTimer(surface);
+    }
   }
 
   void _handleClosed(_PresentationSurface surface) {
@@ -187,9 +249,11 @@ final class _GraphOperationPresenterState
       return;
     }
     surface
+      ..cancelDisplayTimer()
       ..plan = null
       ..messenger = null
-      ..controller = null;
+      ..controller = null
+      ..isEntered = false;
     if (surface.isConfirmed) {
       _surface = null;
       _requestNext();
@@ -199,6 +263,9 @@ final class _GraphOperationPresenterState
     }
   }
 }
+
+/// Обычное время показа сообщения — время показа [SnackBar] по умолчанию.
+const _displayDuration = Duration(milliseconds: 4000);
 
 /// Текущая поверхность результата; живёт до закрытия сообщения, даже после
 /// подтверждения предъявления, и не образует журнал предъявленных tokens.
@@ -210,6 +277,17 @@ final class _PresentationSurface {
   ScaffoldMessengerState? messenger;
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller;
   var isConfirmed = false;
+
+  /// Появление текущего сообщения завершилось.
+  var isEntered = false;
+
+  /// Отсчёт времени показа; `null`, пока отсчёт не начат или уже завершён.
+  Timer? displayTimer;
+
+  void cancelDisplayTimer() {
+    displayTimer?.cancel();
+    displayTimer = null;
+  }
 
   void remove() {
     final currentMessenger = messenger;

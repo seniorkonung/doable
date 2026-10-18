@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -245,6 +246,74 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     },
   );
+
+  // Обычное время показа — 4 с. Лист и диалог перекрывают страницу без
+  // собственного Scaffold; лист закрывается и после этого времени, и до его
+  // конца.
+  for (final scenario
+      in <
+        ({
+          String route,
+          Duration openFor,
+          Future<void> Function(BuildContext) open,
+        })
+      >[
+        (
+          route: 'листе',
+          openFor: const Duration(seconds: 10),
+          open: _openSheet,
+        ),
+        (
+          route: 'диалоге',
+          openFor: const Duration(seconds: 10),
+          open: (context) => showDialog<void>(
+            context: context,
+            builder: (_) => const AlertDialog(content: Text('Диалог')),
+          ),
+        ),
+        (route: 'листе', openFor: const Duration(seconds: 3), open: _openSheet),
+      ]) {
+    testWidgets('результат, пришедший при открытом ${scenario.route}, ждёт '
+        '${scenario.openFor.inSeconds} с его закрытия и затем показывается над '
+        'страницей один раз на обычное время с доступной семантикой', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(tester);
+      final page = tester.element(find.byType(Scaffold));
+      final navigator = Navigator.of(page);
+      unawaited(scenario.open(page));
+      await tester.pumpAndSettle();
+
+      final covered = harness.startDelete(index: 1, title: 'Перекрытое');
+      harness.completeDeleted(covered);
+      await tester.pumpAndSettle();
+      await tester.pump(scenario.openFor);
+      await tester.pumpAndSettle();
+
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Перекрытое')), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('graph-operation-message')),
+        ),
+        matchesSemantics(
+          label: _deleted('Перекрытое'),
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Перекрытое')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
 
   testWidgets(
     'success с живым инициатором и fallback-ошибка используют одну очередь',
@@ -1829,6 +1898,11 @@ final class _PresentationOnlyChange implements GraphChange {
   @override
   final GraphRevision revision;
 }
+
+Future<void> _openSheet(BuildContext context) => showDoableSheet<void>(
+  context: context,
+  builder: (_) => const Sheet(title: 'Лист', child: SizedBox(height: 120)),
+);
 
 Future<void> _closeMessage(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 5));
