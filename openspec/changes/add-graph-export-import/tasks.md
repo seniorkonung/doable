@@ -1204,7 +1204,7 @@
   - **Files likely touched:** `lib/src/data_transfer/application/graph_import_provider.dart` (новый, название рабочее), `lib/src/app/app_runtime.dart`, `test/data_transfer/graph_import_test.dart`, `test/app/bootstrap/app_runtime_graph_import_test.dart` (новый).
   - **Estimated scope:** M.
 
-- [ ] 4.8 Добавить в иконки дизайн-системы значок импорта и значок предупреждения из макета
+- [x] 4.8 Добавить в иконки дизайн-системы значок импорта и значок предупреждения из макета
   - **Acceptance criteria:**
     - По требованию «Иконки из дизайна» `app-appearance` значок строки «Import data» — ведущий SVG кнопки `pickFile` — и значок предупреждения блока `failed`, который показывает макет `SettingsImportFailed`, из `context/doable-design/design/Settings.dc.html` сохраняют исходную графику, размеры и толщину линий. Они добавлены в `DoableIconData` с записями в таблице `lib/src/design_system/icons/README.md`.
   - **Verification:**

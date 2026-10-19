@@ -32,6 +32,8 @@
 | [export.svg](assets/export.svg) | `Settings.dc.html` | Кнопка `openExport`, ведущий SVG |
 | [lock_open.svg](assets/lock_open.svg) | `Settings.dc.html` | `exportOpen` → предупреждение панели, SVG |
 | [backups.svg](assets/backups.svg) | `Settings.dc.html` | Кнопка `openBackups`, ведущий SVG |
+| [import.svg](assets/import.svg) | `Settings.dc.html` | Кнопка `pickFile`, ведущий SVG |
+| [warning.svg](assets/warning.svg) | `Settings.dc.html` | Блок `failed` → предупреждение, SVG |
 
 Мини-значки имеют линию 2 при размере 14, значки меню — линию 1,75 при размере 22.
 Календарь навигации содержит отметки дней, календарь меню и мини-значок — нет.
