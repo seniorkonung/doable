@@ -21,8 +21,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/file_document_access.dart';
-import '../../support/forwarding_graph_fact_log.dart';
 import '../../support/graph_log_completeness_reference.dart';
+import '../../support/held_snapshot_cleanup_fact_log.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/local_database_harness.dart';
@@ -81,7 +81,7 @@ void main() {
       clock: () => now,
       graphFilesFactory: (log) async => (
         compaction: GraphLogCompaction(
-          log: _HeldRegistryRead(log, () async {
+          log: HeldSnapshotCleanupFactLog(log, () async {
             cleanupStarted.complete();
             await releaseCleanup.future;
           }),
@@ -132,22 +132,6 @@ void main() {
       backupState,
     );
   });
-}
-
-/// Лог фактов, в котором первое чтение имён файлов реестра снимков — чтение
-/// очистки каталога снимков — начинается после [_hold].
-final class _HeldRegistryRead extends ForwardingGraphFactLog {
-  _HeldRegistryRead(super.source, this._hold);
-
-  Future<void> Function()? _hold;
-
-  @override
-  Future<Set<String>> readSnapshotFileNames() async {
-    final hold = _hold;
-    _hold = null;
-    await hold?.call();
-    return super.readSnapshotFileNames();
-  }
 }
 
 List<String> _lines(List<GraphEntityRecord> records) => [

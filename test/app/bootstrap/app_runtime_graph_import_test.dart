@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/file_document_access.dart';
 import '../../support/graph_import_files.dart';
+import '../../support/held_snapshot_cleanup_fact_log.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -29,11 +30,14 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory root;
+  late Directory snapshots;
   late Directory temporary;
   late FileDocumentAccess documents;
 
   setUp(() async {
     root = await Directory.systemTemp.createTemp('doable_runtime_import_');
+    snapshots = Directory.fromUri(root.uri.resolve('graph_snapshots/'))
+      ..createSync();
     temporary = Directory.fromUri(root.uri.resolve('tmp/'))..createSync();
     documents = FileDocumentAccess(
       Directory.fromUri(root.uri.resolve('documents/'))..createSync(),
@@ -47,13 +51,15 @@ void main() {
 
   /// Runtime с файлами графа в [root]: сжатием, которое пишет состояние для
   /// экспорта изолятом [stateWriteRunner], а снимок замены —
-  /// [replacementSnapshotRunner], каталогом временных файлов
+  /// [replacementSnapshotRunner], очисткой каталога снимков, которая
+  /// начинается после [holdSnapshotCleanup], каталогом временных файлов
   /// [temporaryDirectory] и документами [documents].
   AppRuntime runtimeWith({
     LocalDataConnectionFactory connectionFactory = openInMemoryLocalDatabase,
     GraphStateWriteRunner stateWriteRunner = runGraphStateWriteInIsolate,
     GraphReplacementSnapshotWriteRunner replacementSnapshotRunner =
         runGraphReplacementSnapshotWriteInIsolate,
+    Future<void> Function()? holdSnapshotCleanup,
     Directory? temporaryDirectory,
   }) {
     final runtime = AppRuntime(
@@ -62,8 +68,8 @@ void main() {
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
       graphFilesFactory: (log) async => (
         compaction: GraphLogCompaction(
-          log: log,
-          directory: Directory.fromUri(root.uri.resolve('graph_snapshots/')),
+          log: HeldSnapshotCleanupFactLog(log, holdSnapshotCleanup),
+          directory: snapshots,
           clock: () => DateTime.utc(2026, 10, 19, 9),
           diagnosticsSink: InMemoryDiagnosticsSink(),
           stateWriteRunner: stateWriteRunner,
@@ -158,6 +164,50 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('импорт из контейнера готового приложения пишет снимок замены только '
+      'после очистки каталога снимков', () async {
+    final leftover = File.fromUri(
+      snapshots.uri.resolve('прерванная запись.jsonl.gz.tmp'),
+    )..createSync();
+    final cleanupStarted = Completer<void>();
+    final releaseCleanup = Completer<void>();
+    final leftoverAtSnapshotWrite = <bool>[];
+    final runtime = runtimeWith(
+      holdSnapshotCleanup: () async {
+        cleanupStarted.complete();
+        await releaseCleanup.future;
+      },
+      replacementSnapshotRunner: (write) {
+        leftoverAtSnapshotWrite.add(leftover.existsSync());
+        return runGraphReplacementSnapshotWriteInIsolate(write);
+      },
+    );
+    final ready = await runtime.bootstrap() as AppRuntimeReady;
+    await cleanupStarted.future;
+    final container = ready.container;
+    expect(
+      await container
+          .read(personalGraphRepositoryProvider)
+          .execute(CreateTag(TagName.fromInput('Дом'))),
+      isA<GraphCommandSucceeded>(),
+    );
+    final confirmation = awaitConfirmation(ready);
+    final importing = container
+        .read(graphImportControllerProvider.notifier)
+        .start();
+    await confirmation;
+    container.read(graphImportControllerProvider.notifier).confirm();
+    await pumpEventQueue();
+
+    // Импорт подтверждён, но запись снимка замены ждёт очистку.
+    expect(leftoverAtSnapshotWrite, isEmpty);
+
+    releaseCleanup.complete();
+
+    expect(await (await importing)!.future, isA<GraphImported>());
+    expect(leftoverAtSnapshotWrite, [false]);
   });
 
   test('выключение дожидается импорта, принятого координатором, и только '
