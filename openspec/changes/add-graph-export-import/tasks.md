@@ -1053,3 +1053,14 @@
   - **Dependencies:** Нет.
   - **Files likely touched:** `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `test/graph_snapshots/graph_log_compaction_test.dart`, `test/graph/data/drift_graph_fact_log_access_test.dart`.
   - **Estimated scope:** S.
+
+- [ ] 3.29 Относить к нехватке места отказ замены графа, после которого SQLite сам откатил всю транзакцию
+  - **Acceptance criteria:**
+    - По решению 12 [дизайна](design.md) классификатор относит отказ отката транзакции Drift (`CouldNotRollBackException`) к категории исходной ошибки, из-за которой транзакция откатывалась, в том числе когда обе ошибки пришли из фонового соединения внутри `DriftRemoteException`. Поэтому `SQLITE_FULL`, после которого SQLite сам откатил всю транзакцию — в операторе без журнала оператора, при сбросе кэша страниц или при COMMIT, — а `ROLLBACK` от Drift отказал, остаётся нехваткой места задачи 3.8.
+    - По требованию «Восстановление копии» [спецификации](specs/graph-backups/spec.md) такое восстановление даёт исход нехватки места, который предъявляется сообщением «Недостаточно места на устройстве. Освободите место и повторите. Ничего не изменено» с «Повторить», и диагностируется этапом замены с категорией `storageFull`. Граф, копии, лог и реестр снимков остаются прежними, а снимок замены удаляется. Команды и чтения, которые объединяют нехватку места с неизвестным отказом, сохраняют прежние исходы.
+  - **Verification:**
+    - Проверить классификацию отказа отката с `SQLITE_FULL` в причине, в том числе внутри вложенных `DriftRemoteException`. На файловой базе воспроизвести нехватку места, после которой SQLite откатил всю транзакцию замены, например `PRAGMA max_page_count` на вставке строки таблицы без триггеров. Проверка убеждается, что Drift сообщил об отказе отката, а не об откате одного оператора, и что восстановление даёт исход и диагностику нехватки места, не меняя граф, копии, лог и реестр снимков. Выполнить `mise exec --no-deps -- flutter test test/data/local/sqlite_failure_classifier_test.dart test/graph/data/drift_graph_replacement_test.dart test/data_transfer/graph_restore_test.dart`.
+    - Если после этой задачи в этапе 3 нет незавершённых задач, выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 3.8, 3.10, 3.15.
+  - **Files likely touched:** `lib/src/data/local/sqlite_failure_classifier.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/graph/data/drift_graph_replacement_test.dart`, `test/data_transfer/graph_restore_test.dart`.
+  - **Estimated scope:** S.
