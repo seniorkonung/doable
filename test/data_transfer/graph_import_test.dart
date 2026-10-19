@@ -5,7 +5,9 @@ import 'dart:isolate';
 
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/data_transfer/application/document_access.dart';
+import 'package:doable/src/data_transfer/application/graph_composition.dart';
 import 'package:doable/src/data_transfer/application/graph_import.dart';
+import 'package:doable/src/data_transfer/application/graph_import_provider.dart';
 import 'package:doable/src/data_transfer/application/graph_replacement.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -47,8 +49,18 @@ void main() {
   late GraphLogCompaction compaction;
   late ProviderContainer container;
   late EncodedDiagnosticsLog diagnostics;
+  late _ControlledComposition composition;
   var replacementSnapshotRunner = runGraphReplacementSnapshotWriteInIsolate;
   var chosenFiles = 0;
+
+  GraphImport graphImport({DocumentAccess? access}) => GraphImport(
+    documents: access ?? documents,
+    compaction: compaction,
+    replacement: repository,
+    temporaryDirectory: Future.value(temporary),
+    snapshotFiles: Future.value(),
+    diagnosticsSink: diagnostics,
+  );
 
   setUp(() async {
     harness = await LocalDatabaseHarness.fileBacked();
@@ -81,9 +93,13 @@ void main() {
     );
     addTearDown(compaction.shutdown);
     diagnostics = EncodedDiagnosticsLog();
+    composition = _ControlledComposition(repository);
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
+        graphImportControllerProvider.overrideWith(
+          () => GraphImportController(graphImport(), composition),
+        ),
       ],
     );
     addTearDown(() async {
@@ -91,15 +107,6 @@ void main() {
       container.dispose();
     });
   });
-
-  GraphImport graphImport({DocumentAccess? access}) => GraphImport(
-    documents: access ?? documents,
-    compaction: compaction,
-    replacement: repository,
-    temporaryDirectory: Future.value(temporary),
-    snapshotFiles: Future.value(),
-    diagnosticsSink: diagnostics,
-  );
 
   /// Человек выбирает в системном диалоге документ с байтами [bytes].
   File choose(List<int> bytes) {
@@ -638,6 +645,293 @@ void main() {
       expect(diagnostics.events, isEmpty);
     });
   });
+
+  group('импорт на протяжении жизни контейнера', () {
+    late List<GraphImportState> states;
+    late List<GraphCommandCompletion> completions;
+
+    setUp(() {
+      states = [];
+      container.listen(
+        graphImportControllerProvider,
+        (_, state) => states.add(state),
+      );
+      completions = [];
+      final published = container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .completions
+          .listen(completions.add);
+      addTearDown(published.cancel);
+    });
+
+    GraphImportController controller() =>
+        container.read(graphImportControllerProvider.notifier);
+
+    GraphImportState current() => container.read(graphImportControllerProvider);
+
+    /// Дожидается состояния импорта вида [T].
+    Future<T> reached<T extends GraphImportState>() async {
+      if (current() case final T state) return state;
+      final reached = Completer<T>();
+      final subscription = container.listen(graphImportControllerProvider, (
+        _,
+        state,
+      ) {
+        if (state case final T state when !reached.isCompleted) {
+          reached.complete(state);
+        }
+      });
+      try {
+        return await reached.future;
+      } finally {
+        subscription.close();
+      }
+    }
+
+    test('сценарий «Отмена чтения выбранного файла»: отмена показывает '
+        'отмену, пока копирование документа не прекращено, и завершает импорт '
+        'без подтверждения, сообщения, изменений и временных файлов', () async {
+      await createGraph();
+      final before = await storedState();
+      choose(graphExportFileOf(reference));
+      final providerAnswer = Completer<void>();
+      documents.beforeCopy = () => providerAnswer.future;
+      final started = controller().start();
+      await reached<GraphImportReadingFile>();
+
+      controller().cancel();
+
+      expect(current(), isA<GraphImportCancelling>());
+      expect(await started, isNull);
+      expect(states, [
+        isA<GraphImportReadingFile>(),
+        isA<GraphImportCancelling>(),
+        isA<GraphImportIdle>(),
+      ]);
+      providerAnswer.complete();
+      await documents.copies.single;
+      expect(completions, isEmpty);
+      expect(await storedState(), before);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
+
+    test('отмена, пока после чтения файла читается состав графа, завершает '
+        'импорт без подтверждения и временных файлов', () async {
+      await createGraph();
+      choose(graphExportFileOf(reference));
+      final compositionRead = composition.holdNextRead();
+      final started = controller().start();
+      await compositionRead.reached;
+
+      controller().cancel();
+      compositionRead.release();
+
+      expect(await started, isNull);
+      expect(states, [
+        isA<GraphImportReadingFile>(),
+        isA<GraphImportCancelling>(),
+        isA<GraphImportIdle>(),
+      ]);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
+
+    test('отказ чтения файла завершает импорт, принятый координатором, без '
+        'подтверждения, а вызывающий по его токену получает право предъявить '
+        'отказ', () async {
+      await createGraph();
+      final before = await storedState();
+      choose(photoFile());
+
+      final accepted = await controller().start();
+
+      expect(
+        await accepted!.future,
+        _importFailedWith(GraphImportFailure.invalidFile),
+      );
+      final claim = container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .claimInitiatorFailure(accepted.token);
+      expect(
+        claim?.completion,
+        isA<GraphImportCompletion>().having(
+          (completion) => completion.result,
+          'исход',
+          _importFailedWith(GraphImportFailure.invalidFile),
+        ),
+      );
+      expect(states, [isA<GraphImportReadingFile>(), isA<GraphImportIdle>()]);
+      expect(await storedState(), before);
+    });
+
+    test('при непустом графе импорт ждёт подтверждения с датой сохранения и '
+        'количествами файла, не меняя граф, а подтверждение заменяет граф '
+        'записями файла', () async {
+      await createGraph();
+      final before = await storedState();
+      choose(graphExportFileOf(reference));
+      final started = controller().start();
+
+      final awaiting = await reached<GraphImportAwaitingConfirmation>();
+
+      expect(
+        awaiting.header.writtenAt,
+        DateTime.utc(2026, 10, 3, 18, 42, 7, 654, 321),
+      );
+      expect(_countsOf(awaiting.header.counts), [2, 4, 3, 3, 2]);
+      expect(await storedState(), before);
+      controller().confirm();
+      expect(await (await started)!.future, isA<GraphImported>());
+      expect(await graphState(), reference.skip(1));
+      expect(current(), isA<GraphImportIdle>());
+    });
+
+    test('при пустом графе, состав которого не прочитан, импорт ждёт '
+        'подтверждения', () async {
+      composition.failsReads = true;
+      choose(graphExportFileOf(reference));
+      final started = controller().start();
+
+      await reached<GraphImportAwaitingConfirmation>();
+
+      expect(await graphState(), isEmpty);
+      controller().decline();
+      await started;
+    });
+
+    test('отказ от подтверждения завершает импорт без сообщения, изменений и '
+        'временных файлов', () async {
+      await createGraph();
+      final before = await storedState();
+      choose(graphExportFileOf(reference));
+      final started = controller().start();
+      await reached<GraphImportAwaitingConfirmation>();
+
+      controller().decline();
+
+      expect(await started, isNull);
+      expect(current(), isA<GraphImportIdle>());
+      expect(completions, isEmpty);
+      expect(await storedState(), before);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
+
+    test('сценарий «Импорт в пустой граф без подтверждения»: замена '
+        'начинается сразу после чтения файла', () async {
+      choose(graphExportFileOf(reference));
+
+      final accepted = await controller().start();
+
+      expect(await accepted!.future, isA<GraphImported>());
+      expect(states, isNot(contains(isA<GraphImportAwaitingConfirmation>())));
+      expect(await graphState(), reference.skip(1));
+    });
+
+    test('ход замены сообщается долями обеих фаз по порядку от нуля до '
+        'полного, а после импорта его нет', () async {
+      choose(graphExportFileOf(reference));
+
+      await (await controller().start())!.future;
+
+      final progress = [
+        for (final state in states)
+          if (state case GraphImportReplacing(:final progress)) progress,
+      ];
+      for (final phase in GraphReplacementPhase.values) {
+        final shares = [
+          for (final step in progress)
+            if (step.phase == phase) step.share,
+        ];
+        expect(shares.first, 0, reason: '$phase');
+        expect(shares.last, 1, reason: '$phase');
+        for (var index = 1; index < shares.length; index++) {
+          expect(shares[index], greaterThan(shares[index - 1]));
+        }
+      }
+      final phases = [for (final step in progress) step.phase];
+      expect(
+        phases.indexOf(GraphReplacementPhase.replacement),
+        greaterThan(phases.lastIndexOf(GraphReplacementPhase.snapshotWrite)),
+      );
+      expect(states.last, isA<GraphImportIdle>());
+    });
+
+    test('отмена во время замены показывает отмену до конца отката и '
+        'завершает импорт без сообщения, изменений и временных '
+        'файлов', () async {
+      await createGraph();
+      final before = await storedState();
+      choose(graphExportFileOf(reference));
+      final started = controller().start();
+      await reached<GraphImportAwaitingConfirmation>();
+      container.listen(graphImportControllerProvider, (_, state) {
+        if (state case GraphImportReplacing(
+          progress: GraphReplacementProgress(
+            phase: GraphReplacementPhase.replacement,
+            share: > 0,
+          ),
+        )) {
+          scheduleMicrotask(controller().cancel);
+        }
+      });
+
+      controller().confirm();
+
+      expect(await (await started)!.future, isA<GraphImportCancelled>());
+      expect(states.sublist(states.length - 2), [
+        isA<GraphImportCancelling>(),
+        isA<GraphImportIdle>(),
+      ]);
+      expect(completions, isEmpty);
+      expect(await storedState(), before);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
+
+    test('после точки невозврата замены отмена не принимается: импорт '
+        'подтверждает замену без отмены и заменяет граф', () async {
+      choose(graphExportFileOf(reference));
+      container.listen(graphImportControllerProvider, (_, state) {
+        if (state is GraphImportCommitting) controller().cancel();
+      });
+
+      final accepted = await controller().start();
+
+      expect(await accepted!.future, isA<GraphImported>());
+      expect(states, isNot(contains(isA<GraphImportCancelling>())));
+      expect(states.sublist(states.length - 2), [
+        isA<GraphImportCommitting>(),
+        isA<GraphImportIdle>(),
+      ]);
+      expect(await graphState(), reference.skip(1));
+    });
+
+    test('пока ожидается ответ диалога выбора или идёт импорт, новый запуск '
+        'ничего не делает', () async {
+      final document = choose(graphExportFileOf(reference));
+      var dialogs = 0;
+      final answer = Completer<DocumentOpening>();
+      documents.openingDialog = () {
+        dialogs += 1;
+        return answer.future;
+      };
+      final releaseSnapshotWrite = Completer<void>();
+      replacementSnapshotRunner = (write) async {
+        await releaseSnapshotWrite.future;
+        return runGraphReplacementSnapshotWriteInIsolate(write);
+      };
+      final first = controller().start();
+      final duringDialog = controller().start();
+      answer.complete(documents.chosen(document));
+      final accepted = await first;
+
+      final duringImport = controller().start();
+      releaseSnapshotWrite.complete();
+
+      expect(await accepted!.future, isA<GraphImported>());
+      expect(await duringDialog, isNull);
+      expect(await duringImport, isNull);
+      expect(dialogs, 1);
+    });
+  });
 }
 
 /// Где импорт обнаружил, что файл не подходит.
@@ -665,6 +959,51 @@ Matcher _readingFailed(GraphImportFailure failure) =>
       'категория',
       failure,
     );
+
+Matcher _importFailedWith(GraphImportFailure failure) =>
+    isA<GraphImportFailed>().having(
+      (failed) => failed.failure,
+      'категория',
+      failure,
+    );
+
+/// Состав графа источника [_source], чтение которого отказывает, пока
+/// [failsReads] истинно, а следующее после [holdNextRead] чтение ждёт
+/// задержки.
+final class _ControlledComposition implements GraphCompositionSource {
+  _ControlledComposition(this._source);
+
+  final GraphCompositionSource _source;
+  var failsReads = false;
+  _CompositionReadHold? _hold;
+
+  _CompositionReadHold holdNextRead() => _hold = _CompositionReadHold();
+
+  @override
+  Stream<GraphCompositionRead> watchComposition() async* {
+    if (_hold case final hold?) {
+      _hold = null;
+      hold._reached.complete();
+      await hold._released.future;
+    }
+    if (failsReads) {
+      yield const GraphCompositionReadFailed();
+    } else {
+      yield* _source.watchComposition();
+    }
+  }
+}
+
+/// Задержка чтения состава графа: [reached] завершается, когда оно начато,
+/// а продолжается оно после [release].
+final class _CompositionReadHold {
+  final _reached = Completer<void>();
+  final _released = Completer<void>();
+
+  Future<void> get reached => _reached.future;
+
+  void release() => _released.complete();
+}
 
 /// Доступ к документам, при котором человек отменяет чтение файла сразу
 /// после того, как документ скопирован.
