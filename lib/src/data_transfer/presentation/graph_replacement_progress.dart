@@ -17,18 +17,18 @@ import '../application/graph_restore_provider.dart';
 /// Прогресс открывается, когда восстановление начинается, и закрывается без
 /// сообщения, когда оно завершается: успехом, отказом или отменой. Исход
 /// предъявляет координатор. Системное «назад» прогресс не закрывает.
-final class GraphRestoreProgressHost extends ConsumerStatefulWidget {
-  const GraphRestoreProgressHost({required this.child, super.key});
+final class GraphReplacementProgressHost extends ConsumerStatefulWidget {
+  const GraphReplacementProgressHost({required this.child, super.key});
 
   final Widget child;
 
   @override
-  ConsumerState<GraphRestoreProgressHost> createState() =>
-      _GraphRestoreProgressHostState();
+  ConsumerState<GraphReplacementProgressHost> createState() =>
+      _GraphReplacementProgressHostState();
 }
 
-final class _GraphRestoreProgressHostState
-    extends ConsumerState<GraphRestoreProgressHost> {
+final class _GraphReplacementProgressHostState
+    extends ConsumerState<GraphReplacementProgressHost> {
   /// Прогресс идущего восстановления.
   Route<void>? _progress;
 
@@ -56,7 +56,7 @@ final class _GraphRestoreProgressHostState
       context: context,
       barrierColor: Theme.of(context).extension<DoableColors>()!.scrim,
       barrierDismissible: false,
-      builder: (_) => const _GraphRestoreProgress(),
+      builder: (_) => const _GraphReplacementProgress(),
     );
     // Маршрут открывается напрямую, а не через showDialog, чтобы закрыть
     // именно его, а не верхний маршрут навигатора.
@@ -83,8 +83,8 @@ const _snapshotWriteShare = 0.3;
 /// Модальный прогресс восстановления: экранный диктор читает, что идёт
 /// восстановление, его ход и кнопку «Отменить», после точки невозврата
 /// замены — её недоступность, а после отмены — «Отмена…» до конца отката.
-final class _GraphRestoreProgress extends ConsumerWidget {
-  const _GraphRestoreProgress();
+final class _GraphReplacementProgress extends ConsumerWidget {
+  const _GraphReplacementProgress();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
