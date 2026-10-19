@@ -84,11 +84,15 @@ final class FileDocumentAccess implements DocumentAccess {
   /// [DocumentCopyStorageFull] или [DocumentCopyFailed].
   DocumentCopy? copyFailure;
 
+  /// Копирования документов в порядке начала. Каждое завершается, когда
+  /// закончило работу с файлом приложения, в том числе брошенное отменой.
+  final copies = <Future<void>>[];
+
   @override
   Future<DocumentOpening> openDocument() => openingDialog();
 
   /// Как плагин, отмена сразу завершает копирование, а брошенное копирование
-  /// копию не оставляет.
+  /// удаляет файл [destination], когда поставщик ответит.
   @override
   Future<DocumentCopy> copyDocument(
     OpenedDocument document, {
@@ -98,11 +102,12 @@ final class FileDocumentAccess implements DocumentAccess {
     final outcome = Completer<DocumentCopy>();
     unawaited(
       cancellation.then((_) {
-        if (!outcome.isCompleted)
+        if (!outcome.isCompleted) {
           outcome.complete(const DocumentCopyCancelled());
+        }
       }),
     );
-    unawaited(_copy(document, destination, outcome));
+    copies.add(_copy(document, destination, outcome));
     return outcome.future;
   }
 
@@ -112,16 +117,17 @@ final class FileDocumentAccess implements DocumentAccess {
     Completer<DocumentCopy> outcome,
   ) async {
     await beforeCopy?.call();
-    if (outcome.isCompleted) return;
-    if (copyFailure case final failure?) {
-      outcome.complete(failure);
-      return;
+    if (!outcome.isCompleted) {
+      if (copyFailure case final failure?) {
+        outcome.complete(failure);
+        return;
+      }
+      await File.fromUri(Uri.parse(document.uri)).copy(destination.path);
+      if (!outcome.isCompleted) {
+        outcome.complete(const DocumentCopied());
+        return;
+      }
     }
-    await File.fromUri(Uri.parse(document.uri)).copy(destination.path);
-    if (outcome.isCompleted) {
-      await destination.delete();
-    } else {
-      outcome.complete(const DocumentCopied());
-    }
+    if (await destination.exists()) await destination.delete();
   }
 }
