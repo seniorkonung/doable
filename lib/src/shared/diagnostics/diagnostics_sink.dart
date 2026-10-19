@@ -54,6 +54,18 @@ enum DiagnosticsFailureCode {
   /// На устройстве не хватило места: база сообщила `SQLITE_FULL` или запись
   /// файла отказала с `ENOSPC`.
   storageFull,
+
+  /// Файл, выбранный для импорта, не является экспортом Doable или повреждён,
+  /// в том числе нарушает правила данных графа.
+  invalidGraphFile,
+
+  /// Файл, выбранный для импорта, создан более новой версией формата данных
+  /// графа, чем поддерживает приложение.
+  newerGraphFormatVersion,
+
+  /// Документ, выбранный в системном диалоге, не прочитан: поставщик не
+  /// открыл его, или чтение прервалось.
+  documentUnreadable,
   incompatibleSchema,
   unexpected,
 }
@@ -717,4 +729,45 @@ final class GraphBackupRestoreDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(DiagnosticsFailed(duration: duration, code: code));
 
   final GraphBackupRestoreDiagnosticsStage? stage;
+}
+
+/// Этап импорта графа из файла экспорта.
+enum GraphImportDiagnosticsStage {
+  /// Открытие документа системным диалогом выбора, его копирование во
+  /// временный файл приложения и чтение заголовка копии.
+  documentRead,
+
+  /// Проверка данных файла: формата, версии формата, полей и количеств
+  /// записей и правил данных графа, в том числе тех, нарушение которых
+  /// обнаружили схема хранилища или общая проверка пути в транзакции замены.
+  dataValidation,
+
+  /// Запись проверенных записей файла в снимок замены.
+  snapshotWrite,
+
+  /// Замена графа снимком замены в монопольном режиме координатора.
+  replacement,
+}
+
+/// Импорт графа из файла экспорта: исход, длительность работы после выбора
+/// документа без ожидания подтверждения, а у отказа — этап и безопасная
+/// категория. Отмена диалога, отказ от подтверждения и отмена импорта
+/// отказом не считаются и события не дают.
+///
+/// Записи графа, названия, описания, даты дневных выборов, идентификаторы,
+/// имя, путь и адрес файла и документа и исходное исключение не входят в
+/// контракт события. Конструкторы допускают этап только у отказа. Передача
+/// получателю — через [recordDiagnosticsSafely].
+final class GraphImportDiagnosticsEvent extends DiagnosticsEvent {
+  GraphImportDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphImportDiagnosticsEvent.failed({
+    required GraphImportDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphImportDiagnosticsStage? stage;
 }

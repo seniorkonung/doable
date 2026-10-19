@@ -321,6 +321,22 @@ void main() {
               'failureCode': 'snapshotCorruption',
             },
           ),
+          (
+            'отказ импорта графа из-за файла, который не является экспортом '
+                'Doable или повреждён',
+            GraphImportDiagnosticsEvent.failed(
+              stage: GraphImportDiagnosticsStage.dataValidation,
+              duration: const Duration(microseconds: 101),
+              code: DiagnosticsFailureCode.invalidGraphFile,
+            ),
+            {
+              'operation': 'graphImport',
+              'stage': 'dataValidation',
+              'outcome': 'failed',
+              'durationMicros': 101,
+              'failureCode': 'invalidGraphFile',
+            },
+          ),
         ]) {
       test('$description кодируется только операцией, этапом отказа, исходом, '
           'длительностью и категорией отказа', () {

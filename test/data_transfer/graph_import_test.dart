@@ -30,6 +30,7 @@ import '../support/failing_snapshot_temporary_files.dart';
 import '../support/file_document_access.dart';
 import '../support/graph_import_files.dart';
 import '../support/graph_log_completeness_reference.dart';
+import '../support/encoded_diagnostics_log.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/stalling_replacement_snapshot_reads.dart';
@@ -45,6 +46,7 @@ void main() {
   late FileDocumentAccess documents;
   late GraphLogCompaction compaction;
   late ProviderContainer container;
+  late EncodedDiagnosticsLog diagnostics;
   var replacementSnapshotRunner = runGraphReplacementSnapshotWriteInIsolate;
   var chosenFiles = 0;
 
@@ -78,6 +80,7 @@ void main() {
       replacementSnapshotRunner: (write) => replacementSnapshotRunner(write),
     );
     addTearDown(compaction.shutdown);
+    diagnostics = EncodedDiagnosticsLog();
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
@@ -95,6 +98,7 @@ void main() {
     replacement: repository,
     temporaryDirectory: Future.value(temporary),
     snapshotFiles: Future.value(),
+    diagnosticsSink: diagnostics,
   );
 
   /// Человек выбирает в системном диалоге документ с байтами [bytes].
@@ -269,6 +273,18 @@ void main() {
     expect(await storedBackups(), isEmpty);
   });
 
+  test('успешный импорт диагностируется успехом без пользовательских '
+      'данных', () async {
+    await createGraph();
+    final file = await readFile(graphExportFileOf(reference));
+
+    expect(await importFile(file), isA<GraphImported>());
+
+    expect(diagnostics.events, [
+      {'operation': 'graphImport', 'outcome': 'succeeded'},
+    ]);
+  });
+
   test('ход импорта сообщается долями записи снимка замены, а затем замены, '
       'и каждая растёт до полной', () async {
     await createGraph();
@@ -294,9 +310,12 @@ void main() {
     }
   });
 
-  test('неподходящий файл отклоняется там, где его можно обнаружить, своим '
-      'исходом и не меняет граф, копии, лог, реестр и каталог снимков и '
-      'временный каталог', () async {
+  test('сценарий «Отклонённый файл диагностируется без содержимого»: '
+      'неподходящий файл, в том числе с двумя тегами одного названия, '
+      'отклоняется там, где его можно обнаружить, своим исходом, '
+      'диагностируется этапом проверки данных и своей категорией без '
+      'пользовательских данных и не меняет граф, копии, лог, реестр и каталог '
+      'снимков и временный каталог', () async {
     await createGraph();
     final before = await storedState();
     List<int> edited(int line, void Function(Map<String, Object?> json) edit) =>
@@ -377,88 +396,106 @@ void main() {
 
     for (final MapEntry(key: reason, value: (bytes, rejection))
         in cases.entries) {
+      diagnostics = EncodedDiagnosticsLog();
+
       expect(await rejectionOf(bytes), rejection, reason: reason);
+      expect(diagnostics.events, [
+        _importFailed('dataValidation', rejection.$2),
+      ], reason: reason);
       expect(await storedState(), before, reason: reason);
       expect(await _fileNamesIn(temporary), isEmpty, reason: reason);
     }
   });
 
   test('отмена диалога, диалог, который не открылся, и отказы копирования '
-      'документа дают свои исходы и не оставляют временных файлов', () async {
+      'документа дают свои исходы, отказы диагностируются этапом чтения '
+      'документа, а отмена события не даёт, и не остаётся временных '
+      'файлов', () async {
     final document = choose(graphExportFileOf(reference));
-    final cases = <String, (DocumentOpening, DocumentCopy?, Matcher)>{
-      'отмена диалога': (
-        const DocumentOpeningCancelled(),
-        null,
-        isA<GraphImportFileReadingCancelled>(),
-      ),
-      'диалог не открылся': (
-        const DocumentOpeningFailed(),
-        null,
-        _readingFailed(GraphImportFailure.unknown),
-      ),
-      'документ не прочитан': (
-        documents.chosen(document),
-        const DocumentNotRead(),
-        _readingFailed(GraphImportFailure.documentUnreadable),
-      ),
-      'копии не хватило места': (
-        documents.chosen(document),
-        const DocumentCopyStorageFull(),
-        _readingFailed(GraphImportFailure.storageFull),
-      ),
-      'копия не записана': (
-        documents.chosen(document),
-        const DocumentCopyFailed(),
-        _readingFailed(GraphImportFailure.unknown),
-      ),
-    };
+    final cases =
+        <String, (DocumentOpening, DocumentCopy?, GraphImportFailure?)>{
+          'отмена диалога': (const DocumentOpeningCancelled(), null, null),
+          'диалог не открылся': (
+            const DocumentOpeningFailed(),
+            null,
+            GraphImportFailure.unknown,
+          ),
+          'документ не прочитан': (
+            documents.chosen(document),
+            const DocumentNotRead(),
+            GraphImportFailure.documentUnreadable,
+          ),
+          'копии не хватило места': (
+            documents.chosen(document),
+            const DocumentCopyStorageFull(),
+            GraphImportFailure.storageFull,
+          ),
+          'копия не записана': (
+            documents.chosen(document),
+            const DocumentCopyFailed(),
+            GraphImportFailure.unknown,
+          ),
+        };
 
-    for (final MapEntry(key: reason, value: (dialog, copyFailure, outcome))
+    for (final MapEntry(key: reason, value: (dialog, copyFailure, failure))
         in cases.entries) {
       documents
         ..openingDialog = (() async => dialog)
         ..copyFailure = copyFailure;
+      diagnostics = EncodedDiagnosticsLog();
 
-      expect(await readChosen(), outcome, reason: reason);
+      final reading = await readChosen();
+
+      if (failure == null) {
+        expect(reading, isA<GraphImportFileReadingCancelled>(), reason: reason);
+        expect(diagnostics.events, isEmpty, reason: reason);
+      } else {
+        expect(reading, _readingFailed(failure), reason: reason);
+        expect(diagnostics.events, [
+          _importFailed('documentRead', failure),
+        ], reason: reason);
+      }
       expect(await _fileNamesIn(temporary), isEmpty, reason: reason);
     }
   });
 
-  test('отказ от прочитанного файла удаляет его временную копию', () async {
+  test('отказ от прочитанного файла удаляет его временную копию и события '
+      'диагностики не даёт', () async {
     final file = await readFile(graphExportFileOf(reference));
 
     await file.discard();
 
     expect(await _fileNamesIn(temporary), isEmpty);
+    expect(diagnostics.events, isEmpty);
   });
 
   group('нехватка места', () {
-    test(
-      'при записи снимка замены даёт свой исход и ничего не меняет',
-      () async {
-        await createGraph();
-        final before = await storedState();
-        final file = await readFile(graphExportFileOf(reference));
-        replacementSnapshotRunner =
-            writeGraphReplacementSnapshotFailingOnTemporaryFiles;
+    test('при записи снимка замены даёт свой исход, диагностируемый этапом '
+        'записи снимка замены, и ничего не меняет', () async {
+      await createGraph();
+      final before = await storedState();
+      final file = await readFile(graphExportFileOf(reference));
+      replacementSnapshotRunner =
+          writeGraphReplacementSnapshotFailingOnTemporaryFiles;
 
-        expect(
-          await importFile(file),
-          isA<GraphImportFailed>().having(
-            (failed) => failed.failure,
-            'категория',
-            GraphImportFailure.storageFull,
-          ),
-        );
+      expect(
+        await importFile(file),
+        isA<GraphImportFailed>().having(
+          (failed) => failed.failure,
+          'категория',
+          GraphImportFailure.storageFull,
+        ),
+      );
 
-        expect(await storedState(), before);
-        expect(await _fileNamesIn(temporary), isEmpty);
-      },
-    );
+      expect(diagnostics.events, [
+        _importFailed('snapshotWrite', GraphImportFailure.storageFull),
+      ]);
+      expect(await storedState(), before);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
 
-    test('при замене графа, когда база не может вырасти, даёт свой исход и '
-        'ничего не меняет', () async {
+    test('при замене графа, когда база не может вырасти, даёт свой исход, '
+        'диагностируемый этапом замены, и ничего не меняет', () async {
       // Длинные описания занимают страницы переполнения, которых в базе
       // после VACUUM нет.
       var lines = reference;
@@ -487,6 +524,9 @@ void main() {
         ),
       );
 
+      expect(diagnostics.events, [
+        _importFailed('replacement', GraphImportFailure.storageFull),
+      ]);
       expect(await storedState(), before);
       expect(await _fileNamesIn(temporary), isEmpty);
     });
@@ -494,7 +534,7 @@ void main() {
 
   group('отмена', () {
     test('во время копирования документа сразу завершает чтение файла без '
-        'временных файлов, а копирование, брошенное ею и закончившееся во '
+        'временных файлов и события диагностики, а копирование, брошенное ею и закончившееся во '
         'время следующего импорта, не меняет его временный файл и '
         'исход', () async {
       choose(graphExportFileOf(reference));
@@ -511,6 +551,7 @@ void main() {
       cancellation.complete();
 
       expect(await abandoned, isA<GraphImportFileReadingCancelled>());
+      expect(diagnostics.events, isEmpty);
       documents.beforeCopy = null;
       final file = await readFile(graphExportFileOf(reference));
       providerAnswer.complete();
@@ -521,7 +562,7 @@ void main() {
     });
 
     test('сразу после копирования документа завершает чтение файла без '
-        'временных файлов', () async {
+        'временных файлов и события диагностики', () async {
       choose(graphExportFileOf(reference));
       final cancellation = Completer<void>();
 
@@ -534,10 +575,11 @@ void main() {
       );
 
       expect(await _fileNamesIn(temporary), isEmpty);
+      expect(diagnostics.events, isEmpty);
     });
 
-    test('во время записи снимка замены прекращает импорт без изменений и '
-        'без файлов', () async {
+    test('во время записи снимка замены прекращает импорт без изменений, '
+        'без файлов и без события диагностики', () async {
       await createGraph();
       final before = await storedState();
       final file = await readFile(graphExportFileOf(reference));
@@ -567,9 +609,11 @@ void main() {
       expect(phases, isNot(contains(GraphReplacementPhase.replacement)));
       expect(await storedState(), before);
       expect(await _fileNamesIn(temporary), isEmpty);
+      expect(diagnostics.events, isEmpty);
     });
 
-    test('во время замены откатывает её без изменений и без файлов', () async {
+    test('во время замены откатывает её без изменений, без файлов и без '
+        'события диагностики', () async {
       await createGraph();
       final before = await storedState();
       final file = await readFile(graphExportFileOf(reference));
@@ -591,12 +635,29 @@ void main() {
       expect(outcome, isA<GraphImportCancelled>());
       expect(await storedState(), before);
       expect(await _fileNamesIn(temporary), isEmpty);
+      expect(diagnostics.events, isEmpty);
     });
   });
 }
 
 /// Где импорт обнаружил, что файл не подходит.
 enum _Detection { header, snapshotWrite, replacement }
+
+/// Отказ импорта на этапе [stage] с категорией [failure] так, как его
+/// кодирует журнал разработчика, без длительности.
+Map<String, Object?> _importFailed(String stage, GraphImportFailure failure) =>
+    {
+      'operation': 'graphImport',
+      'stage': stage,
+      'outcome': 'failed',
+      'failureCode': switch (failure) {
+        GraphImportFailure.invalidFile => 'invalidGraphFile',
+        GraphImportFailure.newerFormatVersion => 'newerGraphFormatVersion',
+        GraphImportFailure.storageFull => 'storageFull',
+        GraphImportFailure.documentUnreadable => 'documentUnreadable',
+        GraphImportFailure.unknown => 'unexpected',
+      },
+    };
 
 Matcher _readingFailed(GraphImportFailure failure) =>
     isA<GraphImportFileReadingFailed>().having(

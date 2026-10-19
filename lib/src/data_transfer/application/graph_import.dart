@@ -8,6 +8,7 @@ import '../../graph_format/graph_format_file.dart';
 import '../../graph_format/graph_format_records.dart';
 import '../../graph_snapshots/graph_log_compaction.dart';
 import '../../graph_snapshots/graph_snapshot_store.dart';
+import '../../shared/diagnostics/diagnostics_sink.dart';
 import 'document_access.dart';
 import 'graph_replacement.dart';
 
@@ -27,6 +28,10 @@ var _importAttempts = 0;
 /// команды графа в это время подтверждаются как обычно, — и заменяет граф
 /// этим снимком в монопольном режиме координатора. Прежнее состояние
 /// непустого графа транзакция замены сохраняет копией перед заменой.
+///
+/// Исход импорта сообщается в [DiagnosticsSink]; отмена и отказ от
+/// подтверждения события не дают, а отказ диагностики исход импорта не
+/// меняет.
 final class GraphImport {
   GraphImport({
     required this._documents,
@@ -34,6 +39,7 @@ final class GraphImport {
     required this._replacement,
     required this._temporaryDirectory,
     required this._snapshotFiles,
+    required this._diagnosticsSink,
   });
 
   final DocumentAccess _documents;
@@ -51,6 +57,7 @@ final class GraphImport {
   /// файлы прежних запусков. Снимок замены пишется только после этого, иначе
   /// очистка удалила бы его до регистрации.
   final Future<void> _snapshotFiles;
+  final DiagnosticsSink _diagnosticsSink;
 
   /// Открывает системный диалог выбора файла, копирует выбранный документ
   /// во временный файл и читает его заголовок.
@@ -73,6 +80,7 @@ final class GraphImport {
     required void Function() onDocumentChosen,
     required Future<void> cancellation,
   }) async {
+    final stopwatch = Stopwatch()..start();
     final File copy;
     try {
       // Каталог создаётся до диалога: право чтения выбранного документа
@@ -84,7 +92,7 @@ final class GraphImport {
         directory.uri.resolve('graph_import_${++_importAttempts}.jsonl.gz'),
       );
     } on Object catch (error) {
-      return GraphImportFileReadingFailed(_failureOf(error));
+      return _readingFailed(_failureOf(error), stopwatch);
     }
 
     final OpenedDocument document;
@@ -94,9 +102,11 @@ final class GraphImport {
       case DocumentOpeningCancelled():
         return const GraphImportFileReadingCancelled();
       case DocumentOpeningFailed():
-        return const GraphImportFileReadingFailed(GraphImportFailure.unknown);
+        return _readingFailed(GraphImportFailure.unknown, stopwatch);
     }
     onDocumentChosen();
+    // Время человека в диалоге в длительность импорта не входит.
+    stopwatch.reset();
 
     var isCancelled = false;
     unawaited(cancellation.then((_) => isCancelled = true));
@@ -110,15 +120,11 @@ final class GraphImport {
       case DocumentCopyCancelled():
         return const GraphImportFileReadingCancelled();
       case DocumentNotRead():
-        return const GraphImportFileReadingFailed(
-          GraphImportFailure.documentUnreadable,
-        );
+        return _readingFailed(GraphImportFailure.documentUnreadable, stopwatch);
       case DocumentCopyStorageFull():
-        return const GraphImportFileReadingFailed(
-          GraphImportFailure.storageFull,
-        );
+        return _readingFailed(GraphImportFailure.storageFull, stopwatch);
       case DocumentCopyFailed():
-        return const GraphImportFileReadingFailed(GraphImportFailure.unknown);
+        return _readingFailed(GraphImportFailure.unknown, stopwatch);
     }
 
     try {
@@ -127,14 +133,28 @@ final class GraphImport {
       // закрывает файл.
       await reading.records.listen(null).cancel();
       if (!isCancelled) {
-        return GraphImportFileRead(GraphImportFile._(copy, reading.header));
+        return GraphImportFileRead(
+          GraphImportFile._(copy, reading.header, stopwatch.elapsed),
+        );
       }
       await _deleteTemporaryFile(copy);
       return const GraphImportFileReadingCancelled();
     } on Object catch (error) {
       await _deleteTemporaryFile(copy);
-      return GraphImportFileReadingFailed(_failureOf(error));
+      return _readingFailed(_failureOf(error), stopwatch);
     }
+  }
+
+  GraphImportFileReadingFailed _readingFailed(
+    GraphImportFailure failure,
+    Stopwatch stopwatch,
+  ) {
+    _recordFailure(
+      GraphImportDiagnosticsStage.documentRead,
+      failure,
+      stopwatch.elapsed,
+    );
+    return GraphImportFileReadingFailed(failure);
   }
 
   /// Заменяет граф записями прочитанного файла [file]; саму замену выполняет
@@ -159,6 +179,9 @@ final class GraphImport {
     required void Function(GraphReplacementProgress progress) onProgress,
     required GraphReplacementCancellation cancellation,
   }) async {
+    // Ожидание подтверждения человеком в длительность импорта не входит.
+    final stopwatch = Stopwatch()..start();
+    Duration duration() => file._readingDuration + stopwatch.elapsed;
     UnregisteredGraphSnapshot? snapshot;
     try {
       final written = await _writeSnapshot(
@@ -169,7 +192,7 @@ final class GraphImport {
         cancelled: cancellation.requested,
       );
       snapshot = written;
-      return await exclusive.replace(() {
+      final imported = await exclusive.replace(() {
         onProgress(
           const GraphReplacementProgress(GraphReplacementPhase.replacement, 0),
         );
@@ -181,6 +204,11 @@ final class GraphImport {
           cancellation: cancellation,
         );
       });
+      recordDiagnosticsSafely(
+        _diagnosticsSink,
+        GraphImportDiagnosticsEvent.succeeded(duration: duration()),
+      );
+      return imported;
     } on GraphReplacementSnapshotCancelled {
       // Запись снимка замены при отмене удаляет свой файл.
       return const GraphImportCancelled();
@@ -189,7 +217,16 @@ final class GraphImport {
       return const GraphImportCancelled();
     } on Object catch (error) {
       await snapshot?.delete();
-      return GraphImportFailed(_failureOf(error));
+      final failure = _failureOf(error);
+      _recordFailure(
+        // Снимок замены есть, только когда его запись завершилась.
+        snapshot == null
+            ? GraphImportDiagnosticsStage.snapshotWrite
+            : GraphImportDiagnosticsStage.replacement,
+        failure,
+        duration(),
+      );
+      return GraphImportFailed(failure);
     }
   }
 
@@ -209,15 +246,52 @@ final class GraphImport {
       await file.discard();
     }
   }
+
+  /// Сообщает об отказе [failure] на шаге [step].
+  ///
+  /// Нарушение правил данных и более новая версия формата относятся к
+  /// проверке данных, на каком бы шаге их ни обнаружили: при чтении
+  /// заголовка, при записи снимка замены или в транзакции замены.
+  void _recordFailure(
+    GraphImportDiagnosticsStage step,
+    GraphImportFailure failure,
+    Duration duration,
+  ) => recordDiagnosticsSafely(
+    _diagnosticsSink,
+    GraphImportDiagnosticsEvent.failed(
+      stage: switch (failure) {
+        GraphImportFailure.invalidFile ||
+        GraphImportFailure.newerFormatVersion =>
+          GraphImportDiagnosticsStage.dataValidation,
+        GraphImportFailure.storageFull ||
+        GraphImportFailure.documentUnreadable ||
+        GraphImportFailure.unknown => step,
+      },
+      duration: duration,
+      code: switch (failure) {
+        GraphImportFailure.invalidFile =>
+          DiagnosticsFailureCode.invalidGraphFile,
+        GraphImportFailure.newerFormatVersion =>
+          DiagnosticsFailureCode.newerGraphFormatVersion,
+        GraphImportFailure.storageFull => DiagnosticsFailureCode.storageFull,
+        GraphImportFailure.documentUnreadable =>
+          DiagnosticsFailureCode.documentUnreadable,
+        GraphImportFailure.unknown => DiagnosticsFailureCode.unexpected,
+      },
+    ),
+  );
 }
 
 /// Копия выбранного документа во временном файле приложения с прочитанным
 /// заголовком. Её один раз импортирует [GraphImport.importFile] или
 /// отбрасывает [discard].
 final class GraphImportFile {
-  const GraphImportFile._(this._copy, this.header);
+  const GraphImportFile._(this._copy, this.header, this._readingDuration);
 
   final File _copy;
+
+  /// Длительность копирования документа и чтения заголовка.
+  final Duration _readingDuration;
 
   /// Заголовок файла: дата сохранения и количества записей каждого вида.
   /// Записи файла с ними ещё не сверены.
