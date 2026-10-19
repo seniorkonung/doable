@@ -80,6 +80,10 @@ final class FileDocumentAccess implements DocumentAccess {
   /// как у облачного поставщика, который сначала загружает документ.
   Future<void> Function()? beforeCopy;
 
+  /// Ожидание перед ответом на отмену копирования, как у канала плагина,
+  /// ответ которого приходит не в том же кадре.
+  Future<void> Function()? beforeCancellationAnswer;
+
   /// Отказ копирования вместо копии: [DocumentNotRead],
   /// [DocumentCopyStorageFull] или [DocumentCopyFailed].
   DocumentCopy? copyFailure;
@@ -91,8 +95,9 @@ final class FileDocumentAccess implements DocumentAccess {
   @override
   Future<DocumentOpening> openDocument() => openingDialog();
 
-  /// Как плагин, отмена сразу завершает копирование, а брошенное копирование
-  /// удаляет файл [destination], когда поставщик ответит.
+  /// Как плагин, отмена завершает копирование, не дожидаясь поставщика, а
+  /// брошенное копирование удаляет файл [destination], когда поставщик
+  /// ответит.
   @override
   Future<DocumentCopy> copyDocument(
     OpenedDocument document, {
@@ -101,7 +106,8 @@ final class FileDocumentAccess implements DocumentAccess {
   }) {
     final outcome = Completer<DocumentCopy>();
     unawaited(
-      cancellation.then((_) {
+      cancellation.then((_) async {
+        if (beforeCancellationAnswer case final answer?) await answer();
         if (!outcome.isCompleted) {
           outcome.complete(const DocumentCopyCancelled());
         }
