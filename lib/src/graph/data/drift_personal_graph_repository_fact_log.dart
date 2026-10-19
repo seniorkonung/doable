@@ -26,29 +26,17 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
     required int after,
     required int upTo,
   }) async {
-    final packages = _database.graphLogPackages;
-    final snapshots = _database.graphSnapshots;
     final rows =
-        await (_database.select(packages).join([
-                leftOuterJoin(
-                  snapshots,
-                  snapshots.id.equalsExp(packages.snapshotId),
-                ),
-              ])
+        await (_database.select(_database.graphLogPackages)
               ..where(
-                packages.position.isBiggerThanValue(after) &
-                    packages.position.isSmallerOrEqualValue(upTo),
+                (package) =>
+                    package.position.isBiggerThanValue(after) &
+                    package.position.isSmallerOrEqualValue(upTo),
               )
-              ..orderBy([OrderingTerm.asc(packages.position)])
+              ..orderBy([(package) => OrderingTerm.asc(package.position)])
               ..limit(graphFactLogPortionLimit))
             .get();
-    return [
-      for (final row in rows)
-        _storedLogPackage(
-          row.readTable(packages),
-          row.readTableOrNull(snapshots),
-        ),
-    ];
+    return [for (final row in rows) _storedLogPackage(row)];
   }
 
   /// Хранилище снимков не зависит от данных графа, поэтому строку вне формы
@@ -386,33 +374,24 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
 /// Запись графа с ключом порядка её строки.
 typedef _OrderedRecord = (GraphRecordOrderKey, GraphEntityRecord);
 
-/// Схема гарантирует пакету «изменение» версию формата и факты, а пакету
-/// «сброс» — зарегистрированный снимок.
-StoredGraphLogPackage _storedLogPackage(
-  local.GraphLogPackage row,
-  local.RegisteredGraphSnapshot? snapshot,
-) => switch ((row, snapshot)) {
-  (
-    local.GraphLogPackage(
-      kind: 'change',
-      :final position,
-      :final formatVersion?,
-      :final facts?,
-    ),
-    null,
-  ) =>
-    StoredGraphChangePackage(
-      position: position,
-      formatVersion: formatVersion,
-      facts: facts,
-    ),
-  (local.GraphLogPackage(kind: 'reset', :final position), final snapshot?) =>
-    StoredGraphResetPackage(
-      position: position,
-      snapshot: _snapshotEntry(snapshot),
-    ),
-  _ => throw StateError('Пакет лога вне схемы.'),
-};
+/// Схема гарантирует пакету «изменение» версию формата и факты.
+StoredGraphLogPackage _storedLogPackage(local.GraphLogPackage row) =>
+    switch (row) {
+      local.GraphLogPackage(
+        kind: 'change',
+        :final position,
+        :final formatVersion?,
+        :final facts?,
+      ) =>
+        StoredGraphChangePackage(
+          position: position,
+          formatVersion: formatVersion,
+          facts: facts,
+        ),
+      local.GraphLogPackage(kind: 'reset', :final position) =>
+        StoredGraphResetPackage(position: position),
+      _ => throw StateError('Пакет лога вне схемы.'),
+    };
 
 GraphSnapshotEntry _snapshotEntry(local.RegisteredGraphSnapshot row) =>
     GraphSnapshotEntry(

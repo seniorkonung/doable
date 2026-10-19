@@ -20,7 +20,6 @@ import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_backups/graph_change_summary.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
-import 'package:doable/src/graph_snapshots/graph_fact_log.dart';
 import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -207,19 +206,19 @@ void main() {
     await replace(snapshot);
 
     expect(await graphLines(), _recordLines(golden));
-    final reset = await repository.readPackages(
-      after: position,
-      upTo: position + 1,
+    expect(
+      await rows(
+        'SELECT package.position AS package_position, package.kind, '
+        'snapshot.position AS snapshot_position, snapshot.file_name '
+        'FROM graph_log_packages AS package '
+        'LEFT JOIN graph_snapshots AS snapshot '
+        'ON snapshot.id = package.snapshot_id '
+        'WHERE package.position > $position',
+      ),
+      [
+        [position + 1, 'reset', position + 1, snapshot.fileName],
+      ],
     );
-    expect(reset, [
-      isA<StoredGraphResetPackage>()
-          .having((package) => package.position, 'позиция', position + 1)
-          .having(
-            (package) => package.snapshot.fileName,
-            'снимок',
-            snapshot.fileName,
-          ),
-    ]);
     await createTag('Спорт и отдых');
     final state = await store.readStateAt(
       await repository.readCurrentPosition(),

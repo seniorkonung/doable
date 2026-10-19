@@ -14,7 +14,6 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
-import 'package:doable/src/graph_snapshots/graph_fact_log.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -95,15 +94,18 @@ void main() {
         expect(leftovers, isEmpty);
         expect(await _graphLines(database), backupGraph);
         expect(
-          (await repository.readPackages(
-            after: previousPosition,
-            upTo: previousPosition + 1,
-          )).single,
-          isA<StoredGraphResetPackage>().having(
-            (package) => package.snapshot.position,
-            'позиция снимка',
-            previousPosition + 1,
+          await _rows(
+            database,
+            'SELECT package.position AS package_position, package.kind, '
+            'snapshot.position AS snapshot_position '
+            'FROM graph_log_packages AS package '
+            'LEFT JOIN graph_snapshots AS snapshot '
+            'ON snapshot.id = package.snapshot_id '
+            'WHERE package.position > $previousPosition',
           ),
+          [
+            [previousPosition + 1, 'reset', previousPosition + 1],
+          ],
         );
         // Захват включён, а признак записи единым путём снят.
         expect(await _logControl(database), [

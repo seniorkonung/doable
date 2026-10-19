@@ -179,15 +179,11 @@ void main() {
 
   test(
     'пакет «сброс» отдаётся между пакетами «изменение» отдельным вариантом со '
-    'своим снимком',
+    'своей позицией',
     () async {
       await appendPackages(1);
-      final snapshot = GraphSnapshotEntry(
-        position: 2,
-        fileName: 'снимок-сброса',
-        byteSize: 4096,
-        checksum: Uint8List.fromList(List.generate(32, (index) => index)),
-      );
+      final snapshot = _snapshot(2);
+      // Схема требует от пакета «сброс» ссылку на зарегистрированный снимок.
       final snapshotId = await database
           .into(database.graphSnapshots)
           .insert(
@@ -219,10 +215,6 @@ void main() {
             .having((package) => package.facts, 'facts', _facts('пакет 0')),
       );
       expect(reset.position, 2);
-      expect(reset.snapshot.position, snapshot.position);
-      expect(reset.snapshot.fileName, snapshot.fileName);
-      expect(reset.snapshot.byteSize, snapshot.byteSize);
-      expect(reset.snapshot.checksum, snapshot.checksum);
       expect(
         after,
         isA<StoredGraphChangePackage>().having(

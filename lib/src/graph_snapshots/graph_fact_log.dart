@@ -33,14 +33,10 @@ final class StoredGraphChangePackage extends StoredGraphLogPackage {
 }
 
 /// Пакет «сброс»: граф заменён, и состояние на позиции пакета записано
-/// только в снимке [snapshot], а не фактами.
+/// только в снимке замены, а не фактами. Снимок зарегистрирован на позиции
+/// пакета, поэтому сборка состояния находит его в реестре по позиции.
 final class StoredGraphResetPackage extends StoredGraphLogPackage {
-  const StoredGraphResetPackage({
-    required super.position,
-    required this.snapshot,
-  });
-
-  final GraphSnapshotEntry snapshot;
+  const StoredGraphResetPackage({required super.position});
 }
 
 /// Снимок в реестре снимков: файл состояния графа на позиции лога.
