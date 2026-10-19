@@ -1463,6 +1463,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataBackupDataReplaced => 'Данные заменены';
 
   @override
+  String get dataRestoreRunning => 'Восстановление копии…';
+
+  @override
+  String dataReplacementProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
+
+  @override
+  String get dataReplacementCancel => 'Отменить';
+
+  @override
+  String get dataReplacementCancelling => 'Отмена…';
+
+  @override
   String get tagNavigationTitle => 'Намерения с тегом';
 
   @override

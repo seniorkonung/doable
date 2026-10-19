@@ -2233,6 +2233,30 @@ abstract class AppLocalizations {
   /// **'Data replaced'**
   String get dataBackupDataReplaced;
 
+  /// Заголовок модального прогресса, пока идёт восстановление резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring the copy…'**
+  String get dataRestoreRunning;
+
+  /// Ход замены графа для экранного диктора: выполненная доля в процентах
+  ///
+  /// In en, this message translates to:
+  /// **'{share}'**
+  String dataReplacementProgress(double share);
+
+  /// Кнопка модального прогресса замены графа, откатывающая замену
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dataReplacementCancel;
+
+  /// Состояние модального прогресса замены графа после «Отменить», пока замена откатывается
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelling…'**
+  String get dataReplacementCancelling;
+
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:

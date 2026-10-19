@@ -1449,6 +1449,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataBackupDataReplaced => 'Data replaced';
 
   @override
+  String get dataRestoreRunning => 'Restoring the copy…';
+
+  @override
+  String dataReplacementProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
+
+  @override
+  String get dataReplacementCancel => 'Cancel';
+
+  @override
+  String get dataReplacementCancelling => 'Cancelling…';
+
+  @override
   String get tagNavigationTitle => 'Tagged intentions';
 
   @override
