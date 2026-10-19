@@ -1109,3 +1109,14 @@
   - **Dependencies:** 3.21.
   - **Files likely touched:** `lib/src/design_system/components/sheet.dart`, `lib/src/data_transfer/presentation/backups_sheet.dart`, `test/data_transfer/presentation/backups_sheet_test.dart`.
   - **Estimated scope:** S.
+
+- [ ] 3.34 Отдавать пакет «сброс» в контракте лога только с его позицией, без ссылки на снимок
+  - **Acceptance criteria:**
+    - Вариант «сброс» контракта `GraphFactLog` несёт только позицию пакета. Эта задача заменяет требование критерия задачи 3.2 «пакет «сброс» указывает свой снимок»: ссылку не использует ни один потребитель. Сборка состояния находит снимок замены в реестре по позиции, а сжатие сохраняет снимки пакетов «сброс» собственным запросом по решению 7 [дизайна](design.md). Чтение порции пакетов больше не соединяет их с реестром снимков и не разбирает строку снимка.
+    - В базе пакет «сброс» по-прежнему ссылается на снимок замены: схема требует эту ссылку и не даёт удалить снимок, на который ссылается пакет (решения 4 и 7). Сборка состояния, которой встретился «сброс» внутри диапазона, по-прежнему отказывает. Замена, сжатие, экспорт, копии, сводки и восстановление для человека не меняются.
+  - **Verification:**
+    - Тестом чтения пакетов проверить, что пакет «сброс» между двумя пакетами «изменение» читается вариантом «сброс» со своей позицией. Тесты замены графа и прерывания процесса посреди замены проверяют, что подтверждённая замена записала пакет «сброс» со ссылкой на зарегистрированный снимок замены. Ссылку они читают прямо из строки пакета и реестра снимков, а не через контракт. Выполнить `mise exec --no-deps -- flutter test --exclude-tags=flutter_process test/graph/data/drift_graph_fact_log_access_test.dart test/graph/data/drift_graph_replacement_test.dart test/graph_snapshots/` и `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph/data/drift_graph_replacement_process_durability_test.dart`.
+    - Если после этой задачи в этапе 3 нет незавершённых задач, выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 3.2, 3.10.
+  - **Files likely touched:** `lib/src/graph_snapshots/graph_fact_log.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `test/graph/data/drift_graph_fact_log_access_test.dart`, `test/graph/data/drift_graph_replacement_test.dart`, `test/graph/data/drift_graph_replacement_process_durability_test.dart`.
+  - **Estimated scope:** S.

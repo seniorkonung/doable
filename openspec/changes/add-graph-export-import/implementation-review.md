@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Все задачи этапа 3 (3.1–3.27) поставлены, а полные проверки проекта на проверяемой голове проходят. Серьёзных замечаний и замечаний средней важности нет. Остаётся одно замечание низкой важности: ссылка пакета «сброс» на снимок, которую никто не читает. Принятых остаточных рисков нет.
+**Summary:** Все задачи этапа 3 (3.1–3.27) поставлены, а полные проверки проекта на проверяемой голове проходят. Нерешённых замечаний нет: исправления по замечаниям этого ревью ведут незавершённые задачи 3.28–3.34. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -82,14 +82,7 @@
 
 ## Findings
 
-### F6 · Low — Ссылка пакета «сброс» на снимок в контракте лога не нужна ни одному потребителю
-
-- **Evidence:** `lib/src/graph_snapshots/graph_fact_log.dart:34-43` добавляет `StoredGraphResetPackage.snapshot`. Ради него каждое чтение порции пакетов соединяет реестр снимков (`lib/src/graph/data/drift_personal_graph_repository_fact_log.dart:31-52`) и разбирает его строку (`:372-395`). Единственный потребитель в продуктовом коде отбрасывает ссылку: `StoredGraphResetPackage(:final position) => GraphHistoryReset(position: position)` (`lib/src/graph_snapshots/graph_snapshot_store.dart:189-191`). Снимки пакетов «сброс» удаление истории сохраняет собственным запросом (`drift_personal_graph_repository_fact_log.dart:331-342`), а сборка состояния находит снимок замены в реестре по позиции. Ссылку читают только тесты. Элемент требует критерий приёмки задачи 3.2: «пакет «сброс» указывает свой снимок».
-- **Evidence revisions:** ["9a0a612b472b98cad5a214b604cdc6b9fbcbd38a"]
-- **Impact:** Каждое чтение истории — для сжатия, экспорта, восстановления, сводок и подсчёта «с тех пор» — платит за соединение и разбор строки снимка. Контракт несёт элемент без потребителя, а его тесты поддерживают поведение, которым никто не пользуется.
-- **Required outcome:** Контракт лога отдаёт ссылку пакета «сброс» на снимок, только если её использует потребитель; иначе вариант «сброс» несёт лишь свою позицию.
-- **Earliest source of truth:** task/verification
-- **Affected artifacts:** ["openspec/changes/add-graph-export-import/tasks.md: 3.2", "lib/src/graph_snapshots/graph_fact_log.dart", "lib/src/graph/data/drift_personal_graph_repository_fact_log.dart", "test/graph/data/drift_graph_fact_log_access_test.dart", "test/support/forwarding_graph_fact_log.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
