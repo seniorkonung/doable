@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart'
-    show AppDatabase, LocalDatabaseSqlOperation;
+    show AppDatabase, LocalDatabaseSqlOperation, LocalDatabaseSqlStatement;
 import 'package:doable/src/data_transfer/application/graph_restore.dart';
 import 'package:doable/src/data_transfer/application/graph_restore_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -46,7 +46,7 @@ const _threshold = 3;
 
 void main() {
   late LocalDatabaseHarness harness;
-  late TransactionStorageExhaustion storageExhaustion;
+  late _StatementProbe probe;
   late AppDatabase database;
   late DriftPersonalGraphRepository repository;
   late Directory snapshots;
@@ -63,10 +63,10 @@ void main() {
   setUp(() async {
     harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
-    storageExhaustion = TransactionStorageExhaustion();
+    probe = _StatementProbe();
     database = await harness.openReadyDatabase(
-      setup: (connection) => storageExhaustion.storage = connection,
-      observer: storageExhaustion,
+      setup: (connection) => probe.storage = connection,
+      observer: probe,
     );
     now = DateTime(2026, 10, 5, 9);
     repository = DriftPersonalGraphRepository(
@@ -545,6 +545,59 @@ void main() {
       expect(await storedState(), before);
       expect(diagnostics.events, isEmpty);
     });
+
+    test('непосредственно перед проверкой точки невозврата замены '
+        'принимается и откатывает замену с исходом отмены без '
+        'изменений', () async {
+      await createTag('Дом');
+      final backup = await makeManualBackup();
+      await createTag('Сад');
+      final before = await storedState();
+      final states = <GraphRestoreState>[];
+      container.listen(
+        graphRestoreControllerProvider,
+        (_, state) => states.add(state),
+      );
+      probe.onStatement = (statement) {
+        if (_enablesCapture(statement)) controller().cancel();
+      };
+
+      expect(await restore(backup), isA<GraphBackupRestoreCancelled>());
+
+      probe.onStatement = null;
+      expect(states, isNot(contains(isA<GraphRestoreCommitting>())));
+      expect(states.sublist(states.length - 2), [
+        isA<GraphRestoreCancelling>(),
+        isA<GraphRestoreIdle>(),
+      ]);
+      expect(await storedState(), before);
+      expect(diagnostics.events, isEmpty);
+    });
+
+    test('после точки невозврата замены не принимается и не меняет состояние '
+        'контроллера, а восстановление завершается успехом', () async {
+      await createTag('Дом');
+      final backup = await makeManualBackup();
+      final backupState = await graphState();
+      await createTag('Сад');
+      final states = <GraphRestoreState>[];
+      container.listen(graphRestoreControllerProvider, (_, state) {
+        states.add(state);
+        if (state is GraphRestoreCommitting) controller().cancel();
+      });
+
+      expect(await restore(backup), isA<GraphBackupRestored>());
+
+      expect(states, isNot(contains(isA<GraphRestoreCancelling>())));
+      expect(states.sublist(states.length - 2), [
+        isA<GraphRestoreCommitting>(),
+        isA<GraphRestoreIdle>(),
+      ]);
+      expect(await graphState(), backupState);
+      expect(diagnostics.events, [
+        {'operation': 'graphBackupRestore', 'outcome': 'succeeded'},
+      ]);
+    });
   });
 
   group('нехватка места', () {
@@ -555,7 +608,7 @@ void main() {
       final backup = await makeManualBackup();
       await createTag('Сад');
       final before = await storedState();
-      storageExhaustion.exhaustsBefore = (statement) =>
+      probe.exhaustsBefore = (statement) =>
           statement.operation == LocalDatabaseSqlOperation.insert &&
           statement.statements.single.startsWith(
             'INSERT INTO "graph_log_packages"',
@@ -646,6 +699,23 @@ Object _shown(GraphChangesSinceBackup changes) => switch (changes) {
     'Данные заменялись',
   GraphChangesSinceBackupUncounted() => 'Не посчитано',
 };
+
+/// Включение захвата фактов — последний оператор транзакции замены перед её
+/// точкой невозврата.
+bool _enablesCapture(LocalDatabaseSqlStatement statement) =>
+    statement.operation == LocalDatabaseSqlOperation.update &&
+    statement.statements.single.contains('SET "capture"') &&
+    statement.arguments.single == 1;
+
+/// Исчерпывает место хранилища, как [TransactionStorageExhaustion], а после
+/// оператора сообщает о нём [onStatement].
+final class _StatementProbe extends TransactionStorageExhaustion {
+  void Function(LocalDatabaseSqlStatement statement)? onStatement;
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) =>
+      onStatement?.call(statement);
+}
 
 /// Получатель диагностики, по которому проверка дожидается окончания
 /// сжатия: исход сжатия сообщается после удаления истории.

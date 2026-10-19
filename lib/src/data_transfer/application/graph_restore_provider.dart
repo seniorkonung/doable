@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph_backups/graph_backup_registry.dart';
+import 'graph_replacement.dart';
 import 'graph_restore.dart';
 
 /// Восстановление резервной копии на протяжении жизни контейнера приложения:
@@ -39,8 +38,15 @@ final class GraphRestoreRunning extends GraphRestoreState {
   final GraphRestoreProgress progress;
 }
 
-/// Отмена запрошена: восстановление прекращается, а начатая замена
-/// откатывается. Состояние держится до конца отката.
+/// Замена прошла точку невозврата и подтверждается: отмена больше не
+/// принимается, и восстановление завершается так же, как без неё. Ход замены
+/// к этому моменту полный.
+final class GraphRestoreCommitting extends GraphRestoreState {
+  const GraphRestoreCommitting();
+}
+
+/// Отмена принята до точки невозврата замены: восстановление прекращается,
+/// а начатая замена откатывается. Состояние держится до конца отката.
 final class GraphRestoreCancelling extends GraphRestoreState {
   const GraphRestoreCancelling();
 }
@@ -50,8 +56,9 @@ final class GraphRestoreController extends Notifier<GraphRestoreState> {
 
   final GraphRestore _restore;
 
-  /// Отмена принятого восстановления, пока оно идёт.
-  Completer<void>? _cancellation;
+  /// Отмена идущего восстановления, пока её можно запросить: `null` без
+  /// восстановления и после принятой отмены.
+  GraphReplacementCancellation? _cancellation;
 
   @override
   GraphRestoreState build() => const GraphRestoreIdle();
@@ -66,13 +73,16 @@ final class GraphRestoreController extends Notifier<GraphRestoreState> {
   /// [GraphCommandCoordinator]. Успех и отказ предъявляет координатор, а
   /// отмена сообщения не даёт.
   ///
-  /// Пока восстановление идёт, состояние сообщает его ход, а после [cancel] —
-  /// отмену до её окончания. Восстановление, не принятое координатором,
-  /// состояния не меняет.
+  /// Пока восстановление идёт, состояние сообщает его ход, после принятой
+  /// [cancel] — отмену до её окончания, а после точки невозврата замены —
+  /// подтверждение замены, которое отменить уже нельзя. Восстановление, не
+  /// принятое координатором, состояния не меняет.
   GraphBackupRestoreStart start(GraphBackupEntry backup) => ref
       .read(graphCommandCoordinatorProvider.notifier)
       .acceptBackupRestore((exclusive) async {
-        final cancellation = _cancellation = Completer<void>();
+        final cancellation = _cancellation = GraphReplacementCancellation(
+          onPointOfNoReturn: () => _publish(const GraphRestoreCommitting()),
+        );
         _publish(
           const GraphRestoreRunning(
             GraphRestoreProgress(GraphRestorePhase.snapshotWrite, 0),
@@ -83,11 +93,13 @@ final class GraphRestoreController extends Notifier<GraphRestoreState> {
             backup,
             exclusive,
             onProgress: (progress) {
-              if (!cancellation.isCompleted) {
+              // После принятой отмены ход не публикуется: до конца отката
+              // состояние сообщает отмену.
+              if (_cancellation != null) {
                 _publish(GraphRestoreRunning(progress));
               }
             },
-            cancelled: cancellation.future,
+            cancellation: cancellation,
           );
         } finally {
           _cancellation = null;
@@ -95,11 +107,14 @@ final class GraphRestoreController extends Notifier<GraphRestoreState> {
         }
       });
 
-  /// Отменяет идущее восстановление; без него ничего не делает.
+  /// Отменяет идущее восстановление, если замена ещё не прошла точку
+  /// невозврата. Принятие отмены и проверка в точке невозврата — одно
+  /// синхронное решение, поэтому после точки невозврата, как и без
+  /// восстановления, ничего не меняется.
   void cancel() {
     final cancellation = _cancellation;
-    if (cancellation == null || cancellation.isCompleted) return;
-    cancellation.complete();
+    if (cancellation == null || !cancellation.request()) return;
+    _cancellation = null;
     _publish(const GraphRestoreCancelling());
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../graph/application/graph_change.dart';
 import '../../graph_snapshots/graph_snapshot_store.dart'
     show GraphSnapshotCorruption, UnregisteredGraphSnapshot;
@@ -19,11 +21,17 @@ final class GraphReplacementCancellation {
   /// [onPointOfNoReturn] вызывается, когда замена проходит точку невозврата:
   /// с этого момента отмена не принимается.
   GraphReplacementCancellation({
-    void Function() onPointOfNoReturn = _ignorePointOfNoReturn,
-  }) : _onPointOfNoReturn = onPointOfNoReturn;
+    this._onPointOfNoReturn = _ignorePointOfNoReturn,
+  });
 
   final void Function() _onPointOfNoReturn;
   var _state = _GraphReplacementCancellationState.open;
+  final _requested = Completer<void>();
+
+  /// Завершается, когда отмена принята. По нему прекращается подготовка
+  /// замены, которая не может проверить отмену синхронно, — запись снимка
+  /// замены в отдельном изоляте.
+  Future<void> get requested => _requested.future;
 
   /// Запрашивает отмену и сообщает, принята ли она.
   ///
@@ -34,6 +42,7 @@ final class GraphReplacementCancellation {
     switch (_state) {
       case _GraphReplacementCancellationState.open:
         _state = _GraphReplacementCancellationState.requested;
+        _requested.complete();
         return true;
       case _GraphReplacementCancellationState.requested:
         return true;

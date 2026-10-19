@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph_backups/graph_backup_registry.dart';
@@ -109,23 +107,22 @@ final class GraphRestore {
   /// Заменяет граф состоянием копии [backup]; саму замену выполняет
   /// [exclusive] принятого координатором восстановления.
   ///
-  /// [onProgress] получает ход обеих фаз. Завершение [cancelled] прекращает
-  /// запись снимка замены между записями, а замену — между пакетами
-  /// операторов, откатывая её транзакцию; после точки невозврата замены
-  /// отмена не принимается, и восстановление завершается без неё. Копия,
-  /// которую к началу восстановления уже удалило окно хранения, даёт отказ.
-  /// Нехватка места на устройстве в любой фазе даёт
+  /// [onProgress] получает ход обеих фаз. Отмена, принятая [cancellation],
+  /// прекращает запись снимка замены между записями, а замену — между
+  /// пакетами операторов, откатывая её транзакцию, и даёт
+  /// [GraphBackupRestoreCancelled]. После точки невозврата замены
+  /// [cancellation] отмену не принимает, и восстановление завершается так же,
+  /// как без неё. Копия, которую к началу восстановления уже удалило окно
+  /// хранения, даёт отказ. Нехватка места на устройстве в любой фазе даёт
   /// [GraphBackupRestoreStorageFull]. После отказа и отмены граф, копии и
   /// реестр снимков остаются прежними, а файл снимка замены удаляется.
   Future<GraphBackupRestoreOutcome> restore(
     GraphBackupEntry backup,
     GraphExclusiveReplacement exclusive, {
     required void Function(GraphRestoreProgress progress) onProgress,
-    required Future<void> cancelled,
+    required GraphReplacementCancellation cancellation,
   }) async {
     final stopwatch = Stopwatch()..start();
-    final cancellation = GraphReplacementCancellation();
-    unawaited(cancelled.then((_) => cancellation.request()));
     UnregisteredGraphSnapshot? snapshot;
     try {
       await _snapshotFiles;
@@ -134,7 +131,7 @@ final class GraphRestore {
         onProgress: (share) => onProgress(
           GraphRestoreProgress(GraphRestorePhase.snapshotWrite, share),
         ),
-        cancelled: cancelled,
+        cancelled: cancellation.requested,
       );
       snapshot = written;
       final restored = await exclusive.replace(() {

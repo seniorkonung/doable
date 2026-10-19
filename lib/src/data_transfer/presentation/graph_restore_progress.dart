@@ -40,7 +40,9 @@ final class _GraphRestoreProgressHostState
     // прогресс.
     ref.listenManual(graphRestoreControllerProvider, (_, state) {
       switch (state) {
-        case GraphRestoreRunning() || GraphRestoreCancelling():
+        case GraphRestoreRunning() ||
+            GraphRestoreCommitting() ||
+            GraphRestoreCancelling():
           _open();
         case GraphRestoreIdle():
           _close();
@@ -79,8 +81,8 @@ final class _GraphRestoreProgressHostState
 const _snapshotWriteShare = 0.3;
 
 /// Модальный прогресс восстановления: экранный диктор читает, что идёт
-/// восстановление, его ход и кнопку «Отменить», а после отмены — «Отмена…»
-/// до конца отката.
+/// восстановление, его ход и кнопку «Отменить», после точки невозврата
+/// замены — её недоступность, а после отмены — «Отмена…» до конца отката.
 final class _GraphRestoreProgress extends ConsumerWidget {
   const _GraphRestoreProgress();
 
@@ -91,11 +93,16 @@ final class _GraphRestoreProgress extends ConsumerWidget {
     final title = localizations.dataRestoreRunning;
     // Откат после отмены не измеряется. Когда восстановление завершено,
     // маршрут удаляется раньше следующего кадра.
-    final (share, isCancelling) = switch (ref.watch(
+    final (share, cancellation) = switch (ref.watch(
       graphRestoreControllerProvider,
     )) {
-      GraphRestoreRunning(:final progress) => (_overallShare(progress), false),
-      GraphRestoreCancelling() || GraphRestoreIdle() => (null, true),
+      GraphRestoreRunning(:final progress) => (
+        _overallShare(progress),
+        _Cancellation.available,
+      ),
+      GraphRestoreCommitting() => (1.0, _Cancellation.unavailable),
+      GraphRestoreCancelling() ||
+      GraphRestoreIdle() => (null, _Cancellation.accepted),
     };
     return PopScope<void>(
       canPop: false,
@@ -127,16 +134,19 @@ final class _GraphRestoreProgress extends ConsumerWidget {
           // показывает.
           MergeSemantics(
             child: Semantics(
-              liveRegion: isCancelling,
+              liveRegion: cancellation == _Cancellation.accepted,
               child: OutlinedButton(
-                onPressed: isCancelling
-                    ? null
-                    : ref.read(graphRestoreControllerProvider.notifier).cancel,
-                child: Text(
-                  isCancelling
-                      ? localizations.dataReplacementCancelling
-                      : localizations.dataReplacementCancel,
-                ),
+                onPressed: switch (cancellation) {
+                  _Cancellation.available =>
+                    ref.read(graphRestoreControllerProvider.notifier).cancel,
+                  _Cancellation.unavailable || _Cancellation.accepted => null,
+                },
+                child: Text(switch (cancellation) {
+                  _Cancellation.available || _Cancellation.unavailable =>
+                    localizations.dataReplacementCancel,
+                  _Cancellation.accepted =>
+                    localizations.dataReplacementCancelling,
+                }),
               ),
             ),
           ),
@@ -144,6 +154,18 @@ final class _GraphRestoreProgress extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Отмена восстановления на кнопке прогресса.
+enum _Cancellation {
+  /// Отмену можно запросить кнопкой «Отменить».
+  available,
+
+  /// Замена прошла точку невозврата: «Отменить» недоступна до исхода.
+  unavailable,
+
+  /// Отмена принята: кнопка показывает «Отмена…» до конца отката.
+  accepted,
 }
 
 /// Ход обеих фаз восстановления одной долей от 0 до 1.

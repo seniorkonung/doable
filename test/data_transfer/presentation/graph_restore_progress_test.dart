@@ -9,6 +9,7 @@ import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         LocalDatabaseConnectionObserver,
+        LocalDatabaseSqlOperation,
         LocalDatabaseSqlStatement,
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
@@ -162,6 +163,41 @@ void main() {
     });
   }
 
+  testWidgets('после точки невозврата замены «Отменить» недоступна, экранный '
+      'диктор сообщает о её недоступности, а нажатие не показывает '
+      '«Отмена…», и восстановление завершается сообщением «Копия '
+      'восстановлена»', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final app = await _RestoreApp.open(tester, hold: _ReplacementHold.commit);
+    app.startRestore();
+    await _waitFor(tester, () => app.replacement.isHolding);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSemantics(find.text('Отменить')),
+      isSemantics(
+        label: 'Отменить',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+        hasTapAction: false,
+      ),
+    );
+    await tester.tap(find.text('Отменить'), warnIfMissed: false);
+    await tester.pump();
+    expect(find.text('Отмена…'), findsNothing);
+    expect(find.text('Отменить'), findsOneWidget);
+
+    app.replacement.proceed();
+    await _waitFor(
+      tester,
+      () => find.text('Копия восстановлена').evaluate().isNotEmpty,
+    );
+    expect(app.outcome, isA<GraphBackupRestored>());
+    expect(find.text('Восстановление копии…'), findsNothing);
+    semantics.dispose();
+  });
+
   testWidgets('после отказа восстановления прогресс закрывается, а страница '
       '«Настройки» остаётся открытой', (tester) async {
     final app = await _RestoreApp.open(tester);
@@ -181,8 +217,8 @@ void main() {
 }
 
 /// Приложение новой установки с тегом и ручной копией, открытое на странице
-/// «Настройки» на языке [language]. Замена графа ждёт [replacement] на
-/// первом операторе удаления прежнего графа.
+/// «Настройки» на языке [language]. Замена графа ждёт [replacement] там,
+/// где её задерживает [hold].
 final class _RestoreApp {
   _RestoreApp._(this._tester, this._container, this._backup, this.replacement);
 
@@ -198,11 +234,12 @@ final class _RestoreApp {
     WidgetTester tester, {
     String language = 'ru',
     String settings = 'Настройки',
+    _ReplacementHold hold = _ReplacementHold.previousGraphDeletion,
   }) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.binding.platformDispatcher.localesTestValue = [Locale(language)];
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-    final replacement = _ReplacementControl();
+    final replacement = _ReplacementControl(hold);
     final files = TemporaryGraphFiles();
     final runtime = AppRuntime(
       connectionFactory: () => observeConfiguredLocalDatabaseConnection(
@@ -266,14 +303,30 @@ final class _RestoreApp {
   }
 }
 
-/// Задерживает замену графа на её первом операторе удаления прежнего графа,
-/// пока проверка не продолжит замену или не отклонит этот оператор отказом
-/// хранилища.
+/// Где проверка задерживает замену графа.
+enum _ReplacementHold {
+  /// На первом операторе удаления прежнего графа, до точки невозврата.
+  previousGraphDeletion,
+
+  /// На подтверждении транзакции замены, после точки невозврата.
+  commit,
+}
+
+/// Задерживает замену графа там, где её задерживает [_hold], пока проверка
+/// не продолжит замену или не отклонит первый оператор удаления прежнего
+/// графа отказом хранилища.
 final class _ReplacementControl extends LocalDatabaseConnectionObserver {
+  _ReplacementControl(this._hold);
+
+  final _ReplacementHold _hold;
   final _release = Completer<void>();
   var _isReached = false;
 
-  /// Замена дошла до удаления прежнего графа и ждёт.
+  /// Замена выполнила последний оператор перед точкой невозврата, и её
+  /// транзакции осталось только подтверждение.
+  var _isCommitNext = false;
+
+  /// Замена дошла до места задержки и ждёт.
   bool get isHolding => _isReached && !_release.isCompleted;
 
   void proceed() {
@@ -289,12 +342,32 @@ final class _ReplacementControl extends LocalDatabaseConnectionObserver {
 
   @override
   FutureOr<void> beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (_isReached ||
+    if (_hold != _ReplacementHold.previousGraphDeletion ||
+        _isReached ||
         !statement.statements.any(
           (sql) => sql.startsWith('DELETE FROM daily_choices '),
         )) {
       return null;
     }
+    _isReached = true;
+    return _release.future;
+  }
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    // Включение захвата фактов — последний оператор транзакции замены перед
+    // её точкой невозврата.
+    if (_hold == _ReplacementHold.commit &&
+        statement.operation == LocalDatabaseSqlOperation.update &&
+        statement.statements.single.contains('SET "capture"') &&
+        statement.arguments.single == 1) {
+      _isCommitNext = true;
+    }
+  }
+
+  @override
+  FutureOr<void> beforeTransactionCommit() {
+    if (!_isCommitNext || _isReached) return null;
     _isReached = true;
     return _release.future;
   }
