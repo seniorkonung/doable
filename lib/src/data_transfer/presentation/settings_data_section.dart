@@ -9,14 +9,18 @@ import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_icon.dart';
 import '../../design_system/doable_metrics.dart';
 import '../../design_system/doable_type.dart';
+import '../../graph/application/graph_command_coordinator.dart';
+import '../../graph/presentation/operation_failure_presentation.dart';
 import '../../graph_backups/graph_backup_registry.dart';
 import '../../graph_backups/graph_backups_provider.dart';
 import '../application/graph_composition.dart';
 import '../application/graph_composition_provider.dart';
 import '../application/graph_export_provider.dart';
+import '../application/graph_restore_provider.dart';
 import 'backup_descriptions.dart';
 import 'backups_sheet.dart';
 import 'export_data_sheet.dart';
+import 'restore_backup_confirmation.dart';
 
 /// Раздел «Данные» страницы «Настройки»: пояснение, что граф хранится только
 /// на устройстве, и строки операций с данными.
@@ -66,6 +70,10 @@ const _justNowWindow = Duration(minutes: 1);
 /// Строка «Резервные копии» открывает панель копий и сообщает, когда сделана
 /// последняя по созданию копия. Без копий пустой граф копировать нечего, а
 /// отказ чтения копий не выдаётся за их отсутствие.
+///
+/// Строка начинает восстановление копии, подтверждённое в панели, и по праву
+/// инициатора (ADR-0012) предъявляет под собой его отказ, пока открыта
+/// страница. Успех предъявляет общая поверхность результатов.
 final class _BackupsRow extends ConsumerStatefulWidget {
   const _BackupsRow();
 
@@ -73,26 +81,149 @@ final class _BackupsRow extends ConsumerStatefulWidget {
   ConsumerState<_BackupsRow> createState() => _BackupsRowState();
 }
 
+/// Отказ восстановления копии [backup], который строка предъявляет по праву
+/// [claim].
+final class _RestoreFailure {
+  const _RestoreFailure(
+    this.backup, {
+    required this.isStorageFull,
+    required this.claim,
+  });
+
+  final GraphBackupEntry backup;
+
+  /// Восстановлению не хватило места; после того как место освобождено, его
+  /// можно повторить.
+  final bool isStorageFull;
+  final GraphInitiatorPresentationClaim? claim;
+}
+
 final class _BackupsRowState extends ConsumerState<_BackupsRow> {
+  late final GraphCommandCoordinator _coordinator;
+
   /// Перестраивает строку, когда подпись «только что» перестаёт быть верной.
   Timer? _justNowExpiry;
+
+  /// Восстановление, начатое строкой, пока она ждёт его исхода или
+  /// предъявляет его отказ.
+  GraphBackupRestoreOperationToken? _restoreToken;
+  _RestoreFailure? _restoreFailure;
+
+  @override
+  void initState() {
+    super.initState();
+    _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+  }
 
   @override
   void dispose() {
     _justNowExpiry?.cancel();
+    _releaseRestorePresentation();
     super.dispose();
+  }
+
+  /// Неподтверждённый отказ прежнего восстановления переходит к общей
+  /// поверхности результатов.
+  void _releaseRestorePresentation() {
+    if (_restoreToken case final token?) {
+      _coordinator.releaseInitiatorPresentation(token);
+    }
+    _restoreToken = null;
+  }
+
+  Future<void> _openSheet() async {
+    final backup = await showBackupsSheet(context);
+    if (backup != null && mounted) await _restore(backup);
+  }
+
+  /// Снова открывает подтверждение восстановления копии [backup]: пока
+  /// освобождалось место, граф мог измениться, поэтому изменения с тех пор
+  /// считаются заново.
+  Future<void> _retryRestore(GraphBackupEntry backup) async {
+    final confirmed = await confirmBackupRestore(
+      context,
+      backup: backup,
+      changesSince: ref
+          .read(graphRestoreControllerProvider.notifier)
+          .countChangesSince(backup),
+    );
+    if (confirmed && mounted) await _restore(backup);
+  }
+
+  Future<void> _restore(GraphBackupEntry backup) async {
+    _releaseRestorePresentation();
+    setState(() => _restoreFailure = null);
+    switch (ref.read(graphRestoreControllerProvider.notifier).start(backup)) {
+      case GraphBackupRestoreAccepted(:final token, :final future):
+        _restoreToken = token;
+        final outcome = await future;
+        if (!mounted || !identical(_restoreToken, token)) return;
+        switch (outcome) {
+          case GraphBackupRestoreFailed() || GraphBackupRestoreStorageFull():
+            setState(
+              () => _restoreFailure = _RestoreFailure(
+                backup,
+                isStorageFull: outcome is GraphBackupRestoreStorageFull,
+                claim: _coordinator.claimInitiatorFailure(token),
+              ),
+            );
+          // Успех предъявляет общая поверхность, а отмена сообщения не даёт.
+          case GraphBackupRestored() || GraphBackupRestoreCancelled():
+            _restoreToken = null;
+        }
+      // Восстановление не принято: идёт прежнее, исход которого строка уже
+      // ждёт, или приложение завершает работу.
+      case GraphBackupRestoreAlreadyRunning() ||
+          GraphCommandCoordinatorDraining():
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
+    final failure = _restoreFailure;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _row(localizations),
+        if (failure != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              DoableMetrics.space2,
+              0,
+              DoableMetrics.space2,
+              DoableMetrics.space2,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                OperationFailurePresentation(
+                  claim: failure.claim,
+                  message: failure.isStorageFull
+                      ? localizations.dataReplacementStorageFull
+                      : localizations.dataBackupRestoreFailed,
+                ),
+                if (failure.isStorageFull)
+                  TextButton(
+                    onPressed: () => unawaited(_retryRestore(failure.backup)),
+                    child: Text(localizations.commonRetry),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Строка по прочитанным копиям и составу графа.
+  OptionRow _row(AppLocalizations localizations) {
     OptionRow row({String? hint, VoidCallback? onPressed}) => OptionRow(
       icon: DoableIconData.backups,
       name: localizations.dataBackupsTitle,
       hint: hint,
       onPressed: onPressed,
     );
-    void openSheet() => unawaited(showBackupsSheet(context));
+    void openSheet() => unawaited(_openSheet());
     return switch ((
       ref.watch(graphBackupListProvider).value,
       ref.watch(graphCompositionProvider).value,

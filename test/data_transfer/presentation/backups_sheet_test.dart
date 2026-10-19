@@ -528,9 +528,10 @@ final class _BackupInsertControl extends LocalDatabaseConnectionObserver {
   }
 }
 
-/// Приложение новой установки на странице «Настройки» с открытой панелью
-/// копий. В панели одна ежедневная копия с тегом «Дом», а после неё создан
-/// тег «Сад». Часы остановлены 7 октября 2026 года в 09:00.
+/// Приложение новой установки на странице «Настройки» с панелью копий,
+/// открытой строкой «Резервные копии». В панели одна ежедневная копия с тегом
+/// «Дом», а после неё создан тег «Сад». Часы остановлены 7 октября 2026 года
+/// в 09:00.
 final class _RestoreFromSheetApp {
   _RestoreFromSheetApp._(this._tester, this._container);
 
@@ -582,9 +583,7 @@ final class _RestoreFromSheetApp {
       () => find.byType(SettingsPage).evaluate().isNotEmpty,
     );
     await tester.pumpAndSettle();
-    // Строки «Резервные копии» в разделе «Данные» ещё нет, поэтому панель
-    // открывается со страницы напрямую.
-    unawaited(showBackupsSheet(tester.element(find.byType(SettingsPage))));
+    await tester.tap(find.text('Резервные копии'));
     await _waitFor(
       tester,
       () => find.text('Сегодня, 09:00').evaluate().isNotEmpty,

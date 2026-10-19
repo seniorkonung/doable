@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/main.dart';
+import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
+import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups, Tag;
 import 'package:doable/src/data_transfer/application/graph_composition.dart';
 import 'package:doable/src/data_transfer/application/graph_composition_provider.dart';
@@ -22,6 +26,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -29,9 +34,12 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/file_document_access.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/temporary_graph_files.dart';
 
 void main() {
   for (final (language, title, explanation, name, nothing, hint) in [
@@ -342,6 +350,101 @@ void main() {
 
     expect(find.byType(BottomSheet), findsOneWidget);
   });
+
+  const restoreFailed = 'Не удалось восстановить копию. Ничего не изменено';
+  const storageFull =
+      'Недостаточно места на устройстве. Освободите место и повторите. '
+      'Ничего не изменено';
+
+  testWidgets('отказ восстановления копии показан под строкой «Резервные '
+      'копии» без действия и прочитан экранным диктором, а после ухода со '
+      'страницы общая поверхность его не повторяет', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final app = await _RestoreApp.open(tester);
+    app.storage.failsWith = sqlite.SqlError.SQLITE_IOERR;
+    await app.chooseBackup();
+
+    await tester.tap(find.text('Восстановить копию'));
+    await _waitFor(
+      tester,
+      () => find.text(restoreFailed).evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSemantics(find.text(restoreFailed)),
+      isSemantics(label: restoreFailed, isLiveRegion: true),
+    );
+    expect(find.text('Повторить'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsPage), findsNothing);
+    expect(find.text(restoreFailed), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('отказ восстановления, который строка «Резервные копии» не '
+      'успела показать, после ухода со страницы показывает общая '
+      'поверхность', (tester) async {
+    final app = await _RestoreApp.open(tester);
+    app.storage.failsWith = sqlite.SqlError.SQLITE_IOERR;
+    await app.chooseBackup();
+    // Без фокуса ввода сообщение под строкой не считается показанным.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+    await tester.tap(find.text('Восстановить копию'));
+    await _waitFor(
+      tester,
+      () => find.text(restoreFailed).evaluate().isNotEmpty,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SettingsPage), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text(restoreFailed),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('при нехватке места под строкой «Резервные копии» показано '
+      'сообщение с «Повторить», которое снова открывает подтверждение '
+      'восстановления той же копии с новым подсчётом изменений', (
+    tester,
+  ) async {
+    final app = await _RestoreApp.open(tester);
+    app.storage.failsWith = sqlite.SqlError.SQLITE_FULL;
+    await app.chooseBackup();
+    await tester.tap(find.text('Восстановить копию'));
+    await _waitFor(tester, () => find.text(storageFull).evaluate().isNotEmpty);
+    await tester.runAsync(() => app.createTag('Лес'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Повторить'));
+    await app.waitForChangesSince();
+
+    expect(
+      find.text(
+        'Она сделана сегодня в 09:00. С тех пор: 2 добавлено. '
+        'Восстановление отменит всё это.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Восстановить копию'));
+    await _waitFor(
+      tester,
+      () => find.text('Копия восстановлена').evaluate().isNotEmpty,
+    );
+    expect(find.text(storageFull), findsNothing);
+    expect(await app.tagNames(), ['Дом']);
+  });
 }
 
 var _nextBackupId = 0;
@@ -492,4 +595,140 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
     await tester.pump(const Duration(milliseconds: 20));
   }
   fail('Условие не выполнилось');
+}
+
+/// Приложение новой установки на странице «Настройки» с одной ежедневной
+/// копией с тегом «Дом», после которой создан тег «Сад». Часы остановлены
+/// 7 октября 2026 года в 09:00, а замену графа может отклонить [storage].
+final class _RestoreApp {
+  _RestoreApp._(this._tester, this._container, this.storage);
+
+  final WidgetTester _tester;
+  final ProviderContainer _container;
+  final _ReplacementFailure storage;
+
+  static Future<_RestoreApp> open(WidgetTester tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = [const Locale('ru')];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    final storage = _ReplacementFailure();
+    final files = TemporaryGraphFiles();
+    final runtime = AppRuntime(
+      connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        storage,
+      ),
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
+      graphFilesFactory: files.create,
+      clock: () => DateTime(2026, 10, 7, 9).toUtc(),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      // Выключение дожидается работы, начатой в кадрах проверки, например
+      // проверки ежедневной копии при возвращении в приложение, поэтому
+      // продолжается и в реальном ожидании, и в кадрах.
+      var isShutDown = false;
+      unawaited(runtime.shutdown().whenComplete(() => isShutDown = true));
+      await _waitFor(tester, () => isShutDown);
+    });
+    final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+    final app = _RestoreApp._(tester, ready.container, storage);
+    await tester.runAsync(() async {
+      await app.createTag('Дом');
+      // Проверка при запуске могла сделать ежедневную копию уже с тегом, и
+      // тогда второй копии за день не будет.
+      await ready.container.read(graphBackupsProvider).makeDailyBackupIfDue();
+      await app.createTag('Сад');
+    });
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await _waitFor(tester, () => find.byType(HomePage).evaluate().isNotEmpty);
+    await _waitFor(
+      tester,
+      () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Настройки'));
+    await _waitFor(
+      tester,
+      () => find.byType(SettingsPage).evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+    return app;
+  }
+
+  Future<void> createTag(String name) async => expect(
+    await _container
+        .read(personalGraphRepositoryProvider)
+        .execute(CreateTag(TagName.fromInput(name))),
+    isA<GraphCommandSucceeded>(),
+  );
+
+  /// Открывает строкой «Резервные копии» панель копий и выбирает копию.
+  Future<void> chooseBackup() async {
+    await _tester.tap(find.text('Резервные копии'));
+    await _waitFor(
+      _tester,
+      () => find.text('Сегодня, 09:00').evaluate().isNotEmpty,
+    );
+    await _tester.pumpAndSettle();
+    await _tester.tap(find.text('Сегодня, 09:00'));
+    await waitForChangesSince();
+  }
+
+  /// Ждёт, пока подтверждение восстановления посчитает изменения с тех пор.
+  Future<void> waitForChangesSince() async {
+    await _waitFor(
+      _tester,
+      () => find.textContaining('С тех пор').evaluate().isNotEmpty,
+    );
+    await _tester.pumpAndSettle();
+  }
+
+  /// Названия тегов графа в порядке создания.
+  Future<List<String>> tagNames() async {
+    final catalog = await _tester.runAsync(
+      () => _container
+          .read(personalGraphRepositoryProvider)
+          .getTagCatalog(const TagCatalogBrowseMode()),
+    );
+    return [
+      for (final tag in (catalog! as TagCatalogSuccess).value.items)
+        tag.name.value,
+    ];
+  }
+}
+
+/// Отклоняет отказом хранилища с кодом [failsWith] первый оператор удаления
+/// прежнего графа следующей замены графа; последующие замены не трогает.
+final class _ReplacementFailure extends LocalDatabaseConnectionObserver {
+  int? failsWith;
+
+  @override
+  FutureOr<void> beforeStatement(LocalDatabaseSqlStatement statement) {
+    final code = failsWith;
+    if (code == null ||
+        !statement.statements.any(
+          (sql) => sql.startsWith('DELETE FROM daily_choices '),
+        )) {
+      return null;
+    }
+    failsWith = null;
+    throw sqlite.SqliteException(
+      extendedResultCode: code,
+      message: 'injected storage failure',
+    );
+  }
+}
+
+/// Чередует реальное ожидание хранилища и изолята записи снимка с кадрами,
+/// пока не выполнится [done].
+Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
+  for (var attempt = 0; attempt < 100 && !done(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  expect(done(), isTrue);
 }

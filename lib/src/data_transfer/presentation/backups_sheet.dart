@@ -18,16 +18,20 @@ import 'restore_backup_confirmation.dart';
 /// Открывает над страницей и её панелью навигации панель «Резервные копии»
 /// с копиями от новых к старым по созданию и кнопкой ручной копии.
 ///
-/// Выбор копии открывает подтверждение её восстановления, а подтверждённое
-/// восстановление закрывает панель и идёт под модальным прогрессом.
+/// Выбор копии открывает подтверждение её восстановления, а подтверждение
+/// закрывает панель. Возвращает копию, восстановление которой подтверждено;
+/// если панель закрыта без подтверждения — `null`. Восстановление начинает
+/// вызывающий, когда панель уже закрыта: иначе её закрытие закрыло бы
+/// модальный прогресс восстановления.
 ///
 /// Ручная копия идёт без прогресса, а её успех сообщения не даёт: новая
 /// копия появляется в списке. Отказ ручной копии показывает общая
 /// поверхность результатов, когда панель уже закрыта.
-Future<void> showBackupsSheet(BuildContext context) => showDoableSheet<void>(
-  context: context,
-  builder: (_) => const _BackupsSheet(),
-);
+Future<GraphBackupEntry?> showBackupsSheet(BuildContext context) =>
+    showDoableSheet<GraphBackupEntry>(
+      context: context,
+      builder: (_) => const _BackupsSheet(),
+    );
 
 final class _BackupsSheet extends ConsumerWidget {
   const _BackupsSheet();
@@ -51,7 +55,7 @@ final class _BackupsSheet extends ConsumerWidget {
                 _BackupRow(
                   backup,
                   now: now,
-                  onPressed: () => _restore(context, ref, backup),
+                  onPressed: () => _confirmRestore(context, ref, backup),
                 ),
             ],
             // Отказ чтения не означает, что копий нет.
@@ -87,24 +91,20 @@ final class _BackupsSheet extends ConsumerWidget {
 }
 
 /// Подтверждает восстановление копии [backup] с изменениями с тех пор и
-/// начинает подтверждённое восстановление; его исход предъявляет
-/// координатор.
-Future<void> _restore(
+/// закрывает панель с подтверждённой копией.
+Future<void> _confirmRestore(
   BuildContext context,
   WidgetRef ref,
   GraphBackupEntry backup,
 ) async {
-  final restore = ref.read(graphRestoreControllerProvider.notifier);
   final confirmed = await confirmBackupRestore(
     context,
     backup: backup,
-    changesSince: restore.countChangesSince(backup),
+    changesSince: ref
+        .read(graphRestoreControllerProvider.notifier)
+        .countChangesSince(backup),
   );
-  if (!confirmed || !context.mounted) return;
-  // Панель закрывается раньше, чем восстановление откроет над ней свой
-  // прогресс: иначе закрылся бы прогресс.
-  Navigator.of(context).pop();
-  restore.start(backup);
+  if (confirmed && context.mounted) Navigator.of(context).pop(backup);
 }
 
 /// Копия: когда она сделана и что изменилось с предыдущей копии. Экранный
