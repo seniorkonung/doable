@@ -1392,6 +1392,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataExportSave => 'Save to a file';
 
   @override
+  String get dataImportTitle => 'Import data';
+
+  @override
+  String get dataImportHint => 'Replace everything with a copy from a file';
+
+  @override
+  String get dataImportHintEmptyGraph => 'Bring back a copy from a file';
+
+  @override
+  String get dataImportChooseAnotherFile => 'Choose another file';
+
+  @override
   String get dataBackupsTitle => 'Backups';
 
   @override

@@ -8,6 +8,7 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups, Tag;
+import 'package:doable/src/data_transfer/application/document_access.dart';
 import 'package:doable/src/data_transfer/application/graph_composition.dart';
 import 'package:doable/src/data_transfer/application/graph_composition_provider.dart';
 import 'package:doable/src/data_transfer/application/graph_export.dart';
@@ -39,6 +40,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_local_date.dart';
 import '../../support/file_document_access.dart';
+import '../../support/graph_import_files.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/temporary_graph_files.dart';
@@ -471,6 +473,279 @@ void main() {
     expect(find.text(storageFull), findsNothing);
     expect(await app.tagNames(), ['Дом']);
   });
+
+  for (final (language, export, nothing, import, bringBack, replace) in [
+    (
+      'ru',
+      'Экспорт данных',
+      'Пока нечего экспортировать',
+      'Импорт данных',
+      'Вернуть копию из файла',
+      'Заменить всё копией из файла',
+    ),
+    (
+      'en',
+      'Export data',
+      'Nothing to export yet',
+      'Import data',
+      'Bring back a copy from a file',
+      'Replace everything with a copy from a file',
+    ),
+  ]) {
+    testWidgets('$language: сценарий «Пустой граф новой установки»: строка '
+        '«Экспорт данных» недоступна, а строка «Импорт данных» стоит после '
+        'неё, доступна и предлагает вернуть копию из файла, пока не появится '
+        'первый тег', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _DataSectionApp.open(tester, language: language);
+
+      expect(find.text(nothing), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text(import)).dy,
+        greaterThan(tester.getTopLeft(find.text(export)).dy),
+      );
+      expect(
+        tester.getSemantics(find.text(import)),
+        isSemantics(
+          label: '$import\n$bringBack',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+
+      await app.createTag('Дом');
+      await tester.pumpAndSettle();
+      expect(find.text(bringBack), findsNothing);
+      expect(find.text(replace), findsOneWidget);
+      semantics.dispose();
+    });
+  }
+
+  for (final (state, read) in [
+    ('пока состав графа не прочитан', null),
+    ('после отказа чтения состава графа', const GraphCompositionReadFailed()),
+  ]) {
+    testWidgets('$state строка «Импорт данных» доступна и предлагает '
+        'заменить всё копией из файла', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final composition = StreamController<GraphCompositionRead>();
+      addTearDown(composition.close);
+      if (read != null) composition.add(read);
+      await _DataSectionApp.open(tester, composition: composition.stream);
+
+      expect(
+        tester.getSemantics(find.text('Импорт данных')),
+        isSemantics(
+          label: 'Импорт данных\nЗаменить всё копией из файла',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('пока идёт экспорт, строка «Импорт данных» доступна и '
+      'начинает импорт: открывает диалог выбора, а выбранный файл ждёт '
+      'подтверждения замены непустого графа', (tester) async {
+    final app = await _ImportApp.open(tester);
+    final writeReached = Completer<void>();
+    final releaseWrite = Completer<void>();
+    app.documents.beforeWrite = () {
+      writeReached.complete();
+      return releaseWrite.future;
+    };
+    await tester.tap(find.text('Экспорт данных'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сохранить в файл'));
+    await _waitFor(tester, () => writeReached.isCompleted);
+    await tester.pumpAndSettle();
+    expect(find.text('Сохраняется в файл…'), findsOneWidget);
+    app.choose(graphExportFileOf(referenceGraphFileLines()));
+
+    await tester.tap(find.text('Импорт данных'));
+    await _waitFor(
+      tester,
+      () => find.text('Импортировать эту копию?').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+
+    expect(app.openings, 1);
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    releaseWrite.complete();
+    await _waitFor(
+      tester,
+      () => find.text('Данные сохранены в файл').evaluate().isNotEmpty,
+    );
+  });
+
+  const invalidFile =
+      'Не удалось импортировать файл. Это не экспорт Doable, или он '
+      'повреждён. Ничего не изменено';
+  const chooseAnotherFile = 'Выбрать другой файл';
+  const retry = 'Повторить';
+
+  for (final (cause, arrange, message, action)
+      in <(String, void Function(_ImportApp app), String, String?)>[
+        (
+          'выбран не экспорт Doable',
+          (app) => app.choose(photoFile()),
+          invalidFile,
+          chooseAnotherFile,
+        ),
+        (
+          'выбран файл более новой версии',
+          (app) => app.choose(newerFormatVersionFile()),
+          'Файл создан более новой версией Doable. Обновите приложение, '
+              'чтобы импортировать его. Ничего не изменено',
+          null,
+        ),
+        (
+          'копии файла не хватило места',
+          (app) => app
+            ..choose(graphExportFileOf(referenceGraphFileLines()))
+            ..documents.copyFailure = const DocumentCopyStorageFull(),
+          storageFull,
+          retry,
+        ),
+        (
+          'файл не прочитан',
+          (app) => app
+            ..choose(graphExportFileOf(referenceGraphFileLines()))
+            ..documents.copyFailure = const DocumentNotRead(),
+          'Не удалось прочитать файл. Проверьте доступ к нему и повторите. '
+              'Ничего не изменено',
+          retry,
+        ),
+        (
+          'копия файла не записана по неизвестной причине',
+          (app) => app
+            ..choose(graphExportFileOf(referenceGraphFileLines()))
+            ..documents.copyFailure = const DocumentCopyFailed(),
+          'Не удалось импортировать данные. Ничего не изменено',
+          null,
+        ),
+      ]) {
+    testWidgets('$cause: под строкой «Импорт данных» показан отказ, который '
+        'читает экранный диктор, ${switch (action) {
+          null => 'без действия',
+          final action => 'с действием «$action»',
+        }}', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _ImportApp.open(tester);
+      arrange(app);
+
+      await tester.tap(find.text('Импорт данных'));
+      await _waitFor(tester, () => find.text(message).evaluate().isNotEmpty);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      expect(
+        tester.getTopLeft(find.text(message)).dy,
+        greaterThan(tester.getTopLeft(find.text('Импорт данных')).dy),
+      );
+      expect(
+        tester.getSemantics(find.text(message)),
+        isSemantics(label: message, isLiveRegion: true),
+      );
+      for (final label in [chooseAnotherFile, retry]) {
+        if (label == action) {
+          expect(
+            tester.getSemantics(find.text(label)),
+            isSemantics(label: label, isButton: true, hasTapAction: true),
+          );
+        } else {
+          expect(find.text(label), findsNothing);
+        }
+      }
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('en: отказ импорта чужого файла под строкой «Import data» '
+      'предлагает выбрать другой файл', (tester) async {
+    final app = await _ImportApp.open(tester, language: 'en');
+    app.choose(photoFile());
+
+    await tester.tap(find.text('Import data'));
+    const message =
+        'Couldn’t import the file. It isn’t a Doable export, or it’s '
+        'damaged. Nothing was changed';
+    await _waitFor(tester, () => find.text(message).evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose another file'), findsOneWidget);
+  });
+
+  testWidgets('«Выбрать другой файл» один раз снова открывает диалог выбора '
+      'и убирает прежний отказ', (tester) async {
+    final app = await _ImportApp.open(tester);
+    app.choose(photoFile());
+    await tester.tap(find.text('Импорт данных'));
+    await _waitFor(tester, () => find.text(invalidFile).evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    app.choose(graphExportFileOf(referenceGraphFileLines()));
+
+    await tester.tap(find.text(chooseAnotherFile));
+    await _waitFor(
+      tester,
+      () => find.text('Импортировать эту копию?').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+
+    expect(app.openings, 2);
+    expect(find.text(invalidFile), findsNothing);
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('отказ импорта, показанный под строкой «Импорт данных», после '
+      'ухода со страницы общая поверхность не повторяет', (tester) async {
+    final app = await _ImportApp.open(tester);
+    app.choose(photoFile());
+    await tester.tap(find.text('Импорт данных'));
+    await _waitFor(tester, () => find.text(invalidFile).evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SettingsPage), findsNothing);
+    expect(find.text(invalidFile), findsNothing);
+  });
+
+  testWidgets('отказ импорта, который строка «Импорт данных» не успела '
+      'показать, после ухода со страницы показывает общая поверхность', (
+    tester,
+  ) async {
+    final app = await _ImportApp.open(tester);
+    app.choose(photoFile());
+    // Без фокуса ввода сообщение под строкой не считается показанным.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+    await tester.tap(find.text('Импорт данных'));
+    await _waitFor(tester, () => find.text(invalidFile).evaluate().isNotEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SettingsPage), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text(invalidFile),
+      ),
+      findsOneWidget,
+    );
+  });
 }
 
 var _nextBackupId = 0;
@@ -726,6 +1001,85 @@ final class _RestoreApp {
         tag.name.value,
     ];
   }
+}
+
+/// Приложение новой установки с тегом «Дом» на языке [language], открытое
+/// на странице «Настройки». Файл, который человек выбирает в диалоге
+/// выбора, задаёт [choose].
+final class _ImportApp {
+  _ImportApp._(this.documents, this._chosen);
+
+  /// Документы, копирование и запись которых проверка может изменить.
+  final FileDocumentAccess documents;
+  final File _chosen;
+
+  /// Сколько раз открывался диалог выбора файла.
+  var openings = 0;
+
+  static Future<_ImportApp> open(
+    WidgetTester tester, {
+    String language = 'ru',
+  }) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = [Locale(language)];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    final chosenDirectory = Directory.systemTemp.createTempSync(
+      'doable_import_row_',
+    );
+    addTearDown(() => chosenDirectory.deleteSync(recursive: true));
+    final files = TemporaryGraphFiles();
+    final runtime = AppRuntime(
+      connectionFactory: openInMemoryLocalDatabase,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
+      graphFilesFactory: files.create,
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      var isShutDown = false;
+      unawaited(runtime.shutdown().whenComplete(() => isShutDown = true));
+      await _waitFor(tester, () => isShutDown);
+    });
+    final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+    await tester.runAsync(() async {
+      expect(
+        await ready.container
+            .read(personalGraphRepositoryProvider)
+            .execute(CreateTag(TagName.fromInput('Дом'))),
+        isA<GraphCommandSucceeded>(),
+      );
+    });
+    final app = _ImportApp._(
+      files.documents,
+      File.fromUri(chosenDirectory.uri.resolve('chosen.jsonl.gz')),
+    );
+    files.documents.openingDialog = () async {
+      app.openings++;
+      return files.documents.chosen(app._chosen);
+    };
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await _waitFor(tester, () => find.byType(HomePage).evaluate().isNotEmpty);
+    await _waitFor(
+      tester,
+      () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byTooltip(switch (language) {
+        'en' => 'Settings',
+        _ => 'Настройки',
+      }),
+    );
+    await _waitFor(
+      tester,
+      () => find.byType(SettingsPage).evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+    return app;
+  }
+
+  /// Человек выбирает в диалоге выбора файл с байтами [bytes].
+  void choose(List<int> bytes) => _chosen.writeAsBytesSync(bytes);
 }
 
 /// Отклоняет отказом хранилища с кодом [failsWith] первый оператор удаления

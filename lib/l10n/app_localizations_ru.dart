@@ -1406,6 +1406,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataExportSave => 'Сохранить в файл';
 
   @override
+  String get dataImportTitle => 'Импорт данных';
+
+  @override
+  String get dataImportHint => 'Заменить всё копией из файла';
+
+  @override
+  String get dataImportHintEmptyGraph => 'Вернуть копию из файла';
+
+  @override
+  String get dataImportChooseAnotherFile => 'Выбрать другой файл';
+
+  @override
   String get dataBackupsTitle => 'Резервные копии';
 
   @override

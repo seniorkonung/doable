@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../design_system/components/failure_notice.dart';
 import '../../design_system/components/option_row.dart';
 import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_icon.dart';
@@ -18,10 +19,12 @@ import '../../graph_backups/graph_backups_provider.dart';
 import '../application/graph_composition.dart';
 import '../application/graph_composition_provider.dart';
 import '../application/graph_export_provider.dart';
+import '../application/graph_import_provider.dart';
 import '../application/graph_restore_provider.dart';
 import 'backup_descriptions.dart';
 import 'backups_sheet.dart';
 import 'export_data_sheet.dart';
+import 'graph_import_failure_message.dart';
 import 'restore_backup_confirmation.dart';
 
 /// Раздел «Данные» страницы «Настройки»: пояснение, что граф хранится только
@@ -60,6 +63,7 @@ final class SettingsDataSection extends StatelessWidget {
         const SizedBox(height: 6),
         const _BackupsRow(),
         const _ExportRow(),
+        const _ImportRow(),
       ],
     );
   }
@@ -335,5 +339,152 @@ final class _ExportRow extends ConsumerWidget {
           onPressed: () => showExportDataSheet(context),
         ),
     };
+  }
+}
+
+/// Строка «Импорт данных» доступна всегда, в том числе пока идёт экспорт, и
+/// начинает импорт файла экспорта. Пустой граф она предлагает вернуть из
+/// файла, а отказ чтения состава не выдаётся за пустой граф.
+///
+/// Отказ начатого строкой импорта она по праву инициатора (ADR-0012)
+/// предъявляет под собой, пока открыта страница, с действием, которое снова
+/// начинает импорт, если отказ так можно исправить. Успех предъявляет общая
+/// поверхность результатов.
+final class _ImportRow extends ConsumerStatefulWidget {
+  const _ImportRow();
+
+  @override
+  ConsumerState<_ImportRow> createState() => _ImportRowState();
+}
+
+/// Отказ импорта [failure], который строка предъявляет по праву [claim].
+final class _ImportFailure {
+  const _ImportFailure(this.failure, {required this.claim});
+
+  final GraphImportFailure failure;
+  final GraphInitiatorPresentationClaim? claim;
+}
+
+final class _ImportRowState extends ConsumerState<_ImportRow> {
+  late final GraphCommandCoordinator _coordinator;
+
+  /// Импорт, начатый строкой, пока она ждёт его исхода или предъявляет его
+  /// отказ.
+  GraphImportOperationToken? _importToken;
+  _ImportFailure? _importFailure;
+
+  @override
+  void initState() {
+    super.initState();
+    _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+  }
+
+  @override
+  void dispose() {
+    _releaseImportPresentation();
+    super.dispose();
+  }
+
+  /// Неподтверждённый отказ прежнего импорта переходит к общей поверхности
+  /// результатов.
+  void _releaseImportPresentation() {
+    if (_importToken case final token?) {
+      _coordinator.releaseInitiatorPresentation(token);
+    }
+    _importToken = null;
+  }
+
+  /// Начинает импорт с системного диалога выбора файла и убирает прежний
+  /// отказ.
+  Future<void> _import() async {
+    _releaseImportPresentation();
+    setState(() => _importFailure = null);
+    final accepted = await ref
+        .read(graphImportControllerProvider.notifier)
+        .start();
+    // Импорт отменён, от замены отказались, или координатор его не принял.
+    if (accepted == null) return;
+    _importToken = accepted.token;
+    // Страница закрыта, пока импорт ещё не был принят.
+    if (!mounted) {
+      _releaseImportPresentation();
+      return;
+    }
+    final outcome = await accepted.future;
+    if (!mounted || !identical(_importToken, accepted.token)) return;
+    switch (outcome) {
+      case GraphImportFailed(:final failure):
+        setState(
+          () => _importFailure = _ImportFailure(
+            failure,
+            claim: _coordinator.claimInitiatorFailure(accepted.token),
+          ),
+        );
+      // Успех предъявляет общая поверхность, а отмена сообщения не даёт.
+      case GraphImported() || GraphImportCancelled():
+        _importToken = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final failure = _importFailure;
+    void import() => unawaited(_import());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OptionRow(
+          icon: DoableIconData.import,
+          name: localizations.dataImportTitle,
+          hint: switch (ref.watch(graphCompositionProvider).value) {
+            GraphCompositionReadSucceeded(:final composition)
+                when composition.isEmpty =>
+              localizations.dataImportHintEmptyGraph,
+            // Пока состав не прочитан и после отказа его чтения неизвестно,
+            // пуст ли граф.
+            null ||
+            GraphCompositionReadSucceeded() ||
+            GraphCompositionReadFailed() => localizations.dataImportHint,
+          },
+          onPressed: import,
+        ),
+        if (failure != null)
+          Padding(
+            // Сообщение выровнено по значку строки.
+            padding: const EdgeInsets.fromLTRB(
+              DoableMetrics.space2,
+              DoableMetrics.space1,
+              DoableMetrics.space2,
+              DoableMetrics.space2,
+            ),
+            child: FailureNotice(
+              message: OperationFailurePresentation(
+                claim: failure.claim,
+                message: graphImportFailureMessage(
+                  localizations,
+                  failure.failure,
+                ),
+                inheritsColor: true,
+              ),
+              // Право на прежний документ и временные файлы к этому моменту
+              // отпущены и удалены, поэтому исправление — новый импорт.
+              action: switch (failure.failure) {
+                GraphImportFailure.invalidFile => (
+                  label: localizations.dataImportChooseAnotherFile,
+                  onPressed: import,
+                ),
+                GraphImportFailure.storageFull ||
+                GraphImportFailure.documentUnreadable => (
+                  label: localizations.commonRetry,
+                  onPressed: import,
+                ),
+                GraphImportFailure.newerFormatVersion ||
+                GraphImportFailure.unknown => null,
+              },
+            ),
+          ),
+      ],
+    );
   }
 }

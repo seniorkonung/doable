@@ -2173,6 +2173,30 @@ abstract class AppLocalizations {
   /// **'Save to a file'**
   String get dataExportSave;
 
+  /// Название строки импорта в разделе «Данные»
+  ///
+  /// In en, this message translates to:
+  /// **'Import data'**
+  String get dataImportTitle;
+
+  /// Подпись строки импорта, когда граф не пуст или его состав неизвестен
+  ///
+  /// In en, this message translates to:
+  /// **'Replace everything with a copy from a file'**
+  String get dataImportHint;
+
+  /// Подпись строки импорта при пустом графе
+  ///
+  /// In en, this message translates to:
+  /// **'Bring back a copy from a file'**
+  String get dataImportHintEmptyGraph;
+
+  /// Действие под строкой «Импорт данных» после отказа импорта файла, который не является экспортом Doable или повреждён; снова открывает системный диалог выбора файла
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another file'**
+  String get dataImportChooseAnotherFile;
+
   /// Заголовок панели «Резервные копии»
   ///
   /// In en, this message translates to:
