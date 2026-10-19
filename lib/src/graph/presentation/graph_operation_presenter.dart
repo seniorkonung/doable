@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
+import '../../data_transfer/presentation/graph_import_failure_message.dart';
 import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -349,14 +350,10 @@ String _importMessage(
   GraphImportCompletion completion,
 ) => switch (completion.result) {
   GraphImported() => localizations.dataImported,
-  GraphImportFailed(:final failure) => switch (failure) {
-    GraphImportFailure.invalidFile => localizations.dataImportInvalidFile,
-    GraphImportFailure.newerFormatVersion =>
-      localizations.dataImportNewerVersion,
-    GraphImportFailure.storageFull => localizations.dataReplacementStorageFull,
-    GraphImportFailure.documentUnreadable => localizations.dataImportUnreadable,
-    GraphImportFailure.unknown => localizations.dataImportFailed,
-  },
+  GraphImportFailed(:final failure) => graphImportFailureMessage(
+    localizations,
+    failure,
+  ),
 };
 
 GraphOperationMessage _exportMessage(
