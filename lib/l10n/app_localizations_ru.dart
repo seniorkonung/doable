@@ -1481,6 +1481,46 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataReplacementCancelling => 'Отмена…';
 
   @override
+  String get dataRestoreConfirmationTitle => 'Восстановить эту копию?';
+
+  @override
+  String dataRestoreMadeToday(String time) {
+    return 'Она сделана сегодня в $time.';
+  }
+
+  @override
+  String dataRestoreMadeYesterday(String time) {
+    return 'Она сделана вчера в $time.';
+  }
+
+  @override
+  String dataRestoreMadeOn(String date, String time) {
+    return 'Она сделана $date в $time.';
+  }
+
+  @override
+  String dataRestoreChangesSince(String changes) {
+    return 'С тех пор: $changes. Восстановление отменит всё это.';
+  }
+
+  @override
+  String get dataRestoreNoChangesSince => 'С тех пор ничего не изменилось.';
+
+  @override
+  String get dataRestoreReplacedSince =>
+      'С тех пор данные заменялись. Восстановление отменит все изменения.';
+
+  @override
+  String get dataRestoreReplacesEverything =>
+      'Она заменит всё, что сейчас есть в Doable. Сначала текущее состояние сохраняется как резервная копия.';
+
+  @override
+  String get dataRestoreConfirmationCancel => 'Отмена';
+
+  @override
+  String get dataRestoreConfirm => 'Восстановить копию';
+
+  @override
   String get tagNavigationTitle => 'Намерения с тегом';
 
   @override

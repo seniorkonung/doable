@@ -2257,6 +2257,66 @@ abstract class AppLocalizations {
   /// **'Cancelling…'**
   String get dataReplacementCancelling;
 
+  /// Заголовок подтверждения восстановления резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this copy?'**
+  String get dataRestoreConfirmationTitle;
+
+  /// Момент копии, сделанной сегодня, в подтверждении её восстановления
+  ///
+  /// In en, this message translates to:
+  /// **'It was made today at {time}.'**
+  String dataRestoreMadeToday(String time);
+
+  /// Момент копии, сделанной вчера, в подтверждении её восстановления
+  ///
+  /// In en, this message translates to:
+  /// **'It was made yesterday at {time}.'**
+  String dataRestoreMadeYesterday(String time);
+
+  /// Момент копии, сделанной раньше вчерашнего дня, в подтверждении её восстановления
+  ///
+  /// In en, this message translates to:
+  /// **'It was made on {date} at {time}.'**
+  String dataRestoreMadeOn(String date, String time);
+
+  /// Изменения графа после копии, которые отменит её восстановление
+  ///
+  /// In en, this message translates to:
+  /// **'Since then: {changes}. Restoring undoes all of it.'**
+  String dataRestoreChangesSince(String changes);
+
+  /// Подтверждение восстановления копии, после которой граф не изменялся
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed since then.'**
+  String get dataRestoreNoChangesSince;
+
+  /// Подтверждение восстановления копии, после которой граф заменялся импортом или восстановлением
+  ///
+  /// In en, this message translates to:
+  /// **'The data has been replaced since then. Restoring undoes every change.'**
+  String get dataRestoreReplacedSince;
+
+  /// Предупреждение подтверждения восстановления: копия заменит весь граф, а текущее состояние сначала сохраняется копией
+  ///
+  /// In en, this message translates to:
+  /// **'It will replace everything now in Doable. A backup of the current state is made first.'**
+  String get dataRestoreReplacesEverything;
+
+  /// Действие подтверждения восстановления копии, закрывающее его без изменений
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dataRestoreConfirmationCancel;
+
+  /// Действие подтверждения восстановления копии, начинающее восстановление
+  ///
+  /// In en, this message translates to:
+  /// **'Restore copy'**
+  String get dataRestoreConfirm;
+
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:

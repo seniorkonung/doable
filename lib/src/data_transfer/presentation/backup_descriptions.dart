@@ -31,14 +31,15 @@ sealed class BackupMoment {
     if (day == DateTime(today.year, today.month, today.day - 1)) {
       return BackupMadeYesterday._(time);
     }
+    final dateWithYear = DateFormat('d MMMM y', locale).format(made);
     // Перерыв в использовании копии не удаляет, поэтому копия может быть
     // сделана и в прошлом году; тогда дата называет и год.
     return BackupMadeEarlier._(
       time,
-      date: DateFormat(
-        made.year == today.year ? 'd MMMM' : 'd MMMM y',
-        locale,
-      ).format(made),
+      date: made.year == today.year
+          ? DateFormat('d MMMM', locale).format(made)
+          : dateWithYear,
+      dateWithYear: dateWithYear,
     );
   }
 
@@ -56,10 +57,17 @@ final class BackupMadeYesterday extends BackupMoment {
 
 /// Копия сделана раньше вчерашнего дня.
 final class BackupMadeEarlier extends BackupMoment {
-  const BackupMadeEarlier._(super.time, {required this.date}) : super._();
+  const BackupMadeEarlier._(
+    super.time, {
+    required this.date,
+    required this.dateWithYear,
+  }) : super._();
 
   /// Дата копии: «6 октября», а копии прошлых лет — «6 октября 2025».
   final String date;
+
+  /// Дата копии с годом: «6 октября 2026».
+  final String dateWithYear;
 }
 
 /// Изменения [counts] без нулевых частей: «3 добавлено, 2 изменено, 1

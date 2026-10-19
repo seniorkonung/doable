@@ -1467,6 +1467,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataReplacementCancelling => 'Cancelling…';
 
   @override
+  String get dataRestoreConfirmationTitle => 'Restore this copy?';
+
+  @override
+  String dataRestoreMadeToday(String time) {
+    return 'It was made today at $time.';
+  }
+
+  @override
+  String dataRestoreMadeYesterday(String time) {
+    return 'It was made yesterday at $time.';
+  }
+
+  @override
+  String dataRestoreMadeOn(String date, String time) {
+    return 'It was made on $date at $time.';
+  }
+
+  @override
+  String dataRestoreChangesSince(String changes) {
+    return 'Since then: $changes. Restoring undoes all of it.';
+  }
+
+  @override
+  String get dataRestoreNoChangesSince => 'Nothing has changed since then.';
+
+  @override
+  String get dataRestoreReplacedSince =>
+      'The data has been replaced since then. Restoring undoes every change.';
+
+  @override
+  String get dataRestoreReplacesEverything =>
+      'It will replace everything now in Doable. A backup of the current state is made first.';
+
+  @override
+  String get dataRestoreConfirmationCancel => 'Cancel';
+
+  @override
+  String get dataRestoreConfirm => 'Restore copy';
+
+  @override
   String get tagNavigationTitle => 'Tagged intentions';
 
   @override
