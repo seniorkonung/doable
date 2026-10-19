@@ -386,6 +386,26 @@ void main() {
       ));
     });
 
+    test('команды, подтверждённые во время подсчёта, его не ждут, а сжатие, '
+        'завершившееся за это время, его не меняет: подсчёт описывает ровно '
+        'изменения до позиции, на которой он начат', () async {
+      compaction.start();
+      final health = await createIntention('Здоровье');
+      final backup = await makeManualBackup();
+      await createIntention('Бегать');
+      await confirm(ArchiveIntention(health.id));
+      final hold = log.holdNextRead();
+      final counted = controller().countChangesSince(backup);
+      await hold.reached;
+
+      final compacted = compactionOutcomes.next;
+      await confirmCommands(_threshold + 1);
+      expect((await compacted).status, isA<DiagnosticsSucceeded>());
+      hold.release();
+
+      expect(_shown(await counted), (added: 1, changed: 1, deleted: 0));
+    });
+
     test('после замены графа даёт признак замены вместо чисел', () async {
       await createTag('Дом');
       final backup = await makeManualBackup();
