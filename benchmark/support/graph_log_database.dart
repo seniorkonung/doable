@@ -150,13 +150,17 @@ final class GraphLogDatabase {
     );
   }
 
-  /// Память операции [operation] в отдельном процессе над этой базой.
-  Future<GraphLogMemory> measureMemory(GraphLogMemoryOperation operation) =>
-      measureGraphLogMemory(
-        operation,
-        harness.databaseFile,
-        snapshots: snapshots,
-      );
+  /// Память операции [operation] в отдельном процессе над этой базой;
+  /// импорт читает документ [document].
+  Future<GraphLogMemory> measureMemory(
+    GraphLogMemoryOperation operation, {
+    File? document,
+  }) => measureGraphLogMemory(
+    operation,
+    harness.databaseFile,
+    snapshots: snapshots,
+    document: document,
+  );
 
   Future<void> dispose() => harness.dispose();
 }

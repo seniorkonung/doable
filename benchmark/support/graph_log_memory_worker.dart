@@ -20,10 +20,12 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../test/support/file_document_access.dart';
 import '../../test/support/in_memory_diagnostics_sink.dart';
 import 'graph_backup_restore.dart';
+import 'graph_file_import.dart';
 
 const _operationVariable = 'DOABLE_GRAPH_LOG_OPERATION';
 const _pathVariable = 'DOABLE_GRAPH_LOG_PATH';
 const _snapshotsVariable = 'DOABLE_GRAPH_LOG_SNAPSHOTS';
+const _documentVariable = 'DOABLE_GRAPH_LOG_DOCUMENT';
 const _resultMarker = 'DOABLE_GRAPH_LOG_MEMORY:';
 
 /// Насколько пик живых данных операции на профиле может превышать её пик на
@@ -60,6 +62,12 @@ enum GraphLogMemoryOperation {
   /// (`SQLITE_TEMP_STORE=2`).
   restore,
 
+  /// Импорт файла экспорта от выбранного документа до замены графа его
+  /// записями: копирование документа во временный файл, чтение заголовка,
+  /// запись снимка замены и замена. Замер — наибольший объём живых данных
+  /// кучи вместе с памятью malloc процесса, как у [restore].
+  import,
+
   /// Итог фактов пакетов после последнего снимка: живые данные, которые
   /// собранное состояние удерживает до выдачи записей.
   rangeSummary,
@@ -71,12 +79,13 @@ enum GraphLogMemoryOperation {
 
 /// Прирост памяти операции над её значением перед операцией и число
 /// выданных операцией записей; у сжатия записей нет, у экспорта это записи
-/// записанного документа, а у восстановления — записи графа после замены.
+/// записанного документа, а у восстановления и импорта — записи графа после
+/// замены.
 typedef GraphLogMemory = ({int growthBytes, int records});
 
 /// Выполняет [operation] в новом процессе Flutter: операции лога — над
-/// базой [path] с каталогом снимков [snapshots], чтение — над файлом
-/// формата [path].
+/// базой [path] с каталогом снимков [snapshots], импорт — ещё и документа
+/// [document], чтение — над файлом формата [path].
 ///
 /// Отдельный процесс не наследует память, которую заняли подготовка данных
 /// и предыдущие замеры: освобождённая память остаётся у процесса, и рост
@@ -85,6 +94,7 @@ Future<GraphLogMemory> measureGraphLogMemory(
   GraphLogMemoryOperation operation,
   File path, {
   Directory? snapshots,
+  File? document,
 }) async {
   final result = await Process.run(
     _findFlutterExecutable(),
@@ -101,6 +111,7 @@ Future<GraphLogMemory> measureGraphLogMemory(
       _operationVariable: operation.name,
       _pathVariable: path.path,
       _snapshotsVariable: ?snapshots?.path,
+      _documentVariable: ?document?.path,
     },
   );
   final output = result.stdout as String;
@@ -136,6 +147,12 @@ void main() {
         path,
         Directory(environment[_snapshotsVariable]!),
       ),
+      GraphLogMemoryOperation.import => _importInIsolate(
+        path,
+        Directory(environment[_snapshotsVariable]!),
+        File(environment[_documentVariable]!),
+        await _temporaryDirectory('doable_graph_import_'),
+      ),
       _ => await _openGraphOperation(
         operation,
         path,
@@ -146,7 +163,8 @@ void main() {
       GraphLogMemoryOperation.assembly ||
       GraphLogMemoryOperation.compaction ||
       GraphLogMemoryOperation.export => await _LiveHeapPeak.start(),
-      GraphLogMemoryOperation.restore => await _LiveHeapPeak.startWithMalloc(),
+      GraphLogMemoryOperation.restore ||
+      GraphLogMemoryOperation.import => await _LiveHeapPeak.startWithMalloc(),
       GraphLogMemoryOperation.rangeSummary => await _RetainedLiveHeap.start(),
       GraphLogMemoryOperation.fileRead => _ResidentSetPeak.start(),
     };
@@ -217,6 +235,7 @@ Future<_Operation> _openGraphOperation(
       diagnostics,
     ),
     GraphLogMemoryOperation.restore ||
+    GraphLogMemoryOperation.import ||
     GraphLogMemoryOperation.fileRead => throw ArgumentError.value(operation),
   };
 }
@@ -228,10 +247,7 @@ Future<_Operation> _openExport(
   Directory snapshots,
   InMemoryDiagnosticsSink diagnostics,
 ) async {
-  final directory = await Directory.systemTemp.createTemp(
-    'doable_graph_export_',
-  );
-  addTearDown(() => directory.delete(recursive: true));
+  final directory = await _temporaryDirectory('doable_graph_export_');
   final documents = FileDocumentAccess(
     await Directory.fromUri(directory.uri.resolve('documents/')).create(),
   );
@@ -286,18 +302,63 @@ _Operation _restoreInIsolate(File databaseFile, Directory snapshots) =>
           } finally {
             await restore.dispose();
           }
-          final row = await database.customSelect('''SELECT
-            (SELECT count(*) FROM tags) + (SELECT count(*) FROM intentions) +
-            (SELECT count(*) FROM tag_assignments) +
-            (SELECT count(*) FROM long_term_relations) +
-            (SELECT count(*) FROM daily_choices) AS records''').getSingle();
-          return row.read<int>('records');
+          return await _graphRecords(database);
         } finally {
           await database.close();
         }
       });
       return () async => records;
     };
+
+/// Импорт документа [document], выбранного в диалоге выбора, через временный
+/// каталог [temporary], как после подтверждения импорта, в отдельном изоляте
+/// той же группы по той же причине, что и [_restoreInIsolate].
+_Operation _importInIsolate(
+  File databaseFile,
+  Directory snapshots,
+  File document,
+  Directory temporary,
+) => () async {
+  final records = await Isolate.run(() async {
+    final database = AppDatabase(openFileBackedLocalDatabase(databaseFile));
+    try {
+      final import = BenchmarkGraphImport(
+        await _openRepository(database),
+        document: document,
+        snapshots: snapshots,
+        temporary: temporary,
+        clock: () => _now,
+      );
+      try {
+        await import.importFile(await import.readChosenFile());
+      } finally {
+        await import.dispose();
+      }
+      return await _graphRecords(database);
+    } finally {
+      await database.close();
+    }
+  });
+  return () async => records;
+};
+
+/// Число записей графа в базе [database].
+Future<int> _graphRecords(AppDatabase database) async {
+  final row = await database.customSelect('''SELECT
+    (SELECT count(*) FROM tags) + (SELECT count(*) FROM intentions) +
+    (SELECT count(*) FROM tag_assignments) +
+    (SELECT count(*) FROM long_term_relations) +
+    (SELECT count(*) FROM daily_choices) AS records''').getSingle();
+  return row.read<int>('records');
+}
+
+/// Новый временный каталог с префиксом [prefix], который удаляется в конце
+/// замера.
+Future<Directory> _temporaryDirectory(String prefix) async {
+  final directory = await Directory.systemTemp.createTemp(prefix);
+  addTearDown(() => directory.delete(recursive: true));
+  return directory;
+}
 
 final _now = DateTime.utc(2026, 10, 17, 12);
 
