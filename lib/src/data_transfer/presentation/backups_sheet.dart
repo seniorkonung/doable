@@ -69,6 +69,16 @@ final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
     return Sheet(
       title: localizations.dataBackupsTitle,
       text: localizations.dataBackupsExplanation,
+      footer: FilledButton(
+        // Вторую копию, пока делается первая, координатор не принимает,
+        // а исход копии предъявляет сам.
+        onPressed: () => ref
+            .read(graphCommandCoordinatorProvider.notifier)
+            .acceptManualBackup(
+              ref.read(graphBackupsProvider).makeManualBackup,
+            ),
+        child: Text(localizations.dataBackupsMakeNow),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -94,22 +104,6 @@ final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
               ),
             ],
           },
-          const SizedBox(height: DoableMetrics.space3),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DoableMetrics.space2,
-            ),
-            child: FilledButton(
-              // Вторую копию, пока делается первая, координатор не принимает,
-              // а исход копии предъявляет сам.
-              onPressed: () => ref
-                  .read(graphCommandCoordinatorProvider.notifier)
-                  .acceptManualBackup(
-                    ref.read(graphBackupsProvider).makeManualBackup,
-                  ),
-              child: Text(localizations.dataBackupsMakeNow),
-            ),
-          ),
         ],
       ),
     );

@@ -1098,7 +1098,7 @@
   - **Files likely touched:** `lib/src/data_transfer/presentation/settings_data_section.dart`, `lib/src/data_transfer/presentation/backups_sheet.dart`, `lib/src/data_transfer/presentation/restore_backup_confirmation.dart`, `test/data_transfer/presentation/settings_data_section_test.dart`, `test/data_transfer/presentation/backups_sheet_test.dart`, `test/data_transfer/presentation/restore_backup_confirmation_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 3.33 Закрепить кнопку «Сделать копию сейчас» под прокручиваемым списком панели «Резервные копии», как в макете
+- [x] 3.33 Закрепить кнопку «Сделать копию сейчас» под прокручиваемым списком панели «Резервные копии», как в макете
   - **Acceptance criteria:**
     - По макету `SettingsBackups`, по которому строится панель задачи 3.21, прокручивается только список копий, если он не помещается по высоте панели. Кнопка «Сделать копию сейчас» остаётся видна под ним без прокрутки и над нижним системным отступом, а ручка, заголовок и пояснение стоят над списком, как прежде. Пока список не прочитан или вместо него показано «Не удалось загрузить копии», кнопка стоит там же. Если копии помещаются, панель по-прежнему высотой по содержимому, а кнопка стоит сразу под списком.
     - Лист дизайн-системы `Sheet` получает необязательную нижнюю часть, закреплённую под прокручиваемым телом вне прокрутки. Это новый вариант листа вместе с первым потребителем по [ADR-0032](../../../docs/adr/0032-present-design-system-sheets-over-root-navigator.md), а компонент остаётся без предметной логики по [ADR-0030](../../../docs/adr/0030-keep-design-system-components-presentational.md). Без нижней части лист работает как прежде, поэтому панель «Экспорт данных» и листы быстрого создания не меняются.

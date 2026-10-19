@@ -9,6 +9,7 @@ import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups;
 import 'package:doable/src/data_transfer/presentation/backups_sheet.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -312,6 +313,76 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('когда копии не помещаются в панель, прокручивается только '
+      'список, а «Сделать копию сейчас» видна под ним над системным '
+      'отступом и нажимается без прокрутки', (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+    addTearDown(tester.view.reset);
+    final app = await _BackupsApp.open(tester);
+    await app.createTag('Дом');
+    final button = find
+        .widgetWithText(FilledButton, 'Сделать копию сейчас')
+        .hitTestable();
+
+    for (var copy = 0; copy < 7; copy++) {
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Нет изменений'), findsNWidgets(6));
+    final buttonRect = tester.getRect(button);
+    expect(buttonRect.bottom, lessThanOrEqualTo(640 - 34));
+    final oldest = find.text('1 добавлено');
+    expect(oldest.hitTestable(), findsNothing);
+
+    await tester.scrollUntilVisible(
+      oldest,
+      100,
+      scrollable: find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(oldest.hitTestable(), findsOneWidget);
+    expect(tester.getRect(oldest).bottom, lessThanOrEqualTo(buttonRect.top));
+    expect(tester.getRect(button), buttonRect);
+  });
+
+  testWidgets('когда копии помещаются, панель высотой по содержимому, а '
+      '«Сделать копию сейчас» стоит сразу под списком', (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+    addTearDown(tester.view.reset);
+
+    await _openListedSheet(
+      tester,
+      backups: [
+        _backup(DateTime(2026, 10, 7, 8, 15), _counts(1, 0, 0)),
+        _backup(DateTime(2026, 10, 6, 21, 40), _counts(0, 1, 0)),
+      ],
+    );
+
+    expect(tester.getRect(find.byType(BottomSheet)).top, greaterThan(24));
+    final oldestRow = find.ancestor(
+      of: find.text('1 изменено'),
+      matching: find.byType(InkWell),
+    );
+    expect(
+      tester
+              .getRect(
+                find.widgetWithText(FilledButton, 'Сделать копию сейчас'),
+              )
+              .top -
+          tester.getRect(oldestRow).bottom,
+      DoableMetrics.space3,
+    );
   });
 
   testWidgets('отказ ручной копии оставляет список и кнопку прежними, а '
