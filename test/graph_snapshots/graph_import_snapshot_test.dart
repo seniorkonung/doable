@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/stalling_replacement_snapshot_reads.dart';
 
 void main() {
   final golden = File('test/graph_format/golden/graph_format_v1.jsonl')
@@ -102,7 +103,10 @@ void main() {
     final cancellation = Completer<void>();
     final write = writeImported(
       compaction(
-        replacementSnapshotRunner: _stallingReadOf(input, stalls.sendPort),
+        replacementSnapshotRunner: writeGraphReplacementSnapshotStallingReadOf(
+          input.path,
+          stalls.sendPort,
+        ),
       ),
       cancelled: cancellation.future,
     );
@@ -168,61 +172,6 @@ void main() {
 
     expect(await _fileNamesIn(snapshots), isEmpty);
   });
-}
-
-/// Пишет снимок замены графа в отдельном изоляте, как
-/// [runGraphReplacementSnapshotWriteInIsolate], но чтение файла [input]
-/// останавливается после первой половины его байтов: порт [stalled]
-/// получает порт, сообщение в который продолжает чтение.
-/// https://api.dart.dev/dart-io/IOOverrides-class.html
-GraphReplacementSnapshotWriteRunner _stallingReadOf(
-  File input,
-  SendPort stalled,
-) {
-  final stallingPath = input.path;
-  return (write) => Isolate.run(
-    () => IOOverrides.runWithIOOverrides(
-      write.run,
-      _StallingFiles(stallingPath, stalled),
-    ),
-  );
-}
-
-final class _StallingFiles extends IOOverrides {
-  _StallingFiles(this._path, this._stalled);
-
-  final String _path;
-  final SendPort _stalled;
-
-  @override
-  File createFile(String path) {
-    final file = super.createFile(path);
-    return path == _path ? _StallingFile(file, _stalled) : file;
-  }
-}
-
-final class _StallingFile implements File {
-  _StallingFile(this._file, this._stalled);
-
-  final File _file;
-  final SendPort _stalled;
-
-  @override
-  String get path => _file.path;
-
-  @override
-  Stream<List<int>> openRead([int? start, int? end]) async* {
-    final bytes = await _file.readAsBytes();
-    final half = bytes.length ~/ 2;
-    yield bytes.sublist(0, half);
-    final resume = ReceivePort();
-    _stalled.send(resume.sendPort);
-    await resume.first;
-    yield bytes.sublist(half);
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 Future<Set<String>> _fileNamesIn(Directory directory) async => {
