@@ -77,6 +77,24 @@ enum _GraphReplacementCancellationState {
 
 void _ignorePointOfNoReturn() {}
 
+/// Фаза замены графа импортом или восстановлением копии.
+enum GraphReplacementPhase {
+  /// Новый граф — состояние копии или записи файла — пишется в снимок
+  /// замены; команды графа принимаются.
+  snapshotWrite,
+
+  /// Граф заменяется снимком замены в монопольном режиме координатора.
+  replacement,
+}
+
+/// Ход замены графа: фаза и доля обработанных в ней записей от 0 до 1.
+final class GraphReplacementProgress {
+  const GraphReplacementProgress(this.phase, this.share);
+
+  final GraphReplacementPhase phase;
+  final double share;
+}
+
 /// Записи снимка замены нарушают правило целостности графа, которого не
 /// выражает схема хранилища: путь дневного выбора не непрерывен от источника
 /// до выбранного намерения, или после вставки в графе не столько записей

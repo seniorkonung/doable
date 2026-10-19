@@ -27,23 +27,6 @@ final class GraphChangesSinceBackupUncounted extends GraphChangesSinceBackup {
   const GraphChangesSinceBackupUncounted();
 }
 
-/// Фаза восстановления копии.
-enum GraphRestorePhase {
-  /// Состояние копии пишется в снимок замены; команды графа принимаются.
-  snapshotWrite,
-
-  /// Граф заменяется снимком замены в монопольном режиме координатора.
-  replacement,
-}
-
-/// Ход восстановления копии: фаза и доля обработанных в ней записей от 0 до 1.
-final class GraphRestoreProgress {
-  const GraphRestoreProgress(this.phase, this.share);
-
-  final GraphRestorePhase phase;
-  final double share;
-}
-
 /// Восстановление резервной копии атомарной заменой всего графа её
 /// состоянием (ADR-0036).
 ///
@@ -119,7 +102,7 @@ final class GraphRestore {
   Future<GraphBackupRestoreOutcome> restore(
     GraphBackupEntry backup,
     GraphExclusiveReplacement<GraphBackupRestored> exclusive, {
-    required void Function(GraphRestoreProgress progress) onProgress,
+    required void Function(GraphReplacementProgress progress) onProgress,
     required GraphReplacementCancellation cancellation,
   }) async {
     final stopwatch = Stopwatch()..start();
@@ -129,19 +112,19 @@ final class GraphRestore {
       final written = await _writeSnapshot(
         backup,
         onProgress: (share) => onProgress(
-          GraphRestoreProgress(GraphRestorePhase.snapshotWrite, share),
+          GraphReplacementProgress(GraphReplacementPhase.snapshotWrite, share),
         ),
         cancelled: cancellation.requested,
       );
       snapshot = written;
       final restored = await exclusive.replace(() {
         onProgress(
-          const GraphRestoreProgress(GraphRestorePhase.replacement, 0),
+          const GraphReplacementProgress(GraphReplacementPhase.replacement, 0),
         );
         return _replacement.replaceGraph(
           written,
           onProgress: (share) => onProgress(
-            GraphRestoreProgress(GraphRestorePhase.replacement, share),
+            GraphReplacementProgress(GraphReplacementPhase.replacement, share),
           ),
           cancellation: cancellation,
         );

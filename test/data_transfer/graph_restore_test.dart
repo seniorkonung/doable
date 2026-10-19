@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, LocalDatabaseSqlOperation, LocalDatabaseSqlStatement;
+import 'package:doable/src/data_transfer/application/graph_replacement.dart';
 import 'package:doable/src/data_transfer/application/graph_restore.dart';
 import 'package:doable/src/data_transfer/application/graph_restore_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -361,7 +362,7 @@ void main() {
       for (final state in states)
         if (state case GraphRestoreRunning(:final progress)) progress,
     ];
-    for (final phase in GraphRestorePhase.values) {
+    for (final phase in GraphReplacementPhase.values) {
       final shares = [
         for (final step in progress)
           if (step.phase == phase) step.share,
@@ -374,8 +375,8 @@ void main() {
     }
     final phases = [for (final step in progress) step.phase];
     expect(
-      phases.indexOf(GraphRestorePhase.replacement),
-      greaterThan(phases.lastIndexOf(GraphRestorePhase.snapshotWrite)),
+      phases.indexOf(GraphReplacementPhase.replacement),
+      greaterThan(phases.lastIndexOf(GraphReplacementPhase.snapshotWrite)),
     );
     expect(states.last, isA<GraphRestoreIdle>());
   });
@@ -531,8 +532,8 @@ void main() {
       final before = await storedState();
       container.listen(graphRestoreControllerProvider, (_, state) {
         if (state case GraphRestoreRunning(
-          progress: GraphRestoreProgress(
-            phase: GraphRestorePhase.replacement,
+          progress: GraphReplacementProgress(
+            phase: GraphReplacementPhase.replacement,
             share: > 0,
           ),
         )) {

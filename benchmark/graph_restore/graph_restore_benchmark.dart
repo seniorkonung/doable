@@ -8,7 +8,7 @@ import 'package:doable/src/data/local/app_database.dart'
         LocalDatabaseConnectionObserver,
         LocalDatabaseSqlOperation,
         LocalDatabaseSqlStatement;
-import 'package:doable/src/data_transfer/application/graph_restore.dart';
+import 'package:doable/src/data_transfer/application/graph_replacement.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -207,8 +207,8 @@ final class _Restore {
     Duration? replacementStart;
     Duration? deletionEnd;
     Duration? insertionEnd;
-    void onProgress(GraphRestoreProgress progress) {
-      if (progress.phase != GraphRestorePhase.replacement) return;
+    void onProgress(GraphReplacementProgress progress) {
+      if (progress.phase != GraphReplacementPhase.replacement) return;
       final elapsed = stopwatch.elapsed;
       replacementStart ??= elapsed;
       // Прежний граф и снимок замены — одно состояние копии, а ход замены

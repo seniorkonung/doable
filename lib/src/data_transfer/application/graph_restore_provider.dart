@@ -35,7 +35,7 @@ final class GraphRestoreIdle extends GraphRestoreState {
 final class GraphRestoreRunning extends GraphRestoreState {
   const GraphRestoreRunning(this.progress);
 
-  final GraphRestoreProgress progress;
+  final GraphReplacementProgress progress;
 }
 
 /// Замена прошла точку невозврата и подтверждается: отмена больше не
@@ -85,7 +85,7 @@ final class GraphRestoreController extends Notifier<GraphRestoreState> {
         );
         _publish(
           const GraphRestoreRunning(
-            GraphRestoreProgress(GraphRestorePhase.snapshotWrite, 0),
+            GraphReplacementProgress(GraphReplacementPhase.snapshotWrite, 0),
           ),
         );
         try {

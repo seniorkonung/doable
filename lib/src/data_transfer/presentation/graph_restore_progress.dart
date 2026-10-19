@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_metrics.dart';
 import '../../design_system/doable_type.dart';
-import '../application/graph_restore.dart';
+import '../application/graph_replacement.dart';
 import '../application/graph_restore_provider.dart';
 
 /// Пока идёт восстановление копии, показывает над страницей [child], её
@@ -169,8 +169,10 @@ enum _Cancellation {
 }
 
 /// Ход обеих фаз восстановления одной долей от 0 до 1.
-double _overallShare(GraphRestoreProgress progress) => switch (progress.phase) {
-  GraphRestorePhase.snapshotWrite => progress.share * _snapshotWriteShare,
-  GraphRestorePhase.replacement =>
-    _snapshotWriteShare + progress.share * (1 - _snapshotWriteShare),
-};
+double _overallShare(GraphReplacementProgress progress) =>
+    switch (progress.phase) {
+      GraphReplacementPhase.snapshotWrite =>
+        progress.share * _snapshotWriteShare,
+      GraphReplacementPhase.replacement =>
+        _snapshotWriteShare + progress.share * (1 - _snapshotWriteShare),
+    };

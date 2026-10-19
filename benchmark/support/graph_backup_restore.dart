@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:doable/src/data_transfer/application/graph_replacement.dart';
 import 'package:doable/src/data_transfer/application/graph_restore.dart';
 import 'package:doable/src/data_transfer/application/graph_restore_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -78,7 +79,7 @@ final class BenchmarkGraphRestore {
   /// [onProgress] получает ход обеих фаз.
   Future<void> restore(
     GraphBackupEntry backup, {
-    void Function(GraphRestoreProgress progress)? onProgress,
+    void Function(GraphReplacementProgress progress)? onProgress,
   }) async {
     final subscription = onProgress == null
         ? null
