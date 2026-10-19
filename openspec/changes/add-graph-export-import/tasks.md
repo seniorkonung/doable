@@ -1064,3 +1064,25 @@
   - **Dependencies:** 3.8, 3.10, 3.15.
   - **Files likely touched:** `lib/src/data/local/sqlite_failure_classifier.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/graph/data/drift_graph_replacement_test.dart`, `test/data_transfer/graph_restore_test.dart`.
   - **Estimated scope:** S.
+
+- [ ] 3.30 Делать последнюю проверку отмены в транзакции замены графа точкой невозврата, о прохождении которой узнаёт вызывающий
+  - **Acceptance criteria:**
+    - По требованию «Атомарная замена графа» [спецификации](specs/graph-export-import/spec.md) и решению 10 [дизайна](design.md) замена задачи 3.10 последний раз проверяет отмену в транзакции сразу перед COMMIT: после сверки количеств, строки копии перед заменой, снимка, пакета «сброс» и включения захвата. Эта проверка — точка невозврата. Отмена, принятая до неё, откатывает всю транзакцию, и граф, копии, лог и реестр снимков остаются прежними. После неё замена отмену не принимает и подтверждается.
+    - Контракт `GraphReplacement` описывает точку невозврата, а вызывающий узнаёт о её прохождении до подтверждения. Принятие отмены и проверка в точке невозврата — одно синхронное решение: отмена, запрошенная в момент проверки, либо откатывает замену, либо не принимается, и запросивший узнаёт, какой исход наступил.
+  - **Verification:**
+    - На файловой базе проверить три случая. Отмена, запрошенная после включения захвата и до точки невозврата, откатывает замену без изменений графа, копий, лога и реестра снимков. Отмена, запрошенная после точки невозврата, не принимается, а замена подтверждается с копией перед заменой и пакетом «сброс». Вызывающий узнаёт о прохождении точки до подтверждения. Выполнить `mise exec --no-deps -- flutter test test/graph/data/drift_graph_replacement_test.dart`.
+    - Если после этой задачи в этапе 3 нет незавершённых задач, выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 3.10.
+  - **Files likely touched:** `lib/src/data_transfer/application/graph_replacement.dart`, `lib/src/graph/data/drift_personal_graph_repository_replacement.dart`, `test/graph/data/drift_graph_replacement_test.dart`.
+  - **Estimated scope:** S.
+
+- [ ] 3.31 Делать «Отменить» в прогрессе восстановления недоступной после точки невозврата замены и не показывать после неё «Отмена…»
+  - **Acceptance criteria:**
+    - По требованию «Атомарная замена графа» [спецификации](specs/graph-export-import/spec.md) и решению 10 [дизайна](design.md) восстановление задачи 3.15 передаёт отмену замене через точку невозврата задачи 3.30. Отмена, принятая `GraphRestoreController` до этой точки, всегда откатывает замену и даёт исход отмены задачи 3.22: «Отмена…» до конца отката и закрытие прогресса без сообщения.
+    - После точки невозврата контроллер отмену не принимает и «Отмена…» не публикует. Прогресс показывает «Отменить» недоступной до исхода, и экранный диктор сообщает о её недоступности, а не «Отмена…». Восстановление завершается так же, как без нажатия, — сообщением «Копия восстановлена». Новых текстов нет.
+  - **Verification:**
+    - Тестами восстановления с управляемой заменой проверить два случая. Отмена, принятая контроллером непосредственно перед проверкой точки невозврата, откатывает замену с исходом отмены. Отмена после точки не меняет состояние контроллера, и восстановление завершается успехом. Виджетными тестами прогресса проверить, что после точки «Отменить» недоступна, её семантика сообщает о недоступности, а нажатие не показывает «Отмена…», тогда как отмена до точки работает как прежде. Выполнить `mise exec --no-deps -- flutter test test/data_transfer/graph_restore_test.dart test/data_transfer/presentation/graph_restore_progress_test.dart`.
+    - Если после этой задачи в этапе 3 нет незавершённых задач, выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 3.15, 3.22, 3.30.
+  - **Files likely touched:** `lib/src/data_transfer/application/graph_restore.dart`, `lib/src/data_transfer/application/graph_restore_provider.dart`, `lib/src/data_transfer/presentation/graph_restore_progress.dart`, `test/data_transfer/graph_restore_test.dart`, `test/data_transfer/presentation/graph_restore_progress_test.dart`.
+  - **Estimated scope:** M.
