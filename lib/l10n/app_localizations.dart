@@ -2167,6 +2167,42 @@ abstract class AppLocalizations {
   /// **'Couldn’t load backups'**
   String get dataBackupsReadFailed;
 
+  /// Подпись строки «Резервные копии», когда последняя копия сделана меньше минуты назад
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy just now'**
+  String get dataBackupsLastJustNow;
+
+  /// Подпись строки «Резервные копии», когда последняя копия сделана сегодня
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy today at {time}'**
+  String dataBackupsLastToday(String time);
+
+  /// Подпись строки «Резервные копии», когда последняя копия сделана вчера
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy yesterday at {time}'**
+  String dataBackupsLastYesterday(String time);
+
+  /// Подпись строки «Резервные копии», когда последняя копия сделана раньше вчерашнего дня
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy on {date} at {time}'**
+  String dataBackupsLastOn(String date, String time);
+
+  /// Подпись доступной строки «Резервные копии», когда копий нет, а граф не пуст
+  ///
+  /// In en, this message translates to:
+  /// **'No backups yet'**
+  String get dataBackupsNone;
+
+  /// Подпись недоступной строки «Резервные копии», когда копий нет и граф пуст
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to back up yet'**
+  String get dataBackupsNothing;
+
   /// Момент копии, сделанной сегодня, в списке копий
   ///
   /// In en, this message translates to:

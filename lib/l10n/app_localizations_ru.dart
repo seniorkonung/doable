@@ -1400,6 +1400,30 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataBackupsReadFailed => 'Не удалось загрузить копии';
 
   @override
+  String get dataBackupsLastJustNow => 'Последняя копия только что';
+
+  @override
+  String dataBackupsLastToday(String time) {
+    return 'Последняя копия сегодня в $time';
+  }
+
+  @override
+  String dataBackupsLastYesterday(String time) {
+    return 'Последняя копия вчера в $time';
+  }
+
+  @override
+  String dataBackupsLastOn(String date, String time) {
+    return 'Последняя копия $date в $time';
+  }
+
+  @override
+  String get dataBackupsNone => 'Пока нет копий';
+
+  @override
+  String get dataBackupsNothing => 'Пока нечего копировать';
+
+  @override
   String dataBackupMadeToday(String time) {
     return 'Сегодня, $time';
   }

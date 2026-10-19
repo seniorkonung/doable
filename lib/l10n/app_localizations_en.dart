@@ -1386,6 +1386,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataBackupsReadFailed => 'Couldn’t load backups';
 
   @override
+  String get dataBackupsLastJustNow => 'Last copy just now';
+
+  @override
+  String dataBackupsLastToday(String time) {
+    return 'Last copy today at $time';
+  }
+
+  @override
+  String dataBackupsLastYesterday(String time) {
+    return 'Last copy yesterday at $time';
+  }
+
+  @override
+  String dataBackupsLastOn(String date, String time) {
+    return 'Last copy on $date at $time';
+  }
+
+  @override
+  String get dataBackupsNone => 'No backups yet';
+
+  @override
+  String get dataBackupsNothing => 'Nothing to back up yet';
+
+  @override
   String dataBackupMadeToday(String time) {
     return 'Today, $time';
   }

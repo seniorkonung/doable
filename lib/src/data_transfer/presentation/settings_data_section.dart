@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,9 +9,13 @@ import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_icon.dart';
 import '../../design_system/doable_metrics.dart';
 import '../../design_system/doable_type.dart';
+import '../../graph_backups/graph_backup_registry.dart';
+import '../../graph_backups/graph_backups_provider.dart';
 import '../application/graph_composition.dart';
 import '../application/graph_composition_provider.dart';
 import '../application/graph_export_provider.dart';
+import 'backup_descriptions.dart';
+import 'backups_sheet.dart';
 import 'export_data_sheet.dart';
 
 /// Раздел «Данные» страницы «Настройки»: пояснение, что граф хранится только
@@ -46,9 +52,98 @@ final class SettingsDataSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
+        const _BackupsRow(),
         const _ExportRow(),
       ],
     );
+  }
+}
+
+/// Сколько после копии строка «Резервные копии» сообщает, что она сделана
+/// только что.
+const _justNowWindow = Duration(minutes: 1);
+
+/// Строка «Резервные копии» открывает панель копий и сообщает, когда сделана
+/// последняя по созданию копия. Без копий пустой граф копировать нечего, а
+/// отказ чтения копий не выдаётся за их отсутствие.
+final class _BackupsRow extends ConsumerStatefulWidget {
+  const _BackupsRow();
+
+  @override
+  ConsumerState<_BackupsRow> createState() => _BackupsRowState();
+}
+
+final class _BackupsRowState extends ConsumerState<_BackupsRow> {
+  /// Перестраивает строку, когда подпись «только что» перестаёт быть верной.
+  Timer? _justNowExpiry;
+
+  @override
+  void dispose() {
+    _justNowExpiry?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    OptionRow row({String? hint, VoidCallback? onPressed}) => OptionRow(
+      icon: DoableIconData.backups,
+      name: localizations.dataBackupsTitle,
+      hint: hint,
+      onPressed: onPressed,
+    );
+    void openSheet() => unawaited(showBackupsSheet(context));
+    return switch ((
+      ref.watch(graphBackupListProvider).value,
+      ref.watch(graphCompositionProvider).value,
+    )) {
+      // Пока копии не прочитаны, неизвестно, есть ли последняя копия.
+      (null, _) => row(),
+      (GraphBackupsReadSucceeded(backups: [final last, ...]), _) => row(
+        hint: _lastBackupText(localizations, last.madeAt),
+        onPressed: openSheet,
+      ),
+      // Пока состав не прочитан, неизвестно, есть ли что копировать.
+      (GraphBackupsReadSucceeded(), null) => row(
+        hint: localizations.dataBackupsNone,
+      ),
+      (
+        GraphBackupsReadSucceeded(),
+        GraphCompositionReadSucceeded(:final composition),
+      )
+          when composition.isEmpty =>
+        row(hint: localizations.dataBackupsNothing),
+      // Отказ чтения состава не означает пустого графа.
+      (
+        GraphBackupsReadSucceeded(),
+        GraphCompositionReadSucceeded() || GraphCompositionReadFailed(),
+      ) =>
+        row(hint: localizations.dataBackupsNone, onPressed: openSheet),
+      // Отказ чтения не означает, что копий нет.
+      (GraphBackupsReadFailed(), _) => row(onPressed: openSheet),
+    };
+  }
+
+  /// Когда сделана последняя копия с моментом [madeAt]: только что, а затем
+  /// день и время по правилам локали.
+  String _lastBackupText(AppLocalizations localizations, DateTime madeAt) {
+    final now = ref.watch(graphBackupsClockProvider)();
+    final elapsed = now.difference(madeAt);
+    _justNowExpiry?.cancel();
+    // Копия с моментом позже текущего сделана до перевода часов назад.
+    if (!elapsed.isNegative && elapsed < _justNowWindow) {
+      _justNowExpiry = Timer(_justNowWindow - elapsed, () {
+        if (mounted) setState(() {});
+      });
+      return localizations.dataBackupsLastJustNow;
+    }
+    return switch (BackupMoment.of(context, madeAt, now: now)) {
+      BackupMadeToday(:final time) => localizations.dataBackupsLastToday(time),
+      BackupMadeYesterday(:final time) =>
+        localizations.dataBackupsLastYesterday(time),
+      BackupMadeEarlier(:final date, :final time) =>
+        localizations.dataBackupsLastOn(date, time),
+    };
   }
 }
 

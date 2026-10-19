@@ -25,8 +25,8 @@ final class OptionRow extends StatelessWidget {
   const OptionRow({
     required this.icon,
     required this.name,
-    required this.hint,
     required this.onPressed,
+    this.hint,
     this.trailing = OptionRowTrailing.none,
     this.progress,
     this.autofocus = false,
@@ -35,7 +35,9 @@ final class OptionRow extends StatelessWidget {
 
   final DoableIconData icon;
   final String name;
-  final String hint;
+
+  /// Пояснение под названием; без него строка показывает только название.
+  final String? hint;
 
   /// Без обработчика строка недоступна: значок и название приглушены, а
   /// экранный диктор объявляет недоступность состоянием строки.
@@ -134,12 +136,13 @@ final class OptionRow extends StatelessWidget {
                             name,
                             style: DoableType.action.copyWith(color: ink),
                           ),
-                          Text(
-                            hint,
-                            style: DoableType.hint.copyWith(
-                              color: colors.muted,
+                          if (hint case final hint?)
+                            Text(
+                              hint,
+                              style: DoableType.hint.copyWith(
+                                color: colors.muted,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
