@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data_transfer/application/graph_restore.dart';
 import 'package:doable/src/data_transfer/presentation/restore_backup_confirmation.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -11,6 +12,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/daily_choice_local_date.dart';
 
 /// Текущий момент проверок подтверждения: 7 октября 2026 года, полдень.
 final _now = DateTime(2026, 10, 7, 12);
@@ -139,6 +142,38 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
+  testWidgets('с наступлением следующей местной даты подтверждение называет '
+      'сегодняшнюю копию сделанной вчера', (tester) async {
+    var now = _now;
+    final localDate = ControlledDailyChoiceLocalDate(
+      CalendarDate.fromParts(2026, 10, 7),
+    );
+    await _openConfirmation(
+      tester,
+      backup: _backup(DateTime(2026, 10, 7, 8, 15)),
+      changesSince: Future.value(
+        const GraphChangesSinceBackupCounted(
+          GraphChangeCounts(added: 0, changed: 0, deleted: 0),
+        ),
+      ),
+      clock: () => now,
+      localDate: localDate,
+    );
+    expect(
+      find.text('Она сделана сегодня в 08:15. С тех пор ничего не изменилось.'),
+      findsOneWidget,
+    );
+
+    now = DateTime(2026, 10, 8);
+    localDate.today = CalendarDate.fromParts(2026, 10, 8);
+    await tester.pump(localDate.untilNextDate);
+
+    expect(
+      find.text('Она сделана вчера в 08:15. С тех пор ничего не изменилось.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('экранный диктор называет подтверждение и читает его текст и '
       'доступные действия', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -209,18 +244,26 @@ List<String?> _dialogTexts(WidgetTester tester) => tester
 FilledButton _restoreButton(WidgetTester tester) =>
     tester.widget(find.widgetWithText(FilledButton, 'Восстановить копию'));
 
-/// Открывает над страницей подтверждение восстановления копии [backup] в
-/// момент [_now] и возвращает его исход.
+DateTime _readNow() => _now;
+
+/// Открывает над страницей подтверждение восстановления копии [backup] по
+/// часам копий [clock] — по умолчанию в момент [_now] — и возвращает его
+/// исход. Местную дату можно задать управляемым источником [localDate].
 Future<Future<bool>> _openConfirmation(
   WidgetTester tester, {
   required GraphBackupEntry backup,
   required Future<GraphChangesSinceBackup> changesSince,
   String language = 'ru',
+  DateTime Function() clock = _readNow,
+  ControlledDailyChoiceLocalDate? localDate,
 }) async {
   late Future<bool> confirmation;
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [graphBackupsClockProvider.overrideWithValue(() => _now)],
+      overrides: [
+        graphBackupsClockProvider.overrideWithValue(clock),
+        ?localDate?.override,
+      ],
       child: MaterialApp(
         locale: Locale(language),
         localizationsDelegates: AppLocalizations.localizationsDelegates,

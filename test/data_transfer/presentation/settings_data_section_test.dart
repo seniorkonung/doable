@@ -6,6 +6,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups, Tag;
 import 'package:doable/src/data_transfer/application/graph_composition.dart';
 import 'package:doable/src/data_transfer/application/graph_composition_provider.dart';
@@ -36,6 +37,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_local_date.dart';
 import '../../support/file_document_access.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -312,6 +314,30 @@ void main() {
     });
   }
 
+  testWidgets('после возвращения приложения в активное состояние с другой '
+      'местной датой строка «Резервные копии» без новых копий называет '
+      'вчерашней сегодняшнюю копию', (tester) async {
+    final localDate = ControlledDailyChoiceLocalDate(
+      CalendarDate.fromParts(2026, 10, 18),
+    );
+    final app = await _DataSectionApp.open(
+      tester,
+      localDate: localDate,
+      backups: Stream.value(
+        GraphBackupsReadSucceeded([_backup(DateTime(2026, 10, 18, 8, 15))]),
+      ),
+    );
+    expect(find.text('Последняя копия сегодня в 08:15'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    app.clock.now = DateTime(2026, 10, 19, 7);
+    localDate.today = CalendarDate.fromParts(2026, 10, 19);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(find.text('Последняя копия вчера в 08:15'), findsOneWidget);
+  });
+
   testWidgets('при отказе чтения копий строка «Резервные копии» и при пустом '
       'графе доступна без времени последней копии, а панель сообщает об '
       'отказе', (tester) async {
@@ -463,7 +489,8 @@ GraphBackupEntry _backup(DateTime madeAt) {
 /// Раздел «Данные» над настоящим хранилищем графа в памяти: состав и копии
 /// читает, а экспорт и копии пишет репозиторий. Документы — файлы временного
 /// каталога, а чтение состава и копий можно заменить потоками [composition]
-/// и [backups].
+/// и [backups]. Местную дату можно задать управляемым источником
+/// [localDate].
 final class _DataSectionApp {
   _DataSectionApp._(
     this._repository,
@@ -482,6 +509,7 @@ final class _DataSectionApp {
     String language = 'ru',
     Stream<GraphCompositionRead>? composition,
     Stream<GraphBackupsRead>? backups,
+    ControlledDailyChoiceLocalDate? localDate,
   }) async {
     final database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
@@ -536,6 +564,7 @@ final class _DataSectionApp {
           graphBackupsClockProvider.overrideWithValue(() => clock.now),
           if (backups != null)
             graphBackupListProvider.overrideWith((ref) => backups),
+          ?localDate?.override,
         ],
         child: MaterialApp(
           locale: Locale(language),

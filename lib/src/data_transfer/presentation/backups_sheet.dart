@@ -2,6 +2,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../design_system/components/notice.dart';
 import '../../design_system/components/sheet.dart';
 import '../../design_system/doable_colors.dart';
@@ -33,11 +35,35 @@ Future<GraphBackupEntry?> showBackupsSheet(BuildContext context) =>
       builder: (_) => const _BackupsSheet(),
     );
 
-final class _BackupsSheet extends ConsumerWidget {
+final class _BackupsSheet extends ConsumerStatefulWidget {
   const _BackupsSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BackupsSheet> createState() => _BackupsSheetState();
+}
+
+final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
+  /// Перестраивает панель с началом другой местной даты, чтобы дни копий
+  /// назывались относительно нового сегодня.
+  late final DailyChoiceLocalDayObserver _localDay;
+
+  @override
+  void initState() {
+    super.initState();
+    _localDay = DailyChoiceLocalDayObserver(
+      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+      onTodayChanged: () => setState(() {}),
+    );
+  }
+
+  @override
+  void dispose() {
+    _localDay.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final now = ref.watch(graphBackupsClockProvider)();
     return Sheet(

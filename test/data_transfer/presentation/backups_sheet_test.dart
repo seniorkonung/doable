@@ -6,6 +6,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups;
 import 'package:doable/src/data_transfer/presentation/backups_sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -28,6 +29,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/temporary_graph_files.dart';
@@ -219,6 +221,54 @@ void main() {
       semantics.dispose();
     });
   }
+
+  testWidgets('с наступлением следующей местной даты панель без новых копий '
+      'называет сегодняшнюю копию вчерашней, а вчерашнюю — датой, и в '
+      'подписях, и в доступных названиях', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var now = _now;
+    final localDate = ControlledDailyChoiceLocalDate(
+      CalendarDate.fromParts(2026, 10, 7),
+    );
+    await _openSheet(
+      tester,
+      overrides: [
+        graphBackupListProvider.overrideWith(
+          (ref) => Stream.value(
+            GraphBackupsReadSucceeded([
+              _backup(DateTime(2026, 10, 7, 8, 15), _counts(1, 0, 0)),
+              _backup(DateTime(2026, 10, 6, 21, 40), _counts(0, 1, 0)),
+            ]),
+          ),
+        ),
+        graphBackupsClockProvider.overrideWithValue(() => now),
+        localDate.override,
+      ],
+    );
+    expect(find.text('Сегодня, 08:15'), findsOneWidget);
+
+    now = DateTime(2026, 10, 8);
+    localDate.today = CalendarDate.fromParts(2026, 10, 8);
+    await tester.pump(localDate.untilNextDate);
+
+    expect(_sheetTexts(tester).skip(2), [
+      'Вчера, 08:15',
+      '1 добавлено',
+      '6 октября, 21:40',
+      '1 изменено',
+      'Сделать копию сейчас',
+    ]);
+    for (final label in [
+      'Восстановить копию от вчера, 08:15\n1 добавлено',
+      'Восстановить копию от 6 октября, 21:40\n1 изменено',
+    ]) {
+      expect(
+        tester.getSemantics(find.text(label.split('\n').last)),
+        isSemantics(label: label, isButton: true, hasTapAction: true),
+      );
+    }
+    semantics.dispose();
+  });
 
   testWidgets('при отказе чтения копий панель вместо списка показывает '
       '«Не удалось загрузить копии» и кнопку', (tester) async {

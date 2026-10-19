@@ -2,6 +2,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_metrics.dart';
 import '../../design_system/doable_type.dart';
@@ -33,7 +35,7 @@ Future<bool> confirmBackupRestore(
     ) ??
     false;
 
-final class _RestoreBackupConfirmation extends ConsumerWidget {
+final class _RestoreBackupConfirmation extends ConsumerStatefulWidget {
   const _RestoreBackupConfirmation({
     required this.backup,
     required this.changesSince,
@@ -43,13 +45,39 @@ final class _RestoreBackupConfirmation extends ConsumerWidget {
   final Future<GraphChangesSinceBackup> changesSince;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RestoreBackupConfirmation> createState() =>
+      _RestoreBackupConfirmationState();
+}
+
+final class _RestoreBackupConfirmationState
+    extends ConsumerState<_RestoreBackupConfirmation> {
+  /// Перестраивает подтверждение с началом другой местной даты, чтобы день
+  /// копии назывался относительно нового сегодня.
+  late final DailyChoiceLocalDayObserver _localDay;
+
+  @override
+  void initState() {
+    super.initState();
+    _localDay = DailyChoiceLocalDayObserver(
+      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+      onTodayChanged: () => setState(() {}),
+    );
+  }
+
+  @override
+  void dispose() {
+    _localDay.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final colors = Theme.of(context).extension<DoableColors>()!;
     final title = localizations.dataRestoreConfirmationTitle;
     final made = switch (BackupMoment.of(
       context,
-      backup.madeAt,
+      widget.backup.madeAt,
       now: ref.watch(graphBackupsClockProvider)(),
     )) {
       BackupMadeToday(:final time) => localizations.dataRestoreMadeToday(time),
@@ -59,7 +87,7 @@ final class _RestoreBackupConfirmation extends ConsumerWidget {
         localizations.dataRestoreMadeOn(dateWithYear, time),
     };
     return FutureBuilder(
-      future: changesSince,
+      future: widget.changesSince,
       builder: (context, counting) => AlertDialog(
         semanticLabel: title,
         scrollable: true,

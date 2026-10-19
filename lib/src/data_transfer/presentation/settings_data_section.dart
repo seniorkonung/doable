@@ -4,6 +4,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../design_system/components/option_row.dart';
 import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_icon.dart';
@@ -104,6 +106,10 @@ final class _BackupsRowState extends ConsumerState<_BackupsRow> {
   /// Перестраивает строку, когда подпись «только что» перестаёт быть верной.
   Timer? _justNowExpiry;
 
+  /// Перестраивает строку с началом другой местной даты, чтобы день
+  /// последней копии назывался относительно нового сегодня.
+  late final DailyChoiceLocalDayObserver _localDay;
+
   /// Восстановление, начатое строкой, пока она ждёт его исхода или
   /// предъявляет его отказ.
   GraphBackupRestoreOperationToken? _restoreToken;
@@ -113,11 +119,16 @@ final class _BackupsRowState extends ConsumerState<_BackupsRow> {
   void initState() {
     super.initState();
     _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+    _localDay = DailyChoiceLocalDayObserver(
+      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+      onTodayChanged: () => setState(() {}),
+    );
   }
 
   @override
   void dispose() {
     _justNowExpiry?.cancel();
+    _localDay.dispose();
     _releaseRestorePresentation();
     super.dispose();
   }
