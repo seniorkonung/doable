@@ -48,6 +48,37 @@ abstract interface class DocumentAccess {
     CreatedDocument document, {
     required CreatedDocumentOutcome outcome,
   });
+
+  /// Открывает системный диалог выбора документа любого типа: часть
+  /// поставщиков указывает тип документа неверно, а файл проверяется по
+  /// содержимому.
+  ///
+  /// Если человек закрыл диалог или Activity приложения отсоединилась, пока
+  /// диалог ожидал ответа, исход — [DocumentOpeningCancelled]. Пока
+  /// ожидается ответ другого диалога, этот не открывается, и исход —
+  /// [DocumentOpeningFailed].
+  ///
+  /// Право чтения открытого документа удерживается до конца его копирования
+  /// [copyDocument], даже если движок приложения перенесён в другую
+  /// Activity. Вызывающая сторона копирует каждый открытый документ один раз;
+  /// право, которое осталось у приложения, отпускается при следующем запуске.
+  Future<DocumentOpening> openDocument();
+
+  /// Копирует все байты открытого документа [document] в файл приложения
+  /// [destination] и при любом исходе отпускает право чтения документа.
+  ///
+  /// После отказа неполной копии нет. Завершение [cancellation] отменяет
+  /// копирование: исход сразу становится [DocumentCopyCancelled], даже если
+  /// поставщик документа держит его открытие или чтение и отмену не
+  /// учитывает. Такой поставщик может ответить позже. Тогда брошенное
+  /// копирование больше не пишет [destination], а удаляет его, и исход
+  /// повторно не сообщается, поэтому у каждого копирования свой
+  /// [destination]. Отмена после исхода ничего не меняет.
+  Future<DocumentCopy> copyDocument(
+    OpenedDocument document, {
+    required File destination,
+    required Future<void> cancellation,
+  });
 }
 
 /// Исход операции, для которой создан документ.
@@ -103,4 +134,65 @@ final class DocumentWritten extends DocumentWrite {
 /// запись прервалась, например из-за отозванного доступа или нехватки места.
 final class DocumentWriteFailed extends DocumentWrite {
   const DocumentWriteFailed();
+}
+
+/// Документ, открытый системным диалогом выбора.
+final class OpenedDocument {
+  const OpenedDocument(this.uri);
+
+  /// Адрес документа у его поставщика, непрозрачный для приложения. В
+  /// диагностику не попадает: адрес может содержать имя файла и папки.
+  final String uri;
+}
+
+/// Исход системного диалога выбора документа.
+sealed class DocumentOpening {
+  const DocumentOpening();
+}
+
+final class DocumentOpened extends DocumentOpening {
+  const DocumentOpened(this.document);
+
+  final OpenedDocument document;
+}
+
+/// Человек не выбрал документ; отказом это не считается.
+final class DocumentOpeningCancelled extends DocumentOpening {
+  const DocumentOpeningCancelled();
+}
+
+/// Системный диалог выбора не открылся.
+final class DocumentOpeningFailed extends DocumentOpening {
+  const DocumentOpeningFailed();
+}
+
+/// Исход копирования открытого документа в файл приложения.
+sealed class DocumentCopy {
+  const DocumentCopy();
+}
+
+final class DocumentCopied extends DocumentCopy {
+  const DocumentCopied();
+}
+
+/// Документ не прочитан: поставщик документа не открыл его или чтение
+/// прервалось, например облачный файл недоступен без сети, файл перемещён или
+/// доступ к нему отозван.
+final class DocumentNotRead extends DocumentCopy {
+  const DocumentNotRead();
+}
+
+/// Копии не хватило места на устройстве.
+final class DocumentCopyStorageFull extends DocumentCopy {
+  const DocumentCopyStorageFull();
+}
+
+/// Копия не записана по другой причине.
+final class DocumentCopyFailed extends DocumentCopy {
+  const DocumentCopyFailed();
+}
+
+/// Копирование отменено; отказом это не считается.
+final class DocumentCopyCancelled extends DocumentCopy {
+  const DocumentCopyCancelled();
 }

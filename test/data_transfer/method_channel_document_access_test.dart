@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/src/data_transfer/application/document_access.dart';
@@ -150,4 +151,128 @@ void main() {
       completes,
     );
   });
+
+  test('диалог выбора возвращает открытый документ по его адресу', () async {
+    final calls = <MethodCall>[];
+    answer((call) async {
+      calls.add(call);
+      return documentUri;
+    });
+
+    final opening = await const MethodChannelDocumentAccess().openDocument();
+
+    expect(calls.single.method, 'openDocument');
+    expect(
+      opening,
+      isA<DocumentOpened>().having(
+        (opened) => opened.document.uri,
+        'адрес документа',
+        documentUri,
+      ),
+    );
+  });
+
+  test('диалог выбора, закрытый без документа, даёт отмену', () async {
+    answer((_) async => null);
+
+    final opening = await const MethodChannelDocumentAccess().openDocument();
+
+    expect(opening, isA<DocumentOpeningCancelled>());
+  });
+
+  test(
+    'неоткрывшийся диалог выбора даёт типизированный отказ вместо исключения',
+    () async {
+      answer((_) async => throw PlatformException(code: 'dialog_unavailable'));
+
+      final opening = await const MethodChannelDocumentAccess().openDocument();
+
+      expect(opening, isA<DocumentOpeningFailed>());
+    },
+  );
+
+  test(
+    'копирование передаёт адрес документа и путь копии и завершается копией',
+    () async {
+      final calls = <MethodCall>[];
+      answer((call) async {
+        calls.add(call);
+        return null;
+      });
+
+      final copy = await const MethodChannelDocumentAccess().copyDocument(
+        const OpenedDocument(documentUri),
+        destination: File(
+          '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+        ),
+        cancellation: Completer<void>().future,
+      );
+
+      expect(calls.single.method, 'copyDocument');
+      expect(calls.single.arguments, {
+        'document': documentUri,
+        'destination':
+            '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+      });
+      expect(copy, isA<DocumentCopied>());
+    },
+  );
+
+  for (final (code, outcome) in [
+    ('document_not_read', isA<DocumentNotRead>()),
+    ('storage_full', isA<DocumentCopyStorageFull>()),
+    ('copy_not_written', isA<DocumentCopyFailed>()),
+    ('error', isA<DocumentCopyFailed>()),
+  ]) {
+    test('отказ копирования с кодом $code даёт типизированный исход вместо '
+        'исключения', () async {
+      answer((_) async => throw PlatformException(code: code));
+
+      final copy = await const MethodChannelDocumentAccess().copyDocument(
+        const OpenedDocument(documentUri),
+        destination: File(
+          '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+        ),
+        cancellation: Completer<void>().future,
+      );
+
+      expect(copy, outcome);
+    });
+  }
+
+  test(
+    'отмена передаёт плагину путь копии, и копирование завершается отменой',
+    () async {
+      final cancelCalls = <MethodCall>[];
+      final cancelled = Completer<void>();
+      answer((call) async {
+        switch (call.method) {
+          case 'copyDocument':
+            // Плагин сообщает исход копирования, когда принял отмену.
+            await cancelled.future;
+            throw PlatformException(code: 'copy_cancelled');
+          case 'cancelCopy':
+            cancelCalls.add(call);
+            cancelled.complete();
+        }
+        return null;
+      });
+      final cancellation = Completer<void>();
+
+      final copying = const MethodChannelDocumentAccess().copyDocument(
+        const OpenedDocument(documentUri),
+        destination: File(
+          '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+        ),
+        cancellation: cancellation.future,
+      );
+      cancellation.complete();
+
+      expect(await copying, isA<DocumentCopyCancelled>());
+      expect(cancelCalls.single.arguments, {
+        'destination':
+            '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+      });
+    },
+  );
 }

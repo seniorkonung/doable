@@ -5,31 +5,43 @@ import android.content.ActivityNotFoundException
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
+import android.system.ErrnoException
+import android.system.OsConstants
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
+import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Документы вне каталога приложения через системные диалоги Storage Access
  * Framework без разрешений и без `FileProvider` (ADR-0037).
  *
  * Канал создаёт документ диалогом `ACTION_CREATE_DOCUMENT` и копирует в него
- * временный файл приложения потоками `ContentResolver` в [backgroundExecutor];
- * байты через канал не передаются. Контракт канала задаёт
+ * временный файл приложения, а документ, открытый диалогом
+ * `ACTION_OPEN_DOCUMENT`, копирует в файл приложения. Копирование идёт
+ * потоками `ContentResolver` в [backgroundExecutor]; байты через канал не
+ * передаются. Контракт канала задаёт
  * `lib/src/data_transfer/data/method_channel_document_access.dart`.
  *
  * Временное право на документ Android снимает вместе с Activity, получившей
  * ответ диалога, а движок при смене дисплея переносится в другую Activity
- * (ADR-0031). Поэтому право записи закрепляется при ответе диалога и
- * отпускается на шаге завершения работы с документом. После отказа операции
- * этот шаг сначала удаляет документ: удалению нужно это право.
+ * (ADR-0031). Поэтому право закрепляется при ответе диалога. Право записи
+ * отпускается на шаге завершения работы с документом; после отказа операции
+ * этот шаг сначала удаляет документ: удалению нужно это право. Право чтения
+ * отпускается, когда закончено копирование открытого документа.
  *
  * Диалог позволяет выбрать и существующий файл, подтвердив его замену, и
  * возвращает его так же, как созданный документ. Поэтому перед ответом в Dart
@@ -38,15 +50,23 @@ import java.util.concurrent.Executor
  */
 class DocumentAccessPlugin internal constructor(
     private val backgroundExecutor: Executor,
+    /** Открывает для записи файл копии открытого документа. */
+    private val openCopy: (File) -> OutputStream,
 ) : FlutterPlugin, ActivityAware, PluginRegistry.ActivityResultListener {
-    constructor() : this(Executor { Thread(it, "DocumentAccess").start() })
+    constructor() : this(Executor { Thread(it, "DocumentAccess").start() }, { FileOutputStream(it) })
 
     private lateinit var channel: MethodChannel
     private lateinit var contentResolver: ContentResolver
     private var activityBinding: ActivityPluginBinding? = null
 
-    /** Ответ на создание документа, пока диалог ожидает выбора места. */
-    private var pendingCreation: MethodChannel.Result? = null
+    /** Диалог, ожидающий ответа человека, и ответ на открывший его вызов. */
+    private var pendingDialog: PendingDialog? = null
+
+    /**
+     * Копирования открытых документов по путям их копий, пока исход
+     * копирования не сообщён.
+     */
+    private val copies = ConcurrentHashMap<String, DocumentCopy>()
 
     /**
      * Документы, о которых поставщик при выборе сообщил нулевой размер, до шага
@@ -84,23 +104,31 @@ class DocumentAccessPlugin internal constructor(
     // движка в другую Activity, поэтому ожидающий запрос завершается как отмена.
     override fun onDetachedFromActivity() {
         detachActivity()
-        pendingCreation?.success(null)
-        pendingCreation = null
+        pendingDialog?.result?.success(null)
+        pendingDialog = null
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        if (requestCode != CREATE_DOCUMENT_REQUEST) return false
-        val result = pendingCreation ?: return false
-        pendingCreation = null
+        val pending = pendingDialog?.takeIf { it.dialog.requestCode == requestCode } ?: return false
+        pendingDialog = null
+        val result = pending.result
         val document = data?.data?.takeIf { resultCode == Activity.RESULT_OK }
         if (document == null) {
             result.success(null)
             return true
         }
         // Право закрепляется, пока жива Activity, получившая ответ.
-        takeWriteGrant(document)
-        // Запрос размера — межпроцессный вызов поставщика.
-        backgroundExecutor.execute { answerChosenDocument(document, result) }
+        when (pending.dialog) {
+            DocumentDialog.CREATION -> {
+                takeGrant(document, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                // Запрос размера — межпроцессный вызов поставщика.
+                backgroundExecutor.execute { answerChosenDocument(document, result) }
+            }
+            DocumentDialog.OPENING -> {
+                takeGrant(document, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                result.success(document.toString())
+            }
+        }
         return true
     }
 
@@ -145,6 +173,7 @@ class DocumentAccessPlugin internal constructor(
     private fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "createDocument" -> createDocument(requireNotNull(call.argument<String>("name")), result)
+            "openDocument" -> openDocument(result)
             "writeDocument" -> writeDocument(
                 source = requireNotNull(call.argument<String>("source")),
                 document = Uri.parse(requireNotNull(call.argument<String>("document"))),
@@ -155,28 +184,50 @@ class DocumentAccessPlugin internal constructor(
                 succeeded = requireNotNull(call.argument<Boolean>("succeeded")),
                 result = result,
             )
+            "copyDocument" -> copyDocument(
+                document = Uri.parse(requireNotNull(call.argument<String>("document"))),
+                destination = File(requireNotNull(call.argument<String>("destination"))),
+                result = result,
+            )
+            "cancelCopy" -> {
+                copies.remove(requireNotNull(call.argument<String>("destination")))?.cancel()
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
 
     private fun createDocument(name: String, result: MethodChannel.Result) {
-        val activity = activityBinding?.activity
-        // Второй диалог не открывается, пока первый ожидает ответа.
-        if (activity == null || pendingCreation != null) {
-            result.error(DIALOG_UNAVAILABLE, null, null)
-            return
-        }
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
             .setType(DOCUMENT_TYPE)
             .putExtra(Intent.EXTRA_TITLE, name)
+        startDialog(DocumentDialog.CREATION, intent, result)
+    }
+
+    // Часть поставщиков указывает тип документа неверно, а файл всё равно
+    // проверяется по содержимому, поэтому диалог принимает документ любого типа.
+    private fun openDocument(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        startDialog(DocumentDialog.OPENING, intent, result)
+    }
+
+    private fun startDialog(dialog: DocumentDialog, intent: Intent, result: MethodChannel.Result) {
+        val activity = activityBinding?.activity
+        // Второй диалог не открывается, пока первый ожидает ответа.
+        if (activity == null || pendingDialog != null) {
+            result.error(DIALOG_UNAVAILABLE, null, null)
+            return
+        }
         try {
-            activity.startActivityForResult(intent, CREATE_DOCUMENT_REQUEST)
+            activity.startActivityForResult(intent, dialog.requestCode)
         } catch (error: ActivityNotFoundException) {
             result.error(DIALOG_UNAVAILABLE, null, null)
             return
         }
-        pendingCreation = result
+        pendingDialog = PendingDialog(dialog, result)
     }
 
     private fun writeDocument(source: String, document: Uri, result: MethodChannel.Result) {
@@ -197,6 +248,93 @@ class DocumentAccessPlugin internal constructor(
                 false
             }
             if (written) result.success(null) else result.error(DOCUMENT_NOT_WRITTEN, null, null)
+        }
+    }
+
+    private fun copyDocument(document: Uri, destination: File, result: MethodChannel.Result) {
+        val copy = DocumentCopy(result)
+        copies[destination.path] = copy
+        backgroundExecutor.execute {
+            val outcome = copyBytes(document, destination, copy)
+            // Отменённое копирование уже сообщило исход и само удаляет копию,
+            // когда поставщик ответил.
+            val reported = copy.finish()
+            if (!reported || outcome != CopyOutcome.COPIED) destination.delete()
+            releaseGrant(document)
+            copies.remove(destination.path, copy)
+            if (reported) outcome.reply(result)
+        }
+    }
+
+    /**
+     * Копирует все байты [document] в [destination], пока копирование [copy]
+     * не отменено. Исключение в собственном потоке завершило бы процесс,
+     * поэтому любой отказ поставщика становится исходом.
+     */
+    private fun copyBytes(document: Uri, destination: File, copy: DocumentCopy): CopyOutcome {
+        val input = try {
+            openForReading(document, copy.cancellation)
+        } catch (error: Exception) {
+            return CopyOutcome.DOCUMENT_NOT_READ
+        }
+        try {
+            // Поставщик, который не учитывает сигнал отмены, отвечает и после неё.
+            if (copy.isCancelled) return CopyOutcome.CANCELLED
+            return writeCopy(input, destination, copy)
+        } finally {
+            try {
+                input.close()
+            } catch (error: Exception) {
+                // Чтение уже закончено: исход копирования известен.
+            }
+        }
+    }
+
+    /**
+     * Открывает [document] для чтения с сигналом [cancellation].
+     *
+     * `ContentResolver` открывает документ для чтения типизированным запросом
+     * любого типа, и `DocumentsProvider` теряет сигнал (Android SDK 36.1), а
+     * клиент поставщика передаёт его в `DocumentsProvider.openDocument`. Клиент
+     * нестабильный, поэтому гибель поставщика становится отказом чтения, а не
+     * завершает процесс приложения. Как и потоки `ContentResolver`, поток
+     * держит поставщика, пока не закрыт: поставщик отдаёт документ через канал.
+     */
+    private fun openForReading(document: Uri, cancellation: CancellationSignal): InputStream {
+        val client = checkNotNull(contentResolver.acquireUnstableContentProviderClient(document))
+        val descriptor = try {
+            checkNotNull(client.openFile(document, "r", cancellation))
+        } catch (error: Exception) {
+            client.close()
+            throw error
+        }
+        return object : ParcelFileDescriptor.AutoCloseInputStream(descriptor) {
+            override fun close() = try {
+                super.close()
+            } finally {
+                client.close()
+            }
+        }
+    }
+
+    private fun writeCopy(input: InputStream, destination: File, copy: DocumentCopy): CopyOutcome {
+        try {
+            openCopy(destination).use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val count = try {
+                        input.read(buffer)
+                    } catch (error: Exception) {
+                        return CopyOutcome.DOCUMENT_NOT_READ
+                    }
+                    // Поставщик, который не учитывает сигнал отмены, отвечает и после неё.
+                    if (copy.isCancelled) return CopyOutcome.CANCELLED
+                    if (count < 0) return CopyOutcome.COPIED
+                    output.write(buffer, 0, count)
+                }
+            }
+        } catch (error: Exception) {
+            return if (error.isStorageFull()) CopyOutcome.STORAGE_FULL else CopyOutcome.COPY_NOT_WRITTEN
         }
     }
 
@@ -225,9 +363,10 @@ class DocumentAccessPlugin internal constructor(
         }
     }
 
-    private fun takeWriteGrant(document: Uri) {
+    /** Закрепляет право на [document] в режиме [mode], если поставщик его дал. */
+    private fun takeGrant(document: Uri, mode: Int) {
         try {
-            contentResolver.takePersistableUriPermission(document, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            contentResolver.takePersistableUriPermission(document, mode)
         } catch (error: SecurityException) {
             // Поставщик не дал закрепляемого права: копирование идёт с временным.
         }
@@ -245,12 +384,70 @@ class DocumentAccessPlugin internal constructor(
         }
     }
 
+    private enum class DocumentDialog(val requestCode: Int) {
+        CREATION(0x0d0c),
+        OPENING(0x0d0d),
+    }
+
+    private class PendingDialog(val dialog: DocumentDialog, val result: MethodChannel.Result)
+
     private companion object {
         const val CHANNEL = "software.doable.doable/document_access"
         const val DOCUMENT_TYPE = "application/gzip"
-        const val CREATE_DOCUMENT_REQUEST = 0x0d0c
         const val DIALOG_UNAVAILABLE = "dialog_unavailable"
         const val DOCUMENT_NOT_WRITTEN = "document_not_written"
         const val EXISTING_FILE = "existing_file"
     }
 }
+
+/**
+ * Копирование открытого документа, исход которого сообщается [result] один
+ * раз: отменой или самим копированием, если оно закончилось раньше.
+ */
+private class DocumentCopy(private val result: MethodChannel.Result) {
+    /** Сигнал, с которым открывается документ; отмена подаёт его поставщику. */
+    val cancellation = CancellationSignal()
+    private val state = AtomicReference(State.RUNNING)
+
+    val isCancelled get() = state.get() == State.CANCELLED
+
+    /**
+     * Сразу сообщает исход отмены, не дожидаясь поставщика, который может
+     * держать открытие документа или чтение из канала и не учитывать сигнал.
+     * После исхода копирования ничего не меняет.
+     */
+    fun cancel() {
+        if (!state.compareAndSet(State.RUNNING, State.CANCELLED)) return
+        cancellation.cancel()
+        CopyOutcome.CANCELLED.reply(result)
+    }
+
+    /** Заканчивает копирование и возвращает, должно ли оно сообщить свой исход. */
+    fun finish(): Boolean = state.compareAndSet(State.RUNNING, State.FINISHED)
+
+    private enum class State { RUNNING, CANCELLED, FINISHED }
+}
+
+/** Исход копирования открытого документа в файл приложения. */
+private enum class CopyOutcome {
+    COPIED,
+    DOCUMENT_NOT_READ,
+    STORAGE_FULL,
+    COPY_NOT_WRITTEN,
+    CANCELLED;
+
+    fun reply(result: MethodChannel.Result) {
+        val code = when (this) {
+            COPIED -> return result.success(null)
+            DOCUMENT_NOT_READ -> "document_not_read"
+            STORAGE_FULL -> "storage_full"
+            COPY_NOT_WRITTEN -> "copy_not_written"
+            CANCELLED -> "copy_cancelled"
+        }
+        result.error(code, null, null)
+    }
+}
+
+/** Отказ файловой системы из-за нехватки места на устройстве. */
+private fun Throwable.isStorageFull(): Boolean =
+    generateSequence(this) { it.cause }.any { it is ErrnoException && it.errno == OsConstants.ENOSPC }
