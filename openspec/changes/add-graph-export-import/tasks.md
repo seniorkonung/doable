@@ -1086,3 +1086,14 @@
   - **Dependencies:** 3.15, 3.22, 3.30.
   - **Files likely touched:** `lib/src/data_transfer/application/graph_restore.dart`, `lib/src/data_transfer/application/graph_restore_provider.dart`, `lib/src/data_transfer/presentation/graph_restore_progress.dart`, `test/data_transfer/graph_restore_test.dart`, `test/data_transfer/presentation/graph_restore_progress_test.dart`.
   - **Estimated scope:** M.
+
+- [ ] 3.32 Обновлять относительный день копий в строке «Резервные копии», панели копий и подтверждении восстановления при смене местной даты
+  - **Acceptance criteria:**
+    - По требованиям «Список резервных копий», «Восстановление копии» и «Локализация и доступность резервных копий» [спецификации](specs/graph-backups/spec.md), пока показаны строка «Резервные копии» задачи 3.24, панель задачи 3.21 или подтверждение задачи 3.23, относительный день копии соответствует текущей местной дате, даже если новых копий нет. С началом следующей местной даты и при возвращении приложения в активное состояние с другой местной датой «Последняя копия сегодня в 08:15» становится «Последняя копия вчера в 08:15», копия «Сегодня, 08:15» — «Вчера, 08:15», копия «Вчера, 21:40» — датой, а «Она сделана сегодня в 08:15» — «Она сделана вчера в 08:15». Доступные названия копий «Восстановить копию от <когда>» меняются вместе с подписями.
+    - О смене местной даты все три поверхности узнают от существующего `DailyChoiceLocalDayObserver` с источником `dailyChoiceLocalDateSourceProvider`, как Главная и каталог дневных выборов. Подпись по-прежнему строится по часам `graphBackupsClockProvider`, а наблюдатель освобождается вместе со своей поверхностью. «Последняя копия только что», сводки, изменения с тех пор и действия подтверждения работают как прежде; новых текстов нет.
+  - **Verification:**
+    - Виджетными тестами с управляемыми часами копий и местной датой из `test/support/daily_choice_local_date.dart` проверить без новых копий: строка показывает «вчера» после возвращения приложения в активное состояние с другой местной датой; панель — подписи и доступные названия копий после наступления следующей местной даты; подтверждение — «Она сделана вчера» после наступления следующей местной даты. Выполнить `mise exec --no-deps -- flutter test test/data_transfer/presentation/`.
+    - Если после этой задачи в этапе 3 нет незавершённых задач, выполнить `mise run codegen-check`, `mise run check` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+  - **Dependencies:** 3.21, 3.23, 3.24.
+  - **Files likely touched:** `lib/src/data_transfer/presentation/settings_data_section.dart`, `lib/src/data_transfer/presentation/backups_sheet.dart`, `lib/src/data_transfer/presentation/restore_backup_confirmation.dart`, `test/data_transfer/presentation/settings_data_section_test.dart`, `test/data_transfer/presentation/backups_sheet_test.dart`, `test/data_transfer/presentation/restore_backup_confirmation_test.dart`.
+  - **Estimated scope:** M.
