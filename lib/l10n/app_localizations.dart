@@ -2066,6 +2066,36 @@ abstract class AppLocalizations {
   /// **'Not enough space on the device. Free up space and try again. Nothing was changed'**
   String get dataReplacementStorageFull;
 
+  /// Сообщение общей поверхности об успешном импорте файла экспорта
+  ///
+  /// In en, this message translates to:
+  /// **'Data imported'**
+  String get dataImported;
+
+  /// Сообщение об отказе импорта: файл не является экспортом Doable или повреждён; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t import the file. It isn’t a Doable export, or it’s damaged. Nothing was changed'**
+  String get dataImportInvalidFile;
+
+  /// Сообщение об отказе импорта файла более новой версии формата; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'The file was created by a newer version of Doable. Update the app to import it. Nothing was changed'**
+  String get dataImportNewerVersion;
+
+  /// Сообщение об отказе импорта: выбранный файл не удалось прочитать; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t read the file. Check that you can access it and try again. Nothing was changed'**
+  String get dataImportUnreadable;
+
+  /// Сообщение об отказе импорта по неизвестной причине; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t import the data. Nothing was changed'**
+  String get dataImportFailed;
+
   /// Сообщение общей поверхности без действия об отказе ручной резервной копии
   ///
   /// In en, this message translates to:

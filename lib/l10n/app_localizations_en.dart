@@ -1282,6 +1282,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'Not enough space on the device. Free up space and try again. Nothing was changed';
 
   @override
+  String get dataImported => 'Data imported';
+
+  @override
+  String get dataImportInvalidFile =>
+      'Couldn’t import the file. It isn’t a Doable export, or it’s damaged. Nothing was changed';
+
+  @override
+  String get dataImportNewerVersion =>
+      'The file was created by a newer version of Doable. Update the app to import it. Nothing was changed';
+
+  @override
+  String get dataImportUnreadable =>
+      'Couldn’t read the file. Check that you can access it and try again. Nothing was changed';
+
+  @override
+  String get dataImportFailed =>
+      'Couldn’t import the data. Nothing was changed';
+
+  @override
   String get dataManualBackupFailed => 'Couldn’t back up';
 
   @override

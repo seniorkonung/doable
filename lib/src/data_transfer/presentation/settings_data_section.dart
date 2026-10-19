@@ -182,9 +182,9 @@ final class _BackupsRowState extends ConsumerState<_BackupsRow> {
           case GraphBackupRestored() || GraphBackupRestoreCancelled():
             _restoreToken = null;
         }
-      // Восстановление не принято: идёт прежнее, исход которого строка уже
-      // ждёт, или приложение завершает работу.
-      case GraphBackupRestoreAlreadyRunning() ||
+      // Восстановление не принято: идёт другая замена графа или приложение
+      // завершает работу.
+      case GraphReplacementAlreadyRunning() ||
           GraphCommandCoordinatorDraining():
     }
   }

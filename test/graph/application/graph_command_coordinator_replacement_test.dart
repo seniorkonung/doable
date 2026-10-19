@@ -73,7 +73,7 @@ void main() {
       harness.coordinator.acceptBackupRestore(
         (_) => fail('Второе восстановление не должно запускаться'),
       ),
-      isA<GraphBackupRestoreAlreadyRunning>(),
+      isA<GraphReplacementAlreadyRunning>(),
     );
 
     first.complete(const GraphBackupRestoreFailed());

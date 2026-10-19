@@ -1288,6 +1288,25 @@ class AppLocalizationsRu extends AppLocalizations {
       'Недостаточно места на устройстве. Освободите место и повторите. Ничего не изменено';
 
   @override
+  String get dataImported => 'Данные импортированы';
+
+  @override
+  String get dataImportInvalidFile =>
+      'Не удалось импортировать файл. Это не экспорт Doable, или он повреждён. Ничего не изменено';
+
+  @override
+  String get dataImportNewerVersion =>
+      'Файл создан более новой версией Doable. Обновите приложение, чтобы импортировать его. Ничего не изменено';
+
+  @override
+  String get dataImportUnreadable =>
+      'Не удалось прочитать файл. Проверьте доступ к нему и повторите. Ничего не изменено';
+
+  @override
+  String get dataImportFailed =>
+      'Не удалось импортировать данные. Ничего не изменено';
+
+  @override
   String get dataManualBackupFailed => 'Не удалось сделать копию';
 
   @override

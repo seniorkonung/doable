@@ -118,7 +118,7 @@ final class GraphRestore {
   /// реестр снимков остаются прежними, а файл снимка замены удаляется.
   Future<GraphBackupRestoreOutcome> restore(
     GraphBackupEntry backup,
-    GraphExclusiveReplacement exclusive, {
+    GraphExclusiveReplacement<GraphBackupRestored> exclusive, {
     required void Function(GraphRestoreProgress progress) onProgress,
     required GraphReplacementCancellation cancellation,
   }) async {

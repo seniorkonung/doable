@@ -1625,6 +1625,102 @@ void main() {
   }
 
   for (final scenario in [
+    (
+      locale: const Locale('ru'),
+      imported: 'Данные импортированы',
+      failures: {
+        GraphImportFailure.invalidFile:
+            'Не удалось импортировать файл. Это не экспорт Doable, или он '
+            'повреждён. Ничего не изменено',
+        GraphImportFailure.newerFormatVersion:
+            'Файл создан более новой версией Doable. Обновите приложение, '
+            'чтобы импортировать его. Ничего не изменено',
+        GraphImportFailure.storageFull:
+            'Недостаточно места на устройстве. Освободите место и повторите. '
+            'Ничего не изменено',
+        GraphImportFailure.documentUnreadable:
+            'Не удалось прочитать файл. Проверьте доступ к нему и повторите. '
+            'Ничего не изменено',
+        GraphImportFailure.unknown:
+            'Не удалось импортировать данные. Ничего не изменено',
+      },
+    ),
+    (
+      locale: const Locale('en'),
+      imported: 'Data imported',
+      failures: {
+        GraphImportFailure.invalidFile:
+            'Couldn’t import the file. It isn’t a Doable export, or it’s '
+            'damaged. Nothing was changed',
+        GraphImportFailure.newerFormatVersion:
+            'The file was created by a newer version of Doable. Update the '
+            'app to import it. Nothing was changed',
+        GraphImportFailure.storageFull:
+            'Not enough space on the device. Free up space and try again. '
+            'Nothing was changed',
+        GraphImportFailure.documentUnreadable:
+            'Couldn’t read the file. Check that you can access it and try '
+            'again. Nothing was changed',
+        GraphImportFailure.unknown:
+            'Couldn’t import the data. Nothing was changed',
+      },
+    ),
+  ]) {
+    testWidgets(
+      'успех импорта сразу предъявляется общей поверхностью, а отказ каждого '
+      'вида сначала принадлежит инициатору и без его права предъявляется '
+      'общей поверхностью своим текстом без действия, '
+      '${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: scenario.locale,
+        );
+        harness.startImported();
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.imported), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: scenario.imported,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        await _closeMessage(tester);
+
+        for (final MapEntry(key: failure, value: message)
+            in scenario.failures.entries) {
+          final accepted = harness.startImportFailed(failure);
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing, reason: '$failure');
+          final claim = harness.claimInitiatorFailure(accepted.token);
+          expect(claim, isNotNull, reason: '$failure');
+
+          harness.releaseInitiatorClaim(claim!);
+          await tester.pumpAndSettle();
+          expect(find.text(message), findsOneWidget, reason: '$failure');
+          expect(
+            tester.getSemantics(
+              find.byKey(const ValueKey('graph-operation-message')),
+            ),
+            matchesSemantics(
+              label: message,
+              isLiveRegion: true,
+              textDirection: TextDirection.ltr,
+            ),
+          );
+          expect(find.byType(SnackBarAction), findsNothing, reason: '$failure');
+          await _closeMessage(tester);
+        }
+      },
+    );
+  }
+
+  for (final scenario in [
     (locale: const Locale('ru'), failed: 'Не удалось сделать копию'),
     (locale: const Locale('en'), failed: 'Couldn’t back up'),
   ]) {
@@ -1932,7 +2028,9 @@ final class _PresenterHarness {
       <
         GraphBackupRestoreAccepted,
         Completer<
-          Future<GraphBackupRestoreOutcome> Function(GraphExclusiveReplacement)
+          Future<GraphBackupRestoreOutcome> Function(
+            GraphExclusiveReplacement<GraphBackupRestored>,
+          )
         >
       >{};
   var exportRetries = 0;
@@ -2658,7 +2756,9 @@ final class _PresenterHarness {
   GraphBackupRestoreAccepted startBackupRestore() {
     final finish =
         Completer<
-          Future<GraphBackupRestoreOutcome> Function(GraphExclusiveReplacement)
+          Future<GraphBackupRestoreOutcome> Function(
+            GraphExclusiveReplacement<GraphBackupRestored>,
+          )
         >();
     final accepted = _coordinator.acceptBackupRestore(
       (exclusive) async => (await finish.future)(exclusive),
@@ -2669,10 +2769,12 @@ final class _PresenterHarness {
 
   void completeBackupRestored(GraphBackupRestoreAccepted accepted) =>
       _restores[accepted]!.complete(
-        (GraphExclusiveReplacement exclusive) => exclusive.replace(
-          () async =>
-              ConfirmedGraphReplacement(const TestDetailsRevision(0, epoch: 1)),
-        ),
+        (GraphExclusiveReplacement<GraphBackupRestored> exclusive) =>
+            exclusive.replace(
+              () async => ConfirmedGraphReplacement(
+                const TestDetailsRevision(0, epoch: 1),
+              ),
+            ),
       );
 
   void completeBackupRestore(
@@ -2682,6 +2784,17 @@ final class _PresenterHarness {
 
   void startManualBackup(ManualGraphBackupOutcome outcome) =>
       _coordinator.acceptManualBackup(() async => outcome);
+
+  void startImported() => _coordinator.acceptImport(
+    (exclusive) => exclusive.replace(
+      () async =>
+          ConfirmedGraphReplacement(const TestDetailsRevision(0, epoch: 1)),
+    ),
+  );
+
+  GraphImportAccepted startImportFailed(GraphImportFailure failure) =>
+      _coordinator.acceptImport((_) async => GraphImportFailed(failure))
+          as GraphImportAccepted;
 }
 
 Future<_PresenterHarness> _pumpPresenterApp(

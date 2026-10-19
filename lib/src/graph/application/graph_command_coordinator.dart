@@ -160,6 +160,13 @@ final class GraphBackupRestoreOperationToken extends GraphOperationToken {
   String toString() => 'GraphBackupRestoreOperationToken';
 }
 
+final class GraphImportOperationToken extends GraphOperationToken {
+  GraphImportOperationToken._();
+
+  @override
+  String toString() => 'GraphImportOperationToken';
+}
+
 final class GraphManualBackupOperationToken extends GraphOperationToken {
   GraphManualBackupOperationToken._();
 
@@ -414,7 +421,7 @@ sealed class GraphBackupRestoreResult extends GraphBackupRestoreOutcome {
 /// Граф заменён состоянием копии.
 ///
 /// Этот исход даёт только замена в монопольном режиме координатора —
-/// [GraphExclusiveReplacement.replace].
+/// [GraphExclusiveReplacement.replace] принятого восстановления.
 final class GraphBackupRestored extends GraphBackupRestoreResult {
   const GraphBackupRestored._(this.replacement);
 
@@ -460,6 +467,84 @@ final class GraphBackupRestoreCompletion extends GraphPresentableCompletion {
   };
 }
 
+/// Исход импорта файла экспорта, выполненного модулем операций с данными.
+sealed class GraphImportOutcome {
+  const GraphImportOutcome();
+}
+
+/// Человек отменил импорт: граф и копии остались прежними, а сообщения нет.
+final class GraphImportCancelled extends GraphImportOutcome {
+  const GraphImportCancelled();
+}
+
+/// Исход импорта, который предъявляется сообщением.
+sealed class GraphImportResult extends GraphImportOutcome {
+  const GraphImportResult();
+}
+
+/// Граф заменён содержимым файла экспорта.
+///
+/// Этот исход даёт только замена в монопольном режиме координатора —
+/// [GraphExclusiveReplacement.replace] принятого импорта.
+final class GraphImported extends GraphImportResult {
+  const GraphImported._(this.replacement);
+
+  final ConfirmedGraphReplacement replacement;
+}
+
+/// Импорт не удался, и граф и копии остались прежними.
+final class GraphImportFailed extends GraphImportResult {
+  const GraphImportFailed(this.failure);
+
+  final GraphImportFailure failure;
+}
+
+/// Категория отказа импорта; от неё зависит, как человек может его
+/// исправить.
+enum GraphImportFailure {
+  /// Файл не является экспортом Doable или повреждён, в том числе нарушает
+  /// правила данных графа.
+  invalidFile,
+
+  /// Файл создан более новой версией формата, чем поддерживает приложение.
+  newerFormatVersion,
+
+  /// На устройстве не хватило места.
+  storageFull,
+
+  /// Выбранный документ не прочитан: поставщик не открыл его или чтение
+  /// прервалось.
+  documentUnreadable,
+
+  /// Причину нельзя отнести ни к одной другой категории.
+  unknown,
+}
+
+/// Завершение импорта файла экспорта.
+///
+/// Успех сразу принадлежит общей поверхности, а отказ — сначала строке
+/// «Импорт данных» через право инициатора. Отмена завершения не даёт.
+final class GraphImportCompletion extends GraphPresentableCompletion {
+  const GraphImportCompletion._({required this.token, required this.result});
+
+  @override
+  final GraphImportOperationToken token;
+  final GraphImportResult result;
+
+  /// Изменение «граф заменён» успешного импорта.
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => switch (result) {
+    GraphImported(:final replacement) => replacement,
+    GraphImportFailed() => null,
+  };
+
+  @override
+  bool get isFailure => switch (result) {
+    GraphImported() => false,
+    GraphImportFailed() => true,
+  };
+}
+
 /// Завершение ручной копии с политикой «только отказ» по ADR-0016.
 ///
 /// Новая копия видна в списке копий и в строке «Резервные копии», поэтому
@@ -493,24 +578,26 @@ final class GraphManualBackupFailedCompletion
   bool get isFailure => true;
 }
 
-/// Право принятого восстановления копии заменить граф в монопольном режиме
-/// координатора.
-final class GraphExclusiveReplacement {
-  GraphExclusiveReplacement._(this._coordinator);
+/// Право принятой замены графа — импорта или восстановления копии — заменить
+/// граф в монопольном режиме координатора; [R] — успешный исход этой
+/// операции.
+final class GraphExclusiveReplacement<R> {
+  GraphExclusiveReplacement._(this._coordinator, this._replaced);
 
   final GraphCommandCoordinator _coordinator;
+  final R Function(ConfirmedGraphReplacement replacement) _replaced;
 
   /// Входит в монопольный режим, дожидается завершения команд, принятых
   /// раньше, и выполняет замену графа [replace].
   ///
   /// В монопольном режиме новые команды графа не принимаются: их начало —
   /// [GraphCommandCoordinatorDraining]. Режим длится до публикации исхода
-  /// восстановления, поэтому завершения команд, принятых после замены,
-  /// публикуются позже завершения «граф заменён». Исключение [replace]
-  /// передаётся вызывающему.
-  Future<GraphBackupRestored> replace(
+  /// замены, поэтому завершения команд, принятых после замены, публикуются
+  /// позже завершения «граф заменён». Исключение [replace] передаётся
+  /// вызывающему.
+  Future<R> replace(
     Future<ConfirmedGraphReplacement> Function() replace,
-  ) => _coordinator._replaceExclusively(replace);
+  ) async => _replaced(await _coordinator._replaceExclusively(replace));
 }
 
 sealed class IntentionOperationTarget {
@@ -660,8 +747,25 @@ final class GraphBackupRestoreAccepted extends GraphBackupRestoreStart {
   final Future<GraphBackupRestoreOutcome> future;
 }
 
-final class GraphBackupRestoreAlreadyRunning extends GraphBackupRestoreStart {
-  const GraphBackupRestoreAlreadyRunning();
+sealed class GraphImportStart {
+  const GraphImportStart();
+}
+
+final class GraphImportAccepted extends GraphImportStart {
+  const GraphImportAccepted({required this.token, required this.future});
+
+  final GraphImportOperationToken token;
+
+  /// Исход импорта, в том числе отмена; завершение, если оно есть, к этому
+  /// моменту уже опубликовано.
+  final Future<GraphImportOutcome> future;
+}
+
+/// Координатор не принимает замену графа: идёт другая — импорт или
+/// восстановление копии.
+final class GraphReplacementAlreadyRunning extends GraphBackupRestoreStart
+    implements GraphImportStart {
+  const GraphReplacementAlreadyRunning();
 }
 
 sealed class GraphManualBackupStart {
@@ -689,6 +793,7 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart
         TagCommandStart,
         GraphExportStart,
         GraphBackupRestoreStart,
+        GraphImportStart,
         GraphManualBackupStart {
   const GraphCommandCoordinatorDraining();
 }
@@ -754,7 +859,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   // Запись переставляется в конец при публикации завершения, поэтому порядок
   // записей совпадает с порядком публикации terminal outcome: завершения
   // команд публикуются последовательно в порядке принятия, а экспорта,
-  // восстановления копии и отказа ручной копии — вне этой
+  // импорта, восстановления копии и отказа ручной копии — вне этой
   // последовательности.
   final _entries = <GraphOperationToken, _PresentationEntry>{};
   final _registrations = <GraphAppPresentationRegistration>[];
@@ -764,7 +869,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   Future<void> _publicationTail = Future<void>.value();
   var _isDraining = false;
   var _isExportRunning = false;
-  var _isBackupRestoreRunning = false;
+
+  /// Принята замена графа — импорт или восстановление копии, — исход которой
+  /// ещё не опубликован.
+  var _hasAcceptedReplacement = false;
   var _isManualBackupRunning = false;
 
   /// Монопольный режим замены графа: новые команды графа не принимаются.
@@ -1189,38 +1297,102 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ///
   /// Подготовка замены идёт без монопольного режима: команды графа
   /// принимаются как обычно. Саму замену [restore] выполняет через
-  /// [GraphExclusiveReplacement.replace]. Пока принятое восстановление
-  /// выполняется, второе не принимается. Исключение [restore] становится
-  /// отказом.
+  /// [GraphExclusiveReplacement.replace]. Пока принятая замена графа —
+  /// импорт или восстановление — выполняется, восстановление не
+  /// принимается. Исключение [restore] становится отказом.
   GraphBackupRestoreStart acceptBackupRestore(
     Future<GraphBackupRestoreOutcome> Function(
-      GraphExclusiveReplacement exclusive,
+      GraphExclusiveReplacement<GraphBackupRestored> exclusive,
     )
     restore,
   ) {
     if (_isDraining) {
       return const GraphCommandCoordinatorDraining();
     }
-    if (_isBackupRestoreRunning) {
-      return const GraphBackupRestoreAlreadyRunning();
+    if (_hasAcceptedReplacement) {
+      return const GraphReplacementAlreadyRunning();
     }
 
-    _isBackupRestoreRunning = true;
     final token = GraphBackupRestoreOperationToken._();
+    return GraphBackupRestoreAccepted(
+      token: token,
+      future: _runReplacement(
+        token,
+        () => restore(GraphExclusiveReplacement._(this, GraphBackupRestored._)),
+        failed: const GraphBackupRestoreFailed(),
+        completionOf: (outcome) => switch (outcome) {
+          GraphBackupRestoreCancelled() => null,
+          GraphBackupRestoreResult() => GraphBackupRestoreCompletion._(
+            token: token,
+            result: outcome,
+          ),
+        },
+      ),
+    );
+  }
+
+  /// Принимает импорт файла экспорта, который выполняет [import] модуля
+  /// операций с данными.
+  ///
+  /// Подготовка замены идёт без монопольного режима: команды графа
+  /// принимаются как обычно. Саму замену [import] выполняет через
+  /// [GraphExclusiveReplacement.replace]. Исход, известный до замены,
+  /// например отказ чтения документа, [import] возвращает сразу, не входя в
+  /// монопольный режим. Пока принятая замена графа — импорт или
+  /// восстановление копии — выполняется, импорт не принимается. Исключение
+  /// [import] становится отказом по неизвестной причине.
+  GraphImportStart acceptImport(
+    Future<GraphImportOutcome> Function(
+      GraphExclusiveReplacement<GraphImported> exclusive,
+    )
+    import,
+  ) {
+    if (_isDraining) {
+      return const GraphCommandCoordinatorDraining();
+    }
+    if (_hasAcceptedReplacement) {
+      return const GraphReplacementAlreadyRunning();
+    }
+
+    final token = GraphImportOperationToken._();
+    return GraphImportAccepted(
+      token: token,
+      future: _runReplacement(
+        token,
+        () => import(GraphExclusiveReplacement._(this, GraphImported._)),
+        failed: const GraphImportFailed(GraphImportFailure.unknown),
+        completionOf: (outcome) => switch (outcome) {
+          GraphImportCancelled() => null,
+          GraphImportResult() => GraphImportCompletion._(
+            token: token,
+            result: outcome,
+          ),
+        },
+      ),
+    );
+  }
+
+  /// Выполняет принятую замену графа [replacement] и публикует её завершение
+  /// [completionOf] сразу по окончании, вне последовательной публикации
+  /// команд; исход без завершения — отмена — права предъявления не
+  /// оставляет. Исключение [replacement] становится исходом [failed].
+  Future<O> _runReplacement<O>(
+    GraphOperationToken token,
+    Future<O> Function() replacement, {
+    required O failed,
+    required GraphPresentableCompletion? Function(O outcome) completionOf,
+  }) {
+    _hasAcceptedReplacement = true;
     final entry = _PresentationEntry(token);
     _entries[token] = entry;
     late final Future<void> tracked;
-    final publication = _runBackupRestore(restore).then((outcome) {
-      _isBackupRestoreRunning = false;
+    final publication = _settleReplacement(replacement, failed).then((outcome) {
+      _hasAcceptedReplacement = false;
       _isReplacing = false;
-      switch (outcome) {
-        case GraphBackupRestoreCancelled():
+      switch (completionOf(outcome)) {
+        case null:
           _discardEntry(entry);
-        case GraphBackupRestoreResult():
-          final completion = GraphBackupRestoreCompletion._(
-            token: token,
-            result: outcome,
-          );
+        case final completion:
           _placeAtPublication(entry, completion);
           _completionController.add(completion);
           _dispatchAppPresentation();
@@ -1232,24 +1404,21 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       _completeShutdownIfDrained();
     });
     _inFlight.add(tracked);
-
-    return GraphBackupRestoreAccepted(token: token, future: publication);
+    return publication;
   }
 
-  Future<GraphBackupRestoreOutcome> _runBackupRestore(
-    Future<GraphBackupRestoreOutcome> Function(
-      GraphExclusiveReplacement exclusive,
-    )
-    restore,
+  Future<O> _settleReplacement<O>(
+    Future<O> Function() replacement,
+    O failed,
   ) async {
     try {
-      return await restore(GraphExclusiveReplacement._(this));
+      return await replacement();
     } on Object {
-      return const GraphBackupRestoreFailed();
+      return failed;
     }
   }
 
-  Future<GraphBackupRestored> _replaceExclusively(
+  Future<ConfirmedGraphReplacement> _replaceExclusively(
     Future<ConfirmedGraphReplacement> Function() replace,
   ) async {
     _isReplacing = true;
@@ -1257,7 +1426,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     // монопольном режиме нет, поэтому хвост публикации охватывает все
     // принятые раньше.
     await _publicationTail;
-    return GraphBackupRestored._(await replace());
+    return replace();
   }
 
   /// Принимает ручную копию, которую делает [backup] модуля резервных копий;

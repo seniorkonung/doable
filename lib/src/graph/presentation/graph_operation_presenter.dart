@@ -325,6 +325,9 @@ GraphOperationMessage _messageFor(
   GraphBackupRestoreCompletion() => GraphOperationMessage(
     _backupRestoreMessage(localizations, completion),
   ),
+  GraphImportCompletion() => GraphOperationMessage(
+    _importMessage(localizations, completion),
+  ),
   GraphManualBackupFailedCompletion() => GraphOperationMessage(
     localizations.dataManualBackupFailed,
   ),
@@ -337,6 +340,23 @@ String _backupRestoreMessage(
   GraphBackupRestored() => localizations.dataBackupRestored,
   GraphBackupRestoreFailed() => localizations.dataBackupRestoreFailed,
   GraphBackupRestoreStorageFull() => localizations.dataReplacementStorageFull,
+};
+
+/// Отказ импорта показывается здесь без действия: исправить его можно из
+/// строки «Импорт данных».
+String _importMessage(
+  AppLocalizations localizations,
+  GraphImportCompletion completion,
+) => switch (completion.result) {
+  GraphImported() => localizations.dataImported,
+  GraphImportFailed(:final failure) => switch (failure) {
+    GraphImportFailure.invalidFile => localizations.dataImportInvalidFile,
+    GraphImportFailure.newerFormatVersion =>
+      localizations.dataImportNewerVersion,
+    GraphImportFailure.storageFull => localizations.dataReplacementStorageFull,
+    GraphImportFailure.documentUnreadable => localizations.dataImportUnreadable,
+    GraphImportFailure.unknown => localizations.dataImportFailed,
+  },
 };
 
 GraphOperationMessage _exportMessage(
