@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data_transfer/application/graph_replacement.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
@@ -101,7 +102,7 @@ void main() {
       await repository.replaceGraph(
         snapshot,
         onProgress: (share) => probe.share = share,
-        isCancelled: () => false,
+        cancellation: GraphReplacementCancellation(),
       );
       if (probe.stopPoint == GraphReplacementStopPoint.afterCommit) {
         await probe.reportReadyAndWait();

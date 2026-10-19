@@ -313,8 +313,8 @@ final class DriftPersonalGraphRepository
   Future<ConfirmedGraphReplacement> replaceGraph(
     UnregisteredGraphSnapshot snapshot, {
     required void Function(double share) onProgress,
-    required bool Function() isCancelled,
-  }) => _replaceGraph(snapshot, onProgress, isCancelled);
+    required GraphReplacementCancellation cancellation,
+  }) => _replaceGraph(snapshot, onProgress, cancellation);
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);

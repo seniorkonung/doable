@@ -8,6 +8,66 @@ final class GraphReplacementCancelled implements Exception {
   const GraphReplacementCancelled();
 }
 
+/// Отмена замены графа: вызывающий её запрашивает, а замена принимает её
+/// только до своей точки невозврата.
+///
+/// Запрос отмены и прохождение точки невозврата исключают друг друга. Оба
+/// решаются синхронно, поэтому запрос, пришедший в момент проверки в точке
+/// невозврата, либо принят и откатывает замену, либо не принят, и
+/// запросивший узнаёт об этом из [request].
+final class GraphReplacementCancellation {
+  /// [onPointOfNoReturn] вызывается, когда замена проходит точку невозврата:
+  /// с этого момента отмена не принимается.
+  GraphReplacementCancellation({
+    void Function() onPointOfNoReturn = _ignorePointOfNoReturn,
+  }) : _onPointOfNoReturn = onPointOfNoReturn;
+
+  final void Function() _onPointOfNoReturn;
+  var _state = _GraphReplacementCancellationState.open;
+
+  /// Запрашивает отмену и сообщает, принята ли она.
+  ///
+  /// До точки невозврата отмена принимается: замена откатывается и даёт
+  /// [GraphReplacementCancelled]. После точки невозврата отмена не
+  /// принимается, и замена завершается так же, как без запроса.
+  bool request() {
+    switch (_state) {
+      case _GraphReplacementCancellationState.open:
+        _state = _GraphReplacementCancellationState.requested;
+        return true;
+      case _GraphReplacementCancellationState.requested:
+        return true;
+      case _GraphReplacementCancellationState.passedPointOfNoReturn:
+        return false;
+    }
+  }
+
+  /// Проверка отмены заменой: принятая отмена даёт
+  /// [GraphReplacementCancelled].
+  void throwIfRequested() {
+    if (_state == _GraphReplacementCancellationState.requested) {
+      throw const GraphReplacementCancelled();
+    }
+  }
+
+  /// Последняя проверка отмены заменой — точка невозврата. Принятая отмена
+  /// даёт [GraphReplacementCancelled]; иначе отмена с этого момента не
+  /// принимается, а вызывающий узнаёт о прохождении точки.
+  void passPointOfNoReturn() {
+    throwIfRequested();
+    _state = _GraphReplacementCancellationState.passedPointOfNoReturn;
+    _onPointOfNoReturn();
+  }
+}
+
+enum _GraphReplacementCancellationState {
+  open,
+  requested,
+  passedPointOfNoReturn,
+}
+
+void _ignorePointOfNoReturn() {}
+
 /// Записи снимка замены нарушают правило целостности графа, которого не
 /// выражает схема хранилища: путь дневного выбора не непрерывен от источника
 /// до выбранного намерения, или после вставки в графе не столько записей
@@ -46,8 +106,16 @@ abstract interface class GraphReplacement {
   /// [onProgress] получает долю обработанных записей — удалённых записей
   /// прежнего графа и вставленных записей снимка, — когда она достигает
   /// следующей сотой доли, и последней — полную. Перед каждым пакетом
-  /// операторов и после последнего проверяется [isCancelled]: отмена даёт
+  /// операторов проверяется отмена [cancellation]: принятая отмена даёт
   /// [GraphReplacementCancelled].
+  ///
+  /// Последний раз отмена проверяется в транзакции сразу перед COMMIT —
+  /// после сверки количеств, копии перед заменой, регистрации снимка,
+  /// пакета «сброс» и включения захвата. Эта проверка — точка невозврата
+  /// [GraphReplacementCancellation.passPointOfNoReturn]. Отмена, принятая до
+  /// неё, откатывает всю транзакцию. После неё отмена не принимается, а
+  /// вызывающий узнаёт о прохождении точки до подтверждения транзакции;
+  /// отменить замену уже нельзя, и откатить её может только отказ COMMIT.
   ///
   /// Любой отказ откатывает всю транзакцию: граф, копии, лог и реестр
   /// снимков остаются прежними, а файл [snapshot] остаётся вызывающему.
@@ -59,6 +127,6 @@ abstract interface class GraphReplacement {
   Future<ConfirmedGraphReplacement> replaceGraph(
     UnregisteredGraphSnapshot snapshot, {
     required void Function(double share) onProgress,
-    required bool Function() isCancelled,
+    required GraphReplacementCancellation cancellation,
   });
 }

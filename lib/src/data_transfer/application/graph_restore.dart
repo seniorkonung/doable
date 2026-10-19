@@ -111,11 +111,12 @@ final class GraphRestore {
   ///
   /// [onProgress] получает ход обеих фаз. Завершение [cancelled] прекращает
   /// запись снимка замены между записями, а замену — между пакетами
-  /// операторов, откатывая её транзакцию. Копия, которую к началу
-  /// восстановления уже удалило окно хранения, даёт отказ. Нехватка места на
-  /// устройстве в любой фазе даёт [GraphBackupRestoreStorageFull]. После
-  /// отказа и отмены граф, копии и реестр снимков остаются прежними, а файл
-  /// снимка замены удаляется.
+  /// операторов, откатывая её транзакцию; после точки невозврата замены
+  /// отмена не принимается, и восстановление завершается без неё. Копия,
+  /// которую к началу восстановления уже удалило окно хранения, даёт отказ.
+  /// Нехватка места на устройстве в любой фазе даёт
+  /// [GraphBackupRestoreStorageFull]. После отказа и отмены граф, копии и
+  /// реестр снимков остаются прежними, а файл снимка замены удаляется.
   Future<GraphBackupRestoreOutcome> restore(
     GraphBackupEntry backup,
     GraphExclusiveReplacement exclusive, {
@@ -123,8 +124,8 @@ final class GraphRestore {
     required Future<void> cancelled,
   }) async {
     final stopwatch = Stopwatch()..start();
-    var isCancelled = false;
-    unawaited(cancelled.then((_) => isCancelled = true));
+    final cancellation = GraphReplacementCancellation();
+    unawaited(cancelled.then((_) => cancellation.request()));
     UnregisteredGraphSnapshot? snapshot;
     try {
       await _snapshotFiles;
@@ -145,7 +146,7 @@ final class GraphRestore {
           onProgress: (share) => onProgress(
             GraphRestoreProgress(GraphRestorePhase.replacement, share),
           ),
-          isCancelled: () => isCancelled,
+          cancellation: cancellation,
         );
       });
       recordDiagnosticsSafely(

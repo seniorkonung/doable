@@ -156,11 +156,11 @@ void main() {
   Future<ConfirmedGraphReplacement> replace(
     UnregisteredGraphSnapshot snapshot, {
     void Function(double share)? onProgress,
-    bool Function()? isCancelled,
+    GraphReplacementCancellation? cancellation,
   }) => repository.replaceGraph(
     snapshot,
     onProgress: onProgress ?? (_) {},
-    isCancelled: isCancelled ?? () => false,
+    cancellation: cancellation ?? GraphReplacementCancellation(),
   );
 
   Future<List<String>> graphLines() async =>
@@ -511,10 +511,86 @@ void main() {
         'наблюдателям лога и списка копий', () async {
       await expectEpochAndObserversUntouched(
         (snapshot) => expectLater(
-          replace(snapshot, isCancelled: () => true),
+          replace(
+            snapshot,
+            cancellation: GraphReplacementCancellation()..request(),
+          ),
           throwsA(isA<GraphReplacementCancelled>()),
         ),
       );
+    });
+  });
+
+  group('точка невозврата', () {
+    test('отмена, запрошенная после включения захвата, принимается и '
+        'откатывает замену: граф, копии, лог и реестр снимков остаются '
+        'прежними', () async {
+      await createPreviousGraph();
+      final before = await storedState();
+      final snapshot = await goldenSnapshot();
+      final cancellation = GraphReplacementCancellation();
+      bool? accepted;
+      probe.onStatement = (statement) {
+        if (_enablesCapture(statement)) accepted = cancellation.request();
+      };
+
+      await expectLater(
+        replace(snapshot, cancellation: cancellation),
+        throwsA(isA<GraphReplacementCancelled>()),
+      );
+
+      probe.onStatement = null;
+      expect(accepted, isTrue);
+      expect(await storedState(), before);
+    });
+
+    test('отмена, запрошенная после точки невозврата, не принимается, а '
+        'замена подтверждается с копией перед заменой и пакетом '
+        '«сброс»', () async {
+      await createPreviousGraph();
+      final position = await repository.readCurrentPosition();
+      final snapshot = await goldenSnapshot();
+      late final GraphReplacementCancellation cancellation;
+      bool? accepted;
+      cancellation = GraphReplacementCancellation(
+        onPointOfNoReturn: () => accepted = cancellation.request(),
+      );
+
+      await replace(snapshot, cancellation: cancellation);
+
+      expect(accepted, isFalse);
+      expect(await graphLines(), _recordLines(golden));
+      expect(
+        [for (final backup in await backups()) (backup.kind, backup.position)],
+        [(GraphBackupKind.beforeReplacement, position)],
+      );
+      expect(
+        await rows(
+          'SELECT position, kind FROM graph_log_packages '
+          'WHERE position > $position',
+        ),
+        [
+          [position + 1, 'reset'],
+        ],
+      );
+    });
+
+    test('вызывающий узнаёт о прохождении точки невозврата до подтверждения '
+        'транзакции замены', () async {
+      await createPreviousGraph();
+      final snapshot = await goldenSnapshot();
+      final events = <String>[];
+      probe.onTransactionEnd = () => events.add('транзакция завершена');
+
+      await replace(
+        snapshot,
+        cancellation: GraphReplacementCancellation(
+          onPointOfNoReturn: () => events.add('точка невозврата'),
+        ),
+      );
+
+      probe.onTransactionEnd = null;
+      expect(events, ['точка невозврата', 'транзакция завершена']);
     });
   });
 
@@ -615,18 +691,19 @@ void main() {
         await createPreviousGraph();
         final before = await storedState();
         final snapshot = await goldenSnapshot();
-        var cancelled = false;
+        final cancellation = GraphReplacementCancellation();
+        var accepted = false;
         probe.onStatement = (statement) {
-          if (cancels(statement)) cancelled = true;
+          if (cancels(statement)) accepted = cancellation.request();
         };
 
         await expectLater(
-          replace(snapshot, isCancelled: () => cancelled),
+          replace(snapshot, cancellation: cancellation),
           throwsA(isA<GraphReplacementCancelled>()),
         );
 
         probe.onStatement = null;
-        expect(cancelled, isTrue);
+        expect(accepted, isTrue);
         expect(await storedState(), before);
       });
     }
@@ -815,6 +892,12 @@ bool _insertsInto(LocalDatabaseSqlStatement statement, String table) =>
     statement.operation == LocalDatabaseSqlOperation.insert &&
     statement.statements.single.startsWith('INSERT INTO "$table"');
 
+/// Включение захвата фактов: им замена заканчивает свою транзакцию.
+bool _enablesCapture(LocalDatabaseSqlStatement statement) =>
+    statement.operation == LocalDatabaseSqlOperation.update &&
+    statement.statements.single.contains('SET "capture"') &&
+    statement.arguments.single == 1;
+
 /// Чтение количеств записей всех видов: только оно считает назначения
 /// тегов.
 bool _countsRecords(LocalDatabaseSqlStatement statement) =>
@@ -823,10 +906,12 @@ bool _countsRecords(LocalDatabaseSqlStatement statement) =>
 
 /// Перед оператором исчерпывает место хранилища, как
 /// [TransactionStorageExhaustion], или отказывает, когда его выбирает
-/// [failsBefore], а после оператора сообщает о нём [onStatement].
+/// [failsBefore], после оператора сообщает о нём [onStatement], а после
+/// завершения транзакции — [onTransactionEnd].
 final class _StatementProbe extends TransactionStorageExhaustion {
   bool Function(LocalDatabaseSqlStatement statement)? failsBefore;
   void Function(LocalDatabaseSqlStatement statement)? onStatement;
+  void Function()? onTransactionEnd;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -839,4 +924,7 @@ final class _StatementProbe extends TransactionStorageExhaustion {
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) =>
       onStatement?.call(statement);
+
+  @override
+  void onTransactionFinished() => onTransactionEnd?.call();
 }

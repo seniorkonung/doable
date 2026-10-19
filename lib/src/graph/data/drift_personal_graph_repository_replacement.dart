@@ -17,12 +17,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   Future<ConfirmedGraphReplacement> _replaceGraph(
     UnregisteredGraphSnapshot snapshot,
     void Function(double share) onProgress,
-    bool Function() isCancelled,
+    GraphReplacementCancellation cancellation,
   ) => _sequencer.run(() async {
-    void checkCancellation() {
-      if (isCancelled()) throw const GraphReplacementCancelled();
-    }
-
     // Момент копии перед заменой и время записи пакета «сброс» — одно
     // показание часов (ADR-0006).
     final replacedAt = _now();
@@ -44,13 +40,12 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
             _recordTotal(snapshot.counts),
         onProgress,
       );
-      await _deletePreviousGraph(progress, checkCancellation);
+      await _deletePreviousGraph(progress, cancellation);
       await _insertSnapshotRecords(
         snapshot.readRecords(),
         progress,
-        checkCancellation,
+        cancellation,
       );
-      checkCancellation();
       if (!_sameRecordCounts(await _selectRecordCounts(), snapshot.counts)) {
         throw const GraphReplacementRecordsRejected();
       }
@@ -81,6 +76,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
             ),
           );
       await _setGraphCapture(true);
+      // Точка невозврата: после неё транзакцию завершает только COMMIT.
+      cancellation.passPointOfNoReturn();
       return (resetPosition, summary != null);
     });
     if (addedBackup) {
@@ -176,7 +173,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   /// удалённых записей каждого вида.
   Future<void> _deletePreviousGraph(
     _ReplacementProgress progress,
-    void Function() checkCancellation,
+    GraphReplacementCancellation cancellation,
   ) async {
     final tables =
         <(TableInfo<Table, Object?>, Set<TableInfo<Table, Object?>>)>[
@@ -192,7 +189,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
     for (final (table, updates) in tables) {
       final name = table.actualTableName;
       while (true) {
-        checkCancellation();
+        cancellation.throwIfRequested();
         final deleted = await _database.customUpdate(
           'DELETE FROM $name WHERE rowid IN (SELECT rowid FROM $name LIMIT ?)',
           variables: [Variable.withInt(_replacementBatchRowLimit)],
@@ -212,13 +209,13 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   Future<void> _insertSnapshotRecords(
     Stream<GraphEntityRecord> records,
     _ReplacementProgress progress,
-    void Function() checkCancellation,
+    GraphReplacementCancellation cancellation,
   ) async {
     final batch = <GraphEntityRecord>[];
     var batchRows = 0;
     Future<void> flush() async {
       if (batch.isEmpty) return;
-      checkCancellation();
+      cancellation.throwIfRequested();
       await _insertRecordBatch(batch);
       progress.add(batch.length);
       batch.clear();

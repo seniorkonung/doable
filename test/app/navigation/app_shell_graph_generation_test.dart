@@ -318,7 +318,7 @@ Future<void> _replaceGraph(WidgetTester tester, _App app) async {
       () => replacement.replaceGraph(
         snapshot,
         onProgress: (_) {},
-        isCancelled: () => false,
+        cancellation: GraphReplacementCancellation(),
       ),
     ),
   ) as GraphBackupRestoreAccepted;
