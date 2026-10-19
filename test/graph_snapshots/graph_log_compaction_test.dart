@@ -217,6 +217,104 @@ void main() {
     await expectStateMatchesDatabase();
   });
 
+  test('сжатие сохраняет по ближайшему снимку не новее позиции каждой '
+      'хранимой копии, а после удаления самой старой копии, сделанной до '
+      'первого снимка, следующее сжатие удаляет пакеты до снимка новой самой '
+      'старой копии', () async {
+    final store = GraphSnapshotStore(
+      log: repository,
+      directory: snapshots,
+      clock: () => now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
+    final backups = <int, List<String>>{};
+    Future<void> makeBackup() async {
+      final position = await repository.readCurrentPosition();
+      await insertDailyBackupRow(database, position: position);
+      backups[position] = _lines(await referenceGraphRecords(database));
+    }
+
+    Future<GraphSnapshotEntry?> compact() async {
+      final compaction = compactionOver(repository)..start();
+      await compaction.shutdown();
+      return repository.readSnapshotAtOrBefore(
+        await repository.readCurrentPosition(),
+      );
+    }
+
+    Future<void> expectBackupStatesRestored() async {
+      for (final MapEntry(key: position, value: lines) in backups.entries) {
+        final state = await store.readStateAt(position);
+        expect(
+          _lines(await state.records.toList()),
+          lines,
+          reason: '$position',
+        );
+      }
+    }
+
+    Future<List<int>> packagePositions() async {
+      final upTo = await repository.readCurrentPosition();
+      return [
+        for (final package in await repository.readPackages(
+          after: 0,
+          upTo: upTo,
+        ))
+          package.position,
+      ];
+    }
+
+    await confirmCommands(2);
+    await makeBackup();
+    await confirmCommands(_threshold);
+    final first = await compact();
+    await confirmCommands(1);
+    await makeBackup();
+    await confirmCommands(1);
+    await makeBackup();
+    await confirmCommands(2);
+    final second = await compact();
+    await confirmCommands(1);
+    await makeBackup();
+    await confirmCommands(_threshold);
+    final third = await compact();
+
+    expect([first?.position, second?.position, third?.position], [5, 9, 13]);
+    expect(backups.keys, [2, 6, 7, 10]);
+    expect(await repository.readSnapshotFileNames(), {
+      first?.fileName,
+      second?.fileName,
+      third?.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
+    );
+    expect(await packagePositions(), [for (var p = 1; p <= 13; p++) p]);
+    await expectBackupStatesRestored();
+
+    await database.customStatement(
+      'DELETE FROM graph_backups WHERE position = 2',
+    );
+    backups.remove(2);
+    await confirmCommands(_threshold + 1);
+    final fourth = await compact();
+
+    expect(fourth?.position, 17);
+    expect(await repository.readSnapshotFileNames(), {
+      first?.fileName,
+      second?.fileName,
+      fourth?.fileName,
+    });
+    expect(
+      await _fileNamesIn(snapshots),
+      await repository.readSnapshotFileNames(),
+    );
+    expect(await packagePositions(), [for (var p = 6; p <= 17; p++) p]);
+    await expectBackupStatesRestored();
+    await expectStateMatchesDatabase();
+  });
+
   test('команда во время сжатия подтверждается до его окончания, а второе '
       'сжатие не начинается', () async {
     final registrationReached = Completer<void>();

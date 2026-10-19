@@ -301,9 +301,10 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
       );
 
   /// Позиции копий читает та же транзакция, поэтому копия, записанная до
-  /// неё, сохраняет свою историю. После удаления пакетов до базового снимка
-  /// границы в логе остаются только сохраняемые пакеты «сброс», а схема не
-  /// даёт удалить снимок, на который они ссылаются.
+  /// неё, сохраняет свою историю, а её восстановление воспроизводит пакеты
+  /// только после её ближайшего снимка. После удаления пакетов до базового
+  /// снимка границы в логе остаются только сохраняемые пакеты «сброс», а
+  /// схема не даёт удалить снимок, на который они ссылаются.
   Future<List<String>> _removeHistoryBefore(
     int boundary,
     Iterable<GraphSnapshotEntry> retained,
@@ -320,6 +321,20 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
       final base = await _newestSnapshotQuery(
         atOrBefore: min(boundary, oldestBackupPosition ?? boundary),
       ).getSingleOrNull();
+      // У копии, сделанной до первого снимка, ближайшего снимка нет.
+      final backupSnapshotIds = await _database
+          .customSelect(
+            '''SELECT DISTINCT (
+                 SELECT id FROM graph_snapshots
+                 WHERE position <= graph_backups.position
+                 ORDER BY position DESC, id DESC
+                 LIMIT 1
+               ) AS snapshot_id
+             FROM graph_backups''',
+            readsFrom: {backups, _database.graphSnapshots},
+          )
+          .map((row) => row.read<int?>('snapshot_id'))
+          .get();
       final packages = _database.graphLogPackages;
       if (base != null) {
         await (_database.delete(packages)..where(
@@ -335,7 +350,11 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
       final removed =
           await (_database.delete(_database.graphSnapshots)..where(
                 (snapshot) =>
-                    snapshot.id.isNotIn([latest.id, ?base?.id]) &
+                    snapshot.id.isNotIn([
+                      latest.id,
+                      ?base?.id,
+                      ...backupSnapshotIds.nonNulls,
+                    ]) &
                     snapshot.fileName.isNotIn(retainedFileNames) &
                     snapshot.id.isNotInQuery(resetSnapshots),
               ))

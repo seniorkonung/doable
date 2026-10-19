@@ -296,18 +296,28 @@ void main() {
     final beforeRestore = await graphState();
     expect(await restore(backup), isA<GraphBackupRestored>());
     final beforeReplacement = (await storedBackups()).first;
-    final [backupBase, unneeded, replacement] = await snapshotPositions();
+    final [backupBase, beforeReplacementBase, replacement] =
+        await snapshotPositions();
     expect(backupBase, lessThanOrEqualTo(backup.position));
-    expect(unneeded, greaterThan(backup.position));
+    expect(beforeReplacementBase, greaterThan(backup.position));
+    expect(
+      beforeReplacementBase,
+      lessThanOrEqualTo(beforeReplacement.position),
+    );
+    compacted = compactionOutcomes.next;
+    await confirmCommands(_threshold + 1);
+    expect((await compacted).status, isA<DiagnosticsSucceeded>());
+    final unneeded = (await snapshotPositions()).last;
+    expect(unneeded, greaterThan(replacement));
 
     compacted = compactionOutcomes.next;
     await confirmCommands(_threshold + 1);
     expect((await compacted).status, isA<DiagnosticsSucceeded>());
 
     final retained = await snapshotPositions();
-    expect(retained, hasLength(3));
-    expect(retained.take(2), [backupBase, replacement]);
-    expect(retained.last, greaterThan(replacement));
+    expect(retained, hasLength(4));
+    expect(retained.take(3), [backupBase, beforeReplacementBase, replacement]);
+    expect(retained.last, greaterThan(unneeded));
     expect(await restore(beforeReplacement), isA<GraphBackupRestored>());
     expect(await graphState(), beforeRestore);
   });
