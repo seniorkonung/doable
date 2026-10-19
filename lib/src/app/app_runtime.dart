@@ -15,6 +15,8 @@ import '../data_transfer/application/graph_composition.dart';
 import '../data_transfer/application/graph_composition_provider.dart';
 import '../data_transfer/application/graph_export.dart';
 import '../data_transfer/application/graph_export_provider.dart';
+import '../data_transfer/application/graph_import.dart';
+import '../data_transfer/application/graph_import_provider.dart';
 import '../data_transfer/application/graph_replacement.dart';
 import '../data_transfer/application/graph_restore.dart';
 import '../data_transfer/application/graph_restore_provider.dart';
@@ -108,16 +110,18 @@ final class AppRuntime {
   /// [quickCreationModeStore] принадлежит этому runtime и обслуживает единый
   /// контроллер независимо от подготовки и команд личного графа.
   /// [graphFilesFactory] подключает файлы графа вне базы. После подготовки
-  /// хранилища runtime удаляет временные файлы прежних запусков, очищает
-  /// каталог снимков и затем запускает сжатие лога фактов. Экспорт графа
-  /// пишет состояние через то же сжатие и начинает запись временного файла
-  /// только после удаления временных файлов прежних запусков. Резервные
-  /// копии ведутся над тем же сжатием: после подготовки хранилища и при
-  /// каждом возвращении приложения на передний план runtime проверяет фоном,
-  /// нужна ли ежедневная копия. Восстановление копии пишет снимок замены
-  /// через то же сжатие только после очистки каталога снимков и заменяет граф
-  /// репозиторием в монопольном режиме координатора. Выключение дожидается
-  /// идущего экспорта, восстановления, сжатия и создания копии и только потом
+  /// хранилища runtime один раз удаляет временные файлы прежних запусков,
+  /// очищает каталог снимков и затем запускает сжатие лога фактов. Экспорт
+  /// графа пишет состояние через то же сжатие, а экспорт и импорт пишут
+  /// временные файлы только после удаления временных файлов прежних
+  /// запусков. Резервные копии ведутся над тем же сжатием: после подготовки
+  /// хранилища и при каждом возвращении приложения на передний план runtime
+  /// проверяет фоном, нужна ли ежедневная копия. Восстановление копии и
+  /// импорт пишут снимок замены через то же сжатие только после очистки
+  /// каталога снимков и заменяют граф репозиторием в монопольном режиме
+  /// координатора; импорт решает, нужно ли подтверждение замены, по составу
+  /// графа. Выключение дожидается идущего экспорта, восстановления, импорта,
+  /// принятого координатором, сжатия и создания копии и только потом
   /// закрывает базу.
   /// Лог фактов, состав графа, реестр копий и замену графа ведёт репозиторий
   /// по умолчанию, поэтому с [repositoryFactory] файлы графа, состав графа и
@@ -325,15 +329,21 @@ final class AppRuntime {
       if (_lifecycle != _AppRuntimeLifecycle.running) {
         throw StateError('Файлы графа созданы после начала shutdown.');
       }
-      final export = switch (files) {
-        final files? => GraphExport(
+      // Одна очистка на запуск: очистка, начатая второй операцией, удалила
+      // бы временный файл первой.
+      final temporaryDirectory = switch (files) {
+        final files? => _removeTemporaryFiles(files.temporaryDirectory),
+        null => null,
+      };
+      final export = switch ((files, temporaryDirectory)) {
+        (final files?, final temporaryDirectory?) => GraphExport(
           documents: files.documents,
           compaction: files.compaction,
-          temporaryDirectory: _removeTemporaryFiles(files.temporaryDirectory),
+          temporaryDirectory: temporaryDirectory,
           clock: _clock,
           diagnosticsSink: _diagnosticsSink,
         ),
-        null => null,
+        _ => null,
       };
       final backups = switch ((files, backupRegistry)) {
         (final files?, final registry?) => GraphBackups(
@@ -353,6 +363,18 @@ final class AppRuntime {
           snapshotFiles: snapshotFilesCleaned.future,
           diagnosticsSink: _diagnosticsSink,
         ),
+        _ => null,
+      };
+      final graphImport = switch ((files, temporaryDirectory, replacement)) {
+        (final files?, final temporaryDirectory?, final replacement?) =>
+          GraphImport(
+            documents: files.documents,
+            compaction: files.compaction,
+            replacement: replacement,
+            temporaryDirectory: temporaryDirectory,
+            snapshotFiles: snapshotFilesCleaned.future,
+            diagnosticsSink: _diagnosticsSink,
+          ),
         _ => null,
       };
       container = ProviderContainer(
@@ -378,6 +400,13 @@ final class AppRuntime {
           if (restore != null)
             graphRestoreControllerProvider.overrideWith(
               () => GraphRestoreController(restore),
+            ),
+          if ((graphImport, composition) case (
+            final graphImport?,
+            final composition?,
+          ))
+            graphImportControllerProvider.overrideWith(
+              () => GraphImportController(graphImport, composition),
             ),
         ],
         retry: (retryCount, error) => null,
@@ -452,7 +481,8 @@ final class AppRuntime {
 
     _lifecycle = _AppRuntimeLifecycle.closing;
     _foregroundReturns?.dispose();
-    // Координатор дожидается принятых команд и идущего экспорта.
+    // Координатор дожидается принятых команд, идущего экспорта и принятой
+    // замены графа — восстановления или импорта.
     final draining = _commandCoordinator?.shutdown() ?? Future<void>.value();
     final compacting = _stopGraphSnapshots();
     final backingUp = _dailyGraphBackup ?? Future<void>.value();
