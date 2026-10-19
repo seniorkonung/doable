@@ -1564,6 +1564,71 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataRestoreConfirm => 'Восстановить копию';
 
   @override
+  String get dataImportConfirmationTitle => 'Импортировать эту копию?';
+
+  @override
+  String dataImportConfirmationFacts(
+    String date,
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  ) {
+    final intl.NumberFormat intentionsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String intentionsString = intentionsNumberFormat.format(intentions);
+    final intl.NumberFormat relationsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String relationsString = relationsNumberFormat.format(relations);
+    final intl.NumberFormat dailyChoicesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String dailyChoicesString = dailyChoicesNumberFormat.format(
+      dailyChoices,
+    );
+    final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tagsString = tagsNumberFormat.format(tags);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: '$intentionsString намерения',
+      many: '$intentionsString намерений',
+      few: '$intentionsString намерения',
+      one: '$intentionsString намерение',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: '$relationsString связи',
+      many: '$relationsString связей',
+      few: '$relationsString связи',
+      one: '$relationsString связь',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      dailyChoices,
+      locale: localeName,
+      other: '$dailyChoicesString дневного выбора',
+      many: '$dailyChoicesString дневных выборов',
+      few: '$dailyChoicesString дневных выбора',
+      one: '$dailyChoicesString дневной выбор',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      tags,
+      locale: localeName,
+      other: '$tagsString тега',
+      many: '$tagsString тегов',
+      few: '$tagsString тега',
+      one: '$tagsString тег',
+    );
+    return 'Она сохранена $date года и содержит $_temp0, $_temp1, $_temp2 и $_temp3.';
+  }
+
+  @override
+  String get dataImportConfirm => 'Импортировать и заменить';
+
+  @override
   String get tagNavigationTitle => 'Намерения с тегом';
 
   @override

@@ -1550,6 +1550,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataRestoreConfirm => 'Restore copy';
 
   @override
+  String get dataImportConfirmationTitle => 'Import this copy?';
+
+  @override
+  String dataImportConfirmationFacts(
+    String date,
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  ) {
+    final intl.NumberFormat intentionsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String intentionsString = intentionsNumberFormat.format(intentions);
+    final intl.NumberFormat relationsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String relationsString = relationsNumberFormat.format(relations);
+    final intl.NumberFormat dailyChoicesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String dailyChoicesString = dailyChoicesNumberFormat.format(
+      dailyChoices,
+    );
+    final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tagsString = tagsNumberFormat.format(tags);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: '$intentionsString intentions',
+      one: '$intentionsString intention',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: '$relationsString relations',
+      one: '$relationsString relation',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      dailyChoices,
+      locale: localeName,
+      other: '$dailyChoicesString daily choices',
+      one: '$dailyChoicesString daily choice',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      tags,
+      locale: localeName,
+      other: '$tagsString tags',
+      one: '$tagsString tag',
+    );
+    return 'It was saved on $date and holds $_temp0, $_temp1, $_temp2 and $_temp3.';
+  }
+
+  @override
+  String get dataImportConfirm => 'Import and replace';
+
+  @override
   String get tagNavigationTitle => 'Tagged intentions';
 
   @override

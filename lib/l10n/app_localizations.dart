@@ -2383,6 +2383,30 @@ abstract class AppLocalizations {
   /// **'Restore copy'**
   String get dataRestoreConfirm;
 
+  /// Заголовок подтверждения импорта файла экспорта в непустой граф
+  ///
+  /// In en, this message translates to:
+  /// **'Import this copy?'**
+  String get dataImportConfirmationTitle;
+
+  /// Дата сохранения файла импорта по местному времени и числа его намерений, долговременных связей, дневных выборов и тегов из заголовка файла
+  ///
+  /// In en, this message translates to:
+  /// **'It was saved on {date} and holds {intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}}.'**
+  String dataImportConfirmationFacts(
+    String date,
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  );
+
+  /// Действие подтверждения импорта, начинающее замену графа содержимым файла
+  ///
+  /// In en, this message translates to:
+  /// **'Import and replace'**
+  String get dataImportConfirm;
+
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:
