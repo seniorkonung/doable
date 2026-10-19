@@ -2305,6 +2305,12 @@ abstract class AppLocalizations {
   /// **'Restoring the copy…'**
   String get dataRestoreRunning;
 
+  /// Заголовок модального прогресса импорта с выбора файла до исхода замены графа
+  ///
+  /// In en, this message translates to:
+  /// **'Importing data…'**
+  String get dataImportRunning;
+
   /// Ход замены графа для экранного диктора: выполненная доля в процентах
   ///
   /// In en, this message translates to:

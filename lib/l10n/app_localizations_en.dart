@@ -1495,6 +1495,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataRestoreRunning => 'Restoring the copy…';
 
   @override
+  String get dataImportRunning => 'Importing data…';
+
+  @override
   String dataReplacementProgress(double share) {
     final intl.NumberFormat shareNumberFormat =
         intl.NumberFormat.percentPattern(localeName);

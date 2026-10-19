@@ -8,8 +8,8 @@ import '../../design_system/doable_metrics.dart';
 import '../navigation/ordinary_page_scaffold.dart';
 
 /// Страница «Настройки» — обычная страница поверх Главной с разделом
-/// «Данные». Пока идёт восстановление копии, над страницей открыт его
-/// модальный прогресс.
+/// «Данные». Пока идёт восстановление копии или импорт, над страницей открыт
+/// модальный прогресс замены графа.
 @RoutePage()
 final class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});

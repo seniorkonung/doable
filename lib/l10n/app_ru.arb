@@ -393,6 +393,7 @@
   "dataBackupNoChanges": "Нет изменений",
   "dataBackupDataReplaced": "Данные заменены",
   "dataRestoreRunning": "Восстановление копии…",
+  "dataImportRunning": "Импорт данных…",
   "dataReplacementProgress": "{share}",
   "dataReplacementCancel": "Отменить",
   "dataReplacementCancelling": "Отмена…",

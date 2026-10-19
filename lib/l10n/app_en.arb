@@ -1268,6 +1268,8 @@
   "@dataBackupDataReplaced": {"description": "Сводка копии, между которой и предыдущей копией граф заменялся импортом или восстановлением"},
   "dataRestoreRunning": "Restoring the copy…",
   "@dataRestoreRunning": {"description": "Заголовок модального прогресса, пока идёт восстановление резервной копии"},
+  "dataImportRunning": "Importing data…",
+  "@dataImportRunning": {"description": "Заголовок модального прогресса импорта с выбора файла до исхода замены графа"},
   "dataReplacementProgress": "{share}",
   "@dataReplacementProgress": {"description": "Ход замены графа для экранного диктора: выполненная доля в процентах", "placeholders": {"share": {"type": "double", "format": "percentPattern"}}},
   "dataReplacementCancel": "Cancel",

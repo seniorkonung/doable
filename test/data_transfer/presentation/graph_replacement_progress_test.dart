@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -13,6 +14,7 @@ import 'package:doable/src/data/local/app_database.dart'
         LocalDatabaseSqlStatement,
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
+import 'package:doable/src/data_transfer/application/graph_import_provider.dart';
 import 'package:doable/src/data_transfer/application/graph_restore_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -28,6 +30,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
+import '../../support/file_document_access.dart';
+import '../../support/graph_import_files.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/temporary_graph_files.dart';
@@ -214,6 +218,285 @@ void main() {
     expect(find.text('Восстановление копии…'), findsNothing);
     expect(find.byType(SettingsPage), findsOneWidget);
   });
+
+  testWidgets('сценарий «Отмена чтения выбранного файла»: с выбора файла над '
+      'страницей «Настройки» открыт прогресс импорта без доли хода, страница '
+      'и панель навигации под ним недоступны, «назад» его не закрывает, а '
+      '«Отменить» закрывает его без подтверждения и сообщения', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final app = await _ImportApp.open(tester);
+    final reading = Completer<void>();
+    app.documents.beforeCopy = () => reading.future;
+
+    app.startImport();
+    await _waitFor(
+      tester,
+      () => find.text('Импорт данных…').evaluate().isNotEmpty,
+    );
+    // Прогресс без доли хода анимируется непрерывно, и кадры не успокоятся,
+    // поэтому конец перехода маршрута дожидается заданное время.
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(tester.getSemantics(find.text('Импорт данных…')).value, isEmpty);
+    expect(
+      tester.getSemantics(find.text('Отменить')),
+      isSemantics(
+        label: 'Отменить',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+    await tester.tap(
+      appNavigationDestination(AppDestination.intentionGraph),
+      warnIfMissed: false,
+    );
+    await tester.tap(find.text('Экспорт данных'), warnIfMissed: false);
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.home,
+    );
+    expect(find.text('Импорт данных…'), findsOneWidget);
+
+    await tester.tap(find.text('Отменить'));
+    await _waitFor(tester, () => app.isFinished);
+    await tester.pumpAndSettle();
+
+    expect(app.outcome, isNull);
+    expect(find.text('Импорт данных…'), findsNothing);
+    expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(SettingsPage), findsOneWidget);
+    semantics.dispose();
+  });
+
+  for (final (
+        language,
+        settings,
+        title,
+        question,
+        confirm,
+        progress,
+        cancel,
+        imported,
+      )
+      in [
+        (
+          'ru',
+          'Настройки',
+          'Импорт данных…',
+          'Импортировать эту копию?',
+          'Импортировать и заменить',
+          '20 %',
+          'Отменить',
+          'Данные импортированы',
+        ),
+        (
+          'en',
+          'Settings',
+          'Importing data…',
+          'Import this copy?',
+          'Import and replace',
+          '20%',
+          'Cancel',
+          'Data imported',
+        ),
+      ]) {
+    testWidgets('$language: пока импорт ждёт подтверждения, вместо прогресса '
+        'открыто подтверждение, после «Импортировать и заменить» прогресс '
+        'сообщает экранному диктору, что идёт импорт, его ход и доступную '
+        '«Отменить», а после успеха закрывается, и страница «Настройки» '
+        'остаётся открытой', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _ImportApp.open(
+        tester,
+        language: language,
+        settings: settings,
+      );
+
+      app.startImport();
+      await _waitFor(tester, () => find.text(question).evaluate().isNotEmpty);
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsNothing);
+
+      await tester.tap(find.text(confirm));
+      await _waitFor(tester, () => app.replacement.isHolding);
+      await tester.pumpAndSettle();
+
+      // Запись снимка замены завершена, а замена ещё ничего не удалила.
+      expect(find.text(question), findsNothing);
+      expect(
+        tester.getSemantics(find.text(title)),
+        isSemantics(label: title, value: progress),
+      );
+      expect(
+        tester.getSemantics(find.text(cancel)),
+        isSemantics(
+          label: cancel,
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+
+      app.replacement.proceed();
+      await _waitFor(tester, () => find.text(imported).evaluate().isNotEmpty);
+      expect(app.outcome, isA<GraphImported>());
+      expect(find.text(title), findsNothing);
+      expect(find.byType(SettingsPage), findsOneWidget);
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('отказ от подтверждения импорта закрывает его без прогресса и '
+      'сообщения и завершает импорт', (tester) async {
+    final app = await _ImportApp.open(tester);
+    app.startImport();
+    await _waitFor(
+      tester,
+      () => find.text('Импортировать эту копию?').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Отмена'));
+    await _waitFor(tester, () => app.isFinished);
+    await tester.pumpAndSettle();
+
+    expect(app.outcome, isNull);
+    expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(find.text('Импорт данных…'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('«Отменить» в прогрессе импорта показывает «Отмена…» до конца '
+      'отката замены, а затем прогресс закрывается без сообщения', (
+    tester,
+  ) async {
+    final app = await _ImportApp.open(tester);
+    app.startImport();
+    await app.confirmUntilReplacementHolds();
+
+    await tester.tap(find.text('Отменить'));
+    await tester.pump();
+    expect(find.text('Отмена…'), findsOneWidget);
+
+    // Замена ещё не заметила отмену и не откатилась.
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Отмена…'), findsOneWidget);
+
+    app.replacement.proceed();
+    await _waitFor(tester, () => app.isFinished);
+    await tester.pumpAndSettle();
+    expect(app.outcome, isA<GraphImportCancelled>());
+    expect(find.text('Импорт данных…'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(SettingsPage), findsOneWidget);
+  });
+
+  testWidgets('после точки невозврата замены «Отменить» в прогрессе импорта '
+      'недоступна, экранный диктор сообщает о её недоступности, а нажатие не '
+      'показывает «Отмена…», и импорт завершается сообщением «Данные '
+      'импортированы»', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final app = await _ImportApp.open(tester, hold: _ReplacementHold.commit);
+    app.startImport();
+    await app.confirmUntilReplacementHolds();
+
+    expect(
+      tester.getSemantics(find.text('Отменить')),
+      isSemantics(
+        label: 'Отменить',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+        hasTapAction: false,
+      ),
+    );
+    await tester.tap(find.text('Отменить'), warnIfMissed: false);
+    await tester.pump();
+    expect(find.text('Отмена…'), findsNothing);
+
+    app.replacement.proceed();
+    await _waitFor(
+      tester,
+      () => find.text('Данные импортированы').evaluate().isNotEmpty,
+    );
+    expect(app.outcome, isA<GraphImported>());
+    expect(find.text('Импорт данных…'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('сценарий «Импорт в пустой граф без подтверждения»: прогресс '
+      'импорта открыт с выбора файла до исхода, и ход замены сменяет чтение '
+      'файла без подтверждения', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final app = await _ImportApp.open(tester, isGraphEmpty: true);
+    final reading = Completer<void>();
+    app.documents.beforeCopy = () => reading.future;
+    app.startImport();
+    await _waitFor(
+      tester,
+      () => find.text('Импорт данных…').evaluate().isNotEmpty,
+    );
+    // Прогресс без доли хода анимируется непрерывно, и кадры не успокоятся,
+    // поэтому конец перехода маршрута дожидается заданное время.
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.getSemantics(find.text('Импорт данных…')).value, isEmpty);
+
+    reading.complete();
+    await _waitFor(tester, () => app.replacement.isHolding);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(
+      tester.getSemantics(find.text('Импорт данных…')),
+      isSemantics(label: 'Импорт данных…', value: '20 %'),
+    );
+
+    app.replacement.proceed();
+    await _waitFor(
+      tester,
+      () => find.text('Данные импортированы').evaluate().isNotEmpty,
+    );
+    expect(find.text('Импорт данных…'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('после отказа импорта прогресс закрывается без подтверждения, а '
+      'страница «Настройки» остаётся открытой', (tester) async {
+    final app = await _ImportApp.open(tester, file: photoFile());
+    final reading = Completer<void>();
+    app.documents.beforeCopy = () => reading.future;
+    app.startImport();
+    await _waitFor(
+      tester,
+      () => find.text('Импорт данных…').evaluate().isNotEmpty,
+    );
+    // Прогресс без доли хода анимируется непрерывно, и кадры не успокоятся,
+    // поэтому конец перехода маршрута дожидается заданное время.
+    await tester.pump(const Duration(seconds: 1));
+
+    reading.complete();
+    await _waitFor(tester, () => app.isFinished);
+    await tester.pumpAndSettle();
+
+    expect(
+      app.outcome,
+      isA<GraphImportFailed>().having(
+        (failed) => failed.failure,
+        'категория',
+        GraphImportFailure.invalidFile,
+      ),
+    );
+    expect(find.text('Импорт данных…'), findsNothing);
+    expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(find.byType(SettingsPage), findsOneWidget);
+  });
 }
 
 /// Приложение новой установки с тегом и ручной копией, открытое на странице
@@ -236,26 +519,13 @@ final class _RestoreApp {
     String settings = 'Настройки',
     _ReplacementHold hold = _ReplacementHold.previousGraphDeletion,
   }) async {
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    tester.binding.platformDispatcher.localesTestValue = [Locale(language)];
-    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
     final replacement = _ReplacementControl(hold);
-    final files = TemporaryGraphFiles();
-    final runtime = AppRuntime(
-      connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
-        replacement,
-      ),
-      diagnosticsSink: InMemoryDiagnosticsSink(),
-      quickCreationModeStore: InMemoryQuickCreationModeStore(),
-      graphFilesFactory: files.create,
+    final (runtime, container) = await _startRuntime(
+      tester,
+      language: language,
+      replacement: replacement,
+      files: TemporaryGraphFiles(),
     );
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.runAsync(runtime.shutdown);
-    });
-    final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
-    final container = ready.container;
     final backup = await tester.runAsync(() async {
       final repository = container.read(personalGraphRepositoryProvider);
       expect(
@@ -270,19 +540,7 @@ final class _RestoreApp {
       return (await (repository as GraphBackupRegistry).readBackups())
           .singleWhere((backup) => backup.kind == GraphBackupKind.manual);
     });
-    await tester.pumpWidget(MainApp(runtime: runtime));
-    await _waitFor(tester, () => find.byType(HomePage).evaluate().isNotEmpty);
-    await _waitFor(
-      tester,
-      () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip(settings));
-    await _waitFor(
-      tester,
-      () => find.byType(SettingsPage).evaluate().isNotEmpty,
-    );
-    await tester.pumpAndSettle();
+    await _openSettings(tester, runtime, settings: settings);
     return _RestoreApp._(tester, container, backup!, replacement);
   }
 
@@ -301,6 +559,143 @@ final class _RestoreApp {
       await _waitFor(_tester, () => outcome != null);
     });
   }
+}
+
+/// Приложение новой установки на языке [language], открытое на странице
+/// «Настройки». В графе есть тег, если [isGraphEmpty] не задан. В диалоге
+/// выбора человек выбирает файл с байтами [file] — по умолчанию эталонный
+/// файл экспорта, — а замена графа ждёт [replacement] там, где её
+/// задерживает [hold].
+final class _ImportApp {
+  _ImportApp._(this._tester, this._container, this.documents, this.replacement);
+
+  final WidgetTester _tester;
+  final ProviderContainer _container;
+
+  /// Документы, копирование которых проверка может задержать.
+  final FileDocumentAccess documents;
+  final _ReplacementControl replacement;
+
+  /// Импорт завершён: координатор его не принял, или он получил исход
+  /// [outcome].
+  var isFinished = false;
+  GraphImportOutcome? outcome;
+
+  static Future<_ImportApp> open(
+    WidgetTester tester, {
+    String language = 'ru',
+    String settings = 'Настройки',
+    _ReplacementHold hold = _ReplacementHold.previousGraphDeletion,
+    bool isGraphEmpty = false,
+    List<int>? file,
+  }) async {
+    final replacement = _ReplacementControl(hold);
+    final files = TemporaryGraphFiles();
+    final (runtime, container) = await _startRuntime(
+      tester,
+      language: language,
+      replacement: replacement,
+      files: files,
+    );
+    if (!isGraphEmpty) {
+      await tester.runAsync(() async {
+        expect(
+          await container
+              .read(personalGraphRepositoryProvider)
+              .execute(CreateTag(TagName.fromInput('Дом'))),
+          isA<GraphCommandSucceeded>(),
+        );
+      });
+    }
+    final chosenDirectory = Directory.systemTemp.createTempSync(
+      'doable_import_progress_',
+    );
+    addTearDown(() => chosenDirectory.deleteSync(recursive: true));
+    final chosen = File.fromUri(chosenDirectory.uri.resolve('chosen.jsonl.gz'))
+      ..writeAsBytesSync(file ?? graphExportFileOf(referenceGraphFileLines()));
+    files.documents.openingDialog = () async => files.documents.chosen(chosen);
+    await _openSettings(tester, runtime, settings: settings);
+    return _ImportApp._(tester, container, files.documents, replacement);
+  }
+
+  /// Начинает импорт, как его начнёт строка «Импорт данных»: человек сразу
+  /// выбирает файл в диалоге.
+  void startImport() {
+    unawaited(
+      _container.read(graphImportControllerProvider.notifier).start().then((
+        accepted,
+      ) async {
+        outcome = await accepted?.future;
+        isFinished = true;
+      }),
+    );
+    // Выключение дожидается импорта, принятого координатором, а задержанная
+    // замена продолжается только кадрами проверки.
+    addTearDown(() async {
+      replacement.proceed();
+      await _waitFor(_tester, () => isFinished);
+    });
+  }
+
+  /// Дожидается подтверждения импорта, подтверждает его и дожидается, пока
+  /// замена дойдёт до места задержки.
+  Future<void> confirmUntilReplacementHolds() async {
+    await _waitFor(
+      _tester,
+      () => find.text('Импортировать и заменить').evaluate().isNotEmpty,
+    );
+    await _tester.pumpAndSettle();
+    await _tester.tap(find.text('Импортировать и заменить'));
+    await _waitFor(_tester, () => replacement.isHolding);
+    await _tester.pumpAndSettle();
+  }
+}
+
+/// Готовый runtime новой установки на языке [language] с файлами графа
+/// [files]; замену графа в нём ждёт [replacement].
+Future<(AppRuntime, ProviderContainer)> _startRuntime(
+  WidgetTester tester, {
+  required String language,
+  required _ReplacementControl replacement,
+  required TemporaryGraphFiles files,
+}) async {
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+  tester.binding.platformDispatcher.localesTestValue = [Locale(language)];
+  addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+  final runtime = AppRuntime(
+    connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+      openInMemoryLocalDatabase(),
+      replacement,
+    ),
+    diagnosticsSink: InMemoryDiagnosticsSink(),
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
+    graphFilesFactory: files.create,
+  );
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(runtime.shutdown);
+  });
+  final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+  return (runtime, ready.container);
+}
+
+/// Показывает приложение [runtime] и открывает с Главной страницу
+/// «Настройки» переходом с доступным названием [settings].
+Future<void> _openSettings(
+  WidgetTester tester,
+  AppRuntime runtime, {
+  required String settings,
+}) async {
+  await tester.pumpWidget(MainApp(runtime: runtime));
+  await _waitFor(tester, () => find.byType(HomePage).evaluate().isNotEmpty);
+  await _waitFor(
+    tester,
+    () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byTooltip(settings));
+  await _waitFor(tester, () => find.byType(SettingsPage).evaluate().isNotEmpty);
+  await tester.pumpAndSettle();
 }
 
 /// Где проверка задерживает замену графа.
