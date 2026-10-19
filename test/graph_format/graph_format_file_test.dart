@@ -193,6 +193,19 @@ void main() {
           lines[1],
         ]),
         'удаление сущности': file([...lines.take(lines.length - 1), deletion]),
+        'намерения не по возрастанию времени создания': file([
+          ...lines.take(3),
+          lines[4],
+          lines[3],
+          ...lines.skip(5),
+        ]),
+        'намерения одного времени создания не по возрастанию идентификатора':
+            file([...lines.take(5), lines[6], lines[5], ...lines.skip(7)]),
+        'повторённые время создания и идентификатор намерения': file([
+          ...lines.take(6),
+          lines[5],
+          ...lines.skip(7),
+        ]),
       };
 
       for (final MapEntry(key: reason, value: bytes) in invalidFiles.entries) {
@@ -231,22 +244,25 @@ void main() {
       await expectLater(_readAll(failing), throwsA(isA<FileSystemException>()));
     });
 
-    test('запись отклоняет записи вне секций и количеств заголовка', () async {
+    test('запись отклоняет записи вне секций и количеств заголовка и '
+        'намерения не в каноническом порядке', () async {
       final header = GraphFormatHeader(
         writtenAt: DateTime.utc(2026, 10, 17),
         counts: GraphRecordCounts(
           tags: 1,
-          intentions: 1,
+          intentions: 2,
           tagAssignments: 0,
           longTermRelations: 0,
           dailyChoices: 0,
         ),
       );
-      final [tag, _, intention, ...] = _expectedGoldenRecords();
+      final [tag, _, health, running, ..., lastChoice] =
+          _expectedGoldenRecords();
       final invalidRecords = {
-        'запись вне своей секции': [intention, tag],
-        'записей больше, чем в заголовке': [tag, intention, intention],
-        'записей меньше, чем в заголовке': [tag],
+        'запись вне своей секции': [health, tag, running],
+        'записей больше, чем в заголовке': [tag, health, running, lastChoice],
+        'записей меньше, чем в заголовке': [tag, health],
+        'намерения не в каноническом порядке': [tag, running, health],
       };
 
       for (final MapEntry(key: reason, value: records)

@@ -98,6 +98,15 @@ final class IntentionRecord extends GraphEntityRecord {
   final Intention intention;
 }
 
+/// Канонический порядок намерений в секции файла формата — тот же, в каком
+/// их перечисляет база: по времени создания, затем по идентификатору. Время
+/// создания — показание часов устройства, поэтому созданное позже намерение
+/// может встать перед прежними.
+int compareIntentionsInFormatOrder(Intention first, Intention second) {
+  final byCreation = first.createdAt.value.compareTo(second.createdAt.value);
+  return byCreation != 0 ? byCreation : first.id.compareTo(second.id);
+}
+
 final class TagAssignmentRecord extends GraphEntityRecord {
   const TagAssignmentRecord(this.assignment);
 

@@ -85,7 +85,9 @@ Future<UnregisteredGraphSnapshot> runGraphReplacementSnapshotWriteInIsolate(
 /// последний снимок не проходит проверку, снимок пересобирается из базы вне
 /// порога, а запись дожидается пересборки и выполняется заново из нового
 /// снимка. Снимок замены графа на позиции, выбранной чтением истории, пишет
-/// [writeReplacementSnapshot] так же, но без пересборки.
+/// [writeReplacementSnapshot] так же, но без пересборки, а снимок замены из
+/// недоверенного файла формата — [writeReplacementSnapshotOfFile] в
+/// отдельном изоляте без обращений к логу.
 final class GraphLogCompaction {
   GraphLogCompaction({
     required this._log,
@@ -231,9 +233,38 @@ final class GraphLogCompaction {
     GraphStateSource state, {
     required void Function(double share) onProgress,
     required Future<void> cancelled,
+  }) => _writeReplacementSnapshot(
+    _StateReplacementSource(state),
+    onProgress: onProgress,
+    cancelled: cancelled,
+  );
+
+  /// Пишет записи недоверенного файла формата [file] в новый снимок каталога
+  /// снимков по правилу [GraphSnapshotStore.writeReplacementSnapshotOfFile] в
+  /// отдельном изоляте и не регистрирует его: снимок замены графа
+  /// регистрирует транзакция замены. [onProgress] получает ход записи, а
+  /// завершение [cancelled] прекращает её между записями отказом
+  /// [GraphReplacementSnapshotCancelled].
+  ///
+  /// Запись не читает лог, поэтому команды графа её не ждут. Она не
+  /// выполняется одновременно с [removeUnregisteredFiles].
+  Future<UnregisteredGraphSnapshot> writeReplacementSnapshotOfFile(
+    File file, {
+    required void Function(double share) onProgress,
+    required Future<void> cancelled,
+  }) => _writeReplacementSnapshot(
+    _FileReplacementSource(file.path),
+    onProgress: onProgress,
+    cancelled: cancelled,
+  );
+
+  Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
+    _ReplacementSnapshotSource source, {
+    required void Function(double share) onProgress,
+    required Future<void> cancelled,
   }) => _inWriter(
     (compaction) => _replacementSnapshotRunner(
-      GraphReplacementSnapshotWrite._(state, _directory, _clock(), compaction),
+      GraphReplacementSnapshotWrite._(source, _directory, _clock(), compaction),
     ),
     onProgress: onProgress,
     cancelled: cancelled,
@@ -440,19 +471,19 @@ final class GraphStateWrite {
       );
 }
 
-/// Запись снимка замены графа для отдельного изолята: источник состояния,
-/// выбранный чтением истории, каталог снимков, момент записи и порт, через
-/// который изолят обращается к логу фактов, передаёт ход записи и
-/// получает отмену.
+/// Запись снимка замены графа для отдельного изолята: источник записей —
+/// состояние на позиции, выбранной чтением истории, или файл формата, —
+/// каталог снимков, момент записи и порт, через который изолят обращается к
+/// логу фактов, передаёт ход записи и получает отмену.
 final class GraphReplacementSnapshotWrite {
   const GraphReplacementSnapshotWrite._(
-    this._state,
+    this._source,
     this._directory,
     this._writtenAt,
     this._compaction,
   );
 
-  final GraphStateSource _state;
+  final _ReplacementSnapshotSource _source;
   final Directory _directory;
   final DateTime _writtenAt;
   final SendPort _compaction;
@@ -465,21 +496,51 @@ final class GraphReplacementSnapshotWrite {
     // изолят сжатия узнаёт его из первого сообщения записи.
     final cancellation = ReceivePort()..listen((_) => cancelled = true);
     _compaction.send(_WriterCancellation(cancellation.sendPort));
+    final store = GraphSnapshotStore(
+      log: _PortGraphFactLog(_compaction),
+      directory: _directory,
+      clock: () => _writtenAt,
+      diagnosticsSink: _PortDiagnosticsSink(_compaction),
+    );
+    void onProgress(double share) => _compaction.send(_WriterProgress(share));
+    bool isCancelled() => cancelled;
     try {
-      return await GraphSnapshotStore(
-        log: _PortGraphFactLog(_compaction),
-        directory: _directory,
-        clock: () => _writtenAt,
-        diagnosticsSink: _PortDiagnosticsSink(_compaction),
-      ).writeReplacementSnapshot(
-        _state,
-        onProgress: (share) => _compaction.send(_WriterProgress(share)),
-        isCancelled: () => cancelled,
-      );
+      return await switch (_source) {
+        _StateReplacementSource(:final state) => store.writeReplacementSnapshot(
+          state,
+          onProgress: onProgress,
+          isCancelled: isCancelled,
+        ),
+        _FileReplacementSource(:final path) =>
+          store.writeReplacementSnapshotOfFile(
+            File(path),
+            onProgress: onProgress,
+            isCancelled: isCancelled,
+          ),
+      };
     } finally {
       cancellation.close();
     }
   }
+}
+
+/// Источник записей снимка замены графа.
+sealed class _ReplacementSnapshotSource {
+  const _ReplacementSnapshotSource();
+}
+
+/// Состояние графа на позиции, выбранной чтением истории.
+final class _StateReplacementSource extends _ReplacementSnapshotSource {
+  const _StateReplacementSource(this.state);
+
+  final GraphStateSource state;
+}
+
+/// Недоверенный файл формата по пути [path].
+final class _FileReplacementSource extends _ReplacementSnapshotSource {
+  const _FileReplacementSource(this.path);
+
+  final String path;
 }
 
 /// Лог фактов изолята записи: каждую операцию выполняет лог изолята сжатия,

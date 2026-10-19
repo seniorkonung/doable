@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import '../intention/domain/intention.dart';
 import 'graph_format_codec.dart';
 import 'graph_format_records.dart';
 
@@ -13,7 +14,8 @@ abstract final class GraphFormatFile {
   /// Сжатые байты файла с заголовком [header] и записями [records].
   ///
   /// Записи кодируются по мере прослушивания результата. Они должны идти по
-  /// секциям в количествах заголовка, иначе поток завершается [StateError]:
+  /// секциям в количествах заголовка, а намерения — строго по
+  /// [compareIntentionsInFormatOrder], иначе поток завершается [StateError]:
   /// такой файл чтение не примет. Запись длиннее предела завершает поток
   /// отказом [GraphRecordTooLong].
   static Stream<List<int>> write(
@@ -25,7 +27,10 @@ abstract final class GraphFormatFile {
   ///
   /// Чужой, повреждённый или обрезанный файл даёт [GraphFormatCorruption]
   /// здесь или в [GraphFormatFileReading.records], файл более новой версии —
-  /// [GraphFormatVersionTooNew]. Ошибки самого [file] передаются как есть.
+  /// [GraphFormatVersionTooNew]. Повреждение — в том числе намерения не
+  /// строго по [compareIntentionsInFormatOrder]: в таком порядке их
+  /// перечисляет база, поэтому прочитанные записи канонические. Ошибки самого
+  /// [file] передаются как есть.
   static Future<GraphFormatFileReading> read(Stream<List<int>> file) async {
     final lines = StreamIterator(
       _readLines(_decompress(file), firstLineLimit: _headerByteLimit),
@@ -108,7 +113,9 @@ Stream<List<int>> _writeLines(
   final sections = _Sections(header.counts);
   await for (final record in records) {
     if (!sections.accept(record)) {
-      throw StateError('Запись не совпадает с секциями заголовка.');
+      throw StateError(
+        'Запись не совпадает с секциями заголовка или порядком намерений.',
+      );
     }
     yield _terminated(GraphFormatCodec.encode(record));
   }
@@ -237,7 +244,8 @@ final class _Chunks implements Sink<List<int>> {
   void close() {}
 }
 
-/// Сверяет записи с секциями, размеры которых задают количества заголовка.
+/// Сверяет записи с секциями, размеры которых задают количества заголовка, и
+/// с каноническим порядком намерений.
 final class _Sections {
   _Sections(GraphRecordCounts counts)
     : _remaining = [
@@ -247,10 +255,13 @@ final class _Sections {
   /// Сколько записей осталось в каждой секции, по номеру секции.
   final List<int> _remaining;
   var _current = 0;
+  Intention? _lastIntention;
 
   bool get isComplete => _remaining.every((count) => count == 0);
 
-  /// Учитывает [record], если запись следующая по порядку секций.
+  /// Учитывает [record], если запись следующая по порядку секций, а
+  /// намерение идёт строго после предыдущего по
+  /// [compareIntentionsInFormatOrder].
   bool accept(GraphEntityRecord record) {
     while (_current < _remaining.length && _remaining[_current] == 0) {
       _current++;
@@ -258,6 +269,13 @@ final class _Sections {
     if (_current == _remaining.length ||
         _Section.of(record).index != _current) {
       return false;
+    }
+    if (record case IntentionRecord(:final intention)) {
+      if (_lastIntention case final last?
+          when compareIntentionsInFormatOrder(last, intention) >= 0) {
+        return false;
+      }
+      _lastIntention = intention;
     }
     _remaining[_current]--;
     return true;

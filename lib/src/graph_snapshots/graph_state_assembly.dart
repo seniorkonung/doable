@@ -1,5 +1,4 @@
 import '../graph_format/graph_format_records.dart';
-import '../intention/domain/intention.dart';
 
 /// Запись базового состояния и позиция лога, состояние графа на которой она
 /// отражает.
@@ -255,7 +254,7 @@ int _compareCreated(_Life first, _Life second) =>
         IntentionRecord(intention: final firstIntention),
         IntentionRecord(intention: final secondIntention),
       ) =>
-        _compareIntentions(firstIntention, secondIntention),
+        compareIntentionsInFormatOrder(firstIntention, secondIntention),
       _ => first.creation.compareTo(second.creation),
     };
 
@@ -268,17 +267,9 @@ bool _precedes(GraphEntityRecord created, GraphEntityRecord base) =>
         IntentionRecord(intention: final createdIntention),
         IntentionRecord(intention: final baseIntention),
       ) =>
-        _compareIntentions(createdIntention, baseIntention) < 0,
+        compareIntentionsInFormatOrder(createdIntention, baseIntention) < 0,
       _ => false,
     };
-
-/// Порядок намерений в базе и в файле формата: по времени создания, затем по
-/// идентификатору. Время создания — показание часов устройства, поэтому
-/// созданное позже намерение может встать перед прежними.
-int _compareIntentions(Intention first, Intention second) {
-  final byCreation = first.createdAt.value.compareTo(second.createdAt.value);
-  return byCreation != 0 ? byCreation : first.id.compareTo(second.id);
-}
 
 /// Секции в порядке файла формата.
 enum _Section {

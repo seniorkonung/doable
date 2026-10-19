@@ -31,7 +31,8 @@ final class GraphReplacedInRange implements Exception {
 }
 
 /// Запись снимка замены графа [GraphSnapshotStore.writeReplacementSnapshot]
-/// отменена, а её файл удалён.
+/// или [GraphSnapshotStore.writeReplacementSnapshotOfFile] отменена, а её
+/// файл удалён.
 final class GraphReplacementSnapshotCancelled implements Exception {
   const GraphReplacementSnapshotCancelled();
 }
@@ -344,6 +345,55 @@ final class GraphSnapshotStore {
         onProgress,
       ),
     );
+  }
+
+  /// Пишет записи недоверенного файла формата [file] в новый файл каталога
+  /// снимков так же надёжно, как [writeReplacementSnapshot], и не
+  /// регистрирует его: снимок замены графа регистрирует транзакция замены.
+  /// Заголовок снимка несёт момент записи по часам хранилища и количества
+  /// записей файла.
+  ///
+  /// Файл читается построчно по правилу [GraphFormatFile.read]: записи
+  /// повышаются до текущей версии, поля проверяются предметными типами, а
+  /// записи сверяются с количествами заголовка и каноническим порядком
+  /// намерений, поэтому снимок канонический. Чужой, повреждённый или
+  /// обрезанный файл даёт [GraphFormatCorruption], файл более новой версии —
+  /// [GraphFormatVersionTooNew].
+  ///
+  /// [onProgress] получает долю записанных записей от количеств заголовка
+  /// файла по правилу [writeStateFile]. Когда [isCancelled] истинно, запись
+  /// прекращается перед следующей записью отказом
+  /// [GraphReplacementSnapshotCancelled]. При отказе и отмене файл снимка
+  /// удаляется, а файл, оставшийся после завершения процесса, удаляет
+  /// [removeUnregisteredFiles]. Запись не выполняется одновременно с
+  /// [removeUnregisteredFiles].
+  Future<UnregisteredGraphSnapshot> writeReplacementSnapshotOfFile(
+    File file, {
+    required void Function(double share) onProgress,
+    required bool Function() isCancelled,
+  }) async {
+    final reading = await GraphFormatFile.read(file.openRead());
+    var recordsListened = false;
+    Stream<GraphEntityRecord> records() async* {
+      recordsListened = true;
+      yield* reading.records;
+    }
+
+    try {
+      final counts = reading.header.counts;
+      return await _writeSnapshotFile(
+        counts,
+        _reportingProgress(
+          _untilCancelled(records(), isCancelled),
+          _total(counts),
+          onProgress,
+        ),
+      );
+    } finally {
+      // Файл открыт, пока его записи не дослушаны или подписка на них не
+      // отменена, а запись, отказавшая до первой записи, их не слушала.
+      if (!recordsListened) await reading.records.listen(null).cancel();
+    }
   }
 
   /// Сборка состояния на позиции [position] из снимка [snapshot] и пакетов
