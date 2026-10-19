@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/main.dart';
+import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/home/home_page.dart';
+import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups;
 import 'package:doable/src/data_transfer/presentation/backups_sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -15,6 +19,7 @@ import 'package:doable/src/graph_backups/graph_backups_provider.dart';
 import 'package:doable/src/graph_backups/graph_change_summary.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +29,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/temporary_graph_files.dart';
 
 /// Текущий момент проверок со списком копий: 7 октября 2026 года, полдень.
 final _now = DateTime(2026, 10, 7, 12);
@@ -206,7 +213,7 @@ void main() {
       for (final label in labels) {
         expect(
           tester.getSemantics(find.text(label.split('\n').last)),
-          matchesSemantics(label: label),
+          isSemantics(label: label, isButton: true, hasTapAction: true),
         );
       }
       semantics.dispose();
@@ -292,6 +299,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('Не удалось сделать копию').hitTestable(), findsOneWidget);
+  });
+
+  testWidgets('выбор копии открывает над панелью подтверждение с тем, что '
+      'изменилось с тех пор, а «Отмена» оставляет панель и граф прежними', (
+    tester,
+  ) async {
+    final app = await _RestoreFromSheetApp.open(tester);
+
+    await app.chooseBackup();
+
+    expect(
+      find.text(
+        'Она сделана сегодня в 09:00. С тех пор: 1 добавлено. '
+        'Восстановление отменит всё это.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(_sheetTexts(tester).skip(2), [
+      'Сегодня, 09:00',
+      '1 добавлено',
+      'Сделать копию сейчас',
+    ]);
+    expect(await app.backupKinds(), [GraphBackupKind.daily]);
+    expect(await app.tagNames(), ['Дом', 'Сад']);
+  });
+
+  testWidgets('«Восстановить копию», нажатое дважды, закрывает подтверждение '
+      'и панель и один раз восстанавливает копию под прогрессом над '
+      'страницей «Настройки»', (tester) async {
+    final app = await _RestoreFromSheetApp.open(tester);
+    await app.chooseBackup();
+
+    await tester.tap(find.text('Восстановить копию'));
+    await tester.pump();
+    await tester.tap(find.text('Восстановить копию'), warnIfMissed: false);
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Восстановить эту копию?'), findsNothing);
+    expect(find.text('Восстановление копии…'), findsOneWidget);
+    expect(find.byType(SettingsPage), findsOneWidget);
+    await _waitFor(
+      tester,
+      () => find.text('Копия восстановлена').evaluate().isNotEmpty,
+    );
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(await app.backupKinds(), [
+      GraphBackupKind.beforeReplacement,
+      GraphBackupKind.daily,
+    ]);
+    expect(await app.tagNames(), ['Дом']);
   });
 }
 
@@ -465,4 +526,115 @@ final class _BackupInsertControl extends LocalDatabaseConnectionObserver {
     _held = null;
     return held?.future;
   }
+}
+
+/// Приложение новой установки на странице «Настройки» с открытой панелью
+/// копий. В панели одна ежедневная копия с тегом «Дом», а после неё создан
+/// тег «Сад». Часы остановлены 7 октября 2026 года в 09:00.
+final class _RestoreFromSheetApp {
+  _RestoreFromSheetApp._(this._tester, this._container);
+
+  final WidgetTester _tester;
+  final ProviderContainer _container;
+
+  static Future<_RestoreFromSheetApp> open(WidgetTester tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = [const Locale('ru')];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    final files = TemporaryGraphFiles();
+    final runtime = AppRuntime(
+      connectionFactory: openInMemoryLocalDatabase,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
+      graphFilesFactory: files.create,
+      clock: () => DateTime(2026, 10, 7, 9).toUtc(),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(runtime.shutdown);
+    });
+    final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+    final container = ready.container;
+    await tester.runAsync(() async {
+      final repository = container.read(personalGraphRepositoryProvider);
+      expect(
+        await repository.execute(CreateTag(TagName.fromInput('Дом'))),
+        isA<GraphCommandSucceeded>(),
+      );
+      // Проверка при запуске могла сделать ежедневную копию уже с тегом, и
+      // тогда второй копии за день не будет.
+      await container.read(graphBackupsProvider).makeDailyBackupIfDue();
+      expect(
+        await repository.execute(CreateTag(TagName.fromInput('Сад'))),
+        isA<GraphCommandSucceeded>(),
+      );
+    });
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await _waitFor(tester, () => find.byType(HomePage).evaluate().isNotEmpty);
+    await _waitFor(
+      tester,
+      () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Настройки'));
+    await _waitFor(
+      tester,
+      () => find.byType(SettingsPage).evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+    // Строки «Резервные копии» в разделе «Данные» ещё нет, поэтому панель
+    // открывается со страницы напрямую.
+    unawaited(showBackupsSheet(tester.element(find.byType(SettingsPage))));
+    await _waitFor(
+      tester,
+      () => find.text('Сегодня, 09:00').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+    return _RestoreFromSheetApp._(tester, container);
+  }
+
+  /// Выбирает копию в панели и ждёт подсчёта изменений с тех пор.
+  Future<void> chooseBackup() async {
+    await _tester.tap(find.text('Сегодня, 09:00'));
+    await _waitFor(
+      _tester,
+      () => find.textContaining('С тех пор').evaluate().isNotEmpty,
+    );
+    await _tester.pumpAndSettle();
+  }
+
+  /// Виды хранимых копий от новых к старым.
+  Future<List<GraphBackupKind>> backupKinds() async {
+    final backups = await _tester.runAsync(
+      () => (_container.read(
+        personalGraphRepositoryProvider,
+      ) as GraphBackupRegistry).readBackups(),
+    );
+    return [for (final backup in backups!) backup.kind];
+  }
+
+  /// Названия тегов графа в порядке создания.
+  Future<List<String>> tagNames() async {
+    final catalog = await _tester.runAsync(
+      () => _container
+          .read(personalGraphRepositoryProvider)
+          .getTagCatalog(const TagCatalogBrowseMode()),
+    );
+    return [
+      for (final tag in (catalog! as TagCatalogSuccess).value.items)
+        tag.name.value,
+    ];
+  }
+}
+
+/// Чередует реальное ожидание хранилища и изолята записи снимка с кадрами,
+/// пока не выполнится [done].
+Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
+  for (var attempt = 0; attempt < 100 && !done(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  expect(done(), isTrue);
 }

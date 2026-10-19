@@ -11,10 +11,15 @@ import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph_backups/graph_backup_registry.dart';
 import '../../graph_backups/graph_backups_provider.dart';
 import '../../graph_backups/graph_change_summary.dart';
+import '../application/graph_restore_provider.dart';
 import 'backup_descriptions.dart';
+import 'restore_backup_confirmation.dart';
 
 /// Открывает над страницей и её панелью навигации панель «Резервные копии»
 /// с копиями от новых к старым по созданию и кнопкой ручной копии.
+///
+/// Выбор копии открывает подтверждение её восстановления, а подтверждённое
+/// восстановление закрывает панель и идёт под модальным прогрессом.
 ///
 /// Ручная копия идёт без прогресса, а её успех сообщения не даёт: новая
 /// копия появляется в списке. Отказ ручной копии показывает общая
@@ -42,7 +47,12 @@ final class _BackupsSheet extends ConsumerWidget {
             // Пока список не прочитан, панель показывает только кнопку.
             null => const <Widget>[],
             GraphBackupsReadSucceeded(:final backups) => [
-              for (final backup in backups) _BackupRow(backup, now: now),
+              for (final backup in backups)
+                _BackupRow(
+                  backup,
+                  now: now,
+                  onPressed: () => _restore(context, ref, backup),
+                ),
             ],
             // Отказ чтения не означает, что копий нет.
             GraphBackupsReadFailed() => [
@@ -76,13 +86,36 @@ final class _BackupsSheet extends ConsumerWidget {
   }
 }
 
+/// Подтверждает восстановление копии [backup] с изменениями с тех пор и
+/// начинает подтверждённое восстановление; его исход предъявляет
+/// координатор.
+Future<void> _restore(
+  BuildContext context,
+  WidgetRef ref,
+  GraphBackupEntry backup,
+) async {
+  final restore = ref.read(graphRestoreControllerProvider.notifier);
+  final confirmed = await confirmBackupRestore(
+    context,
+    backup: backup,
+    changesSince: restore.countChangesSince(backup),
+  );
+  if (!confirmed || !context.mounted) return;
+  // Панель закрывается раньше, чем восстановление откроет над ней свой
+  // прогресс: иначе закрылся бы прогресс.
+  Navigator.of(context).pop();
+  restore.start(backup);
+}
+
 /// Копия: когда она сделана и что изменилось с предыдущей копии. Экранный
-/// диктор читает её как восстановление копии от этого момента со сводкой.
+/// диктор читает её как кнопку восстановления копии от этого момента со
+/// сводкой.
 final class _BackupRow extends StatelessWidget {
-  const _BackupRow(this.backup, {required this.now});
+  const _BackupRow(this.backup, {required this.now, required this.onPressed});
 
   final GraphBackupEntry backup;
   final DateTime now;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -95,36 +128,41 @@ final class _BackupRow extends StatelessWidget {
     const figures = [FontFeature.tabularFigures()];
     return MergeSemantics(
       child: Semantics(
+        button: true,
         label: moment.restoreLabel,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 56),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DoableMetrics.space4,
-              vertical: 6,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ExcludeSemantics(
-                  child: Text(
-                    moment.label,
-                    style: DoableType.action.copyWith(
-                      color: colors.ink,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(DoableMetrics.radiusLg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DoableMetrics.space4,
+                vertical: 6,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ExcludeSemantics(
+                    child: Text(
+                      moment.label,
+                      style: DoableType.action.copyWith(
+                        color: colors.ink,
+                        fontFeatures: figures,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _summaryText(localizations, backup.summary),
+                    style: DoableType.hint.copyWith(
+                      color: colors.muted,
                       fontFeatures: figures,
                     ),
                   ),
-                ),
-                Text(
-                  _summaryText(localizations, backup.summary),
-                  style: DoableType.hint.copyWith(
-                    color: colors.muted,
-                    fontFeatures: figures,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
