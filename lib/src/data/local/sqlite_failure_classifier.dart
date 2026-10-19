@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show CouldNotRollBackException;
 import 'package:drift/isolate.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -33,7 +34,7 @@ final class SqliteUnexpectedFailure extends SqliteFailure {
 }
 
 SqliteFailure classifySqliteFailure(Object error) {
-  final cause = unwrapDriftRemoteException(error);
+  final cause = _originalCause(error);
   return switch (cause) {
     SqliteException(:final extendedResultCode) => switch (extendedResultCode) {
       SqlExtendedError.SQLITE_IOERR_DATA => const SqliteCorruptionFailure(),
@@ -87,6 +88,16 @@ bool _isCorruptionFamily(int extendedResultCode) {
 }
 
 int _primaryResultCode(int extendedResultCode) => extendedResultCode & 0xff;
+
+/// Ошибка SQLite или файловой системы без обёрток Drift: ошибки фонового
+/// соединения и отказа отката транзакции. Откат отказывает, когда SQLite
+/// после ошибки, например `SQLITE_FULL`, уже сам откатил всю транзакцию,
+/// поэтому категорию задаёт ошибка, из-за которой транзакция откатывалась.
+Object _originalCause(Object error) => switch (error) {
+  DriftRemoteException(:final remoteCause) => _originalCause(remoteCause),
+  CouldNotRollBackException(:final cause) => _originalCause(cause),
+  _ => error,
+};
 
 Object unwrapDriftRemoteException(Object error) {
   var cause = error;

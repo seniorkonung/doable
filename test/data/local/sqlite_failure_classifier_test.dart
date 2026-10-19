@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:doable/src/data/local/sqlite_failure_classifier.dart';
+import 'package:drift/drift.dart' show CouldNotRollBackException;
 import 'package:drift/isolate.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -141,6 +142,32 @@ void main() {
       );
 
       expect(failure, isA<SqliteCorruptionFailure>());
+    });
+
+    // Drift сообщает об отказе ROLLBACK, когда SQLite после SQLITE_FULL уже
+    // сам откатил всю транзакцию. Из фонового соединения обе ошибки приходят
+    // в DriftRemoteException.
+    test('относит отказ отката транзакции из фонового соединения к категории '
+        'ошибки, из-за которой транзакция откатывалась', () {
+      final failure = classifySqliteFailure(
+        CouldNotRollBackException(
+          _NestedDriftRemoteException(
+            SqliteException(
+              extendedResultCode: SqlError.SQLITE_FULL,
+              message: 'CANARY-личные-данные',
+            ),
+          ),
+          StackTrace.empty,
+          _NestedDriftRemoteException(
+            SqliteException(
+              extendedResultCode: SqlError.SQLITE_ERROR,
+              message: 'cannot rollback - no transaction is active',
+            ),
+          ),
+        ),
+      );
+
+      expect(failure, isA<SqliteStorageFullFailure>());
     });
 
     // Достаточно общего кода и кодов, от которых зависит приложение

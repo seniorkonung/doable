@@ -6,11 +6,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    show
-        AppDatabase,
-        LocalDatabaseConnectionObserver,
-        LocalDatabaseSqlOperation,
-        LocalDatabaseSqlStatement;
+    show AppDatabase, LocalDatabaseSqlOperation, LocalDatabaseSqlStatement;
 import 'package:doable/src/data/local/sqlite_failure_classifier.dart';
 import 'package:doable/src/data_transfer/application/graph_composition.dart';
 import 'package:doable/src/data_transfer/application/graph_replacement.dart';
@@ -38,12 +34,14 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:drift/drift.dart' show CouldNotRollBackException;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/encoded_diagnostics_log.dart';
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/transaction_storage_exhaustion.dart';
 
 /// Эталонный файл формата версии 1: все виды записей, архивированные
 /// намерение и связь и путь через архивированную связь к намерению без
@@ -73,7 +71,10 @@ void main() {
   setUp(() async {
     harness = await LocalDatabaseHarness.fileBacked();
     probe = _StatementProbe();
-    database = await harness.openReadyDatabase(observer: probe);
+    database = await harness.openReadyDatabase(
+      setup: (connection) => probe.storage = connection,
+      observer: probe,
+    );
     now = DateTime.utc(2026, 10, 18, 9);
     diagnostics = EncodedDiagnosticsLog();
     repository = DriftPersonalGraphRepository(
@@ -705,6 +706,29 @@ void main() {
       expect(await storedState(), before);
     });
 
+    test('нехватка места, после которой SQLite сам откатил всю транзакцию, '
+        'даёт отказ отката с нехваткой места в причине и оставляет граф, '
+        'копии, лог и реестр снимков прежними', () async {
+      await createPreviousGraph();
+      final before = await storedState();
+      final snapshot = await goldenSnapshot();
+      probe.exhaustsBefore = (statement) =>
+          _insertsInto(statement, 'graph_log_packages');
+
+      await expectLater(
+        replace(snapshot),
+        throwsA(
+          isA<CouldNotRollBackException>().having(
+            classifySqliteFailure,
+            'категория отказа',
+            isA<SqliteStorageFullFailure>(),
+          ),
+        ),
+      );
+
+      expect(await storedState(), before);
+    });
+
     test('снимок замены с изменённым байтом даёт отказ повреждения снимка и '
         'оставляет граф, копии, лог и реестр снимков прежними', () async {
       await createPreviousGraph();
@@ -797,14 +821,16 @@ bool _countsRecords(LocalDatabaseSqlStatement statement) =>
     statement.operation == LocalDatabaseSqlOperation.select &&
     statement.statements.single.contains('count(*) FROM tag_assignments');
 
-/// Перед оператором отказывает, когда его выбирает [failsBefore], а после
-/// оператора сообщает о нём [onStatement].
-final class _StatementProbe extends LocalDatabaseConnectionObserver {
+/// Перед оператором исчерпывает место хранилища, как
+/// [TransactionStorageExhaustion], или отказывает, когда его выбирает
+/// [failsBefore], а после оператора сообщает о нём [onStatement].
+final class _StatementProbe extends TransactionStorageExhaustion {
   bool Function(LocalDatabaseSqlStatement statement)? failsBefore;
   void Function(LocalDatabaseSqlStatement statement)? onStatement;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
+    super.beforeStatement(statement);
     if (failsBefore?.call(statement) ?? false) {
       throw StateError('Внедрённый отказ');
     }

@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
+import 'package:doable/src/data/local/app_database.dart'
+    show AppDatabase, LocalDatabaseSqlOperation;
 import 'package:doable/src/data_transfer/application/graph_restore.dart';
 import 'package:doable/src/data_transfer/application/graph_restore_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -37,6 +38,7 @@ import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/transaction_storage_exhaustion.dart';
 
 /// Порог сжатия проверок: несколько пакетов вместо производственного
 /// значения.
@@ -44,6 +46,7 @@ const _threshold = 3;
 
 void main() {
   late LocalDatabaseHarness harness;
+  late TransactionStorageExhaustion storageExhaustion;
   late AppDatabase database;
   late DriftPersonalGraphRepository repository;
   late Directory snapshots;
@@ -60,7 +63,11 @@ void main() {
   setUp(() async {
     harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
-    database = await harness.openReadyDatabase();
+    storageExhaustion = TransactionStorageExhaustion();
+    database = await harness.openReadyDatabase(
+      setup: (connection) => storageExhaustion.storage = connection,
+      observer: storageExhaustion,
+    );
     now = DateTime(2026, 10, 5, 9);
     repository = DriftPersonalGraphRepository(
       database,
@@ -541,6 +548,32 @@ void main() {
   });
 
   group('нехватка места', () {
+    test('при замене графа, после которой SQLite сам откатил всю транзакцию, '
+        'даёт свой исход, диагностируемый этапом замены и категорией '
+        'нехватки места, ничего не меняет и удаляет снимок замены', () async {
+      await createTag('Дом');
+      final backup = await makeManualBackup();
+      await createTag('Сад');
+      final before = await storedState();
+      storageExhaustion.exhaustsBefore = (statement) =>
+          statement.operation == LocalDatabaseSqlOperation.insert &&
+          statement.statements.single.startsWith(
+            'INSERT INTO "graph_log_packages"',
+          );
+
+      expect(await restore(backup), isA<GraphBackupRestoreStorageFull>());
+
+      expect(await storedState(), before);
+      expect(diagnostics.events, [
+        {
+          'operation': 'graphBackupRestore',
+          'stage': 'replacement',
+          'outcome': 'failed',
+          'failureCode': 'storageFull',
+        },
+      ]);
+    });
+
     test('при записи снимка замены даёт свой исход, диагностируемый этапом '
         'записи снимка замены и категорией нехватки места, и ничего не '
         'меняет', () async {
