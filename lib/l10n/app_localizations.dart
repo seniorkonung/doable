@@ -2365,17 +2365,17 @@ abstract class AppLocalizations {
   /// **'The data has been replaced since then. Restoring undoes every change.'**
   String get dataRestoreReplacedSince;
 
-  /// Предупреждение подтверждения восстановления: копия заменит весь граф, а текущее состояние сначала сохраняется копией
+  /// Предупреждение подтверждений восстановления копии и импорта: копия заменит весь граф, а текущее состояние сначала сохраняется копией
   ///
   /// In en, this message translates to:
   /// **'It will replace everything now in Doable. A backup of the current state is made first.'**
-  String get dataRestoreReplacesEverything;
+  String get dataReplacementReplacesEverything;
 
-  /// Действие подтверждения восстановления копии, закрывающее его без изменений
+  /// Действие подтверждений восстановления копии и импорта, закрывающее подтверждение без изменений
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
-  String get dataRestoreConfirmationCancel;
+  String get dataReplacementConfirmationCancel;
 
   /// Действие подтверждения восстановления копии, начинающее восстановление
   ///

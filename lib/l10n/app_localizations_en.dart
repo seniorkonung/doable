@@ -1540,11 +1540,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'The data has been replaced since then. Restoring undoes every change.';
 
   @override
-  String get dataRestoreReplacesEverything =>
+  String get dataReplacementReplacesEverything =>
       'It will replace everything now in Doable. A backup of the current state is made first.';
 
   @override
-  String get dataRestoreConfirmationCancel => 'Cancel';
+  String get dataReplacementConfirmationCancel => 'Cancel';
 
   @override
   String get dataRestoreConfirm => 'Restore copy';

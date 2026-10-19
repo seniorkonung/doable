@@ -105,7 +105,7 @@ final class _RestoreBackupConfirmationState
             ),
             const SizedBox(height: DoableMetrics.space2),
             Text(
-              localizations.dataRestoreReplacesEverything,
+              localizations.dataReplacementReplacesEverything,
               style: DoableType.body.copyWith(color: colors.ink),
             ),
           ],
@@ -113,7 +113,7 @@ final class _RestoreBackupConfirmationState
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(localizations.dataRestoreConfirmationCancel),
+            child: Text(localizations.dataReplacementConfirmationCancel),
           ),
           FilledButton(
             onPressed: counting.connectionState == ConnectionState.done

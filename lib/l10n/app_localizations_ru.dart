@@ -1554,11 +1554,11 @@ class AppLocalizationsRu extends AppLocalizations {
       'С тех пор данные заменялись. Восстановление отменит все изменения.';
 
   @override
-  String get dataRestoreReplacesEverything =>
+  String get dataReplacementReplacesEverything =>
       'Она заменит всё, что сейчас есть в Doable. Сначала текущее состояние сохраняется как резервная копия.';
 
   @override
-  String get dataRestoreConfirmationCancel => 'Отмена';
+  String get dataReplacementConfirmationCancel => 'Отмена';
 
   @override
   String get dataRestoreConfirm => 'Восстановить копию';
