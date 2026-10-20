@@ -121,10 +121,10 @@ void main() {
   Future<GraphImportFileReading> readChosen({
     DocumentAccess? access,
     void Function()? onDocumentChosen,
-    Future<void>? cancellation,
+    GraphImportReadingCancellation? cancellation,
   }) => graphImport(access: access).readChosenFile(
     onDocumentChosen: onDocumentChosen ?? () {},
-    cancellation: cancellation ?? Completer<void>().future,
+    cancellation: cancellation ?? GraphImportReadingCancellation(),
   );
 
   Future<GraphImportFile> readFile(List<int> bytes) async {
@@ -630,6 +630,36 @@ void main() {
   });
 
   group('отмена', () {
+    test('после отправленного отказа копирования, до его обработки, '
+        'завершает чтение без отказа и события диагностики', () async {
+      choose(photoFile());
+      final cancellation = GraphImportReadingCancellation();
+      documents
+        ..copyFailure = const DocumentNotRead()
+        ..afterCopyAnswer = cancellation.request;
+
+      final reading = await readChosen(cancellation: cancellation);
+
+      expect(reading, isA<GraphImportFileReadingCancelled>());
+      expect(diagnostics.events, isEmpty);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
+
+    test('после успешного копирования фотографии имеет приоритет над '
+        'отказом заголовка и не даёт события диагностики', () async {
+      choose(photoFile());
+      final cancellation = GraphImportReadingCancellation();
+
+      final reading = await readChosen(
+        access: _CancelledAfterCopy(documents, cancellation),
+        cancellation: cancellation,
+      );
+
+      expect(reading, isA<GraphImportFileReadingCancelled>());
+      expect(diagnostics.events, isEmpty);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
+
     test('во время копирования документа сразу завершает чтение файла без '
         'временных файлов и события диагностики, а копирование, брошенное ею и закончившееся во '
         'время следующего импорта, не меняет его временный файл и '
@@ -637,15 +667,15 @@ void main() {
       choose(graphExportFileOf(reference));
       final providerAnswer = Completer<void>();
       documents.beforeCopy = () => providerAnswer.future;
-      final cancellation = Completer<void>();
+      final cancellation = GraphImportReadingCancellation();
       final chosen = Completer<void>();
       final abandoned = readChosen(
         onDocumentChosen: chosen.complete,
-        cancellation: cancellation.future,
+        cancellation: cancellation,
       );
       await chosen.future;
 
-      cancellation.complete();
+      cancellation.request();
 
       expect(await abandoned, isA<GraphImportFileReadingCancelled>());
       expect(diagnostics.events, isEmpty);
@@ -661,12 +691,12 @@ void main() {
     test('сразу после копирования документа завершает чтение файла без '
         'временных файлов и события диагностики', () async {
       choose(graphExportFileOf(reference));
-      final cancellation = Completer<void>();
+      final cancellation = GraphImportReadingCancellation();
 
       expect(
         await readChosen(
           access: _CancelledAfterCopy(documents, cancellation),
-          cancellation: cancellation.future,
+          cancellation: cancellation,
         ),
         isA<GraphImportFileReadingCancelled>(),
       );
@@ -1080,7 +1110,7 @@ Future<GraphImportFileReading> _readChosenFileInNewIsolate(
   );
   return graphImport.readChosenFile(
     onDocumentChosen: () {},
-    cancellation: Completer<void>().future,
+    cancellation: GraphImportReadingCancellation(),
   );
 });
 
@@ -1196,7 +1226,7 @@ final class _CancelledAfterCopy implements DocumentAccess {
   _CancelledAfterCopy(this._documents, this._cancellation);
 
   final DocumentAccess _documents;
-  final Completer<void> _cancellation;
+  final GraphImportReadingCancellation _cancellation;
 
   @override
   Future<DocumentOpening> openDocument() => _documents.openDocument();
@@ -1212,7 +1242,7 @@ final class _CancelledAfterCopy implements DocumentAccess {
       destination: destination,
       cancellation: cancellation,
     );
-    _cancellation.complete();
+    _cancellation.request();
     return copy;
   }
 

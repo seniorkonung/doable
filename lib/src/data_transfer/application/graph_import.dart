@@ -60,7 +60,7 @@ final class GraphImport {
   /// во временный файл и читает его заголовок.
   ///
   /// [onDocumentChosen] вызывается, как только человек выбрал документ, до
-  /// начала копирования. Завершение [cancellation] до исхода прекращает
+  /// начала копирования. Запрос [cancellation] до исхода прекращает
   /// чтение: копирование завершается сразу, даже если поставщик документа
   /// держит его открытие или чтение, а уже скопированный файл удаляется.
   /// Каждая попытка копирует документ в свой временный файл, имя которого
@@ -73,9 +73,13 @@ final class GraphImport {
   /// [GraphImportFileReadingFailed]. После отмены и отказа граф не меняется,
   /// а временного файла не остаётся: копию, брошенную отменой, удаляет само
   /// копирование, когда поставщик ответит.
+  ///
+  /// Отказ фиксирует исход через [GraphImportReadingCancellation.finish]
+  /// до диагностики. При успехе это делает вызывающий, когда закончит
+  /// подготовку подтверждения: до этого принятая отмена отбрасывает файл.
   Future<GraphImportFileReading> readChosenFile({
     required void Function() onDocumentChosen,
-    required Future<void> cancellation,
+    required GraphImportReadingCancellation cancellation,
   }) async {
     final stopwatch = Stopwatch()..start();
     final File copy;
@@ -91,7 +95,7 @@ final class GraphImport {
         directory.uri.resolve('graph_import_${const Uuid().v4()}.jsonl.gz'),
       );
     } on Object catch (error) {
-      return _readingFailed(_failureOf(error), stopwatch);
+      return _readingFailed(_failureOf(error), stopwatch, cancellation);
     }
 
     final OpenedDocument document;
@@ -99,31 +103,47 @@ final class GraphImport {
       case DocumentOpened(document: final opened):
         document = opened;
       case DocumentOpeningCancelled():
+        cancellation.finish();
         return const GraphImportFileReadingCancelled();
       case DocumentOpeningFailed():
-        return _readingFailed(GraphImportFailure.unknown, stopwatch);
+        return _readingFailed(
+          GraphImportFailure.unknown,
+          stopwatch,
+          cancellation,
+        );
     }
     onDocumentChosen();
     // Время человека в диалоге в длительность импорта не входит.
     stopwatch.reset();
 
-    var isCancelled = false;
-    unawaited(cancellation.then((_) => isCancelled = true));
     switch (await _documents.copyDocument(
       document,
       destination: copy,
-      cancellation: cancellation,
+      cancellation: cancellation.requested,
     )) {
       case DocumentCopied():
         break;
       case DocumentCopyCancelled():
+        cancellation.finish();
         return const GraphImportFileReadingCancelled();
       case DocumentNotRead():
-        return _readingFailed(GraphImportFailure.documentUnreadable, stopwatch);
+        return _readingFailed(
+          GraphImportFailure.documentUnreadable,
+          stopwatch,
+          cancellation,
+        );
       case DocumentCopyStorageFull():
-        return _readingFailed(GraphImportFailure.storageFull, stopwatch);
+        return _readingFailed(
+          GraphImportFailure.storageFull,
+          stopwatch,
+          cancellation,
+        );
       case DocumentCopyFailed():
-        return _readingFailed(GraphImportFailure.unknown, stopwatch);
+        return _readingFailed(
+          GraphImportFailure.unknown,
+          stopwatch,
+          cancellation,
+        );
     }
 
     try {
@@ -131,23 +151,28 @@ final class GraphImport {
       // Записи читает импорт, принятый координатором; отмена подписки
       // закрывает файл.
       await reading.records.listen(null).cancel();
-      if (!isCancelled) {
+      if (!cancellation.isRequested) {
         return GraphImportFileRead(
           GraphImportFile._(copy, reading.header, stopwatch.elapsed),
         );
       }
       await _deleteTemporaryFile(copy);
+      cancellation.finish();
       return const GraphImportFileReadingCancelled();
     } on Object catch (error) {
       await _deleteTemporaryFile(copy);
-      return _readingFailed(_failureOf(error), stopwatch);
+      return _readingFailed(_failureOf(error), stopwatch, cancellation);
     }
   }
 
-  GraphImportFileReadingFailed _readingFailed(
+  GraphImportFileReading _readingFailed(
     GraphImportFailure failure,
     Stopwatch stopwatch,
+    GraphImportReadingCancellation cancellation,
   ) {
+    if (cancellation.finish()) {
+      return const GraphImportFileReadingCancelled();
+    }
     _recordFailure(
       GraphImportDiagnosticsStage.documentRead,
       failure,
@@ -305,6 +330,32 @@ Future<void> _deleteTemporaryFile(File file) async {
     await file.delete();
   } on FileSystemException {
     // Файла нет, или его удалит очистка временного каталога при запуске.
+  }
+}
+
+/// Общая для чтения и контроллера точка принятия отмены: запрос и фиксация
+/// исхода решаются синхронно, до диагностики и передачи отказа координатору.
+final class GraphImportReadingCancellation {
+  final _requested = Completer<void>();
+  var _isFinished = false;
+
+  /// Сигнал копированию документа; поставщика дожидаться не требуется.
+  Future<void> get requested => _requested.future;
+
+  bool get isRequested => _requested.isCompleted;
+
+  /// Принимает отмену, пока исход чтения не зафиксирован.
+  bool request() {
+    if (_isFinished) return false;
+    if (!isRequested) _requested.complete();
+    return true;
+  }
+
+  /// Фиксирует исход и сообщает, была ли принята отмена. После этого
+  /// контроллер не может принять отмену уже завершённого чтения.
+  bool finish() {
+    _isFinished = true;
+    return isRequested;
   }
 }
 

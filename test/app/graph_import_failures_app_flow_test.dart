@@ -14,12 +14,15 @@ import 'package:doable/src/data/local/app_database.dart'
         LocalDatabaseSqlStatement,
         observeConfiguredLocalDatabaseConnection,
         openFileBackedLocalDatabase;
+import 'package:doable/src/data_transfer/application/document_access.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_backups/graph_backups_provider.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
@@ -56,6 +59,48 @@ const _storageFull =
 const _importRunning = 'Импорт данных…';
 
 void main() {
+  testWidgets('принятая отмена чтения имеет приоритет над поздним отказом '
+      'копирования: после «Отмена…» прогресс закрывается без подтверждения, '
+      'сообщения, операции координатора и события отказа', (tester) async {
+    final app = await _ImportApp.start(tester);
+    await app.openSettings();
+    final before = app.storedState();
+    final completions = <GraphCommandCompletion>[];
+    final subscription = app._container
+        .read(graphCommandCoordinatorProvider.notifier)
+        .completions
+        .listen(completions.add);
+    addTearDown(subscription.cancel);
+    final providerAnswer = Completer<void>();
+    final cancellationAnswer = Completer<void>();
+    app.documents
+      ..beforeCopy = (() => providerAnswer.future)
+      ..beforeCancellationAnswer = (() => cancellationAnswer.future)
+      ..copyFailure = const DocumentNotRead();
+    app.chooseForImport(_document(photoFile()));
+
+    await app.startImport();
+    await _until(tester, find.text(_importRunning));
+    await tester.tap(find.text('Отменить'));
+    await tester.pump();
+    expect(find.text('Отмена…'), findsOneWidget);
+
+    providerAnswer.complete();
+    await app.waitForProgressEnd();
+    cancellationAnswer.complete();
+    await _settle(tester);
+
+    expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
+    expect(find.textContaining('Ничего не изменено'), findsNothing);
+    expect(completions, isEmpty);
+    expect(
+      app._diagnostics.events.whereType<GraphImportDiagnosticsEvent>(),
+      isEmpty,
+    );
+    expect(app.storedState(), before);
+  });
+
   testWidgets('сценарий «Отмена чтения выбранного файла»: пока выбранный файл '
       'читается, «Отменить» показывает «Отмена…», затем прогресс закрывается '
       'без подтверждения и сообщения, а граф и копии остаются прежними', (
@@ -278,6 +323,7 @@ final class _ImportApp {
   final LocalDatabaseHarness _harness;
   final TemporaryGraphFiles _files;
   final _statements = _HeldReplacement();
+  final _diagnostics = InMemoryDiagnosticsSink();
 
   late AppRuntime _runtime;
   late ProviderContainer _container;
@@ -325,7 +371,7 @@ final class _ImportApp {
         ),
         _statements,
       ),
-      diagnosticsSink: InMemoryDiagnosticsSink(),
+      diagnosticsSink: _diagnostics,
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
       graphFilesFactory: _files.create,
       dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(

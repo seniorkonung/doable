@@ -84,7 +84,7 @@ final class GraphImportController extends Notifier<GraphImportState> {
 
   /// Отмена чтения выбранного файла, пока её можно запросить: `null` вне
   /// чтения и после принятой отмены.
-  Completer<void>? _readingCancellation;
+  GraphImportReadingCancellation? _readingCancellation;
 
   /// Ответ на подтверждение замены, пока импорт его ждёт.
   Completer<bool>? _confirmation;
@@ -116,13 +116,13 @@ final class GraphImportController extends Notifier<GraphImportState> {
   Future<GraphImportAccepted?> start() async {
     if (_isImporting) return null;
     _isImporting = true;
-    final readingCancellation = Completer<void>();
+    final readingCancellation = GraphImportReadingCancellation();
     final reading = await _import.readChosenFile(
       onDocumentChosen: () {
         _readingCancellation = readingCancellation;
         _publish(const GraphImportReadingFile());
       },
-      cancellation: readingCancellation.future,
+      cancellation: readingCancellation,
     );
     switch (reading) {
       case GraphImportFileReadingCancelled():
@@ -137,7 +137,7 @@ final class GraphImportController extends Notifier<GraphImportState> {
         _readingCancellation = null;
         // Отмена, принятая, пока читался состав графа, прекращает импорт так
         // же, как отмена чтения файла.
-        if (readingCancellation.isCompleted ||
+        if (readingCancellation.finish() ||
             (requiresConfirmation && !await _confirm(file.header))) {
           await file.discard();
           _finish();
@@ -164,8 +164,8 @@ final class GraphImportController extends Notifier<GraphImportState> {
   /// чтения и замены, ничего не меняется.
   void cancel() {
     if (_readingCancellation case final reading?) {
+      if (!reading.request()) return;
       _readingCancellation = null;
-      reading.complete();
       _publish(const GraphImportCancelling());
       return;
     }

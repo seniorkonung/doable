@@ -60,7 +60,7 @@ final class BenchmarkGraphImport {
   }) async {
     final reading = await _import.readChosenFile(
       onDocumentChosen: onDocumentChosen ?? () {},
-      cancellation: Completer<void>().future,
+      cancellation: GraphImportReadingCancellation(),
     );
     return switch (reading) {
       GraphImportFileRead(:final file) => file,

@@ -88,6 +88,10 @@ final class FileDocumentAccess implements DocumentAccess {
   /// [DocumentCopyStorageFull] или [DocumentCopyFailed].
   DocumentCopy? copyFailure;
 
+  /// Сигнал сразу после отправки ответа копирования, до его обработки
+  /// вызывающим: отмена может быть принята уже после ответа плагина.
+  void Function()? afterCopyAnswer;
+
   /// Копирования документов в порядке начала. Каждое завершается, когда
   /// закончило работу с файлом приложения, в том числе брошенное отменой.
   final copies = <Future<void>>[];
@@ -126,6 +130,7 @@ final class FileDocumentAccess implements DocumentAccess {
     if (!outcome.isCompleted) {
       if (copyFailure case final failure?) {
         outcome.complete(failure);
+        afterCopyAnswer?.call();
         return;
       }
       await File.fromUri(Uri.parse(document.uri)).copy(destination.path);
