@@ -275,26 +275,18 @@ class DocumentAccessPlugin internal constructor(
         result: MethodChannel.Result,
     ) {
         require(prefixLimit > 0 && chunkSize in 1..prefixLimit)
-        startRead(document, destination, result) { input, read ->
-            readDocument(input, destination, read, prefixLimit, chunkSize)
-        }
-    }
-
-    /** Общий владелец открытия, отмены, исхода и очистки чтения документа. */
-    private fun startRead(
-        document: Uri,
-        destination: File,
-        result: MethodChannel.Result,
-        consume: (InputStream, DocumentRead) -> CopyOutcome,
-    ) {
         val read = DocumentRead(result)
         check(reads.putIfAbsent(destination.path, read) == null)
         backgroundExecutor.execute {
-            var outcome = CopyOutcome.DOCUMENT_NOT_READ
+            var outcome = ReadOutcome.DOCUMENT_NOT_READ
             try {
                 val input = openForReading(document, read.cancellation)
                 try {
-                    outcome = if (read.isCancelled) CopyOutcome.CANCELLED else consume(input, read)
+                    outcome = if (read.isCancelled) {
+                        ReadOutcome.CANCELLED
+                    } else {
+                        readDocument(input, destination, read, prefixLimit, chunkSize)
+                    }
                 } finally {
                     try {
                         input.close()
@@ -305,12 +297,12 @@ class DocumentAccessPlugin internal constructor(
             } catch (error: Exception) {
                 // Поставщик может отказать и при открытии, и между порциями.
             }
-            if (outcome != CopyOutcome.COPIED) destination.delete()
+            if (outcome != ReadOutcome.COPIED) destination.delete()
             releaseGrant(document)
             reads.remove(destination.path, read)
             // Отмена уже сообщила исход. Позднее завершение и отказ канала
             // удаляют только файл своей попытки.
-            if (!read.finish(outcome) && outcome == CopyOutcome.COPIED) destination.delete()
+            if (!read.finish(outcome) && outcome == ReadOutcome.COPIED) destination.delete()
         }
     }
 
@@ -319,7 +311,7 @@ class DocumentAccessPlugin internal constructor(
         if (read == null) {
             // Завершение идемпотентно: отмена могла уже освободить сессию.
             if (action == ReadAction.FINISH) result.success(null)
-            else CopyOutcome.DOCUMENT_NOT_READ.reply(result)
+            else ReadOutcome.CANCELLED.reply(result)
         } else {
             read.request(action, result)
         }
@@ -331,16 +323,16 @@ class DocumentAccessPlugin internal constructor(
         read: DocumentRead,
         prefixLimit: Int,
         chunkSize: Int,
-    ): CopyOutcome {
-        if (!read.answer(null)) return CopyOutcome.CANCELLED
+    ): ReadOutcome {
+        if (!read.answer(null)) return ReadOutcome.CANCELLED
         val prefix = ByteArrayOutputStream(chunkSize)
         val buffer = ByteArray(chunkSize)
         var ended = false
         while (!read.isCancelled) {
             val action = read.next()
-            if (read.isCancelled) return CopyOutcome.CANCELLED
+            if (read.isCancelled) return ReadOutcome.CANCELLED
             when (action) {
-                ReadAction.FINISH -> return CopyOutcome.COPIED
+                ReadAction.FINISH -> return ReadOutcome.CLOSED_WITHOUT_COPY
                 ReadAction.COPY -> return writeCopy(input, destination, read, prefix)
                 ReadAction.PREFIX -> {
                     val remaining = prefixLimit - prefix.size()
@@ -355,12 +347,12 @@ class DocumentAccessPlugin internal constructor(
                         prefix.write(buffer, 0, count)
                     }
                     if (!read.answer(if (count < 0) byteArrayOf() else buffer.copyOf(count))) {
-                        return CopyOutcome.CANCELLED
+                        return ReadOutcome.CANCELLED
                     }
                 }
             }
         }
-        return CopyOutcome.CANCELLED
+        return ReadOutcome.CANCELLED
     }
 
     /**
@@ -395,28 +387,28 @@ class DocumentAccessPlugin internal constructor(
         destination: File,
         read: DocumentRead,
         prefix: ByteArrayOutputStream,
-    ): CopyOutcome {
+    ): ReadOutcome {
         try {
-            if (read.isCancelled) return CopyOutcome.CANCELLED
+            if (read.isCancelled) return ReadOutcome.CANCELLED
             openCopy(destination).use { output ->
-                if (read.isCancelled) return CopyOutcome.CANCELLED
+                if (read.isCancelled) return ReadOutcome.CANCELLED
                 prefix.writeTo(output)
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 while (!read.isCancelled) {
                     val count = try {
                         input.read(buffer)
                     } catch (error: Exception) {
-                        return CopyOutcome.DOCUMENT_NOT_READ
+                        return ReadOutcome.DOCUMENT_NOT_READ
                     }
                     // Поставщик, который не учитывает сигнал отмены, отвечает и после неё.
-                    if (read.isCancelled) return CopyOutcome.CANCELLED
-                    if (count < 0) return CopyOutcome.COPIED
+                    if (read.isCancelled) return ReadOutcome.CANCELLED
+                    if (count < 0) return ReadOutcome.COPIED
                     output.write(buffer, 0, count)
                 }
             }
-            return CopyOutcome.CANCELLED
+            return ReadOutcome.CANCELLED
         } catch (error: Exception) {
-            return if (error.isStorageFull()) CopyOutcome.STORAGE_FULL else CopyOutcome.COPY_NOT_WRITTEN
+            return if (error.isStorageFull()) ReadOutcome.STORAGE_FULL else ReadOutcome.COPY_NOT_WRITTEN
         }
     }
 
@@ -501,7 +493,7 @@ private class DocumentRead(result: MethodChannel.Result) {
     @Synchronized
     fun request(action: ReadAction, result: MethodChannel.Result) {
         if (state != State.RUNNING) {
-            CopyOutcome.CANCELLED.reply(result)
+            ReadOutcome.CANCELLED.reply(result)
             return
         }
         check(pending == null)
@@ -535,14 +527,14 @@ private class DocumentRead(result: MethodChannel.Result) {
         requests.add(ReadAction.FINISH)
         cancellation.cancel()
         try {
-            result?.let(CopyOutcome.CANCELLED::reply)
+            result?.let(ReadOutcome.CANCELLED::reply)
         } catch (error: Exception) {
             // Движок мог уже потерять канал; повторного ответа не будет.
         }
     }
 
     @Synchronized
-    fun finish(outcome: CopyOutcome): Boolean {
+    fun finish(outcome: ReadOutcome): Boolean {
         if (state != State.RUNNING) return false
         state = State.FINISHED
         val result = checkNotNull(pending)
@@ -559,9 +551,10 @@ private class DocumentRead(result: MethodChannel.Result) {
     private enum class State { RUNNING, CANCELLED, FINISHED }
 }
 
-/** Исход копирования открытого документа в файл приложения. */
-private enum class CopyOutcome {
+/** Исход сессии чтения открытого документа с копией в файл приложения или без неё. */
+private enum class ReadOutcome {
     COPIED,
+    CLOSED_WITHOUT_COPY,
     DOCUMENT_NOT_READ,
     STORAGE_FULL,
     COPY_NOT_WRITTEN,
@@ -569,7 +562,7 @@ private enum class CopyOutcome {
 
     fun reply(result: MethodChannel.Result) {
         val code = when (this) {
-            COPIED -> return result.success(null)
+            COPIED, CLOSED_WITHOUT_COPY -> return result.success(null)
             DOCUMENT_NOT_READ -> "document_not_read"
             STORAGE_FULL -> "storage_full"
             COPY_NOT_WRITTEN -> "copy_not_written"

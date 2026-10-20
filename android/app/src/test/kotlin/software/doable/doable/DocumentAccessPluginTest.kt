@@ -694,6 +694,43 @@ class DocumentAccessPluginTest {
         }
 
     @Test
+    fun `Поздние запросы порции и копирования сохраняют отмену до и после освобождения сессии`() {
+        val closing = CountDownLatch(1)
+        val allowClose = CountDownLatch(1)
+        openDocument {
+            content.writeBytes(byteArrayOf(1))
+            onReadClose = {
+                closing.countDown()
+                allowClose.await()
+            }
+        }
+        val copy = File(temporary.root, "import-cancelled.jsonl.gz")
+        val methods = listOf("readDocumentPrefix", "copyReadDocument")
+
+        withDocumentRead(copy) { worker ->
+            try {
+                assertNull(messenger.invoke("cancelCopy", mapOf("destination" to copy.path)).value())
+                assertTrue(closing.await(5, TimeUnit.SECONDS))
+
+                for (method in methods) {
+                    val reply = messenger.invoke(method, mapOf("destination" to copy.path))
+                    assertEquals("До освобождения: $method", "copy_cancelled", reply.errorCode())
+                }
+            } finally {
+                allowClose.countDown()
+                worker.join(5_000)
+            }
+            assertFalse(worker.isAlive)
+
+            for (method in methods) {
+                val reply = messenger.invoke(method, mapOf("destination" to copy.path))
+                assertEquals("После освобождения: $method", "copy_cancelled", reply.errorCode())
+            }
+            assertNull(messenger.invoke("finishDocumentRead", mapOf("destination" to copy.path)).value())
+        }
+    }
+
+    @Test
     fun `Потеря движка будит ожидание решения Dart и отпускает поток и право без повторного исхода`() =
         assertStoppedWhileAwaitingDecision {
             plugin.onDetachedFromEngine(pluginBinding(context, messenger))
