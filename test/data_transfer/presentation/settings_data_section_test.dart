@@ -38,6 +38,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_flow_wait.dart' as app_flow;
 import '../../support/daily_choice_local_date.dart';
 import '../../support/file_document_access.dart';
 import '../../support/graph_import_files.dart';
@@ -644,6 +645,7 @@ void main() {
       await _waitFor(tester, () => find.text(message).evaluate().isNotEmpty);
       await tester.pumpAndSettle();
 
+      expect(find.text('Импортировать эту копию?'), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
       expect(
         tester.getTopLeft(find.text(message)).dy,
@@ -702,6 +704,12 @@ void main() {
     expect(find.text(invalidFile), findsNothing);
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();
+    await app_flow.settle(tester);
+
+    expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(find.text('Импорт данных…'), findsNothing);
+    expect(find.text(invalidFile), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
   });
 
   testWidgets('отказ импорта, показанный под строкой «Импорт данных», после '

@@ -254,10 +254,7 @@ void main() {
   Future<List<Object>> storedState() async => [
     await graphState(),
     await rows('SELECT * FROM graph_backups ORDER BY id'),
-    await rows(
-      'SELECT position, kind, snapshot_id FROM graph_log_packages '
-      'ORDER BY position',
-    ),
+    await rows('SELECT * FROM graph_log_packages ORDER BY position'),
     await rows('SELECT * FROM graph_snapshots ORDER BY id'),
     await _fileNamesIn(snapshots),
   ];
@@ -328,14 +325,6 @@ void main() {
     // Строки эталона: 1–2 — теги, 3–6 — намерения, 7–9 — назначения тегов,
     // 10–12 — долговременные связи, 13–14 — дневные выборы.
     final cases = <String, (List<int>, (_Detection, GraphImportFailure))>{
-      'фотография': (
-        photoFile(),
-        (_Detection.header, GraphImportFailure.invalidFile),
-      ),
-      'файл более новой версии': (
-        newerFormatVersionFile(),
-        (_Detection.header, GraphImportFailure.newerFormatVersion),
-      ),
       'файл, обрезанный посередине': (
         truncatedGraphExportFile(),
         (_Detection.snapshotWrite, GraphImportFailure.invalidFile),
@@ -509,6 +498,9 @@ void main() {
   ]) {
     test('$name отклоняется до копирования и не подменяется нехваткой '
         'места', () async {
+      await createGraph();
+      await repository.insertManualBackup(since: null);
+      final before = await storedState();
       final access = _PrefixDocumentAccess(bytes)
         ..copyFailure = const DocumentCopyStorageFull();
       final reading = readChosen(access: access);
@@ -526,6 +518,8 @@ void main() {
       expect(access.copies, 0);
       expect(access.prefixClosed, isTrue);
       expect(access.finished, isTrue);
+      expect(diagnostics.events, [_importFailed('dataValidation', failure)]);
+      expect(await storedState(), before);
       expect(await _fileNamesIn(temporary), isEmpty);
     });
   }
@@ -1115,6 +1109,7 @@ void main() {
     test('отказ от подтверждения завершает импорт без сообщения, изменений и '
         'временных файлов', () async {
       await createGraph();
+      await repository.insertManualBackup(since: null);
       final before = await storedState();
       choose(graphExportFileOf(reference));
       final started = controller().start();

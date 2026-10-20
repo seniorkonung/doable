@@ -11,7 +11,6 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
-import 'package:doable/src/data_transfer/application/document_access.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
@@ -43,13 +42,11 @@ final class ImportAppHarness {
     this._files,
     this._modes,
     this.now,
-    this._documentAccess,
   );
 
   final WidgetTester tester;
   final LocalDatabaseHarness _harness;
   final TemporaryGraphFiles _files;
-  final DocumentAccess? _documentAccess;
   final diagnostics = InMemoryDiagnosticsSink();
 
   /// Соединение приложения с файлом хранилища.
@@ -76,7 +73,6 @@ final class ImportAppHarness {
     required DateTime at,
     QuickCreationMode quickCreationMode = QuickCreationMode.intention,
     Future<void> Function(PersonalGraphRepository graph)? seed,
-    DocumentAccess? documents,
   }) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
@@ -89,7 +85,6 @@ final class ImportAppHarness {
       TemporaryGraphFiles(),
       InMemoryQuickCreationModeStore()..mode = quickCreationMode,
       at,
-      documents,
     );
     if (seed != null) {
       await tester.runAsync(() async {
@@ -124,14 +119,7 @@ final class ImportAppHarness {
       ),
       diagnosticsSink: diagnostics,
       quickCreationModeStore: _modes,
-      graphFilesFactory: (log) async {
-        final files = await _files.create(log);
-        return (
-          compaction: files.compaction,
-          temporaryDirectory: files.temporaryDirectory,
-          documents: _documentAccess ?? files.documents,
-        );
-      },
+      graphFilesFactory: _files.create,
       dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
         date: CalendarDate.fromParts(now.year, now.month, now.day),
         untilNextDate: const Duration(hours: 12),

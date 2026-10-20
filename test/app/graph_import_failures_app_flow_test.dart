@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:doable/src/data_transfer/application/document_access.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -19,11 +18,6 @@ import '../support/temporary_import_document.dart';
 const _invalidFile =
     'Не удалось импортировать файл. Это не экспорт Doable, или он повреждён. '
     'Ничего не изменено';
-
-/// Отказ импорта файла более новой версии формата.
-const _newerVersion =
-    'Файл создан более новой версией Doable. Обновите приложение, чтобы '
-    'импортировать его. Ничего не изменено';
 
 /// Отказ импорта, которому не хватило места на устройстве.
 const _storageFull =
@@ -73,65 +67,6 @@ void main() {
       app.diagnostics.events.whereType<GraphImportDiagnosticsEvent>(),
       isEmpty,
     );
-    expect(app.storedState(), before);
-  });
-
-  testWidgets('сценарий «Выбран чужой файл»: фотография без чтения остатка '
-      'и попытки записи при нехватке места без подтверждения даёт '
-      'под строкой «Импорт данных» отказ с действием «Выбрать другой файл», '
-      'которое снова открывает системный диалог, а отказ от подтверждения '
-      'выбранного в нём файла ничего не меняет и сообщения не даёт', (
-    tester,
-  ) async {
-    final documents = _PhotoDocumentAccess();
-    final app = await _startApp(tester, documents: documents);
-    await app.openSettings();
-    final before = app.storedState();
-
-    await app.startImport();
-    await app_flow.until(tester, find.text(_invalidFile));
-
-    expect(find.text('Импортировать эту копию?'), findsNothing);
-    expect(find.text(_storageFull), findsNothing);
-    expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
-    expect(documents.remainderRequested, isFalse);
-    expect(documents.copyAttempts, 0);
-    expect(documents.finished, isTrue);
-    expect(app.storedState(), before);
-
-    // Подтверждение откроется, только если новый диалог выбрал исправный
-    // файл.
-    app.chooseForImport(temporaryImportDocument(_referenceFile()));
-    documents.followingDocuments = app.documents;
-    await tester.tap(find.text('Выбрать другой файл'));
-    await app.waitForConfirmation();
-    await tester.tap(find.text('Отмена'));
-    await tester.pump();
-    // Прогресс и сообщение появились бы за это время.
-    await app_flow.settle(tester);
-
-    expect(find.text('Импортировать эту копию?'), findsNothing);
-    expect(find.text(_importRunning), findsNothing);
-    expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
-    expect(find.text(_invalidFile), findsNothing);
-    expect(app.storedState(), before);
-  });
-
-  testWidgets('сценарий «Файл более новой версии»: без подтверждения под '
-      'строкой «Импорт данных» отказ предлагает обновить приложение и не '
-      'предлагает действия, а граф и копии остаются прежними', (tester) async {
-    final app = await _startApp(tester);
-    await app.openSettings();
-    final before = app.storedState();
-    app.chooseForImport(temporaryImportDocument(newerFormatVersionFile()));
-
-    await app.startImport();
-    await app_flow.until(tester, find.text(_newerVersion));
-
-    expect(find.text('Импортировать эту копию?'), findsNothing);
-    expect(find.text('Выбрать другой файл'), findsNothing);
-    expect(find.text('Повторить'), findsNothing);
-    expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
     expect(app.storedState(), before);
   });
 
@@ -191,14 +126,10 @@ final _now = DateTime(2026, 10, 6, 8, 15);
 
 /// Создаёт граф командой, чтобы он был отражён в логе, и ждёт первую
 /// ежедневную копию перед сравнением сохранённого состояния.
-Future<ImportAppHarness> _startApp(
-  WidgetTester tester, {
-  DocumentAccess? documents,
-}) async {
+Future<ImportAppHarness> _startApp(WidgetTester tester) async {
   final app = await ImportAppHarness.start(
     tester,
     at: _now,
-    documents: documents,
     seed: (graph) async {
       expect(
         await graph.execute(CreateTag(TagName.fromInput('Дом'))),
@@ -208,52 +139,6 @@ Future<ImportAppHarness> _startApp(
   );
   await app.waitForBackups(1);
   return app;
-}
-
-/// Облачная фотография: доступно только начало, запись копии дала бы
-/// нехватку места. Следующий выбор использует обычные файловые документы.
-final class _PhotoDocumentAccess implements DocumentAccess, DocumentRead {
-  DocumentAccess? followingDocuments;
-  var remainderRequested = false;
-  var copyAttempts = 0;
-  var finished = false;
-
-  @override
-  Future<DocumentOpening> openDocument() async =>
-      followingDocuments?.openDocument() ??
-      const DocumentOpened(OpenedDocument('content://cloud/photo.jpg'));
-
-  @override
-  DocumentRead readDocument(
-    OpenedDocument document, {
-    required File destination,
-    required Future<void> cancellation,
-  }) =>
-      followingDocuments?.readDocument(
-        document,
-        destination: destination,
-        cancellation: cancellation,
-      ) ??
-      this;
-
-  @override
-  Stream<List<int>> get prefix async* {
-    yield photoFile();
-    remainderRequested = true;
-    throw DocumentReadFailure.unreadable;
-  }
-
-  @override
-  Future<DocumentCopy> copy() async {
-    copyAttempts++;
-    return const DocumentCopyStorageFull();
-  }
-
-  @override
-  Future<void> finish() async => finished = true;
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /// Исправный эталонный файл экспорта.
