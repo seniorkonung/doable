@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 
@@ -16,8 +17,8 @@ import '../application/document_access.dart';
 /// отменённое копирование — копии, поэтому плагин тоже передаёт их ошибкой
 /// канала со своим кодом.
 ///
-/// Копирование открытого документа плагин различает по пути копии: по нему
-/// отмена находит копирование.
+/// Сессию чтения плагин различает по пути копии: по нему отмена находит
+/// чтение начала, ожидание решения и копирование.
 final class MethodChannelDocumentAccess implements DocumentAccess {
   const MethodChannelDocumentAccess();
 
@@ -92,38 +93,98 @@ final class MethodChannelDocumentAccess implements DocumentAccess {
   }
 
   @override
-  Future<DocumentCopy> copyDocument(
+  DocumentRead readDocument(
     OpenedDocument document, {
     required File destination,
     required Future<void> cancellation,
-  }) async {
-    // Отмена отправляется после вызова копирования, поэтому плагин получает
-    // её, уже начав копирование.
-    final copying = _channel.invokeMethod<void>('copyDocument', {
+  }) => _MethodChannelDocumentRead(document, destination, cancellation);
+}
+
+final class _MethodChannelDocumentRead implements DocumentRead {
+  _MethodChannelDocumentRead(
+    OpenedDocument document,
+    File destination,
+    Future<void> cancellation,
+  ) : _arguments = {'destination': destination.path} {
+    _started = _channel.invokeMethod<void>('beginDocumentRead', {
+      ..._arguments,
       'document': document.uri,
-      'destination': destination.path,
+      'prefixLimit': documentPrefixByteLimit,
+      'chunkSize': documentPrefixChunkSize,
     });
-    unawaited(cancellation.then((_) => _cancelCopy(destination)));
+    unawaited(cancellation.then((_) => _cancel()));
+  }
+
+  static const _channel = MethodChannelDocumentAccess._channel;
+  final Map<String, String> _arguments;
+  late final Future<void> _started;
+  var _finished = false;
+
+  @override
+  late final Stream<List<int>> prefix = _prefix();
+
+  Stream<List<int>> _prefix() async* {
     try {
-      await copying;
-      return const DocumentCopied();
+      await _started;
+      var read = 0;
+      while (read < documentPrefixByteLimit) {
+        final bytes = await _channel.invokeMethod<Uint8List>(
+          'readDocumentPrefix',
+          _arguments,
+        );
+        if (bytes == null) throw DocumentReadFailure.unknown;
+        if (bytes.isEmpty) return;
+        read += bytes.length;
+        yield bytes;
+      }
     } on PlatformException catch (error) {
-      return switch (error.code) {
-        _documentNotRead => const DocumentNotRead(),
-        _storageFull => const DocumentCopyStorageFull(),
-        _copyCancelled => const DocumentCopyCancelled(),
-        _ => const DocumentCopyFailed(),
+      throw switch (error.code) {
+        MethodChannelDocumentAccess._copyCancelled =>
+          DocumentReadFailure.cancelled,
+        MethodChannelDocumentAccess._documentNotRead =>
+          DocumentReadFailure.unreadable,
+        _ => DocumentReadFailure.unknown,
       };
     }
   }
 
-  Future<void> _cancelCopy(File destination) async {
+  @override
+  Future<DocumentCopy> copy() async {
     try {
-      await _channel.invokeMethod<void>('cancelCopy', {
-        'destination': destination.path,
-      });
+      await _started;
+      await _channel.invokeMethod<void>('copyReadDocument', _arguments);
+      return const DocumentCopied();
+    } on PlatformException catch (error) {
+      return switch (error.code) {
+        MethodChannelDocumentAccess._documentNotRead => const DocumentNotRead(),
+        MethodChannelDocumentAccess._storageFull =>
+          const DocumentCopyStorageFull(),
+        MethodChannelDocumentAccess._copyCancelled =>
+          const DocumentCopyCancelled(),
+        _ => const DocumentCopyFailed(),
+      };
+    } finally {
+      _finished = true;
+    }
+  }
+
+  @override
+  Future<void> finish() async {
+    if (_finished) return;
+    _finished = true;
+    try {
+      await _channel.invokeMethod<void>('finishDocumentRead', _arguments);
     } on PlatformException {
-      // Неотменённое копирование завершится своим исходом.
+      // Завершённая или отменённая сессия уже освобождает свои ресурсы.
+    }
+  }
+
+  Future<void> _cancel() async {
+    if (_finished) return;
+    try {
+      await _channel.invokeMethod<void>('cancelCopy', _arguments);
+    } on PlatformException {
+      // Неотменённое чтение завершится своим исходом.
     }
   }
 }

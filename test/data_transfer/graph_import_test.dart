@@ -467,6 +467,174 @@ void main() {
     }
   });
 
+  for (final (name, bytes, failure) in [
+    ('фотография', photoFile(), GraphImportFailure.invalidFile),
+    (
+      'чужой gzip',
+      graphExportFileOf(['{"format":"another-app","version":1}']),
+      GraphImportFailure.invalidFile,
+    ),
+    (
+      'более новая версия',
+      newerFormatVersionFile(),
+      GraphImportFailure.newerFormatVersion,
+    ),
+    (
+      'повреждённая дата заголовка',
+      graphExportFileOf(
+        withEditedLine(reference, 0, (header) {
+          header['writtenAt'] = 'не дата';
+        }),
+      ),
+      GraphImportFailure.invalidFile,
+    ),
+    (
+      'повреждённые количества заголовка',
+      graphExportFileOf(
+        withEditedLine(reference, 0, (header) {
+          header['counts'] = {'tags': -1};
+        }),
+      ),
+      GraphImportFailure.invalidFile,
+    ),
+    (
+      'заголовок длиннее 4 КиБ',
+      graphExportFileOf([reference.first.padRight(4 * 1024 + 1)]),
+      GraphImportFailure.invalidFile,
+    ),
+  ]) {
+    test('$name отклоняется до копирования и не подменяется нехваткой '
+        'места', () async {
+      final access = _PrefixDocumentAccess(bytes)
+        ..copyFailure = const DocumentCopyStorageFull();
+      final reading = readChosen(access: access);
+      reading.ignore();
+
+      expect(
+        await Future.any([
+          reading,
+          access.remainderRequested.future.then<GraphImportFileReading>(
+            (_) => throw TestFailure('Импорт запросил недоступный остаток.'),
+          ),
+        ]),
+        _readingFailed(failure),
+      );
+      expect(access.copies, 0);
+      expect(access.prefixClosed, isTrue);
+      expect(access.finished, isTrue);
+      expect(await _fileNamesIn(temporary), isEmpty);
+    });
+  }
+
+  for (final (name, header) in [
+    ('опубликованный эталон', reference.first),
+    ('заголовок на пределе', reference.first.padRight(4 * 1024)),
+  ]) {
+    test('$name разрешает копирование без ожидания остатка и сохраняет '
+        'проверенный заголовок в полностью записанном файле', () async {
+      final bytes = graphExportFileOf([header, ...reference.skip(1)]);
+      final access = _PrefixDocumentAccess(bytes);
+      final reading = readChosen(access: access);
+      reading.ignore();
+
+      final result = await Future.any([
+        reading,
+        access.remainderRequested.future.then<GraphImportFileReading>(
+          (_) => throw TestFailure('Проверка заголовка запросила остаток.'),
+        ),
+      ]);
+
+      expect(result, isA<GraphImportFileRead>());
+      final file = (result as GraphImportFileRead).file;
+      expect(_countsOf(file.header.counts), [2, 4, 3, 3, 2]);
+      expect(
+        file.header.writtenAt,
+        DateTime.utc(2026, 10, 3, 18, 42, 7, 654, 321),
+      );
+      expect(access.copies, 1);
+      expect(access.prefixClosed, isTrue);
+      expect(access.finished, isTrue);
+      await file.discard();
+    });
+  }
+
+  test('отсутствие заголовка в 64 КиБ сжатого начала не разрешает '
+      'копирование остатка', () async {
+    // Неоконченное имя в обрамлении gzip не даёт распакованных строк.
+    choose([
+      0x1f,
+      0x8b,
+      8,
+      8,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      ...List.filled(documentPrefixByteLimit, 0x61),
+    ]);
+    var chunks = 0;
+    documents
+      ..afterPrefixAnswer = () {
+        chunks++;
+      }
+      ..copyFailure = const DocumentCopyStorageFull();
+
+    expect(await readChosen(), _readingFailed(GraphImportFailure.invalidFile));
+    expect(chunks * documentPrefixChunkSize, documentPrefixByteLimit);
+    expect(documents.copies, isEmpty);
+    expect(await _fileNamesIn(temporary), isEmpty);
+  });
+
+  test('ошибка поставщика до получения заголовка остаётся отказом чтения '
+      'документа без копирования', () async {
+    final access = _PrefixDocumentAccess([])
+      ..prefixFailure = DocumentReadFailure.unreadable;
+
+    expect(
+      await readChosen(access: access),
+      _readingFailed(GraphImportFailure.documentUnreadable),
+    );
+    expect(access.copies, 0);
+    expect(access.finished, isTrue);
+    expect(diagnostics.events, [
+      _importFailed('documentRead', GraphImportFailure.documentUnreadable),
+    ]);
+  });
+
+  test('принятая отмена при чтении начала сохраняет приоритет над отказом '
+      'поставщика и не даёт диагностики', () async {
+    final cancellation = GraphImportReadingCancellation();
+    final access = _PrefixDocumentAccess([])..waitForCancellation = true;
+    final reading = readChosen(access: access, cancellation: cancellation);
+    await access.prefixStarted.future;
+
+    cancellation.request();
+
+    expect(await reading, isA<GraphImportFileReadingCancelled>());
+    expect(access.copies, 0);
+    expect(access.finished, isTrue);
+    expect(diagnostics.events, isEmpty);
+    expect(await _fileNamesIn(temporary), isEmpty);
+  });
+
+  test('принятая отмена между проверкой заголовка и разрешением копирования '
+      'завершает сессию без копии и диагностики', () async {
+    final cancellation = GraphImportReadingCancellation();
+    final access = _PrefixDocumentAccess(graphExportFileOf(reference))
+      ..onPrefixClosed = cancellation.request;
+
+    expect(
+      await readChosen(access: access, cancellation: cancellation),
+      isA<GraphImportFileReadingCancelled>(),
+    );
+    expect(access.copies, 0);
+    expect(access.finished, isTrue);
+    expect(diagnostics.events, isEmpty);
+    expect(await _fileNamesIn(temporary), isEmpty);
+  });
+
   test('отказ от прочитанного файла удаляет его временную копию и события '
       'диагностики не даёт', () async {
     final file = await readFile(graphExportFileOf(reference));
@@ -632,7 +800,7 @@ void main() {
   group('отмена', () {
     test('после отправленного отказа копирования, до его обработки, '
         'завершает чтение без отказа и события диагностики', () async {
-      choose(photoFile());
+      choose(graphExportFileOf(reference));
       final cancellation = GraphImportReadingCancellation();
       documents
         ..copyFailure = const DocumentNotRead()
@@ -645,15 +813,13 @@ void main() {
       expect(await _fileNamesIn(temporary), isEmpty);
     });
 
-    test('после успешного копирования фотографии имеет приоритет над '
+    test('после ответа с началом фотографии имеет приоритет над '
         'отказом заголовка и не даёт события диагностики', () async {
       choose(photoFile());
       final cancellation = GraphImportReadingCancellation();
 
-      final reading = await readChosen(
-        access: _CancelledAfterCopy(documents, cancellation),
-        cancellation: cancellation,
-      );
+      documents.afterPrefixAnswer = cancellation.request;
+      final reading = await readChosen(cancellation: cancellation);
 
       expect(reading, isA<GraphImportFileReadingCancelled>());
       expect(diagnostics.events, isEmpty);
@@ -666,14 +832,14 @@ void main() {
         'исход', () async {
       choose(graphExportFileOf(reference));
       final providerAnswer = Completer<void>();
-      documents.beforeCopy = () => providerAnswer.future;
+      final copyStarted = Completer<void>();
+      documents.beforeCopy = () {
+        copyStarted.complete();
+        return providerAnswer.future;
+      };
       final cancellation = GraphImportReadingCancellation();
-      final chosen = Completer<void>();
-      final abandoned = readChosen(
-        onDocumentChosen: chosen.complete,
-        cancellation: cancellation,
-      );
-      await chosen.future;
+      final abandoned = readChosen(cancellation: cancellation);
+      await copyStarted.future;
 
       cancellation.request();
 
@@ -815,9 +981,14 @@ void main() {
       final before = await storedState();
       choose(graphExportFileOf(reference));
       final providerAnswer = Completer<void>();
-      documents.beforeCopy = () => providerAnswer.future;
+      final copyStarted = Completer<void>();
+      documents.beforeCopy = () {
+        copyStarted.complete();
+        return providerAnswer.future;
+      };
       final started = controller().start();
       await reached<GraphImportReadingFile>();
+      await copyStarted.future;
 
       controller().cancel();
 
@@ -1134,18 +1305,25 @@ final class _ExternalCopyDocumentAccess implements DocumentAccess {
       DocumentOpened(OpenedDocument(_documentUri));
 
   @override
-  Future<DocumentCopy> copyDocument(
+  DocumentRead readDocument(
     OpenedDocument document, {
     required File destination,
     required Future<void> cancellation,
-  }) async {
-    final answers = ReceivePort();
-    try {
-      _requests.send((destination.path, answers.sendPort, Isolate.current));
-      return await answers.first as DocumentCopy;
-    } finally {
-      answers.close();
-    }
+  }) {
+    final read = FileDocumentAccess(Directory.systemTemp).readDocument(
+      document,
+      destination: destination,
+      cancellation: cancellation,
+    );
+    return _CopyOverride(read, () async {
+      final answers = ReceivePort();
+      try {
+        _requests.send((destination.path, answers.sendPort, Isolate.current));
+        return await answers.first as DocumentCopy;
+      } finally {
+        answers.close();
+      }
+    });
   }
 
   @override
@@ -1220,8 +1398,89 @@ final class _CompositionReadHold {
   void release() => _released.complete();
 }
 
-/// Доступ к документам, при котором человек отменяет чтение файла сразу
-/// после того, как документ скопирован.
+/// Начало доступно порциями, а запрос остатка требует явного разрешения.
+final class _PrefixDocumentAccess implements DocumentAccess, DocumentRead {
+  _PrefixDocumentAccess(this._bytes) {
+    addTearDown(() {
+      if (!_release.isCompleted) _release.complete();
+    });
+  }
+
+  final List<int> _bytes;
+  final remainderRequested = Completer<void>();
+  final prefixStarted = Completer<void>();
+  final _release = Completer<void>();
+  late File _destination;
+  late Future<void> _cancellation;
+  DocumentCopy? copyFailure;
+  DocumentReadFailure? prefixFailure;
+  var waitForCancellation = false;
+  void Function()? onPrefixClosed;
+  var copies = 0;
+  var prefixClosed = false;
+  var finished = false;
+
+  @override
+  Future<DocumentOpening> openDocument() async =>
+      const DocumentOpened(OpenedDocument('content://chosen-document'));
+
+  @override
+  DocumentRead readDocument(
+    OpenedDocument document, {
+    required File destination,
+    required Future<void> cancellation,
+  }) {
+    _destination = destination;
+    _cancellation = cancellation;
+    return this;
+  }
+
+  @override
+  late final Stream<List<int>> prefix = _prefix();
+
+  Stream<List<int>> _prefix() async* {
+    prefixStarted.complete();
+    try {
+      if (waitForCancellation) {
+        await _cancellation;
+        throw DocumentReadFailure.unreadable;
+      }
+      if (prefixFailure case final failure?) throw failure;
+      for (
+        var start = 0;
+        start < _bytes.length;
+        start += documentPrefixChunkSize
+      ) {
+        final end = start + documentPrefixChunkSize;
+        yield _bytes.sublist(start, end < _bytes.length ? end : _bytes.length);
+      }
+      remainderRequested.complete();
+      await _release.future;
+    } finally {
+      prefixClosed = true;
+      onPrefixClosed?.call();
+    }
+  }
+
+  @override
+  Future<DocumentCopy> copy() async {
+    copies++;
+    if (copyFailure case final failure?) return failure;
+    await _destination.writeAsBytes(_bytes);
+    return const DocumentCopied();
+  }
+
+  @override
+  Future<void> finish() async {
+    finished = true;
+    _release.complete();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Отменяет чтение сразу после ответа о завершённом копировании.
 final class _CancelledAfterCopy implements DocumentAccess {
   _CancelledAfterCopy(this._documents, this._cancellation);
 
@@ -1232,22 +1491,42 @@ final class _CancelledAfterCopy implements DocumentAccess {
   Future<DocumentOpening> openDocument() => _documents.openDocument();
 
   @override
-  Future<DocumentCopy> copyDocument(
+  DocumentRead readDocument(
     OpenedDocument document, {
     required File destination,
     required Future<void> cancellation,
-  }) async {
-    final copy = await _documents.copyDocument(
+  }) {
+    final read = _documents.readDocument(
       document,
       destination: destination,
       cancellation: cancellation,
     );
-    _cancellation.request();
-    return copy;
+    return _CopyOverride(read, () async {
+      final copy = await read.copy();
+      _cancellation.request();
+      return copy;
+    });
   }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Сохраняет сессию чтения и заменяет только продолжение копирования.
+final class _CopyOverride implements DocumentRead {
+  _CopyOverride(this._read, this._copy);
+
+  final DocumentRead _read;
+  final Future<DocumentCopy> Function() _copy;
+
+  @override
+  Stream<List<int>> get prefix => _read.prefix;
+
+  @override
+  Future<DocumentCopy> copy() => _copy();
+
+  @override
+  Future<void> finish() => _read.finish();
 }
 
 Future<Set<String>> _fileNamesIn(Directory directory) async => {

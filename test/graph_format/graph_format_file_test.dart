@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -28,6 +29,26 @@ void main() {
       .readAsBytesSync();
 
   group('файл формата данных графа', () {
+    test('проверка только заголовка закрывает подписку без ожидания '
+        'остатка документа', () async {
+      var cancelled = false;
+      final source = StreamController<List<int>>(
+        onCancel: () => cancelled = true,
+      );
+      addTearDown(source.close);
+      source.add(
+        gzip.encode([
+          ...GraphFormatCodec.encodeHeader(_expectedGoldenHeader()),
+          0x0a,
+        ]),
+      );
+
+      final reading = await GraphFormatFile.read(source.stream);
+      await reading.close();
+
+      expect(cancelled, isTrue);
+    });
+
     test('эталонный файл версии 1 читается в ожидаемые записи, а повторная '
         'запись с тем же заголовком даёт те же байты JSON Lines', () async {
       final reading = await GraphFormatFile.read(

@@ -200,16 +200,23 @@ void main() {
         return null;
       });
 
-      final copy = await const MethodChannelDocumentAccess().copyDocument(
-        const OpenedDocument(documentUri),
-        destination: File(
-          '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
-        ),
-        cancellation: Completer<void>().future,
-      );
+      final copy = await const MethodChannelDocumentAccess()
+          .readDocument(
+            const OpenedDocument(documentUri),
+            destination: File(
+              '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+            ),
+            cancellation: Completer<void>().future,
+          )
+          .copy();
 
-      expect(calls.single.method, 'copyDocument');
-      expect(calls.single.arguments, {
+      expect(calls.map((call) => call.method), [
+        'beginDocumentRead',
+        'copyReadDocument',
+      ]);
+      expect(calls.first.arguments, {
+        'prefixLimit': documentPrefixByteLimit,
+        'chunkSize': documentPrefixChunkSize,
         'document': documentUri,
         'destination':
             '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
@@ -226,15 +233,22 @@ void main() {
   ]) {
     test('отказ копирования с кодом $code даёт типизированный исход вместо '
         'исключения', () async {
-      answer((_) async => throw PlatformException(code: code));
+      answer((call) async {
+        if (call.method == 'copyReadDocument') {
+          throw PlatformException(code: code);
+        }
+        return null;
+      });
 
-      final copy = await const MethodChannelDocumentAccess().copyDocument(
-        const OpenedDocument(documentUri),
-        destination: File(
-          '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
-        ),
-        cancellation: Completer<void>().future,
-      );
+      final copy = await const MethodChannelDocumentAccess()
+          .readDocument(
+            const OpenedDocument(documentUri),
+            destination: File(
+              '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+            ),
+            cancellation: Completer<void>().future,
+          )
+          .copy();
 
       expect(copy, outcome);
     });
@@ -247,7 +261,7 @@ void main() {
       final cancelled = Completer<void>();
       answer((call) async {
         switch (call.method) {
-          case 'copyDocument':
+          case 'copyReadDocument':
             // Плагин сообщает исход копирования, когда принял отмену.
             await cancelled.future;
             throw PlatformException(code: 'copy_cancelled');
@@ -259,13 +273,15 @@ void main() {
       });
       final cancellation = Completer<void>();
 
-      final copying = const MethodChannelDocumentAccess().copyDocument(
-        const OpenedDocument(documentUri),
-        destination: File(
-          '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
-        ),
-        cancellation: cancellation.future,
-      );
+      final copying = const MethodChannelDocumentAccess()
+          .readDocument(
+            const OpenedDocument(documentUri),
+            destination: File(
+              '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+            ),
+            cancellation: cancellation.future,
+          )
+          .copy();
       cancellation.complete();
 
       expect(await copying, isA<DocumentCopyCancelled>());

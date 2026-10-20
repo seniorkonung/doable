@@ -77,7 +77,7 @@ void main() {
       ..beforeCopy = (() => providerAnswer.future)
       ..beforeCancellationAnswer = (() => cancellationAnswer.future)
       ..copyFailure = const DocumentNotRead();
-    app.chooseForImport(_document(photoFile()));
+    app.chooseForImport(_document(_referenceFile()));
 
     await app.startImport();
     await _until(tester, find.text(_importRunning));

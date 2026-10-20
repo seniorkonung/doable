@@ -41,6 +41,7 @@ abstract final class GraphFormatFile {
       return GraphFormatFileReading._(
         header,
         _readRecords(lines, version, header.counts),
+        lines.cancel,
       );
     } catch (_) {
       await lines.cancel();
@@ -80,7 +81,7 @@ abstract final class GraphFormatFile {
 
 /// Файл формата с прочитанным заголовком.
 final class GraphFormatFileReading {
-  const GraphFormatFileReading._(this.header, this.records);
+  const GraphFormatFileReading._(this.header, this.records, this._close);
 
   final GraphFormatHeader header;
 
@@ -91,6 +92,12 @@ final class GraphFormatFileReading {
   /// с секциями заголовка. Пока его не дослушали или не отменили подписку,
   /// файл остаётся открытым.
   final Stream<GraphEntityRecord> records;
+
+  final Future<void> Function() _close;
+
+  /// Закрывает источник после проверки одного заголовка, не начиная чтение
+  /// записей и не дожидаясь остатка документа.
+  Future<void> close() => _close();
 }
 
 const _lineFeed = 0x0a;

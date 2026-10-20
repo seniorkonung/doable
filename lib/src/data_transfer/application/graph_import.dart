@@ -18,10 +18,11 @@ import 'graph_replacement.dart';
 /// выбора, атомарной заменой всего графа его содержимым (ADR-0036,
 /// ADR-0037).
 ///
-/// Выбранный документ копируется во временный файл приложения, и из копии
-/// читается только заголовок: дата сохранения и количества записей, по
-/// которым человек подтверждает замену. Импорт, принятый координатором,
-/// проверяет записи файла, пишет их в снимок замены в отдельном изоляте —
+/// Заголовок проверяется по ограниченному началу выбранного документа до
+/// разрешения его копирования во временный файл приложения. Дата сохранения
+/// и количества записей нужны человеку для подтверждения замены. Импорт,
+/// принятый координатором, проверяет записи файла и пишет их в снимок замены
+/// в отдельном изоляте —
 /// команды графа в это время подтверждаются как обычно, — и заменяет граф
 /// этим снимком в монопольном режиме координатора. Прежнее состояние
 /// непустого графа транзакция замены сохраняет копией перед заменой.
@@ -56,8 +57,8 @@ final class GraphImport {
   final Future<void> _snapshotFiles;
   final DiagnosticsSink _diagnosticsSink;
 
-  /// Открывает системный диалог выбора файла, копирует выбранный документ
-  /// во временный файл и читает его заголовок.
+  /// Открывает системный диалог выбора файла, проверяет заголовок по началу
+  /// документа и только затем копирует его во временный файл.
   ///
   /// [onDocumentChosen] вызывается, как только человек выбрал документ, до
   /// начала копирования. Запрос [cancellation] до исхода прекращает
@@ -85,7 +86,7 @@ final class GraphImport {
     final File copy;
     try {
       // Каталог создаётся до диалога: право чтения выбранного документа
-      // отпускает только его копирование.
+      // отпускает сессия его чтения.
       final directory = await (await _temporaryDirectory).create(
         recursive: true,
       );
@@ -116,52 +117,49 @@ final class GraphImport {
     // Время человека в диалоге в длительность импорта не входит.
     stopwatch.reset();
 
-    switch (await _documents.copyDocument(
+    final documentRead = _documents.readDocument(
       document,
       destination: copy,
       cancellation: cancellation.requested,
-    )) {
-      case DocumentCopied():
-        break;
-      case DocumentCopyCancelled():
-        cancellation.finish();
-        return const GraphImportFileReadingCancelled();
-      case DocumentNotRead():
-        return _readingFailed(
-          GraphImportFailure.documentUnreadable,
-          stopwatch,
-          cancellation,
-        );
-      case DocumentCopyStorageFull():
-        return _readingFailed(
-          GraphImportFailure.storageFull,
-          stopwatch,
-          cancellation,
-        );
-      case DocumentCopyFailed():
-        return _readingFailed(
-          GraphImportFailure.unknown,
-          stopwatch,
-          cancellation,
-        );
-    }
-
+    );
     try {
-      final reading = await GraphFormatFile.read(copy.openRead());
-      // Записи читает импорт, принятый координатором; отмена подписки
-      // закрывает файл.
-      await reading.records.listen(null).cancel();
+      final reading = await GraphFormatFile.read(documentRead.prefix);
+      // Проверка заголовка не ждёт остатка документа. Сессия сохраняет
+      // начало и тот же поток для продолжения копирования.
+      await reading.close();
+      if (cancellation.isRequested) throw DocumentReadFailure.cancelled;
+
+      switch (await documentRead.copy()) {
+        case DocumentCopied():
+          break;
+        case DocumentCopyCancelled():
+          throw DocumentReadFailure.cancelled;
+        case DocumentNotRead():
+          throw DocumentReadFailure.unreadable;
+        case DocumentCopyStorageFull():
+          return _readingFailed(
+            GraphImportFailure.storageFull,
+            stopwatch,
+            cancellation,
+          );
+        case DocumentCopyFailed():
+          throw DocumentReadFailure.unknown;
+      }
       if (!cancellation.isRequested) {
         return GraphImportFileRead(
           GraphImportFile._(copy, reading.header, stopwatch.elapsed),
         );
       }
-      await _deleteTemporaryFile(copy);
-      cancellation.finish();
-      return const GraphImportFileReadingCancelled();
+      throw DocumentReadFailure.cancelled;
     } on Object catch (error) {
       await _deleteTemporaryFile(copy);
+      if (error == DocumentReadFailure.cancelled) {
+        cancellation.finish();
+        return const GraphImportFileReadingCancelled();
+      }
       return _readingFailed(_failureOf(error), stopwatch, cancellation);
+    } finally {
+      await documentRead.finish();
     }
   }
 
@@ -389,6 +387,7 @@ final class GraphImportFileReadingFailed extends GraphImportFileReading {
 /// хранилища и проверка записей в транзакции замены, а нехватку места —
 /// SQLite и файловая система.
 GraphImportFailure _failureOf(Object error) => switch (error) {
+  DocumentReadFailure.unreadable => GraphImportFailure.documentUnreadable,
   GraphFormatCorruption() ||
   GraphReplacementRecordsRejected() => GraphImportFailure.invalidFile,
   GraphFormatVersionTooNew() => GraphImportFailure.newerFormatVersion,

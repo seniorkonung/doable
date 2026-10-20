@@ -99,46 +99,117 @@ final class FileDocumentAccess implements DocumentAccess {
   @override
   Future<DocumentOpening> openDocument() => openingDialog();
 
-  /// Как плагин, отмена завершает копирование, не дожидаясь поставщика, а
-  /// брошенное копирование удаляет файл [destination], когда поставщик
-  /// ответит.
+  /// Сигнал ответа порции до её обработки модулем формата.
+  void Function()? afterPrefixAnswer;
+
   @override
-  Future<DocumentCopy> copyDocument(
+  DocumentRead readDocument(
     OpenedDocument document, {
     required File destination,
     required Future<void> cancellation,
-  }) {
-    final outcome = Completer<DocumentCopy>();
+  }) => _FileDocumentRead(this, document, destination, cancellation);
+}
+
+/// Как плагин, сохраняет начало и продолжает тот же открытый поток.
+final class _FileDocumentRead implements DocumentRead {
+  _FileDocumentRead(
+    this._documents,
+    this._document,
+    this._destination,
+    Future<void> cancellation,
+  ) {
     unawaited(
       cancellation.then((_) async {
-        if (beforeCancellationAnswer case final answer?) await answer();
-        if (!outcome.isCompleted) {
+        await _documents.beforeCancellationAnswer?.call();
+        _cancelled = true;
+        if (_copyOutcome case final outcome? when !outcome.isCompleted) {
           outcome.complete(const DocumentCopyCancelled());
         }
       }),
     );
-    copies.add(_copy(document, destination, outcome));
+  }
+
+  final FileDocumentAccess _documents;
+  final OpenedDocument _document;
+  final File _destination;
+  final _beginning = <List<int>>[];
+  RandomAccessFile? _input;
+  Completer<DocumentCopy>? _copyOutcome;
+  var _cancelled = false;
+
+  @override
+  late final Stream<List<int>> prefix = _prefix();
+
+  Stream<List<int>> _prefix() async* {
+    try {
+      if (_cancelled) throw DocumentReadFailure.cancelled;
+      final input = _input = File.fromUri(Uri.parse(_document.uri)).openSync();
+      var read = 0;
+      while (read < documentPrefixByteLimit) {
+        if (_cancelled) throw DocumentReadFailure.cancelled;
+        final bytes = input.readSync(documentPrefixChunkSize);
+        if (bytes.isEmpty) return;
+        _beginning.add(bytes);
+        read += bytes.length;
+        _documents.afterPrefixAnswer?.call();
+        yield bytes;
+      }
+    } on FileSystemException {
+      throw DocumentReadFailure.unreadable;
+    }
+  }
+
+  @override
+  Future<DocumentCopy> copy() {
+    final outcome = _copyOutcome = Completer<DocumentCopy>();
+    _documents.copies.add(_copy(outcome));
     return outcome.future;
   }
 
-  Future<void> _copy(
-    OpenedDocument document,
-    File destination,
-    Completer<DocumentCopy> outcome,
-  ) async {
-    await beforeCopy?.call();
-    if (!outcome.isCompleted) {
-      if (copyFailure case final failure?) {
-        outcome.complete(failure);
-        afterCopyAnswer?.call();
+  Future<void> _copy(Completer<DocumentCopy> outcome) async {
+    try {
+      await _documents.beforeCopy?.call();
+      if (_cancelled) {
+        if (!outcome.isCompleted) {
+          outcome.complete(const DocumentCopyCancelled());
+        }
         return;
       }
-      await File.fromUri(Uri.parse(document.uri)).copy(destination.path);
-      if (!outcome.isCompleted) {
-        outcome.complete(const DocumentCopied());
+      if (_documents.copyFailure case final failure?) {
+        outcome.complete(failure);
+        _documents.afterCopyAnswer?.call();
         return;
+      }
+      final output = await _destination.open(mode: FileMode.write);
+      try {
+        for (final bytes in _beginning) {
+          if (_cancelled) break;
+          await output.writeFrom(bytes);
+        }
+        while (!_cancelled) {
+          final bytes = await _input!.read(8192);
+          if (bytes.isEmpty) break;
+          if (!_cancelled) await output.writeFrom(bytes);
+        }
+      } finally {
+        await output.close();
+      }
+      if (!outcome.isCompleted) {
+        outcome.complete(
+          _cancelled ? const DocumentCopyCancelled() : const DocumentCopied(),
+        );
+      }
+    } finally {
+      await _input?.close();
+      if (_cancelled && await _destination.exists()) {
+        await _destination.delete();
       }
     }
-    if (await destination.exists()) await destination.delete();
+  }
+
+  @override
+  Future<void> finish() async {
+    // Брошенное копирование владеет потоком до фактического завершения.
+    if (_copyOutcome == null) await _input?.close();
   }
 }
