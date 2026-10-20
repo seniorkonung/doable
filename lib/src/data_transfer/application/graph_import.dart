@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:uuid/uuid.dart';
+
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph_format/graph_format_codec.dart';
@@ -11,11 +13,6 @@ import '../../graph_snapshots/graph_snapshot_store.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
 import 'document_access.dart';
 import 'graph_replacement.dart';
-
-/// Число попыток импорта в процессе. Каждая копирует документ в свой
-/// временный файл, даже если импорт собран заново, а файлы прежних
-/// процессов удаляет очистка временного каталога при запуске.
-var _importAttempts = 0;
 
 /// Импорт файла экспорта, который человек выбирает системным диалогом
 /// выбора, атомарной заменой всего графа его содержимым (ADR-0036,
@@ -89,7 +86,9 @@ final class GraphImport {
         recursive: true,
       );
       copy = File.fromUri(
-        directory.uri.resolve('graph_import_${++_importAttempts}.jsonl.gz'),
+        // Прежнее нативное копирование может пережить движок и изолят:
+        // его путь не должен совпасть с путём новой попытки после очистки.
+        directory.uri.resolve('graph_import_${const Uuid().v4()}.jsonl.gz'),
       );
     } on Object catch (error) {
       return _readingFailed(_failureOf(error), stopwatch);

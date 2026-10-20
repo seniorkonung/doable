@@ -18,6 +18,7 @@ import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
+import 'package:doable/src/graph_snapshots/graph_fact_log.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -474,6 +475,95 @@ void main() {
 
     expect(await _fileNamesIn(temporary), isEmpty);
     expect(diagnostics.events, isEmpty);
+  });
+
+  group('перезапуск изолята во время копирования документа', () {
+    for (final lateCopy in _LateCopy.values) {
+      test(
+        switch (lateCopy) {
+          _LateCopy.cancelledDeletion =>
+            'позднее удаление отменённой копии сохраняет заголовок и записи '
+                'следующего выбранного документа',
+          _LateCopy.detachedWrite =>
+            'поздняя запись копии без движка сохраняет заголовок и записи '
+                'следующего выбранного документа',
+        },
+        () async {
+          final firstLines = [
+            jsonEncode({
+              'format': 'doable-graph',
+              'version': 1,
+              'writtenAt': '2026-10-03T18:42:07.654321Z',
+              'counts': {
+                'tags': 1,
+                'intentions': 0,
+                'tagAssignments': 0,
+                'longTermRelations': 0,
+                'dailyChoices': 0,
+              },
+            }),
+            reference[1],
+          ];
+          final secondLines = withEditedLine(
+            withEditedLine(firstLines, 0, (header) {
+              header['writtenAt'] = '2026-10-19T09:00:00.000000Z';
+            }),
+            1,
+            (tag) => tag['name'] = 'Сад',
+          );
+          final firstDocument = choose(graphExportFileOf(firstLines));
+          final first = await _startImportReadInNewIsolate(
+            temporary,
+            firstDocument,
+          );
+          // Копирование живёт за пределами изолята, как поток JVM. Его файл
+          // уже появился, но поставщик ещё не закончил работу с документом.
+          await firstDocument.copy(first.copy.path);
+          switch (lateCopy) {
+            case _LateCopy.cancelledDeletion:
+              first.answer.send(const DocumentCopyCancelled());
+              expect(
+                await first.reading,
+                isA<GraphImportFileReadingCancelled>(),
+              );
+            case _LateCopy.detachedWrite:
+              final stopped = expectLater(
+                first.reading,
+                throwsA(isA<RemoteError>()),
+              );
+              first.isolate.kill(priority: Isolate.immediate);
+              await stopped;
+          }
+
+          // Новый запуск очищает каталог после завершения прежнего изолята.
+          await temporary.delete(recursive: true);
+          await temporary.create();
+          final secondDocument = choose(graphExportFileOf(secondLines));
+          final second = await _startImportReadInNewIsolate(
+            temporary,
+            secondDocument,
+          );
+          await secondDocument.copy(second.copy.path);
+
+          // Ответ прежнего поставщика приходит, когда новая копия уже есть,
+          // но её заголовок и записи ещё не прочитаны новым импортом.
+          switch (lateCopy) {
+            case _LateCopy.cancelledDeletion:
+              if (await first.copy.exists()) await first.copy.delete();
+            case _LateCopy.detachedWrite:
+              await firstDocument.copy(first.copy.path);
+          }
+          second.answer.send(const DocumentCopied());
+          final reading = await second.reading;
+          expect(reading, isA<GraphImportFileRead>());
+          final file = (reading as GraphImportFileRead).file;
+          expect(file.header.writtenAt, DateTime.utc(2026, 10, 19, 9));
+          expect(_countsOf(file.header.counts), [1, 0, 0, 0, 0]);
+          expect(await importFile(file), isA<GraphImported>());
+          expect(await graphState(), secondLines.skip(1));
+        },
+      );
+    }
   });
 
   group('нехватка места', () {
@@ -936,6 +1026,101 @@ void main() {
 
 /// Где импорт обнаружил, что файл не подходит.
 enum _Detection { header, snapshotWrite, replacement }
+
+/// Действие копирования, пережившего прежний движок и его Dart-изолят.
+enum _LateCopy { cancelledDeletion, detachedWrite }
+
+/// Чтение настоящим GraphImport в новом изоляте. Копированием управляет
+/// вызывающая проверка вне этого изолята, в том числе после его завершения.
+Future<
+  ({
+    File copy,
+    SendPort answer,
+    Isolate isolate,
+    Future<GraphImportFileReading> reading,
+  })
+>
+_startImportReadInNewIsolate(Directory temporary, File document) async {
+  final requests = ReceivePort();
+  addTearDown(requests.close);
+  final reading = _readChosenFileInNewIsolate(
+    temporary.path,
+    document.uri.toString(),
+    requests.sendPort,
+  );
+  // Уничтожение изолята ожидаемо завершает Isolate.run ошибкой. Даже если
+  // проверка прервалась раньше, ошибка не должна стать необработанной.
+  reading.ignore();
+  final (path, answer, isolate) =
+      await requests.first as (String, SendPort, Isolate);
+  requests.close();
+  addTearDown(() => isolate.kill(priority: Isolate.immediate));
+  return (copy: File(path), answer: answer, isolate: isolate, reading: reading);
+}
+
+/// Отдельная функция не захватывает базу и контейнер проверки замыканием.
+Future<GraphImportFileReading> _readChosenFileInNewIsolate(
+  String temporaryPath,
+  String documentUri,
+  SendPort requests,
+) => Isolate.run(() async {
+  final storage = _UnusedImportStorage();
+  final graphImport = GraphImport(
+    documents: _ExternalCopyDocumentAccess(documentUri, requests),
+    compaction: GraphLogCompaction(
+      log: storage,
+      directory: Directory('$temporaryPath/snapshots'),
+      clock: DateTime.now,
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    ),
+    replacement: storage,
+    temporaryDirectory: Future.value(Directory(temporaryPath)),
+    snapshotFiles: Future.value(),
+    diagnosticsSink: InMemoryDiagnosticsSink(),
+  );
+  return graphImport.readChosenFile(
+    onDocumentChosen: () {},
+    cancellation: Completer<void>().future,
+  );
+});
+
+/// До чтения записей импорт не обращается к логу и замене графа.
+final class _UnusedImportStorage
+    implements ObservableGraphFactLog, GraphReplacement {
+  @override
+  Never noSuchMethod(Invocation invocation) =>
+      throw StateError('Чтение документа не должно обращаться к хранилищу.');
+}
+
+/// Передаёт копирование наружу, чтобы оно переживало уничтожение изолята.
+final class _ExternalCopyDocumentAccess implements DocumentAccess {
+  _ExternalCopyDocumentAccess(this._documentUri, this._requests);
+
+  final String _documentUri;
+  final SendPort _requests;
+
+  @override
+  Future<DocumentOpening> openDocument() async =>
+      DocumentOpened(OpenedDocument(_documentUri));
+
+  @override
+  Future<DocumentCopy> copyDocument(
+    OpenedDocument document, {
+    required File destination,
+    required Future<void> cancellation,
+  }) async {
+    final answers = ReceivePort();
+    try {
+      _requests.send((destination.path, answers.sendPort, Isolate.current));
+      return await answers.first as DocumentCopy;
+    } finally {
+      answers.close();
+    }
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 /// Отказ импорта на этапе [stage] с категорией [failure] так, как его
 /// кодирует журнал разработчика, без длительности.
