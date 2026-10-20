@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
-import '../../design_system/components/failure_notice.dart';
+import '../../design_system/components/notice.dart';
 import '../../design_system/components/option_row.dart';
 import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_icon.dart';
@@ -458,7 +458,7 @@ final class _ImportRowState extends ConsumerState<_ImportRow> {
               DoableMetrics.space2,
               DoableMetrics.space2,
             ),
-            child: FailureNotice(
+            child: Notice.content(
               message: OperationFailurePresentation(
                 claim: failure.claim,
                 message: graphImportFailureMessage(
