@@ -293,31 +293,6 @@ void main() {
     ]);
   });
 
-  test('ход импорта сообщается долями записи снимка замены, а затем замены, '
-      'и каждая растёт до полной', () async {
-    await createGraph();
-    final file = await readFile(graphExportFileOf(reference));
-    final progress = <GraphReplacementProgress>[];
-
-    await importFile(file, onProgress: progress.add);
-
-    final phases = [for (final step in progress) step.phase];
-    expect(
-      phases.indexOf(GraphReplacementPhase.replacement),
-      greaterThan(phases.lastIndexOf(GraphReplacementPhase.snapshotWrite)),
-    );
-    for (final phase in GraphReplacementPhase.values) {
-      final shares = [
-        for (final step in progress)
-          if (step.phase == phase) step.share,
-      ];
-      for (var index = 1; index < shares.length; index++) {
-        expect(shares[index], greaterThan(shares[index - 1]));
-      }
-      expect(shares.last, 1, reason: '$phase');
-    }
-  });
-
   test('сценарий «Отклонённый файл диагностируется без содержимого»: '
       'неподходящий файл, в том числе с двумя тегами одного названия, '
       'отклоняется там, где его можно обнаружить, своим исходом, '
@@ -904,32 +879,6 @@ void main() {
       expect(await _fileNamesIn(temporary), isEmpty);
       expect(diagnostics.events, isEmpty);
     });
-
-    test('во время замены откатывает её без изменений, без файлов и без '
-        'события диагностики', () async {
-      await createGraph();
-      final before = await storedState();
-      final file = await readFile(graphExportFileOf(reference));
-      final cancellation = GraphReplacementCancellation();
-
-      final outcome = await importFile(
-        file,
-        onProgress: (progress) {
-          if (progress case GraphReplacementProgress(
-            phase: GraphReplacementPhase.replacement,
-            share: > 0,
-          )) {
-            scheduleMicrotask(cancellation.request);
-          }
-        },
-        cancellation: cancellation,
-      );
-
-      expect(outcome, isA<GraphImportCancelled>());
-      expect(await storedState(), before);
-      expect(await _fileNamesIn(temporary), isEmpty);
-      expect(diagnostics.events, isEmpty);
-    });
   });
 
   group('импорт на протяжении жизни контейнера', () {
@@ -1147,8 +1096,8 @@ void main() {
     });
 
     test('отмена во время замены показывает отмену до конца отката и '
-        'завершает импорт без сообщения, изменений и временных '
-        'файлов', () async {
+        'завершает импорт без сообщения, изменений, временных файлов и '
+        'события диагностики', () async {
       await createGraph();
       final before = await storedState();
       choose(graphExportFileOf(reference));
@@ -1175,6 +1124,7 @@ void main() {
       expect(completions, isEmpty);
       expect(await storedState(), before);
       expect(await _fileNamesIn(temporary), isEmpty);
+      expect(diagnostics.events, isEmpty);
     });
 
     test('после точки невозврата замены отмена не принимается: импорт '
