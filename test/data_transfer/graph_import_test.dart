@@ -40,6 +40,19 @@ import '../support/stalling_replacement_snapshot_reads.dart';
 
 void main() {
   final reference = referenceGraphFileLines();
+  // Три активных намерения и две связи от первого ко второму и третьему.
+  // Дневных выборов нет, поэтому изменение связи не затрагивает путь.
+  final relationsWithoutChoices = withEditedLine(
+    [reference.first, ...reference.sublist(3, 6), ...reference.sublist(10, 12)],
+    0,
+    (header) => header['counts'] = {
+      'tags': 0,
+      'intentions': 3,
+      'tagAssignments': 0,
+      'longTermRelations': 2,
+      'dailyChoices': 0,
+    },
+  );
 
   late LocalDatabaseHarness harness;
   late AppDatabase database;
@@ -281,6 +294,15 @@ void main() {
     expect(await storedBackups(), isEmpty);
   });
 
+  test('исправная основа проверки правил связей без дневных выборов '
+      'успешно импортируется', () async {
+    final file = await readFile(graphExportFileOf(relationsWithoutChoices));
+
+    expect(await importFile(file), isA<GraphImported>());
+
+    expect(await graphState(), relationsWithoutChoices.skip(1));
+  });
+
   test('успешный импорт диагностируется успехом без пользовательских '
       'данных', () async {
     await createGraph();
@@ -348,18 +370,25 @@ void main() {
         (_Detection.replacement, GraphImportFailure.invalidFile),
       ),
       'совпадение направленных пар связей': (
-        edited(
-          11,
-          (relation) => relation['relatedIntentionId'] =
-              '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12',
+        graphExportFileOf(
+          withEditedLine(
+            relationsWithoutChoices,
+            5,
+            (relation) => relation['relatedIntentionId'] = jsonDecode(
+              relationsWithoutChoices[4],
+            )['relatedIntentionId'],
+          ),
         ),
         (_Detection.replacement, GraphImportFailure.invalidFile),
       ),
       'самосвязь': (
-        edited(
-          10,
-          (relation) =>
-              relation['relatedIntentionId'] = relation['sourceIntentionId'],
+        graphExportFileOf(
+          withEditedLine(
+            relationsWithoutChoices,
+            4,
+            (relation) =>
+                relation['relatedIntentionId'] = relation['sourceIntentionId'],
+          ),
         ),
         (_Detection.replacement, GraphImportFailure.invalidFile),
       ),
