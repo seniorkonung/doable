@@ -1495,3 +1495,16 @@
   - **Dependencies:** 4.22, 4.23.
   - **Files likely touched:** `lib/src/data_transfer/data/method_channel_document_access.dart`, `test/data_transfer/method_channel_document_access_test.dart`.
   - **Estimated scope:** S.
+
+- [ ] 4.34 Подтвердить, что отмена после фиксации отказа чтения импорта не меняет его исход и не показывает «Отмена…»
+  - **Acceptance criteria:**
+    - Одна проверка в `test/data_transfer/graph_import_test.dart` через настоящий `GraphImportController` воспроизводит границу решения 10 [дизайна](design.md): отказ чтения выбранного неподходящего файла уже зафиксирован и записан в диагностику, а `DocumentRead.finish()` ещё ожидает завершения. Запрос `cancel()` в этом окне не публикует `GraphImportCancelling`.
+    - После завершения `finish()` координатор получает исходный `GraphImportFailed` с той же категорией отказа; исход не подавлен и не заменён отменой, а исходное событие диагностики отказа чтения остаётся единственным. Проверка дополняет проверки принятой отмены задачи 4.17, не повторяя их.
+    - Начало и завершение ожидания `finish()` управляются явными сигналами в существующей подмене доступа к документам. Проверка не использует задержки, замеры времени, расширенный тайм-аут или устройство; производственное поведение импорта сохранено.
+  - **Verification:**
+    - Убедиться, что новая проверка падает отдельно при временном удалении проверки `_isFinished` из `GraphImportReadingCancellation.request()` и при игнорировании результата `request()` в `GraphImportController.cancel()`. После каждой проверки восстановить производственный код; в итоговый diff эти изменения не входят.
+    - Выполнить `mise exec --no-deps -- flutter test test/data_transfer/graph_import_test.dart` и `mise exec --no-deps -- openspec validate add-graph-export-import --strict`.
+    - Передать результаты в ревью после последней задачи этапа 4: оно сопоставляет их с условием Ready to advance [плана](plan.md), выполняет полные проверки `mise run check` и решает о завершении этапа. Эта задача этап не завершает.
+  - **Dependencies:** 4.17.
+  - **Files likely touched:** `test/data_transfer/graph_import_test.dart`; при необходимости — `test/support/file_document_access.dart` для управляемого завершения чтения.
+  - **Estimated scope:** S.
