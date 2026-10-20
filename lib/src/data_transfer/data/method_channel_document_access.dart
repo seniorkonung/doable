@@ -112,6 +112,9 @@ final class _MethodChannelDocumentRead implements DocumentRead {
       'prefixLimit': documentPrefixByteLimit,
       'chunkSize': documentPrefixChunkSize,
     });
+    // Ответ канала может прийти до подписки на prefix. Ошибку получит
+    // потребитель сессии, когда начнёт чтение или копирование.
+    _started.ignore();
     unawaited(cancellation.then((_) => _cancel()));
   }
 

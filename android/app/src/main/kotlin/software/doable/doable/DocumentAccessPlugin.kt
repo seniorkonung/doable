@@ -184,11 +184,6 @@ class DocumentAccessPlugin internal constructor(
                 succeeded = requireNotNull(call.argument<Boolean>("succeeded")),
                 result = result,
             )
-            "copyDocument" -> copyDocument(
-                document = Uri.parse(requireNotNull(call.argument<String>("document"))),
-                destination = File(requireNotNull(call.argument<String>("destination"))),
-                result = result,
-            )
             "beginDocumentRead" -> beginDocumentRead(
                 document = Uri.parse(requireNotNull(call.argument<String>("document"))),
                 destination = File(requireNotNull(call.argument<String>("destination"))),
@@ -261,11 +256,6 @@ class DocumentAccessPlugin internal constructor(
             if (written) result.success(null) else result.error(DOCUMENT_NOT_WRITTEN, null, null)
         }
     }
-
-    private fun copyDocument(document: Uri, destination: File, result: MethodChannel.Result) =
-        startRead(document, destination, result) { input, read ->
-            writeCopy(input, destination, read)
-        }
 
     /**
      * `beginDocumentRead(document, destination, prefixLimit, chunkSize)` открывает
@@ -404,13 +394,13 @@ class DocumentAccessPlugin internal constructor(
         input: InputStream,
         destination: File,
         read: DocumentRead,
-        prefix: ByteArrayOutputStream? = null,
+        prefix: ByteArrayOutputStream,
     ): CopyOutcome {
         try {
             if (read.isCancelled) return CopyOutcome.CANCELLED
             openCopy(destination).use { output ->
                 if (read.isCancelled) return CopyOutcome.CANCELLED
-                prefix?.writeTo(output)
+                prefix.writeTo(output)
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 while (!read.isCancelled) {
                     val count = try {

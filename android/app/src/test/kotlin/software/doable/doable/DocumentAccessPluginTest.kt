@@ -376,34 +376,11 @@ class DocumentAccessPluginTest {
     }
 
     @Test
-    fun `Копирование в фоне записывает в файл приложения все байты документа до ответа и отпускает право`() {
-        // Больше буфера копирования, чтобы чтение шло несколькими порциями.
-        val bytes = ByteArray(20_000) { it.toByte() }
-        openDocument { content.writeBytes(bytes) }
-        val copy = File(temporary.root, "import-1.jsonl.gz")
-        var copiedAtReply: ByteArray? = null
-
-        val reply = messenger.invoke(
-            "copyDocument",
-            mapOf("document" to document.toString(), "destination" to copy.path),
-            onReply = { copiedAtReply = copy.readBytes() },
-        )
-        assertFalse(reply.received)
-        backgroundTasks.single().run()
-
-        assertNull(reply.value())
-        assertArrayEquals(bytes, copiedAtReply)
-        assertEquals(emptyList<Uri>(), readGrants())
-    }
-
-    @Test
     fun `Отказ поставщика при открытии документа даёт исход непрочитанного документа без копии`() {
         openDocument { openFailure = FileNotFoundException("Document moved") }
         val copy = File(temporary.root, "import-1.jsonl.gz")
 
-        val reply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to copy.path),
-        )
+        val reply = beginRead(copy)
         backgroundTasks.single().run()
 
         assertEquals("document_not_read", reply.errorCode())
@@ -412,7 +389,7 @@ class DocumentAccessPluginTest {
     }
 
     @Test
-    fun `Отказ поставщика посреди чтения даёт исход непрочитанного документа и удаляет неполную копию`() {
+    fun `Отказ поставщика посреди разрешённого копирования даёт исход непрочитанного документа и удаляет неполную копию`() {
         openDocument {
             content.writeBytes(ByteArray(20_000))
             // Облачный поставщик сообщает в канал, что загрузка прервалась.
@@ -420,46 +397,28 @@ class DocumentAccessPluginTest {
         }
         val copy = File(temporary.root, "import-1.jsonl.gz")
 
-        val reply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to copy.path),
-        )
-        backgroundTasks.single().run()
+        withDocumentRead(copy) {
+            val reply = messenger.invoke("copyReadDocument", mapOf("destination" to copy.path))
 
-        assertEquals("document_not_read", reply.errorCode())
-        assertFalse(copy.exists())
-        assertEquals(emptyList<Uri>(), readGrants())
+            assertEquals("document_not_read", reply.awaitReply().errorCode())
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
     }
 
     @Test
-    fun `Нехватка места при записи копии даёт свой исход и удаляет неполную копию`() {
-        openDocument { content.writeBytes(ByteArray(20_000)) }
-        val copy = File(temporary.root, "import-1.jsonl.gz")
-        copyOutput = { file -> failingOutput(file, ErrnoException("write", OsConstants.ENOSPC)) }
-
-        val reply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to copy.path),
-        )
-        backgroundTasks.single().run()
-
-        assertEquals("storage_full", reply.errorCode())
-        assertFalse(copy.exists())
-        assertEquals(emptyList<Uri>(), readGrants())
-    }
-
-    @Test
-    fun `Другой отказ записи копии даёт исход незаписанной копии`() {
+    fun `Другой отказ записи разрешённой копии даёт исход незаписанной копии`() {
         openDocument { content.writeBytes(ByteArray(20_000)) }
         val copy = File(temporary.root, "import-1.jsonl.gz")
         copyOutput = { file -> failingOutput(file, ErrnoException("write", OsConstants.EIO)) }
 
-        val reply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to copy.path),
-        )
-        backgroundTasks.single().run()
+        withDocumentRead(copy) {
+            val reply = messenger.invoke("copyReadDocument", mapOf("destination" to copy.path))
 
-        assertEquals("copy_not_written", reply.errorCode())
-        assertFalse(copy.exists())
-        assertEquals(emptyList<Uri>(), readGrants())
+            assertEquals("copy_not_written", reply.awaitReply().errorCode())
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
     }
 
     @Test
@@ -467,6 +426,7 @@ class DocumentAccessPluginTest {
         openDocument { content.writeBytes(ByteArray(20_000)) }
         val copy = File(temporary.root, "import-1.jsonl.gz")
         lateinit var reply: ChannelReply
+        val copyRequested = CountDownLatch(1)
         var writes = 0
         var cancelledAtFirstWrite = false
         copyOutput = { file ->
@@ -474,6 +434,7 @@ class DocumentAccessPluginTest {
                 override fun write(b: ByteArray, off: Int, len: Int) {
                     out.write(b, off, len)
                     if (++writes == 1) {
+                        copyRequested.await()
                         messenger.invoke("cancelCopy", mapOf("destination" to copy.path))
                         cancelledAtFirstWrite = reply.received
                     }
@@ -481,16 +442,19 @@ class DocumentAccessPluginTest {
             }
         }
 
-        reply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to copy.path),
-        )
-        backgroundTasks.single().run()
+        withDocumentRead(copy) { worker ->
+            readPrefix(copy)
+            reply = messenger.invoke("copyReadDocument", mapOf("destination" to copy.path))
+            copyRequested.countDown()
+            assertEquals("copy_cancelled", reply.awaitReply().errorCode())
+            worker.join(5_000)
 
-        assertTrue(cancelledAtFirstWrite)
-        assertEquals("copy_cancelled", reply.errorCode())
-        assertEquals(1, writes)
-        assertFalse(copy.exists())
-        assertEquals(emptyList<Uri>(), readGrants())
+            assertTrue(cancelledAtFirstWrite)
+            assertEquals(1, reply.count)
+            assertEquals(1, writes)
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
     }
 
     @Test
@@ -510,20 +474,20 @@ class DocumentAccessPluginTest {
         val copy = File(temporary.root, "import-1.jsonl.gz")
         val openedCopies = mutableListOf<File>()
         copyOutput = { file -> FileOutputStream(file).also { openedCopies += file } }
-        val reply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to copy.path),
-        )
+        val reply = beginRead(copy)
         val worker = thread { backgroundTasks.single().run() }
-        assertTrue(opening.await(5, TimeUnit.SECONDS))
+        try {
+            assertTrue(opening.await(5, TimeUnit.SECONDS))
 
-        val cancel = messenger.invoke("cancelCopy", mapOf("destination" to copy.path))
+            val cancel = messenger.invoke("cancelCopy", mapOf("destination" to copy.path))
 
-        assertNull(cancel.value())
-        assertEquals("copy_cancelled", reply.errorCode())
-        assertTrue(requireNotNull(signalAtOpening).isCanceled)
-
-        providerAnswers.countDown()
-        worker.join(5_000)
+            assertNull(cancel.value())
+            assertEquals("copy_cancelled", reply.errorCode())
+            assertTrue(requireNotNull(signalAtOpening).isCanceled)
+        } finally {
+            providerAnswers.countDown()
+            worker.join(5_000)
+        }
 
         assertFalse(worker.isAlive)
         assertEquals(1, reply.count)
@@ -545,31 +509,31 @@ class DocumentAccessPluginTest {
             }
         }
         val abandoned = File(temporary.root, "import-1.jsonl.gz")
-        val reply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to abandoned.path),
-        )
-        val worker = thread { backgroundTasks.removeAt(0).run() }
-        assertTrue(reading.await(5, TimeUnit.SECONDS))
-
-        messenger.invoke("cancelCopy", mapOf("destination" to abandoned.path))
-        assertEquals("copy_cancelled", reply.errorCode())
-
-        provider.onReadEnd = null
         val next = File(temporary.root, "import-2.jsonl.gz")
-        val nextReply = messenger.invoke(
-            "copyDocument", mapOf("document" to document.toString(), "destination" to next.path),
-        )
-        backgroundTasks.single().run()
-        assertNull(nextReply.value())
+        withDocumentRead(abandoned) { worker ->
+            val reply = messenger.invoke("copyReadDocument", mapOf("destination" to abandoned.path))
+            try {
+                assertTrue(reading.await(5, TimeUnit.SECONDS))
 
-        providerAnswers.countDown()
-        worker.join(5_000)
+                messenger.invoke("cancelCopy", mapOf("destination" to abandoned.path))
+                assertEquals("copy_cancelled", reply.errorCode())
 
-        assertFalse(worker.isAlive)
-        assertEquals(1, reply.count)
-        assertFalse(abandoned.exists())
-        assertArrayEquals(bytes, next.readBytes())
-        assertEquals(emptyList<Uri>(), readGrants())
+                provider.onReadEnd = null
+                withDocumentRead(next) {
+                    val nextReply = messenger.invoke("copyReadDocument", mapOf("destination" to next.path))
+                    assertNull(nextReply.awaitReply().value())
+                }
+            } finally {
+                providerAnswers.countDown()
+                worker.join(5_000)
+            }
+
+            assertFalse(worker.isAlive)
+            assertEquals(1, reply.count)
+            assertFalse(abandoned.exists())
+            assertArrayEquals(bytes, next.readBytes())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
     }
 
     @Test
@@ -631,6 +595,7 @@ class DocumentAccessPluginTest {
         var allowed = false
         var openings = 0
         var closed = false
+        var copiedAtReply: ByteArray? = null
         val provider = openDocument {
             content.writeBytes(prefix)
             onOpen = { openings++ }
@@ -651,9 +616,13 @@ class DocumentAccessPluginTest {
             provider.content.appendBytes(remainder)
             allowed = true
 
-            val copied = messenger.invoke("copyReadDocument", mapOf("destination" to copy.path))
+            val copied = messenger.invoke(
+                "copyReadDocument", mapOf("destination" to copy.path),
+                onReply = { copiedAtReply = copy.readBytes() },
+            )
 
             assertNull(copied.awaitReply().value())
+            assertArrayEquals(prefix + remainder, copiedAtReply)
             assertArrayEquals(prefix + remainder, copy.readBytes())
             assertEquals(1, openings)
             assertTrue(closed)
@@ -785,17 +754,11 @@ class DocumentAccessPluginTest {
     /** Сессия работает в отдельном потоке и ждёт явных запросов канала. */
     private fun withDocumentRead(
         copy: File,
-        prefixLimit: Int,
-        chunkSize: Int,
+        prefixLimit: Int = 64 * 1024,
+        chunkSize: Int = 1024,
         verify: (Thread) -> Unit,
     ) {
-        val begun = messenger.invoke(
-            "beginDocumentRead",
-            mapOf(
-                "document" to document.toString(), "destination" to copy.path,
-                "prefixLimit" to prefixLimit, "chunkSize" to chunkSize,
-            ),
-        )
+        val begun = beginRead(copy, prefixLimit, chunkSize)
         val worker = thread(isDaemon = true) { backgroundTasks.removeAt(0).run() }
         try {
             assertNull(begun.awaitReply().value())
@@ -807,6 +770,15 @@ class DocumentAccessPluginTest {
         assertFalse(worker.isAlive)
         assertEquals(1, begun.count)
     }
+
+    private fun beginRead(copy: File, prefixLimit: Int = 64 * 1024, chunkSize: Int = 1024): ChannelReply =
+        messenger.invoke(
+            "beginDocumentRead",
+            mapOf(
+                "document" to document.toString(), "destination" to copy.path,
+                "prefixLimit" to prefixLimit, "chunkSize" to chunkSize,
+            ),
+        )
 
     private fun readPrefix(copy: File): ChannelReply =
         messenger.invoke("readDocumentPrefix", mapOf("destination" to copy.path)).awaitReply()

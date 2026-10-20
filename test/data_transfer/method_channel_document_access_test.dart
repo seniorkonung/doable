@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:doable/src/data_transfer/application/document_access.dart';
 import 'package:doable/src/data_transfer/data/method_channel_document_access.dart';
+import 'package:doable/src/graph_format/graph_format_codec.dart';
+import 'package:doable/src/graph_format/graph_format_file.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/graph_import_files.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -191,39 +196,195 @@ void main() {
     },
   );
 
-  test(
-    'копирование передаёт адрес документа и путь копии и завершается копией',
-    () async {
+  test('начало запрашивается порциями до пригодного заголовка, затем канал '
+      'разрешает копирование без передачи остатка документа в Dart', () async {
+    final calls = <MethodCall>[];
+    final bytes = graphExportFileOf([referenceGraphFileLines().first]);
+    final chunks = [
+      Uint8List.fromList(bytes.sublist(0, 2)),
+      Uint8List.fromList(bytes.sublist(2, 10)),
+      Uint8List.fromList(bytes.sublist(10)),
+    ].iterator;
+    answer((call) async {
+      calls.add(call);
+      if (call.method == 'readDocumentPrefix') {
+        expect(chunks.moveNext(), isTrue, reason: 'Остаток недоступен Dart');
+        return chunks.current;
+      }
+      return null;
+    });
+
+    final read = const MethodChannelDocumentAccess().readDocument(
+      const OpenedDocument(documentUri),
+      destination: File(
+        '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+      ),
+      cancellation: Completer<void>().future,
+    );
+    addTearDown(read.finish);
+    final file = await GraphFormatFile.read(read.prefix);
+    await file.close();
+
+    expect(calls.map((call) => call.method), [
+      'beginDocumentRead',
+      'readDocumentPrefix',
+      'readDocumentPrefix',
+      'readDocumentPrefix',
+    ]);
+    expect(calls.first.arguments, {
+      'prefixLimit': documentPrefixByteLimit,
+      'chunkSize': documentPrefixChunkSize,
+      'document': documentUri,
+      'destination':
+          '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+    });
+    expect(file.header.counts.intentions, 4);
+    expect(await read.copy(), isA<DocumentCopied>());
+    await read.finish();
+    expect(calls.last.method, 'copyReadDocument');
+    expect(
+      calls.skip(1).map((call) => call.arguments),
+      everyElement({
+        'destination':
+            '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
+      }),
+    );
+  });
+
+  test('заголовок новой версии завершает сессию без разрешения копирования '
+      'и без чтения остатка', () async {
+    final calls = <MethodCall>[];
+    answer((call) async {
+      calls.add(call);
+      if (call.method == 'readDocumentPrefix') {
+        return Uint8List.fromList(newerFormatVersionFile());
+      }
+      return null;
+    });
+    final read = const MethodChannelDocumentAccess().readDocument(
+      const OpenedDocument(documentUri),
+      destination: File('/tmp/import-newer'),
+      cancellation: Completer<void>().future,
+    );
+
+    try {
+      await expectLater(
+        GraphFormatFile.read(read.prefix),
+        throwsA(isA<GraphFormatVersionTooNew>()),
+      );
+    } finally {
+      await read.finish();
+    }
+    await read.finish();
+
+    expect(calls.map((call) => call.method), [
+      'beginDocumentRead',
+      'readDocumentPrefix',
+      'finishDocumentRead',
+    ]);
+    expect(calls.last.arguments, {'destination': '/tmp/import-newer'});
+  });
+
+  for (final (method, code, failure) in [
+    ('beginDocumentRead', 'document_not_read', DocumentReadFailure.unreadable),
+    ('readDocumentPrefix', 'document_not_read', DocumentReadFailure.unreadable),
+    ('readDocumentPrefix', 'copy_cancelled', DocumentReadFailure.cancelled),
+    ('readDocumentPrefix', 'error', DocumentReadFailure.unknown),
+  ]) {
+    test('отказ $method с кодом $code становится типизированным отказом '
+        'чтения и завершает сессию без копирования', () async {
       final calls = <MethodCall>[];
       answer((call) async {
         calls.add(call);
+        if (call.method == method) throw PlatformException(code: code);
         return null;
       });
+      final read = const MethodChannelDocumentAccess().readDocument(
+        const OpenedDocument(documentUri),
+        destination: File('/tmp/import-unread'),
+        cancellation: Completer<void>().future,
+      );
 
-      final copy = await const MethodChannelDocumentAccess()
-          .readDocument(
-            const OpenedDocument(documentUri),
-            destination: File(
-              '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
-            ),
-            cancellation: Completer<void>().future,
-          )
-          .copy();
+      await expectLater(read.prefix.drain<void>(), throwsA(failure));
+      await read.finish();
+
+      expect(calls.last.method, 'finishDocumentRead');
+      expect(
+        calls.map((call) => call.method),
+        isNot(contains('copyReadDocument')),
+      );
+    });
+  }
+
+  test('канал прекращает запросы начала по достижении 64 КиБ', () async {
+    var bytesRead = 0;
+    answer((call) async {
+      if (call.method == 'readDocumentPrefix') {
+        bytesRead += documentPrefixChunkSize;
+        return Uint8List(documentPrefixChunkSize);
+      }
+      return null;
+    });
+    final read = const MethodChannelDocumentAccess().readDocument(
+      const OpenedDocument(documentUri),
+      destination: File('/tmp/import-limit'),
+      cancellation: Completer<void>().future,
+    );
+
+    await read.prefix.drain<void>();
+    await read.finish();
+
+    expect(bytesRead, documentPrefixByteLimit);
+  });
+
+  for (final readingPrefix in [true, false]) {
+    test('отмена ${readingPrefix ? 'чтения начала' : 'ожидания решения'} '
+        'передаёт путь сессии и завершает её без копирования', () async {
+      final calls = <MethodCall>[];
+      final prefixRequested = Completer<void>();
+      final cancelled = Completer<void>();
+      answer((call) async {
+        calls.add(call);
+        switch (call.method) {
+          case 'readDocumentPrefix':
+            prefixRequested.complete();
+            if (!readingPrefix) return Uint8List.fromList([0x1f, 0x8b]);
+            await cancelled.future;
+            throw PlatformException(code: 'copy_cancelled');
+          case 'cancelCopy':
+            cancelled.complete();
+        }
+        return null;
+      });
+      final cancellation = Completer<void>();
+      final read = const MethodChannelDocumentAccess().readDocument(
+        const OpenedDocument(documentUri),
+        destination: File('/tmp/import-cancelled'),
+        cancellation: cancellation.future,
+      );
+      final prefix = readingPrefix
+          ? read.prefix.drain<void>()
+          : read.prefix.first;
+      final assertion = readingPrefix
+          ? expectLater(prefix, throwsA(DocumentReadFailure.cancelled))
+          : expectLater(prefix, completion([0x1f, 0x8b]));
+      await prefixRequested.future;
+      if (!readingPrefix) await assertion;
+
+      cancellation.complete();
+      await cancelled.future;
+      await assertion;
+      await read.finish();
 
       expect(calls.map((call) => call.method), [
         'beginDocumentRead',
-        'copyReadDocument',
+        'readDocumentPrefix',
+        'cancelCopy',
+        'finishDocumentRead',
       ]);
-      expect(calls.first.arguments, {
-        'prefixLimit': documentPrefixByteLimit,
-        'chunkSize': documentPrefixChunkSize,
-        'document': documentUri,
-        'destination':
-            '/data/user/0/software.doable.doable/app_flutter/tmp/import-1',
-      });
-      expect(copy, isA<DocumentCopied>());
-    },
-  );
+      expect(calls.last.arguments, {'destination': '/tmp/import-cancelled'});
+    });
+  }
 
   for (final (code, outcome) in [
     ('document_not_read', isA<DocumentNotRead>()),

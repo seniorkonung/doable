@@ -136,27 +136,33 @@ void main() {
     expect(app.storedState(), before);
   });
 
-  testWidgets('сценарий «Выбран чужой файл»: фотография без подтверждения даёт '
+  testWidgets('сценарий «Выбран чужой файл»: фотография без чтения остатка '
+      'и попытки записи при нехватке места без подтверждения даёт '
       'под строкой «Импорт данных» отказ с действием «Выбрать другой файл», '
       'которое снова открывает системный диалог, а отказ от подтверждения '
       'выбранного в нём файла ничего не меняет и сообщения не даёт', (
     tester,
   ) async {
-    final app = await _ImportApp.start(tester);
+    final documents = _PhotoDocumentAccess();
+    final app = await _ImportApp.start(tester, documents: documents);
     await app.openSettings();
     final before = app.storedState();
-    app.chooseForImport(_document(photoFile()));
 
     await app.startImport();
     await _until(tester, find.text(_invalidFile));
 
     expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(find.text(_storageFull), findsNothing);
     expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
+    expect(documents.remainderRequested, isFalse);
+    expect(documents.copyAttempts, 0);
+    expect(documents.finished, isTrue);
     expect(app.storedState(), before);
 
     // Подтверждение откроется, только если новый диалог выбрал исправный
     // файл.
     app.chooseForImport(_document(_referenceFile()));
+    documents.followingDocuments = app.documents;
     await tester.tap(find.text('Выбрать другой файл'));
     await app.waitForConfirmation();
     await tester.tap(find.text('Отмена'));
@@ -317,11 +323,12 @@ final _now = DateTime(2026, 10, 6, 8, 15);
 /// задержать на её первом операторе удаления прежнего графа, а файлу
 /// хранилища — запретить расти, как при нехватке места.
 final class _ImportApp {
-  _ImportApp._(this._tester, this._harness, this._files);
+  _ImportApp._(this._tester, this._harness, this._files, this._documents);
 
   final WidgetTester _tester;
   final LocalDatabaseHarness _harness;
   final TemporaryGraphFiles _files;
+  final DocumentAccess? _documents;
   final _statements = _HeldReplacement();
   final _diagnostics = InMemoryDiagnosticsSink();
 
@@ -336,13 +343,16 @@ final class _ImportApp {
   /// Запускает приложение над графом, созданным командой, поэтому он
   /// полностью отражён в логе фактов, и ждёт копию, которую запуск делает
   /// фоном: проверки сравнивают хранилище после неё.
-  static Future<_ImportApp> start(WidgetTester tester) async {
+  static Future<_ImportApp> start(
+    WidgetTester tester, {
+    DocumentAccess? documents,
+  }) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
     final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
     addTearDown(() => tester.runAsync(harness.dispose));
-    final app = _ImportApp._(tester, harness, TemporaryGraphFiles());
+    final app = _ImportApp._(tester, harness, TemporaryGraphFiles(), documents);
     await tester.runAsync(() async {
       final graph = DriftPersonalGraphRepository(
         await harness.openReadyDatabase(),
@@ -373,7 +383,14 @@ final class _ImportApp {
       ),
       diagnosticsSink: _diagnostics,
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
-      graphFilesFactory: _files.create,
+      graphFilesFactory: (log) async {
+        final files = await _files.create(log);
+        return (
+          compaction: files.compaction,
+          temporaryDirectory: files.temporaryDirectory,
+          documents: _documents ?? files.documents,
+        );
+      },
       dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
         date: CalendarDate.fromParts(_now.year, _now.month, _now.day),
         untilNextDate: const Duration(hours: 12),
@@ -491,6 +508,52 @@ final class _ImportApp {
   /// Ждёт, пока закроется прогресс импорта.
   Future<void> waitForProgressEnd() =>
       _waitFor(_tester, () => find.text(_importRunning).evaluate().isEmpty);
+}
+
+/// Облачная фотография: доступно только начало, запись копии дала бы
+/// нехватку места. Следующий выбор использует обычные файловые документы.
+final class _PhotoDocumentAccess implements DocumentAccess, DocumentRead {
+  DocumentAccess? followingDocuments;
+  var remainderRequested = false;
+  var copyAttempts = 0;
+  var finished = false;
+
+  @override
+  Future<DocumentOpening> openDocument() async =>
+      followingDocuments?.openDocument() ??
+      const DocumentOpened(OpenedDocument('content://cloud/photo.jpg'));
+
+  @override
+  DocumentRead readDocument(
+    OpenedDocument document, {
+    required File destination,
+    required Future<void> cancellation,
+  }) =>
+      followingDocuments?.readDocument(
+        document,
+        destination: destination,
+        cancellation: cancellation,
+      ) ??
+      this;
+
+  @override
+  Stream<List<int>> get prefix async* {
+    yield photoFile();
+    remainderRequested = true;
+    throw DocumentReadFailure.unreadable;
+  }
+
+  @override
+  Future<DocumentCopy> copy() async {
+    copyAttempts++;
+    return const DocumentCopyStorageFull();
+  }
+
+  @override
+  Future<void> finish() async => finished = true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /// Наблюдатель соединения, который задерживает замену графа по [hold].
