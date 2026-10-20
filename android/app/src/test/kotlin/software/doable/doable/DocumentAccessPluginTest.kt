@@ -572,6 +572,245 @@ class DocumentAccessPluginTest {
         assertEquals(emptyList<Uri>(), readGrants())
     }
 
+    @Test
+    fun `Начало читается только по запросу в пределах порции и общего предела без чтения остатка и записи`() {
+        val prefix = byteArrayOf(10, 20, 30, 40)
+        var closed = false
+        openDocument {
+            content.writeBytes(prefix)
+            onReadEnd = { throw IOException("Остаток пока недоступен") }
+            onReadClose = { closed = true }
+        }
+        val copy = File(temporary.root, "import-prefix.jsonl.gz")
+        copyOutput = { throw AssertionError("Копирование ещё не разрешено") }
+
+        withDocumentRead(copy, prefixLimit = 4, chunkSize = 3) {
+            assertFalse(copy.exists())
+            assertEquals(listOf(document), readGrants())
+            assertArrayEquals(byteArrayOf(10, 20, 30), readPrefix(copy).value() as ByteArray)
+            assertArrayEquals(byteArrayOf(40), readPrefix(copy).value() as ByteArray)
+            assertArrayEquals(byteArrayOf(), readPrefix(copy).value() as ByteArray)
+            assertFalse(copy.exists())
+            assertFalse(closed)
+
+            val finish = messenger.invoke("finishDocumentRead", mapOf("destination" to copy.path))
+            assertNull(finish.awaitReply().value())
+            assertTrue(closed)
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
+    }
+
+    @Test
+    fun `Отказ проверки завершает сессию без открытия назначения даже при нехватке места`() {
+        var writes = 0
+        openDocument {
+            content.writeBytes(byteArrayOf(1, 2))
+            onReadEnd = { throw IOException("Остаток не должен читаться") }
+        }
+        val copy = File(temporary.root, "import-rejected.jsonl.gz")
+        copyOutput = {
+            writes++
+            throw IOException("write failed", ErrnoException("open", OsConstants.ENOSPC))
+        }
+
+        withDocumentRead(copy, prefixLimit = 2, chunkSize = 2) {
+            assertArrayEquals(byteArrayOf(1, 2), readPrefix(copy).value() as ByteArray)
+            val finish = messenger.invoke("finishDocumentRead", mapOf("destination" to copy.path))
+
+            assertNull(finish.awaitReply().value())
+            assertEquals(0, writes)
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
+    }
+
+    @Test
+    fun `Разрешённая копия содержит начало и остаток одного открытия документа ровно по одному разу`() {
+        val prefix = byteArrayOf(10, 20, 30, 40)
+        val remainder = byteArrayOf(50, 60)
+        var allowed = false
+        var openings = 0
+        var closed = false
+        val provider = openDocument {
+            content.writeBytes(prefix)
+            onOpen = { openings++ }
+            onReadEnd = { check(allowed) { "Остаток ещё недоступен" } }
+            onReadClose = { closed = true }
+        }
+        val copy = File(temporary.root, "import-allowed.jsonl.gz")
+        copyOutput = { file ->
+            check(allowed) { "Запись ещё не разрешена" }
+            FileOutputStream(file)
+        }
+
+        withDocumentRead(copy, prefixLimit = 8, chunkSize = 3) {
+            assertArrayEquals(byteArrayOf(10, 20, 30), readPrefix(copy).value() as ByteArray)
+            assertArrayEquals(byteArrayOf(40), readPrefix(copy).value() as ByteArray)
+            assertFalse(copy.exists())
+            // Поставщик догрузил остаток; чтение продолжает тот же дескриптор.
+            provider.content.appendBytes(remainder)
+            allowed = true
+
+            val copied = messenger.invoke("copyReadDocument", mapOf("destination" to copy.path))
+
+            assertNull(copied.awaitReply().value())
+            assertArrayEquals(prefix + remainder, copy.readBytes())
+            assertEquals(1, openings)
+            assertTrue(closed)
+            assertEquals(emptyList<Uri>(), readGrants())
+            assertEquals(1, copied.count)
+        }
+    }
+
+    @Test
+    fun `Нехватка места при разрешённой записи сохранённого начала даёт свой исход и удаляет копию`() {
+        openDocument { content.writeBytes(byteArrayOf(1, 2)) }
+        val copy = File(temporary.root, "import-full.jsonl.gz")
+        copyOutput = { file -> failingOutput(file, ErrnoException("write", OsConstants.ENOSPC)) }
+
+        withDocumentRead(copy, prefixLimit = 2, chunkSize = 2) {
+            readPrefix(copy)
+            val copied = messenger.invoke("copyReadDocument", mapOf("destination" to copy.path))
+
+            assertEquals("storage_full", copied.awaitReply().errorCode())
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
+    }
+
+    @Test
+    fun `Короткий документ заканчивает порции до общего предела без повторного чтения конца`() {
+        var endReads = 0
+        openDocument {
+            content.writeBytes(byteArrayOf(1))
+            onReadEnd = { endReads++ }
+        }
+        val copy = File(temporary.root, "import-short.jsonl.gz")
+
+        withDocumentRead(copy, prefixLimit = 4, chunkSize = 2) {
+            assertArrayEquals(byteArrayOf(1), readPrefix(copy).value() as ByteArray)
+            assertArrayEquals(byteArrayOf(), readPrefix(copy).value() as ByteArray)
+            assertArrayEquals(byteArrayOf(), readPrefix(copy).value() as ByteArray)
+            assertEquals(1, endReads)
+            assertFalse(copy.exists())
+            assertNull(messenger.invoke("finishDocumentRead", mapOf("destination" to copy.path)).awaitReply().value())
+        }
+    }
+
+    @Test
+    fun `Отказ поставщика при чтении начала остаётся отказом чтения без попытки записи`() {
+        var closed = false
+        openDocument {
+            content.writeBytes(byteArrayOf(1))
+            onReadEnd = { throw IOException("Загрузка прервана") }
+            onReadClose = { closed = true }
+        }
+        val copy = File(temporary.root, "import-unread.jsonl.gz")
+        copyOutput = { throw AssertionError("Заголовок ещё не проверен") }
+
+        withDocumentRead(copy, prefixLimit = 4, chunkSize = 2) {
+            readPrefix(copy)
+
+            assertEquals("document_not_read", readPrefix(copy).errorCode())
+            assertTrue(closed)
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
+    }
+
+    @Test
+    fun `Отмена будит ожидание решения Dart и отпускает поток и право без повторного исхода`() =
+        assertStoppedWhileAwaitingDecision { copy ->
+            assertNull(messenger.invoke("cancelCopy", mapOf("destination" to copy.path)).value())
+        }
+
+    @Test
+    fun `Потеря движка будит ожидание решения Dart и отпускает поток и право без повторного исхода`() =
+        assertStoppedWhileAwaitingDecision {
+            plugin.onDetachedFromEngine(pluginBinding(context, messenger))
+        }
+
+    @Test
+    fun `Отказ канала при передаче начала завершает сессию и отпускает поток и право`() {
+        var closed = false
+        var replies = 0
+        openDocument {
+            content.writeBytes(byteArrayOf(1))
+            onReadClose = { closed = true }
+        }
+        val copy = File(temporary.root, "import-channel-lost.jsonl.gz")
+
+        withDocumentRead(copy, prefixLimit = 2, chunkSize = 1) { worker ->
+            messenger.invoke("readDocumentPrefix", mapOf("destination" to copy.path), onReply = {
+                replies++
+                throw IllegalStateException("Канал потерян")
+            })
+            worker.join(5_000)
+
+            assertFalse(worker.isAlive)
+            assertEquals(1, replies)
+            assertTrue(closed)
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+        }
+    }
+
+    private fun assertStoppedWhileAwaitingDecision(stop: (File) -> Unit) {
+        var signal: CancellationSignal? = null
+        var closed = false
+        openDocument {
+            content.writeBytes(byteArrayOf(1))
+            onOpen = { signal = it }
+            onReadEnd = { throw IOException("Остаток недоступен") }
+            onReadClose = { closed = true }
+        }
+        val copy = File(temporary.root, "import-stopped.jsonl.gz")
+
+        withDocumentRead(copy, prefixLimit = 2, chunkSize = 1) { worker ->
+            val prefix = readPrefix(copy)
+            assertArrayEquals(byteArrayOf(1), prefix.value() as ByteArray)
+
+            stop(copy)
+            worker.join(5_000)
+
+            assertFalse(worker.isAlive)
+            assertTrue(requireNotNull(signal).isCanceled)
+            assertTrue(closed)
+            assertFalse(copy.exists())
+            assertEquals(emptyList<Uri>(), readGrants())
+            assertEquals(1, prefix.count)
+        }
+    }
+
+    /** Сессия работает в отдельном потоке и ждёт явных запросов канала. */
+    private fun withDocumentRead(
+        copy: File,
+        prefixLimit: Int,
+        chunkSize: Int,
+        verify: (Thread) -> Unit,
+    ) {
+        val begun = messenger.invoke(
+            "beginDocumentRead",
+            mapOf(
+                "document" to document.toString(), "destination" to copy.path,
+                "prefixLimit" to prefixLimit, "chunkSize" to chunkSize,
+            ),
+        )
+        val worker = thread(isDaemon = true) { backgroundTasks.removeAt(0).run() }
+        try {
+            assertNull(begun.awaitReply().value())
+            verify(worker)
+        } finally {
+            plugin.onDetachedFromEngine(pluginBinding(context, messenger))
+            worker.join(5_000)
+        }
+        assertFalse(worker.isAlive)
+        assertEquals(1, begun.count)
+    }
+
+    private fun readPrefix(copy: File): ChannelReply =
+        messenger.invoke("readDocumentPrefix", mapOf("destination" to copy.path)).awaitReply()
+
     /**
      * Документ, который человек выбрал в диалоге выбора, и его поставщик,
      * настроенный [configure].
@@ -684,6 +923,7 @@ private class ChannelMessenger : BinaryMessenger {
 
 /** Ответ плагина; [onReply] наблюдает состояние в момент ответа. */
 private class ChannelReply(private val onReply: () -> Unit) : BinaryMessenger.BinaryReply {
+    private val answered = CountDownLatch(1)
     @Volatile
     private var envelope: ByteBuffer? = null
 
@@ -697,6 +937,12 @@ private class ChannelReply(private val onReply: () -> Unit) : BinaryMessenger.Bi
         onReply()
         envelope = requireNotNull(reply)
         count++
+        answered.countDown()
+    }
+
+    fun awaitReply(): ChannelReply {
+        assertTrue("Плагин не ответил", answered.await(5, TimeUnit.SECONDS))
+        return this
     }
 
     fun value(): Any? {
@@ -762,6 +1008,9 @@ class DocumentsProviderStub : ContentProvider() {
      */
     var onReadEnd: (() -> Unit)? = null
 
+    /** Закрытие потока, которым плагин владеет до исхода сессии. */
+    var onReadClose: () -> Unit = {}
+
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
         // Метод поставщика, которым DocumentsContract.deleteDocument удаляет документ.
         check(method == "android:deleteDocument") { "Неожиданный метод поставщика $method" }
@@ -794,12 +1043,17 @@ class DocumentsProviderStub : ContentProvider() {
         onOpen(signal)
         openFailure?.let { throw it }
         val descriptor = openFile(uri, mode)
-        val readEnd = onReadEnd ?: return descriptor
+        val readEnd = onReadEnd
         // Поток документа проверяет ошибку канала, дочитав его до конца.
         return object : ParcelFileDescriptor(descriptor) {
-            override fun canDetectErrors() = true
+            override fun canDetectErrors() = readEnd != null
 
-            override fun checkError() = readEnd()
+            override fun checkError() { readEnd?.invoke() }
+
+            override fun close() {
+                super.close()
+                onReadClose()
+            }
         }
     }
 

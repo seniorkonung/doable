@@ -16,6 +16,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -23,7 +24,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.LinkedBlockingQueue
 
 /**
  * Документы вне каталога приложения через системные диалоги Storage Access
@@ -31,9 +32,10 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * Канал создаёт документ диалогом `ACTION_CREATE_DOCUMENT` и копирует в него
  * временный файл приложения, а документ, открытый диалогом
- * `ACTION_OPEN_DOCUMENT`, копирует в файл приложения. Копирование идёт
- * потоками `ContentResolver` в [backgroundExecutor]; байты через канал не
- * передаются. Контракт канала задаёт
+ * `ACTION_OPEN_DOCUMENT`, читает одной сессией: ограниченное начало передаётся
+ * Dart порциями, а копирование в файл приложения разрешает проверка Dart.
+ * Чтение идёт потоками `ContentResolver` в [backgroundExecutor]. Протокол
+ * сессии описан у [beginDocumentRead], Dart-адаптер канала —
  * `lib/src/data_transfer/data/method_channel_document_access.dart`.
  *
  * Временное право на документ Android снимает вместе с Activity, получившей
@@ -62,11 +64,8 @@ class DocumentAccessPlugin internal constructor(
     /** Диалог, ожидающий ответа человека, и ответ на открывший его вызов. */
     private var pendingDialog: PendingDialog? = null
 
-    /**
-     * Копирования открытых документов по путям их копий, пока исход
-     * копирования не сообщён.
-     */
-    private val copies = ConcurrentHashMap<String, DocumentCopy>()
+    /** Сессии чтения начала и копирования по отдельным путям попыток импорта. */
+    private val reads = ConcurrentHashMap<String, DocumentRead>()
 
     /**
      * Документы, о которых поставщик при выборе сообщил нулевой размер, до шага
@@ -84,6 +83,7 @@ class DocumentAccessPlugin internal constructor(
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        reads.values.forEach(DocumentRead::cancel)
         channel.setMethodCallHandler(null)
     }
 
@@ -189,8 +189,19 @@ class DocumentAccessPlugin internal constructor(
                 destination = File(requireNotNull(call.argument<String>("destination"))),
                 result = result,
             )
+            "beginDocumentRead" -> beginDocumentRead(
+                document = Uri.parse(requireNotNull(call.argument<String>("document"))),
+                destination = File(requireNotNull(call.argument<String>("destination"))),
+                prefixLimit = requireNotNull(call.argument<Int>("prefixLimit")),
+                chunkSize = requireNotNull(call.argument<Int>("chunkSize")),
+                result = result,
+            )
+            "readDocumentPrefix" -> requestRead(call, ReadAction.PREFIX, result)
+            "copyReadDocument" -> requestRead(call, ReadAction.COPY, result)
+            "finishDocumentRead" -> requestRead(call, ReadAction.FINISH, result)
             "cancelCopy" -> {
-                copies.remove(requireNotNull(call.argument<String>("destination")))?.cancel()
+                val destination = requireNotNull(call.argument<String>("destination"))
+                reads[destination]?.cancel()
                 result.success(null)
             }
             else -> result.notImplemented()
@@ -251,43 +262,115 @@ class DocumentAccessPlugin internal constructor(
         }
     }
 
-    private fun copyDocument(document: Uri, destination: File, result: MethodChannel.Result) {
-        val copy = DocumentCopy(result)
-        copies[destination.path] = copy
-        backgroundExecutor.execute {
-            val outcome = copyBytes(document, destination, copy)
-            // Отменённое копирование уже сообщило исход и само удаляет копию,
-            // когда поставщик ответил.
-            val reported = copy.finish()
-            if (!reported || outcome != CopyOutcome.COPIED) destination.delete()
-            releaseGrant(document)
-            copies.remove(destination.path, copy)
-            if (reported) outcome.reply(result)
+    private fun copyDocument(document: Uri, destination: File, result: MethodChannel.Result) =
+        startRead(document, destination, result) { input, read ->
+            writeCopy(input, destination, read)
+        }
+
+    /**
+     * `beginDocumentRead(document, destination, prefixLimit, chunkSize)` открывает
+     * поток, не читая его. Последовательные `readDocumentPrefix(destination)`
+     * возвращают не больше [chunkSize] байт, суммарно не больше [prefixLimit].
+     * Пустая порция означает конец потока или достижение предела.
+     * `copyReadDocument(destination)` разрешает запись начала и остатка того же
+     * потока в файл попытки и завершает сессию исходом копирования.
+     * `finishDocumentRead(destination)` закрывает поток без копии.
+     * Параметры задаёт Dart; правил формата документа здесь нет.
+     */
+    private fun beginDocumentRead(
+        document: Uri,
+        destination: File,
+        prefixLimit: Int,
+        chunkSize: Int,
+        result: MethodChannel.Result,
+    ) {
+        require(prefixLimit > 0 && chunkSize in 1..prefixLimit)
+        startRead(document, destination, result) { input, read ->
+            readDocument(input, destination, read, prefixLimit, chunkSize)
         }
     }
 
-    /**
-     * Копирует все байты [document] в [destination], пока копирование [copy]
-     * не отменено. Исключение в собственном потоке завершило бы процесс,
-     * поэтому любой отказ поставщика становится исходом.
-     */
-    private fun copyBytes(document: Uri, destination: File, copy: DocumentCopy): CopyOutcome {
-        val input = try {
-            openForReading(document, copy.cancellation)
-        } catch (error: Exception) {
-            return CopyOutcome.DOCUMENT_NOT_READ
-        }
-        try {
-            // Поставщик, который не учитывает сигнал отмены, отвечает и после неё.
-            if (copy.isCancelled) return CopyOutcome.CANCELLED
-            return writeCopy(input, destination, copy)
-        } finally {
+    /** Общий владелец открытия, отмены, исхода и очистки чтения документа. */
+    private fun startRead(
+        document: Uri,
+        destination: File,
+        result: MethodChannel.Result,
+        consume: (InputStream, DocumentRead) -> CopyOutcome,
+    ) {
+        val read = DocumentRead(result)
+        check(reads.putIfAbsent(destination.path, read) == null)
+        backgroundExecutor.execute {
+            var outcome = CopyOutcome.DOCUMENT_NOT_READ
             try {
-                input.close()
+                val input = openForReading(document, read.cancellation)
+                try {
+                    outcome = if (read.isCancelled) CopyOutcome.CANCELLED else consume(input, read)
+                } finally {
+                    try {
+                        input.close()
+                    } catch (error: Exception) {
+                        // Чтение закончено: ошибка закрытия не меняет его исход.
+                    }
+                }
             } catch (error: Exception) {
-                // Чтение уже закончено: исход копирования известен.
+                // Поставщик может отказать и при открытии, и между порциями.
+            }
+            if (outcome != CopyOutcome.COPIED) destination.delete()
+            releaseGrant(document)
+            reads.remove(destination.path, read)
+            // Отмена уже сообщила исход. Позднее завершение и отказ канала
+            // удаляют только файл своей попытки.
+            if (!read.finish(outcome) && outcome == CopyOutcome.COPIED) destination.delete()
+        }
+    }
+
+    private fun requestRead(call: MethodCall, action: ReadAction, result: MethodChannel.Result) {
+        val read = reads[requireNotNull(call.argument<String>("destination"))]
+        if (read == null) {
+            // Завершение идемпотентно: отмена могла уже освободить сессию.
+            if (action == ReadAction.FINISH) result.success(null)
+            else CopyOutcome.DOCUMENT_NOT_READ.reply(result)
+        } else {
+            read.request(action, result)
+        }
+    }
+
+    private fun readDocument(
+        input: InputStream,
+        destination: File,
+        read: DocumentRead,
+        prefixLimit: Int,
+        chunkSize: Int,
+    ): CopyOutcome {
+        if (!read.answer(null)) return CopyOutcome.CANCELLED
+        val prefix = ByteArrayOutputStream(chunkSize)
+        val buffer = ByteArray(chunkSize)
+        var ended = false
+        while (!read.isCancelled) {
+            val action = read.next()
+            if (read.isCancelled) return CopyOutcome.CANCELLED
+            when (action) {
+                ReadAction.FINISH -> return CopyOutcome.COPIED
+                ReadAction.COPY -> return writeCopy(input, destination, read, prefix)
+                ReadAction.PREFIX -> {
+                    val remaining = prefixLimit - prefix.size()
+                    val count = if (ended || remaining == 0) {
+                        -1
+                    } else {
+                        input.read(buffer, 0, minOf(buffer.size, remaining))
+                    }
+                    if (count < 0) {
+                        ended = true
+                    } else {
+                        prefix.write(buffer, 0, count)
+                    }
+                    if (!read.answer(if (count < 0) byteArrayOf() else buffer.copyOf(count))) {
+                        return CopyOutcome.CANCELLED
+                    }
+                }
             }
         }
+        return CopyOutcome.CANCELLED
     }
 
     /**
@@ -317,22 +400,31 @@ class DocumentAccessPlugin internal constructor(
         }
     }
 
-    private fun writeCopy(input: InputStream, destination: File, copy: DocumentCopy): CopyOutcome {
+    private fun writeCopy(
+        input: InputStream,
+        destination: File,
+        read: DocumentRead,
+        prefix: ByteArrayOutputStream? = null,
+    ): CopyOutcome {
         try {
+            if (read.isCancelled) return CopyOutcome.CANCELLED
             openCopy(destination).use { output ->
+                if (read.isCancelled) return CopyOutcome.CANCELLED
+                prefix?.writeTo(output)
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
+                while (!read.isCancelled) {
                     val count = try {
                         input.read(buffer)
                     } catch (error: Exception) {
                         return CopyOutcome.DOCUMENT_NOT_READ
                     }
                     // Поставщик, который не учитывает сигнал отмены, отвечает и после неё.
-                    if (copy.isCancelled) return CopyOutcome.CANCELLED
+                    if (read.isCancelled) return CopyOutcome.CANCELLED
                     if (count < 0) return CopyOutcome.COPIED
                     output.write(buffer, 0, count)
                 }
             }
+            return CopyOutcome.CANCELLED
         } catch (error: Exception) {
             return if (error.isStorageFull()) CopyOutcome.STORAGE_FULL else CopyOutcome.COPY_NOT_WRITTEN
         }
@@ -400,30 +492,79 @@ class DocumentAccessPlugin internal constructor(
     }
 }
 
+private enum class ReadAction { PREFIX, COPY, FINISH }
+
 /**
- * Копирование открытого документа, исход которого сообщается [result] один
- * раз: отменой или самим копированием, если оно закончилось раньше.
+ * Запросы Dart будят единственного владельца потока. Отмена будит также
+ * ожидание решения и сразу отвечает на текущий запрос, даже если поставщик
+ * держит чтение. Ответы допустимы из фонового потока:
+ * https://api.flutter.dev/javadoc/io/flutter/plugin/common/MethodChannel.Result.html
  */
-private class DocumentCopy(private val result: MethodChannel.Result) {
-    /** Сигнал, с которым открывается документ; отмена подаёт его поставщику. */
+private class DocumentRead(result: MethodChannel.Result) {
     val cancellation = CancellationSignal()
-    private val state = AtomicReference(State.RUNNING)
+    private val requests = LinkedBlockingQueue<ReadAction>()
+    private var pending: MethodChannel.Result? = result
+    @Volatile
+    private var state = State.RUNNING
+    val isCancelled get() = state == State.CANCELLED
 
-    val isCancelled get() = state.get() == State.CANCELLED
-
-    /**
-     * Сразу сообщает исход отмены, не дожидаясь поставщика, который может
-     * держать открытие документа или чтение из канала и не учитывать сигнал.
-     * После исхода копирования ничего не меняет.
-     */
-    fun cancel() {
-        if (!state.compareAndSet(State.RUNNING, State.CANCELLED)) return
-        cancellation.cancel()
-        CopyOutcome.CANCELLED.reply(result)
+    @Synchronized
+    fun request(action: ReadAction, result: MethodChannel.Result) {
+        if (state != State.RUNNING) {
+            CopyOutcome.CANCELLED.reply(result)
+            return
+        }
+        check(pending == null)
+        pending = result
+        requests.add(action)
     }
 
-    /** Заканчивает копирование и возвращает, должно ли оно сообщить свой исход. */
-    fun finish(): Boolean = state.compareAndSet(State.RUNNING, State.FINISHED)
+    fun next(): ReadAction = requests.take()
+
+    @Synchronized
+    fun answer(value: Any?): Boolean {
+        if (state != State.RUNNING) return false
+        val result = checkNotNull(pending)
+        pending = null
+        return try {
+            result.success(value)
+            true
+        } catch (error: Exception) {
+            // Канал потерян: поток и право больше некому передать.
+            cancel()
+            false
+        }
+    }
+
+    @Synchronized
+    fun cancel() {
+        if (state != State.RUNNING) return
+        state = State.CANCELLED
+        val result = pending
+        pending = null
+        requests.add(ReadAction.FINISH)
+        cancellation.cancel()
+        try {
+            result?.let(CopyOutcome.CANCELLED::reply)
+        } catch (error: Exception) {
+            // Движок мог уже потерять канал; повторного ответа не будет.
+        }
+    }
+
+    @Synchronized
+    fun finish(outcome: CopyOutcome): Boolean {
+        if (state != State.RUNNING) return false
+        state = State.FINISHED
+        val result = checkNotNull(pending)
+        pending = null
+        return try {
+            outcome.reply(result)
+            true
+        } catch (error: Exception) {
+            // Ресурсы уже освобождены, а канал больше не принимает ответ.
+            false
+        }
+    }
 
     private enum class State { RUNNING, CANCELLED, FINISHED }
 }
