@@ -222,13 +222,21 @@ void main() {
   testWidgets('сценарий «Отмена чтения выбранного файла»: с выбора файла над '
       'страницей «Настройки» открыт прогресс импорта без доли хода, страница '
       'и панель навигации под ним недоступны, «назад» его не закрывает, а '
-      '«Отменить» закрывает его без подтверждения и сообщения', (tester) async {
+      '«Отменить» показывает «Отмена…» до прекращения чтения, затем закрывает '
+      'прогресс без подтверждения и сообщения', (tester) async {
     final semantics = tester.ensureSemantics();
     final app = await _ImportApp.open(tester);
     final reading = Completer<void>();
-    app.documents.beforeCopy = () => reading.future;
+    final cancellationAnswer = Completer<void>();
+    app.documents
+      ..beforeCopy = (() => reading.future)
+      ..beforeCancellationAnswer = (() => cancellationAnswer.future);
 
     app.startImport();
+    addTearDown(() {
+      if (!cancellationAnswer.isCompleted) cancellationAnswer.complete();
+      if (!reading.isCompleted) reading.complete();
+    });
     await _waitFor(
       tester,
       () => find.text('Импорт данных…').evaluate().isNotEmpty,
@@ -263,6 +271,13 @@ void main() {
     expect(find.text('Импорт данных…'), findsOneWidget);
 
     await tester.tap(find.text('Отменить'));
+    await tester.pump();
+    expect(find.text('Отмена…'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Отмена…'), findsOneWidget);
+
+    cancellationAnswer.complete();
     await _waitFor(tester, () => app.isFinished);
     await tester.pumpAndSettle();
 
@@ -271,6 +286,10 @@ void main() {
     expect(find.text('Импортировать эту копию?'), findsNothing);
     expect(find.byType(SnackBar), findsNothing);
     expect(find.byType(SettingsPage), findsOneWidget);
+    var copyFinished = false;
+    unawaited(app.documents.copies.single.then((_) => copyFinished = true));
+    reading.complete();
+    await _waitFor(tester, () => copyFinished);
     semantics.dispose();
   });
 

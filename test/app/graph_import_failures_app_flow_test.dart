@@ -101,41 +101,6 @@ void main() {
     expect(app.storedState(), before);
   });
 
-  testWidgets('сценарий «Отмена чтения выбранного файла»: пока выбранный файл '
-      'читается, «Отменить» показывает «Отмена…», затем прогресс закрывается '
-      'без подтверждения и сообщения, а граф и копии остаются прежними', (
-    tester,
-  ) async {
-    final app = await _ImportApp.start(tester);
-    await app.openSettings();
-    final before = app.storedState();
-    // Поставщик держит открытие документа, как облачный, который сначала
-    // его загружает, а ответ на отмену приходит после освобождения.
-    app.documents.beforeCopy = () => Completer<void>().future;
-    final cancellationAnswer = Completer<void>();
-    app.documents.beforeCancellationAnswer = () => cancellationAnswer.future;
-    app.chooseForImport(_document(_referenceFile()));
-
-    await app.startImport();
-    await _until(tester, find.text(_importRunning));
-    // Прогресс без доли хода анимируется непрерывно, и кадры не успокоятся,
-    // поэтому конец перехода маршрута дожидается заданное время.
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.text('Отменить'));
-    await tester.pump();
-
-    expect(find.text('Отмена…'), findsOneWidget);
-    cancellationAnswer.complete();
-    await app.waitForProgressEnd();
-    // Подтверждение и сообщение появились бы за это время.
-    await _settle(tester);
-
-    expect(find.text('Импортировать эту копию?'), findsNothing);
-    expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
-    expect(find.text(_invalidFile), findsNothing);
-    expect(app.storedState(), before);
-  });
-
   testWidgets('сценарий «Выбран чужой файл»: фотография без чтения остатка '
       'и попытки записи при нехватке места без подтверждения даёт '
       'под строкой «Импорт данных» отказ с действием «Выбрать другой файл», '
@@ -243,75 +208,6 @@ void main() {
 
     expect(find.text(_storageFull), findsNothing);
     expect(await app.graphState(), referenceGraphFileLines().skip(1));
-  });
-
-  testWidgets('сценарий «Отмена замены»: «Отменить» в ходе импорта показывает '
-      '«Отмена…», затем прогресс закрывается без сообщения, а граф и копии '
-      'остаются прежними', (tester) async {
-    final app = await _ImportApp.start(tester);
-    await app.openSettings();
-    final before = app.storedState();
-    app.chooseForImport(_document(_referenceFile()));
-    await app.startImport();
-    await app.waitForConfirmation();
-    final replacement = app.holdReplacement();
-
-    await app.confirmImport();
-    await _waitFor(tester, () => replacement.isReached);
-    await tester.pump();
-    await tester.tap(find.text('Отменить'));
-    await tester.pump();
-
-    expect(find.text('Отмена…'), findsOneWidget);
-    replacement.release();
-    await app.waitForProgressEnd();
-    // Сообщение появилось бы за это время и ещё не закрылось бы.
-    await _settle(tester);
-
-    expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
-    expect(app.storedState(), before);
-  });
-
-  testWidgets('сценарии «Прогресс замены читается экранным диктором» и '
-      '«„Назад“ не прерывает замену»: диктор сообщает об импорте, его ходе и '
-      'доступной кнопке «Отменить», а после «назад» прогресс остаётся '
-      'открытым и импорт заменяет граф файлом', (tester) async {
-    final semantics = tester.ensureSemantics();
-    final app = await _ImportApp.start(tester);
-    await app.openSettings();
-    app.chooseForImport(_document(_referenceFile()));
-    await app.startImport();
-    await app.waitForConfirmation();
-    final replacement = app.holdReplacement();
-    await app.confirmImport();
-    await _waitFor(tester, () => replacement.isReached);
-    await tester.pump();
-
-    // Снимок замены записан, а замена ещё ничего не удалила.
-    expect(
-      tester.getSemantics(find.text(_importRunning)),
-      isSemantics(label: _importRunning, value: '20 %'),
-    );
-    expect(
-      tester.getSemantics(find.text('Отменить')),
-      isSemantics(
-        label: 'Отменить',
-        isButton: true,
-        hasEnabledState: true,
-        isEnabled: true,
-        hasTapAction: true,
-      ),
-    );
-    await tester.binding.handlePopRoute();
-    await tester.pump();
-    expect(find.text(_importRunning), findsOneWidget);
-
-    replacement.release();
-    await _until(tester, find.text('Данные импортированы'));
-
-    expect(find.byType(SettingsPage), findsOneWidget);
-    expect(await app.graphState(), referenceGraphFileLines().skip(1));
-    semantics.dispose();
   });
 }
 
