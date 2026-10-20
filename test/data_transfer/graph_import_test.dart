@@ -1032,6 +1032,51 @@ void main() {
       expect(await storedState(), before);
     });
 
+    test('отмена после фиксации отказа чтения не показывает отмену и '
+        'сохраняет исход и единственное событие диагностики', () async {
+      choose(photoFile());
+      final finishStarted = Completer<void>();
+      final finishAllowed = Completer<void>();
+      documents.beforeReadFinish = () {
+        finishStarted.complete();
+        return finishAllowed.future;
+      };
+      final started = controller().start();
+      await finishStarted.future;
+
+      try {
+        expect(diagnostics.events, [
+          _importFailed('dataValidation', GraphImportFailure.invalidFile),
+        ]);
+        expect(current(), isA<GraphImportReadingFile>());
+
+        controller().cancel();
+
+        expect(states, [isA<GraphImportReadingFile>()]);
+        expect(current(), isA<GraphImportReadingFile>());
+      } finally {
+        finishAllowed.complete();
+        await started;
+      }
+
+      final accepted = await started;
+      expect(
+        await accepted!.future,
+        _importFailedWith(GraphImportFailure.invalidFile),
+      );
+      expect(completions, [
+        isA<GraphImportCompletion>().having(
+          (completion) => completion.result,
+          'исход',
+          _importFailedWith(GraphImportFailure.invalidFile),
+        ),
+      ]);
+      expect(states, [isA<GraphImportReadingFile>(), isA<GraphImportIdle>()]);
+      expect(diagnostics.events, [
+        _importFailed('dataValidation', GraphImportFailure.invalidFile),
+      ]);
+    });
+
     test('при непустом графе импорт ждёт подтверждения с датой сохранения и '
         'количествами файла, не меняя граф, а подтверждение заменяет граф '
         'записями файла', () async {

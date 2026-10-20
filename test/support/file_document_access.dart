@@ -102,6 +102,9 @@ final class FileDocumentAccess implements DocumentAccess {
   /// Сигнал ответа порции до её обработки модулем формата.
   void Function()? afterPrefixAnswer;
 
+  /// Ожидание перед завершением сессии чтения документа.
+  Future<void> Function()? beforeReadFinish;
+
   @override
   DocumentRead readDocument(
     OpenedDocument document, {
@@ -209,6 +212,7 @@ final class _FileDocumentRead implements DocumentRead {
 
   @override
   Future<void> finish() async {
+    await _documents.beforeReadFinish?.call();
     // Брошенное копирование владеет потоком до фактического завершения.
     if (_copyOutcome == null) await _input?.close();
   }
