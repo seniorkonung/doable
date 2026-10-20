@@ -2,9 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/main.dart';
-import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -15,22 +12,15 @@ import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
-import 'package:doable/src/data/local/app_database.dart'
-    show openFileBackedLocalDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/graph_backups/graph_backup_registry.dart';
-import 'package:doable/src/graph_backups/graph_backups_provider.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionSaved;
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -45,22 +35,15 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_durability_fixture.dart';
-import '../support/file_document_access.dart';
+import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
-import '../support/graph_log_completeness_reference.dart';
-import '../support/in_memory_diagnostics_sink.dart';
-import '../support/in_memory_quick_creation_mode_store.dart';
-import '../support/local_database_harness.dart';
 import '../support/quick_creation.dart';
-import '../support/temporary_graph_files.dart';
+import '../support/temporary_import_document.dart';
 
 void main() {
   testWidgets('сценарии «Импорт экспорта воспроизводит граф», «Настройки '
@@ -69,7 +52,7 @@ void main() {
       'установки с теми же сущностями, данными, порядками и путём дневного '
       'выбора, а её режим быстрого создания остаётся прежним', (tester) async {
     late _ExportedGraph exported;
-    final source = await _ImportApp.start(
+    final source = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 3, 12),
       quickCreationMode: QuickCreationMode.dailyChoice,
@@ -81,7 +64,7 @@ void main() {
     final file = await source.export();
     await source.shutDown();
 
-    final target = await _ImportApp.start(
+    final target = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 6, 9),
       quickCreationMode: QuickCreationMode.intention,
@@ -114,7 +97,7 @@ void main() {
       'граф не изменён, ежедневная копия после импорта показывает «Данные '
       'заменены», а восстановление копии перед импортом возвращает прежний '
       'граф', (tester) async {
-    final app = await _ImportApp.start(
+    final app = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 5, 9),
       seed: (graph) => _createTag(graph, 'Дом'),
@@ -125,7 +108,9 @@ void main() {
     final beforeImport = await app.graphState();
     final stored = app.storedState();
     await app.openSettings();
-    app.chooseForImport(_document(_referenceFileSavedOnOctober3()));
+    app.chooseForImport(
+      temporaryImportDocument(_referenceFileSavedOnOctober3()),
+    );
 
     await app.startImport();
     await app.waitForConfirmation();
@@ -177,7 +162,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     late Tag health;
-    final app = await _ImportApp.start(
+    final app = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 6, 8, 15),
       seed: (graph) async {
@@ -237,128 +222,10 @@ void main() {
   });
 }
 
-/// Приложение над файловым хранилищем своей установки с часами устройства
-/// [now]. Его можно перезапустить над тем же хранилищем и каталогом снимков.
-/// Документы экспорта и импорта — файлы без системных диалогов.
-final class _ImportApp {
-  _ImportApp._(this._tester, this._harness, this._files, this._modes, this.now);
-
-  final WidgetTester _tester;
-  final LocalDatabaseHarness _harness;
-  final TemporaryGraphFiles _files;
-
-  /// Настройка установки — режим быстрого создания.
-  final InMemoryQuickCreationModeStore _modes;
-
-  /// Показание часов устройства для графа, экспорта, копий и местного
-  /// сегодня.
-  DateTime now;
-
-  late AppRuntime _runtime;
-  late ProviderContainer _container;
-  var _isRunning = false;
-  StreamSubscription<GraphBackupsRead>? _watching;
-  List<GraphBackupEntry> _backups = const [];
-
-  /// Запускает приложение новой установки в момент [at] с режимом быстрого
-  /// создания [quickCreationMode]. [seed] создаёт граф командами, поэтому он
-  /// полностью отражён в логе фактов; без [seed] граф пуст.
-  static Future<_ImportApp> start(
-    WidgetTester tester, {
-    required DateTime at,
-    QuickCreationMode quickCreationMode = QuickCreationMode.intention,
-    Future<void> Function(PersonalGraphRepository graph)? seed,
-  }) async {
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
-    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-    final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
-    addTearDown(() => tester.runAsync(harness.dispose));
-    final app = _ImportApp._(
-      tester,
-      harness,
-      TemporaryGraphFiles(),
-      InMemoryQuickCreationModeStore()..mode = quickCreationMode,
-      at,
-    );
-    if (seed != null) {
-      await tester.runAsync(() async {
-        await seed(
-          DriftPersonalGraphRepository(
-            await harness.openReadyDatabase(),
-            UuidV7IntentionIdGenerator(),
-            () => app.now.toUtc(),
-            InMemoryDiagnosticsSink(),
-          ),
-        );
-        await harness.closePersistenceObjectGraph();
-      });
-    }
-    addTearDown(app.shutDown);
-    await app._launch();
-    return app;
-  }
-
-  /// Завершает приложение и в момент [at] запускает его заново.
-  Future<void> restart({required DateTime at}) async {
-    await shutDown();
-    now = at;
-    await _launch();
-  }
-
-  Future<void> _launch() async {
-    final runtime = _runtime = AppRuntime(
-      connectionFactory: () =>
-          openFileBackedLocalDatabase(_harness.databaseFile),
-      diagnosticsSink: InMemoryDiagnosticsSink(),
-      quickCreationModeStore: _modes,
-      graphFilesFactory: _files.create,
-      dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
-        date: CalendarDate.fromParts(now.year, now.month, now.day),
-        untilNextDate: const Duration(hours: 12),
-      ),
-      clock: () => now.toUtc(),
-    );
-    final ready =
-        (await _tester.runAsync(runtime.bootstrap))! as AppRuntimeReady;
-    _isRunning = true;
-    _container = ready.container;
-    _watching = _container.read(graphBackupsProvider).watchBackups().listen((
-      read,
-    ) {
-      if (read case GraphBackupsReadSucceeded(:final backups)) {
-        _backups = backups;
-      }
-    });
-    await _tester.pumpWidget(MainApp(runtime: runtime));
-    await app_flow.until(_tester, find.byType(HomePage));
-    await app_flow.waitFor(
-      _tester,
-      () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
-    );
-  }
-
-  /// Завершает приложение; завершённое приложение ничего не делает.
-  Future<void> shutDown() async {
-    if (!_isRunning) return;
-    _isRunning = false;
-    // Отмена наблюдения завершается вне управляемого времени проверки, и
-    // ожидание продолжило бы проверку вне него.
-    if (_watching case final watching?) unawaited(watching.cancel());
-    _watching = null;
-    await _tester.pumpWidget(const SizedBox.shrink());
-    var isShutDown = false;
-    unawaited(_runtime.shutdown().whenComplete(() => isShutDown = true));
-    await app_flow.waitFor(_tester, () => isShutDown);
-  }
-
-  /// Ждёт, пока хранится [count] копий.
-  Future<void> waitForBackups(int count) =>
-      app_flow.waitFor(_tester, () => _backups.length == count);
-
+extension _ImportScenarioSteps on ImportAppHarness {
   /// Выбор Главной: вкладка, период и вид статистики.
   HomeStatisticsSelection get homeSelection =>
-      _container.read(homeStatisticsViewModelProvider).selection;
+      container.read(homeStatisticsViewModelProvider).selection;
 
   /// Подтверждает команду графа [command] в хранилище приложения, минуя
   /// экраны, поэтому её результат не занимает общую поверхность сообщений.
@@ -367,88 +234,26 @@ final class _ImportApp {
   ) async {
     Object? result;
     unawaited(
-      _container
+      container
           .read(personalGraphRepositoryProvider)
           .execute(command)
           .then((value) => result = value),
     );
-    await app_flow.waitFor(_tester, () => result != null);
+    await app_flow.waitFor(tester, () => result != null);
     expect(result, isA<GraphCommandSucceeded>());
-  }
-
-  /// Граф в хранилище: эталонная выгрузка таблиц графа отдельным
-  /// соединением, без механизма фактов. Записи идут по последовательностям
-  /// создания, поэтому выгрузки совпадают, только если совпадают и порядки.
-  Future<List<String>> graphState() async => (await _tester.runAsync(() async {
-    // Второй экземпляр базы читает файл своим соединением, а не делит
-    // соединение приложения, о чём предупреждает drift.
-    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-    final database = await _harness.openReadyDatabase();
-    try {
-      return [
-        for (final record in await referenceGraphRecords(database))
-          utf8.decode(GraphFormatCodec.encode(record)),
-      ];
-    } finally {
-      await _harness.closePersistenceObjectGraph();
-      driftRuntimeOptions.dontWarnAboutMultipleDatabases = false;
-    }
-  }))!;
-
-  /// Всё содержимое файла хранилища — граф, копии, лог фактов и реестр
-  /// снимков — и имена файлов каталога снимков.
-  Object storedState() => [
-    durabilityFileState(_harness.databaseFile),
-    // Каталог снимков создаёт первая запись снимка.
-    [
-      if (_files.snapshots.existsSync())
-        for (final file in _files.snapshots.listSync())
-          file.uri.pathSegments.last,
-    ]..sort(),
-  ];
-
-  FileDocumentAccess get _documents => _files.documents;
-
-  /// Открывает с Главной страницу «Настройки».
-  Future<void> openSettings() async {
-    await _tester.tap(find.byTooltip('Настройки'));
-    await app_flow.until(_tester, find.byType(SettingsPage));
-    await _tester.pumpAndSettle();
   }
 
   /// Сохраняет граф в новый документ панелью «Экспорт данных» и возвращает
   /// файл документа после сообщения об успехе.
   Future<File> export() async {
     // Пока состав графа не прочитан, строка недоступна.
-    await app_flow.until(_tester, find.text('Сохранить копию всего в файл'));
-    await _tester.tap(find.text('Экспорт данных'));
-    await app_flow.until(_tester, find.text('Сохранить в файл'));
-    await _tester.pumpAndSettle();
-    await _tester.tap(find.text('Сохранить в файл'));
-    await app_flow.until(_tester, find.text('Данные сохранены в файл'));
-    return _documents.created.single;
-  }
-
-  /// В системном диалоге выбора человек выбирает документ [file].
-  void chooseForImport(File file) =>
-      _documents.openingDialog = () async => _documents.chosen(file);
-
-  /// Начинает импорт строкой «Импорт данных».
-  Future<void> startImport() async {
-    await _tester.tap(find.text('Импорт данных'));
-    await _tester.pump();
-  }
-
-  /// Ждёт подтверждения импорта прочитанного файла.
-  Future<void> waitForConfirmation() async {
-    await app_flow.until(_tester, find.text('Импортировать эту копию?'));
-    await _tester.pumpAndSettle();
-  }
-
-  /// Подтверждает замену графа файлом.
-  Future<void> confirmImport() async {
-    await _tester.tap(find.text('Импортировать и заменить'));
-    await _tester.pump();
+    await app_flow.until(tester, find.text('Сохранить копию всего в файл'));
+    await tester.tap(find.text('Экспорт данных'));
+    await app_flow.until(tester, find.text('Сохранить в файл'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сохранить в файл'));
+    await app_flow.until(tester, find.text('Данные сохранены в файл'));
+    return documents.created.single;
   }
 
   /// Открывает навигацию по тегу [tag] и ждёт в её выдаче намерение
@@ -458,31 +263,31 @@ final class _ImportApp {
     required IntentionId intention,
   }) async {
     unawaited(
-      _container.read(appRouterProvider).push(TagNavigationRoute(tagId: tag)),
+      container.read(appRouterProvider).push(TagNavigationRoute(tagId: tag)),
     );
-    await app_flow.until(_tester, find.byKey(ValueKey(intention)));
-    await _tester.pumpAndSettle();
+    await app_flow.until(tester, find.byKey(ValueKey(intention)));
+    await tester.pumpAndSettle();
   }
 
   /// Открывает панель строкой «Резервные копии» и ждёт прочитанный список.
   Future<void> openBackupsSheet() async {
-    await _tester.tap(find.text('Резервные копии'));
-    await app_flow.until(_tester, find.text('Сделать копию сейчас'));
-    await _tester.pumpAndSettle();
+    await tester.tap(find.text('Резервные копии'));
+    await app_flow.until(tester, find.text('Сделать копию сейчас'));
+    await tester.pumpAndSettle();
   }
 
   /// Выбирает в открытой панели копию [label] и ждёт подтверждения её
   /// восстановления с тем, что изменилось с тех пор, — [since].
   Future<void> chooseBackup(String label, {required String since}) async {
-    await _tester.tap(find.text(label));
-    await app_flow.until(_tester, find.text(since));
-    await _tester.pumpAndSettle();
+    await tester.tap(find.text(label));
+    await app_flow.until(tester, find.text(since));
+    await tester.pumpAndSettle();
   }
 
   /// Подтверждает восстановление выбранной копии.
   Future<void> restoreChosenBackup() async {
-    await _tester.tap(find.text('Восстановить копию'));
-    await _tester.pump();
+    await tester.tap(find.text('Восстановить копию'));
+    await tester.pump();
   }
 }
 
@@ -564,17 +369,6 @@ List<int> _referenceFileSavedOnOctober3() {
     ),
     ...lines.skip(1),
   ]);
-}
-
-/// Документ с байтами [bytes] вне каталогов приложения в новом временном
-/// каталоге, который удаляется после теста.
-File _document(List<int> bytes) {
-  final directory = Directory.systemTemp.createTempSync(
-    'doable_import_document_',
-  );
-  addTearDown(() => directory.deleteSync(recursive: true));
-  return File.fromUri(directory.uri.resolve('doable.jsonl.gz'))
-    ..writeAsBytesSync(bytes);
 }
 
 Future<void> _execute(
