@@ -1482,3 +1482,16 @@
   - **Dependencies:** 4.29, 4.30, 4.31.
   - **Files likely touched:** Нет, только проверка; обнаруженные пробелы исправляются в файлах задач 4.30 и 4.31.
   - **Estimated scope:** XS.
+
+- [ ] 4.33 Восстановить прохождение статического анализа этапа 4, удалив два лишних импорта
+  - **Acceptance criteria:**
+    - Из `lib/src/data_transfer/data/method_channel_document_access.dart` и `test/data_transfer/method_channel_document_access_test.dart` удалены лишние импорты `dart:typed_data`: `Uint8List` по-прежнему доступен через существующий `package:flutter/services.dart`. Поведение доступа к документам и утверждения проверок сохранены.
+    - `flutter analyze` завершается без замечаний, а существующие проверки адаптера канала проходят. Правила анализа и состав проверок проекта сохранены.
+    - Результат подготовлен к повторному ревью этапа 4 по условию Ready to advance [плана](plan.md), с опорой на ранее полученные свидетельства задач 4.14, 4.29 и 4.32. Этап завершает только ревью после его последней задачи, в котором `mise run check` проходит целиком.
+  - **Verification:**
+    - Сверить diff: удалены только два лишних импорта, а `Uint8List` остаётся доступен через `package:flutter/services.dart`.
+    - Выполнить `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/data_transfer/method_channel_document_access_test.dart`.
+    - Полные проверки `mise run check` выполняются в ревью после последней задачи этапа; эта задача этап не завершает.
+  - **Dependencies:** 4.22, 4.23.
+  - **Files likely touched:** `lib/src/data_transfer/data/method_channel_document_access.dart`, `test/data_transfer/method_channel_document_access_test.dart`.
+  - **Estimated scope:** S.
