@@ -50,6 +50,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/file_document_access.dart';
@@ -90,7 +91,7 @@ void main() {
     // Импорт в пустой граф не ждёт подтверждения: без него замена не
     // началась бы, и сообщения об успехе не было бы.
     await target.startImport();
-    await _until(tester, find.text('Данные импортированы'));
+    await app_flow.until(tester, find.text('Данные импортированы'));
 
     expect(find.byType(SettingsPage), findsOneWidget);
     expect(await target.graphState(), sourceGraph);
@@ -139,7 +140,7 @@ void main() {
     expect(app.storedState(), stored);
 
     await app.confirmImport();
-    await _until(tester, find.text('Данные импортированы'));
+    await app_flow.until(tester, find.text('Данные импортированы'));
     expect(find.byType(SettingsPage), findsOneWidget);
     await app.waitForBackups(2);
 
@@ -163,7 +164,7 @@ void main() {
           'Восстановление отменит все изменения.',
     );
     await app.restoreChosenBackup();
-    await _until(tester, find.text('Копия восстановлена'));
+    await app_flow.until(tester, find.text('Копия восстановлена'));
 
     expect(await app.graphState(), beforeImport);
   });
@@ -191,9 +192,12 @@ void main() {
     await app.openSettings();
     final file = await app.export();
     await tester.binding.handlePopRoute();
-    await _waitFor(tester, () => find.byType(SettingsPage).evaluate().isEmpty);
+    await app_flow.waitFor(
+      tester,
+      () => find.byType(SettingsPage).evaluate().isEmpty,
+    );
     await _filterIntentionCatalogByTag(tester, health);
-    await openHome(tester, waitFor: _until);
+    await openHome(tester, waitFor: app_flow.until);
     await _tap(tester, find.text('Год'));
     await _tap(tester, find.byTooltip('Предыдущий год'));
     expect(
@@ -206,7 +210,7 @@ void main() {
     await app.waitForConfirmation();
 
     await app.confirmImport();
-    await _until(tester, find.text('Данные импортированы'));
+    await app_flow.until(tester, find.text('Данные импортированы'));
 
     expect(find.byType(SettingsPage), findsOneWidget);
     expect(
@@ -214,12 +218,19 @@ void main() {
       AppDestination.home,
     );
     await tester.binding.handlePopRoute();
-    await _waitFor(tester, () => find.byType(SettingsPage).evaluate().isEmpty);
+    await app_flow.waitFor(
+      tester,
+      () => find.byType(SettingsPage).evaluate().isEmpty,
+    );
     expect(
       (app.homeSelection.tab, app.homeSelection.period),
       (HomeStatisticsTab.month, StatisticsMonth(2026, 10)),
     );
-    await openIntentionGraph(tester, waitFor: _until, content: _catalogList);
+    await openIntentionGraph(
+      tester,
+      waitFor: app_flow.until,
+      content: _catalogList,
+    );
     expect(_tagConditions(), isEmpty);
     expect(_catalogPosition(tester).pixels, 0);
     expect(_catalogPagePosition(tester).pixels, 0);
@@ -320,8 +331,8 @@ final class _ImportApp {
       }
     });
     await _tester.pumpWidget(MainApp(runtime: runtime));
-    await _until(_tester, find.byType(HomePage));
-    await _waitFor(
+    await app_flow.until(_tester, find.byType(HomePage));
+    await app_flow.waitFor(
       _tester,
       () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
     );
@@ -338,12 +349,12 @@ final class _ImportApp {
     await _tester.pumpWidget(const SizedBox.shrink());
     var isShutDown = false;
     unawaited(_runtime.shutdown().whenComplete(() => isShutDown = true));
-    await _waitFor(_tester, () => isShutDown);
+    await app_flow.waitFor(_tester, () => isShutDown);
   }
 
   /// Ждёт, пока хранится [count] копий.
   Future<void> waitForBackups(int count) =>
-      _waitFor(_tester, () => _backups.length == count);
+      app_flow.waitFor(_tester, () => _backups.length == count);
 
   /// Выбор Главной: вкладка, период и вид статистики.
   HomeStatisticsSelection get homeSelection =>
@@ -361,7 +372,7 @@ final class _ImportApp {
           .execute(command)
           .then((value) => result = value),
     );
-    await _waitFor(_tester, () => result != null);
+    await app_flow.waitFor(_tester, () => result != null);
     expect(result, isA<GraphCommandSucceeded>());
   }
 
@@ -401,7 +412,7 @@ final class _ImportApp {
   /// Открывает с Главной страницу «Настройки».
   Future<void> openSettings() async {
     await _tester.tap(find.byTooltip('Настройки'));
-    await _until(_tester, find.byType(SettingsPage));
+    await app_flow.until(_tester, find.byType(SettingsPage));
     await _tester.pumpAndSettle();
   }
 
@@ -409,12 +420,12 @@ final class _ImportApp {
   /// файл документа после сообщения об успехе.
   Future<File> export() async {
     // Пока состав графа не прочитан, строка недоступна.
-    await _until(_tester, find.text('Сохранить копию всего в файл'));
+    await app_flow.until(_tester, find.text('Сохранить копию всего в файл'));
     await _tester.tap(find.text('Экспорт данных'));
-    await _until(_tester, find.text('Сохранить в файл'));
+    await app_flow.until(_tester, find.text('Сохранить в файл'));
     await _tester.pumpAndSettle();
     await _tester.tap(find.text('Сохранить в файл'));
-    await _until(_tester, find.text('Данные сохранены в файл'));
+    await app_flow.until(_tester, find.text('Данные сохранены в файл'));
     return _documents.created.single;
   }
 
@@ -430,7 +441,7 @@ final class _ImportApp {
 
   /// Ждёт подтверждения импорта прочитанного файла.
   Future<void> waitForConfirmation() async {
-    await _until(_tester, find.text('Импортировать эту копию?'));
+    await app_flow.until(_tester, find.text('Импортировать эту копию?'));
     await _tester.pumpAndSettle();
   }
 
@@ -449,14 +460,14 @@ final class _ImportApp {
     unawaited(
       _container.read(appRouterProvider).push(TagNavigationRoute(tagId: tag)),
     );
-    await _until(_tester, find.byKey(ValueKey(intention)));
+    await app_flow.until(_tester, find.byKey(ValueKey(intention)));
     await _tester.pumpAndSettle();
   }
 
   /// Открывает панель строкой «Резервные копии» и ждёт прочитанный список.
   Future<void> openBackupsSheet() async {
     await _tester.tap(find.text('Резервные копии'));
-    await _until(_tester, find.text('Сделать копию сейчас'));
+    await app_flow.until(_tester, find.text('Сделать копию сейчас'));
     await _tester.pumpAndSettle();
   }
 
@@ -464,7 +475,7 @@ final class _ImportApp {
   /// восстановления с тем, что изменилось с тех пор, — [since].
   Future<void> chooseBackup(String label, {required String since}) async {
     await _tester.tap(find.text(label));
-    await _until(_tester, find.text(since));
+    await app_flow.until(_tester, find.text(since));
     await _tester.pumpAndSettle();
   }
 
@@ -639,7 +650,11 @@ final _catalogList = find.byKey(
 /// Открывает каталог намерений, задаёт условие «есть тег» [tag] и
 /// прокручивает выдачу и страницу.
 Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
-  await openIntentionGraph(tester, waitFor: _until, content: _catalogList);
+  await openIntentionGraph(
+    tester,
+    waitFor: app_flow.until,
+    content: _catalogList,
+  );
   await _tap(
     tester,
     find.byKey(const ValueKey('intention-tag-conditions-add')),
@@ -652,19 +667,19 @@ Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
       ),
     ),
   );
-  await _waitFor(
+  await app_flow.waitFor(
     tester,
     () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
   );
   // Выдача с условием прочитана за эти шаги.
-  await _settle(tester);
+  await app_flow.settle(tester);
   for (final position in [
     _catalogPosition(tester),
     _catalogPagePosition(tester),
   ]) {
     position.jumpTo(position.maxScrollExtent / 2);
   }
-  await _advance(tester);
+  await app_flow.advance(tester);
 
   expect(_tagConditions(), [tag.name.value]);
   expect(_catalogPosition(tester).pixels, isPositive);
@@ -707,39 +722,9 @@ ScrollPosition _catalogPagePosition(WidgetTester tester) => _positionOf(
 
 /// Дожидается элемента [finder], доводит его до видимости и нажимает.
 Future<void> _tap(WidgetTester tester, Finder finder) async {
-  await _until(tester, finder);
+  await app_flow.until(tester, finder);
   await tester.ensureVisible(finder);
   await tester.pump();
   await tester.tap(finder);
   await tester.pump();
-}
-
-Future<void> _until(WidgetTester tester, Finder finder) =>
-    _waitFor(tester, () => finder.evaluate().isNotEmpty);
-
-/// Даёт фоновой работе завершиться: результат, который она показала бы,
-/// появился бы за эти шаги.
-Future<void> _settle(WidgetTester tester) async {
-  for (var step = 0; step < 10; step++) {
-    await _advance(tester);
-  }
-}
-
-/// Продвигает время, пока не выполнится [done]. Шагов хватает, чтобы
-/// показанное сообщение общей поверхности закрылось по таймеру.
-Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
-  for (var step = 0; step < 100 && !done(); step++) {
-    await _advance(tester);
-  }
-  expect(done(), isTrue);
-}
-
-/// Один шаг времени: реальное ожидание, в котором идут операции хранилища,
-/// копирование документа и изоляты записи состояния и снимка замены, и кадр
-/// через 100 мс.
-Future<void> _advance(WidgetTester tester) async {
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 20)),
-  );
-  await tester.pump(const Duration(milliseconds: 100));
 }

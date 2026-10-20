@@ -44,6 +44,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/graph_log_completeness_reference.dart';
@@ -94,7 +95,7 @@ void main() {
           'Восстановление отменит всё это.',
     );
     await app.restoreChosenBackup();
-    await _until(tester, find.text('Копия восстановлена'));
+    await app_flow.until(tester, find.text('Копия восстановлена'));
 
     expect(await app.graphState(), backupState);
     await app.openBackupsSheet();
@@ -172,7 +173,7 @@ void main() {
           'Восстановление отменит всё это.',
     );
     await app.restoreChosenBackup();
-    await _until(tester, find.text('Копия восстановлена'));
+    await app_flow.until(tester, find.text('Копия восстановлена'));
 
     expect(await app.graphState(), backupState);
   });
@@ -236,7 +237,7 @@ void main() {
     );
     await app.waitForBackups(1);
     await _filterIntentionCatalogByTag(tester, health);
-    await openHome(tester, waitFor: _until);
+    await openHome(tester, waitFor: app_flow.until);
     await _tap(tester, find.text('Год'));
     await _tap(tester, find.byTooltip('Предыдущий год'));
     expect(
@@ -251,7 +252,7 @@ void main() {
     );
 
     await app.restoreChosenBackup();
-    await _until(tester, find.text('Копия восстановлена'));
+    await app_flow.until(tester, find.text('Копия восстановлена'));
 
     expect(find.byType(SettingsPage), findsOneWidget);
     expect(
@@ -259,12 +260,19 @@ void main() {
       AppDestination.home,
     );
     await tester.binding.handlePopRoute();
-    await _waitFor(tester, () => find.byType(SettingsPage).evaluate().isEmpty);
+    await app_flow.waitFor(
+      tester,
+      () => find.byType(SettingsPage).evaluate().isEmpty,
+    );
     expect(
       (app.homeSelection.tab, app.homeSelection.period),
       (HomeStatisticsTab.month, StatisticsMonth(2026, 10)),
     );
-    await openIntentionGraph(tester, waitFor: _until, content: _catalogList);
+    await openIntentionGraph(
+      tester,
+      waitFor: app_flow.until,
+      content: _catalogList,
+    );
     expect(_tagConditions(), isEmpty);
     expect(_catalogPosition(tester).pixels, 0);
     expect(_catalogPagePosition(tester).pixels, 0);
@@ -292,7 +300,7 @@ void main() {
     final before = app.storedState();
     final replacement = app.holdReplacement();
     await app.restoreChosenBackup();
-    await _waitFor(tester, () => replacement.isReached);
+    await app_flow.waitFor(tester, () => replacement.isReached);
     await tester.pump();
 
     await tester.tap(find.text('Отменить'));
@@ -301,7 +309,7 @@ void main() {
     replacement.release();
     await app.waitForRestoreEnd();
     // Сообщение появилось бы за это время и ещё не закрылось бы.
-    await _settle(tester);
+    await app_flow.settle(tester);
 
     expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
     expect(app.storedState(), before);
@@ -333,7 +341,7 @@ void main() {
     );
     final replacement = app.holdReplacement();
     await app.restoreChosenBackup();
-    await _waitFor(tester, () => replacement.isReached);
+    await app_flow.waitFor(tester, () => replacement.isReached);
     await tester.pump();
 
     // Снимок замены записан, а замена ещё ничего не удалила.
@@ -356,7 +364,7 @@ void main() {
     expect(find.text('Восстановление копии…'), findsOneWidget);
 
     replacement.release();
-    await _until(tester, find.text('Копия восстановлена'));
+    await app_flow.until(tester, find.text('Копия восстановлена'));
 
     expect(find.byType(SettingsPage), findsOneWidget);
     expect(await app.graphState(), backupState);
@@ -402,17 +410,17 @@ void main() {
     await app.chooseBackup('Сегодня, 08:15', since: since);
 
     await app.restoreChosenBackup();
-    await _until(tester, find.text(_storageFull));
+    await app_flow.until(tester, find.text(_storageFull));
 
     expect(find.text('Восстановление копии…'), findsNothing);
     expect(app.storedState(), before);
 
     app.freeStorage();
     await tester.tap(find.text('Повторить'));
-    await _until(tester, find.text(since));
+    await app_flow.until(tester, find.text(since));
     await tester.pumpAndSettle();
     await app.restoreChosenBackup();
-    await _until(tester, find.text('Копия восстановлена'));
+    await app_flow.until(tester, find.text('Копия восстановлена'));
 
     expect(find.text(_storageFull), findsNothing);
     expect(await app.graphState(), backupState);
@@ -507,8 +515,8 @@ final class _RestoreApp {
       }
     });
     await _tester.pumpWidget(MainApp(runtime: runtime));
-    await _until(_tester, find.byType(HomePage));
-    await _waitFor(
+    await app_flow.until(_tester, find.byType(HomePage));
+    await app_flow.waitFor(
       _tester,
       () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
     );
@@ -526,12 +534,12 @@ final class _RestoreApp {
     await _tester.pumpWidget(const SizedBox.shrink());
     var isShutDown = false;
     unawaited(_runtime.shutdown().whenComplete(() => isShutDown = true));
-    await _waitFor(_tester, () => isShutDown);
+    await app_flow.waitFor(_tester, () => isShutDown);
   }
 
   /// Ждёт, пока хранится [count] копий.
   Future<void> waitForBackups(int count) =>
-      _waitFor(_tester, () => _backups.length == count);
+      app_flow.waitFor(_tester, () => _backups.length == count);
 
   /// Выбор Главной: вкладка, период и вид статистики.
   HomeStatisticsSelection get homeSelection =>
@@ -552,7 +560,7 @@ final class _RestoreApp {
           .execute(command)
           .then((value) => result = value),
     );
-    await _waitFor(_tester, () => result != null);
+    await app_flow.waitFor(_tester, () => result != null);
     expect(result, isA<GraphCommandSucceeded>());
   }
 
@@ -604,14 +612,14 @@ final class _RestoreApp {
   /// Открывает с Главной страницу «Настройки».
   Future<void> openSettings() async {
     await _tester.tap(find.byTooltip('Настройки'));
-    await _until(_tester, find.byType(SettingsPage));
+    await app_flow.until(_tester, find.byType(SettingsPage));
     await _tester.pumpAndSettle();
   }
 
   /// Открывает панель строкой «Резервные копии» и ждёт прочитанный список.
   Future<void> openBackupsSheet() async {
     await _tester.tap(find.text('Резервные копии'));
-    await _until(_tester, find.text('Сделать копию сейчас'));
+    await app_flow.until(_tester, find.text('Сделать копию сейчас'));
     await _tester.pumpAndSettle();
   }
 
@@ -619,7 +627,7 @@ final class _RestoreApp {
   /// восстановления с тем, что изменилось с тех пор, — [since].
   Future<void> chooseBackup(String label, {required String since}) async {
     await _tester.tap(find.text(label));
-    await _until(_tester, find.text(since));
+    await app_flow.until(_tester, find.text(since));
     await _tester.pumpAndSettle();
   }
 
@@ -630,7 +638,7 @@ final class _RestoreApp {
   }
 
   /// Ждёт, пока закроется прогресс восстановления.
-  Future<void> waitForRestoreEnd() => _waitFor(
+  Future<void> waitForRestoreEnd() => app_flow.waitFor(
     _tester,
     () => find.text('Восстановление копии…').evaluate().isEmpty,
   );
@@ -721,7 +729,11 @@ final _catalogList = find.byKey(
 /// Открывает каталог намерений, задаёт условие «есть тег» [tag] и
 /// прокручивает выдачу и страницу.
 Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
-  await openIntentionGraph(tester, waitFor: _until, content: _catalogList);
+  await openIntentionGraph(
+    tester,
+    waitFor: app_flow.until,
+    content: _catalogList,
+  );
   await _tap(
     tester,
     find.byKey(const ValueKey('intention-tag-conditions-add')),
@@ -734,19 +746,19 @@ Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
       ),
     ),
   );
-  await _waitFor(
+  await app_flow.waitFor(
     tester,
     () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
   );
   // Выдача с условием прочитана за эти шаги.
-  await _settle(tester);
+  await app_flow.settle(tester);
   for (final position in [
     _catalogPosition(tester),
     _catalogPagePosition(tester),
   ]) {
     position.jumpTo(position.maxScrollExtent / 2);
   }
-  await _advance(tester);
+  await app_flow.advance(tester);
 
   expect(_tagConditions(), [tag.name.value]);
   expect(_catalogPosition(tester).pixels, isPositive);
@@ -789,37 +801,9 @@ ScrollPosition _catalogPagePosition(WidgetTester tester) => _positionOf(
 
 /// Дожидается элемента [finder], доводит его до видимости и нажимает.
 Future<void> _tap(WidgetTester tester, Finder finder) async {
-  await _until(tester, finder);
+  await app_flow.until(tester, finder);
   await tester.ensureVisible(finder);
   await tester.pump();
   await tester.tap(finder);
   await tester.pump();
-}
-
-Future<void> _until(WidgetTester tester, Finder finder) =>
-    _waitFor(tester, () => finder.evaluate().isNotEmpty);
-
-/// Даёт фоновой работе завершиться: результат, который она показала бы,
-/// появился бы за эти шаги.
-Future<void> _settle(WidgetTester tester) async {
-  for (var step = 0; step < 10; step++) {
-    await _advance(tester);
-  }
-}
-
-/// Продвигает время, пока не выполнится [done].
-Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
-  for (var step = 0; step < 100 && !done(); step++) {
-    await _advance(tester);
-  }
-  expect(done(), isTrue);
-}
-
-/// Один шаг времени: реальное ожидание, в котором идут операции хранилища и
-/// изолят записи снимка замены, и кадр через 100 мс.
-Future<void> _advance(WidgetTester tester) async {
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 20)),
-  );
-  await tester.pump(const Duration(milliseconds: 100));
 }

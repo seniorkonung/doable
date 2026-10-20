@@ -31,6 +31,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_flow_wait.dart' as app_flow;
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/file_document_access.dart';
 import '../support/graph_import_files.dart';
@@ -80,7 +81,7 @@ void main() {
     app.chooseForImport(_document(_referenceFile()));
 
     await app.startImport();
-    await _until(tester, find.text(_importRunning));
+    await app_flow.until(tester, find.text(_importRunning));
     await tester.tap(find.text('Отменить'));
     await tester.pump();
     expect(find.text('Отмена…'), findsOneWidget);
@@ -88,7 +89,7 @@ void main() {
     providerAnswer.complete();
     await app.waitForProgressEnd();
     cancellationAnswer.complete();
-    await _settle(tester);
+    await app_flow.settle(tester);
 
     expect(find.text('Импортировать эту копию?'), findsNothing);
     expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
@@ -114,7 +115,7 @@ void main() {
     final before = app.storedState();
 
     await app.startImport();
-    await _until(tester, find.text(_invalidFile));
+    await app_flow.until(tester, find.text(_invalidFile));
 
     expect(find.text('Импортировать эту копию?'), findsNothing);
     expect(find.text(_storageFull), findsNothing);
@@ -133,7 +134,7 @@ void main() {
     await tester.tap(find.text('Отмена'));
     await tester.pump();
     // Прогресс и сообщение появились бы за это время.
-    await _settle(tester);
+    await app_flow.settle(tester);
 
     expect(find.text('Импортировать эту копию?'), findsNothing);
     expect(find.text(_importRunning), findsNothing);
@@ -151,7 +152,7 @@ void main() {
     app.chooseForImport(_document(newerFormatVersionFile()));
 
     await app.startImport();
-    await _until(tester, find.text(_newerVersion));
+    await app_flow.until(tester, find.text(_newerVersion));
 
     expect(find.text('Импортировать эту копию?'), findsNothing);
     expect(find.text('Выбрать другой файл'), findsNothing);
@@ -172,7 +173,7 @@ void main() {
     await app.waitForConfirmation();
 
     await app.confirmImport();
-    await _until(tester, find.text(_invalidFile));
+    await app_flow.until(tester, find.text(_invalidFile));
 
     expect(find.text(_importRunning), findsNothing);
     expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
@@ -192,7 +193,7 @@ void main() {
     await app.waitForConfirmation();
 
     await app.confirmImport();
-    await _until(tester, find.text(_storageFull));
+    await app_flow.until(tester, find.text(_storageFull));
 
     expect(find.text(_importRunning), findsNothing);
     expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
@@ -204,7 +205,7 @@ void main() {
     await tester.tap(find.text('Повторить'));
     await app.waitForConfirmation();
     await app.confirmImport();
-    await _until(tester, find.text('Данные импортированы'));
+    await app_flow.until(tester, find.text('Данные импортированы'));
 
     expect(find.text(_storageFull), findsNothing);
     expect(await app.graphState(), referenceGraphFileLines().skip(1));
@@ -264,7 +265,7 @@ final class _ImportApp {
     });
     addTearDown(app._shutDown);
     await app._launch();
-    await _waitFor(tester, () => app._backups.length == 1);
+    await app_flow.waitFor(tester, () => app._backups.length == 1);
     return app;
   }
 
@@ -304,8 +305,8 @@ final class _ImportApp {
       }
     });
     await _tester.pumpWidget(MainApp(runtime: runtime));
-    await _until(_tester, find.byType(HomePage));
-    await _waitFor(
+    await app_flow.until(_tester, find.byType(HomePage));
+    await app_flow.waitFor(
       _tester,
       () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
     );
@@ -322,7 +323,7 @@ final class _ImportApp {
     await _tester.pumpWidget(const SizedBox.shrink());
     var isShutDown = false;
     unawaited(_runtime.shutdown().whenComplete(() => isShutDown = true));
-    await _waitFor(_tester, () => isShutDown);
+    await app_flow.waitFor(_tester, () => isShutDown);
   }
 
   /// Граф в хранилище: эталонная выгрузка таблиц графа отдельным
@@ -375,7 +376,7 @@ final class _ImportApp {
   /// Открывает с Главной страницу «Настройки».
   Future<void> openSettings() async {
     await _tester.tap(find.byTooltip('Настройки'));
-    await _until(_tester, find.byType(SettingsPage));
+    await app_flow.until(_tester, find.byType(SettingsPage));
     await _tester.pumpAndSettle();
   }
 
@@ -391,7 +392,7 @@ final class _ImportApp {
 
   /// Ждёт подтверждения импорта прочитанного файла.
   Future<void> waitForConfirmation() async {
-    await _until(_tester, find.text('Импортировать эту копию?'));
+    await app_flow.until(_tester, find.text('Импортировать эту копию?'));
     await _tester.pumpAndSettle();
   }
 
@@ -402,8 +403,10 @@ final class _ImportApp {
   }
 
   /// Ждёт, пока закроется прогресс импорта.
-  Future<void> waitForProgressEnd() =>
-      _waitFor(_tester, () => find.text(_importRunning).evaluate().isEmpty);
+  Future<void> waitForProgressEnd() => app_flow.waitFor(
+    _tester,
+    () => find.text(_importRunning).evaluate().isEmpty,
+  );
 }
 
 /// Облачная фотография: доступно только начало, запись копии дала бы
@@ -509,33 +512,4 @@ File _document(List<int> bytes) {
   addTearDown(() => directory.deleteSync(recursive: true));
   return File.fromUri(directory.uri.resolve('doable.jsonl.gz'))
     ..writeAsBytesSync(bytes);
-}
-
-Future<void> _until(WidgetTester tester, Finder finder) =>
-    _waitFor(tester, () => finder.evaluate().isNotEmpty);
-
-/// Даёт фоновой работе завершиться: результат, который она показала бы,
-/// появился бы за эти шаги.
-Future<void> _settle(WidgetTester tester) async {
-  for (var step = 0; step < 10; step++) {
-    await _advance(tester);
-  }
-}
-
-/// Продвигает время, пока не выполнится [done].
-Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
-  for (var step = 0; step < 100 && !done(); step++) {
-    await _advance(tester);
-  }
-  expect(done(), isTrue);
-}
-
-/// Один шаг времени: реальное ожидание, в котором идут операции хранилища,
-/// копирование документа и изолят записи снимка замены, и кадр через
-/// 100 мс.
-Future<void> _advance(WidgetTester tester) async {
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 20)),
-  );
-  await tester.pump(const Duration(milliseconds: 100));
 }
