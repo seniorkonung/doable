@@ -300,8 +300,8 @@ class DocumentAccessPlugin internal constructor(
             if (outcome != ReadOutcome.COPIED) destination.delete()
             releaseGrant(document)
             reads.remove(destination.path, read)
-            // Отмена уже сообщила исход. Позднее завершение и отказ канала
-            // удаляют только файл своей попытки.
+            // Отмена уже сообщила исход. Позднее завершение удаляет только
+            // файл своей попытки.
             if (!read.finish(outcome) && outcome == ReadOutcome.COPIED) destination.delete()
         }
     }
@@ -508,14 +508,8 @@ private class DocumentRead(result: MethodChannel.Result) {
         if (state != State.RUNNING) return false
         val result = checkNotNull(pending)
         pending = null
-        return try {
-            result.success(value)
-            true
-        } catch (error: Exception) {
-            // Канал потерян: поток и право больше некому передать.
-            cancel()
-            false
-        }
+        result.success(value)
+        return true
     }
 
     @Synchronized
@@ -526,11 +520,7 @@ private class DocumentRead(result: MethodChannel.Result) {
         pending = null
         requests.add(ReadAction.FINISH)
         cancellation.cancel()
-        try {
-            result?.let(ReadOutcome.CANCELLED::reply)
-        } catch (error: Exception) {
-            // Движок мог уже потерять канал; повторного ответа не будет.
-        }
+        result?.let(ReadOutcome.CANCELLED::reply)
     }
 
     @Synchronized
@@ -539,13 +529,8 @@ private class DocumentRead(result: MethodChannel.Result) {
         state = State.FINISHED
         val result = checkNotNull(pending)
         pending = null
-        return try {
-            outcome.reply(result)
-            true
-        } catch (error: Exception) {
-            // Ресурсы уже освобождены, а канал больше не принимает ответ.
-            false
-        }
+        outcome.reply(result)
+        return true
     }
 
     private enum class State { RUNNING, CANCELLED, FINISHED }

@@ -736,31 +736,6 @@ class DocumentAccessPluginTest {
             plugin.onDetachedFromEngine(pluginBinding(context, messenger))
         }
 
-    @Test
-    fun `Отказ канала при передаче начала завершает сессию и отпускает поток и право`() {
-        var closed = false
-        var replies = 0
-        openDocument {
-            content.writeBytes(byteArrayOf(1))
-            onReadClose = { closed = true }
-        }
-        val copy = File(temporary.root, "import-channel-lost.jsonl.gz")
-
-        withDocumentRead(copy, prefixLimit = 2, chunkSize = 1) { worker ->
-            messenger.invoke("readDocumentPrefix", mapOf("destination" to copy.path), onReply = {
-                replies++
-                throw IllegalStateException("Канал потерян")
-            })
-            worker.join(5_000)
-
-            assertFalse(worker.isAlive)
-            assertEquals(1, replies)
-            assertTrue(closed)
-            assertFalse(copy.exists())
-            assertEquals(emptyList<Uri>(), readGrants())
-        }
-    }
-
     private fun assertStoppedWhileAwaitingDecision(stop: (File) -> Unit) {
         var signal: CancellationSignal? = null
         var closed = false
