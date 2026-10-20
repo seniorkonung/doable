@@ -1521,3 +1521,15 @@
   - **Dependencies:** 4.21, 4.23, 4.33, 4.34.
   - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt`, `android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt`.
   - **Estimated scope:** S.
+
+- [ ] 4.36 Удалить обработку недостижимого отказа канала из нативной сессии чтения
+  - **Acceptance criteria:**
+    - По уточнённому решению 13 [дизайна](design.md) из `DocumentRead.answer`, `cancel` и `finish` удалены перехваты исключений `MethodChannel.Result`, трактующие их как потерю канала, и обслуживающие их ветки и комментарии. В части «отказа канала» эта задача заменяет критерий завершённой задачи 4.21; её остальные гарантии и уточнения задачи 4.35 сохраняются.
+    - Проверка «Отказ канала при передаче начала завершает сессию и отпускает поток и право», искусственно бросающая `IllegalStateException` из ответа канала, удалена. Существующие проверки отмены и отсоединения движка остаются владельцами утверждений об освобождении потока и права, очистке файла и однократном ответе. Обработка ошибок поставщика и записи и пользовательские исходы импорта сохраняются по решению 13.
+  - **Verification:**
+    - Сверить путь отправки ответа в подключённом встраивании Flutter: при отсоединении движка `FlutterJNI.invokePlatformMessageResponseCallback` пишет предупреждение и возвращается, а `DartMessenger.Reply.reply` бросает `Reply already submitted` при повторном ответе. Проверить diff: удалены только лишняя обработка, связанные комментарии и искусственная проверка; очисткой при отсоединении по-прежнему владеет `onDetachedFromEngine`.
+    - Выполнить из `android/` `./gradlew :app:testDebugUnitTest --tests software.doable.doable.DocumentAccessPluginTest` с уже установленной совместимой JDK 25 и `mise exec --no-deps -- flutter test test/data_transfer/method_channel_document_access_test.dart` из корня репозитория.
+    - Сопоставить результат с условием Ready to advance этапа 4 [плана](plan.md), результатами задач 4.33–4.35 и существующими свидетельствами задач 4.14, 4.29 и 4.32. Передать результаты в ревью после последней задачи этапа: только оно выполняет полные проверки `mise run check` и решает о завершении этапа. Эта задача этап не завершает; устройство для неё не требуется.
+  - **Dependencies:** 4.21, 4.35.
+  - **Files likely touched:** `android/app/src/main/kotlin/software/doable/doable/DocumentAccessPlugin.kt`, `android/app/src/test/kotlin/software/doable/doable/DocumentAccessPluginTest.kt`.
+  - **Estimated scope:** S.
