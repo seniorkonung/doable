@@ -31,6 +31,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show CouldNotRollBackException;
@@ -42,9 +43,9 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/transaction_storage_exhaustion.dart';
 
-/// Эталонный файл формата версии 1: все виды записей, архивированные
-/// намерение и связь и путь через архивированную связь к намерению без
-/// готовности к действию.
+/// Эталонный файл формата версии 1: все виды записей, синий и бесцветный
+/// теги, архивированные намерение и связь и путь через архивированную связь
+/// к намерению без готовности к действию.
 const _goldenPath = 'test/graph_format/golden/graph_format_v1.jsonl';
 
 /// Идентификаторы сущностей эталонного файла.
@@ -106,9 +107,10 @@ void main() {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
-    CreateTag(name: TagName.fromInput(name), color: null),
-  )).tag;
+  Future<Tag> createTag(String name, {TagColor? color}) async =>
+      (await confirm<TagCreated>(
+        CreateTag(name: TagName.fromInput(name), color: color),
+      )).tag;
 
   Future<Intention> createIntention(
     String title, {
@@ -122,9 +124,9 @@ void main() {
     ),
   )).intention;
 
-  /// Непустой прежний граф: тег, намерение и назначение тега.
+  /// Непустой прежний граф: зелёный тег, намерение и назначение тега.
   Future<void> createPreviousGraph() async {
-    final home = await createTag('Дача');
+    final home = await createTag('Дача', color: TagColor.green);
     await createIntention('Бег трусцой', tagIds: {home.id});
   }
 
