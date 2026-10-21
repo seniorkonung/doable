@@ -212,7 +212,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/intention_summary_view.dart`, помощник рядом с адаптером задачи 2.2, `test/intention/presentation/intention_summary_view_test.dart`; правка поиска строки тегов в `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/intention_tag_search_app_flow_test.dart` и `test/app/intention_creation_sheet_integration_test.dart`.
   - **Размер:** M — помощник и одно представление; остальное — механическая правка поиска в проверках.
 
-- [ ] 2.7 Показывать точку в назначениях тегов в подробностях намерения
+- [x] 2.7 Показывать точку в назначениях тегов в подробностях намерения
   - **Критерии приёмки:**
     - Строка назначения показывает `TagDot` размера 8 перед названием. Переход к навигации, снятие назначения, их подписи и состояния не меняются.
   - **Проверка:** `mise exec --no-deps -- flutter test test/tag/presentation/assignments/ test/intention/presentation/details/intention_details_tags_test.dart test/tag/presentation/tag_accessibility_test.dart`. Дополнить проверку раздела назначений цветным и бесцветным тегами; существующие проверки семантики проходят без изменений.
