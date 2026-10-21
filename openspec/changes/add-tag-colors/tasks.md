@@ -195,7 +195,7 @@
   - **Предполагаемые файлы:** `lib/src/tag/presentation/editor/tag_editor_page.dart`, `lib/src/tag/presentation/editor/tag_editor_view_model.dart`, `lib/src/tag/presentation/editor/tag_editor_state.dart`, адаптер задачи 2.2 и его проверка, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/tag/presentation/editor/tag_editor_page_test.dart`; генерируемые файлы локализации.
   - **Размер:** M — одна вертикальная правка формы; строки ARB и адаптер дополняются механически.
 
-- [ ] 2.5 Называть форму существующего тега и открывающее её действие каталога изменением тега
+- [x] 2.5 Называть форму существующего тега и открывающее её действие каталога изменением тега
   - **Критерии приёмки:**
     - Действие строки каталога называется «Изменить тег», форма существующего тега — «Изменение тега», её кнопка сохранения — «Сохранить»; по-английски — «Edit tag», «Edit tag» и «Save». Подписи формы создания не меняются, а описания этих строк в ARB говорят об изменении тега.
   - **Проверка:** `mise run codegen`; `mise exec --no-deps -- flutter test test/tag/presentation/catalog/ test/tag/presentation/editor/ test/intention/presentation/catalog/tag_condition_picker_page_test.dart test/app/tag_app_lifecycle_test.dart test/app/tag_navigation_app_lifecycle_test.dart test/app/navigation/app_shell_pages_above_test.dart`. Существующие проверки, искавшие прежние подписи, переведены на новые.

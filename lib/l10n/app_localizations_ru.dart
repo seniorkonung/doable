@@ -1881,7 +1881,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCatalogCreate => 'Создать тег';
 
   @override
-  String get tagCatalogRename => 'Переименовать тег';
+  String get tagCatalogRename => 'Изменить тег';
 
   @override
   String get tagCatalogDelete => 'Удалить тег';
@@ -1918,7 +1918,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagEditorCreateTitle => 'Новый тег';
 
   @override
-  String get tagEditorRenameTitle => 'Переименование тега';
+  String get tagEditorRenameTitle => 'Изменение тега';
 
   @override
   String get tagEditorNameLabel => 'Название тега';
@@ -1966,7 +1966,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagEditorCreateAction => 'Создать тег';
 
   @override
-  String get tagEditorRenameAction => 'Сохранить название';
+  String get tagEditorRenameAction => 'Сохранить';
 
   @override
   String get tagEditorSaving => 'Сохраняем тег…';

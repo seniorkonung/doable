@@ -1859,7 +1859,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCatalogCreate => 'Create tag';
 
   @override
-  String get tagCatalogRename => 'Rename tag';
+  String get tagCatalogRename => 'Edit tag';
 
   @override
   String get tagCatalogDelete => 'Delete tag';
@@ -1896,7 +1896,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagEditorCreateTitle => 'New tag';
 
   @override
-  String get tagEditorRenameTitle => 'Rename tag';
+  String get tagEditorRenameTitle => 'Edit tag';
 
   @override
   String get tagEditorNameLabel => 'Tag name';
@@ -1944,7 +1944,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagEditorCreateAction => 'Create tag';
 
   @override
-  String get tagEditorRenameAction => 'Save name';
+  String get tagEditorRenameAction => 'Save';
 
   @override
   String get tagEditorSaving => 'Saving tag…';

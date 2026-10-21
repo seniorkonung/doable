@@ -2827,10 +2827,10 @@ abstract class AppLocalizations {
   /// **'Create tag'**
   String get tagCatalogCreate;
 
-  /// Переименовать выбранный тег
+  /// Изменить выбранный тег
   ///
   /// In en, this message translates to:
-  /// **'Rename tag'**
+  /// **'Edit tag'**
   String get tagCatalogRename;
 
   /// Удалить выбранный тег
@@ -2893,10 +2893,10 @@ abstract class AppLocalizations {
   /// **'New tag'**
   String get tagEditorCreateTitle;
 
-  /// Заголовок формы переименования тега
+  /// Заголовок формы изменения тега
   ///
   /// In en, this message translates to:
-  /// **'Rename tag'**
+  /// **'Edit tag'**
   String get tagEditorRenameTitle;
 
   /// Подпись поля названия тега
@@ -2989,10 +2989,10 @@ abstract class AppLocalizations {
   /// **'Create tag'**
   String get tagEditorCreateAction;
 
-  /// Подтвердить переименование тега
+  /// Подтвердить изменение тега
   ///
   /// In en, this message translates to:
-  /// **'Save name'**
+  /// **'Save'**
   String get tagEditorRenameAction;
 
   /// Выполняется запись тега

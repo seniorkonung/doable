@@ -423,7 +423,7 @@ void main() {
     h.repository.completePending([health]);
     await tester.pumpAndSettle();
 
-    for (final tooltip in ['Создать тег', 'Переименовать тег', 'Удалить тег']) {
+    for (final tooltip in ['Создать тег', 'Изменить тег', 'Удалить тег']) {
       expect(
         find.descendant(of: _picker, matching: find.byTooltip(tooltip)),
         findsNothing,

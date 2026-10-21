@@ -889,7 +889,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
     await _waitForEditorToClose(tester);
     expect(find.text('Дом'), findsOneWidget);
-    expect(find.byTooltip('Rename tag'), findsOneWidget);
+    expect(find.byTooltip('Edit tag'), findsOneWidget);
     expect(raw.select('SELECT id FROM tags'), hasLength(1));
     expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
   });
@@ -1166,7 +1166,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     await _waitForEditorToClose(tester);
 
-    await tester.tap(find.byTooltip('Переименовать тег').first);
+    await tester.tap(find.byTooltip('Изменить тег').first);
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsWidgets);
     await tester.enterText(
@@ -1178,7 +1178,7 @@ void main() {
     expect(find.text('Быт'), findsOneWidget);
     expect(find.text('Работа'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Переименовать тег').first);
+    await tester.tap(find.byTooltip('Изменить тег').first);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('tag-editor-name')),
@@ -1422,7 +1422,7 @@ void main() {
     await tester.pump();
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(1)}')), findsNothing);
-    expect(find.byTooltip('Rename tag'), findsNothing);
+    expect(find.byTooltip('Edit tag'), findsNothing);
     expect(find.text('Refreshing tags…'), findsOneWidget);
 
     repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
@@ -1430,13 +1430,13 @@ void main() {
     await tester.pump();
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(1)}')), findsNothing);
-    expect(find.byTooltip('Rename tag'), findsNothing);
+    expect(find.byTooltip('Edit tag'), findsNothing);
 
     repository.complete(_page([_tag(2, 'Работа')], revision: 2));
     await tester.pumpAndSettle();
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(2)}')), findsOneWidget);
-    expect(find.byTooltip('Rename tag'), findsOneWidget);
+    expect(find.byTooltip('Edit tag'), findsOneWidget);
   });
 
   testWidgets('пакет после снимка обновляет выбранное имя из редактора', (
@@ -1533,7 +1533,7 @@ void main() {
 
     expect(find.text('Старое имя'), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')), findsNothing);
-    expect(find.byTooltip('Rename tag'), findsOneWidget);
+    expect(find.byTooltip('Edit tag'), findsOneWidget);
   });
 
   testWidgets(
