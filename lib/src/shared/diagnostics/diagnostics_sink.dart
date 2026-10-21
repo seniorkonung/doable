@@ -131,7 +131,7 @@ enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
 
 enum TagCommandDiagnosticsType {
   create,
-  rename,
+  update,
   delete,
   assign,
   removeAssignment,

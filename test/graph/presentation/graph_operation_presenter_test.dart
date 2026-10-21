@@ -417,9 +417,9 @@ void main() {
 
   for (final scenario in <({TagCommandKind kind, bool unchanged, String ru})>[
     (kind: TagCommandKind.create, unchanged: false, ru: 'Тег создан.'),
-    (kind: TagCommandKind.rename, unchanged: false, ru: 'Тег переименован.'),
+    (kind: TagCommandKind.update, unchanged: false, ru: 'Тег переименован.'),
     (
-      kind: TagCommandKind.rename,
+      kind: TagCommandKind.update,
       unchanged: true,
       ru: 'Название тега не изменилось.',
     ),
@@ -446,7 +446,7 @@ void main() {
 
         final operation = switch (scenario.kind) {
           TagCommandKind.create => 'Создание',
-          TagCommandKind.rename => 'Изменение',
+          TagCommandKind.update => 'Изменение',
           TagCommandKind.delete => 'Удаление',
           TagCommandKind.assign || TagCommandKind.removeAssignment =>
             throw StateError('Сценарий проверяет жизненный цикл тега.'),
@@ -474,7 +474,7 @@ void main() {
   ) async {
     final harness = await _pumpPresenterApp(tester);
     final accepted = harness.startTag(TagCommandKind.create);
-    harness.completeTagSuccess(accepted, TagCommandKind.rename);
+    harness.completeTagSuccess(accepted, TagCommandKind.update);
     await tester.pumpAndSettle();
 
     expect(
@@ -2046,10 +2046,14 @@ final class _PresenterHarness {
     final accepted = switch (kind) {
       TagCommandKind.create => _coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(TagName.fromInput('Планы')),
+        CreateTag(name: TagName.fromInput('Планы'), color: null),
       ),
-      TagCommandKind.rename => _coordinator.acceptTagRename(
-        RenameTag(tagId: _tagId, name: TagName.fromInput('Новое имя')),
+      TagCommandKind.update => _coordinator.acceptTagUpdate(
+        UpdateTag(
+          tagId: _tagId,
+          name: TagName.fromInput('Новое имя'),
+          color: null,
+        ),
       ),
       TagCommandKind.delete => _coordinator.acceptTagDelete(DeleteTag(_tagId)),
       TagCommandKind.assign => _coordinator.acceptTagAssign(
@@ -2089,11 +2093,11 @@ final class _PresenterHarness {
       TagCommandKind.create => TagCreated(
         TagCreatedChange(revision: revision, after: before),
       ),
-      TagCommandKind.rename when unchanged => TagUnchanged(
+      TagCommandKind.update when unchanged => TagUnchanged(
         TagUnchangedChange(revision: revision, tag: before),
       ),
-      TagCommandKind.rename => TagRenamed(
-        TagRenamedChange(revision: revision, before: before, after: after),
+      TagCommandKind.update => TagUpdated(
+        TagUpdatedChange(revision: revision, before: before, after: after),
       ),
       TagCommandKind.delete => TagDeleted(
         TagDeletedChange(revision: revision, tagId: _tagId),

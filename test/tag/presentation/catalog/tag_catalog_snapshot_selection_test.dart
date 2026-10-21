@@ -211,8 +211,8 @@ final class _Harness {
     repository.commandResult = TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: _Revision(revision),
-        value: TagRenamed(
-          TagRenamedChange(
+        value: TagUpdated(
+          TagUpdatedChange(
             before: other,
             after: renamedOther,
             revision: _Revision(revision),
@@ -223,8 +223,12 @@ final class _Harness {
     final start =
         container
                 .read(graphCommandCoordinatorProvider.notifier)
-                .acceptTagRename(
-                  RenameTag(tagId: other.id, name: renamedOther.name),
+                .acceptTagUpdate(
+                  UpdateTag(
+                    tagId: other.id,
+                    name: renamedOther.name,
+                    color: other.color,
+                  ),
                 )
             as TagCommandAccepted;
     await start.future;

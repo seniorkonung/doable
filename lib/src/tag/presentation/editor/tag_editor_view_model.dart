@@ -54,10 +54,10 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     final start = switch (state.context) {
       TagEditorCreating(:final formKey) => _coordinator.acceptTagCreation(
         formKey,
-        CreateTag(name),
+        CreateTag(name: name, color: null),
       ),
-      TagEditorRenaming(:final tag) => _coordinator.acceptTagRename(
-        RenameTag(tagId: tag.id, name: name),
+      TagEditorRenaming(:final tag) => _coordinator.acceptTagUpdate(
+        UpdateTag(tagId: tag.id, name: name, color: tag.color),
       ),
     };
     switch (start) {
@@ -109,7 +109,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
         case GraphResultSuccess(:final value):
           final TagId tagId = switch (value) {
             TagCreated(:final tag) => tag.id,
-            TagRenamed(:final after) => after.id,
+            TagUpdated(:final after) => after.id,
             TagUnchanged(:final tag) => tag.id,
             TagDeleted() => throw StateError('Unexpected tag command result'),
             TagAssignmentChanged() || TagAssignmentUnchanged() =>

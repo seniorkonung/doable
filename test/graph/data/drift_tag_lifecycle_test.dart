@@ -8,6 +8,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,7 +61,8 @@ void main() {
           .toList(),
   };
 
-  test('создание и переименование сохраняют граф и все назначения', () async {
+  test('создание и редактирование названия и цвета сохраняют граф и все '
+      'назначения', () async {
     seedRawGraph(raw, () {
       raw.execute(
         'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -96,10 +98,19 @@ void main() {
     final before = graphState();
     final initialRevision = await currentRevision();
 
-    final created = await repository.execute(CreateTag(_name('Работа')));
+    final created = await repository.execute(
+      CreateTag(name: _name('Работа'), color: TagColor.green),
+    );
     expect(created, isA<TagCommandSucceeded>());
     final newTag = (created as TagCommandSucceeded).value.value as TagCreated;
     expect(newTag.tag.name.value, 'Работа');
+    expect(newTag.tag.color, TagColor.green);
+    expect(
+      raw.select('SELECT color FROM tags WHERE id = ?', [
+        newTag.tag.id.toCanonicalString(),
+      ]).single['color'],
+      'green',
+    );
     expect(newTag.tag.id.toCanonicalString(), isNot(_uuid(6)));
     expect(
       raw.select('SELECT creation_sequence FROM tags WHERE id = ?', [
@@ -121,10 +132,10 @@ void main() {
 
     final tagId = (TagId.decode(_uuid(6)) as TagIdDecodingSuccess).id;
     final renamed = await repository.execute(
-      RenameTag(tagId: tagId, name: _name('Быт')),
+      UpdateTag(tagId: tagId, name: _name('Быт'), color: null),
     );
     expect(renamed, isA<TagCommandSucceeded>());
-    final outcome = (renamed as TagCommandSucceeded).value.value as TagRenamed;
+    final outcome = (renamed as TagCommandSucceeded).value.value as TagUpdated;
     expect(outcome.before.id, tagId);
     expect(outcome.before.name.value, 'Дом');
     expect(outcome.after.id, tagId);
@@ -140,11 +151,45 @@ void main() {
       ]).single['name'],
       'Быт',
     );
+
+    final recolored = await repository.execute(
+      UpdateTag(tagId: tagId, name: _name('Быт'), color: TagColor.blue),
+    );
+    final recoloredOutcome =
+        (recolored as TagCommandSucceeded).value.value as TagUpdated;
+    expect(
+      [recoloredOutcome.before.color, recoloredOutcome.after.color],
+      [null, TagColor.blue],
+    );
+    expect(recoloredOutcome.after.name.value, 'Быт');
+    expect(
+      recolored.value.revision.compareTo(renamed.value.revision),
+      GraphRevisionOrder.newer,
+    );
+    expect(graphState(), before);
+
+    final cleared = await repository.execute(
+      UpdateTag(tagId: tagId, name: _name('Быт'), color: null),
+    );
+    expect(
+      ((cleared as TagCommandSucceeded).value.value as TagUpdated).after.color,
+      isNull,
+    );
+    expect(
+      raw
+          .select('SELECT name, color FROM tags WHERE id = ?', [_uuid(6)])
+          .single
+          .values,
+      ['Быт', null],
+    );
+    expect(graphState(), before);
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
   });
 
-  test('повтор имени не меняет ревизию, смена регистра разрешена, чужое имя занято', () async {
-    final first = await repository.execute(CreateTag(_name('Straße')));
+  test('повтор названия и цвета не меняет ревизию, смена регистра разрешена, чужое имя занято', () async {
+    final first = await repository.execute(
+      CreateTag(name: _name('Straße'), color: TagColor.blue),
+    );
     final id =
         ((first as TagCommandSucceeded).value.value as TagCreated).tag.id;
     final sequence = raw
@@ -153,15 +198,15 @@ void main() {
     final before = await currentRevision();
 
     final unchanged = await repository.execute(
-      RenameTag(tagId: id, name: _name('Straße')),
+      UpdateTag(tagId: id, name: _name('Straße'), color: TagColor.blue),
     );
     expect((unchanged as TagCommandSucceeded).value.value, isA<TagUnchanged>());
     expect(unchanged.value.revision.compareTo(before), GraphRevisionOrder.same);
 
     final renamed = await repository.execute(
-      RenameTag(tagId: id, name: _name('STRASSE')),
+      UpdateTag(tagId: id, name: _name('STRASSE'), color: TagColor.blue),
     );
-    expect((renamed as TagCommandSucceeded).value.value, isA<TagRenamed>());
+    expect((renamed as TagCommandSucceeded).value.value, isA<TagUpdated>());
     expect(
       raw
           .select('SELECT creation_sequence FROM tags')
@@ -170,7 +215,9 @@ void main() {
     );
 
     final revisionBeforeConflict = await currentRevision();
-    final duplicate = await repository.execute(CreateTag(_name('straße')));
+    final duplicate = await repository.execute(
+      CreateTag(name: _name('straße'), color: null),
+    );
     expect(duplicate, isA<TagCommandFailed>());
     expect(
       (duplicate as TagCommandFailed).failure,
@@ -191,8 +238,8 @@ void main() {
     'конкурирующие команды сохраняют единственность и исходную идентичность',
     () async {
       final results = await Future.wait([
-        repository.execute(CreateTag(_name('Дом'))),
-        repository.execute(CreateTag(_name('ДОМ'))),
+        repository.execute(CreateTag(name: _name('Дом'), color: null)),
+        repository.execute(CreateTag(name: _name('ДОМ'), color: null)),
       ]);
       expect(results.whereType<TagCommandSucceeded>().length, 1);
       expect(results.whereType<TagCommandFailed>().length, 1);
@@ -207,11 +254,13 @@ void main() {
         created.id,
       );
 
-      final other = await repository.execute(CreateTag(_name('Работа')));
+      final other = await repository.execute(
+        CreateTag(name: _name('Работа'), color: TagColor.blue),
+      );
       final otherId =
           ((other as TagCommandSucceeded).value.value as TagCreated).tag.id;
       final renamed = await repository.execute(
-        RenameTag(tagId: otherId, name: _name('дом')),
+        UpdateTag(tagId: otherId, name: _name('дом'), color: TagColor.green),
       );
       expect(
         (renamed as TagCommandFailed).failure,
@@ -221,18 +270,24 @@ void main() {
           created.id,
         ),
       );
+      // Конфликт названия откатывает и цвет из той же правки.
       expect(
-        raw.select('SELECT name FROM tags WHERE id = ?', [
-          otherId.toCanonicalString(),
-        ]).single['name'],
-        'Работа',
+        raw
+            .select('SELECT name, color FROM tags WHERE id = ?', [
+              otherId.toCanonicalString(),
+            ])
+            .single
+            .values,
+        ['Работа', 'blue'],
       );
       expect(raw.select('SELECT id FROM tags').length, 2);
     },
   );
 
   test('наблюдатель получает переименование подтверждённого тега', () async {
-    final created = await repository.execute(CreateTag(_name('Дом')));
+    final created = await repository.execute(
+      CreateTag(name: _name('Дом'), color: null),
+    );
     final id =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
     final events = StreamIterator(repository.watchTag(id));
@@ -241,7 +296,7 @@ void main() {
     expect((events.current as TagReadSuccess).value.value!.name.value, 'Дом');
 
     final renamed = await repository.execute(
-      RenameTag(tagId: id, name: _name('Быт')),
+      UpdateTag(tagId: id, name: _name('Быт'), color: null),
     );
     expect(renamed, isA<TagCommandSucceeded>());
     expect(await events.moveNext(), isTrue);
@@ -256,10 +311,10 @@ void main() {
 
   test('отсутствующий тег не заменяется новым одноимённым', () async {
     final missing = (TagId.decode(_uuid(8)) as TagIdDecodingSuccess).id;
-    await repository.execute(CreateTag(_name('Дом')));
+    await repository.execute(CreateTag(name: _name('Дом'), color: null));
     final before = await currentRevision();
     final result = await repository.execute(
-      RenameTag(tagId: missing, name: _name('Дом')),
+      UpdateTag(tagId: missing, name: _name('Дом'), color: null),
     );
     expect((result as TagCommandFailed).failure, isA<TagNotFoundFailure>());
     expect(

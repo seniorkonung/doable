@@ -573,10 +573,11 @@ void _testTaggedGraphLifecycle() {
       const name = 'Общее новое название';
       await _changed(
         tester,
-        (coordinator.acceptTagRename(
-          RenameTag(
+        (coordinator.acceptTagUpdate(
+          UpdateTag(
             tagId: _tagId(firstTagNumber),
             name: TagName.fromInput(name),
+            color: null,
           ),
         ) as TagCommandAccepted).future,
       );
@@ -609,7 +610,7 @@ void _testTaggedGraphLifecycle() {
         tester,
         (coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(TagName.fromInput(name)),
+          CreateTag(name: TagName.fromInput(name), color: null),
         ) as TagCommandAccepted).future,
       );
       expect(created.isFailure, isFalse);

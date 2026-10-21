@@ -201,7 +201,7 @@ TagCommandAccepted acceptTagCommand(
     AssignTag() => coordinator.acceptTagAssign(command),
     RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(command),
     CreateTag() => coordinator.acceptTagCreation(TagCreationFormKey(), command),
-    RenameTag() => coordinator.acceptTagRename(command),
+    UpdateTag() => coordinator.acceptTagUpdate(command),
     DeleteTag() => coordinator.acceptTagDelete(command),
   };
   expect(start, isA<TagCommandAccepted>());
@@ -308,8 +308,8 @@ TagCommandResult tagRenameSuccess({
 }) => TagCommandSucceeded(
   ConfirmedGraphResult(
     revision: revision,
-    value: TagRenamed(
-      TagRenamedChange(revision: revision, before: before, after: after),
+    value: TagUpdated(
+      TagUpdatedChange(revision: revision, before: before, after: after),
     ),
   ),
 );

@@ -314,7 +314,7 @@ final class _ControlledRepository extends Fake
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
     if (command is CreateTag) createAttempts++;
-    if (command is RenameTag) {
+    if (command is UpdateTag) {
       renameAttempts++;
       final gate = _heldRename;
       if (gate != null) {

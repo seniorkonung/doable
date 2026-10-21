@@ -1365,9 +1365,9 @@ final class _CatalogChangePackage {
   final List<DailyChoiceChange> dailyChanges;
   final List<TagChange> tagChanges;
 
-  /// Новые названия тегов, переименованных пакетом.
+  /// Новые состояния тегов, отредактированных пакетом.
   Iterable<Tag> get renamedTags =>
-      tagChanges.whereType<TagRenamedChange>().map((change) => change.after);
+      tagChanges.whereType<TagUpdatedChange>().map((change) => change.after);
 
   /// Идентификаторы тегов, физически удалённых пакетом.
   Iterable<TagId> get deletedTagIds =>

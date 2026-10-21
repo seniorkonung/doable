@@ -14,6 +14,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -109,7 +110,7 @@ void main() {
     expect(await harness.databaseFile.readAsBytes(), corrupted);
   });
 
-  test('чтение, назначение архивированному действию, навигация и снятие сохраняются после перезапусков', () async {
+  test('чтение, правка цвета, назначение архивированному действию, навигация и снятие сохраняются после перезапусков', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     late sqlite.Database raw;
@@ -148,14 +149,15 @@ void main() {
     Future<void> expectState(
       DriftPersonalGraphRepository repository,
       TagId tagId, {
+      required TagColor? color,
       required List<IntentionId> active,
       required List<IntentionId> archived,
     }) async {
       final catalog = (await repository.getTagCatalog(
         const TagCatalogBrowseMode(),
       ) as TagCatalogSuccess).value;
-      expect(catalog.items.map((tag) => (tag.id, tag.name.value)), [
-        (tagId, 'Дом'),
+      expect(catalog.items.map((tag) => (tag.id, tag.name.value, tag.color)), [
+        (tagId, 'Дом', color),
       ]);
       for (final intentionId in [activeAction, archivedAction]) {
         final snapshot = (await repository.getTagAssignments(
@@ -190,11 +192,11 @@ void main() {
       isEmpty,
     );
     final created = await repository.execute(
-      CreateTag(TagName.fromInput('Дом')),
+      CreateTag(name: TagName.fromInput('Дом'), color: null),
     );
     final tagId =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
-    await expectState(repository, tagId, active: [], archived: []);
+    await expectState(repository, tagId, color: null, active: [], archived: []);
 
     for (final intentionId in [archivedAction, activeAction, archivedAction]) {
       expect(
@@ -212,8 +214,20 @@ void main() {
     await expectState(
       repository,
       tagId,
+      color: null,
       active: [activeAction],
       archived: [archivedAction],
+    );
+
+    expect(
+      (await repository.execute(
+        UpdateTag(
+          tagId: tagId,
+          name: TagName.fromInput('Дом'),
+          color: TagColor.blue,
+        ),
+      ) as TagCommandSucceeded).value.value,
+      isA<TagUpdated>(),
     );
 
     for (final intentionId in [activeAction, archivedAction]) {
@@ -228,7 +242,13 @@ void main() {
     // Тег без назначений остаётся доступным для явного назначения.
     repository = await restart();
     expect(_assignmentRows(raw), isEmpty);
-    await expectState(repository, tagId, active: [], archived: []);
+    await expectState(
+      repository,
+      tagId,
+      color: TagColor.blue,
+      active: [],
+      archived: [],
+    );
     expect(
       await repository.execute(
         AssignTag(tagId: tagId, intentionId: archivedAction),
@@ -250,6 +270,7 @@ void main() {
     await expectState(
       repository,
       tagId,
+      color: TagColor.blue,
       active: [],
       archived: [archivedAction],
     );

@@ -95,8 +95,8 @@ void _registerTerminalAppScenarios() {
         final command = app.repository.holdNextCommand(
           delay: _CommandDelay.afterWrite,
         );
-        final accepted = app.runtime.commandCoordinator.acceptTagRename(
-          RenameTag(tagId: _tagId, name: TagName.fromInput('Быт')),
+        final accepted = app.runtime.commandCoordinator.acceptTagUpdate(
+          UpdateTag(tagId: _tagId, name: TagName.fromInput('Быт'), color: null),
         ) as TagCommandAccepted;
         await _waitFor(tester, () => command.written.isCompleted);
         await _waitFor(
@@ -116,7 +116,7 @@ void _registerTerminalAppScenarios() {
         expect(find.text(l10n.tagNavigationTag('Быт')), findsOneWidget);
         command.release.complete();
         expect((await _completed(tester, accepted.future)).isFailure, isFalse);
-        expect(app.repository.commands.whereType<RenameTag>(), hasLength(1));
+        expect(app.repository.commands.whereType<UpdateTag>(), hasLength(1));
         expect(tester.takeException(), isNull);
       },
     );

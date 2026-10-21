@@ -217,7 +217,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
       var items = current.items;
       for (final change in package.changes) {
         switch (change) {
-          case TagRenamedChange(:final after):
+          case TagUpdatedChange(:final after):
             items = [
               for (final tag in items)
                 if (tag.id == after.id) after else tag,

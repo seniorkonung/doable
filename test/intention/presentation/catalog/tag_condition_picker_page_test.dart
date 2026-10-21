@@ -312,11 +312,11 @@ void main() {
 
       final renamed = _tag(1, 'Самочувствие');
       await h.confirm(
-        (coordinator) => coordinator.acceptTagRename(
-          RenameTag(tagId: health.id, name: renamed.name),
+        (coordinator) => coordinator.acceptTagUpdate(
+          UpdateTag(tagId: health.id, name: renamed.name, color: health.color),
         ),
-        (revision) => TagRenamed(
-          TagRenamedChange(revision: revision, before: health, after: renamed),
+        (revision) => TagUpdated(
+          TagUpdatedChange(revision: revision, before: health, after: renamed),
         ),
         revision: 2,
       );
@@ -340,7 +340,7 @@ void main() {
       await h.confirm(
         (coordinator) => coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(rest.name),
+          CreateTag(name: rest.name, color: null),
         ),
         (revision) =>
             TagCreated(TagCreatedChange(revision: revision, after: rest)),

@@ -251,8 +251,8 @@ final class CatalogPageRepository
     _tagCommandResult = TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: graphRevision,
-        value: TagRenamed(
-          TagRenamedChange(
+        value: TagUpdated(
+          TagUpdatedChange(
             revision: graphRevision,
             before: before,
             after: after,
@@ -260,8 +260,8 @@ final class CatalogPageRepository
         ),
       ),
     );
-    final accepted = coordinator.acceptTagRename(
-      RenameTag(tagId: id, name: after.name),
+    final accepted = coordinator.acceptTagUpdate(
+      UpdateTag(tagId: id, name: after.name, color: null),
     ) as TagCommandAccepted;
     await accepted.future;
   }
@@ -271,7 +271,7 @@ final class CatalogPageRepository
     T extends GraphCommandOutcome,
     F extends GraphCommandFailure
   >(GraphCommand<T, F> command) async {
-    if (command is RenameTag) {
+    if (command is UpdateTag) {
       return _tagCommandResult as GraphCommandResult<T, F>;
     }
     if (command is UpdateDailyChoiceFields) {

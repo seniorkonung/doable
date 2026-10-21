@@ -625,7 +625,7 @@ void main() {
     await completeTagCommand(
       container,
       repository,
-      CreateTag(newHealth.name),
+      CreateTag(name: newHealth.name, color: null),
       TagCommandSucceeded(
         ConfirmedGraphResult(
           revision: revision,
@@ -681,7 +681,7 @@ void main() {
     await completeTagCommand(
       container,
       repository,
-      RenameTag(tagId: health.id, name: health.name),
+      UpdateTag(tagId: health.id, name: health.name, color: health.color),
       TagCommandSucceeded(
         ConfirmedGraphResult(
           revision: revision,
@@ -923,7 +923,7 @@ void main() {
     await completeTagCommand(
       container,
       repository,
-      CreateTag(newHealth.name),
+      CreateTag(name: newHealth.name, color: null),
       TagCommandSucceeded(
         ConfirmedGraphResult(
           revision: created,
@@ -2190,12 +2190,12 @@ Future<void> _completeTagRename(
   await completeTagCommand(
     container,
     repository,
-    RenameTag(tagId: before.id, name: after.name),
+    UpdateTag(tagId: before.id, name: after.name, color: before.color),
     TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: revision,
-        value: TagRenamed(
-          TagRenamedChange(revision: revision, before: before, after: after),
+        value: TagUpdated(
+          TagUpdatedChange(revision: revision, before: before, after: after),
         ),
       ),
     ),

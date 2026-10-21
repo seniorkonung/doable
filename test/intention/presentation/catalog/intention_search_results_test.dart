@@ -440,7 +440,7 @@ final class _Harness {
       color: _other.color,
     );
     await complete(
-      RenameTag(tagId: _other.id, name: renamed.name),
+      UpdateTag(tagId: _other.id, name: renamed.name, color: _other.color),
       tagRenameSuccess(
         before: _other,
         after: renamed,

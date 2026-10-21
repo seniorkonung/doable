@@ -114,9 +114,10 @@ void main() {
         expect(first.nextCursor, isNotNull);
         expect(
           await repository.execute(
-            RenameTag(
+            UpdateTag(
               tagId: _tagId(firstTagNumber),
               name: TagName.fromInput('Семья'),
+              color: null,
             ),
           ),
           isA<GraphCommandSucceeded>(),

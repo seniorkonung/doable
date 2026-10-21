@@ -1457,7 +1457,7 @@ final class _Harness {
   Future<void> created(Tag tag, {required int revision}) async {
     final accepted = coordinator.acceptTagCreation(
       TagCreationFormKey(),
-      CreateTag(tag.name),
+      CreateTag(name: tag.name, color: null),
     ) as TagCommandAccepted;
     final r = _Revision(revision);
     repository.completeCommand(
@@ -1468,12 +1468,12 @@ final class _Harness {
   }
 
   Future<void> renamed(Tag before, Tag after, {required int revision}) async {
-    final accepted = coordinator.acceptTagRename(
-      RenameTag(tagId: before.id, name: after.name),
+    final accepted = coordinator.acceptTagUpdate(
+      UpdateTag(tagId: before.id, name: after.name, color: before.color),
     ) as TagCommandAccepted;
     final r = _Revision(revision);
     repository.completeCommand(
-      TagRenamed(TagRenamedChange(revision: r, before: before, after: after)),
+      TagUpdated(TagUpdatedChange(revision: r, before: before, after: after)),
       r,
     );
     await accepted.future;

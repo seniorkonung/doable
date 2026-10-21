@@ -392,7 +392,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
         _tagMissing();
         return;
       }
-      if (change case TagRenamedChange(:final after) when after.id == _tagId) {
+      if (change case TagUpdatedChange(:final after) when after.id == _tagId) {
         _knownTag = after;
         _tagRevision = package.revision;
         if (current is TagNavigationLoaded && current.tag.name != after.name) {

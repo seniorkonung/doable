@@ -35,7 +35,7 @@
   - **Предполагаемые файлы:** `lib/src/graph/data/stored_graph_rows.dart`, `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `lib/src/graph/data/drift_personal_graph_repository_tag_commands.dart`, `lib/src/graph/data/drift_personal_graph_repository_tagged_intentions.dart`, `lib/src/graph/data/drift_personal_graph_repository_fact_log.dart`, `lib/src/graph/data/graph_fact_capture.dart`; перечисленные проверки чтений.
   - **Размер:** M — общий декодер и согласованное расширение его проекций.
 
-- [ ] 1.4 Сохранять название и цвет одной подтверждаемой операцией редактирования
+- [x] 1.4 Сохранять название и цвет одной подтверждаемой операцией редактирования
   - **Критерии приёмки:**
     - `CreateTag` принимает явный nullable-цвет; `UpdateTag`, `TagUpdated` и `TagUpdatedChange` заменяют прежний контракт переименования по решению 2 дизайна. Координатор сохраняет `ExistingTagKey`, последовательность операций и завершение принятой команды независимо от экрана; все вызывающие стороны и обработчики переведены на новый контракт.
     - Репозиторий сохраняет оба поля атомарно, включая явный SQL `NULL`. Изменение только цвета подтверждается, конфликт названия откатывает оба поля, а совпадение обоих полей не создаёт записи, пакета фактов или новой ревизии.

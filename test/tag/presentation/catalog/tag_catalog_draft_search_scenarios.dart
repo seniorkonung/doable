@@ -195,7 +195,7 @@ void _registerDraftSearchScenarios() {
       await tester.pump();
       expect(_visibleNames(tester), ['Рабочее']);
       expect(draft.current.tagIds, [home.id]);
-      expect(repository.commands.single, isA<RenameTag>());
+      expect(repository.commands.single, isA<UpdateTag>());
       expect(repository.statusQueries, isEmpty);
       expect(tester.takeException(), isNull);
     },
@@ -403,15 +403,15 @@ Future<void> _beginDraftRefresh(
 ) async {
   final before = _tag(1, 'Работа');
   final after = _tag(1, 'Рабочее');
-  final accepted = host.coordinator.acceptTagRename(
-    RenameTag(tagId: before.id, name: after.name),
+  final accepted = host.coordinator.acceptTagUpdate(
+    UpdateTag(tagId: before.id, name: after.name, color: before.color),
   ) as TagCommandAccepted;
   repository.command.complete(
     TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: const TagCatalogTestRevision(2),
-        value: TagRenamed(
-          TagRenamedChange(
+        value: TagUpdated(
+          TagUpdatedChange(
             revision: const TagCatalogTestRevision(2),
             before: before,
             after: after,

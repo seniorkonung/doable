@@ -72,7 +72,7 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     final created = await repository.execute(
-      CreateTag(TagName.fromInput('Здоровье')),
+      CreateTag(name: TagName.fromInput('Здоровье'), color: null),
     );
     tagId = ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
 

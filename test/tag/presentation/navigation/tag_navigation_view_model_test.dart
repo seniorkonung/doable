@@ -182,7 +182,7 @@ void main() {
           h.change(
             2,
             changes: [
-              TagRenamedChange(
+              TagUpdatedChange(
                 revision: const _Revision(2),
                 before: _tag('Дом'),
                 after: _tag('Быт'),
@@ -478,7 +478,7 @@ void main() {
             h.change(
               2,
               changes: [
-                TagRenamedChange(
+                TagUpdatedChange(
                   revision: const _Revision(2),
                   before: _tag('Дом'),
                   after: _tag('Промежуточное название'),
@@ -508,7 +508,7 @@ void main() {
       h.change(
         2,
         changes: [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag('Дом'),
             after: _tag('Быт'),

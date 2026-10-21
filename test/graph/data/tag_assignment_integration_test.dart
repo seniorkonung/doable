@@ -57,7 +57,7 @@ void main() {
 
   Future<TagCommandCompletion> send(TagCommand command) => (switch (command) {
     CreateTag() => coordinator.acceptTagCreation(TagCreationFormKey(), command),
-    RenameTag() => coordinator.acceptTagRename(command),
+    UpdateTag() => coordinator.acceptTagUpdate(command),
     DeleteTag() => coordinator.acceptTagDelete(command),
     AssignTag() => coordinator.acceptTagAssign(command),
     RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(command),
@@ -237,12 +237,13 @@ void main() {
       );
 
       final renamed = await send(
-        RenameTag(
+        UpdateTag(
           tagId: _tag(lastTagNumber),
           name: TagName.fromInput('Переименованный'),
+          color: null,
         ),
       );
-      expect(success(renamed), isA<TagRenamed>());
+      expect(success(renamed), isA<TagUpdated>());
       await settled(renamed.revision!);
       expect(
         (catalogState() as TagCatalogLoaded).items[1].name.value,

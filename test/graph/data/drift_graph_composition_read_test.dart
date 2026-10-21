@@ -64,8 +64,9 @@ void main() {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async =>
-      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+  Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
+    CreateTag(name: TagName.fromInput(name), color: null),
+  )).tag;
 
   Future<Intention> createIntention(
     String title, {
@@ -179,7 +180,13 @@ void main() {
     final choice = await choose(needRunning);
     expect(await next(), _composition(2, 1, 1, 1));
 
-    await confirm(RenameTag(tagId: home.id, name: TagName.fromInput('Семья')));
+    await confirm(
+      UpdateTag(
+        tagId: home.id,
+        name: TagName.fromInput('Семья'),
+        color: home.color,
+      ),
+    );
     await confirm(DeleteDailyChoice(choice.id));
     expect(await next(), _composition(2, 1, 0, 1));
     await confirm(DeleteLongTermRelation(needRunning.id));

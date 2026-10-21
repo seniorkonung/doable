@@ -181,19 +181,19 @@ void main() {
     const damagedId = 'CANARY-повреждённый-идентификатор';
 
     final created = await graph.execute(
-      CreateTag(TagName.fromInput(privateName)),
+      CreateTag(name: TagName.fromInput(privateName), color: null),
     );
     expect(created, isA<TagCommandSucceeded>());
     final id =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
     expect((await graph.watchTag(id).first), isA<TagReadSuccess>());
     final renamed = await graph.execute(
-      RenameTag(tagId: id, name: TagName.fromInput(renamedName)),
+      UpdateTag(tagId: id, name: TagName.fromInput(renamedName), color: null),
     );
     expect(renamed, isA<TagCommandSucceeded>());
 
     final conflict = await graph.execute(
-      CreateTag(TagName.fromInput('CANARY-ПЕРЕИМЕНОВАННОЕ')),
+      CreateTag(name: TagName.fromInput('CANARY-ПЕРЕИМЕНОВАННОЕ'), color: null),
     );
     expect(
       (conflict as TagCommandFailed).failure,

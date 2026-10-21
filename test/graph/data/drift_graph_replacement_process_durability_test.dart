@@ -207,7 +207,7 @@ Future<List<Tag>> _seedBackupGraph(
     for (var number = 1; number <= 5; number++)
       (await _confirm<TagCreated>(
         repository,
-        CreateTag(TagName.fromInput('Тег $number')),
+        CreateTag(name: TagName.fromInput('Тег $number'), color: null),
       )).tag,
   ];
   for (var number = 1; number <= 20; number++) {

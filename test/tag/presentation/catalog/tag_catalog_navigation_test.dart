@@ -172,8 +172,12 @@ void main() {
       final coordinator = h.container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      final renamed = coordinator.acceptTagRename(
-        RenameTag(tagId: _tagId(352), name: TagName.fromInput('Новое имя')),
+      final renamed = coordinator.acceptTagUpdate(
+        UpdateTag(
+          tagId: _tagId(352),
+          name: TagName.fromInput('Новое имя'),
+          color: null,
+        ),
       ) as TagCommandAccepted;
       expect((await renamed.future).result, isA<GraphResultSuccess>());
       await tester.pumpAndSettle();
@@ -195,7 +199,7 @@ void main() {
       await tester.pumpAndSettle();
       final created = coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(TagName.fromInput('Новое имя')),
+        CreateTag(name: TagName.fromInput('Новое имя'), color: null),
       ) as TagCommandAccepted;
       expect((await created.future).result, isA<GraphResultSuccess>());
       await tester.pumpAndSettle();

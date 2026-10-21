@@ -205,7 +205,7 @@ final class IntentionTagConditionsViewModel
     var changed = false;
     for (final change in package.changes) {
       switch (change) {
-        case TagRenamedChange(:final after):
+        case TagUpdatedChange(:final after):
           final entry = _entries[after.id];
           if (entry == null ||
               entry.isDeleted ||

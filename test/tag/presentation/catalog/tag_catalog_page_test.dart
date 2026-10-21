@@ -168,7 +168,10 @@ void main() {
                     .read(graphCommandCoordinatorProvider.notifier)
                     .acceptTagCreation(
                       TagCreationFormKey(),
-                      CreateTag(TagName.fromInput('Из редактора')),
+                      CreateTag(
+                        name: TagName.fromInput('Из редактора'),
+                        color: null,
+                      ),
                     )
                 as TagCommandAccepted;
         repository.completeCommand(
@@ -753,8 +756,8 @@ void main() {
       tester.element(find.byKey(const ValueKey('tag-catalog-create'))),
     ).read(graphCommandCoordinatorProvider.notifier);
     final tagId = (TagId.decode(_id(52)) as TagIdDecodingSuccess).id;
-    final rename = coordinator.acceptTagRename(
-      RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
+    final rename = coordinator.acceptTagUpdate(
+      UpdateTag(tagId: tagId, name: TagName.fromInput('Быт'), color: null),
     ) as TagCommandAccepted;
     await rename.future;
     await tester.pumpAndSettle();
@@ -1401,15 +1404,16 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final accepted = coordinator.acceptTagRename(
-      RenameTag(
+    final accepted = coordinator.acceptTagUpdate(
+      UpdateTag(
         tagId: _tag(52, 'Старое имя').id,
         name: TagName.fromInput('Новое имя'),
+        color: null,
       ),
     ) as TagCommandAccepted;
     repository.completeCommand(
-      TagRenamed(
-        TagRenamedChange(
+      TagUpdated(
+        TagUpdatedChange(
           revision: const _Revision(2),
           before: _tag(52, 'Старое имя'),
           after: _tag(52, 'Новое имя'),
@@ -1511,16 +1515,17 @@ void main() {
       final accepted =
           container
                   .read(graphCommandCoordinatorProvider.notifier)
-                  .acceptTagRename(
-                    RenameTag(
+                  .acceptTagUpdate(
+                    UpdateTag(
                       tagId: _tag(1, 'Тег 1').id,
                       name: TagName.fromInput('Новое имя'),
+                      color: null,
                     ),
                   )
               as TagCommandAccepted;
       repository.completeCommand(
-        TagRenamed(
-          TagRenamedChange(
+        TagUpdated(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Тег 1'),
             after: _tag(1, 'Новое имя'),
@@ -1582,7 +1587,7 @@ void main() {
                 .read(graphCommandCoordinatorProvider.notifier)
                 .acceptTagCreation(
                   TagCreationFormKey(),
-                  CreateTag(TagName.fromInput('Другой')),
+                  CreateTag(name: TagName.fromInput('Другой'), color: null),
                 )
             as TagCommandAccepted;
     repository.completeCommand(

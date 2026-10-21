@@ -1,5 +1,6 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../intention/domain/intention_id.dart';
+import '../domain/tag_color.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_assignment.dart';
 import '../domain/tag_name.dart';
@@ -19,16 +20,24 @@ sealed class TagLifecycleCommand extends TagCommand {
 }
 
 final class CreateTag extends TagLifecycleCommand {
-  const CreateTag(this.name);
+  const CreateTag({required this.name, required this.color});
 
   final TagName name;
+  final TagColor? color;
 }
 
-final class RenameTag extends TagLifecycleCommand {
-  const RenameTag({required this.tagId, required this.name});
+/// Задаёт полное новое редактируемое состояние тега: название и цвет
+/// сохраняются вместе, `null` возвращает тег к состоянию «Без цвета».
+final class UpdateTag extends TagLifecycleCommand {
+  const UpdateTag({
+    required this.tagId,
+    required this.name,
+    required this.color,
+  });
 
   final TagId tagId;
   final TagName name;
+  final TagColor? color;
 }
 
 /// Подтверждение привязано к id. Исполнение удаляет тег и все его назначения

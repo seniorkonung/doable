@@ -95,12 +95,12 @@ void main() {
 
       // Переименование меняет название проекции и строки, но не набор.
       final renamed = _tag(1, 'Дом и сад');
-      draft.coordinator.acceptTagRename(
-        RenameTag(tagId: home.id, name: renamed.name),
+      draft.coordinator.acceptTagUpdate(
+        UpdateTag(tagId: home.id, name: renamed.name, color: home.color),
       );
       repository.completeCommand(
-        TagRenamed(
-          TagRenamedChange(
+        TagUpdated(
+          TagUpdatedChange(
             revision: const TagCatalogTestRevision(2),
             before: home,
             after: renamed,
@@ -156,7 +156,7 @@ void main() {
       final namesake = _tag(3, 'Дом и сад');
       draft.coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(namesake.name),
+        CreateTag(name: namesake.name, color: null),
       );
       repository.completeCommand(
         TagCreated(
@@ -198,7 +198,7 @@ void main() {
       // Перечитывания вызывают только постоянные команды тегов; локальные
       // включения не пишут назначений, не проверяют пар и не сбрасывают поиск.
       expect(repository.commands, [
-        isA<RenameTag>(),
+        isA<UpdateTag>(),
         isA<DeleteTag>(),
         isA<CreateTag>(),
       ]);

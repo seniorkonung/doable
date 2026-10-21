@@ -219,9 +219,13 @@ void main() {
     expect(() => catalog.rows.clear(), throwsUnsupportedError);
 
     final renamed = await graph.execute(
-      RenameTag(tagId: tagId, name: TagName.fromInput('Я')),
+      UpdateTag(
+        tagId: tagId,
+        name: TagName.fromInput('Я'),
+        color: TagColor.blue,
+      ),
     );
-    final outcome = (renamed as TagCommandSucceeded).value.value as TagRenamed;
+    final outcome = (renamed as TagCommandSucceeded).value.value as TagUpdated;
     expect(
       [outcome.before.color, outcome.after.color],
       [TagColor.blue, TagColor.blue],

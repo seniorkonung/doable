@@ -785,8 +785,12 @@ void main() {
         );
         final rename = container
             .read(graphCommandCoordinatorProvider.notifier)
-            .acceptTagRename(
-              RenameTag(tagId: home.id, name: TagName.fromInput('Спорт')),
+            .acceptTagUpdate(
+              UpdateTag(
+                tagId: home.id,
+                name: TagName.fromInput('Спорт'),
+                color: home.color,
+              ),
             );
         expect(rename, isA<TagCommandAccepted>());
         await tester.runAsync(() => (rename as TagCommandAccepted).future);
@@ -1134,14 +1138,20 @@ Future<void> _beginRefresh(
   final accepted =
       container
               .read(graphCommandCoordinatorProvider.notifier)
-              .acceptTagRename(RenameTag(tagId: before.id, name: after.name))
+              .acceptTagUpdate(
+                UpdateTag(
+                  tagId: before.id,
+                  name: after.name,
+                  color: before.color,
+                ),
+              )
           as TagCommandAccepted;
   repository.command.complete(
     TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: const TagCatalogTestRevision(2),
-        value: TagRenamed(
-          TagRenamedChange(
+        value: TagUpdated(
+          TagUpdatedChange(
             revision: const TagCatalogTestRevision(2),
             before: before,
             after: after,

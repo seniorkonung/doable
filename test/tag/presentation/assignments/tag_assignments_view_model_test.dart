@@ -58,7 +58,7 @@ void main() {
       await pumpEventQueue();
       h.changes.add(
         _Package(const _Revision(2), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Дом'),
             after: _tag(1, 'Семья'),
@@ -99,7 +99,7 @@ void main() {
       await pumpEventQueue();
       h.changes.add(
         _Package(const _Revision(2), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Дом'),
             after: _tag(1, 'Быт'),
@@ -108,7 +108,7 @@ void main() {
       );
       h.changes.add(
         _Package(const _Revision(3), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(3),
             before: _tag(1, 'Быт'),
             after: _tag(1, 'Семья'),
@@ -144,7 +144,7 @@ void main() {
       await pumpEventQueue();
       h.changes.add(
         _Package(const _Revision(2), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Старое'),
             after: _tag(1, 'Новое'),
@@ -288,7 +288,7 @@ void main() {
 
     h.changes.add(
       _Package(const _Revision(2), [
-        TagRenamedChange(
+        TagUpdatedChange(
           revision: const _Revision(2),
           before: _tag(2, 'Дом'),
           after: _tag(2, 'Быт'),

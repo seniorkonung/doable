@@ -372,7 +372,7 @@ final class _Harness {
       changes.add(_Package(_Revision(revision), packageChanges));
 
   void rename(int revision, Tag before, String name) => package(revision, [
-    TagRenamedChange(
+    TagUpdatedChange(
       revision: _Revision(revision),
       before: before,
       after: Tag(

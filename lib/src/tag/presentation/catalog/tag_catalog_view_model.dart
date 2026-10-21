@@ -744,7 +744,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         : <TagSelectionRow>[];
     for (final change in package.changes) {
       switch (change) {
-        case TagRenamedChange(:final after):
+        case TagUpdatedChange(:final after):
           if (!snapshotAlreadyIncludes) {
             items = [
               for (final tag in items)

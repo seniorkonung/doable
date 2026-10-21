@@ -23,12 +23,12 @@ import '../../support/tag_assignment_changed.dart';
 
 void main() {
   test(
-    'переименование и удаление одного тега разделяют ключ после ухода',
+    'редактирование и удаление одного тега разделяют ключ после ухода',
     () async {
       final repository = _ControlledRepository();
       final coordinator = _coordinator(repository);
-      final accepted = coordinator.acceptTagRename(
-        RenameTag(tagId: _tagId, name: _name),
+      final accepted = coordinator.acceptTagUpdate(
+        UpdateTag(tagId: _tagId, name: _name, color: null),
       ) as TagCommandAccepted;
       coordinator.releaseInitiatorPresentation(accepted.token);
       final registration = coordinator.registerAppPresentation();
@@ -40,7 +40,9 @@ void main() {
         isA<TagCommandAlreadyRunning>(),
       );
       expect(
-        coordinator.acceptTagRename(RenameTag(tagId: _tagId, name: _name)),
+        coordinator.acceptTagUpdate(
+          UpdateTag(tagId: _tagId, name: _name, color: null),
+        ),
         isA<TagCommandAlreadyRunning>(),
       );
       expect(repository.commands, hasLength(1));
@@ -115,7 +117,9 @@ void main() {
       isA<IntentionCommandAlreadyRunning>(),
     );
     expect(
-      coordinator.acceptTagRename(RenameTag(tagId: _tagId, name: _name)),
+      coordinator.acceptTagUpdate(
+        UpdateTag(tagId: _tagId, name: _name, color: null),
+      ),
       isA<TagCommandAlreadyRunning>(),
     );
     expect(repository.commands, [same(command)]);

@@ -280,7 +280,7 @@ void _testWatchFailureDuringSelectionUpdates() {
               h.change(
                 2,
                 changes: [
-                  TagRenamedChange(
+                  TagUpdatedChange(
                     revision: const _Revision(2),
                     before: _tag('Дом'),
                     after: _tag('Быт'),

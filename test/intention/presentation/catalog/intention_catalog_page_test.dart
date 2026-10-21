@@ -1520,7 +1520,7 @@ void main() {
       tester,
       container,
       repository,
-      RenameTag(tagId: health.id, name: renamed.name),
+      UpdateTag(tagId: health.id, name: renamed.name, color: health.color),
       tagRenameSuccess(
         before: health,
         after: renamed,

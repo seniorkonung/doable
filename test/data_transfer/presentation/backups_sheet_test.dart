@@ -614,7 +614,9 @@ final class _BackupsApp {
 
   Future<void> createTag(String name) async {
     expect(
-      await _repository.execute(CreateTag(TagName.fromInput(name))),
+      await _repository.execute(
+        CreateTag(name: TagName.fromInput(name), color: null),
+      ),
       isA<GraphCommandSucceeded>(),
     );
   }
@@ -680,14 +682,18 @@ final class _RestoreFromSheetApp {
     await tester.runAsync(() async {
       final repository = container.read(personalGraphRepositoryProvider);
       expect(
-        await repository.execute(CreateTag(TagName.fromInput('Дом'))),
+        await repository.execute(
+          CreateTag(name: TagName.fromInput('Дом'), color: null),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       // Проверка при запуске могла сделать ежедневную копию уже с тегом, и
       // тогда второй копии за день не будет.
       await container.read(graphBackupsProvider).makeDailyBackupIfDue();
       expect(
-        await repository.execute(CreateTag(TagName.fromInput('Сад'))),
+        await repository.execute(
+          CreateTag(name: TagName.fromInput('Сад'), color: null),
+        ),
         isA<GraphCommandSucceeded>(),
       );
     });

@@ -104,7 +104,7 @@ void main() {
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 5, 14);
-    await app.execute(CreateTag(TagName.fromInput('Сад')));
+    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
     final beforeImport = await app.graphState();
     final stored = app.storedState();
     await app.openSettings();
@@ -388,7 +388,10 @@ Future<T> _confirm<T extends GraphCommandOutcome>(
 }
 
 Future<Tag> _createTag(PersonalGraphRepository graph, String name) async =>
-    (await _confirm<TagCreated>(graph, CreateTag(TagName.fromInput(name)))).tag;
+    (await _confirm<TagCreated>(
+      graph,
+      CreateTag(name: TagName.fromInput(name), color: null),
+    )).tag;
 
 Future<Intention> _createIntention(
   PersonalGraphRepository graph,

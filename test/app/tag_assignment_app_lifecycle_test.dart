@@ -170,10 +170,11 @@ void main() {
       );
 
       repository.holdNextCatalogRead();
-      final unrelatedRename = runtime.commandCoordinator.acceptTagRename(
-        RenameTag(
+      final unrelatedRename = runtime.commandCoordinator.acceptTagUpdate(
+        UpdateTag(
           tagId: _tagId(lastTagNumber),
           name: TagName.fromInput('Рабочее'),
+          color: null,
         ),
       ) as TagCommandAccepted;
       await tester.runAsync(() => unrelatedRename.future);
@@ -188,8 +189,12 @@ void main() {
             loaded().selectedAssignment ==
             TagCatalogSelectedAssignment.assigned,
       );
-      final renamed = runtime.commandCoordinator.acceptTagRename(
-        RenameTag(tagId: selectedId, name: TagName.fromInput('Спорт')),
+      final renamed = runtime.commandCoordinator.acceptTagUpdate(
+        UpdateTag(
+          tagId: selectedId,
+          name: TagName.fromInput('Спорт'),
+          color: null,
+        ),
       ) as TagCommandAccepted;
       await tester.runAsync(() => renamed.future);
       await _pumpUntil(
@@ -216,10 +221,11 @@ void main() {
       expect(tester.widget<FilledButton>(assign).onPressed, isNull);
 
       repository.holdNextCatalogRead();
-      final beforeDelete = runtime.commandCoordinator.acceptTagRename(
-        RenameTag(
+      final beforeDelete = runtime.commandCoordinator.acceptTagUpdate(
+        UpdateTag(
           tagId: _tagId(lastTagNumber),
           name: TagName.fromInput('Работа'),
+          color: null,
         ),
       ) as TagCommandAccepted;
       await tester.runAsync(() => beforeDelete.future);
@@ -323,8 +329,8 @@ void main() {
               is TagCatalogSelectionReady,
     );
 
-    final renamed = runtime.commandCoordinator.acceptTagRename(
-      RenameTag(tagId: id, name: TagName.fromInput('Быт')),
+    final renamed = runtime.commandCoordinator.acceptTagUpdate(
+      UpdateTag(tagId: id, name: TagName.fromInput('Быт'), color: null),
     ) as TagCommandAccepted;
     await renamed.future;
     await _until(

@@ -467,8 +467,8 @@ final class _Harness {
                   ? TagUnchanged(
                       TagUnchangedChange(revision: graphRevision, tag: _tag),
                     )
-                  : TagRenamed(
-                      TagRenamedChange(
+                  : TagUpdated(
+                      TagUpdatedChange(
                         revision: graphRevision,
                         before: _tag,
                         after: next,
@@ -479,8 +479,8 @@ final class _Harness {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final accepted = coordinator.acceptTagRename(
-      RenameTag(tagId: _tag.id, name: next.name),
+    final accepted = coordinator.acceptTagUpdate(
+      UpdateTag(tagId: _tag.id, name: next.name, color: _tag.color),
     ) as TagCommandAccepted;
     await accepted.future;
     if (!failure) _tag = next;

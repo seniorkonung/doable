@@ -335,7 +335,7 @@ void main() {
             .onPressed!;
         changes.add(
           _Package(const _Revision(1), [
-            TagRenamedChange(
+            TagUpdatedChange(
               revision: const _Revision(1),
               before: _tag(301, 'Дом'),
               after: _tag(301, 'Быт'),
