@@ -42,7 +42,7 @@ final class GraphCommandCoordinatorProvider
 }
 
 String _$graphCommandCoordinatorHash() =>
-    r'4e5a9e9e194b53fbc4ea0a594d883b10727d7629';
+    r'bd1ddb6ab7d45586eba876231f13924bfd208557';
 
 abstract class _$GraphCommandCoordinator extends $Notifier<void> {
   void build();

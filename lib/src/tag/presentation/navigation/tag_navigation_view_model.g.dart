@@ -60,7 +60,7 @@ final class TagNavigationViewModelProvider
 }
 
 String _$tagNavigationViewModelHash() =>
-    r'be576f30037e118ad325f848aee3b7f70b9cdb3e';
+    r'b08f24ec575c55c26a5c33affe9307a3163f9759';
 
 final class TagNavigationViewModelFamily extends $Family
     with
