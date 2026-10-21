@@ -458,7 +458,7 @@ void main() {
       expect(
         find.descendant(
           of: deletedToggle,
-          matching: find.text(
+          matching: findTextIgnoringInlineWidgets(
             l10n.intentionTagConditionDeleted(
               l10n.intentionTagConditionAbsent(deleted.name.value),
             ),

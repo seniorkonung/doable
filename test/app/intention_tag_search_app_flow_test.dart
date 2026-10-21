@@ -324,7 +324,7 @@ List<String> _conditions(WidgetTester tester, Type page) => [
             ),
           )
           .evaluate())
-    (label.widget as Text).data!,
+    textIgnoringInlineWidgets(label.widget as Text),
 ];
 
 Future<void> _expectResults(

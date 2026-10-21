@@ -370,7 +370,7 @@ List<String> _shownConditions(WidgetTester tester) => [
       matching: find.byKey(const ValueKey('intention-tag-condition-label')),
     ),
   ))
-    text.data!,
+    textIgnoringInlineWidgets(text),
 ];
 
 Result<IntentionCatalogFirstPage> _firstPage(

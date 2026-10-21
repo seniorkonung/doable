@@ -13,6 +13,8 @@ Text tagPhraseText({
   required String Function(String) phrase,
   required List<({String name, TagColor? color})> tags,
   required TagDotSize dotSize,
+  Key? key,
+  TextStyle? style,
 }) {
   const placeholder = '\uFFFC';
   final [prefix, suffix] = phrase(placeholder).split(placeholder);
@@ -37,6 +39,8 @@ Text tagPhraseText({
         TextSpan(text: suffix),
       ],
     ),
+    key: key,
+    style: style,
     semanticsLabel: phrase(tags.map((tag) => tag.name).join(', ')),
   );
 }

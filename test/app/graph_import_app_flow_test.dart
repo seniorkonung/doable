@@ -43,6 +43,7 @@ import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
 import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
+import '../support/inline_text.dart';
 import '../support/quick_creation.dart';
 import '../support/temporary_import_document.dart';
 
@@ -500,7 +501,7 @@ List<String?> _tagConditions() => [
             ),
           )
           .evaluate())
-    (label.widget as Text).data,
+    textIgnoringInlineWidgets(label.widget as Text),
 ];
 
 ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester
