@@ -1927,6 +1927,42 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagEditorNameLimit => 'Не более 255 отображаемых символов.';
 
   @override
+  String get tagColorNone => 'Без цвета';
+
+  @override
+  String get tagColorBrown => 'Коричневый';
+
+  @override
+  String get tagColorOrange => 'Оранжевый';
+
+  @override
+  String get tagColorOlive => 'Оливковый';
+
+  @override
+  String get tagColorGreen => 'Зелёный';
+
+  @override
+  String get tagColorTeal => 'Бирюзовый';
+
+  @override
+  String get tagColorBlue => 'Синий';
+
+  @override
+  String get tagColorViolet => 'Сиреневый';
+
+  @override
+  String get tagColorPurple => 'Фиолетовый';
+
+  @override
+  String get tagColorPink => 'Розовый';
+
+  @override
+  String get tagColorLabel => 'Цвет';
+
+  @override
+  String get tagColorGroupLabel => 'Цвет тега';
+
+  @override
   String get tagEditorCreateAction => 'Создать тег';
 
   @override

@@ -2,13 +2,18 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/tag_color_picker.dart';
+import '../../../design_system/components/tag_dot.dart';
+import '../../../design_system/doable_metrics.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/tag_read_result.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
+import '../tag_color_presentation.dart';
 import '../tag_failure_message.dart';
 import 'tag_editor_state.dart';
 import 'tag_editor_view_model.dart';
@@ -73,6 +78,7 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
     };
     final readStatus = _readStatus(l10n, state.status);
     final creating = state.context is TagEditorCreating;
+    final selectedColor = tagColorPresentation(state.color);
 
     return Scaffold(
       appBar: AppBar(
@@ -93,6 +99,11 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
+                prefixIcon: Center(
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: TagDot(color: selectedColor, size: TagDotSize.large),
+                ),
                 labelText: l10n.tagEditorNameLabel,
                 helperText: l10n.tagEditorNameLimit,
                 helperMaxLines: 2,
@@ -105,6 +116,28 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
                       ),
               ),
               onChanged: model.changeName,
+            ),
+            const SizedBox(height: DoableMetrics.space1),
+            TagColorPicker(
+              value: selectedColor,
+              label: l10n.tagColorLabel,
+              groupLabel: l10n.tagColorGroupLabel,
+              colorLabel: (color) => tagColorLabel(l10n, color),
+              onChanged: (color) {
+                if (color == selectedColor) return;
+                model.changeColor(tagColorFromPresentation(color));
+                // Объявляется только выбор пользователя, без события при открытии:
+                // https://api.flutter.dev/flutter/semantics/SemanticsService/sendAnnouncement.html
+                if (MediaQuery.supportsAnnounceOf(context)) {
+                  unawaited(
+                    SemanticsService.sendAnnouncement(
+                      View.of(context),
+                      tagColorLabel(l10n, color),
+                      Directionality.of(context),
+                    ),
+                  );
+                }
+              },
             ),
             if (generalFailure != null) ...[
               const SizedBox(height: 16),

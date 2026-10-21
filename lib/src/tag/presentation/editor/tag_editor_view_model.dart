@@ -11,6 +11,7 @@ import '../../application/tag_command.dart';
 import '../../application/tag_read_result.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
+import '../../domain/tag_color.dart';
 import '../../domain/tag_id.dart';
 import '../../domain/tag_name.dart';
 import 'tag_editor_state.dart';
@@ -36,6 +37,11 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
   void changeName(String value) {
     if (_closed || state.input == value) return;
     state = state.withInput(value);
+  }
+
+  void changeColor(TagColor? value) {
+    if (_closed || state.color == value) return;
+    state = state.withColor(value);
   }
 
   Future<void> submit() async {

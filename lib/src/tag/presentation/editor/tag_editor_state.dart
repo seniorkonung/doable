@@ -188,6 +188,15 @@ final class TagEditorState {
     failurePresentation: failurePresentation,
   );
 
+  TagEditorState withColor(TagColor? value) => TagEditorState(
+    context: context,
+    input: input,
+    color: value,
+    status: status,
+    event: event,
+    failurePresentation: failurePresentation,
+  );
+
   TagEditorState withoutEvent() => TagEditorState(
     context: context,
     input: input,

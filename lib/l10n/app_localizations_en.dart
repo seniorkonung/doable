@@ -1905,6 +1905,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagEditorNameLimit => 'No more than 255 visible characters.';
 
   @override
+  String get tagColorNone => 'No color';
+
+  @override
+  String get tagColorBrown => 'Brown';
+
+  @override
+  String get tagColorOrange => 'Orange';
+
+  @override
+  String get tagColorOlive => 'Olive';
+
+  @override
+  String get tagColorGreen => 'Green';
+
+  @override
+  String get tagColorTeal => 'Teal';
+
+  @override
+  String get tagColorBlue => 'Blue';
+
+  @override
+  String get tagColorViolet => 'Violet';
+
+  @override
+  String get tagColorPurple => 'Purple';
+
+  @override
+  String get tagColorPink => 'Pink';
+
+  @override
+  String get tagColorLabel => 'Color';
+
+  @override
+  String get tagColorGroupLabel => 'Tag color';
+
+  @override
   String get tagEditorCreateAction => 'Create tag';
 
   @override
