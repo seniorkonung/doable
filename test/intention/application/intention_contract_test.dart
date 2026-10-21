@@ -8,6 +8,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -344,7 +345,7 @@ void main() {
       ]);
     });
 
-    test('переименование тега заменяет только его название в сводке', () {
+    test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
       final secondId = _tagId('00000000-0000-4000-8000-000000000001');
       final summary = IntentionSummary(
@@ -366,20 +367,21 @@ void main() {
         ],
       );
 
-      final copy = summary.withRenamedTag(
+      final copy = summary.withUpdatedTag(
         Tag(
           id: secondId,
-          name: TagName.fromStored('Переименованный'),
-          color: null,
+          name: TagName.fromStored('Второй тег'),
+          color: TagColor.blue,
         ),
       );
 
       expect(copy.tags.map((tag) => tag.id), [firstId, secondId]);
       expect(copy.tags.map((tag) => tag.name.value), [
         'Первый тег',
-        'Переименованный',
+        'Второй тег',
       ]);
-      expect(summary.tags.last.name.value, 'Второй тег');
+      expect(copy.tags.map((tag) => tag.color), [null, TagColor.blue]);
+      expect(summary.tags.last.color, isNull);
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.hasDescription, summary.hasDescription);
@@ -390,7 +392,7 @@ void main() {
       expect(copy.updatedAt, summary.updatedAt);
     });
 
-    test('переименование неназначенного тега не меняет сводку', () {
+    test('изменение неназначенного тега не меняет сводку', () {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
@@ -409,15 +411,17 @@ void main() {
         ],
       );
 
-      final copy = summary.withRenamedTag(
+      final copy = summary.withUpdatedTag(
         Tag(
           id: _tagId('00000000-0000-4000-8000-000000000002'),
           name: TagName.fromStored('Здоровье'),
-          color: null,
+          color: TagColor.blue,
         ),
       );
 
-      expect(copy.tags.map((tag) => tag.name.value), ['Здоровье']);
+      expect(copy.tags.map((tag) => (tag.name.value, tag.color)), [
+        ('Здоровье', null),
+      ]);
       expect(copy.title, 'Гулять');
     });
 

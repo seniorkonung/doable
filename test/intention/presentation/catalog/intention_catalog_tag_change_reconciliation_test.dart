@@ -13,6 +13,7 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -462,8 +463,8 @@ void main() {
     expect(current.totalCount, 1);
   });
 
-  test('переименование обновляет названия загруженных строк и сохраняет '
-      'условие, состав, количество и продолжение', () async {
+  test('изменение только цвета заменяет тег в загруженных строках и '
+      'сохраняет условие, состав, количество и продолжение', () async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(
       repository,
@@ -488,28 +489,24 @@ void main() {
     );
     final before = _loaded(container, browse);
 
-    final wellBeing = Tag(
+    final blueHealth = Tag(
       id: health.id,
-      name: TagName.fromInput('Самочувствие'),
-      color: health.color,
+      name: health.name,
+      color: TagColor.blue,
     );
-    await _completeTagRename(
+    await _completeTagUpdate(
       container,
       repository,
       before: health,
-      after: wellBeing,
+      after: blueHealth,
       revision: const TestCatalogRevision(2),
     );
 
     final current = _loaded(container, browse);
     expect(current.items.map((item) => item.id), [fourth.id, third.id]);
-    expect(current.items.map(_tagNames), [
-      ['Самочувствие', 'Отдых'],
-      ['Самочувствие'],
-    ]);
-    expect(current.items.map(_tagIds), [
-      [health.id, rest.id],
-      [health.id],
+    expect(current.items.map(_tagStates), [
+      [(health.id, 'Здоровье', TagColor.blue), (rest.id, 'Отдых', null)],
+      [(health.id, 'Здоровье', TagColor.blue)],
     ]);
     for (final (index, item) in current.items.indexed) {
       expect(item.createdAt.value, before.items[index].createdAt.value);
@@ -526,7 +523,7 @@ void main() {
     await waitForCatalogQueries(repository, 3);
     expect(repository.queryAt(2).cursor, same(before.nextCursor));
     expect(repository.queryAt(2).tagFilter, filter);
-    final second = testSummary(index: 2, tags: [wellBeing]);
+    final second = testSummary(index: 2, tags: [blueHealth]);
     repository.complete(
       2,
       ResultSuccess(
@@ -549,8 +546,8 @@ void main() {
     expect(completed.nextCursor, isNull);
   });
 
-  test('первая порция, прочитанная до переименования, публикуется с новым '
-      'названием', () async {
+  test('первая порция, прочитанная до изменения тега, публикуется с новыми '
+      'названием и цветом', () async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     _observeConfirmedStates(container, browse);
@@ -559,9 +556,9 @@ void main() {
     final wellBeing = Tag(
       id: health.id,
       name: TagName.fromInput('Самочувствие'),
-      color: health.color,
+      color: TagColor.blue,
     );
-    await _completeTagRename(
+    await _completeTagUpdate(
       container,
       repository,
       before: health,
@@ -583,8 +580,8 @@ void main() {
     await container.read(intentionCatalogViewModelProvider(browse).future);
 
     final current = _loaded(container, browse);
-    expect(current.items.map(_tagNames), [
-      ['Самочувствие'],
+    expect(current.items.map(_tagStates), [
+      [(health.id, 'Самочувствие', TagColor.blue)],
     ]);
     expect(current.totalCount, 1);
   });
@@ -1594,7 +1591,7 @@ void main() {
         name: TagName.fromInput('Самочувствие'),
         color: health.color,
       );
-      await _completeTagRename(
+      await _completeTagUpdate(
         container,
         repository,
         before: health,
@@ -2179,8 +2176,8 @@ IntentionCatalogConfirmedState _confirmed(
     container.read(intentionCatalogViewModelProvider(purpose)).requireValue
         as IntentionCatalogConfirmedState;
 
-/// Проводит подтверждённое переименование тега через coordinator.
-Future<void> _completeTagRename(
+/// Проводит подтверждённое редактирование тега через coordinator.
+Future<void> _completeTagUpdate(
   ProviderContainer container,
   ControlledCatalogRepository repository, {
   required Tag before,
@@ -2190,7 +2187,7 @@ Future<void> _completeTagRename(
   await completeTagCommand(
     container,
     repository,
-    UpdateTag(tagId: before.id, name: after.name, color: before.color),
+    UpdateTag(tagId: before.id, name: after.name, color: after.color),
     TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: revision,
@@ -2208,6 +2205,10 @@ List<TagId> _tagIds(IntentionSummary summary) => [
 
 List<String> _tagNames(IntentionSummary summary) => [
   for (final tag in summary.tags) tag.name.value,
+];
+
+List<(TagId, String, TagColor?)> _tagStates(IntentionSummary summary) => [
+  for (final tag in summary.tags) (tag.id, tag.name.value, tag.color),
 ];
 
 IntentionCatalogLoaded _loaded(

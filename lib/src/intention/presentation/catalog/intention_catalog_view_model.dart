@@ -1118,8 +1118,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         entry.value.active,
       );
     }
-    for (final renamed in package.renamedTags) {
-      reconciled = _applyRenamedTagContent(reconciled, renamed);
+    for (final updated in package.updatedTags) {
+      reconciled = _applyUpdatedTagContent(reconciled, updated);
     }
     final tagFilter = confirmed.query.tagFilter;
     var opensExcludedMatches = false;
@@ -1168,19 +1168,19 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     );
   }
 
-  /// Заменяет название переименованного тега в загруженных строках.
+  /// Заменяет полное состояние отредактированного тега в загруженных строках.
   ///
   /// Условия поиска хранят только идентификаторы тегов, поэтому состав
   /// совпадений, порядок, число совпадений и курсор сохраняются.
-  IntentionCatalogConfirmedState _applyRenamedTagContent(
+  IntentionCatalogConfirmedState _applyUpdatedTagContent(
     IntentionCatalogConfirmedState confirmed,
-    Tag renamed,
+    Tag updated,
   ) {
     if (confirmed is! IntentionCatalogLoaded) {
       return confirmed;
     }
     final items = [
-      for (final item in confirmed.items) item.withRenamedTag(renamed),
+      for (final item in confirmed.items) item.withUpdatedTag(updated),
     ];
     if (items.indexed.every(
       (entry) => identical(entry.$2, confirmed.items[entry.$1]),
@@ -1346,7 +1346,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// согласуется одним изменением ревизии без ожидания самостоятельных команд.
 /// Модель каталога полагается на эти контракты и сама пакет с фактом без
 /// такой мутации не отклоняет.
-/// Переименование тега меняет только его название в загруженных строках,
+/// Редактирование тега заменяет его полное состояние в загруженных строках,
 /// а физическое удаление тега согласуется по сохранённым условиям поиска.
 final class _CatalogChangePackage {
   _CatalogChangePackage(this.revision, Iterable<GraphChange> changes)
@@ -1365,8 +1365,8 @@ final class _CatalogChangePackage {
   final List<DailyChoiceChange> dailyChanges;
   final List<TagChange> tagChanges;
 
-  /// Новые состояния тегов, отредактированных пакетом.
-  Iterable<Tag> get renamedTags =>
+  /// Новые полные состояния тегов, отредактированных пакетом.
+  Iterable<Tag> get updatedTags =>
       tagChanges.whereType<TagUpdatedChange>().map((change) => change.after);
 
   /// Идентификаторы тегов, физически удалённых пакетом.

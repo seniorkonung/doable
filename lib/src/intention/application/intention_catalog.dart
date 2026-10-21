@@ -302,13 +302,14 @@ final class IntentionSummary {
         tags: tags,
       );
 
-  /// Заменяет название назначенного тега той же идентичности.
+  /// Заменяет полное состояние назначенного тега той же идентичности:
+  /// название и цвет.
   ///
   /// Состав и порядок тегов переносятся без изменений, поэтому соответствие
   /// фильтру, порядок выдачи и временные метки сохраняются. Если тег не
   /// назначен намерению, возвращается та же сводка.
-  IntentionSummary withRenamedTag(Tag renamed) {
-    if (!tags.any((tag) => tag.id == renamed.id)) {
+  IntentionSummary withUpdatedTag(Tag updated) {
+    if (!tags.any((tag) => tag.id == updated.id)) {
       return this;
     }
     return IntentionSummary(
@@ -320,7 +321,7 @@ final class IntentionSummary {
       activeRelationCount: activeRelationCount,
       createdAt: createdAt,
       updatedAt: updatedAt,
-      tags: [for (final tag in tags) tag.id == renamed.id ? renamed : tag],
+      tags: [for (final tag in tags) tag.id == updated.id ? updated : tag],
     );
   }
 
