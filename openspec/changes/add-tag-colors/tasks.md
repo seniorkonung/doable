@@ -14,13 +14,15 @@
   - **Предполагаемые файлы:** `lib/src/tag/domain/tag_color.dart` (новый), `lib/src/tag/domain/tag.dart`, `lib/src/graph_format/graph_format_codec.dart`, `test/graph_format/graph_format_codec_test.dart`, `test/graph_format/graph_format_file_test.dart`, оба эталона в `test/graph_format/golden/`, `test/app/navigation/app_shell_graph_generation_test.dart`; механические изменения существующих конструкторов в коде, тестах и бенчмарках.
   - **Размер:** M — один переход общего контракта с механической адаптацией вызовов.
 
-- [ ] 1.2 Разрешить хранение цвета в текущей базовой схеме БД
+- [ ] 1.2 Хранить цвет в новой базовой схеме БД 4
   - **Критерии приёмки:**
     - Столбец цвета допускает только SQL `NULL` и девять кодов; существующие ограничения идентичности, уникальности названия и назначений сохраняются.
-    - Текущая схема БД 3, её генерируемое представление и эталон согласованы. Миграции прежних неопубликованных данных и автоматическое пересоздание хранилища не добавляются.
-  - **Проверка:** `mise run codegen`; `mise exec --no-deps -- flutter test test/data/local/tag_schema_test.dart test/data/local/app_database_schema_test.dart`.
+    - Базовая версия схемы БД — 4 по разделу «Migration Plan» дизайна: новая установка создаёт её одним шагом, генерируемое представление и эталон `drift_schema_v4.json` согласованы, а эталон `drift_schema_v3.json` удалён. Миграции прежних неопубликованных данных и автоматическое пересоздание хранилища не добавляются.
+    - Хранилище прежней тестовой сборки с маркером 3 bootstrap классифицирует как повреждение и не изменяет, как хранилища маркеров 1 и 2.
+    - Раздел `README.md` «Local data before launch and rollback» описывает базовую схему 4. В нём сказано, что данные установок со схемами 1–3 вместе со снимками, логом и копиями очищаются вручную перед первым запуском новой сборки, а та же очистка нужна перед откатом к любой сборке без схемы 4.
+  - **Проверка:** `mise run codegen`; `mise exec --no-deps -- flutter test test/data/local/tag_schema_test.dart test/data/local/app_database_schema_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/fault_injection_test.dart`; `mise exec --no-deps -- flutter test --concurrency=1 test/data/local/migrations/file_backed_migration_test.dart` — потребители номера текущей версии схемы.
   - **Зависимости:** 1.1 — согласованные коды цвета.
-  - **Предполагаемые файлы:** `lib/src/data/local/schema/tag_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v3.json`, `test/data/local/tag_schema_test.dart`, `test/data/local/app_database_schema_test.dart`.
+  - **Предполагаемые файлы:** `lib/src/data/local/schema/tag_schema.drift`, `lib/src/data/local/app_database.dart`, `lib/src/data/local/app_database.g.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `drift_schemas/drift_schema_v4.json` (новый), `drift_schemas/drift_schema_v3.json` (удаляется), `test/data/local/tag_schema_test.dart`, `test/data/local/app_database_schema_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `README.md`.
   - **Размер:** M.
 
 - [ ] 1.3 Передавать цвет через все чтения тега и захват фактов
@@ -169,7 +171,7 @@
   - **Проверка:**
     - Выполнить `mise run check` и `openspec validate add-tag-colors --strict --no-interactive`. После фиксации изменений выполнить `mise run codegen-check` на чистой рабочей копии, подтвердив воспроизводимость генерируемых файлов и эталона схемы.
     - Собрать `mise exec --no-deps -- flutter build apk --release` и предоставить `build/app/outputs/flutter-apk/app-release.apk`. После изменения Dart-кода при наличии запущенного приложения выполнить hot reload или restart и проверить `get_runtime_errors`; запускать устройство или эмулятор для этого не требуется.
-    - Сообщить оставшиеся ручные проверки первой фазы: работа прежнего редактирования названия с сохранением цвета, восстановление копии и перенос графа с новым форматом на согласованном наборе тестовых данных. Завершение этого пакета означает завершение первой фазы; перед реализацией второй требуется отдельный пакет задач по плану.
+    - Сообщить оставшиеся ручные проверки первой фазы: работа прежнего редактирования названия с сохранением цвета, восстановление копии и перенос графа с новым форматом на установке, данные которой очищены по README. Завершение этого пакета означает завершение первой фазы; перед реализацией второй требуется отдельный пакет задач по плану.
   - **Зависимости:** 1.1–1.17.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
