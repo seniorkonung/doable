@@ -3,6 +3,7 @@ import '../../../graph/application/graph_revision.dart';
 import '../../application/tag_read_result.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
+import '../../domain/tag_color.dart';
 import '../../domain/tag_id.dart';
 
 sealed class TagEditorContext {
@@ -123,6 +124,7 @@ final class TagEditorState {
   const TagEditorState({
     required this.context,
     required this.input,
+    required this.color,
     required this.status,
     this.event,
     this.failurePresentation,
@@ -133,12 +135,19 @@ final class TagEditorState {
         TagEditorCreating() => '',
         TagEditorRenaming(:final tag) => tag.name.value,
       },
+      color = switch (context) {
+        TagEditorCreating() => null,
+        TagEditorRenaming(:final tag) => tag.color,
+      },
       status = const TagEditorIdle(),
       event = null,
       failurePresentation = null;
 
   final TagEditorContext context;
   final String input;
+
+  /// Цвет, который отправит форма вместе с названием; `null` — «Без цвета».
+  final TagColor? color;
   final TagEditorStatus status;
   final TagEditorEvent? event;
 
@@ -154,6 +163,7 @@ final class TagEditorState {
   TagEditorState withInput(String value) => TagEditorState(
     context: context,
     input: value,
+    color: color,
     status: switch (status) {
       TagEditorSubmissionFailed(
         failure: TagNameInputFailure() || TagNameOccupiedFailure(),
@@ -172,6 +182,7 @@ final class TagEditorState {
   }) => TagEditorState(
     context: context,
     input: input,
+    color: color,
     status: value,
     event: event,
     failurePresentation: failurePresentation,
@@ -180,6 +191,7 @@ final class TagEditorState {
   TagEditorState withoutEvent() => TagEditorState(
     context: context,
     input: input,
+    color: color,
     status: status,
     failurePresentation: failurePresentation,
   );

@@ -9,6 +9,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
@@ -24,22 +25,25 @@ void main() {
     );
   });
 
-  for (final (locale, context, message) in [
+  for (final (locale, context, message, color) in [
     (
       const Locale('ru'),
       TagEditorCreating(TagCreationFormKey()),
       'Сохранение этого тега уже выполняется. Дождитесь результата.',
+      null,
     ),
     (
       const Locale('en'),
       TagEditorRenaming(
-        Tag(id: _id(1), name: TagName.fromInput('Home'), color: null),
+        Tag(id: _id(1), name: TagName.fromInput('Home'), color: TagColor.blue),
       ),
       'Saving this tag is already in progress. Wait for its result.',
+      TagColor.blue,
     ),
   ]) {
     testWidgets(
-      'повторное сохранение сообщает о занятости: ${locale.languageCode}',
+      'повторное сохранение сообщает о занятости, а после отказа отправляет '
+      'новое название с цветом тега: ${locale.languageCode}',
       (tester) async {
         final repository = _Repository();
         final container = ProviderContainer(
@@ -111,15 +115,14 @@ void main() {
         );
         await tester.pump();
         expect(notice, findsNothing);
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.byKey(const ValueKey('tag-editor-submit')),
-              )
-              .onPressed,
-          isNotNull,
-        );
         expect(repository.commands, hasLength(1));
+
+        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        await tester.pump();
+        expect(repository.commands.map(_name), ['Первое имя', 'Второе имя']);
+        expect(repository.commands.map(_color), [color, color]);
+        repository.fail(const TagUnavailableFailure());
+        await tester.pumpAndSettle();
       },
     );
   }
@@ -215,6 +218,16 @@ Future<void> _pumpEditor(WidgetTester tester, _Repository repository) async {
   );
   await tester.pumpAndSettle();
 }
+
+String _name(TagCommand command) => switch (command) {
+  CreateTag(:final name) || UpdateTag(:final name) => name.value,
+  _ => throw StateError('Форма отправила не команду сохранения тега'),
+};
+
+TagColor? _color(TagCommand command) => switch (command) {
+  CreateTag(:final color) || UpdateTag(:final color) => color,
+  _ => throw StateError('Форма отправила не команду сохранения тега'),
+};
 
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
