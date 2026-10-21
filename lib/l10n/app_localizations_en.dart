@@ -1955,7 +1955,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCreated => 'Tag created.';
 
   @override
-  String get tagRenamed => 'Tag renamed.';
+  String get tagUpdated => 'Tag updated.';
 
   @override
   String get tagUnchanged => 'Tag name unchanged.';

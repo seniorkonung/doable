@@ -3001,11 +3001,11 @@ abstract class AppLocalizations {
   /// **'Tag created.'**
   String get tagCreated;
 
-  /// Подтверждение переименования тега
+  /// Подтверждение изменения тега
   ///
   /// In en, this message translates to:
-  /// **'Tag renamed.'**
-  String get tagRenamed;
+  /// **'Tag updated.'**
+  String get tagUpdated;
 
   /// Подтверждение неизменного названия тега
   ///

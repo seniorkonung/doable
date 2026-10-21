@@ -1978,7 +1978,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCreated => 'Тег создан.';
 
   @override
-  String get tagRenamed => 'Тег переименован.';
+  String get tagUpdated => 'Тег изменён.';
 
   @override
   String get tagUnchanged => 'Название тега не изменилось.';

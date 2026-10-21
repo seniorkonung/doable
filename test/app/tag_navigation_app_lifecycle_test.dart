@@ -133,7 +133,7 @@ void main() {
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsOneWidget);
       await _waitFor(
         tester,
-        () => find.textContaining(l10n.tagRenamed).evaluate().isNotEmpty,
+        () => find.textContaining(l10n.tagUpdated).evaluate().isNotEmpty,
       );
       expect(
         app.raw.select('SELECT name FROM tags WHERE id = ?', [
@@ -150,7 +150,7 @@ void main() {
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsNothing);
       expect(app.model(tester).canActOn(_intention(2)), isTrue);
       await _dismissMessage(tester);
-      expect(find.textContaining(l10n.tagRenamed), findsNothing);
+      expect(find.textContaining(l10n.tagUpdated), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

@@ -398,7 +398,7 @@ String _tagMessage(
   switch (completion.result) {
     GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
       (TagCommandKind.create, TagCreated()) => localizations.tagCreated,
-      (TagCommandKind.update, TagUpdated()) => localizations.tagRenamed,
+      (TagCommandKind.update, TagUpdated()) => localizations.tagUpdated,
       (TagCommandKind.update, TagUnchanged()) => localizations.tagUnchanged,
       (TagCommandKind.delete, TagDeleted()) => localizations.tagDeleted,
       (TagCommandKind.assign, TagAssignmentChanged(:final state))

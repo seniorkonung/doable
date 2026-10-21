@@ -417,7 +417,7 @@ void main() {
 
   for (final scenario in <({TagCommandKind kind, bool unchanged, String ru})>[
     (kind: TagCommandKind.create, unchanged: false, ru: 'Тег создан.'),
-    (kind: TagCommandKind.update, unchanged: false, ru: 'Тег переименован.'),
+    (kind: TagCommandKind.update, unchanged: false, ru: 'Тег изменён.'),
     (
       kind: TagCommandKind.update,
       unchanged: true,
@@ -483,7 +483,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Create — “tag”: Tag renamed.'), findsNothing);
+    expect(find.text('Create — “tag”: Tag updated.'), findsNothing);
     await _closeMessage(tester);
   });
 
