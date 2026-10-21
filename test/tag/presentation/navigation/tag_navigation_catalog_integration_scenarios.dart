@@ -263,8 +263,8 @@ void _realTagNavigationCatalogScenarios() {
       isA<TagAssignmentsLoaded>(),
     ]);
 
-    final renamed = await (h.coordinator.acceptTagRename(
-      RenameTag(tagId: h.tagId, name: TagName.fromInput('Быт')),
+    final renamed = await (h.coordinator.acceptTagUpdate(
+      UpdateTag(tagId: h.tagId, name: TagName.fromInput('Быт'), color: null),
     ) as TagCommandAccepted).future;
     expect(renamed.confirmedResult, isA<TagCommandSucceeded>());
     final current = await h.until<TagAssignmentsState>(

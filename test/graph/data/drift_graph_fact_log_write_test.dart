@@ -92,7 +92,9 @@ void main() {
     }
 
     final tag = (await expectOnePackage<TagCreated>(
-      repository.execute(CreateTag(TagName.fromInput('Дом'))),
+      repository.execute(
+        CreateTag(name: TagName.fromInput('Дом'), color: null),
+      ),
       ['создание тега'],
     )).tag;
     final source = (await expectOnePackage<IntentionSaved>(
@@ -255,7 +257,9 @@ void main() {
   test('удаление тега, назначенного намерению с идентификатором вне формы, '
       'отклоняется повреждением без изменения базы и лога фактов', () async {
     final tag = _confirmed<TagCreated>(
-      await repository.execute(CreateTag(TagName.fromInput('Дом'))),
+      await repository.execute(
+        CreateTag(name: TagName.fromInput('Дом'), color: null),
+      ),
     ).tag;
     await seedGraph(database, () async {
       await database.customStatement(

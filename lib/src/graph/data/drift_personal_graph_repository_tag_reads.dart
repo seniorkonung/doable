@@ -12,7 +12,8 @@ extension _TagReading on DriftPersonalGraphRepository {
     };
     final rows = await _database
         .customSelect(
-          '''SELECT a.intention_id, a.tag_id AS assigned_tag_id, t.id, t.name
+          '''SELECT a.intention_id, a.tag_id AS assigned_tag_id,
+         t.id, t.name, t.color
        FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
        WHERE a.intention_id IN (${List.filled(requested.length, '?').join(', ')})
        ORDER BY a.intention_id ASC, a.tag_creation_sequence ASC''',
@@ -118,9 +119,9 @@ extension _TagReading on DriftPersonalGraphRepository {
           final rows = await _database
               .customSelect(
                 intentionId == null
-                    ? '''SELECT id, name FROM tags
+                    ? '''SELECT id, name, color FROM tags
                    ORDER BY creation_sequence ASC'''
-                    : '''SELECT t.id, t.name,
+                    : '''SELECT t.id, t.name, t.color,
                    EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.intention_id = ?) AS is_assigned
                    FROM tags t
                    ORDER BY t.creation_sequence ASC''',
@@ -190,7 +191,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           await _validateTagReadIntention(intentionId);
           final rows = await _database
               .customSelect(
-                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name
+                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name, t.color
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.intention_id = ?
                ORDER BY a.tag_creation_sequence ASC''',
@@ -256,7 +257,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           () => _database.transaction(() async {
             final row = await _database
                 .customSelect(
-                  'SELECT id, name FROM tags WHERE id = ?',
+                  'SELECT id, name, color FROM tags WHERE id = ?',
                   variables: [Variable<String>(id.toCanonicalString())],
                   readsFrom: {_database.tags},
                 )
@@ -272,7 +273,8 @@ extension _TagReading on DriftPersonalGraphRepository {
           if (old.revision.compareTo(snapshot.revision) ==
                   GraphRevisionOrder.same &&
               old.value?.id == snapshot.value?.id &&
-              old.value?.name == snapshot.value?.name) {
+              old.value?.name == snapshot.value?.name &&
+              old.value?.color == snapshot.value?.color) {
             continue;
           }
         }

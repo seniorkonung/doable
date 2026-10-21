@@ -364,7 +364,7 @@ final class _BackupsApp {
   Future<void> createTag(String name) =>
       _confirmed(switch (_coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(TagName.fromInput(name)),
+        CreateTag(name: TagName.fromInput(name), color: null),
       )) {
         TagCommandAccepted(:final future) => future,
         final start => fail('Создание тега не принято: $start'),
@@ -472,7 +472,10 @@ Future<T> _confirm<T extends GraphCommandOutcome>(
 }
 
 Future<Tag> _createTag(PersonalGraphRepository graph, String name) async =>
-    (await _confirm<TagCreated>(graph, CreateTag(TagName.fromInput(name)))).tag;
+    (await _confirm<TagCreated>(
+      graph,
+      CreateTag(name: TagName.fromInput(name), color: null),
+    )).tag;
 
 Future<Intention> _createIntention(
   PersonalGraphRepository graph,

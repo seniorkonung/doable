@@ -348,7 +348,7 @@ void main() {
         ]);
       });
       final created = await repository.execute(
-        CreateTag(TagName.fromInput('Спорт')),
+        CreateTag(name: TagName.fromInput('Спорт'), color: null),
       );
       expect(created, isA<TagCommandSucceeded>());
       return ((created as TagCommandSucceeded).value.value as TagCreated)

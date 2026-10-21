@@ -47,7 +47,9 @@ void main() {
     String name,
   ) async {
     expect(
-      await repository.execute(CreateTag(TagName.fromInput(name))),
+      await repository.execute(
+        CreateTag(name: TagName.fromInput(name), color: null),
+      ),
       isA<GraphCommandSucceeded>(),
     );
   }

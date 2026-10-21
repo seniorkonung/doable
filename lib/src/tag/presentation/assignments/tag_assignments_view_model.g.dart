@@ -60,7 +60,7 @@ final class TagAssignmentsViewModelProvider
 }
 
 String _$tagAssignmentsViewModelHash() =>
-    r'328adafcd523590cf5354cde38de3579d414365e';
+    r'24b9525e83b27501cf07a5d303ac941355cc1970';
 
 final class TagAssignmentsViewModelFamily extends $Family
     with

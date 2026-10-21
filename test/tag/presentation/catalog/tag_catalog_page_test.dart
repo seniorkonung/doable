@@ -4,6 +4,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
+import 'package:doable/src/design_system/components/tag_dot.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -23,6 +25,7 @@ import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
@@ -32,6 +35,7 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart'
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -46,6 +50,46 @@ String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
 void main() {
+  testWidgets(
+    'каталог показывает точку и кольцо перед названиями обычного цвета',
+    (tester) async {
+      final repository = _CatalogRepository();
+      addTearDown(repository.dispose);
+      await _pumpCatalog(
+        tester,
+        repository,
+        theme: doableTheme(Brightness.dark),
+      );
+      repository.complete(
+        _page([_tag(1, 'Дом', color: TagColor.blue), _tag(2, 'Работа')]),
+      );
+      await tester.pumpAndSettle();
+
+      _expectTagDot(tester, 'Дом', color: DoableColors.dark.tagBlue);
+      _expectTagDot(
+        tester,
+        'Работа',
+        color: DoableColors.dark.grip,
+        style: PaintingStyle.stroke,
+      );
+      final home = tester.renderObject<RenderParagraph>(
+        find.descendant(of: find.text('Дом'), matching: find.byType(RichText)),
+      );
+      final work = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.text('Работа'),
+          matching: find.byType(RichText),
+        ),
+      );
+      final context = tester.element(find.text('Дом'));
+      expect(
+        home.text.style!.color,
+        Theme.of(context).textTheme.bodyLarge!.color,
+      );
+      expect(work.text.style!.color, home.text.style!.color);
+    },
+  );
+
   for (final assigned in [false, true]) {
     testWidgets(
       'экран сохраняет повтор после исчерпания устаревших проверок: ${assigned ? 'назначен' : 'свободен'}',
@@ -168,7 +212,10 @@ void main() {
                     .read(graphCommandCoordinatorProvider.notifier)
                     .acceptTagCreation(
                       TagCreationFormKey(),
-                      CreateTag(TagName.fromInput('Из редактора')),
+                      CreateTag(
+                        name: TagName.fromInput('Из редактора'),
+                        color: null,
+                      ),
                     )
                 as TagCommandAccepted;
         repository.completeCommand(
@@ -753,8 +800,8 @@ void main() {
       tester.element(find.byKey(const ValueKey('tag-catalog-create'))),
     ).read(graphCommandCoordinatorProvider.notifier);
     final tagId = (TagId.decode(_id(52)) as TagIdDecodingSuccess).id;
-    final rename = coordinator.acceptTagRename(
-      RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
+    final rename = coordinator.acceptTagUpdate(
+      UpdateTag(tagId: tagId, name: TagName.fromInput('Быт'), color: null),
     ) as TagCommandAccepted;
     await rename.future;
     await tester.pumpAndSettle();
@@ -842,7 +889,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
     await _waitForEditorToClose(tester);
     expect(find.text('Дом'), findsOneWidget);
-    expect(find.byTooltip('Rename tag'), findsOneWidget);
+    expect(find.byTooltip('Edit tag'), findsOneWidget);
     expect(raw.select('SELECT id FROM tags'), hasLength(1));
     expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
   });
@@ -1119,7 +1166,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     await _waitForEditorToClose(tester);
 
-    await tester.tap(find.byTooltip('Переименовать тег').first);
+    await tester.tap(find.byTooltip('Изменить тег').first);
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsWidgets);
     await tester.enterText(
@@ -1131,7 +1178,7 @@ void main() {
     expect(find.text('Быт'), findsOneWidget);
     expect(find.text('Работа'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Переименовать тег').first);
+    await tester.tap(find.byTooltip('Изменить тег').first);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('tag-editor-name')),
@@ -1277,15 +1324,21 @@ void main() {
       TagCatalogSuccess(
         TagCatalogSnapshot.selection(
           intentionId: intentionId,
-          rows: [TagSelectionRow(tag: _tag(1, 'Home'), isAssigned: false)],
+          rows: [
+            TagSelectionRow(
+              tag: _tag(1, 'Home', color: TagColor.blue),
+              isAssigned: false,
+            ),
+          ],
 
           revision: const _Revision(),
         ),
       ),
     );
     await tester.pumpAndSettle();
+    _expectTagDot(tester, 'Home', color: DoableColors.light.tagBlue);
     await tester.tap(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')));
-    repository.tagRead(_tag(1, 'Home'));
+    repository.tagRead(_tag(1, 'Home', color: TagColor.blue));
     await tester.pumpAndSettle();
     final assign = find.byKey(const ValueKey('tag-catalog-assign'));
     expect(find.text('Available to assign'), findsOneWidget);
@@ -1300,6 +1353,12 @@ void main() {
       find.text('Could not complete the tag assignment operation. Try again.'),
       findsOneWidget,
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-catalog-search')),
+      'нет совпадений',
+    );
+    await tester.pumpAndSettle();
+    _expectTagDot(tester, 'Home', color: DoableColors.light.tagBlue);
     expect(tester.takeException(), isNull);
   });
 
@@ -1363,7 +1422,7 @@ void main() {
     await tester.pump();
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(1)}')), findsNothing);
-    expect(find.byTooltip('Rename tag'), findsNothing);
+    expect(find.byTooltip('Edit tag'), findsNothing);
     expect(find.text('Refreshing tags…'), findsOneWidget);
 
     repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
@@ -1371,13 +1430,13 @@ void main() {
     await tester.pump();
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(1)}')), findsNothing);
-    expect(find.byTooltip('Rename tag'), findsNothing);
+    expect(find.byTooltip('Edit tag'), findsNothing);
 
     repository.complete(_page([_tag(2, 'Работа')], revision: 2));
     await tester.pumpAndSettle();
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-row-${_id(2)}')), findsOneWidget);
-    expect(find.byTooltip('Rename tag'), findsOneWidget);
+    expect(find.byTooltip('Edit tag'), findsOneWidget);
   });
 
   testWidgets('пакет после снимка обновляет выбранное имя из редактора', (
@@ -1394,33 +1453,41 @@ void main() {
     container
         .read(tagCatalogViewModelProvider().notifier)
         .selectTag(_tag(52, 'Старое имя').id);
-    repository.tagRead(_tag(52, 'Старое имя'));
+    repository.tagRead(_tag(52, 'Старое имя', color: TagColor.blue));
     await tester.pumpAndSettle();
     expect(find.text('Старое имя'), findsOneWidget);
+    _expectTagDot(tester, 'Старое имя', color: DoableColors.light.tagBlue);
 
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final accepted = coordinator.acceptTagRename(
-      RenameTag(
+    final accepted = coordinator.acceptTagUpdate(
+      UpdateTag(
         tagId: _tag(52, 'Старое имя').id,
         name: TagName.fromInput('Новое имя'),
+        color: null,
       ),
     ) as TagCommandAccepted;
     repository.completeCommand(
-      TagRenamed(
-        TagRenamedChange(
+      TagUpdated(
+        TagUpdatedChange(
           revision: const _Revision(2),
-          before: _tag(52, 'Старое имя'),
+          before: _tag(52, 'Старое имя', color: TagColor.blue),
           after: _tag(52, 'Новое имя'),
         ),
       ),
     );
     await accepted.future;
-    repository.tagRead(_tag(52, 'Старое имя'));
+    repository.tagRead(_tag(52, 'Старое имя', color: TagColor.blue));
     await tester.pumpAndSettle();
 
     expect(find.text('Новое имя'), findsOneWidget);
+    _expectTagDot(
+      tester,
+      'Новое имя',
+      color: DoableColors.light.grip,
+      style: PaintingStyle.stroke,
+    );
     expect(find.text('Старое имя'), findsNothing);
     expect(
       find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')),
@@ -1466,7 +1533,7 @@ void main() {
 
     expect(find.text('Старое имя'), findsNothing);
     expect(find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')), findsNothing);
-    expect(find.byTooltip('Rename tag'), findsOneWidget);
+    expect(find.byTooltip('Edit tag'), findsOneWidget);
   });
 
   testWidgets(
@@ -1511,16 +1578,17 @@ void main() {
       final accepted =
           container
                   .read(graphCommandCoordinatorProvider.notifier)
-                  .acceptTagRename(
-                    RenameTag(
+                  .acceptTagUpdate(
+                    UpdateTag(
                       tagId: _tag(1, 'Тег 1').id,
                       name: TagName.fromInput('Новое имя'),
+                      color: null,
                     ),
                   )
               as TagCommandAccepted;
       repository.completeCommand(
-        TagRenamed(
-          TagRenamedChange(
+        TagUpdated(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Тег 1'),
             after: _tag(1, 'Новое имя'),
@@ -1582,7 +1650,7 @@ void main() {
                 .read(graphCommandCoordinatorProvider.notifier)
                 .acceptTagCreation(
                   TagCreationFormKey(),
-                  CreateTag(TagName.fromInput('Другой')),
+                  CreateTag(name: TagName.fromInput('Другой'), color: null),
                 )
             as TagCommandAccepted;
     repository.completeCommand(
@@ -1694,9 +1762,20 @@ void main() {
       addTearDown(draft.dispose);
       await draft.open(tester);
       repository.complete(
-        _page([_tag(1, 'Дом'), _tag(2, 'Работа'), _tag(3, 'Спорт')]),
+        _page([
+          _tag(1, 'Дом', color: TagColor.blue),
+          _tag(2, 'Работа'),
+          _tag(3, 'Спорт'),
+        ]),
       );
       await tester.pumpAndSettle();
+      _expectTagDot(tester, 'Дом', color: DoableColors.light.tagBlue);
+      _expectTagDot(
+        tester,
+        'Работа',
+        color: DoableColors.light.grip,
+        style: PaintingStyle.stroke,
+      );
       final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
 
       expect(find.text('Available to add'), findsNWidgets(3));
@@ -1722,6 +1801,15 @@ void main() {
       expect(_rowStatus(_tag(2, 'Работа'), 'Available to add'), findsOneWidget);
       expect(tester.widget<FilledButton>(add).onPressed, isNull);
       expect(draft.chooserIsCurrent(tester), isTrue);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('tag-catalog-search')),
+        'нет совпадений',
+      );
+      await tester.pump();
+      _expectTagDot(tester, 'Дом', color: DoableColors.light.tagBlue);
+      await tester.tap(find.byTooltip('Clear tag search'));
+      await tester.pump();
 
       await tester.tap(add, warnIfMissed: false);
       await tester.pump();
@@ -2157,6 +2245,7 @@ Future<void> _pumpCatalog(
   WidgetTester tester,
   _CatalogRepository repository, {
   IntentionId? intentionId,
+  ThemeData? theme,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -2165,6 +2254,9 @@ Future<void> _pumpCatalog(
       ],
       child: OrdinaryPageTestApp(
         locale: const Locale('en'),
+        builder: theme == null
+            ? null
+            : (_, child) => Theme(data: theme, child: child!),
         home: TagCatalogPage(selectionContext: _selectionContext(intentionId)),
       ),
     ),
@@ -2177,10 +2269,31 @@ TagCatalogSuccess _page(List<Tag> tags, {int revision = 1}) =>
       TagCatalogSnapshot(items: tags, revision: _Revision(revision)),
     );
 
-Tag _tag(int number, String name) => Tag(
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: color,
 );
+
+void _expectTagDot(
+  WidgetTester tester,
+  String name, {
+  required Color color,
+  PaintingStyle style = PaintingStyle.fill,
+}) {
+  final title = find.text(name);
+  final scope = find.ancestor(of: title, matching: find.byType(ListTile));
+  final dot = find.descendant(
+    of: scope.evaluate().isEmpty
+        ? find.byKey(const ValueKey('tag-catalog-hidden-selection'))
+        : scope,
+    matching: find.byType(TagDot),
+  );
+  expect(dot, findsOneWidget);
+  expect(tester.getSize(dot), const Size.square(10));
+  expect(tester.getTopRight(dot).dx, lessThan(tester.getTopLeft(title).dx));
+  expect(tester.renderObject(dot), paints..circle(color: color, style: style));
+}
 
 final class _Revision implements GraphRevision {
   const _Revision([this.number = 1]);

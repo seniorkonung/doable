@@ -24,6 +24,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -93,8 +94,10 @@ void main() {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async =>
-      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+  Future<Tag> createTag(String name, {TagColor? color}) async =>
+      (await confirm<TagCreated>(
+        CreateTag(name: TagName.fromInput(name), color: color),
+      )).tag;
 
   Future<Intention> createIntention(
     String title, {
@@ -145,7 +148,7 @@ void main() {
   test('снимок замены на позиции копии читается модулем формата в выгрузку '
       'базы на этой позиции, совпадает с переданными размером, суммой и '
       'количествами и не зарегистрирован', () async {
-    final home = await createTag('Дом');
+    final home = await createTag('Дом', color: TagColor.blue);
     final health = await createIntention('Здоровье', tagIds: {home.id});
     final running = await createIntention('Бегать');
     await confirm<LongTermRelationCreated>(

@@ -333,7 +333,7 @@ final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
   bool get isFailure => confirmedResult is GraphResultFailure;
 }
 
-enum TagCommandKind { create, rename, delete, assign, removeAssignment }
+enum TagCommandKind { create, update, delete, assign, removeAssignment }
 
 final class TagCommandCompletion extends GraphPresentableCompletion {
   const TagCommandCompletion._({
@@ -1011,10 +1011,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     CreateTag command,
   ) => _acceptTag({formKey}, command, TagCommandKind.create);
 
-  TagCommandStart acceptTagRename(RenameTag command) => _acceptTag(
+  TagCommandStart acceptTagUpdate(UpdateTag command) => _acceptTag(
     {ExistingTagKey(command.tagId)},
     command,
-    TagCommandKind.rename,
+    TagCommandKind.update,
   );
 
   TagCommandStart acceptTagDelete(DeleteTag command) => _acceptTag(

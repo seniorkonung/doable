@@ -8,10 +8,12 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../tag/application/tag_catalog.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
+import '../../../design_system/components/tag_dot.dart';
 import '../../../tag/presentation/catalog/tag_catalog_filter.dart';
 import '../../../tag/presentation/catalog/tag_catalog_search_controller.dart';
 import '../../../tag/presentation/catalog/tag_catalog_state.dart';
 import '../../../tag/presentation/catalog/tag_catalog_view_model.dart';
+import '../../../tag/presentation/tag_color_presentation.dart';
 import 'intention_tag_conditions_view_model.dart';
 
 /// Выбор тега для условия поиска намерений.
@@ -224,10 +226,21 @@ final class _TagRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              name,
-              key: const ValueKey('tag-condition-picker-name'),
-              style: theme.textTheme.titleMedium,
+            Row(
+              children: [
+                TagDot(
+                  color: tagColorPresentation(tag.color),
+                  size: TagDotSize.large,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    name,
+                    key: const ValueKey('tag-condition-picker-name'),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ],
             ),
             if (selectedRequirement case final requirement?)
               Text(switch (requirement) {

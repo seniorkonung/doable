@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../design_system/components/tag_dot.dart';
 import '../../tag/domain/tag.dart';
+import '../../tag/presentation/tag_phrase_text.dart';
 import '../domain/intention.dart';
 
 /// Количество активных непосредственных связей намерения в его представлении.
@@ -104,7 +106,7 @@ final class IntentionSummaryView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (confirmedTags case final tags?)
-                Text(_tagsLabel(localizations, tags)),
+                _tagsLine(localizations, tags),
               Wrap(
                 spacing: 12,
                 children: [
@@ -120,11 +122,15 @@ final class IntentionSummaryView extends StatelessWidget {
     );
   }
 
-  String _tagsLabel(AppLocalizations localizations, List<Tag> tags) =>
+  Widget _tagsLine(AppLocalizations localizations, List<Tag> tags) =>
       tags.isEmpty
-      ? localizations.intentionSummaryNoTags
-      : localizations.intentionSummaryTags(
-          tags.map((tag) => tag.name.value).join(', '),
+      ? Text(localizations.intentionSummaryNoTags)
+      : tagPhraseText(
+          phrase: localizations.intentionSummaryTags,
+          tags: [
+            for (final tag in tags) (name: tag.name.value, color: tag.color),
+          ],
+          dotSize: TagDotSize.small,
         );
 
   String _archiveStateLabel(AppLocalizations localizations) =>

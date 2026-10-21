@@ -237,14 +237,22 @@ final class CatalogPageRepository
     required int revision,
   }) async {
     final id = (TagId.decode(_uuid(1)) as TagIdDecodingSuccess).id;
-    final before = Tag(id: id, name: TagName.fromInput('Тег ${revision - 1}'));
-    final after = Tag(id: id, name: TagName.fromInput('Тег $revision'));
+    final before = Tag(
+      id: id,
+      name: TagName.fromInput('Тег ${revision - 1}'),
+      color: null,
+    );
+    final after = Tag(
+      id: id,
+      name: TagName.fromInput('Тег $revision'),
+      color: before.color,
+    );
     final graphRevision = _Revision(revision);
     _tagCommandResult = TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: graphRevision,
-        value: TagRenamed(
-          TagRenamedChange(
+        value: TagUpdated(
+          TagUpdatedChange(
             revision: graphRevision,
             before: before,
             after: after,
@@ -252,8 +260,8 @@ final class CatalogPageRepository
         ),
       ),
     );
-    final accepted = coordinator.acceptTagRename(
-      RenameTag(tagId: id, name: after.name),
+    final accepted = coordinator.acceptTagUpdate(
+      UpdateTag(tagId: id, name: after.name, color: null),
     ) as TagCommandAccepted;
     await accepted.future;
   }
@@ -263,7 +271,7 @@ final class CatalogPageRepository
     T extends GraphCommandOutcome,
     F extends GraphCommandFailure
   >(GraphCommand<T, F> command) async {
-    if (command is RenameTag) {
+    if (command is UpdateTag) {
       return _tagCommandResult as GraphCommandResult<T, F>;
     }
     if (command is UpdateDailyChoiceFields) {

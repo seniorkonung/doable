@@ -126,7 +126,10 @@ void _registerNavigationEntryScenarios() {
             );
           }
           await _tap(tester, open);
-          await _until(tester, find.text(l10n.tagNavigationTag(longTag)));
+          await _until(
+            tester,
+            findTextIgnoringInlineWidgets(l10n.tagNavigationTag(longTag)),
+          );
           expect(
             find.descendant(
               of: find.byType(TagNavigationPage),

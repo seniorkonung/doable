@@ -121,7 +121,7 @@ void main() {
     expect(
       await container
           .read(personalGraphRepositoryProvider)
-          .execute(CreateTag(TagName.fromInput('Дом'))),
+          .execute(CreateTag(name: TagName.fromInput('Дом'), color: null)),
       isA<GraphCommandSucceeded>(),
     );
     final confirmation = awaitConfirmation(ready);
@@ -190,7 +190,7 @@ void main() {
     expect(
       await container
           .read(personalGraphRepositoryProvider)
-          .execute(CreateTag(TagName.fromInput('Дом'))),
+          .execute(CreateTag(name: TagName.fromInput('Дом'), color: null)),
       isA<GraphCommandSucceeded>(),
     );
     final confirmation = awaitConfirmation(ready);

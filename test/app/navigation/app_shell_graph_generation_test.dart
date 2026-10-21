@@ -40,6 +40,7 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/inline_text.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/temporary_graph_files.dart';
 
@@ -358,7 +359,7 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
         'dailyChoices': counts.dailyChoices,
       },
     },
-    {'kind': 'tag', 'id': tagId, 'name': 'Здоровье'},
+    {'kind': 'tag', 'id': tagId, 'name': 'Здоровье', 'color': null},
     for (var number = 1; number <= _intentionCount; number++)
       {
         'kind': 'intention',
@@ -412,7 +413,7 @@ Map<String, Object?> _intentionCatalogParameters(WidgetTester tester) => {
               ),
             )
             .evaluate())
-      (label.widget as Text).data,
+      textIgnoringInlineWidgets(label.widget as Text),
   ],
   'порядок': _texts(find.byKey(const ValueKey('catalog-order-control'))),
   'позиция прокрутки': _catalogPosition(tester).pixels,

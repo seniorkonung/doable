@@ -9,6 +9,7 @@ import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
@@ -58,7 +59,7 @@ void main() {
       await pumpEventQueue();
       h.changes.add(
         _Package(const _Revision(2), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Дом'),
             after: _tag(1, 'Семья'),
@@ -95,11 +96,11 @@ void main() {
     () async {
       final h = _Harness();
       addTearDown(h.dispose);
-      h.reads.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
+      h.reads.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа'), _tag(3, 'Учёба')]);
       await pumpEventQueue();
       h.changes.add(
         _Package(const _Revision(2), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Дом'),
             after: _tag(1, 'Быт'),
@@ -108,28 +109,40 @@ void main() {
       );
       h.changes.add(
         _Package(const _Revision(3), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(3),
             before: _tag(1, 'Быт'),
-            after: _tag(1, 'Семья'),
+            after: _tag(1, 'Быт', color: TagColor.blue),
           ),
           TagDeletedChange(revision: const _Revision(3), tagId: _id(2)),
         ]),
       );
       final refreshing = h.state as TagAssignmentsLoaded;
-      expect(refreshing.items.map((tag) => tag.name.value), ['Семья']);
+      expect(
+        refreshing.items.map((tag) => (tag.id, tag.name.value, tag.color)),
+        [(_id(1), 'Быт', TagColor.blue), (_id(3), 'Учёба', null)],
+      );
       expect(refreshing.freshness, TagAssignmentsFreshness.refreshing);
       expect(h.model.canActOn(_id(1)), isFalse);
       expect(h.reads.queries, hasLength(2));
 
-      h.reads.page(1, [_tag(1, 'Быт'), _tag(2, 'Работа')], revision: 2);
+      h.reads.page(1, [
+        _tag(1, 'Быт'),
+        _tag(2, 'Работа'),
+        _tag(3, 'Учёба'),
+      ], revision: 2);
       await pumpEventQueue();
       expect(
-        (h.state as TagAssignmentsLoaded).items.map((tag) => tag.name.value),
-        ['Семья'],
+        (h.state as TagAssignmentsLoaded).items.map(
+          (tag) => (tag.id, tag.name.value, tag.color),
+        ),
+        [(_id(1), 'Быт', TagColor.blue), (_id(3), 'Учёба', null)],
       );
       expect(h.reads.queries, hasLength(3));
-      h.reads.page(2, [_tag(1, 'Семья')], revision: 3);
+      h.reads.page(2, [
+        _tag(1, 'Быт', color: TagColor.blue),
+        _tag(3, 'Учёба'),
+      ], revision: 3);
       await pumpEventQueue();
       expect(h.model.canActOn(_id(1)), isTrue);
     },
@@ -144,7 +157,7 @@ void main() {
       await pumpEventQueue();
       h.changes.add(
         _Package(const _Revision(2), [
-          TagRenamedChange(
+          TagUpdatedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Старое'),
             after: _tag(1, 'Новое'),
@@ -288,7 +301,7 @@ void main() {
 
     h.changes.add(
       _Package(const _Revision(2), [
-        TagRenamedChange(
+        TagUpdatedChange(
           revision: const _Revision(2),
           before: _tag(2, 'Дом'),
           after: _tag(2, 'Быт'),
@@ -631,5 +644,5 @@ IntentionId _intentionId(int number) => (IntentionId.decode(
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
-Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name));
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _id(number), name: TagName.fromInput(name), color: color);

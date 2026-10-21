@@ -55,7 +55,7 @@ enum _MatrixEntry {
     _MatrixEntry.tag => find.byKey(
       ValueKey('tag-catalog-open-${tagFixtureId(_tag)}'),
     ),
-    _MatrixEntry.renameTag => find.byTooltip('Rename tag'),
+    _MatrixEntry.renameTag => find.byTooltip('Edit tag'),
     _MatrixEntry.assignTags => find.byKey(
       const ValueKey('tag-assignments-choose'),
     ),

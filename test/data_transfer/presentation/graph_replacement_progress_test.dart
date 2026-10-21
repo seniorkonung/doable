@@ -548,7 +548,9 @@ final class _RestoreApp {
     final backup = await tester.runAsync(() async {
       final repository = container.read(personalGraphRepositoryProvider);
       expect(
-        await repository.execute(CreateTag(TagName.fromInput('Дом'))),
+        await repository.execute(
+          CreateTag(name: TagName.fromInput('Дом'), color: null),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       expect(
@@ -621,7 +623,7 @@ final class _ImportApp {
         expect(
           await container
               .read(personalGraphRepositoryProvider)
-              .execute(CreateTag(TagName.fromInput('Дом'))),
+              .execute(CreateTag(name: TagName.fromInput('Дом'), color: null)),
           isA<GraphCommandSucceeded>(),
         );
       });

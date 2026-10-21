@@ -676,7 +676,7 @@ final class DriftPersonalGraphRepository
         dailyChoiceCommand,
       ),
       final CreateTag createTag => await _executeTag(createTag),
-      final RenameTag renameTag => await _executeTag(renameTag),
+      final UpdateTag updateTag => await _executeTag(updateTag),
       final DeleteTag deleteTag => await _executeTag(deleteTag),
       final AssignTag assignTag => await _executeTag(assignTag),
       final RemoveTagAssignment removeTagAssignment => await _executeTag(

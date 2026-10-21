@@ -9,9 +9,13 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,7 +28,8 @@ import 'package_consumers_test_support.dart';
 
 /// Пакеты команд тегов на настоящем хранилище: каталожная мутация команды
 /// назначения — изменение кратких данных существующего намерения для всех
-/// потребителей вне поиска.
+/// потребителей вне поиска. Правка тега меняет краткие данные только там,
+/// где показаны теги намерения, — в поиске.
 ///
 /// Граф фикстуры: связи 101 (1→2), 102 (2→3), 103 (1→4), 104 (1→5),
 /// дневной выбор 201 от 1 к 3 по пути 101, 102 и отдельное намерение 6.
@@ -72,7 +77,7 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     final created = await repository.execute(
-      CreateTag(TagName.fromInput('Здоровье')),
+      CreateTag(name: TagName.fromInput('Здоровье'), color: null),
     );
     tagId = ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
 
@@ -236,4 +241,60 @@ void main() {
       expect(probes.intentionDetailsEdit(observed), formBefore);
     },
   );
+
+  test('изменение только цвета назначенного тега доходит до кратких данных '
+      'поиска и не затрагивает остальных потребителей', () async {
+    const browse = BrowseIntentionCatalog();
+    final assigned = await run(AssignTag(tagId: tagId, intentionId: observed));
+    await settlePackageConsumersUntil(
+      () => probes.observingSettledAt(assigned),
+      diagnostics: probes.describe,
+    );
+    container.listen(intentionCatalogViewModelProvider(browse), (_, _) {});
+    IntentionCatalogLoaded? search() =>
+        switch (container.read(intentionCatalogViewModelProvider(browse))) {
+          AsyncData(value: final IntentionCatalogLoaded loaded) => loaded,
+          _ => null,
+        };
+    List<(TagId, String, TagColor?)> observedTags() => [
+      for (final tag
+          in search()!.items.singleWhere((item) => item.id == observed).tags)
+        (tag.id, tag.name.value, tag.color),
+    ];
+    await settlePackageConsumersUntil(() => search() != null);
+    expect(observedTags(), [(tagId, 'Здоровье', null)]);
+    final searchBefore = search()!;
+    final contentBefore = probes.visibleContent();
+    final formBefore = probes.intentionDetailsEdit(observed);
+    final selectionBefore = probes.dailyCatalogSelection;
+
+    probes.reset();
+    final completion = await (coordinator.acceptTagUpdate(
+      UpdateTag(
+        tagId: tagId,
+        name: TagName.fromInput('Здоровье'),
+        color: TagColor.blue,
+      ),
+    ) as TagCommandAccepted).future;
+    final confirmed = completion.confirmedResult;
+    expect((confirmed as TagCommandSucceeded).value.value, isA<TagUpdated>());
+    final updated = confirmed.value.revision;
+    await settlePackageConsumersUntil(
+      () => search()?.revision.compareTo(updated) == GraphRevisionOrder.same,
+    );
+    await quiescePackageConsumers();
+
+    expect(observedTags(), [(tagId, 'Здоровье', TagColor.blue)]);
+    expect(
+      search()!.items.map((item) => item.id),
+      searchBefore.items.map((item) => item.id),
+    );
+    expect(search()!.totalCount, searchBefore.totalCount);
+    for (final probe in probes.all) {
+      expect(probe.forbiddenStates, isEmpty, reason: probe.name);
+    }
+    expect(probes.visibleContent(), contentBefore);
+    expect(probes.intentionDetailsEdit(observed), formBefore);
+    expect(probes.dailyCatalogSelection, selectionBefore);
+  });
 }

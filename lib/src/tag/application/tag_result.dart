@@ -88,11 +88,11 @@ final class TagCreated extends TagCommandSuccess {
   Tag get tag => change.after;
 }
 
-final class TagRenamed extends TagCommandSuccess {
-  const TagRenamed(this.change);
+final class TagUpdated extends TagCommandSuccess {
+  const TagUpdated(this.change);
 
   @override
-  final TagRenamedChange change;
+  final TagUpdatedChange change;
   Tag get before => change.before;
   Tag get after => change.after;
 }

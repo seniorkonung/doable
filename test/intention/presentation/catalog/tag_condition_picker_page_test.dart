@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -19,6 +20,7 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
@@ -39,6 +41,36 @@ final _search = find.byKey(const ValueKey('tag-condition-picker-search'));
 final _list = find.byKey(const ValueKey('tag-condition-picker-list'));
 
 void main() {
+  testWidgets(
+    'строки выбора показывают точку цвета или кольцо перед названием',
+    (tester) async {
+      final home = _tag(1, 'Дом', color: TagColor.blue);
+      final work = _tag(2, 'Работа');
+      final h = await _open(
+        tester,
+        conditions: [_condition(home, _present), _condition(work, _absent)],
+      );
+      h.repository.completePending([home, work]);
+      await tester.pumpAndSettle();
+
+      for (final (tag, color) in [(home, DoableTagColor.blue), (work, null)]) {
+        final dotFinder = find.descendant(
+          of: _row(tag),
+          matching: find.byType(TagDot),
+        );
+        final dot = tester.widget<TagDot>(dotFinder);
+        expect(dot.color, color);
+        expect(dot.size, TagDotSize.large);
+        final name = find.descendant(of: _row(tag), matching: _name);
+        expect(tester.widget<Text>(name).data, tag.name.value);
+        expect(
+          tester.getRect(dotFinder).right,
+          lessThan(tester.getRect(name).left),
+        );
+      }
+    },
+  );
+
   for (final (requirement, label) in [(_present, 'Есть'), (_absent, 'Нет')]) {
     testWidgets(
       'выбор «$label» закрывает экран и возвращает тег, надобность и ревизию снимка',
@@ -312,11 +344,11 @@ void main() {
 
       final renamed = _tag(1, 'Самочувствие');
       await h.confirm(
-        (coordinator) => coordinator.acceptTagRename(
-          RenameTag(tagId: health.id, name: renamed.name),
+        (coordinator) => coordinator.acceptTagUpdate(
+          UpdateTag(tagId: health.id, name: renamed.name, color: health.color),
         ),
-        (revision) => TagRenamed(
-          TagRenamedChange(revision: revision, before: health, after: renamed),
+        (revision) => TagUpdated(
+          TagUpdatedChange(revision: revision, before: health, after: renamed),
         ),
         revision: 2,
       );
@@ -340,7 +372,7 @@ void main() {
       await h.confirm(
         (coordinator) => coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(rest.name),
+          CreateTag(name: rest.name, color: null),
         ),
         (revision) =>
             TagCreated(TagCreatedChange(revision: revision, after: rest)),
@@ -423,7 +455,7 @@ void main() {
     h.repository.completePending([health]);
     await tester.pumpAndSettle();
 
-    for (final tooltip in ['Создать тег', 'Переименовать тег', 'Удалить тег']) {
+    for (final tooltip in ['Создать тег', 'Изменить тег', 'Удалить тег']) {
       expect(
         find.descendant(of: _picker, matching: find.byTooltip(tooltip)),
         findsNothing,
@@ -688,6 +720,7 @@ IntentionTagCondition _condition(
   tagId: tag.id,
   requirement: requirement,
   name: tag.name,
+  color: tag.color,
   isDeleted: false,
 );
 
@@ -695,5 +728,5 @@ TagId _id(int number) => (TagId.decode(
   '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name));
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _id(number), name: TagName.fromInput(name), color: color);

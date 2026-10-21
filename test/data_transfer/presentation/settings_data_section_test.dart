@@ -872,8 +872,9 @@ final class _DataSectionApp {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async =>
-      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+  Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
+    CreateTag(name: TagName.fromInput(name), color: null),
+  )).tag;
 
   Future<void> makeManualBackup() async =>
       expect(await _backups.makeManualBackup(), ManualGraphBackupOutcome.made);
@@ -972,7 +973,7 @@ final class _RestoreApp {
   Future<void> createTag(String name) async => expect(
     await _container
         .read(personalGraphRepositoryProvider)
-        .execute(CreateTag(TagName.fromInput(name))),
+        .execute(CreateTag(name: TagName.fromInput(name), color: null)),
     isA<GraphCommandSucceeded>(),
   );
 
@@ -1053,7 +1054,7 @@ final class _ImportApp {
       expect(
         await ready.container
             .read(personalGraphRepositoryProvider)
-            .execute(CreateTag(TagName.fromInput('Дом'))),
+            .execute(CreateTag(name: TagName.fromInput('Дом'), color: null)),
         isA<GraphCommandSucceeded>(),
       );
     });

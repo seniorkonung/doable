@@ -449,6 +449,7 @@ void main() {
           final renamed = Tag(
             id: selected.id,
             name: TagName.fromInput('Актуальный дом'),
+            color: selected.color,
           );
           repository.observe(renamed, revision: 2);
           await tester.pumpAndSettle();
@@ -784,8 +785,12 @@ void main() {
         );
         final rename = container
             .read(graphCommandCoordinatorProvider.notifier)
-            .acceptTagRename(
-              RenameTag(tagId: home.id, name: TagName.fromInput('Спорт')),
+            .acceptTagUpdate(
+              UpdateTag(
+                tagId: home.id,
+                name: TagName.fromInput('Спорт'),
+                color: home.color,
+              ),
             );
         expect(rename, isA<TagCommandAccepted>());
         await tester.runAsync(() => (rename as TagCommandAccepted).future);
@@ -1133,14 +1138,20 @@ Future<void> _beginRefresh(
   final accepted =
       container
               .read(graphCommandCoordinatorProvider.notifier)
-              .acceptTagRename(RenameTag(tagId: before.id, name: after.name))
+              .acceptTagUpdate(
+                UpdateTag(
+                  tagId: before.id,
+                  name: after.name,
+                  color: before.color,
+                ),
+              )
           as TagCommandAccepted;
   repository.command.complete(
     TagCommandSucceeded(
       ConfirmedGraphResult(
         revision: const TagCatalogTestRevision(2),
-        value: TagRenamed(
-          TagRenamedChange(
+        value: TagUpdated(
+          TagUpdatedChange(
             revision: const TagCatalogTestRevision(2),
             before: before,
             after: after,
@@ -1275,7 +1286,15 @@ List<String> _visibleNames(WidgetTester tester) => [
   for (final tile in tester.widgetList<ListTile>(
     find.descendant(of: _list, matching: find.byType(ListTile)),
   ))
-    (tile.title! as Text).data!,
+    tester
+        .widgetList<RichText>(
+          find.descendant(
+            of: find.byWidget(tile.title!),
+            matching: find.byType(RichText),
+          ),
+        )
+        .map((text) => text.text.toPlainText())
+        .join(),
 ];
 
 Finder _row(Tag tag) =>
@@ -1310,6 +1329,7 @@ String _id(int number) =>
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Прежний смысл необязательного получателя: без намерения — просмотр

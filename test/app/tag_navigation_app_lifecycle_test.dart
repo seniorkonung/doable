@@ -43,6 +43,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/inline_text.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
@@ -70,8 +71,12 @@ void main() {
             .evaluate()
             .isEmpty,
       );
-      final accepted = app.runtime.commandCoordinator.acceptTagRename(
-        RenameTag(tagId: _tagId, name: TagName.fromInput('Новое название')),
+      final accepted = app.runtime.commandCoordinator.acceptTagUpdate(
+        UpdateTag(
+          tagId: _tagId,
+          name: TagName.fromInput('Новое название'),
+          color: null,
+        ),
       ) as TagCommandAccepted;
       await _completed(tester, accepted.future);
       await app.openNavigation(tester);
@@ -106,8 +111,8 @@ void main() {
       final before = await app.loaded(tester);
       final l10n = app.l10n(tester);
       app.repository.failPages = true;
-      final accepted = app.runtime.commandCoordinator.acceptTagRename(
-        RenameTag(tagId: _tagId, name: TagName.fromInput('Быт')),
+      final accepted = app.runtime.commandCoordinator.acceptTagUpdate(
+        UpdateTag(tagId: _tagId, name: TagName.fromInput('Быт'), color: null),
       ) as TagCommandAccepted;
       final completion = await _completed(tester, accepted.future);
       expect(completion.result, isA<GraphResultSuccess>());
@@ -129,7 +134,7 @@ void main() {
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsOneWidget);
       await _waitFor(
         tester,
-        () => find.textContaining(l10n.tagRenamed).evaluate().isNotEmpty,
+        () => find.textContaining(l10n.tagUpdated).evaluate().isNotEmpty,
       );
       expect(
         app.raw.select('SELECT name FROM tags WHERE id = ?', [
@@ -142,11 +147,11 @@ void main() {
       final current = await app.loaded(tester);
       expect(current.scope, TaggedIntentionsScope.archived);
       expect(current.tag.name.value, 'Быт');
-      expect(app.repository.commands.whereType<RenameTag>(), hasLength(1));
+      expect(app.repository.commands.whereType<UpdateTag>(), hasLength(1));
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsNothing);
       expect(app.model(tester).canActOn(_intention(2)), isTrue);
       await _dismissMessage(tester);
-      expect(find.textContaining(l10n.tagRenamed), findsNothing);
+      expect(find.textContaining(l10n.tagUpdated), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -201,7 +206,7 @@ void main() {
           expect(find.byKey(ValueKey(_intention(1))), findsNothing);
           final created = app.runtime.commandCoordinator.acceptTagCreation(
             TagCreationFormKey(),
-            CreateTag(before.tag.name),
+            CreateTag(name: before.tag.name, color: null),
           ) as TagCommandAccepted;
           final replacement = await _completed(tester, created.future);
           switch (replacement.result) {
@@ -231,7 +236,7 @@ void main() {
             case _Mutation.renameTag:
               expect(current.tag.name.value, 'Быт');
               expect(
-                find.text(
+                findTextIgnoringInlineWidgets(
                   app.l10n(tester).tagNavigationTag(before.tag.name.value),
                 ),
                 findsNothing,
@@ -295,8 +300,8 @@ Future<GraphCommandCompletion> _mutate(_App app, _Mutation mutation) {
     _Mutation.removeAssignment => (coordinator.acceptTagRemoveAssignment(
       RemoveTagAssignment(tagId: _tagId, intentionId: _intention(4)),
     ) as TagCommandAccepted).future,
-    _Mutation.renameTag => (coordinator.acceptTagRename(
-      RenameTag(tagId: _tagId, name: TagName.fromInput('Быт')),
+    _Mutation.renameTag => (coordinator.acceptTagUpdate(
+      UpdateTag(tagId: _tagId, name: TagName.fromInput('Быт'), color: null),
     ) as TagCommandAccepted).future,
     _Mutation.deleteTag => (coordinator.acceptTagDelete(
       DeleteTag(_tagId),

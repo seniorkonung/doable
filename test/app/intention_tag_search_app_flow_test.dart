@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/inline_text.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
@@ -305,7 +306,7 @@ List<_Row> _results(WidgetTester tester, Type page) => [
           matching: find.byType(Text),
         )
         .evaluate()
-        .map((element) => (element.widget as Text).data!)
+        .map((element) => textIgnoringInlineWidgets(element.widget as Text))
         .toList()) {
       [final title, final tags, ...] => (title, tags),
       final texts => fail('Строка результата без названия и тегов: $texts'),
@@ -323,7 +324,7 @@ List<String> _conditions(WidgetTester tester, Type page) => [
             ),
           )
           .evaluate())
-    (label.widget as Text).data!,
+    textIgnoringInlineWidgets(label.widget as Text),
 ];
 
 Future<void> _expectResults(

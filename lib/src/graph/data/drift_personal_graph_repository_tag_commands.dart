@@ -6,7 +6,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     var stage = TagCommandDiagnosticsStage.validation;
     final type = switch (command) {
       CreateTag() => TagCommandDiagnosticsType.create,
-      RenameTag() => TagCommandDiagnosticsType.rename,
+      UpdateTag() => TagCommandDiagnosticsType.update,
       DeleteTag() => TagCommandDiagnosticsType.delete,
       AssignTag() => TagCommandDiagnosticsType.assign,
       RemoveTagAssignment() => TagCommandDiagnosticsType.removeAssignment,
@@ -24,7 +24,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
       final confirmed = await _writeGraph<TagCommandSuccess>(
         (_) => switch (command) {
           CreateTag() => _createTag(command, onStage: (value) => stage = value),
-          RenameTag() => _renameTag(command, onStage: (value) => stage = value),
+          UpdateTag() => _updateTag(command, onStage: (value) => stage = value),
           DeleteTag() => _deleteTag(command, onStage: (value) => stage = value),
           AssignTag() => _assignTag(command, onStage: (value) => stage = value),
           RemoveTagAssignment() => _removeTagAssignment(
@@ -35,7 +35,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         afterRollback: (error) async {
           // После отката индекс имени остаётся окончательным арбитром гонки.
           final conflictingName = switch (command) {
-            CreateTag(:final name) || RenameTag(:final name) => name,
+            CreateTag(:final name) || UpdateTag(:final name) => name,
             DeleteTag() || AssignTag() || RemoveTagAssignment() => null,
           };
           if (conflictingName == null) return;
@@ -49,7 +49,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
             if (occupied != null &&
                 switch (command) {
                   CreateTag() => true,
-                  RenameTag(:final tagId) => occupied.id != tagId,
+                  UpdateTag(:final tagId) => occupied.id != tagId,
                   DeleteTag() || AssignTag() || RemoveTagAssignment() => false,
                 }) {
               throw _TagNameOccupied(occupied.id);
@@ -83,37 +83,48 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
           local.TagsCompanion.insert(
             id: id.toCanonicalString(),
             name: command.name.value,
+            color: Value(command.color?.code),
           ),
         );
     onStage(TagCommandDiagnosticsStage.resultRead);
     final tag = await _findTagById(id);
-    if (tag == null || tag.name != command.name) {
+    if (tag == null || tag.name != command.name || tag.color != command.color) {
       throw const StoredGraphCorruption();
     }
     return _CommittedTagCreated(tag);
   }
 
-  Future<_CommittedTagCommand> _renameTag(
-    RenameTag command, {
+  Future<_CommittedTagCommand> _updateTag(
+    UpdateTag command, {
     required void Function(TagCommandDiagnosticsStage) onStage,
   }) async {
     final before = await _findTagById(command.tagId);
     if (before == null) throw _TagMissing(command.tagId);
-    if (before.name == command.name) return _CommittedTagUnchanged(before);
+    if (before.name == command.name && before.color == command.color) {
+      return _CommittedTagUnchanged(before);
+    }
 
     onStage(TagCommandDiagnosticsStage.write);
+    // Цвет передаётся всегда: «Без цвета» записывается явным SQL NULL.
     final rows =
         await (_database.update(
               _database.tags,
             )..where((row) => row.id.equals(command.tagId.toCanonicalString())))
-            .write(local.TagsCompanion(name: Value(command.name.value)));
+            .write(
+              local.TagsCompanion(
+                name: Value(command.name.value),
+                color: Value(command.color?.code),
+              ),
+            );
     if (rows != 1) throw _TagMissing(command.tagId);
     onStage(TagCommandDiagnosticsStage.resultRead);
     final after = await _findTagById(command.tagId);
-    if (after == null || after.name != command.name) {
+    if (after == null ||
+        after.name != command.name ||
+        after.color != command.color) {
       throw const StoredGraphCorruption();
     }
-    return _CommittedTagRenamed(before: before, after: after);
+    return _CommittedTagUpdated(before: before, after: after);
   }
 
   Future<_CommittedTagCommand> _deleteTag(
@@ -264,7 +275,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   Future<tag_domain.Tag?> _findTagById(TagId id) async {
     final row = await _database
         .customSelect(
-          'SELECT id, name FROM tags WHERE id = ?',
+          'SELECT id, name, color FROM tags WHERE id = ?',
           variables: [Variable<String>(id.toCanonicalString())],
           readsFrom: {_database.tags},
         )
@@ -282,7 +293,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     if (ids.isEmpty) return const {};
     final rows = await _database
         .customSelect(
-          'SELECT id, name FROM tags '
+          'SELECT id, name, color FROM tags '
           'WHERE id IN (SELECT value FROM json_each(?))',
           variables: [
             Variable<String>(
@@ -306,7 +317,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   Future<tag_domain.Tag?> _findTagByNameKey(String key) async {
     final row = await _database
         .customSelect(
-          'SELECT id, name FROM tags WHERE name_key = ?',
+          'SELECT id, name, color FROM tags WHERE name_key = ?',
           variables: [Variable<String>(key)],
           readsFrom: {_database.tags},
         )
@@ -333,16 +344,16 @@ final class _CommittedTagCreated extends _CommittedTagCommand {
       TagCreated(TagCreatedChange(revision: revision, after: tag));
 }
 
-final class _CommittedTagRenamed extends _CommittedTagCommand {
-  const _CommittedTagRenamed({required this.before, required this.after});
+final class _CommittedTagUpdated extends _CommittedTagCommand {
+  const _CommittedTagUpdated({required this.before, required this.after});
   final tag_domain.Tag before;
   final tag_domain.Tag after;
 
   @override
   bool get didMutate => true;
   @override
-  TagCommandSuccess toSuccess(GraphRevision revision) => TagRenamed(
-    TagRenamedChange(revision: revision, before: before, after: after),
+  TagCommandSuccess toSuccess(GraphRevision revision) => TagUpdated(
+    TagUpdatedChange(revision: revision, before: before, after: after),
   );
 }
 

@@ -4,11 +4,13 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/graph/data/stored_graph_rows.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
@@ -59,11 +61,12 @@ void main() {
   });
   tearDown(() => database.close());
 
-  void addTag(int number, String name) {
+  void addTag(int number, String name, {String? color}) {
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)', [
         _uuid(number),
         name,
+        color,
       ]);
     });
   }
@@ -94,7 +97,7 @@ void main() {
     expect(empty.items, isEmpty);
 
     for (var number = 1; number <= 7; number++) {
-      addTag(number, 'Тег $number');
+      addTag(number, 'Тег $number', color: number.isOdd ? 'blue' : null);
     }
     final loaded = snapshot(
       await repository.getTagCatalog(const TagCatalogBrowseMode()),
@@ -102,6 +105,28 @@ void main() {
     expect(loaded.items.map((tag) => tag.name.value), [
       for (var number = 1; number <= 7; number++) 'Тег $number',
     ]);
+    expect(loaded.items.map((tag) => tag.color), [
+      for (var number = 1; number <= 7; number++)
+        number.isOdd ? TagColor.blue : null,
+    ]);
+  });
+
+  test('общий декодер отличает пропущенный столбец цвета от SQL NULL', () {
+    final row = {'id': _uuid(1), 'name': 'Дом'};
+
+    expect(decodeStoredTag({...row, 'color': 'blue'}).color, TagColor.blue);
+    expect(decodeStoredTag({...row, 'color': null}).color, isNull);
+    for (final invalid in [
+      row,
+      {...row, 'color': 'red'},
+      {...row, 'color': 1},
+    ]) {
+      expect(
+        () => decodeStoredTag(invalid),
+        throwsA(isA<StoredGraphCorruption>()),
+        reason: 'Строка $invalid',
+      );
+    }
   });
 
   test(
@@ -179,7 +204,8 @@ void main() {
     );
   });
 
-  test('наблюдение различает отсутствие, появление и удаление тега', () async {
+  test('наблюдение различает отсутствие, появление, изменение только цвета и '
+      'удаление тега', () async {
     final events = StreamIterator(repository.watchTag(_tagId(1)));
     addTearDown(events.cancel);
     expect(await events.moveNext(), isTrue);
@@ -189,13 +215,34 @@ void main() {
     await seedGraph(
       database,
       () => database.customUpdate(
-        'INSERT INTO tags (id, name) VALUES (?, ?)',
+        "INSERT INTO tags (id, name, color) VALUES (?, ?, 'blue')",
         variables: [Variable<String>(_uuid(1)), const Variable<String>('Дом')],
         updates: {database.tags},
       ),
     );
     expect(await events.moveNext(), isTrue);
-    expect((events.current as TagReadSuccess).value.value!.name.value, 'Дом');
+    final appeared = (events.current as TagReadSuccess).value;
+    expect(appeared.value!.name.value, 'Дом');
+    expect(appeared.value!.color, TagColor.blue);
+
+    // Запись в обход репозитория не меняет ревизию: новый снимок отличается
+    // только цветом.
+    await seedGraph(
+      database,
+      () => database.customUpdate(
+        'UPDATE tags SET color = NULL WHERE id = ?',
+        variables: [Variable<String>(_uuid(1))],
+        updates: {database.tags},
+      ),
+    );
+    expect(await events.moveNext(), isTrue);
+    final uncolored = (events.current as TagReadSuccess).value;
+    expect(
+      uncolored.revision.compareTo(appeared.revision),
+      GraphRevisionOrder.same,
+    );
+    expect(uncolored.value!.name.value, 'Дом');
+    expect(uncolored.value!.color, isNull);
 
     await seedGraph(
       database,

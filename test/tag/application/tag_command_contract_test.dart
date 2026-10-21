@@ -5,21 +5,32 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('переименование не допускает другую идентичность или прежнее имя', () {
+  test('редактирование сохраняет идентичность и допускает изменение только '
+      'цвета, но не полное совпадение', () {
     const revision = _Revision(1);
     final before = _tag(1, 'Дом');
     final otherId = _tag(2, 'Быт');
-    final sameName = Tag(id: before.id, name: TagName.fromInput('Дом'));
+    final sameState = Tag(
+      id: before.id,
+      name: TagName.fromInput('Дом'),
+      color: null,
+    );
+    final recolored = Tag(
+      id: before.id,
+      name: before.name,
+      color: TagColor.blue,
+    );
 
     expect(
       () =>
-          TagRenamedChange(revision: revision, before: before, after: otherId),
+          TagUpdatedChange(revision: revision, before: before, after: otherId),
       throwsA(
         isA<TagChangeValidationException>().having(
           (error) => error.failure,
@@ -29,15 +40,26 @@ void main() {
       ),
     );
     expect(
-      () =>
-          TagRenamedChange(revision: revision, before: before, after: sameName),
+      () => TagUpdatedChange(
+        revision: revision,
+        before: before,
+        after: sameState,
+      ),
       throwsA(
         isA<TagChangeValidationException>().having(
           (error) => error.failure,
           'причина',
-          TagChangeValidationFailure.nameUnchanged,
+          TagChangeValidationFailure.unchanged,
         ),
       ),
+    );
+    expect(
+      TagUpdatedChange(
+        revision: revision,
+        before: before,
+        after: recolored,
+      ).after.color,
+      TagColor.blue,
     );
   });
 
@@ -179,7 +201,7 @@ IntentionId _intentionId(int suffix) => (IntentionId.decode(
 Tag _tag(int suffix, String name) {
   final text = '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}';
   final decoded = TagId.decode(text) as TagIdDecodingSuccess;
-  return Tag(id: decoded.id, name: TagName.fromInput(name));
+  return Tag(id: decoded.id, name: TagName.fromInput(name), color: null);
 }
 
 IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(

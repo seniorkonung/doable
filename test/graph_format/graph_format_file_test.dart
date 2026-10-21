@@ -20,6 +20,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_descript
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +87,7 @@ void main() {
               Tag(
                 id: _tagId(_tagIds[0]),
                 name: TagName.fromStored('Тег $producedTags'),
+                color: null,
               ),
             );
           }
@@ -409,8 +411,9 @@ GraphFormatHeader _expectedGoldenHeader() => GraphFormatHeader(
 );
 
 /// Допустимый сохранённый граф: путь первого дневного выбора проходит через
-/// ныне архивированную связь к архивированному намерению, а тег «Дом»
-/// назначен сначала намерению «Бегать по утрам», затем «Здоровье».
+/// ныне архивированную связь к архивированному намерению, а синий тег «Дом»
+/// назначен сначала намерению «Бегать по утрам», затем «Здоровье»; тег
+/// «Спорт» без цвета.
 List<GraphEntityRecord> _expectedGoldenRecords() {
   final home = _tagId(_tagIds[0]);
   final sport = _tagId(_tagIds[1]);
@@ -425,8 +428,10 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
   final midnightChoice = _dailyChoiceId(_dailyChoiceIds[1]);
 
   return [
-    TagRecord(Tag(id: home, name: TagName.fromStored('Дом'))),
-    TagRecord(Tag(id: sport, name: TagName.fromStored('Спорт'))),
+    TagRecord(
+      Tag(id: home, name: TagName.fromStored('Дом'), color: TagColor.blue),
+    ),
+    TagRecord(Tag(id: sport, name: TagName.fromStored('Спорт'), color: null)),
     IntentionRecord(
       Intention(
         id: health,

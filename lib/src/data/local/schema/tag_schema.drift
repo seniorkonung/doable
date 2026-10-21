@@ -10,6 +10,14 @@ CREATE TABLE tags (
     substr(name, 1, 1) <> char(65279) AND
     doable_tag_name_valid_v1(name) = 1
   ),
+  -- NULL — тег без цвета; иначе устойчивый код `TagColor`.
+  color TEXT CHECK (
+    color IS NULL OR
+    color IN (
+      'brown', 'orange', 'olive', 'green', 'teal',
+      'blue', 'violet', 'purple', 'pink'
+    )
+  ),
   name_key TEXT NOT NULL COLLATE BINARY UNIQUE
     GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED
 );

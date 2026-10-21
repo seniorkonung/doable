@@ -11,6 +11,7 @@ import '../../application/tag_command.dart';
 import '../../application/tag_read_result.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
+import '../../domain/tag_color.dart';
 import '../../domain/tag_id.dart';
 import '../../domain/tag_name.dart';
 import 'tag_editor_state.dart';
@@ -38,6 +39,11 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     state = state.withInput(value);
   }
 
+  void changeColor(TagColor? value) {
+    if (_closed || state.color == value) return;
+    state = state.withColor(value);
+  }
+
   Future<void> submit() async {
     if (_closed || !state.canSubmit) return;
 
@@ -54,10 +60,10 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     final start = switch (state.context) {
       TagEditorCreating(:final formKey) => _coordinator.acceptTagCreation(
         formKey,
-        CreateTag(name),
+        CreateTag(name: name, color: state.color),
       ),
-      TagEditorRenaming(:final tag) => _coordinator.acceptTagRename(
-        RenameTag(tagId: tag.id, name: name),
+      TagEditorRenaming(:final tag) => _coordinator.acceptTagUpdate(
+        UpdateTag(tagId: tag.id, name: name, color: state.color),
       ),
     };
     switch (start) {
@@ -109,7 +115,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
         case GraphResultSuccess(:final value):
           final TagId tagId = switch (value) {
             TagCreated(:final tag) => tag.id,
-            TagRenamed(:final after) => after.id,
+            TagUpdated(:final after) => after.id,
             TagUnchanged(:final tag) => tag.id,
             TagDeleted() => throw StateError('Unexpected tag command result'),
             TagAssignmentChanged() || TagAssignmentUnchanged() =>

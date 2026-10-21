@@ -17,6 +17,7 @@ import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
@@ -38,7 +39,7 @@ void main() {
   final work = _tag(2, 'Работа');
 
   testWidgets(
-    'одно явное добавление даёт одно включение и одно наблюдение проекции, а переименование, удаление и одноимённый тег не меняют идентичность в наборе',
+    'одно явное добавление даёт одно включение и одно наблюдение проекции, а переименование, изменение только цвета, удаление и одноимённый тег не меняют идентичность в наборе',
     (tester) async {
       final repository = _Repository();
       final draft = _DraftSession(repository);
@@ -95,12 +96,12 @@ void main() {
 
       // Переименование меняет название проекции и строки, но не набор.
       final renamed = _tag(1, 'Дом и сад');
-      draft.coordinator.acceptTagRename(
-        RenameTag(tagId: home.id, name: renamed.name),
+      draft.coordinator.acceptTagUpdate(
+        UpdateTag(tagId: home.id, name: renamed.name, color: home.color),
       );
       repository.completeCommand(
-        TagRenamed(
-          TagRenamedChange(
+        TagUpdated(
+          TagUpdatedChange(
             revision: const TagCatalogTestRevision(2),
             before: home,
             after: renamed,
@@ -124,20 +125,55 @@ void main() {
         isA<IntentionDraftTagAvailable>(),
       );
 
-      // Удаление убирает строку выбора, но не снимает тег из черновика.
-      draft.coordinator.acceptTagDelete(DeleteTag(home.id));
+      // Изменение только цвета обновляет проекцию при прежнем названии и не
+      // меняет набор.
+      final recolored = Tag(
+        id: home.id,
+        name: renamed.name,
+        color: TagColor.blue,
+      );
+      draft.coordinator.acceptTagUpdate(
+        UpdateTag(tagId: home.id, name: recolored.name, color: recolored.color),
+      );
       repository.completeCommand(
-        TagDeleted(
-          TagDeletedChange(
+        TagUpdated(
+          TagUpdatedChange(
             revision: const TagCatalogTestRevision(3),
-            tagId: home.id,
+            before: renamed,
+            after: recolored,
           ),
         ),
         revision: 3,
       );
       await tester.pump();
-      repository.observe(home.id, null, revision: 3);
-      repository.completeRead([work], revision: 3);
+      repository.observe(home.id, recolored, revision: 3);
+      repository.completeRead([recolored, work], revision: 3);
+      await tester.pump();
+      await tester.pump();
+
+      expect(_status(recolored, l10n.tagCatalogInDraft), findsOneWidget);
+      expect(draft.tagSet.current.tagIds, [home.id]);
+      expect(draft.state.selectedTags[home.id]?.name, renamed.name);
+      expect(draft.state.selectedTags[home.id]?.color, TagColor.blue);
+      expect(
+        draft.state.selectedTags[home.id]?.status,
+        isA<IntentionDraftTagAvailable>(),
+      );
+
+      // Удаление убирает строку выбора, но не снимает тег из черновика.
+      draft.coordinator.acceptTagDelete(DeleteTag(home.id));
+      repository.completeCommand(
+        TagDeleted(
+          TagDeletedChange(
+            revision: const TagCatalogTestRevision(4),
+            tagId: home.id,
+          ),
+        ),
+        revision: 4,
+      );
+      await tester.pump();
+      repository.observe(home.id, null, revision: 4);
+      repository.completeRead([work], revision: 4);
       await tester.pump();
       await tester.pump();
 
@@ -146,6 +182,7 @@ void main() {
       expect(tester.widget<FilledButton>(add).onPressed, isNull);
       expect(draft.tagSet.current.tagIds, [home.id]);
       expect(draft.state.selectedTags[home.id]?.name, renamed.name);
+      expect(draft.state.selectedTags[home.id]?.color, TagColor.blue);
       expect(
         draft.state.selectedTags[home.id]?.status,
         isA<IntentionDraftTagMissing>(),
@@ -156,19 +193,19 @@ void main() {
       final namesake = _tag(3, 'Дом и сад');
       draft.coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(namesake.name),
+        CreateTag(name: namesake.name, color: null),
       );
       repository.completeCommand(
         TagCreated(
           TagCreatedChange(
-            revision: const TagCatalogTestRevision(4),
+            revision: const TagCatalogTestRevision(5),
             after: namesake,
           ),
         ),
-        revision: 4,
+        revision: 5,
       );
       await tester.pump();
-      repository.completeRead([work, namesake], revision: 4);
+      repository.completeRead([work, namesake], revision: 5);
       await tester.pump();
       await tester.pump();
 
@@ -198,7 +235,8 @@ void main() {
       // Перечитывания вызывают только постоянные команды тегов; локальные
       // включения не пишут назначений, не проверяют пар и не сбрасывают поиск.
       expect(repository.commands, [
-        isA<RenameTag>(),
+        isA<UpdateTag>(),
+        isA<UpdateTag>(),
         isA<DeleteTag>(),
         isA<CreateTag>(),
       ]);
@@ -328,6 +366,7 @@ String _id(int number) =>
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Живая сессия черновика и координатор в одном контейнере с общим выбором.

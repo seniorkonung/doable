@@ -64,12 +64,14 @@ final class IntentionStatisticsHarness {
       '00000000-0000-4000-8000-000000000001',
     ) as TagIdDecodingSuccess).id,
     name: TagName.fromInput('Тег'),
+    color: null,
   );
 
   Future<void> change(int revision, {int epoch = 0}) async {
     final next = Tag(
       id: _tag.id,
       name: TagName.fromInput('Тег $epoch $revision'),
+      color: _tag.color,
     );
     final stamp = StatisticsTestRevision(revision, epoch);
     reader.commandResult = TagCommandSucceeded(
@@ -77,15 +79,17 @@ final class IntentionStatisticsHarness {
         revision: stamp,
         value: next.name == _tag.name
             ? TagUnchanged(TagUnchangedChange(revision: stamp, tag: _tag))
-            : TagRenamed(
-                TagRenamedChange(revision: stamp, before: _tag, after: next),
+            : TagUpdated(
+                TagUpdatedChange(revision: stamp, before: _tag, after: next),
               ),
       ),
     );
     final accepted =
         container
                 .read(graphCommandCoordinatorProvider.notifier)
-                .acceptTagRename(RenameTag(tagId: _tag.id, name: next.name))
+                .acceptTagUpdate(
+                  UpdateTag(tagId: _tag.id, name: next.name, color: _tag.color),
+                )
             as TagCommandAccepted;
     await accepted.future;
     _tag = next;

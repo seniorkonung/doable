@@ -384,7 +384,7 @@ String _tagMessage(
 ) => localizations.graphOperationMessage(
   switch (completion.kind) {
     TagCommandKind.create => localizations.graphOperationCreate,
-    TagCommandKind.rename => localizations.graphOperationUpdate,
+    TagCommandKind.update => localizations.graphOperationUpdate,
     TagCommandKind.delete => localizations.graphOperationDelete,
     TagCommandKind.assign => localizations.graphOperationAssignTag,
     TagCommandKind.removeAssignment =>
@@ -398,8 +398,8 @@ String _tagMessage(
   switch (completion.result) {
     GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
       (TagCommandKind.create, TagCreated()) => localizations.tagCreated,
-      (TagCommandKind.rename, TagRenamed()) => localizations.tagRenamed,
-      (TagCommandKind.rename, TagUnchanged()) => localizations.tagUnchanged,
+      (TagCommandKind.update, TagUpdated()) => localizations.tagUpdated,
+      (TagCommandKind.update, TagUnchanged()) => localizations.tagUnchanged,
       (TagCommandKind.delete, TagDeleted()) => localizations.tagDeleted,
       (TagCommandKind.assign, TagAssignmentChanged(:final state))
           when state == TagAssignmentState.assigned =>

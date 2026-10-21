@@ -204,8 +204,9 @@ void main() {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async =>
-      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+  Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
+    CreateTag(name: TagName.fromInput(name), color: null),
+  )).tag;
 
   /// Непустой граф: тег и намерение с этим тегом.
   Future<void> createGraph() async {

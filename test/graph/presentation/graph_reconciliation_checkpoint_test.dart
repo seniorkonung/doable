@@ -257,8 +257,8 @@ void main() {
           expect(model().canActOn(target), isTrue);
         }
 
-        final renamed = await (coordinator.acceptTagRename(
-          RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
+        final renamed = await (coordinator.acceptTagUpdate(
+          UpdateTag(tagId: tagId, name: TagName.fromInput('Быт'), color: null),
         ) as TagCommandAccepted).future;
         await settle(renamed.revision!);
         expect(loaded().tagId, tagId);
@@ -339,7 +339,7 @@ void main() {
 
         final recreated = await (coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(TagName.fromInput('Общий тег')),
+          CreateTag(name: TagName.fromInput('Общий тег'), color: null),
         ) as TagCommandAccepted).future;
         final newTag =
             ((recreated.confirmedResult as TagCommandSucceeded).value.value
@@ -1490,7 +1490,7 @@ void main() {
       final beforeGroup = harness.neighborhood;
       final accepted = harness.coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(TagName.fromInput('Дом')),
+        CreateTag(name: TagName.fromInput('Дом'), color: null),
       ) as TagCommandAccepted;
       const revision = TestGraphRevision(5);
       final tag = tag_domain.Tag(
@@ -1499,6 +1499,7 @@ void main() {
           InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
         },
         name: TagName.fromInput('Дом'),
+        color: null,
       );
       repository.completeTagCommand(
         0,
@@ -1545,8 +1546,8 @@ void main() {
 
       final currentCatalog = harness.catalog;
       final currentGroup = harness.neighborhood;
-      final unchanged = harness.coordinator.acceptTagRename(
-        RenameTag(tagId: tag.id, name: tag.name),
+      final unchanged = harness.coordinator.acceptTagUpdate(
+        UpdateTag(tagId: tag.id, name: tag.name, color: tag.color),
       ) as TagCommandAccepted;
       repository.completeTagCommand(
         1,
@@ -1675,7 +1676,13 @@ void main() {
         index: 1,
         title: 'Владелец',
         activeRelationCount: 1,
-        tags: [tag_domain.Tag(id: tagId, name: TagName.fromInput('Здоровье'))],
+        tags: [
+          tag_domain.Tag(
+            id: tagId,
+            name: TagName.fromInput('Здоровье'),
+            color: null,
+          ),
+        ],
       );
       final accepted = harness.coordinator.acceptTagAssign(
         AssignTag(tagId: tagId, intentionId: target),

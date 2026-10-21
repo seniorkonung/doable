@@ -268,7 +268,7 @@ void main() {
         const CreateIntention(title: 'Бегать', description: 'По утрам'),
       )).intention;
       final home = (await confirm<TagCreated>(
-        CreateTag(TagName.fromInput('Дом')),
+        CreateTag(name: TagName.fromInput('Дом'), color: null),
       )).tag;
       final previous = await repository.readCurrentPosition();
 
@@ -280,7 +280,9 @@ void main() {
         ),
       );
       await confirm<TagDeleted>(DeleteTag(home.id));
-      await confirm<TagCreated>(CreateTag(TagName.fromInput('Работа')));
+      await confirm<TagCreated>(
+        CreateTag(name: TagName.fromInput('Работа'), color: null),
+      );
 
       expect(_shown(await summaryAfter(previous)), (
         added: 1,
@@ -292,13 +294,17 @@ void main() {
     test(
       'изменённый байт снимка на начале диапазона сводку не меняет',
       () async {
-        await confirm<TagCreated>(CreateTag(TagName.fromInput('Дом')));
+        await confirm<TagCreated>(
+          CreateTag(name: TagName.fromInput('Дом'), color: null),
+        );
         final snapshot = await store.writeSnapshot(1);
         final file = File.fromUri(snapshots.uri.resolve(snapshot.fileName));
         final bytes = await file.readAsBytes();
         bytes[bytes.length ~/ 2] ^= 0xff;
         await file.writeAsBytes(bytes);
-        await confirm<TagCreated>(CreateTag(TagName.fromInput('Дача')));
+        await confirm<TagCreated>(
+          CreateTag(name: TagName.fromInput('Дача'), color: null),
+        );
         await expectLater(
           () async => (await store.readStateAt(2)).records.drain<void>(),
           throwsA(isA<GraphSnapshotCorruption>()),
@@ -328,8 +334,9 @@ Object _shown(GraphChangeSummary summary) => switch (summary) {
 
 final _createdAt = DateTime.utc(2026, 10, 1, 7);
 
-TagRecord _tag(int number, String name) =>
-    TagRecord(Tag(id: _tagId(number), name: TagName.fromStored(name)));
+TagRecord _tag(int number, String name) => TagRecord(
+  Tag(id: _tagId(number), name: TagName.fromStored(name), color: null),
+);
 
 IntentionRecord _intention(int number, String title, {bool archived = false}) =>
     IntentionRecord(

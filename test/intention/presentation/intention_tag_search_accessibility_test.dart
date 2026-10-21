@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/inline_text.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 
@@ -320,7 +321,10 @@ void main() {
             : tagsLine;
         _expectNotTruncated(
           tester,
-          find.descendant(of: row, matching: find.text(line)),
+          find.descendant(
+            of: row,
+            matching: findTextIgnoringInlineWidgets(line),
+          ),
         );
         final rowNode = tester.getSemantics(row);
         expect(rowNode.label, allOf(contains(summary.title), contains(line)));
@@ -454,7 +458,7 @@ void main() {
       expect(
         find.descendant(
           of: deletedToggle,
-          matching: find.text(
+          matching: findTextIgnoringInlineWidgets(
             l10n.intentionTagConditionDeleted(
               l10n.intentionTagConditionAbsent(deleted.name.value),
             ),
@@ -704,6 +708,7 @@ IntentionTagCondition _condition(
   tagId: tag.id,
   requirement: requirement,
   name: tag.name,
+  color: tag.color,
   isDeleted: false,
 );
 
@@ -743,6 +748,7 @@ Tag _tag(int index, String name) => Tag(
     ),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Прокачивает кадры и переходы маршрутов без ожидания бесконечных

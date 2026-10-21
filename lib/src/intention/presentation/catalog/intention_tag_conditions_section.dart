@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/tag_dot.dart';
+import '../../../tag/presentation/tag_phrase_text.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_tag_conditions_view_model.dart';
 
@@ -82,25 +84,16 @@ final class _ConditionChip extends StatelessWidget {
     final theme = Theme.of(context);
     final id = condition.tagId.toCanonicalString();
     final name = condition.name.value;
-    final (
-      icon,
-      requirementLabel,
-      requirementSemantics,
-    ) = switch (condition.requirement) {
+    final (icon, requirementSemantics) = switch (condition.requirement) {
       IntentionTagRequirement.mustBePresent => (
         Icons.check,
-        name,
         localizations.intentionTagConditionPresentSemantics(name),
       ),
       IntentionTagRequirement.mustBeAbsent => (
         Icons.block,
-        localizations.intentionTagConditionAbsent(name),
         localizations.intentionTagConditionAbsentSemantics(name),
       ),
     };
-    final label = condition.isDeleted
-        ? localizations.intentionTagConditionDeleted(requirementLabel)
-        : requirementLabel;
     final semanticsLabel = condition.isDeleted
         ? localizations.intentionTagConditionDeletedSemantics(
             requirementSemantics,
@@ -142,8 +135,23 @@ final class _ConditionChip extends StatelessWidget {
                         const SizedBox(width: 8),
                         // Длинное название переносится, а не обрезается.
                         Flexible(
-                          child: Text(
-                            label,
+                          child: tagPhraseText(
+                            phrase: (name) {
+                              final label = switch (condition.requirement) {
+                                IntentionTagRequirement.mustBePresent => name,
+                                IntentionTagRequirement.mustBeAbsent =>
+                                  localizations.intentionTagConditionAbsent(
+                                    name,
+                                  ),
+                              };
+                              return condition.isDeleted
+                                  ? localizations.intentionTagConditionDeleted(
+                                      label,
+                                    )
+                                  : label;
+                            },
+                            tags: [(name: name, color: condition.color)],
+                            dotSize: TagDotSize.medium,
                             key: const ValueKey(
                               'intention-tag-condition-label',
                             ),

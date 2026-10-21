@@ -222,8 +222,8 @@ void main() {
       // тега.
       await app.runTagCommand(
         tester,
-        app.coordinator.acceptTagRename(
-          RenameTag(tagId: home, name: TagName.fromInput('Быт')),
+        app.coordinator.acceptTagUpdate(
+          UpdateTag(tagId: home, name: TagName.fromInput('Быт'), color: null),
         ),
       );
       await _waitForStorage(tester, () => _chipNames(tester).first == 'Быт');
@@ -239,7 +239,7 @@ void main() {
         tester,
         app.coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(TagName.fromInput('Быт')),
+          CreateTag(name: TagName.fromInput('Быт'), color: null),
         ),
       );
       await _until(tester, _chipStatus(home));

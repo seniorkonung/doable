@@ -21,11 +21,13 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_log_completeness_reference.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -76,8 +78,9 @@ void main() {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async =>
-      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+  Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
+    CreateTag(name: TagName.fromInput(name), color: null),
+  )).tag;
 
   /// Все порции записей графа от начала до конца.
   Future<List<GraphRecordPortion>> readAllRecordPortions() async {
@@ -116,7 +119,7 @@ void main() {
       expect(await repository.readCurrentPosition(), 0);
 
       final result = await repository.execute(
-        CreateTag(TagName.fromInput('Дом')),
+        CreateTag(name: TagName.fromInput('Дом'), color: null),
       );
 
       expect(result, isA<GraphResultSuccess<Object?, GraphCommandFailure>>());
@@ -236,7 +239,7 @@ void main() {
 
       final first = await repository.readPackages(after: 0, upTo: upTo);
       final command = repository
-          .execute(CreateTag(TagName.fromInput('Дом')))
+          .execute(CreateTag(name: TagName.fromInput('Дом'), color: null))
           .whenComplete(() => completions.add('команда'));
       final second = repository
           .readPackages(after: first.last.position, upTo: upTo)
@@ -340,6 +343,25 @@ void main() {
     );
   });
 
+  test('порция записей переносит цвет тега и его отсутствие', () async {
+    final colored = await createTag('Дом');
+    await createTag('Работа');
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        "UPDATE tags SET color = 'blue' WHERE id = ?",
+        [colored.id.toCanonicalString()],
+      ),
+    );
+
+    final portion = await repository.readGraphRecords();
+
+    expect(
+      [for (final record in portion.records) (record as TagRecord).tag.color],
+      [TagColor.blue, null],
+    );
+  });
+
   test('команда, отправленная между порциями записей, подтверждается до '
       'следующей порции и попадает в неё', () async {
     for (var index = 0; index <= graphFactLogPortionLimit; index++) {
@@ -349,7 +371,7 @@ void main() {
 
     final first = await repository.readGraphRecords();
     final command = repository
-        .execute(CreateTag(TagName.fromInput('Новый')))
+        .execute(CreateTag(name: TagName.fromInput('Новый'), color: null))
         .whenComplete(() => completions.add('команда'));
     final second = repository
         .readGraphRecords(after: first.next)

@@ -114,7 +114,8 @@ final class TagCatalogAssignmentKeysBusy extends TagCatalogAssignmentStatus {
 }
 
 /// Строки принадлежат одному полному отображаемому снимку. При актуализации
-/// известные имена и удаления учитываются сразу, но список остаётся неактуальным.
+/// известные изменения и удаления тегов учитываются сразу, но список остаётся
+/// неактуальным.
 final class TagCatalogLoaded extends TagCatalogState {
   TagCatalogLoaded({
     required this.mode,

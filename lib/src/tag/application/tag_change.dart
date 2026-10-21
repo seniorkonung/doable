@@ -16,7 +16,7 @@ final class TagCreatedChange extends TagChange {
   final Tag after;
 }
 
-enum TagChangeValidationFailure { identityMismatch, nameUnchanged }
+enum TagChangeValidationFailure { identityMismatch, unchanged }
 
 final class TagChangeValidationException implements Exception {
   const TagChangeValidationException(this.failure);
@@ -24,8 +24,9 @@ final class TagChangeValidationException implements Exception {
   final TagChangeValidationFailure failure;
 }
 
-final class TagRenamedChange extends TagChange {
-  factory TagRenamedChange({
+/// Редактирование одного тега: отличается название, цвет или оба поля.
+final class TagUpdatedChange extends TagChange {
+  factory TagUpdatedChange({
     required GraphRevision revision,
     required Tag before,
     required Tag after,
@@ -35,15 +36,15 @@ final class TagRenamedChange extends TagChange {
         TagChangeValidationFailure.identityMismatch,
       );
     }
-    if (before.name == after.name) {
+    if (before.name == after.name && before.color == after.color) {
       throw const TagChangeValidationException(
-        TagChangeValidationFailure.nameUnchanged,
+        TagChangeValidationFailure.unchanged,
       );
     }
-    return TagRenamedChange._(revision: revision, before: before, after: after);
+    return TagUpdatedChange._(revision: revision, before: before, after: after);
   }
 
-  const TagRenamedChange._({
+  const TagUpdatedChange._({
     required this.revision,
     required this.before,
     required this.after,
@@ -55,7 +56,8 @@ final class TagRenamedChange extends TagChange {
   final Tag after;
 }
 
-/// Полное совпадение сохранённого имени подтверждается без новой ревизии.
+/// Полное совпадение сохранённых названия и цвета подтверждается без новой
+/// ревизии.
 final class TagUnchangedChange extends TagChange {
   const TagUnchangedChange({required this.revision, required this.tag});
 

@@ -248,6 +248,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
               local.TagsCompanion.insert(
                 id: tag.id.toCanonicalString(),
                 name: tag.name.value,
+                color: Value(tag.color?.code),
               ),
             );
           case IntentionRecord(:final intention):

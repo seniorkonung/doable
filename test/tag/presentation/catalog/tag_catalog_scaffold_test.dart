@@ -66,6 +66,7 @@ void main() {
           Tag(
             id: (TagId.decode(tagFixtureId(301)) as TagIdDecodingSuccess).id,
             name: TagName.fromInput('Дом'),
+            color: null,
           ),
         ]);
         await tester.pumpAndSettle();

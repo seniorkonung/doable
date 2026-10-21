@@ -2827,10 +2827,10 @@ abstract class AppLocalizations {
   /// **'Create tag'**
   String get tagCatalogCreate;
 
-  /// Переименовать выбранный тег
+  /// Изменить выбранный тег
   ///
   /// In en, this message translates to:
-  /// **'Rename tag'**
+  /// **'Edit tag'**
   String get tagCatalogRename;
 
   /// Удалить выбранный тег
@@ -2893,10 +2893,10 @@ abstract class AppLocalizations {
   /// **'New tag'**
   String get tagEditorCreateTitle;
 
-  /// Заголовок формы переименования тега
+  /// Заголовок формы изменения тега
   ///
   /// In en, this message translates to:
-  /// **'Rename tag'**
+  /// **'Edit tag'**
   String get tagEditorRenameTitle;
 
   /// Подпись поля названия тега
@@ -2911,16 +2911,88 @@ abstract class AppLocalizations {
   /// **'No more than 255 visible characters.'**
   String get tagEditorNameLimit;
 
+  /// Название варианта цвета тега: Без цвета
+  ///
+  /// In en, this message translates to:
+  /// **'No color'**
+  String get tagColorNone;
+
+  /// Название варианта цвета тега: Коричневый
+  ///
+  /// In en, this message translates to:
+  /// **'Brown'**
+  String get tagColorBrown;
+
+  /// Название варианта цвета тега: Оранжевый
+  ///
+  /// In en, this message translates to:
+  /// **'Orange'**
+  String get tagColorOrange;
+
+  /// Название варианта цвета тега: Оливковый
+  ///
+  /// In en, this message translates to:
+  /// **'Olive'**
+  String get tagColorOlive;
+
+  /// Название варианта цвета тега: Зелёный
+  ///
+  /// In en, this message translates to:
+  /// **'Green'**
+  String get tagColorGreen;
+
+  /// Название варианта цвета тега: Бирюзовый
+  ///
+  /// In en, this message translates to:
+  /// **'Teal'**
+  String get tagColorTeal;
+
+  /// Название варианта цвета тега: Синий
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get tagColorBlue;
+
+  /// Название варианта цвета тега: Сиреневый
+  ///
+  /// In en, this message translates to:
+  /// **'Violet'**
+  String get tagColorViolet;
+
+  /// Название варианта цвета тега: Фиолетовый
+  ///
+  /// In en, this message translates to:
+  /// **'Purple'**
+  String get tagColorPurple;
+
+  /// Название варианта цвета тега: Розовый
+  ///
+  /// In en, this message translates to:
+  /// **'Pink'**
+  String get tagColorPink;
+
+  /// Заголовок выбора цвета тега
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get tagColorLabel;
+
+  /// Доступное название группы цветов тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag color'**
+  String get tagColorGroupLabel;
+
   /// Подтвердить создание тега
   ///
   /// In en, this message translates to:
   /// **'Create tag'**
   String get tagEditorCreateAction;
 
-  /// Подтвердить переименование тега
+  /// Подтвердить изменение тега
   ///
   /// In en, this message translates to:
-  /// **'Save name'**
+  /// **'Save'**
   String get tagEditorRenameAction;
 
   /// Выполняется запись тега
@@ -3001,11 +3073,11 @@ abstract class AppLocalizations {
   /// **'Tag created.'**
   String get tagCreated;
 
-  /// Подтверждение переименования тега
+  /// Подтверждение изменения тега
   ///
   /// In en, this message translates to:
-  /// **'Tag renamed.'**
-  String get tagRenamed;
+  /// **'Tag updated.'**
+  String get tagUpdated;
 
   /// Подтверждение неизменного названия тега
   ///

@@ -69,6 +69,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/inline_text.dart';
 
 /// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
 /// длиннее экрана.
@@ -1268,7 +1269,7 @@ List<String?> _conditions(WidgetTester tester) => [
             ),
           )
           .evaluate())
-    (label.widget as Text).data,
+    textIgnoringInlineWidgets(label.widget as Text),
 ];
 
 ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester

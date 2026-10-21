@@ -1011,10 +1011,11 @@ void main() {
 
       await _completeTag(
         container,
-        (coordinator) => coordinator.acceptTagRename(
-          RenameTag(
+        (coordinator) => coordinator.acceptTagUpdate(
+          UpdateTag(
             tagId: _tagId(301),
             name: TagName.fromInput('Самочувствие'),
+            color: null,
           ),
         ),
       );
@@ -1041,7 +1042,7 @@ void main() {
         container,
         (coordinator) => coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(TagName.fromInput('Самочувствие')),
+          CreateTag(name: TagName.fromInput('Самочувствие'), color: null),
         ),
       );
       final recreated = (await _tagSnapshot(repository)).tags
@@ -1072,8 +1073,12 @@ void main() {
       final stale = await _tagSnapshot(repository);
       await _completeTag(
         container,
-        (coordinator) => coordinator.acceptTagRename(
-          RenameTag(tagId: _tagId(302), name: TagName.fromInput('Бег')),
+        (coordinator) => coordinator.acceptTagUpdate(
+          UpdateTag(
+            tagId: _tagId(302),
+            name: TagName.fromInput('Бег'),
+            color: null,
+          ),
         ),
       );
       await _deleteTag(container, _tagId(304));

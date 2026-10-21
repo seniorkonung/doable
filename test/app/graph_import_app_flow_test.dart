@@ -33,6 +33,7 @@ import 'package:doable/src/statistics/presentation/home_statistics_view_model.da
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
@@ -42,6 +43,7 @@ import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
 import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
+import '../support/inline_text.dart';
 import '../support/quick_creation.dart';
 import '../support/temporary_import_document.dart';
 
@@ -49,8 +51,9 @@ void main() {
   testWidgets('сценарии «Импорт экспорта воспроизводит граф», «Настройки '
       'установки не переносятся» и «Импорт в пустой граф без подтверждения»: '
       'новая установка без подтверждения импортирует файл экспорта другой '
-      'установки с теми же сущностями, данными, порядками и путём дневного '
-      'выбора, а её режим быстрого создания остаётся прежним', (tester) async {
+      'установки с теми же сущностями, данными, включая синий тег и тег без '
+      'цвета, порядками и путём дневного выбора, а её режим быстрого создания '
+      'остаётся прежним', (tester) async {
     late _ExportedGraph exported;
     final source = await ImportAppHarness.start(
       tester,
@@ -104,7 +107,7 @@ void main() {
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 5, 14);
-    await app.execute(CreateTag(TagName.fromInput('Сад')));
+    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
     final beforeImport = await app.graphState();
     final stored = app.storedState();
     await app.openSettings();
@@ -291,8 +294,8 @@ extension _ImportScenarioSteps on ImportAppHarness {
   }
 }
 
-/// Граф файла экспорта сценария «Импорт экспорта воспроизводит граф»: тег
-/// [tag] назначен сначала намерению [assignedFirst], а затем намерению
+/// Граф файла экспорта сценария «Импорт экспорта воспроизводит граф»: синий
+/// тег [tag] назначен сначала намерению [assignedFirst], а затем намерению
 /// [assignedSecond], созданному раньше него.
 typedef _ExportedGraph = ({
   TagId tag,
@@ -304,8 +307,8 @@ typedef _ExportedGraph = ({
 /// архивированное намерение «Читать», две связи «нужно» намерения «Здоровье»
 /// с P2, созданные одна за другой, сначала к «Бегать», затем к созданному
 /// раньше «Плавать», дневной выбор, путь которого проходит через ныне
-/// архивированную связь «Здоровье» → «Бегать», и тег «Утро», назначенный
-/// сначала «Бегать», затем «Плавать».
+/// архивированную связь «Здоровье» → «Бегать», синий тег «Утро», назначенный
+/// сначала «Бегать», затем «Плавать», и отдельный тег «Вечер» без цвета.
 Future<_ExportedGraph> _seedExportedGraph(PersonalGraphRepository graph) async {
   final health = await _createIntention(graph, 'Здоровье');
   final swimming = await _createIntention(
@@ -341,9 +344,10 @@ Future<_ExportedGraph> _seedExportedGraph(PersonalGraphRepository graph) async {
     ),
   );
   await _execute(graph, ArchiveLongTermRelation(needsRunning.id));
-  final morning = await _createTag(graph, 'Утро');
+  final morning = await _createTag(graph, 'Утро', color: TagColor.blue);
   await _execute(graph, AssignTag(tagId: morning.id, intentionId: running.id));
   await _execute(graph, AssignTag(tagId: morning.id, intentionId: swimming.id));
+  await _createTag(graph, 'Вечер');
   return (
     tag: morning.id,
     assignedFirst: running.id,
@@ -387,8 +391,14 @@ Future<T> _confirm<T extends GraphCommandOutcome>(
   return confirmed.value as T;
 }
 
-Future<Tag> _createTag(PersonalGraphRepository graph, String name) async =>
-    (await _confirm<TagCreated>(graph, CreateTag(TagName.fromInput(name)))).tag;
+Future<Tag> _createTag(
+  PersonalGraphRepository graph,
+  String name, {
+  TagColor? color,
+}) async => (await _confirm<TagCreated>(
+  graph,
+  CreateTag(name: TagName.fromInput(name), color: color),
+)).tag;
 
 Future<Intention> _createIntention(
   PersonalGraphRepository graph,
@@ -491,7 +501,7 @@ List<String?> _tagConditions() => [
             ),
           )
           .evaluate())
-    (label.widget as Text).data,
+    textIgnoringInlineWidgets(label.widget as Text),
 ];
 
 ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester

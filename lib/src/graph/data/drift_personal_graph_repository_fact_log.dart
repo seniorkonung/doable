@@ -109,7 +109,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
   }) async {
     final rows = await _database
         .customSelect(
-          '''SELECT creation_sequence, id, name FROM tags
+          '''SELECT creation_sequence, id, name, color FROM tags
          WHERE creation_sequence > ?
          ORDER BY creation_sequence
          LIMIT ?''',

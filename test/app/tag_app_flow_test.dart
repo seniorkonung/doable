@@ -1,6 +1,8 @@
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/tag_dot.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/inline_text.dart';
 import '../support/tag_storage_fixture.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
@@ -48,6 +51,77 @@ Future<void> _saveName(WidgetTester tester, String name) async {
 }
 
 void main() {
+  testWidgets('Изменение только цвета общего тега', (tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = [const Locale('ru')];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    late sqlite.Database raw;
+    final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
+      connectionFactory: () =>
+          openInMemoryLocalDatabase(setup: (database) => raw = database),
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+    });
+    await tester.runAsync(runtime.bootstrap);
+    seedTagStorageFixture(raw);
+    final tagId = tagFixtureId(firstTagNumber);
+    final graphBefore = retainedTagFixtureGraph(raw);
+    final assignmentsBefore = raw.select(
+      'SELECT * FROM tag_assignments ORDER BY rowid',
+    );
+    expect(
+      raw.select('SELECT id, name, color FROM tags WHERE id = ?', [tagId]),
+      [
+        {'id': tagId, 'name': 'Дом', 'color': null},
+      ],
+    );
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(
+      tester,
+      waitFor: _until,
+      content: findTextIgnoringInlineWidgets('Теги: Дом'),
+    );
+    await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
+    final row = find.byKey(ValueKey('tag-catalog-row-$tagId'));
+    await _tap(
+      tester,
+      find.descendant(of: row, matching: find.byTooltip('Изменить тег')),
+    );
+    await _tap(tester, find.bySemanticsLabel('Синий'));
+    await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
+    await _expectBlueDot(tester, row);
+    expect(find.byKey(const ValueKey('tag-editor-name')), findsNothing);
+    expect(
+      raw.select('SELECT id, name, color FROM tags WHERE id = ?', [tagId]),
+      [
+        {'id': tagId, 'name': 'Дом', 'color': 'blue'},
+      ],
+    );
+    expect(
+      raw.select('SELECT * FROM tag_assignments ORDER BY rowid'),
+      assignmentsBefore,
+    );
+    expect(retainedTagFixtureGraph(raw), graphBefore);
+
+    await tester.binding.handlePopRoute();
+    await _expectBlueDot(tester, findTextIgnoringInlineWidgets('Теги: Дом'));
+    await _tap(tester, find.text('Намерение 1'));
+    await _expectBlueDot(
+      tester,
+      find.byKey(ValueKey('tag-assignment-row-$tagId')),
+    );
+    await _tap(tester, find.byKey(ValueKey('tag-assignment-open-$tagId')));
+    await _expectBlueDot(tester, findTextIgnoringInlineWidgets('Тег: Дом'));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('серия назначений и снятий при занятой поверхности сохраняется '
       'с одним объединённым подтверждением', (tester) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -241,5 +315,22 @@ void main() {
       expect(find.text('Tags'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
+  );
+}
+
+Future<void> _expectBlueDot(WidgetTester tester, Finder view) async {
+  final dot = find.descendant(
+    of: view,
+    matching: find.byWidgetPredicate(
+      (widget) => widget is TagDot && widget.color == DoableTagColor.blue,
+    ),
+  );
+  await _until(tester, dot);
+  await tester.ensureVisible(dot);
+  await tester.pumpAndSettle();
+  expect(dot, findsOneWidget);
+  expect(
+    tester.renderObject(dot),
+    paints..circle(color: DoableColors.light.tagBlue),
   );
 }

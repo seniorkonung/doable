@@ -125,7 +125,7 @@ void main() {
       () => tester.widget<Semantics>(row).properties.selected == true,
     );
     expect(tester.widget<TextField>(search).controller!.text, 'дом');
-    await tester.tap(find.byTooltip('Переименовать тег').first);
+    await tester.tap(find.byTooltip('Изменить тег').first);
     await _until(
       tester,
       () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
@@ -314,7 +314,7 @@ final class _ControlledRepository extends Fake
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
     if (command is CreateTag) createAttempts++;
-    if (command is RenameTag) {
+    if (command is UpdateTag) {
       renameAttempts++;
       final gate = _heldRename;
       if (gate != null) {

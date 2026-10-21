@@ -31,6 +31,7 @@ import '../../../intention/presentation/catalog/catalog_reconciliation_test_supp
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show ControlledCatalogRepository, TestCatalogRevision, testSummary;
 import '../../../support/app_root_pages.dart';
+import '../../../support/inline_text.dart';
 import 'participant_picker_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -542,7 +543,7 @@ void _defineTagSearchTests() {
 
     expect(opened.router.current.name, RelationParticipantPickerRoute.name);
     expect(_shownConditions(tester), ['not Спорт']);
-    expect(find.text('Tags: Здоровье'), findsNWidgets(2));
+    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsNWidgets(2));
 
     await tester.tap(_conditionToggle(sport));
     await _pumpUntilQueries(tester, repository, 4);
@@ -554,7 +555,7 @@ void _defineTagSearchTests() {
     repository.complete(3, _tagSearchPage(_summaries([sport], count: 1)));
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), ['Спорт']);
-    expect(find.text('Tags: Спорт'), findsOneWidget);
+    expect(findTextIgnoringInlineWidgets('Tags: Спорт'), findsOneWidget);
 
     await tester.tap(_conditionRemove(sport));
     await _pumpUntilQueries(tester, repository, 5);
@@ -862,7 +863,7 @@ List<String> _shownConditions(WidgetTester tester) => [
       matching: find.byKey(const ValueKey('intention-tag-condition-label')),
     ),
   ))
-    text.data!,
+    textIgnoringInlineWidgets(text),
 ];
 
 Result<IntentionCatalogFirstPage> _tagSearchPage(
@@ -892,6 +893,7 @@ Tag _tag(int index, String name) => Tag(
     ),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 Future<void> _pumpUntilReconciliationQueries(

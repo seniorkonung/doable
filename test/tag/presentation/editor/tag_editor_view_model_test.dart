@@ -10,6 +10,7 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
@@ -27,10 +28,9 @@ void main() {
       final first = h.model.submit();
       final second = h.model.submit();
       expect(h.repository.commands, hasLength(1));
-      expect(
-        (h.repository.commands.single.command as CreateTag).name.value,
-        'Дом',
-      );
+      final command = h.repository.commands.single.command as CreateTag;
+      expect(command.name.value, 'Дом');
+      expect(command.color, isNull);
       await second;
       h.repository.failCommand(0, const TagUnavailableFailure());
       await first;
@@ -38,6 +38,67 @@ void main() {
       expect(h.state.status, isA<TagEditorSubmissionFailed>());
       expect(h.state.failurePresentation, isNotNull);
       expect(h.state.canSubmit, isTrue);
+    },
+  );
+
+  test('правка названия цветного тега отправляет его цвет и сохраняет цвет после отказа', () async {
+    final h = _Harness(TagEditorRenaming(_tag(1, 'Дом', color: TagColor.blue)));
+    addTearDown(h.dispose);
+    expect(h.state.color, TagColor.blue);
+    h.model.changeName('Работа');
+    expect(h.state.color, TagColor.blue);
+    final submit = h.model.submit();
+    h.repository.failCommand(0, TagNameOccupiedFailure(_id(2)));
+    await submit;
+    expect(h.state.input, 'Работа');
+    expect(h.state.color, TagColor.blue);
+
+    h.model.changeName('Быт');
+    final retry = h.model.submit();
+    final commands = [
+      for (final request in h.repository.commands) request.command as UpdateTag,
+    ];
+    expect(commands.map((command) => command.name.value), ['Работа', 'Быт']);
+    expect(commands.map((command) => command.color), [
+      TagColor.blue,
+      TagColor.blue,
+    ]);
+    h.repository.failCommand(1, const TagUnavailableFailure());
+    await retry;
+  });
+
+  test(
+    'подтверждённая правка цветного тега сохраняет цвет до потребления события',
+    () async {
+      final before = _tag(1, 'Дом', color: TagColor.blue);
+      final after = _tag(1, 'Быт', color: TagColor.blue);
+      final h = _Harness(TagEditorRenaming(before));
+      addTearDown(h.dispose);
+      h.model.changeName('Быт');
+      final submit = h.model.submit();
+      h.repository.succeedCommand(
+        0,
+        TagUpdated(
+          TagUpdatedChange(
+            revision: const _Revision(2),
+            before: before,
+            after: after,
+          ),
+        ),
+      );
+      await pumpEventQueue();
+      h.repository.failRead(0, const TagReadUnavailableFailure());
+      await submit;
+      expect(h.state.status, isA<TagEditorCommittedReadFailed>());
+      expect(h.state.color, TagColor.blue);
+
+      final retry = h.model.retryCommittedRead();
+      h.repository.completeRead(1, after);
+      await retry;
+      expect((h.state.event as TagEditorSaved).tag.color, TagColor.blue);
+      h.model.consumeEvent();
+      expect(h.state.event, isNull);
+      expect(h.state.color, TagColor.blue);
     },
   );
 
@@ -298,5 +359,5 @@ final class _Revision implements GraphRevision {
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
-Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name));
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _id(number), name: TagName.fromInput(name), color: color);

@@ -12,6 +12,7 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -176,24 +177,41 @@ void main() {
     final graph = repository(sink);
     const privateName = 'CANARY-название-тега';
     const renamedName = 'CANARY-переименованное';
+    const otherName = 'CANARY-другой-тег';
     const privateError = 'CANARY-ошибка-SQL-и-параметр';
     const privateAssignment = 'CANARY-назначение';
     const damagedId = 'CANARY-повреждённый-идентификатор';
 
     final created = await graph.execute(
-      CreateTag(TagName.fromInput(privateName)),
+      CreateTag(name: TagName.fromInput(privateName), color: null),
     );
     expect(created, isA<TagCommandSucceeded>());
     final id =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
     expect((await graph.watchTag(id).first), isA<TagReadSuccess>());
     final renamed = await graph.execute(
-      RenameTag(tagId: id, name: TagName.fromInput(renamedName)),
+      UpdateTag(tagId: id, name: TagName.fromInput(renamedName), color: null),
     );
-    expect(renamed, isA<TagCommandSucceeded>());
+    expect((renamed as TagCommandSucceeded).value.value, isA<TagUpdated>());
+    final recolored = await graph.execute(
+      UpdateTag(
+        tagId: id,
+        name: TagName.fromInput(renamedName),
+        color: TagColor.blue,
+      ),
+    );
+    expect((recolored as TagCommandSucceeded).value.value, isA<TagUpdated>());
+    final unchanged = await graph.execute(
+      UpdateTag(
+        tagId: id,
+        name: TagName.fromInput(renamedName),
+        color: TagColor.blue,
+      ),
+    );
+    expect((unchanged as TagCommandSucceeded).value.value, isA<TagUnchanged>());
 
     final conflict = await graph.execute(
-      CreateTag(TagName.fromInput('CANARY-ПЕРЕИМЕНОВАННОЕ')),
+      CreateTag(name: TagName.fromInput('CANARY-ПЕРЕИМЕНОВАННОЕ'), color: null),
     );
     expect(
       (conflict as TagCommandFailed).failure,
@@ -205,6 +223,55 @@ void main() {
     expect(
       (conflictEvent.status as DiagnosticsFailed).code,
       DiagnosticsFailureCode.conflict,
+    );
+
+    final other = await graph.execute(
+      CreateTag(name: TagName.fromInput(otherName), color: null),
+    );
+    final otherId =
+        ((other as TagCommandSucceeded).value.value as TagCreated).tag.id;
+    final updateConflict = await graph.execute(
+      UpdateTag(
+        tagId: otherId,
+        name: TagName.fromInput('CANARY-ПЕРЕИМЕНОВАННОЕ'),
+        color: TagColor.green,
+      ),
+    );
+    expect(
+      (updateConflict as TagCommandFailed).failure,
+      isA<TagNameOccupiedFailure>(),
+    );
+    expect(await graph.execute(DeleteTag(otherId)), isA<TagCommandSucceeded>());
+    // Изменение без записи завершается ещё на этапе проверки.
+    expect(
+      sink.events.whereType<TagCommandDiagnosticsEvent>().where(
+        (event) =>
+            event.commandType == TagCommandDiagnosticsType.update &&
+            event.status is! DiagnosticsStarted,
+      ),
+      [
+        for (final stage in [
+          TagCommandDiagnosticsStage.resultRead,
+          TagCommandDiagnosticsStage.resultRead,
+          TagCommandDiagnosticsStage.validation,
+        ])
+          isA<TagCommandDiagnosticsEvent>()
+              .having((event) => event.stage, 'этап', stage)
+              .having(
+                (event) => event.status,
+                'исход',
+                isA<DiagnosticsSucceeded>(),
+              ),
+        isA<TagCommandDiagnosticsEvent>().having(
+          (event) => event.status,
+          'исход',
+          isA<DiagnosticsFailed>().having(
+            (status) => status.code,
+            'код',
+            DiagnosticsFailureCode.conflict,
+          ),
+        ),
+      ],
     );
 
     raw.execute('''
@@ -263,10 +330,14 @@ void main() {
     for (final privateValue in [
       privateName,
       renamedName,
+      otherName,
+      TagColor.blue.code,
+      TagColor.green.code,
       privateError,
       privateAssignment,
       damagedId,
       id.toCanonicalString(),
+      otherId.toCanonicalString(),
     ]) {
       expect(recorded, isNot(contains(privateValue)));
     }

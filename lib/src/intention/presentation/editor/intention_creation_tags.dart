@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/tag_dot.dart';
 import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag_id.dart';
+import '../../../tag/presentation/tag_color_presentation.dart';
 import 'intention_editor_state.dart';
 
 /// Выбранные теги черновика создания намерения.
 ///
 /// Показывает проекцию сессии компактными элементами в порядке набора: с
-/// последним известным названием, состоянием наблюдения и доступным снятием.
+/// последними известными названием и цветом, состоянием наблюдения и
+/// доступным снятием.
 /// Тег, отсутствие которого подтвердил отказ создания, показывается
 /// удалённым независимо от проекции. Снятие и повтор наблюдения передаются
 /// владельцу через [onRemove] и [onRetryObservation] и меняют только черновик
@@ -54,6 +57,7 @@ final class IntentionCreationTags extends StatelessWidget {
             _DraftTagChip(
               id: id,
               name: tag.name.value,
+              color: tagColorPresentation(tag.color),
               // Отказ создания подтвердил отсутствие в транзакции: это
               // сильнее ещё не обновлённой проекции.
               status: missingTagIds.contains(id)
@@ -79,6 +83,7 @@ final class _DraftTagChip extends StatelessWidget {
   const _DraftTagChip({
     required this.id,
     required this.name,
+    required this.color,
     required this.status,
     required this.onRemove,
     required this.onRetryObservation,
@@ -86,6 +91,7 @@ final class _DraftTagChip extends StatelessWidget {
 
   final TagId id;
   final String name;
+  final DoableTagColor? color;
   final IntentionDraftTagStatus status;
   final VoidCallback? onRemove;
   final VoidCallback onRetryObservation;
@@ -145,6 +151,8 @@ final class _DraftTagChip extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        TagDot(color: color, size: TagDotSize.medium),
+                        const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             name,

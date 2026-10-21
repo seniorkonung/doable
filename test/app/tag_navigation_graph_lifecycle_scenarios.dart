@@ -573,17 +573,21 @@ void _testTaggedGraphLifecycle() {
       const name = 'Общее новое название';
       await _changed(
         tester,
-        (coordinator.acceptTagRename(
-          RenameTag(
+        (coordinator.acceptTagUpdate(
+          UpdateTag(
             tagId: _tagId(firstTagNumber),
             name: TagName.fromInput(name),
+            color: null,
           ),
         ) as TagCommandAccepted).future,
       );
       await _expectTargets(tester, app.router, [
         _intentionId(2),
       ], scope: TaggedIntentionsScope.archived);
-      expect(find.text(_l10n(tester).tagNavigationTag(name)), findsOneWidget);
+      expect(
+        findTextIgnoringInlineWidgets(_l10n(tester).tagNavigationTag(name)),
+        findsOneWidget,
+      );
       expect(_snapshot(app.raw)['tag_assignments'], before['tag_assignments']);
       final deleted = await _completed(
         tester,
@@ -609,7 +613,7 @@ void _testTaggedGraphLifecycle() {
         tester,
         (coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(TagName.fromInput(name)),
+          CreateTag(name: TagName.fromInput(name), color: null),
         ) as TagCommandAccepted).future,
       );
       expect(created.isFailure, isFalse);

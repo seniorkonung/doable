@@ -14,6 +14,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_descript
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart';
@@ -55,7 +56,16 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
 
   return [
     for (final row in tags)
-      TagRecord(Tag(id: _tagId(row.id), name: TagName.fromStored(row.name))),
+      TagRecord(
+        Tag(
+          id: _tagId(row.id),
+          name: TagName.fromStored(row.name),
+          color: switch (row.color) {
+            final code? => _tagColor(code),
+            null => null,
+          },
+        ),
+      ),
     for (final row in intentions) IntentionRecord(_intention(row)),
     for (final row in assignments)
       TagAssignmentRecord(
@@ -142,6 +152,9 @@ StoredChoicePath _path(List<local.DailyChoicePathStep> rows) {
 }
 
 TagId _tagId(String value) => (TagId.decode(value) as TagIdDecodingSuccess).id;
+
+TagColor _tagColor(String code) =>
+    (TagColor.decode(code) as TagColorDecodingSuccess).color;
 
 IntentionId _intentionId(String value) =>
     (IntentionId.decode(value) as IntentionIdDecodingSuccess).id;

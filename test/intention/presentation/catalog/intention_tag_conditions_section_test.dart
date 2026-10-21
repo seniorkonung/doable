@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -18,6 +19,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
+import '../../../support/inline_text.dart';
 
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
@@ -35,6 +38,47 @@ final _picker = find.byType(TagConditionPickerPage);
 final _add = find.byKey(const ValueKey('intention-tag-conditions-add'));
 
 void main() {
+  testWidgets(
+    'точки цветного и бесцветного тегов стоят перед названием при смене надобности и удалении',
+    (tester) async {
+      final h = await _open(tester);
+      final home = _tag(1, 'Дом', color: TagColor.blue);
+      final work = _tag(2, 'Работа');
+      await h.select(home, _present);
+      await h.select(work, _absent);
+
+      void expectLabels(List<String> labels) {
+        for (final (tag, color) in [
+          (home, DoableTagColor.blue),
+          (work, null),
+        ]) {
+          final dot = tester.widget<TagDot>(
+            find.descendant(of: _chip(tag), matching: find.byType(TagDot)),
+          );
+          expect(dot.color, color);
+          expect(dot.size, TagDotSize.medium);
+        }
+        expect([
+          for (final text in tester.widgetList<Text>(
+            find.byKey(const ValueKey('intention-tag-condition-label')),
+          ))
+            text.textSpan!.toPlainText(includeSemanticsLabels: false),
+        ], labels);
+      }
+
+      expectLabels(['\uFFFCДом', 'не \uFFFCРабота']);
+
+      await tester.tap(_toggle(home));
+      await tester.tap(_toggle(work));
+      await tester.pump();
+      expectLabels(['не \uFFFCДом', '\uFFFCРабота']);
+
+      await h.delete(home, revision: 2);
+      await h.delete(work, revision: 3);
+      expectLabels(['не \uFFFCДом (тег удалён)', '\uFFFCРабота (тег удалён)']);
+    },
+  );
+
   testWidgets('без условий раздел показывает только кнопку «+ Тег»', (
     tester,
   ) async {
@@ -424,7 +468,7 @@ final class _Harness {
         matching: find.byKey(const ValueKey('intention-tag-condition-label')),
       ),
     ))
-      text.data!,
+      textIgnoringInlineWidgets(text),
   ];
 
   /// Условия, с которыми модель каталога того же назначения читает выдачу.
@@ -537,5 +581,5 @@ TagId _id(int number) => (TagId.decode(
   '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name));
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _id(number), name: TagName.fromInput(name), color: color);

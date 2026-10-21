@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/tag_dot.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
@@ -13,6 +14,7 @@ import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
+import '../tag_color_presentation.dart';
 import '../tag_failure_message.dart';
 import 'tag_assignments_state.dart';
 import 'tag_assignments_view_model.dart';
@@ -311,7 +313,17 @@ final class _LoadedAssignments extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(tag.name.value),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TagDot(
+                        color: tagColorPresentation(tag.color),
+                        size: TagDotSize.medium,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text(tag.name.value)),
+                    ],
+                  ),
                   Semantics(
                     container: true,
                     child: Tooltip(

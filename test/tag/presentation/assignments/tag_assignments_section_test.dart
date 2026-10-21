@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Tag, TagAssignment;
+import 'package:doable/src/design_system/components/tag_dot.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -18,6 +20,7 @@ import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
@@ -91,6 +94,51 @@ void main() {
     );
   });
   tearDown(() => database.close());
+
+  testWidgets('назначения показывают точку и кольцо перед названиями', (
+    tester,
+  ) async {
+    final reads = _PendingReads();
+    await tester.pumpWidget(
+      _host(
+        repository: repository,
+        intentionId: _intentionId(1),
+        locale: const Locale('ru'),
+        onChoose: (_) {},
+        reads: reads,
+      ),
+    );
+    reads.page(0, [
+      _tag(301, 'Дом', color: TagColor.blue),
+      _tag(302, 'Работа'),
+    ]);
+    await tester.pumpAndSettle();
+
+    for (final (number, name, color, style) in [
+      (301, 'Дом', DoableColors.light.tagBlue, PaintingStyle.fill),
+      (302, 'Работа', DoableColors.light.grip, PaintingStyle.stroke),
+    ]) {
+      final title = find.text(name);
+      final row = find.byKey(
+        ValueKey('tag-assignment-row-${tagFixtureId(number)}'),
+      );
+      final dot = find.descendant(of: row, matching: find.byType(TagDot));
+      expect(dot, findsOneWidget);
+      expect(tester.getSize(dot), const Size.square(8));
+      expect(tester.getTopRight(dot).dx, lessThan(tester.getTopLeft(title).dx));
+      expect(
+        tester.renderObject(dot),
+        paints..circle(color: color, style: style),
+      );
+      final text = tester.widget<RichText>(
+        find.descendant(of: title, matching: find.byType(RichText)),
+      );
+      expect(
+        text.text.style!.color,
+        Theme.of(tester.element(title)).textTheme.bodyMedium!.color,
+      );
+    }
+  });
 
   for (final (locale, removeText) in [
     (const Locale('ru'), 'Снять назначение'),
@@ -335,7 +383,7 @@ void main() {
             .onPressed!;
         changes.add(
           _Package(const _Revision(1), [
-            TagRenamedChange(
+            TagUpdatedChange(
               revision: const _Revision(1),
               before: _tag(301, 'Дом'),
               after: _tag(301, 'Быт'),
@@ -749,8 +797,8 @@ final class _PendingRepository extends Fake implements PersonalGraphRepository {
   }
 }
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name));
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _tagId(number), name: TagName.fromInput(name), color: color);
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
   for (var attempt = 0; attempt < 30 && !done(); attempt++) {

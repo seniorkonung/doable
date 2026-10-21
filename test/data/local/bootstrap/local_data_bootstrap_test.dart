@@ -252,8 +252,8 @@ void main() {
       },
     );
 
-    // Предварительные сборки создавали схемы 1 и 2; перехода с них нет.
-    for (final preReleaseSchemaVersion in [1, 2]) {
+    // Предварительные сборки создавали схемы 1–3; перехода с них нет.
+    for (final preReleaseSchemaVersion in [1, 2, 3]) {
       test(
         'классифицирует хранилище предварительной сборки версии '
         '$preReleaseSchemaVersion как corruption без его изменения',

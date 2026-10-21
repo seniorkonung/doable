@@ -36,6 +36,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/inline_text.dart';
 import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
@@ -1375,7 +1376,7 @@ void main() {
     expect(_shownConditions(tester), ['Здоровье']);
     expect(_catalogScrollPosition(tester).pixels, 0);
     expect(find.text('Намерение 60'), findsOneWidget);
-    expect(find.text('Tags: Здоровье'), findsWidgets);
+    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsWidgets);
     expect(find.text('No tags'), findsNothing);
     expect(repository.tagCommands, isEmpty);
   });
@@ -1514,13 +1515,13 @@ void main() {
     await _openCatalogWithConditions(tester, container, repository, [
       (health, IntentionTagRequirement.mustBePresent),
     ], _firstPage(_taggedSummaries([health], first: 3, last: 1), revision: 1));
-    expect(find.text('Tags: Здоровье'), findsNWidgets(3));
+    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsNWidgets(3));
 
     await _completeCatalogWidgetTagCommand(
       tester,
       container,
       repository,
-      RenameTag(tagId: health.id, name: renamed.name),
+      UpdateTag(tagId: health.id, name: renamed.name, color: health.color),
       tagRenameSuccess(
         before: health,
         after: renamed,
@@ -1529,7 +1530,10 @@ void main() {
     );
 
     expect(_shownConditions(tester), ['Самочувствие']);
-    expect(find.text('Tags: Самочувствие'), findsNWidgets(3));
+    expect(
+      findTextIgnoringInlineWidgets('Tags: Самочувствие'),
+      findsNWidgets(3),
+    );
     expect(find.text('Total intentions: 3'), findsOneWidget);
 
     await _completeCatalogWidgetTagCommand(
@@ -2008,7 +2012,7 @@ List<String> _shownConditions(WidgetTester tester) => [
       matching: find.byKey(const ValueKey('intention-tag-condition-label')),
     ),
   ))
-    text.data!,
+    textIgnoringInlineWidgets(text),
 ];
 
 Result<IntentionCatalogFirstPage> _firstPage(
@@ -2128,6 +2132,7 @@ Tag _tag(int index, String name) => Tag(
     ),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 IntentionCatalogLoaded _loadedCatalog(ProviderContainer container) =>

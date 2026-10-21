@@ -50,6 +50,7 @@ import '../support/daily_choice_durability_fixture.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/inline_text.dart';
 import '../support/local_database_harness.dart';
 import '../support/temporary_graph_files.dart';
 
@@ -158,7 +159,7 @@ void main() {
     );
     await app.waitForBackups(1);
     final backupState = await app.graphState();
-    await app.execute(CreateTag(TagName.fromInput('Сад')));
+    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
 
     // Обновление — новый запуск над тем же хранилищем и каталогом снимков:
     // версия схемы и формата данных у обновлённого приложения та же.
@@ -189,7 +190,7 @@ void main() {
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 5, 14);
-    await app.execute(CreateTag(TagName.fromInput('Сад')));
+    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
     await app.openSettings();
     await app.openBackupsSheet();
     await app.chooseBackup(
@@ -288,7 +289,7 @@ void main() {
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 6, 8, 40);
-    await app.execute(CreateTag(TagName.fromInput('Сад')));
+    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
     await app.openSettings();
     await app.openBackupsSheet();
     await app.chooseBackup(
@@ -330,7 +331,7 @@ void main() {
     await app.waitForBackups(1);
     final backupState = await app.graphState();
     app.now = DateTime(2026, 10, 6, 8, 40);
-    await app.execute(CreateTag(TagName.fromInput('Сад')));
+    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
     await app.openSettings();
     await app.openBackupsSheet();
     await app.chooseBackup(
@@ -399,7 +400,7 @@ void main() {
     for (final intention in long) {
       await app.execute(DeleteIntention(intention.id));
     }
-    await app.execute(CreateTag(TagName.fromInput('Дом')));
+    await app.execute(CreateTag(name: TagName.fromInput('Дом'), color: null));
     await app.openSettings();
     app.fillStorage();
     final before = app.storedState();
@@ -689,7 +690,10 @@ Future<T> _confirm<T extends GraphCommandOutcome>(
 }
 
 Future<Tag> _createTag(PersonalGraphRepository graph, String name) async =>
-    (await _confirm<TagCreated>(graph, CreateTag(TagName.fromInput(name)))).tag;
+    (await _confirm<TagCreated>(
+      graph,
+      CreateTag(name: TagName.fromInput(name), color: null),
+    )).tag;
 
 Future<Intention> _createIntention(
   PersonalGraphRepository graph,
@@ -776,7 +780,7 @@ List<String?> _tagConditions() => [
             ),
           )
           .evaluate())
-    (label.widget as Text).data,
+    textIgnoringInlineWidgets(label.widget as Text),
 ];
 
 ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester

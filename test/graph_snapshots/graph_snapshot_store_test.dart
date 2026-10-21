@@ -79,8 +79,9 @@ void main() {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async =>
-      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+  Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
+    CreateTag(name: TagName.fromInput(name), color: null),
+  )).tag;
 
   Future<Intention> createIntention(
     String title, {
@@ -148,7 +149,11 @@ void main() {
     await store.writeSnapshot(await repository.readCurrentPosition());
 
     await confirm(
-      RenameTag(tagId: sport.id, name: TagName.fromInput('Физкультура')),
+      UpdateTag(
+        tagId: sport.id,
+        name: TagName.fromInput('Физкультура'),
+        color: sport.color,
+      ),
     );
     await confirm(RemoveTagAssignment(tagId: home.id, intentionId: health.id));
     await confirm(AssignTag(tagId: home.id, intentionId: health.id));

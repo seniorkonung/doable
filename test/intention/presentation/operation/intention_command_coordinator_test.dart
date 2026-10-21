@@ -992,8 +992,12 @@ _confirmedFullCreatedResult(GraphRevision revision) {
   final id = _id(_firstUuid);
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 10, 4));
   final tags = [
-    Tag(id: _tagId(_firstTagUuid), name: TagName.fromInput('Дом')),
-    Tag(id: _tagId(_secondTagUuid), name: TagName.fromInput('Выходные')),
+    Tag(id: _tagId(_firstTagUuid), name: TagName.fromInput('Дом'), color: null),
+    Tag(
+      id: _tagId(_secondTagUuid),
+      name: TagName.fromInput('Выходные'),
+      color: null,
+    ),
   ];
   return ResultSuccess(
     ConfirmedGraphResult(

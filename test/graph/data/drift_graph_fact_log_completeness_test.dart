@@ -26,6 +26,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_descript
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show ComparableExpr, OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
@@ -115,8 +116,10 @@ void main() {
     return confirmed.value as T;
   }
 
-  Future<Tag> createTag(String name) async =>
-      (await confirm<TagCreated>(CreateTag(TagName.fromInput(name)))).tag;
+  Future<Tag> createTag(String name, {TagColor? color}) async =>
+      (await confirm<TagCreated>(
+        CreateTag(name: TagName.fromInput(name), color: color),
+      )).tag;
 
   Future<Intention> createIntention(
     String title, {
@@ -144,16 +147,29 @@ void main() {
     ),
   )).relation;
 
-  test('команды тегов: создание, переименование, назначение, снятие и '
-      'удаление тега вместе с назначениями', () async {
-    final home = await createTag('Дом');
+  test('команды тегов: создание цветного и бесцветного тегов, '
+      'переименование, правка только цвета, возврат к «Без цвета», '
+      'назначение, снятие и удаление тега вместе с назначениями', () async {
+    final home = await createTag('Дом', color: TagColor.blue);
     final sport = await createTag('Спорт');
     final running = await createIntention('Бегать');
     final swimming = await createIntention('Плавать');
 
     await confirm(
-      RenameTag(tagId: sport.id, name: TagName.fromInput('Физкультура')),
+      UpdateTag(
+        tagId: sport.id,
+        name: TagName.fromInput('Физкультура'),
+        color: sport.color,
+      ),
     );
+    await confirm(
+      UpdateTag(
+        tagId: sport.id,
+        name: TagName.fromInput('Физкультура'),
+        color: TagColor.green,
+      ),
+    );
+    await confirm(UpdateTag(tagId: home.id, name: home.name, color: null));
     await confirm(AssignTag(tagId: home.id, intentionId: running.id));
     await confirm(AssignTag(tagId: sport.id, intentionId: running.id));
     await confirm(AssignTag(tagId: sport.id, intentionId: swimming.id));

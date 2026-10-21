@@ -1803,7 +1803,11 @@ void main() {
           diagnostics,
         );
         final renamed = await repository.execute(
-          RenameTag(tagId: homeTagId, name: TagName.fromInput('Быт')),
+          UpdateTag(
+            tagId: homeTagId,
+            name: TagName.fromInput('Быт'),
+            color: null,
+          ),
         );
         expect(renamed, isA<TagCommandSucceeded>());
 
@@ -1847,7 +1851,9 @@ void main() {
         );
         _tagCommandSuccess(await repository.execute(DeleteTag(homeTagId)));
         final recreated = _tagCommandSuccess(
-          await repository.execute(CreateTag(TagName.fromInput('Дом'))),
+          await repository.execute(
+            CreateTag(name: TagName.fromInput('Дом'), color: null),
+          ),
         );
         final recreatedTagId = (recreated.value as TagCreated).tag.id;
         expect(recreatedTagId, isNot(homeTagId));

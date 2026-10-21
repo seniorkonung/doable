@@ -17,6 +17,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -285,7 +286,37 @@ void main() {
       _lines(facts),
       _lines([
         GraphEntityChanged(
-          TagRecord(Tag(id: _tagId(_tagA), name: TagName.fromStored('Дача'))),
+          TagRecord(
+            Tag(
+              id: _tagId(_tagA),
+              name: TagName.fromStored('Дача'),
+              color: null,
+            ),
+          ),
+        ),
+      ]),
+    );
+  });
+
+  test('изменение только цвета тега даёт факт «изменена» с новым '
+      'цветом', () async {
+    await addGraph();
+
+    final facts = await capture(
+      () => write("UPDATE tags SET color = 'blue' WHERE id = ?", [_tagA]),
+    );
+
+    expect(
+      _lines(facts),
+      _lines([
+        GraphEntityChanged(
+          TagRecord(
+            Tag(
+              id: _tagId(_tagA),
+              name: TagName.fromStored('Дом'),
+              color: TagColor.blue,
+            ),
+          ),
         ),
       ]),
     );

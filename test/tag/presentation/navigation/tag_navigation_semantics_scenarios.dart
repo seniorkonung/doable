@@ -76,6 +76,7 @@ void _registerNavigationSemanticsScenarios() {
       final tag = Tag(
         id: _tag.id,
         name: TagName.fromInput('Длинное название 🏷️ ' * 10),
+        color: _tag.color,
       );
       reads.page(0, [], tag: tag);
       await tester.pumpAndSettle();
@@ -104,7 +105,10 @@ void _registerNavigationSemanticsScenarios() {
       );
       await tester.pumpAndSettle();
       await _expectNavigationStatusSemantics(tester, l10n.tagNotFound);
-      expect(find.text(l10n.tagNavigationTag(tag.name.value)), findsNothing);
+      expect(
+        findTextIgnoringInlineWidgets(l10n.tagNavigationTag(tag.name.value)),
+        findsNothing,
+      );
       for (final scope in TaggedIntentionsScope.values) {
         await tester.scrollUntilVisible(_scope(scope), -300, maxScrolls: 100);
         await tester.pumpAndSettle();
