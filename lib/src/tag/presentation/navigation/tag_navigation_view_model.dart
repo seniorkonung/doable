@@ -45,7 +45,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
   int _staleReadAttempts = 0;
   bool _tagIsMissing = false;
   // Требуемая ревизия списка и ревизия известного тега согласуются отдельно:
-  // посторонний пакет не подтверждает название или существование тега.
+  // посторонний пакет не подтверждает состояние или существование тега.
   GraphRevision? _requiredRevision;
   // Одно предыдущее значение отвергает запоздалые сигналы сменившейся эпохи.
   // Журнал пакетов и эпох не накапливается.
@@ -252,7 +252,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
         _staleReadAttempts = 0;
         if (_tagRevision?.compareTo(value.revision) ==
                 GraphRevisionOrder.same &&
-            _knownTag?.name != value.tag.name) {
+            _knownTag?.hasSameState(value.tag) != true) {
           _firstFailure(const TaggedIntentionsUnexpectedFailure());
           return;
         }
@@ -308,7 +308,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
           _firstPagePending = true;
           return;
         }
-        if (value.tag.name != base.tag.name ||
+        if (!value.tag.hasSameState(base.tag) ||
             identical(value.nextCursor, base.nextCursor) ||
             !_unique([...base.items, ...value.items])) {
           _pageFailure(base, const TaggedIntentionsUnexpectedFailure());
@@ -395,7 +395,8 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
       if (change case TagUpdatedChange(:final after) when after.id == _tagId) {
         _knownTag = after;
         _tagRevision = package.revision;
-        if (current is TagNavigationLoaded && current.tag.name != after.name) {
+        if (current is TagNavigationLoaded &&
+            !current.tag.hasSameState(after)) {
           current = current.withStatus(
             tag: after,
             refreshFailure: current.refreshFailure,
@@ -523,7 +524,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
       case GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch:
         return;
       case GraphRevisionOrder.same:
-        if (firstPage.value.tag.name != observation.value.name) {
+        if (!firstPage.value.tag.hasSameState(observation.value)) {
           _watchRecovery?.firstPage = null;
           _firstFailure(const TaggedIntentionsUnexpectedFailure());
           return;
@@ -610,6 +611,11 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
       );
     }
   }
+}
+
+extension on Tag {
+  /// Название и цвет вместе составляют редактируемое состояние тега.
+  bool hasSameState(Tag other) => name == other.name && color == other.color;
 }
 
 final class _WatchRecovery {

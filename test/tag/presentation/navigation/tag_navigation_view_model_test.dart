@@ -24,6 +24,7 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
@@ -171,13 +172,14 @@ void main() {
 
   for (final source in ['пакет', 'наблюдение']) {
     test(
-      '$source обновляет известное имя под более новой требуемой ревизией списка',
+      '$source обновляет известный цвет под более новой требуемой ревизией списка',
       () async {
         final h = _Harness();
         addTearDown(h.dispose);
         h.reads.page(0, [_intention(1)], cursor: _Cursor());
         await pumpEventQueue();
         h.change(3);
+        final recolored = _tag('Дом', color: TagColor.blue);
         if (source == 'пакет') {
           h.change(
             2,
@@ -185,21 +187,27 @@ void main() {
               TagUpdatedChange(
                 revision: const _Revision(2),
                 before: _tag('Дом'),
-                after: _tag('Быт'),
+                after: recolored,
               ),
             ],
           );
         } else {
-          h.reads.observe(_tag('Быт'), revision: 2);
+          h.reads.observe(recolored, revision: 2);
         }
         final refreshing = h.state as TagNavigationLoaded;
-        expect(refreshing.tag.name.value, 'Быт');
+        expect(refreshing.tag.id, _tagId(1));
+        expect(refreshing.tag.name.value, 'Дом');
+        expect(refreshing.tag.color, TagColor.blue);
+        expect(refreshing.scope, TaggedIntentionsScope.active);
+        expect(refreshing.items.single.id, _intention(1).id);
         expect(refreshing.canUseCurrentItems, isFalse);
         h.reads.observe(_tag('Дом'));
-        expect((h.state as TagNavigationLoaded).tag.name.value, 'Быт');
-        h.reads.page(1, [_intention(101)], tag: _tag('Быт'), revision: 3);
+        expect((h.state as TagNavigationLoaded).tag.color, TagColor.blue);
+        h.reads.page(1, [_intention(101)], tag: recolored, revision: 3);
         await pumpEventQueue();
-        expect((h.state as TagNavigationLoaded).canUseCurrentItems, isTrue);
+        final current = h.state as TagNavigationLoaded;
+        expect(current.tag.color, TagColor.blue);
+        expect(current.canUseCurrentItems, isTrue);
         expect(h.reads.queries, hasLength(2));
       },
     );
@@ -1209,8 +1217,8 @@ final class _Revision implements GraphRevision {
   }
 }
 
-Tag _tag(String name, {int id = 1}) =>
-    Tag(id: _tagId(id), name: TagName.fromInput(name), color: null);
+Tag _tag(String name, {int id = 1, TagColor? color}) =>
+    Tag(id: _tagId(id), name: TagName.fromInput(name), color: color);
 
 TagId _tagId(int n) => (TagId.decode(
   '10000000-0000-4000-8000-${n.toString().padLeft(12, '0')}',
