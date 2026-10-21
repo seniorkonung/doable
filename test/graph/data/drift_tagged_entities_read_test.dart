@@ -10,6 +10,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -132,6 +133,42 @@ void main() {
       ),
     );
   }
+
+  test('навигация и краткие данные намерений возвращают теги с цветом и без '
+      'цвета', () async {
+    seedRawGraph(raw, () {
+      raw.execute("UPDATE tags SET color = 'blue' WHERE id = ?", [
+        tagFixtureId(firstTagNumber),
+      ]);
+    });
+
+    final navigation = page(
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
+          tagId: _tag(firstTagNumber),
+          scope: TaggedIntentionsScope.active,
+          pageSize: 1,
+        ),
+      ),
+    );
+    final catalog = await graph.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: 10,
+      ),
+    );
+
+    expect(navigation.tag.color, TagColor.blue);
+    final summary = (catalog as ResultSuccess<IntentionCatalogPage>).value.items
+        .singleWhere((item) => item.id == _intention(1));
+    expect(summary.tags.map((tag) => tag.id), [
+      _tag(firstTagNumber),
+      _tag(lastTagNumber),
+    ]);
+    expect(summary.tags.map((tag) => tag.color), [TagColor.blue, null]);
+  });
 
   test('повреждение дополнительного намерения отклоняет всю порцию', () async {
     seedRawGraph(raw, () {

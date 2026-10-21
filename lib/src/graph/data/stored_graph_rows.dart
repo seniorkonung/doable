@@ -13,6 +13,7 @@ import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../tag/domain/tag.dart';
 import '../../tag/domain/tag_assignment.dart';
+import '../../tag/domain/tag_color.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_name.dart';
 
@@ -83,14 +84,28 @@ ChoicePathStepId _decodeStoredChoicePathStepId(String value) =>
       InvalidChoicePathStepIdDecoding() => throw const StoredGraphCorruption(),
     };
 
-/// Тег из столбцов `id` и `name`. Название проверяет `CHECK` схемы той же
-/// функцией [TagName.fromStored], поэтому здесь оно только преобразуется в
-/// тип. Схема не хранит цвет, поэтому тег без цвета.
+/// Тег из столбцов `id`, `name` и `color`. Название проверяет `CHECK` схемы
+/// той же функцией [TagName.fromStored], поэтому здесь оно только
+/// преобразуется в тип.
 Tag decodeStoredTag(Map<String, Object?> data) => Tag(
   id: decodeStoredTagId(requiredStoredString(data, 'id')),
   name: TagName.fromStored(requiredStoredString(data, 'name')),
-  color: null,
+  color: _decodeStoredTagColor(data),
 );
+
+/// SQL `NULL` — тег без цвета. Строка без столбца `color` — проекция,
+/// забывшая цвет, а не тег без цвета, поэтому она тоже даёт отказ.
+TagColor? _decodeStoredTagColor(Map<String, Object?> data) {
+  if (!data.containsKey('color')) throw const StoredGraphCorruption();
+  return switch (data['color']) {
+    null => null,
+    final String code => switch (TagColor.decode(code)) {
+      TagColorDecodingSuccess(:final color) => color,
+      UnknownTagColorDecoding() => throw const StoredGraphCorruption(),
+    },
+    _ => throw const StoredGraphCorruption(),
+  };
+}
 
 /// Намерение из столбцов таблицы `intentions`, имена которых в строке
 /// начинаются с [prefix]. Название и описание хранятся в той форме, к

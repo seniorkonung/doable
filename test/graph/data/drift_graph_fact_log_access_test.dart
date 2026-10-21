@@ -21,11 +21,13 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_log_completeness_reference.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -337,6 +339,25 @@ void main() {
     expect(
       _lines(portions.expand((portion) => portion.records)),
       _lines(await referenceGraphRecords(database)),
+    );
+  });
+
+  test('порция записей переносит цвет тега и его отсутствие', () async {
+    final colored = await createTag('Дом');
+    await createTag('Работа');
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        "UPDATE tags SET color = 'blue' WHERE id = ?",
+        [colored.id.toCanonicalString()],
+      ),
+    );
+
+    final portion = await repository.readGraphRecords();
+
+    expect(
+      [for (final record in portion.records) (record as TagRecord).tag.color],
+      [TagColor.blue, null],
     );
   });
 

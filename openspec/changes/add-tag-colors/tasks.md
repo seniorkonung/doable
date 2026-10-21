@@ -25,7 +25,7 @@
   - **Предполагаемые файлы:** `lib/src/data/local/schema/tag_schema.drift`, `lib/src/data/local/app_database.dart`, `lib/src/data/local/app_database.g.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `drift_schemas/drift_schema_v4.json` (новый), `drift_schemas/drift_schema_v3.json` (удаляется), `test/data/local/tag_schema_test.dart`, `test/data/local/app_database_schema_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `README.md`.
   - **Размер:** M.
 
-- [ ] 1.3 Передавать цвет через все чтения тега и захват фактов
+- [x] 1.3 Передавать цвет через все чтения тега и захват фактов
   - **Критерии приёмки:**
     - Общий декодер различает отсутствующий столбец и SQL `NULL`, преобразует допустимый код в `TagColor` и использует `StoredGraphCorruption` для некорректного представления.
     - Каталог, выбор, назначения, наблюдение тега, навигация, краткие данные намерений и чтение результата команды возвращают полный тег с цветом. Все использующие общий декодер проекции обновлены согласованно.

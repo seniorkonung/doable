@@ -10,6 +10,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -190,10 +191,16 @@ void main() {
     expect(raw.select('SELECT * FROM tag_assignments'), oldAssignments);
   });
 
-  test('неизменяемые снимки сохраняют порядок тегов и общую ревизию', () async {
+  test('неизменяемые снимки сохраняют порядок тегов, их цвет и общую '
+      'ревизию', () async {
     final intentionId = _intention(1);
     final tagId =
         (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
+    seedRawGraph(raw, () {
+      raw.execute("UPDATE tags SET color = 'blue' WHERE id = ?", [
+        tagFixtureId(firstTagNumber),
+      ]);
+    });
     final before = assignments(await graph.getTagAssignments(intentionId));
     final catalog = selection(
       await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
@@ -211,14 +218,16 @@ void main() {
     expect(() => catalog.items.clear(), throwsUnsupportedError);
     expect(() => catalog.rows.clear(), throwsUnsupportedError);
 
+    final renamed = await graph.execute(
+      RenameTag(tagId: tagId, name: TagName.fromInput('Я')),
+    );
+    final outcome = (renamed as TagCommandSucceeded).value.value as TagRenamed;
     expect(
-      await graph.execute(
-        RenameTag(tagId: tagId, name: TagName.fromInput('Я')),
-      ),
-      isA<TagCommandSucceeded>(),
+      [outcome.before.color, outcome.after.color],
+      [TagColor.blue, TagColor.blue],
     );
     final after = assignments(await graph.getTagAssignments(intentionId));
-    final renamed = selection(
+    final renamedCatalog = selection(
       await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
     );
     final updated = (await graph.getTagAssignmentStatus(
@@ -226,12 +235,19 @@ void main() {
       intentionId,
     ) as TagAssignmentStatusSuccess).value;
     expect(after.items.map((tag) => tag.name.value), ['Я']);
-    expect(renamed.items.map((tag) => tag.name.value), ['Я', 'Работа']);
+    expect(after.items.map((tag) => tag.color), [TagColor.blue]);
+    expect(renamedCatalog.items.map((tag) => tag.name.value), ['Я', 'Работа']);
+    expect(renamedCatalog.items.map((tag) => tag.color), [TagColor.blue, null]);
     expect(after.revision.compareTo(before.revision), GraphRevisionOrder.newer);
-    expect(renamed.revision.compareTo(after.revision), GraphRevisionOrder.same);
+    expect(
+      renamedCatalog.revision.compareTo(after.revision),
+      GraphRevisionOrder.same,
+    );
     expect(updated.revision.compareTo(after.revision), GraphRevisionOrder.same);
     expect(before.items.single.name.value, 'Дом');
+    expect(before.items.single.color, TagColor.blue);
     expect(catalog.items.first.name.value, 'Дом');
+    expect(catalog.rows.map((row) => row.tag.color), [TagColor.blue, null]);
   });
 
   test(
