@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
@@ -30,6 +29,10 @@ final class TagEditorPage extends ConsumerStatefulWidget {
 
 final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
   late final TextEditingController _nameController;
+
+  /// Живая область включается первым выбором пользователя,
+  /// поэтому открытие формы ничего не объявляет.
+  var _announcesColor = false;
 
   @override
   void initState() {
@@ -123,20 +126,11 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
               label: l10n.tagColorLabel,
               groupLabel: l10n.tagColorGroupLabel,
               colorLabel: (color) => tagColorLabel(l10n, color),
+              announcesValue: _announcesColor,
               onChanged: (color) {
                 if (color == selectedColor) return;
                 model.changeColor(tagColorFromPresentation(color));
-                // Объявляется только выбор пользователя, без события при открытии:
-                // https://api.flutter.dev/flutter/semantics/SemanticsService/sendAnnouncement.html
-                if (MediaQuery.supportsAnnounceOf(context)) {
-                  unawaited(
-                    SemanticsService.sendAnnouncement(
-                      View.of(context),
-                      tagColorLabel(l10n, color),
-                      Directionality.of(context),
-                    ),
-                  );
-                }
+                setState(() => _announcesColor = true);
               },
             ),
             if (generalFailure != null) ...[

@@ -7,7 +7,8 @@ import '../doable_type.dart';
 import 'tag_dot.dart';
 
 /// Выбор одного из девяти цветов тега или варианта «Без цвета».
-/// Потребитель хранит [value], передаёт готовые подписи и объявляет смену цвета.
+/// Потребитель хранит [value], передаёт готовые подписи и решает,
+/// когда объявлять смену цвета, через [announcesValue].
 final class TagColorPicker extends StatelessWidget {
   const TagColorPicker({
     required this.value,
@@ -15,6 +16,7 @@ final class TagColorPicker extends StatelessWidget {
     required this.colorLabel,
     required this.groupLabel,
     required this.onChanged,
+    this.announcesValue = false,
     super.key,
   });
 
@@ -27,6 +29,10 @@ final class TagColorPicker extends StatelessWidget {
   /// Доступное название группы образцов.
   final String groupLabel;
   final ValueChanged<DoableTagColor?> onChanged;
+
+  /// Делает название выбранного варианта в шапке живой областью:
+  /// экранный диктор объявляет каждое изменение этого названия.
+  final bool announcesValue;
 
   @override
   Widget build(BuildContext context) {
@@ -53,10 +59,14 @@ final class TagColorPicker extends StatelessWidget {
               ),
               const SizedBox(width: DoableMetrics.space2),
               Expanded(
-                child: Text(
-                  colorLabel(value),
-                  textAlign: TextAlign.end,
-                  style: DoableType.body.copyWith(color: colors.muted),
+                child: Semantics(
+                  container: announcesValue,
+                  liveRegion: announcesValue,
+                  child: Text(
+                    colorLabel(value),
+                    textAlign: TextAlign.end,
+                    style: DoableType.body.copyWith(color: colors.muted),
+                  ),
                 ),
               ),
             ],

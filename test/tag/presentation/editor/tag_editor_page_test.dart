@@ -97,7 +97,10 @@ void main() {
           ),
         );
       }
-      expect(find.text(labels.first), findsOneWidget);
+      expect(
+        tester.getSemantics(find.text(labels.first)),
+        isSemantics(isLiveRegion: false),
+      );
       expect(tester.takeAnnouncements(), isEmpty);
       final dot = find.descendant(
         of: find.byKey(const ValueKey('tag-editor-name')),
@@ -115,7 +118,10 @@ void main() {
 
       await tester.tap(_swatch(labels[6]));
       await tester.pumpAndSettle();
-      expect(find.text(labels[6]), findsOneWidget);
+      expect(
+        tester.getSemantics(find.text(labels[6])),
+        isSemantics(label: labels[6], isLiveRegion: true),
+      );
       expect(
         tester.getSemantics(_swatch(labels[6])),
         isSemantics(
@@ -130,12 +136,14 @@ void main() {
         tester.renderObject(dot),
         paints..circle(color: DoableColors.light.tagBlue),
       );
-      expect(tester.takeAnnouncements(), [
-        isAccessibilityAnnouncement(labels[6]),
-      ]);
+      expect(tester.takeAnnouncements(), isEmpty);
       expect(repository.commands, isEmpty);
       await tester.tap(_swatch(labels[6]));
       await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(find.text(labels[6])),
+        isSemantics(label: labels[6], isLiveRegion: true),
+      );
       expect(tester.takeAnnouncements(), isEmpty);
 
       await tester.enterText(
@@ -177,7 +185,10 @@ void main() {
         editorContext: TagEditorRenaming(original),
       );
 
-      expect(find.text(originalLabel), findsOneWidget);
+      expect(
+        tester.getSemantics(find.text(originalLabel)),
+        isSemantics(isLiveRegion: false),
+      );
       expect(
         tester.getSemantics(_swatch(originalLabel)),
         isSemantics(
@@ -511,7 +522,8 @@ Future<void> _pumpEditor(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(supportsAnnounce: true),
+          // Android с TalkBack не поддерживает SemanticsService.sendAnnouncement.
+          data: MediaQuery.of(context).copyWith(supportsAnnounce: false),
           child: child!,
         ),
         home: TagEditorPage(
