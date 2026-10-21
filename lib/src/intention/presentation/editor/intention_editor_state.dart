@@ -1,6 +1,7 @@
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag.dart';
+import '../../../tag/domain/tag_color.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../../tag/domain/tag_name.dart';
 import '../../application/intention_result.dart';
@@ -91,41 +92,50 @@ final class IntentionCreationDraft {
   );
 }
 
-/// Выбранный тег черновика для показа: последнее известное название и
-/// состояние его наблюдения.
+/// Выбранный тег черновика для показа: последние известные название и цвет
+/// и состояние его наблюдения.
 ///
 /// Проекция отделена от набора идентичностей черновика: её изменения не
 /// меняют состав набора, изменённость черновика и данные отправки и не
 /// заменяют проверку существования тегов при сохранении.
 final class IntentionDraftTag {
-  const IntentionDraftTag({required this.name, required this.status});
+  const IntentionDraftTag({
+    required this.name,
+    required this.color,
+    required this.status,
+  });
 
   /// Последнее подтверждённое название: сначала из выбора, затем из
   /// наблюдения. Сохраняется при отсутствии тега и отказе чтения.
   final TagName name;
+
+  /// Последний подтверждённый цвет; `null` — «Без цвета». Источник и
+  /// сохранение те же, что у [name].
+  final TagColor? color;
   final IntentionDraftTagStatus status;
 
   IntentionDraftTag withStatus(IntentionDraftTagStatus value) =>
-      IntentionDraftTag(name: name, status: value);
+      IntentionDraftTag(name: name, color: color, status: value);
 }
 
 sealed class IntentionDraftTagStatus {
   const IntentionDraftTagStatus();
 }
 
-/// Наблюдение ещё не подтвердило тег; показывается название из выбора.
+/// Наблюдение ещё не подтвердило тег; показываются название и цвет из
+/// выбора.
 final class IntentionDraftTagLoading extends IntentionDraftTagStatus {
   const IntentionDraftTagLoading();
 }
 
-/// Наблюдение подтвердило тег и его актуальное название.
+/// Наблюдение подтвердило тег и его актуальные название и цвет.
 final class IntentionDraftTagAvailable extends IntentionDraftTagStatus {
   const IntentionDraftTagAvailable();
 }
 
 /// Наблюдение подтвердило отсутствие тега. Удалённый тег не возвращается с
 /// прежним идентификатором, поэтому он остаётся в наборе недоступным с
-/// последним известным названием до явного снятия.
+/// последними известными названием и цветом до явного снятия.
 final class IntentionDraftTagMissing extends IntentionDraftTagStatus {
   const IntentionDraftTagMissing();
 }
@@ -247,6 +257,7 @@ final class IntentionEditorState {
             ...selectedTags,
             tag.id: IntentionDraftTag(
               name: tag.name,
+              color: tag.color,
               status: const IntentionDraftTagLoading(),
             ),
           }),

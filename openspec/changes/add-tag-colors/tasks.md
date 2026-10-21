@@ -101,7 +101,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart`, `test/graph/presentation/tag_package_catalog_consumers_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
   - **Размер:** M.
 
-- [ ] 1.11 Сохранять актуальный цвет выбранных тегов в черновике намерения
+- [x] 1.11 Сохранять актуальный цвет выбранных тегов в черновике намерения
   - **Критерии приёмки:**
     - Собственное представление тега черновика переносит типизированный цвет при добавлении, копировании и смене статуса; наблюдение принимает обновление цвета при прежнем названии.
     - Цвет обновляется по идентификатору без изменения выбранного набора черновика или постоянных назначений. Существующие состояния недоступного и удалённого тега сохраняют действующую семантику.

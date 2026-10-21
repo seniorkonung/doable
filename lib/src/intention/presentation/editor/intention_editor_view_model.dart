@@ -369,7 +369,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
   /// Начинает новое поколение наблюдения выбранного тега. При повторе
   /// сохраняется ревизия последнего принятого ответа, чтобы более старый
-  /// снимок не вернул прежнее название.
+  /// снимок не вернул прежние название и цвет.
   void _observeTag(TagId id) {
     final previous = _tagObservations.remove(id)?..release();
     final generation = ++_tagObservationGeneration;
@@ -422,7 +422,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
           case (null, IntentionDraftTagMissing()):
             return;
           case (final Tag current, IntentionDraftTagAvailable())
-              when current.name == tag.name:
+              when current.name == tag.name && current.color == tag.color:
             return;
           case (null, _):
             state = state.withSelectedTag(
@@ -434,6 +434,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
               id,
               IntentionDraftTag(
                 name: current.name,
+                color: current.color,
                 status: const IntentionDraftTagAvailable(),
               ),
             );

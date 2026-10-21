@@ -15,6 +15,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1112,7 +1113,7 @@ void main() {
   });
 
   group('проекция выбранных тегов', () {
-    test('подтверждённое отсутствие сохраняет идентификатор и последнее название до явного снятия и не подменяется одноимённым тегом', () async {
+    test('подтверждённое отсутствие сохраняет идентификатор, последние название и цвет до явного снятия и не подменяется одноимённым тегом', () async {
       final watches = _TagWatches();
       final repository = ControlledCatalogRepository()
         ..tagObservations = watches.watch;
@@ -1127,13 +1128,14 @@ void main() {
       editor.draftTagSet.add(_tag(1, 'Дом'));
       await _deliverEvents(container);
       final deletedWatch = watches.single(_tagId(1))
-        ..observe(_tag(1, 'Быт'), revision: 2)
+        ..observe(_tag(1, 'Быт', color: TagColor.blue), revision: 2)
         ..observe(null, revision: 3);
       await _deliverEvents(container);
 
       final missing = container.read(provider);
       expect(missing.draft.tagIds, [_tagId(1)]);
       expect(_tagNames(missing), {_tagId(1): 'Быт'});
+      expect(_tagColors(missing), {_tagId(1): TagColor.blue});
       expect(_tagStatus(missing, 1), isA<IntentionDraftTagMissing>());
       // Отсутствие в проекции не заменяет транзакционную проверку при
       // сохранении и само не блокирует отправку.
@@ -1370,6 +1372,53 @@ void main() {
         isA<IntentionDraftTagAvailable>(),
       );
       expect(readdedWatch.isReleased, isFalse);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('изменение только цвета выбранного тега, включая возврат к «Без цвета», обновляет проекцию без изменения набора черновика', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final tagSet = container.read(provider.notifier).draftTagSet
+        ..add(_tag(1, 'Дом', color: TagColor.blue));
+
+      expect(_tagColors(container.read(provider)), {_tagId(1): TagColor.blue});
+      expect(
+        _tagStatus(container.read(provider), 1),
+        isA<IntentionDraftTagLoading>(),
+      );
+
+      await _deliverEvents(container);
+      final watch = watches.single(_tagId(1))
+        ..observe(_tag(1, 'Дом', color: TagColor.blue), revision: 1);
+      await _deliverEvents(container);
+      final published = <IntentionDraftTagSetSnapshot>[];
+      final changesSubscription = tagSet.changes.listen(published.add);
+      addTearDown(changesSubscription.cancel);
+
+      watch.observe(_tag(1, 'Дом', color: TagColor.green), revision: 2);
+      await _deliverEvents(container);
+
+      final recolored = container.read(provider);
+      expect(_tagNames(recolored), {_tagId(1): 'Дом'});
+      expect(_tagColors(recolored), {_tagId(1): TagColor.green});
+      expect(_tagStatus(recolored, 1), isA<IntentionDraftTagAvailable>());
+      expect(recolored.draft.tagIds, [_tagId(1)]);
+
+      watch.observe(_tag(1, 'Дом'), revision: 3);
+      await _deliverEvents(container);
+
+      final uncolored = container.read(provider);
+      expect(_tagColors(uncolored), {_tagId(1): null});
+      expect(uncolored.draft.tagIds, [_tagId(1)]);
+      expect(published, isEmpty);
       expect(repository.commands, isEmpty);
       expect(repository.tagCommands, isEmpty);
     });
@@ -2066,11 +2115,14 @@ TagId _tagId(int number) => switch (TagId.decode(
   InvalidTagIdDecoding() => throw StateError('Некорректный UUID тега.'),
 };
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _tagId(number), name: TagName.fromInput(name), color: color);
 
 Map<TagId, String> _tagNames(IntentionEditorState state) =>
     state.selectedTags.map((id, tag) => MapEntry(id, tag.name.value));
+
+Map<TagId, TagColor?> _tagColors(IntentionEditorState state) =>
+    state.selectedTags.map((id, tag) => MapEntry(id, tag.color));
 
 IntentionDraftTagStatus? _tagStatus(IntentionEditorState state, int number) =>
     state.selectedTags[_tagId(number)]?.status;
