@@ -10,6 +10,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_tag_conditio
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,17 +26,19 @@ const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
 
 void main() {
-  test('подтверждённое переименование обновляет название условия', () {
+  test('подтверждённое изменение только цвета обновляет условие без новой '
+      'выдачи', () {
     final h = _Harness();
     addTearDown(h.dispose);
     h.select(_tag(1, 'Здоровье'), _present);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     final queries = h.repository.queries.length;
 
-    h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
+    h.update(2, _tag(1, 'Здоровье'), _tag(1, 'Здоровье', color: TagColor.blue));
 
-    expect(h.shown, [(_id(1), _present, 'Самочувствие', false)]);
-    // Идентичность условия прежняя: новая выдача не начинается.
+    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
+    expect(h.colors, {_id(1): TagColor.blue});
+    // Идентичность и надобность условия прежние: новая выдача не начинается.
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     expect(h.repository.queries, hasLength(queries));
   });
@@ -91,22 +94,29 @@ void main() {
     ]);
   });
 
-  test('устаревший выбор предъявляется с актуальным названием', () async {
+  test('устаревший выбор предъявляется с актуальными названием и '
+      'цветом', () async {
     final h = _Harness();
     addTearDown(h.dispose);
-    // Переименование подтверждено до выбора: тег ещё не был условием.
-    h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
+    // Редактирование подтверждено до выбора: тег ещё не был условием.
+    h.update(
+      2,
+      _tag(1, 'Здоровье'),
+      _tag(1, 'Самочувствие', color: TagColor.blue),
+    );
 
     h.select(_tag(1, 'Здоровье'), _present, revision: 1);
 
     // Поиск применяется сразу, не дожидаясь уточнения предъявления.
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
+    expect(h.colors, {_id(1): null});
     expect(h.reads.queries, [_id(1)]);
 
-    h.reads.tag(0, _tag(1, 'Самочувствие'), revision: 2);
+    h.reads.tag(0, _tag(1, 'Самочувствие', color: TagColor.blue), revision: 2);
     await pumpEventQueue();
     expect(h.shown, [(_id(1), _present, 'Самочувствие', false)]);
+    expect(h.colors, {_id(1): TagColor.blue});
 
     // Следующий выбор из снимка актуальной ревизии чтения не требует.
     h.select(_tag(2, 'Спорт'), _absent, revision: 2);
@@ -173,19 +183,25 @@ void main() {
   });
 
   test(
-    'позднее чтение не возвращает название до более нового пакета',
+    'позднее чтение не возвращает название и цвет до более нового пакета',
     () async {
       final h = _Harness();
       addTearDown(h.dispose);
       h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
       h.select(_tag(1, 'Здоровье'), _present, revision: 1);
 
-      h.rename(3, _tag(1, 'Самочувствие'), 'Тонус');
+      h.update(
+        3,
+        _tag(1, 'Самочувствие'),
+        _tag(1, 'Тонус', color: TagColor.green),
+      );
       expect(h.shown, [(_id(1), _present, 'Тонус', false)]);
+      expect(h.colors, {_id(1): TagColor.green});
       h.reads.tag(0, _tag(1, 'Самочувствие'), revision: 2);
       await pumpEventQueue();
 
       expect(h.shown, [(_id(1), _present, 'Тонус', false)]);
+      expect(h.colors, {_id(1): TagColor.green});
       // Пакет о самом теге подтвердил предъявление: повтор чтения не нужен.
       h.package(4, [
         TagCreatedChange(revision: const _Revision(4), after: _tag(8, 'Быт')),
@@ -233,7 +249,8 @@ void main() {
     expect(h.reads.queries, hasLength(2));
   });
 
-  test('повторный выбор из более нового снимка обновляет название', () {
+  test('повторный выбор из более нового снимка обновляет название и '
+      'цвет', () {
     final h = _Harness();
     addTearDown(h.dispose);
     h.select(_tag(1, 'Здоровье'), _present);
@@ -241,12 +258,18 @@ void main() {
       TagCreatedChange(revision: const _Revision(2), after: _tag(8, 'Быт')),
     ]);
 
-    h.select(_tag(1, 'Самочувствие'), _absent, revision: 2);
+    h.select(
+      _tag(1, 'Самочувствие', color: TagColor.blue),
+      _absent,
+      revision: 2,
+    );
     expect(h.shown, [(_id(1), _absent, 'Самочувствие', false)]);
+    expect(h.colors, {_id(1): TagColor.blue});
 
-    // Прежний снимок не возвращает уже подтверждённое название.
+    // Прежний снимок не возвращает уже подтверждённые название и цвет.
     h.select(_tag(1, 'Здоровье'), _present, revision: 1);
     expect(h.shown, [(_id(1), _present, 'Самочувствие', false)]);
+    expect(h.colors, {_id(1): TagColor.blue});
     expect(h.reads.queries, isEmpty);
   });
 
@@ -343,6 +366,11 @@ final class _Harness {
       ),
   ];
 
+  /// Предъявляемые цвета условий; `null` — «Без цвета».
+  Map<TagId, TagColor?> get colors => {
+    for (final condition in conditions) condition.tagId: condition.color,
+  };
+
   IntentionCatalogViewModel get catalog =>
       container.read(intentionCatalogViewModelProvider(purpose).notifier);
 
@@ -371,17 +399,19 @@ final class _Harness {
   void package(int revision, List<GraphChange> packageChanges) =>
       changes.add(_Package(_Revision(revision), packageChanges));
 
-  void rename(int revision, Tag before, String name) => package(revision, [
+  void update(int revision, Tag before, Tag after) => package(revision, [
     TagUpdatedChange(
       revision: _Revision(revision),
       before: before,
-      after: Tag(
-        id: before.id,
-        name: TagName.fromInput(name),
-        color: before.color,
-      ),
+      after: after,
     ),
   ]);
+
+  void rename(int revision, Tag before, String name) => update(
+    revision,
+    before,
+    Tag(id: before.id, name: TagName.fromInput(name), color: before.color),
+  );
 
   void delete(int revision, TagId tagId) => package(revision, [
     TagDeletedChange(revision: _Revision(revision), tagId: tagId),
@@ -444,5 +474,5 @@ TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _id(number), name: TagName.fromInput(name), color: color);

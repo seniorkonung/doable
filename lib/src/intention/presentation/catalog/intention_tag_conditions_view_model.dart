@@ -11,6 +11,7 @@ import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../tag/application/tag_change.dart';
 import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag.dart';
+import '../../../tag/domain/tag_color.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../../tag/domain/tag_name.dart';
 import '../../application/intention_catalog.dart';
@@ -50,19 +51,24 @@ enum IntentionTagRequirement {
 
 /// Выбранное условие для предъявления: идентичность задаёт только [tagId].
 ///
-/// [name] — актуальное название либо последнее известное, если удаление тега
-/// подтверждено. Название и признак удаления в предикат поиска не входят.
+/// [name] и [color] — актуальные название и цвет либо последние известные,
+/// если удаление тега подтверждено. Название, цвет и признак удаления в
+/// предикат поиска не входят.
 final class IntentionTagCondition {
   const IntentionTagCondition({
     required this.tagId,
     required this.requirement,
     required this.name,
+    required this.color,
     required this.isDeleted,
   });
 
   final TagId tagId;
   final IntentionTagRequirement requirement;
   final TagName name;
+
+  /// `null` — «Без цвета».
+  final TagColor? color;
   final bool isDeleted;
 
   @override
@@ -71,10 +77,11 @@ final class IntentionTagCondition {
       other.tagId == tagId &&
       other.requirement == requirement &&
       other.name == name &&
+      other.color == color &&
       other.isDeleted == isDeleted;
 
   @override
-  int get hashCode => Object.hash(tagId, requirement, name, isDeleted);
+  int get hashCode => Object.hash(tagId, requirement, name, color, isDeleted);
 }
 
 /// Выбор тега с надобностью из снимка каталога тегов на [snapshotRevision].
@@ -166,6 +173,7 @@ final class IntentionTagConditionsViewModel
       _entries[tag.id] = _ConditionEntry(
         requirement: requirement,
         name: tag.name,
+        color: tag.color,
         revision: snapshotRevision,
         needsVerification: !isCurrent,
       );
@@ -177,6 +185,7 @@ final class IntentionTagConditionsViewModel
               GraphRevisionOrder.newer) {
         existing
           ..name = tag.name
+          ..color = tag.color
           ..revision = snapshotRevision
           ..needsVerification = !isCurrent;
       }
@@ -214,6 +223,7 @@ final class IntentionTagConditionsViewModel
           }
           entry
             ..name = after.name
+            ..color = after.color
             ..revision = package.revision
             ..needsVerification = false;
           changed = true;
@@ -249,7 +259,7 @@ final class IntentionTagConditionsViewModel
   }
 
   /// Уточняет предъявление условия, выбранного из снимка, после которого
-  /// тег мог быть переименован или удалён.
+  /// тег мог быть отредактирован или удалён.
   Future<void> _verify(TagId tagId, _ConditionEntry entry) async {
     entry.isVerifying = true;
     final result = await _readTag(tagId);
@@ -274,7 +284,9 @@ final class IntentionTagConditionsViewModel
       if (tag == null) {
         entry.isDeleted = true;
       } else {
-        entry.name = tag.name;
+        entry
+          ..name = tag.name
+          ..color = tag.color;
       }
       state = _snapshot();
     }
@@ -302,6 +314,7 @@ final class IntentionTagConditionsViewModel
         tagId: tagId,
         requirement: entry.requirement,
         name: entry.name,
+        color: entry.color,
         isDeleted: entry.isDeleted,
       ),
   ]);
@@ -336,15 +349,18 @@ final class _ConditionEntry {
   _ConditionEntry({
     required this.requirement,
     required this.name,
+    required this.color,
     required this.revision,
     required this.needsVerification,
   });
 
   IntentionTagRequirement requirement;
   TagName name;
+  TagColor? color;
   bool isDeleted = false;
 
-  /// Ревизия, на которой подтверждено предъявляемое название или удаление.
+  /// Ревизия, на которой подтверждены предъявляемые название и цвет или
+  /// удаление.
   GraphRevision revision;
 
   /// Предъявление взято из снимка, который мог устареть к моменту выбора.

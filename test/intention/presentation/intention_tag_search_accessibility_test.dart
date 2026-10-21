@@ -704,6 +704,7 @@ IntentionTagCondition _condition(
   tagId: tag.id,
   requirement: requirement,
   name: tag.name,
+  color: tag.color,
   isDeleted: false,
 );
 
