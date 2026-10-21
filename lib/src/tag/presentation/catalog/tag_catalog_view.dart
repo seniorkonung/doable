@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
+import '../../../design_system/components/tag_dot.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
@@ -16,6 +17,7 @@ import '../../application/tag_read_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
 import '../editor/tag_editor_state.dart';
+import '../tag_color_presentation.dart';
 import '../tag_failure_message.dart';
 import 'tag_catalog_filter.dart';
 import 'tag_catalog_search_controller.dart';
@@ -719,7 +721,7 @@ final class _LoadedCatalog extends StatelessWidget {
                   container: true,
                   selected: true,
                   child: ListTile(
-                    title: Text(selectedTag.name.value),
+                    title: _CatalogTagName(tag: selectedTag),
                     subtitle: Text(localizations.tagCatalogSelected),
                     trailing: state.canUseCurrentItems
                         ? _TagActions(
@@ -741,7 +743,7 @@ final class _LoadedCatalog extends StatelessWidget {
                 container: true,
                 selected: tag.id == selectedId,
                 child: ListTile(
-                  title: Text(tag.name.value),
+                  title: _CatalogTagName(tag: tag),
                   subtitle: rowStatus(row),
                   onTap:
                       choosing &&
@@ -769,6 +771,23 @@ final class _LoadedCatalog extends StatelessWidget {
       ],
     );
   }
+}
+
+final class _CatalogTagName extends StatelessWidget {
+  const _CatalogTagName({required this.tag, this.textAlign = TextAlign.start});
+
+  final Tag tag;
+  final TextAlign textAlign;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      TagDot(color: tagColorPresentation(tag.color), size: TagDotSize.large),
+      const SizedBox(width: 8),
+      Flexible(child: Text(tag.name.value, textAlign: textAlign)),
+    ],
+  );
 }
 
 /// Признак включения тега в набор черновика. Строка резервирует высоту
@@ -821,7 +840,7 @@ final class _AssignAction extends StatelessWidget {
     };
     return _SelectionActionArea(
       hiddenSelection: switch (_hiddenSelection(state, filter)) {
-        final hidden? => (name: hidden.name.value, status: assignmentLabel),
+        final hidden? => (tag: hidden, status: assignmentLabel),
         null => null,
       },
       action: FilledButton(
@@ -863,7 +882,7 @@ final class _DraftAddAction extends StatelessWidget {
     return _SelectionActionArea(
       hiddenSelection: switch (_hiddenSelection(state, filter)) {
         final hidden? => (
-          name: hidden.name.value,
+          tag: hidden,
           status: draftSet.tagIds.contains(hidden.id)
               ? localizations.tagCatalogInDraft
               : localizations.tagCatalogAvailableForDraft,
@@ -915,8 +934,8 @@ final class _SelectionActionArea extends StatelessWidget {
     this.unavailableReason,
   });
 
-  /// Название и признак выбранного тега, которого не видно в списке.
-  final ({String name, String status})? hiddenSelection;
+  /// Полный тег и его признак, если выбранного тега не видно в списке.
+  final ({Tag tag, String status})? hiddenSelection;
 
   /// Причина недоступности действия, не зависящая от выбранного тега.
   final String? unavailableReason;
@@ -959,7 +978,7 @@ final class _SelectionActionArea extends StatelessWidget {
                                 ),
                               ),
                             if (hiddenSelection case (
-                              :final name,
+                              :final tag,
                               :final status,
                             ))
                               Semantics(
@@ -973,7 +992,10 @@ final class _SelectionActionArea extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(localizations.tagCatalogSelected),
-                                    Text(name, textAlign: TextAlign.center),
+                                    _CatalogTagName(
+                                      tag: tag,
+                                      textAlign: TextAlign.center,
+                                    ),
                                     Text(status, textAlign: TextAlign.center),
                                   ],
                                 ),

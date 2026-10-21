@@ -296,7 +296,15 @@ List<String> _visibleNames(WidgetTester tester) => [
       matching: find.byType(ListTile),
     ),
   ))
-    (tile.title! as Text).data!,
+    tester
+        .widgetList<RichText>(
+          find.descendant(
+            of: find.byWidget(tile.title!),
+            matching: find.byType(RichText),
+          ),
+        )
+        .map((text) => text.text.toPlainText())
+        .join(),
 ];
 Finder _row(Tag tag) =>
     find.byKey(ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'));

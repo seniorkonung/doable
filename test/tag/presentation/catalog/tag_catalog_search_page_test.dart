@@ -1286,7 +1286,15 @@ List<String> _visibleNames(WidgetTester tester) => [
   for (final tile in tester.widgetList<ListTile>(
     find.descendant(of: _list, matching: find.byType(ListTile)),
   ))
-    (tile.title! as Text).data!,
+    tester
+        .widgetList<RichText>(
+          find.descendant(
+            of: find.byWidget(tile.title!),
+            matching: find.byType(RichText),
+          ),
+        )
+        .map((text) => text.text.toPlainText())
+        .join(),
 ];
 
 Finder _row(Tag tag) =>
