@@ -245,7 +245,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_tag_conditions_section.dart`, `lib/src/intention/presentation/catalog/tag_condition_picker_page.dart`, `test/intention/presentation/catalog/intention_tag_conditions_section_test.dart`, `test/intention/presentation/catalog/tag_condition_picker_page_test.dart`; правка чтения подписи условия в `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/graph_import_app_flow_test.dart`, `test/app/graph_restore_app_flow_test.dart`, `test/app/navigation/app_shell_state_test.dart` и `test/app/navigation/app_shell_graph_generation_test.dart`.
   - **Размер:** M — раздел условий и строка выбора; остальное — механическая правка чтения подписи в проверках.
 
-- [ ] 2.11 Подтвердить в приложении, что цвет, выбранный в форме, сохраняется и сразу виден в представлениях тега
+- [x] 2.11 Подтвердить в приложении, что цвет, выбранный в форме, сохраняется и сразу виден в представлениях тега
   - **Критерии приёмки:**
     - На реальном хранилище приложения проходит сценарий «Изменение только цвета общего тега»: тег «Дом» без цвета назначен активному и архивированному намерениям, пользователь открывает изменение «Дом» из каталога, выбирает «Синий» и сохраняет.
     - Без перезапуска синюю точку показывают строка каталога тегов, строка результата в каталоге намерений, назначение в подробностях намерения и заголовок навигации по тегу. Название, идентификатор и оба назначения тега сохраняются.
