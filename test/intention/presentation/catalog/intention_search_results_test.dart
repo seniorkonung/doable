@@ -309,6 +309,7 @@ Tag _tag(int index, String name) => Tag(
     ),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Сводки с обязательным тегом в порядке убывания номера.
@@ -433,7 +434,11 @@ final class _Harness {
   /// подтверждённый пакет заново читает недостающую часть.
   Future<void> recoverRefresh({required int totalCount}) async {
     final read = repository.reconciliationQueries.length;
-    final renamed = Tag(id: _other.id, name: TagName.fromInput('Покой'));
+    final renamed = Tag(
+      id: _other.id,
+      name: TagName.fromInput('Покой'),
+      color: _other.color,
+    );
     await complete(
       RenameTag(tagId: _other.id, name: renamed.name),
       tagRenameSuccess(

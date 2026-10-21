@@ -415,6 +415,7 @@ Tag _tag(int number, String name) => Tag(
     '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
   ) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 Widget _testApp({

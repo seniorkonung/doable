@@ -1173,7 +1173,9 @@ final class _Reads with TagReadContractTestFallback implements TagReadContract {
     pending[index].complete(
       TaggedIntentionsPageSuccess(
         TaggedIntentionsPage(
-          tag: tag ?? Tag(id: query.tagId, name: TagName.fromInput('Дом')),
+          tag:
+              tag ??
+              Tag(id: query.tagId, name: TagName.fromInput('Дом'), color: null),
           scope: query.scope,
           items: items,
           pageSize: query.pageSize,
@@ -1208,7 +1210,7 @@ final class _Revision implements GraphRevision {
 }
 
 Tag _tag(String name, {int id = 1}) =>
-    Tag(id: _tagId(id), name: TagName.fromInput(name));
+    Tag(id: _tagId(id), name: TagName.fromInput(name), color: null);
 
 TagId _tagId(int n) => (TagId.decode(
   '10000000-0000-4000-8000-${n.toString().padLeft(12, '0')}',

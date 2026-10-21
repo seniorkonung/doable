@@ -2075,8 +2075,16 @@ final class _PresenterHarness {
     bool unchanged = false,
   }) {
     const revision = TestDetailsRevision(8);
-    final before = Tag(id: _tagId, name: TagName.fromInput('Планы'));
-    final after = Tag(id: _tagId, name: TagName.fromInput('Новое имя'));
+    final before = Tag(
+      id: _tagId,
+      name: TagName.fromInput('Планы'),
+      color: null,
+    );
+    final after = Tag(
+      id: _tagId,
+      name: TagName.fromInput('Новое имя'),
+      color: before.color,
+    );
     final success = switch (kind) {
       TagCommandKind.create => TagCreated(
         TagCreatedChange(revision: revision, after: before),

@@ -2128,6 +2128,7 @@ Tag _tag(int index, String name) => Tag(
     ),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 IntentionCatalogLoaded _loadedCatalog(ProviderContainer container) =>

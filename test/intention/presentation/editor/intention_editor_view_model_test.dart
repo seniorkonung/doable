@@ -2067,7 +2067,7 @@ TagId _tagId(int number) => switch (TagId.decode(
 };
 
 Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name));
+    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
 
 Map<TagId, String> _tagNames(IntentionEditorState state) =>
     state.selectedTags.map((id, tag) => MapEntry(id, tag.name.value));

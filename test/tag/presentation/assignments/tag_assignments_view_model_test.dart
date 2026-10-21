@@ -632,4 +632,4 @@ TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name));
+    Tag(id: _id(number), name: TagName.fromInput(name), color: null);

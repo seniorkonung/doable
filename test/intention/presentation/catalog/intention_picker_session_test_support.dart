@@ -237,6 +237,7 @@ Tag _tag(int index, String name) => Tag(
     InvalidTagIdDecoding() => throw StateError('Некорректный ID тега в тесте.'),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 Future<void> _settleRoute(WidgetTester tester) async {

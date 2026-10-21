@@ -328,8 +328,9 @@ Object _shown(GraphChangeSummary summary) => switch (summary) {
 
 final _createdAt = DateTime.utc(2026, 10, 1, 7);
 
-TagRecord _tag(int number, String name) =>
-    TagRecord(Tag(id: _tagId(number), name: TagName.fromStored(name)));
+TagRecord _tag(int number, String name) => TagRecord(
+  Tag(id: _tagId(number), name: TagName.fromStored(name), color: null),
+);
 
 IntentionRecord _intention(int number, String title, {bool archived = false}) =>
     IntentionRecord(

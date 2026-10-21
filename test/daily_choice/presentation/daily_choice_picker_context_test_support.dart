@@ -102,6 +102,7 @@ void defineDailyChoicePickerContextTests({
         InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
       },
       name: TagName.fromInput('Отдых'),
+      color: null,
     );
     repository.tagCatalogItems = [tag];
     final launch = _Launch();

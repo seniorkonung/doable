@@ -29,8 +29,16 @@ final _sourceSearchPurpose = SelectDailyChoiceSource(
 );
 
 void main() {
-  final health = Tag(id: _tagId(1), name: TagName.fromInput('Здоровье'));
-  final rest = Tag(id: _tagId(2), name: TagName.fromInput('Отдых'));
+  final health = Tag(
+    id: _tagId(1),
+    name: TagName.fromInput('Здоровье'),
+    color: null,
+  );
+  final rest = Tag(
+    id: _tagId(2),
+    name: TagName.fromInput('Отдых'),
+    color: null,
+  );
   const browse = BrowseIntentionCatalog();
 
   test('снятие обязательного тега исключает намерение и уменьшает количество на один', () async {
@@ -483,6 +491,7 @@ void main() {
     final wellBeing = Tag(
       id: health.id,
       name: TagName.fromInput('Самочувствие'),
+      color: health.color,
     );
     await _completeTagRename(
       container,
@@ -550,6 +559,7 @@ void main() {
     final wellBeing = Tag(
       id: health.id,
       name: TagName.fromInput('Самочувствие'),
+      color: health.color,
     );
     await _completeTagRename(
       container,
@@ -591,6 +601,7 @@ void main() {
     final wellBeing = Tag(
       id: health.id,
       name: TagName.fromInput('Самочувствие'),
+      color: health.color,
     );
     final fourth = testSummary(index: 4, tags: [wellBeing]);
     final third = testSummary(index: 3, tags: [wellBeing, rest]);
@@ -609,7 +620,7 @@ void main() {
     );
     final before = _loaded(container, browse);
 
-    final newHealth = Tag(id: _tagId(3), name: health.name);
+    final newHealth = Tag(id: _tagId(3), name: health.name, color: null);
     const revision = TestCatalogRevision(2);
     await completeTagCommand(
       container,
@@ -907,7 +918,7 @@ void main() {
     );
     confirmedStates.clear();
 
-    final newHealth = Tag(id: _tagId(3), name: health.name);
+    final newHealth = Tag(id: _tagId(3), name: health.name, color: null);
     const created = TestCatalogRevision(3);
     await completeTagCommand(
       container,
@@ -1294,7 +1305,11 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     final confirmedStates = _observeConfirmedStates(container, browse);
-    final sport = Tag(id: _tagId(3), name: TagName.fromInput('Спорт'));
+    final sport = Tag(
+      id: _tagId(3),
+      name: TagName.fromInput('Спорт'),
+      color: null,
+    );
     final tenth = testSummary(index: 10, tags: [health]);
     final eighth = testSummary(index: 8, tags: [health]);
     final filter = IntentionTagFilter(
@@ -1577,6 +1592,7 @@ void main() {
       final renamed = Tag(
         id: health.id,
         name: TagName.fromInput('Самочувствие'),
+        color: health.color,
       );
       await _completeTagRename(
         container,

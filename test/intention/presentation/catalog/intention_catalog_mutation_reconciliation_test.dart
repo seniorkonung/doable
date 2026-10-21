@@ -839,4 +839,5 @@ Tag _tag(int number) => Tag(
     InvalidTagIdDecoding() => throw StateError('Неверный ID тега.'),
   },
   name: TagName.fromInput('Тег $number'),
+  color: null,
 );

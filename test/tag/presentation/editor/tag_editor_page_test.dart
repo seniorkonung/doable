@@ -32,7 +32,9 @@ void main() {
     ),
     (
       const Locale('en'),
-      TagEditorRenaming(Tag(id: _id(1), name: TagName.fromInput('Home'))),
+      TagEditorRenaming(
+        Tag(id: _id(1), name: TagName.fromInput('Home'), color: null),
+      ),
       'Saving this tag is already in progress. Wait for its result.',
     ),
   ]) {

@@ -743,6 +743,7 @@ Tag _tag(int index, String name) => Tag(
     ),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Прокачивает кадры и переходы маршрутов без ожидания бесконечных

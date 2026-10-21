@@ -449,6 +449,7 @@ void main() {
           final renamed = Tag(
             id: selected.id,
             name: TagName.fromInput('Актуальный дом'),
+            color: selected.color,
           );
           repository.observe(renamed, revision: 2);
           await tester.pumpAndSettle();
@@ -1310,6 +1311,7 @@ String _id(int number) =>
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Прежний смысл необязательного получателя: без намерения — просмотр

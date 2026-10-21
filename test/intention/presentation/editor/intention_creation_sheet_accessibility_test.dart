@@ -1176,7 +1176,7 @@ Result<IntentionCommandSuccess> _savedResult() {
 }
 
 Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name));
+    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
 
 TagId _tagId(int number) => switch (TagId.decode(
   '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',

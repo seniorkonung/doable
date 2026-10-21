@@ -233,6 +233,7 @@ Tag _tag(int value, String name) => Tag(
     '00000000-0000-4000-8000-${value.toString().padLeft(12, '0')}',
   ) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 IntentionId _intentionId(int value) => (IntentionId.decode(

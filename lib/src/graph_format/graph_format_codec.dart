@@ -16,6 +16,7 @@ import '../long_term_relation/domain/long_term_relation_description.dart';
 import '../long_term_relation/domain/long_term_relation_id.dart';
 import '../tag/domain/tag.dart';
 import '../tag/domain/tag_assignment.dart';
+import '../tag/domain/tag_color.dart';
 import '../tag/domain/tag_id.dart';
 import '../tag/domain/tag_name.dart';
 import 'graph_format_records.dart';
@@ -290,6 +291,7 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     'kind': _tagKind,
     'id': tag.id.toCanonicalString(),
     'name': tag.name.value,
+    'color': tag.color?.code,
   },
   IntentionRecord(:final intention) => {
     'kind': _intentionKind,
@@ -413,6 +415,7 @@ GraphEntityRecord _readEntity(String kind, _JsonFields fields) =>
         Tag(
           id: _readTagId(fields.string('id')),
           name: TagName.fromStored(fields.string('name')),
+          color: _readTagColor(fields.nullableString('color')),
         ),
       ),
       _intentionKind => IntentionRecord(_readIntention(fields)),
@@ -590,6 +593,15 @@ TagId _readTagId(String text) => switch (TagId.decode(text)) {
   TagIdDecodingSuccess(:final id) => id,
   InvalidTagIdDecoding() => throw const GraphFormatCorruption(),
 };
+
+/// `null` — «Без цвета»; неизвестный код — повреждение.
+TagColor? _readTagColor(String? code) {
+  if (code == null) return null;
+  return switch (TagColor.decode(code)) {
+    TagColorDecodingSuccess(:final color) => color,
+    UnknownTagColorDecoding() => throw const GraphFormatCorruption(),
+  };
+}
 
 IntentionId _readIntentionId(String text) => switch (IntentionId.decode(text)) {
   IntentionIdDecodingSuccess(:final id) => id,

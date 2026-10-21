@@ -373,16 +373,17 @@ final class _PendingRepository extends Fake implements PersonalGraphRepository {
   bool deleted = false;
 
   @override
-  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async =>
-      TagCatalogSuccess(
-        TagCatalogSnapshot(
-          items: deleted
-              ? []
-              : [Tag(id: _tagId(301), name: TagName.fromInput('Дом'))],
+  Future<TagCatalogResult> getTagCatalog(
+    TagCatalogMode mode,
+  ) async => TagCatalogSuccess(
+    TagCatalogSnapshot(
+      items: deleted
+          ? []
+          : [Tag(id: _tagId(301), name: TagName.fromInput('Дом'), color: null)],
 
-          revision: const _Revision(),
-        ),
-      );
+      revision: const _Revision(),
+    ),
+  );
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

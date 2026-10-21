@@ -55,7 +55,13 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
 
   return [
     for (final row in tags)
-      TagRecord(Tag(id: _tagId(row.id), name: TagName.fromStored(row.name))),
+      TagRecord(
+        Tag(
+          id: _tagId(row.id),
+          name: TagName.fromStored(row.name),
+          color: null,
+        ),
+      ),
     for (final row in intentions) IntentionRecord(_intention(row)),
     for (final row in assignments)
       TagAssignmentRecord(

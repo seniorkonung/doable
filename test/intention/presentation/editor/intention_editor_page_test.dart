@@ -2342,7 +2342,7 @@ void _completeCatalogRefresh(ControlledCatalogRepository repository) {
 }
 
 Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name));
+    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
 
 /// Наблюдение подтверждает тег из [tags] или его отсутствие и не
 /// завершается, пока наблюдатель не освободит подписку.

@@ -1499,6 +1499,7 @@ void main() {
           InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
         },
         name: TagName.fromInput('Дом'),
+        color: null,
       );
       repository.completeTagCommand(
         0,
@@ -1675,7 +1676,13 @@ void main() {
         index: 1,
         title: 'Владелец',
         activeRelationCount: 1,
-        tags: [tag_domain.Tag(id: tagId, name: TagName.fromInput('Здоровье'))],
+        tags: [
+          tag_domain.Tag(
+            id: tagId,
+            name: TagName.fromInput('Здоровье'),
+            color: null,
+          ),
+        ],
       );
       final accepted = harness.coordinator.acceptTagAssign(
         AssignTag(tagId: tagId, intentionId: target),

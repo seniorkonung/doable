@@ -47,9 +47,13 @@ void main() {
       final firstId = _tagId('018f0b5d-6b2e-7c80-8000-000000000001');
       final secondId = _tagId('018f0b5d-6b2e-7c80-8000-000000000002');
       final name = TagName.fromInput('  Дом  ');
-      final first = Tag(id: firstId, name: name);
-      final renamed = Tag(id: firstId, name: TagName.fromInput('Быт'));
-      final second = Tag(id: secondId, name: name);
+      final first = Tag(id: firstId, name: name, color: null);
+      final renamed = Tag(
+        id: firstId,
+        name: TagName.fromInput('Быт'),
+        color: first.color,
+      );
+      final second = Tag(id: secondId, name: name, color: null);
 
       expect(first.name.value, 'Дом');
       expect(renamed.id, first.id);

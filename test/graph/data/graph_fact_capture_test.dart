@@ -285,7 +285,13 @@ void main() {
       _lines(facts),
       _lines([
         GraphEntityChanged(
-          TagRecord(Tag(id: _tagId(_tagA), name: TagName.fromStored('Дача'))),
+          TagRecord(
+            Tag(
+              id: _tagId(_tagA),
+              name: TagName.fromStored('Дача'),
+              color: null,
+            ),
+          ),
         ),
       ]),
     );

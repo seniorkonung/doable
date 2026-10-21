@@ -22,6 +22,7 @@ void main() {
             '018f0b5d-6b2e-7c80-8000-000000000001',
           ) as TagIdDecodingSuccess).id,
           name: TagName.fromInput(name),
+          color: null,
         );
         bool? result;
         await tester.pumpWidget(

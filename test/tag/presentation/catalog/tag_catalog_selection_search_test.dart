@@ -347,6 +347,7 @@ IntentionId _intentionId(int number) =>
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Общий выбор в контексте живой сессии черновика, открытый поверх исходной

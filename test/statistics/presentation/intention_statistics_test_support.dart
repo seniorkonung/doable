@@ -64,12 +64,14 @@ final class IntentionStatisticsHarness {
       '00000000-0000-4000-8000-000000000001',
     ) as TagIdDecodingSuccess).id,
     name: TagName.fromInput('Тег'),
+    color: null,
   );
 
   Future<void> change(int revision, {int epoch = 0}) async {
     final next = Tag(
       id: _tag.id,
       name: TagName.fromInput('Тег $epoch $revision'),
+      color: _tag.color,
     );
     final stamp = StatisticsTestRevision(revision, epoch);
     reader.commandResult = TagCommandSucceeded(

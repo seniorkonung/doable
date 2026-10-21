@@ -85,10 +85,11 @@ ChoicePathStepId _decodeStoredChoicePathStepId(String value) =>
 
 /// Тег из столбцов `id` и `name`. Название проверяет `CHECK` схемы той же
 /// функцией [TagName.fromStored], поэтому здесь оно только преобразуется в
-/// тип.
+/// тип. Схема не хранит цвет, поэтому тег без цвета.
 Tag decodeStoredTag(Map<String, Object?> data) => Tag(
   id: decodeStoredTagId(requiredStoredString(data, 'id')),
   name: TagName.fromStored(requiredStoredString(data, 'name')),
+  color: null,
 );
 
 /// Намерение из столбцов таблицы `intentions`, имена которых в строке

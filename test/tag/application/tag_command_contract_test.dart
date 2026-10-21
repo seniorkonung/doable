@@ -15,7 +15,11 @@ void main() {
     const revision = _Revision(1);
     final before = _tag(1, 'Дом');
     final otherId = _tag(2, 'Быт');
-    final sameName = Tag(id: before.id, name: TagName.fromInput('Дом'));
+    final sameName = Tag(
+      id: before.id,
+      name: TagName.fromInput('Дом'),
+      color: before.color,
+    );
 
     expect(
       () =>
@@ -179,7 +183,7 @@ IntentionId _intentionId(int suffix) => (IntentionId.decode(
 Tag _tag(int suffix, String name) {
   final text = '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}';
   final decoded = TagId.decode(text) as TagIdDecodingSuccess;
-  return Tag(id: decoded.id, name: TagName.fromInput(name));
+  return Tag(id: decoded.id, name: TagName.fromInput(name), color: null);
 }
 
 IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(

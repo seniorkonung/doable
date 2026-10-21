@@ -237,8 +237,16 @@ final class CatalogPageRepository
     required int revision,
   }) async {
     final id = (TagId.decode(_uuid(1)) as TagIdDecodingSuccess).id;
-    final before = Tag(id: id, name: TagName.fromInput('Тег ${revision - 1}'));
-    final after = Tag(id: id, name: TagName.fromInput('Тег $revision'));
+    final before = Tag(
+      id: id,
+      name: TagName.fromInput('Тег ${revision - 1}'),
+      color: null,
+    );
+    final after = Tag(
+      id: id,
+      name: TagName.fromInput('Тег $revision'),
+      color: before.color,
+    );
     final graphRevision = _Revision(revision);
     _tagCommandResult = TagCommandSucceeded(
       ConfirmedGraphResult(

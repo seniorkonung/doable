@@ -750,7 +750,7 @@ final class _PendingRepository extends Fake implements PersonalGraphRepository {
 }
 
 Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name));
+    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
   for (var attempt = 0; attempt < 30 && !done(); attempt++) {

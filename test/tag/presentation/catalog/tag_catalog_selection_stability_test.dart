@@ -247,7 +247,11 @@ void main() {
     formerObservation.deliver(
       TagReadSuccess(
         GraphSnapshot(
-          value: Tag(id: first.id, name: TagName.fromInput('Поздний ответ')),
+          value: Tag(
+            id: first.id,
+            name: TagName.fromInput('Поздний ответ'),
+            color: first.color,
+          ),
           revision: const _Revision(2),
         ),
       ),
@@ -572,6 +576,7 @@ final class _ControlledRepository extends Fake
         tag: Tag(
           id: (TagId.decode(_id(index)) as TagIdDecodingSuccess).id,
           name: TagName.fromInput('Тег $index'),
+          color: null,
         ),
         isAssigned: index.isEven,
       ),

@@ -193,6 +193,7 @@ void main() {
       final tag = Tag(
         id: _tag.id,
         name: TagName.fromInput('Длинный тег ' * 20),
+        color: _tag.color,
       );
       reads.page(0, [], tag: tag);
       await tester.pumpAndSettle();
@@ -469,6 +470,7 @@ void main() {
 final _tag = Tag(
   id: (TagId.decode(tagFixtureId(301)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput('Дом'),
+  color: null,
 );
 
 TaggedIntention _intention(

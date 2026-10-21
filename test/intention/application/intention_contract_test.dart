@@ -145,12 +145,21 @@ void main() {
     test(
       'переименование и одноимённый новый тег не подменяют идентичность',
       () {
-        final original = Tag(id: health, name: TagName.fromInput('Здоровье'));
+        final original = Tag(
+          id: health,
+          name: TagName.fromInput('Здоровье'),
+          color: null,
+        );
         final renamed = Tag(
           id: health,
           name: TagName.fromInput('Самочувствие'),
+          color: original.color,
         );
-        final sameName = Tag(id: rest, name: TagName.fromInput('Здоровье'));
+        final sameName = Tag(
+          id: rest,
+          name: TagName.fromInput('Здоровье'),
+          color: null,
+        );
         final required = IntentionTagFilter(requiredTagIds: [original.id]);
         final excluded = IntentionTagFilter(excludedTagIds: [original.id]);
 
@@ -183,14 +192,17 @@ void main() {
       final health = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000101'),
         name: TagName.fromStored('Здоровье'),
+        color: null,
       );
       final rest = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000102'),
         name: TagName.fromStored('Отдых'),
+        color: null,
       );
       final sport = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000103'),
         name: TagName.fromStored('Спорт'),
+        color: null,
       );
       const candidateId = '00000000-0000-4000-8000-000000000001';
       final otherParticipant = _intentionId(
@@ -292,10 +304,12 @@ void main() {
         Tag(
           id: _tagId('00000000-0000-4000-8000-000000000002'),
           name: TagName.fromStored('Первый тег'),
+          color: null,
         ),
         Tag(
           id: _tagId('00000000-0000-4000-8000-000000000001'),
           name: TagName.fromStored('Второй тег'),
+          color: null,
         ),
       ];
       final summary = IntentionSummary(
@@ -343,13 +357,21 @@ void main() {
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
-          Tag(id: firstId, name: TagName.fromStored('Первый тег')),
-          Tag(id: secondId, name: TagName.fromStored('Второй тег')),
+          Tag(id: firstId, name: TagName.fromStored('Первый тег'), color: null),
+          Tag(
+            id: secondId,
+            name: TagName.fromStored('Второй тег'),
+            color: null,
+          ),
         ],
       );
 
       final copy = summary.withRenamedTag(
-        Tag(id: secondId, name: TagName.fromStored('Переименованный')),
+        Tag(
+          id: secondId,
+          name: TagName.fromStored('Переименованный'),
+          color: null,
+        ),
       );
 
       expect(copy.tags.map((tag) => tag.id), [firstId, secondId]);
@@ -382,6 +404,7 @@ void main() {
           Tag(
             id: _tagId('00000000-0000-4000-8000-000000000001'),
             name: TagName.fromStored('Здоровье'),
+            color: null,
           ),
         ],
       );
@@ -390,6 +413,7 @@ void main() {
         Tag(
           id: _tagId('00000000-0000-4000-8000-000000000002'),
           name: TagName.fromStored('Здоровье'),
+          color: null,
         ),
       );
 
@@ -410,8 +434,12 @@ void main() {
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
-          Tag(id: firstId, name: TagName.fromStored('Первый тег')),
-          Tag(id: secondId, name: TagName.fromStored('Второй тег')),
+          Tag(id: firstId, name: TagName.fromStored('Первый тег'), color: null),
+          Tag(
+            id: secondId,
+            name: TagName.fromStored('Второй тег'),
+            color: null,
+          ),
         ],
       );
 
@@ -444,6 +472,7 @@ void main() {
           Tag(
             id: _tagId('00000000-0000-4000-8000-000000000001'),
             name: TagName.fromStored('Здоровье'),
+            color: null,
           ),
         ],
       );

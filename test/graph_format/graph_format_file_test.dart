@@ -86,6 +86,7 @@ void main() {
               Tag(
                 id: _tagId(_tagIds[0]),
                 name: TagName.fromStored('Тег $producedTags'),
+                color: null,
               ),
             );
           }
@@ -425,8 +426,8 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
   final midnightChoice = _dailyChoiceId(_dailyChoiceIds[1]);
 
   return [
-    TagRecord(Tag(id: home, name: TagName.fromStored('Дом'))),
-    TagRecord(Tag(id: sport, name: TagName.fromStored('Спорт'))),
+    TagRecord(Tag(id: home, name: TagName.fromStored('Дом'), color: null)),
+    TagRecord(Tag(id: sport, name: TagName.fromStored('Спорт'), color: null)),
     IntentionRecord(
       Intention(
         id: health,

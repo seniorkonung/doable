@@ -328,6 +328,7 @@ String _id(int number) =>
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 /// Живая сессия черновика и координатор в одном контейнере с общим выбором.

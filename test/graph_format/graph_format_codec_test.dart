@@ -17,6 +17,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_descript
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -122,7 +123,8 @@ void main() {
 
       // Каждая недопустимая строка отличается от одной из этих лишь причиной.
       final validLines = [
-        '{$tag,"name":"Дом"}',
+        '{$tag,"name":"Дом","color":"blue"}',
+        '{$tag,"name":"Дом","color":null}',
         '{$intention,$createdAt,$updatedAt}',
         '{$relation,"type":"need","priority":"P1","description":null,'
             '"archived":false}',
@@ -137,14 +139,17 @@ void main() {
       }
 
       final invalidLines = {
-        'неизвестное поле': '{$tag,"name":"Дом","color":"red"}',
+        'неизвестное поле': '{$tag,"name":"Дом","color":null,"icon":"дом"}',
         'отсутствующее поле': '{$tag}',
+        'отсутствующий цвет тега': '{$tag,"name":"Дом"}',
+        'цвет тега не строка': '{$tag,"name":"Дом","color":6}',
+        'неизвестный код цвета тега': '{$tag,"name":"Дом","color":"red"}',
         // Так записаны факты в пакетах сборок этапов 1 и 2.
         'отсутствующий вид факта':
-            '{"kind":"tag","id":"${_tagIds[0]}","name":"Дом"}',
+            '{"kind":"tag","id":"${_tagIds[0]}","name":"Дом","color":null}',
         'неизвестный вид факта':
             '{"fact":"renamed","kind":"tag","id":"${_tagIds[0]}",'
-            '"name":"Дом"}',
+            '"name":"Дом","color":null}',
         'неизвестный вид записи':
             '{$created,"kind":"note","id":"${_tagIds[0]}"}',
         'неизвестный вид удалённой сущности':
@@ -157,7 +162,7 @@ void main() {
         'неполный JSON': '{$tag,"name":"Дом"',
         'идентификатор не в канонической записи':
             '{$created,"kind":"tag","id":"${_tagIds[0].toUpperCase()}",'
-            '"name":"Дом"}',
+            '"name":"Дом","color":null}',
         'название намерения с окружающими пробелами':
             '{$created,"kind":"intention","id":"${_intentionIds[0]}",'
             '"title":" Здоровье","description":null,"actionReady":false,'
@@ -166,7 +171,8 @@ void main() {
             '{$created,"kind":"intention","id":"${_intentionIds[0]}",'
             '"title":"Здоровье","description":" \\n","actionReady":false,'
             '"archived":false,$createdAt,$updatedAt}',
-        'название тега с окружающими пробелами': '{$tag,"name":"Дом "}',
+        'название тега с окружающими пробелами':
+            '{$tag,"name":"Дом ","color":null}',
         'время без микросекунд':
             '{$intention,"createdAt":"2026-03-29T00:00:00.000Z",$updatedAt}',
         'время не в UTC':
@@ -286,10 +292,12 @@ List<GraphFact> _expectedGoldenFacts() {
 
   return [
     GraphEntityCreated(
-      TagRecord(Tag(id: home, name: TagName.fromStored('Дом'))),
+      TagRecord(
+        Tag(id: home, name: TagName.fromStored('Дом'), color: TagColor.blue),
+      ),
     ),
     GraphEntityChanged(
-      TagRecord(Tag(id: work, name: TagName.fromStored('Работа'))),
+      TagRecord(Tag(id: work, name: TagName.fromStored('Работа'), color: null)),
     ),
     GraphEntityChanged(
       IntentionRecord(

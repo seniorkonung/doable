@@ -264,11 +264,12 @@ final class _Harness {
 Future<void> _flush() => Future<void>.delayed(Duration.zero);
 
 Tag _rename(Tag tag, String name) =>
-    Tag(id: tag.id, name: TagName.fromInput(name));
+    Tag(id: tag.id, name: TagName.fromInput(name), color: tag.color);
 
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 String _id(int number) =>

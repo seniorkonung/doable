@@ -483,8 +483,9 @@ final _morning = DateTime.utc(2026, 10, 1, 7);
 final _evening = DateTime.utc(2026, 10, 1, 19);
 const _minute = Duration(minutes: 1);
 
-TagRecord _tag(int number, String name) =>
-    TagRecord(Tag(id: _tagId(number), name: TagName.fromStored(name)));
+TagRecord _tag(int number, String name) => TagRecord(
+  Tag(id: _tagId(number), name: TagName.fromStored(name), color: null),
+);
 
 IntentionRecord _intention(
   int number,

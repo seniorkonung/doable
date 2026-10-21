@@ -156,7 +156,11 @@ void main() {
   }
 }
 
-final _excluded = Tag(id: _tagId(1), name: TagName.fromInput('Спорт'));
+final _excluded = Tag(
+  id: _tagId(1),
+  name: TagName.fromInput('Спорт'),
+  color: null,
+);
 
 TagId _tagId(int index) => switch (TagId.decode(
   '00000000-0000-4000-8000-${index.toString().padLeft(12, '0')}',

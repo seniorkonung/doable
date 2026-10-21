@@ -2180,6 +2180,7 @@ TagCatalogSuccess _page(List<Tag> tags, {int revision = 1}) =>
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
+  color: null,
 );
 
 final class _Revision implements GraphRevision {

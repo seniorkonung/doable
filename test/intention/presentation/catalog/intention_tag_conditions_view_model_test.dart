@@ -375,7 +375,11 @@ final class _Harness {
     TagRenamedChange(
       revision: _Revision(revision),
       before: before,
-      after: Tag(id: before.id, name: TagName.fromInput(name)),
+      after: Tag(
+        id: before.id,
+        name: TagName.fromInput(name),
+        color: before.color,
+      ),
     ),
   ]);
 
@@ -441,4 +445,4 @@ TagId _id(int number) => (TagId.decode(
 ) as TagIdDecodingSuccess).id;
 
 Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name));
+    Tag(id: _id(number), name: TagName.fromInput(name), color: null);

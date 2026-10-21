@@ -358,6 +358,7 @@ void _registerDraftSearchScenarios() {
           createdRows.single['id'] as String,
         ) as TagIdDecodingSuccess).id,
         name: TagName.fromInput('Домашнее'),
+        color: null,
       );
       expect(tester.widget<TextField>(_search).controller!.value, editingValue);
       expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);

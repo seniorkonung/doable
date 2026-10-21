@@ -358,7 +358,7 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
         'dailyChoices': counts.dailyChoices,
       },
     },
-    {'kind': 'tag', 'id': tagId, 'name': 'Здоровье'},
+    {'kind': 'tag', 'id': tagId, 'name': 'Здоровье', 'color': null},
     for (var number = 1; number <= _intentionCount; number++)
       {
         'kind': 'intention',

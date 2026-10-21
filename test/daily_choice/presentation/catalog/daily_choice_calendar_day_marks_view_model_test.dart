@@ -438,6 +438,7 @@ final class _Harness {
       '00000000-0000-4000-8000-000000000001',
     ) as TagIdDecodingSuccess).id,
     name: TagName.fromInput('Дом'),
+    color: null,
   );
 
   DailyChoiceCalendarDayMarksViewModel get model =>
@@ -454,6 +455,7 @@ final class _Harness {
     final next = Tag(
       id: _tag.id,
       name: unchanged ? _tag.name : TagName.fromInput('Тег $revision'),
+      color: _tag.color,
     );
     final graphRevision = _Revision(revision);
     repository.commandResult = failure

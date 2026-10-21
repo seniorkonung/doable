@@ -696,4 +696,4 @@ TagId _id(int number) => (TagId.decode(
 ) as TagIdDecodingSuccess).id;
 
 Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name));
+    Tag(id: _id(number), name: TagName.fromInput(name), color: null);

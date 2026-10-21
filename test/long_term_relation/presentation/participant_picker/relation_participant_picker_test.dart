@@ -892,6 +892,7 @@ Tag _tag(int index, String name) => Tag(
     ),
   },
   name: TagName.fromInput(name),
+  color: null,
 );
 
 Future<void> _pumpUntilReconciliationQueries(
