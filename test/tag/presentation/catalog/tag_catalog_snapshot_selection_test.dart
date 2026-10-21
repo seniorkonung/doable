@@ -13,6 +13,7 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
@@ -65,19 +66,24 @@ void main() {
     },
   );
 
-  test('позднее наблюдение старой ревизии не возвращает прежнее имя после полного снимка', () async {
+  test('позднее наблюдение старой ревизии не возвращает прежний цвет после полного снимка', () async {
     final harness = await _prepare(intentionNumber);
     await harness.startRefresh();
-    final renamed = _rename(harness.selected, 'Имя из нового снимка');
-    await harness.completeRefresh(selected: renamed);
+    final recolored = _recolor(harness.selected, TagColor.blue);
+    await harness.completeRefresh(selected: recolored);
 
     harness.repository.observation.deliver(harness.selected, revision: 1);
     await _flush();
 
     final selection = harness.state.selection as TagCatalogSelectionReady;
-    expect(selection.tag.id, renamed.id);
-    expect(selection.tag.name.value, renamed.name.value);
-    expect(harness.state.items.first.name.value, renamed.name.value);
+    expect(selection.tag.id, recolored.id);
+    expect(selection.tag.name.value, harness.selected.name.value);
+    expect(selection.tag.color, TagColor.blue);
+    expect(harness.state.items.first.color, TagColor.blue);
+    expect(
+      harness.state.selectedAssignment,
+      TagCatalogSelectedAssignment.available,
+    );
   });
 
   test('позднее наблюдение старой ревизии не возвращает удалённый выбор после полного снимка', () async {
@@ -269,6 +275,9 @@ Future<void> _flush() => Future<void>.delayed(Duration.zero);
 
 Tag _rename(Tag tag, String name) =>
     Tag(id: tag.id, name: TagName.fromInput(name), color: tag.color);
+
+Tag _recolor(Tag tag, TagColor color) =>
+    Tag(id: tag.id, name: tag.name, color: color);
 
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,

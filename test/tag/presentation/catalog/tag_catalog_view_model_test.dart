@@ -13,6 +13,7 @@ import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
@@ -40,7 +41,7 @@ void main() {
     await pumpEventQueue();
     h.model.selectTag(_id(52));
     h.repository.tagRead(_tag(52, 'Из редактора'));
-    await h.renamed(_tag(1, 'Дом'), _tag(1, 'Быт'), revision: 2);
+    await h.updated(_tag(1, 'Дом'), _tag(1, 'Быт'), revision: 2);
     h.repository.statusReads.last.complete(
       const TagAssignmentStatusError(TagAssignmentStatusIntentionNotFound()),
     );
@@ -54,7 +55,7 @@ void main() {
     expect(h.state, isA<TagCatalogIntentionMissing>());
     expect(h.model.assignSelected(), isNull);
 
-    await h.renamed(_tag(1, 'Быт'), _tag(1, 'Новое имя'), revision: 3);
+    await h.updated(_tag(1, 'Быт'), _tag(1, 'Новое имя'), revision: 3);
     await pumpEventQueue();
     expect(h.state, isA<TagCatalogIntentionMissing>());
     expect(h.repository.queries, hasLength(3));
@@ -129,7 +130,7 @@ void main() {
     await pumpEventQueue();
     expect((h.state as TagCatalogLoaded).selection.id, _id(52));
 
-    await h.renamed(_tag(1, 'Дом'), _tag(1, 'Быт'), revision: 2);
+    await h.updated(_tag(1, 'Дом'), _tag(1, 'Быт'), revision: 2);
     h.model.setMode(TagCatalogSelectionMode(_intentionId(2)));
     h.repository.statusRead(0, false);
     h.repository.selectionPage(2, _intentionId(1), [
@@ -283,7 +284,7 @@ void main() {
     h.model.selectTag(_id(52));
     h.repository.tagRead(_tag(52, 'Старое'));
     await pumpEventQueue();
-    await h.renamed(_tag(52, 'Старое'), _tag(52, 'Новое'), revision: 2);
+    await h.updated(_tag(52, 'Старое'), _tag(52, 'Новое'), revision: 2);
     final refreshing = h.state as TagCatalogLoaded;
     expect(refreshing.selection.id, _id(52));
     expect(
@@ -454,7 +455,7 @@ void main() {
       );
       expect(h.model.assignSelected(), isNull);
 
-      await h.renamed(_tag(1, 'Первый'), _tag(1, 'Новый'), revision: 2);
+      await h.updated(_tag(1, 'Первый'), _tag(1, 'Новый'), revision: 2);
       expect(h.repository.statusQueries, hasLength(3));
       h.repository.statusRead(2, false, revision: 1);
       await pumpEventQueue();
@@ -554,7 +555,7 @@ void main() {
     await pumpEventQueue();
     h.model.selectTag(_id(52));
     h.repository.tagRead(_tag(52, 'Из редактора'));
-    await h.renamed(_tag(1, 'Первый'), _tag(1, 'Новый'), revision: 2);
+    await h.updated(_tag(1, 'Первый'), _tag(1, 'Новый'), revision: 2);
     expect(h.repository.statusReads, hasLength(2));
     h.repository.statusReads[1].complete(
       const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
@@ -627,7 +628,7 @@ void main() {
 
   for (final assigned in [false, true]) {
     test(
-      'полный снимок сохраняет выбор и признак назначения: ${assigned ? 'назначен' : 'свободен'}',
+      'изменение только цвета выбранного тега сохраняет выбор и признак назначения до полного снимка: ${assigned ? 'назначен' : 'свободен'}',
       () async {
         final intentionId = _intentionId(1);
         final h = _Harness();
@@ -636,8 +637,8 @@ void main() {
         await pumpEventQueue();
         h.model.setMode(TagCatalogSelectionMode(intentionId));
         h.repository.selectionPage(1, intentionId, [
-          TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
           TagSelectionRow(tag: _tag(52, 'Выбранный'), isAssigned: assigned),
+          TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
         ]);
         await pumpEventQueue();
         h.model.selectTag(_id(52));
@@ -647,19 +648,63 @@ void main() {
         );
         expect(h.repository.statusQueries, isEmpty);
 
-        await h.renamed(_tag(1, 'Первый'), _tag(1, 'Изменённый'), revision: 2);
-        expect((h.state as TagCatalogLoaded).selection.id, _id(52));
+        final blue = _tag(52, 'Выбранный', color: TagColor.blue);
+        await h.updated(_tag(52, 'Выбранный'), blue, revision: 2);
+        final refreshing = h.state as TagCatalogLoaded;
+        expect(
+          refreshing.selectionRows.map(
+            (row) =>
+                (row.tag.id, row.tag.name.value, row.tag.color, row.isAssigned),
+          ),
+          [
+            (_id(52), 'Выбранный', TagColor.blue, assigned),
+            (_id(1), 'Первый', null, false),
+          ],
+        );
+        expect(refreshing.items.map((tag) => (tag.id, tag.color)), [
+          (_id(52), TagColor.blue),
+          (_id(1), null),
+        ]);
+        expect(
+          (refreshing.selection as TagCatalogSelectionReady).tag.color,
+          TagColor.blue,
+        );
+        expect(
+          refreshing.selectedAssignment,
+          assigned
+              ? TagCatalogSelectedAssignment.assigned
+              : TagCatalogSelectedAssignment.available,
+        );
         expect(h.model.assignSelected(), isNull);
+
         h.repository.selectionPage(2, intentionId, [
-          TagSelectionRow(tag: _tag(1, 'Изменённый'), isAssigned: false),
           TagSelectionRow(tag: _tag(52, 'Выбранный'), isAssigned: assigned),
+          TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+        ]);
+        await pumpEventQueue();
+        final afterLate = h.state as TagCatalogLoaded;
+        expect(afterLate.selectionRows.first.tag.color, TagColor.blue);
+        expect(afterLate.items.first.color, TagColor.blue);
+        expect(
+          (afterLate.selection as TagCatalogSelectionReady).tag.color,
+          TagColor.blue,
+        );
+        expect(h.model.assignSelected(), isNull);
+
+        h.repository.selectionPage(3, intentionId, [
+          TagSelectionRow(tag: blue, isAssigned: assigned),
+          TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
         ], revision: 2);
         await pumpEventQueue();
         final loaded = h.state as TagCatalogLoaded;
         expect(loaded.selection.id, _id(52));
+        expect(
+          (loaded.selection as TagCatalogSelectionReady).tag.color,
+          TagColor.blue,
+        );
         expect(loaded.selectionRows.map((row) => row.tag.id), [
-          _id(1),
           _id(52),
+          _id(1),
         ]);
         expect(
           loaded.selectedAssignment,
@@ -694,7 +739,7 @@ void main() {
       TagCatalogSelectedAssignment.available,
     );
 
-    await h.renamed(_tag(1, 'Первый'), _tag(1, 'Изменённый'), revision: 2);
+    await h.updated(_tag(1, 'Первый'), _tag(1, 'Изменённый'), revision: 2);
     expect(
       (h.state as TagCatalogLoaded).freshness,
       TagCatalogFreshness.refreshing,
@@ -877,7 +922,7 @@ void main() {
     h.repository.tagRead(_tag(52, 'Старое имя'));
     await pumpEventQueue();
 
-    await h.renamed(
+    await h.updated(
       _tag(52, 'Старое имя'),
       _tag(52, 'Промежуточное имя'),
       revision: 2,
@@ -912,7 +957,7 @@ void main() {
     h.repository.page(1, [_tag(52, 'Промежуточное имя')], revision: 2);
     await pumpEventQueue();
     expect(h.repository.queries, hasLength(3));
-    await h.renamed(
+    await h.updated(
       _tag(52, 'Старое имя'),
       _tag(52, 'Промежуточное имя'),
       revision: 2,
@@ -962,7 +1007,7 @@ void main() {
       ),
     );
 
-    await h.renamed(_tag(52, 'Старое имя'), _tag(52, 'Новое имя'), revision: 2);
+    await h.updated(_tag(52, 'Старое имя'), _tag(52, 'Новое имя'), revision: 2);
     expect(
       (h.state as TagCatalogLoaded).selection,
       isA<TagCatalogSelectionReady>().having(
@@ -1100,7 +1145,7 @@ void main() {
       h.repository.page(0, [_tag(1, 'Дом')]);
       await pumpEventQueue();
       await h.created(_tag(2, 'Работа'), revision: 2);
-      await h.renamed(_tag(1, 'Дом'), _tag(1, 'Семья'), revision: 3);
+      await h.updated(_tag(1, 'Дом'), _tag(1, 'Семья'), revision: 3);
       final refreshing = h.state as TagCatalogLoaded;
       expect(refreshing.items.single.name.value, 'Семья');
       expect(refreshing.freshness, TagCatalogFreshness.refreshing);
@@ -1467,9 +1512,9 @@ final class _Harness {
     await accepted.future;
   }
 
-  Future<void> renamed(Tag before, Tag after, {required int revision}) async {
+  Future<void> updated(Tag before, Tag after, {required int revision}) async {
     final accepted = coordinator.acceptTagUpdate(
-      UpdateTag(tagId: before.id, name: after.name, color: before.color),
+      UpdateTag(tagId: before.id, name: after.name, color: after.color),
     ) as TagCommandAccepted;
     final r = _Revision(revision);
     repository.completeCommand(
@@ -1637,5 +1682,5 @@ TagId _id(int number) => (TagId.decode(
 IntentionId _intentionId(int number) => (IntentionId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as IntentionIdDecodingSuccess).id;
-Tag _tag(int number, String name) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
