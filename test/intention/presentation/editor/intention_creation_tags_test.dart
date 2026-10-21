@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/design_system/components/tag_dot.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -15,11 +17,13 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_state.
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/src/mock_canvas.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/quick_creation.dart';
@@ -40,6 +44,42 @@ void main() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
     );
+  });
+
+  testWidgets('теги черновика показывают точку и кольцо перед названиями', (
+    tester,
+  ) async {
+    final observations = _TagObservations();
+    final sessions = _EditorSessions();
+    final repository = ControlledCatalogRepository()
+      ..tagObservations = observations.watch;
+    await _openEditor(tester, repository, observers: [sessions]);
+    sessions.notifier(tester).draftTagSet
+      ..add(_tag(1, 'Дом', color: TagColor.blue))
+      ..add(_tag(2, 'Работа'));
+    await tester.pumpAndSettle();
+
+    for (final (number, color, style) in [
+      (1, DoableColors.light.tagBlue, PaintingStyle.fill),
+      (2, DoableColors.light.grip, PaintingStyle.stroke),
+    ]) {
+      final name = find.byKey(_chipNameKey(number));
+      final dot = find.descendant(
+        of: find.byKey(_chip(number)),
+        matching: find.byType(TagDot),
+      );
+      expect(dot, findsOneWidget);
+      expect(tester.getSize(dot), const Size.square(8));
+      expect(tester.getTopRight(dot).dx, lessThan(tester.getTopLeft(name).dx));
+      expect(
+        tester.renderObject(dot),
+        paints..circle(color: color, style: style),
+      );
+      expect(
+        tester.widget<Text>(name).style?.color,
+        Theme.of(tester.element(name)).textTheme.labelLarge?.color,
+      );
+    }
   });
 
   testWidgets(
@@ -556,8 +596,8 @@ String? _statusText(WidgetTester tester, int number) =>
 FilledButton _submitButton(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byKey(_submit));
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name, {TagColor? color}) =>
+    Tag(id: _tagId(number), name: TagName.fromInput(name), color: color);
 
 TagId _tagId(int number) => switch (TagId.decode(
   '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',

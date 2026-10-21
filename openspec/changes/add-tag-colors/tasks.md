@@ -228,7 +228,7 @@
   - **Предполагаемые файлы:** `lib/src/tag/presentation/navigation/tag_navigation_page.dart`, `test/tag/presentation/navigation/tag_navigation_page_test.dart`; правка поиска заголовка в `test/tag/presentation/navigation/tag_navigation_semantics_scenarios.dart`, `test/tag/presentation/tag_navigation_accessibility_scenarios.dart`, `test/tag/presentation/catalog/tag_catalog_navigation_test.dart`, `test/app/tag_navigation_app_flow_test.dart`, `test/app/tag_navigation_graph_lifecycle_scenarios.dart`, `test/app/tag_navigation_app_lifecycle_test.dart` и `test/app/tag_navigation_terminal_app_scenarios.dart`.
   - **Размер:** M — правка одного заголовка; остальное — механическая правка поиска в проверках.
 
-- [ ] 2.9 Показывать точку у тегов черновика создания намерения
+- [x] 2.9 Показывать точку у тегов черновика создания намерения
   - **Критерии приёмки:**
     - Элемент тега черновика получает цвет из `IntentionDraftTag` и показывает `TagDot` размера 8 перед названием. Состояния проверки, недоступности и удаления, зачёркивание, действия повтора и удаления из черновика и точные доступные подписи не меняются.
   - **Проверка:** `mise exec --no-deps -- flutter test test/intention/presentation/editor/`. Дополнить `test/intention/presentation/editor/intention_creation_tags_test.dart` цветным и бесцветным тегами; существующие точные подписи семантики проходят без изменений.
